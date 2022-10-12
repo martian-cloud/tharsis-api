@@ -47,7 +47,7 @@ build-api-docker:
 build-job-docker:
 	docker build --build-arg goversion=$(GO_VERSION) --target job-executor -t tharsis/job-executor .
 
-.PHONY: run-docker
+.PHONY: run-api-docker
 run-api-docker:
 	docker run -it -p 8000:8000 -p 9090:9090 -v ~/.aws:/root/.aws --env-file .env.docker tharsis/api
 
