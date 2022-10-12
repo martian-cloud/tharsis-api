@@ -1,0 +1,222 @@
+package config
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/qiangxue/go-env"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gopkg.in/yaml.v2"
+)
+
+const (
+	defaultServerPort               = "8000"
+	envOidcProviderConfigPrefix     = "THARSIS_OAUTH_PROVIDERS_"
+	defaultMaxGraphQLComplexity     = 0
+	defaultRateLimitStorePluginType = "memory"
+)
+
+// IdpConfig contains the config fields for an Identity Provider
+type IdpConfig struct {
+	IssuerURL     string `yaml:"issuer_url"`
+	ClientID      string `yaml:"client_id"`
+	UsernameClaim string `yaml:"username_claim"`
+}
+
+// Config represents an application configuration.
+type Config struct {
+	// Plugin Data
+	ObjectStorePluginData    map[string]string `yaml:"object_store_plugin_data"`
+	RateLimitStorePluginData map[string]string `yaml:"rate_limit_store_plugin_data" env:"RATE_LIMIT_STORE_PLUGIN_DATA"`
+	JobDispatcherPluginData  map[string]string `yaml:"job_dispatcher_plugin_data"`
+	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data"`
+
+	// Plugin Typ
+	ObjectStorePluginType    string `yaml:"object_store_plugin_type" env:"OBJECT_STORE_PLUGIN_TYPE"`
+	RateLimitStorePluginType string `yaml:"rate_limit_store_plugin_type" env:"RATE_LIMIT_STORE_PLUGIN_TYPE"`
+	JWSProviderPluginType    string `yaml:"jws_provider_plugin_type" env:"JWS_PROVIDER_PLUGIN_TYPE"`
+	JobDispatcherPluginType  string `yaml:"job_dispatcher_plugin_type" env:"JOB_DISPATCHER_PLUGIN_TYPE"`
+
+	// The external facing URL for the Tharsis API
+	TharsisAPIURL string `yaml:"tharsis_api_url" env:"API_URL"`
+
+	// the server port. Defaults to 8000
+	ServerPort string `yaml:"server_port" env:"SERVER_PORT"`
+
+	ServiceAccountIssuerURL string `yaml:"service_account_issuer_url" env:"SERVICE_ACCOUNT_ISSUER_URL"`
+
+	// the url for connecting to the database. required.
+	DBHost     string `yaml:"db_host" env:"DB_HOST"`
+	DBName     string `yaml:"db_name" env:"DB_NAME"`
+	DBSSLMode  string `yaml:"db_ssl_mode" env:"DB_SSL_MODE"`
+	DBUsername string `yaml:"db_username" env:"DB_USERNAME,secret"`
+	DBPassword string `yaml:"db_password" env:"DB_PASSWORD,secret"`
+
+	// TFE Login
+	TFELoginClientID string `yaml:"tfe_login_client_id" env:"TFE_LOGIN_CLIENT_ID"`
+	TFELoginScopes   string `yaml:"tfe_login_scopes" env:"TFE_LOGIN_SCOPES"`
+
+	// The OIDC identity providers
+	OauthProviders []IdpConfig `yaml:"oauth_providers"`
+
+	// Database Configuration
+	DBMaxConnections int `yaml:"db_max_connections" env:"DB_MAX_CONNECTIONS"`
+	DBPort           int `yaml:"db_port" env:"DB_PORT"`
+
+	MaxGraphQLComplexity int `yaml:"max_graphql_complexity" env:"MAX_GRAPHQL_COMPLEXITY"`
+
+	// Enable TFE
+	TFELoginEnabled bool `yaml:"tfe_login_enabled" env:"TFE_LOGIN_ENABLED"`
+}
+
+// Validate validates the application configuration.
+func (c Config) Validate() error {
+	return validation.ValidateStruct(&c,
+		validation.Field(&c.ServerPort, is.Port),
+		validation.Field(&c.ObjectStorePluginType, validation.Required),
+		validation.Field(&c.JWSProviderPluginType, validation.Required),
+		validation.Field(&c.JobDispatcherPluginType, validation.Required),
+		validation.Field(&c.TharsisAPIURL, validation.Required),
+	)
+}
+
+// Load returns an application configuration which is populated from the given configuration file and environment variables.
+func Load(file string, logger logger.Logger) (*Config, error) {
+	// default config
+	c := Config{
+		ServerPort:               defaultServerPort,
+		MaxGraphQLComplexity:     defaultMaxGraphQLComplexity,
+		RateLimitStorePluginType: defaultRateLimitStorePluginType,
+	}
+
+	// load from YAML config file
+	if file != "" {
+		bytes, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config file: %w", err)
+		}
+		if err = yaml.Unmarshal(bytes, &c); err != nil {
+			return nil, fmt.Errorf("failed to parse yaml config file: %w", err)
+		}
+	}
+
+	// load from environment variables prefixed with "THARSIS_"
+	if err := env.New("THARSIS_", logger.Infof).Load(&c); err != nil {
+		return nil, fmt.Errorf("failed to load env variables: %w", err)
+	}
+
+	// Load OAUTH IDP config from environment is available
+	oauthProviders, err := loadOauthConfigFromEnvironment()
+	if err != nil {
+		return nil, fmt.Errorf("failed to oauth provider env variables: %w", err)
+	}
+
+	if len(oauthProviders) > 0 {
+		c.OauthProviders = oauthProviders
+	}
+
+	if c.JWSProviderPluginData == nil {
+		c.JWSProviderPluginData = make(map[string]string)
+	}
+
+	if c.JobDispatcherPluginData == nil {
+		c.JobDispatcherPluginData = make(map[string]string)
+	}
+
+	if c.ObjectStorePluginData == nil {
+		c.ObjectStorePluginData = make(map[string]string)
+	}
+	if c.RateLimitStorePluginData == nil {
+		c.RateLimitStorePluginData = make(map[string]string)
+	}
+
+	// Load JWS Provider plugin data
+	for k, v := range loadPluginData("THARSIS_JWS_PROVIDER_PLUGIN_DATA_") {
+		c.JWSProviderPluginData[k] = v
+	}
+
+	// Load Job Dispatcher plugin data
+	for k, v := range loadPluginData("THARSIS_JOB_DISPATCHER_PLUGIN_DATA_") {
+		c.JobDispatcherPluginData[k] = v
+	}
+
+	// Load Object Store plugin data
+	for k, v := range loadPluginData("THARSIS_OBJECT_STORE_PLUGIN_DATA_") {
+		c.ObjectStorePluginData[k] = v
+	}
+
+	// Load Rate Limiter plugin data
+	for k, v := range loadPluginData("THARSIS_RATE_LIMIT_STORE_PLUGIN_DATA_") {
+		c.RateLimitStorePluginData[k] = v
+	}
+
+	// Default ServiceAccountIssuerURL to TharsisURL
+	if c.ServiceAccountIssuerURL == "" {
+		c.ServiceAccountIssuerURL = c.TharsisAPIURL
+	}
+
+	// validation
+	if err := c.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return &c, nil
+}
+
+func loadPluginData(envPrefix string) map[string]string {
+	pluginData := make(map[string]string)
+
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+
+		key := pair[0]
+		val := pair[1]
+
+		if strings.HasPrefix(key, envPrefix) {
+			pluginDataKey := strings.ToLower(key[len(envPrefix):])
+			pluginData[pluginDataKey] = val
+		}
+	}
+
+	return pluginData
+}
+
+func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
+	var idpConfigs []IdpConfig
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+
+		key := pair[0]
+		val := pair[1]
+		if strings.HasPrefix(key, envOidcProviderConfigPrefix) && strings.HasSuffix(key, "_ISSUER_URL") {
+			// Build IDP config
+			index := key[len(envOidcProviderConfigPrefix) : len(key)-len("_ISSUER_URL")]
+			issuerURL := val
+
+			clientIDKey := envOidcProviderConfigPrefix + index + "_CLIENT_ID"
+			usernameClaimKey := envOidcProviderConfigPrefix + index + "_USERNAME_CLAIM"
+
+			clientID := os.Getenv(clientIDKey)
+			usernameClaim := os.Getenv(usernameClaimKey)
+
+			if clientID == "" {
+				return nil, errors.New(clientIDKey + " environment variable is required")
+			}
+
+			if usernameClaim == "" {
+				usernameClaim = "sub"
+			}
+
+			idpConfigs = append(idpConfigs, IdpConfig{
+				IssuerURL:     issuerURL,
+				ClientID:      clientID,
+				UsernameClaim: usernameClaim,
+			})
+		}
+	}
+	return idpConfigs, nil
+}

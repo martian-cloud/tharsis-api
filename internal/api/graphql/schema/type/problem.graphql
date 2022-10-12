@@ -1,0 +1,12 @@
+enum ProblemType {
+  CONFLICT
+  BAD_REQUEST
+  NOT_FOUND
+  FORBIDDEN
+}
+
+type Problem {
+  message: String!
+  field: [String!]
+  type: ProblemType!
+}

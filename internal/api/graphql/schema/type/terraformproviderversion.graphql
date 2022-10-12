@@ -1,0 +1,61 @@
+enum TerraformProviderVersionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+  VERSION_ASC
+  VERSION_DESC
+}
+
+type TerraformProviderVersionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [TerraformProviderVersionEdge]
+}
+
+type TerraformProviderVersionEdge {
+  cursor: String!
+  node: TerraformProviderVersion
+}
+
+type CreateTerraformProviderVersionPayload {
+  clientMutationId: String
+  providerVersion: TerraformProviderVersion
+  problems: [Problem!]!
+}
+
+type DeleteTerraformProviderVersionPayload {
+  clientMutationId: String
+  providerVersion: TerraformProviderVersion
+  problems: [Problem!]!
+}
+
+type TerraformProviderVersion implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  provider: TerraformProvider!
+  version: String!
+  gpgKeyId: String
+  gpgAsciiArmor: String
+  protocols: [String!]!
+  shaSumsUploaded: Boolean!
+  shaSumsSigUploaded: Boolean!
+  readmeUploaded: Boolean!
+  readme: String!
+  platforms: [TerraformProviderPlatform!]!
+  latest: Boolean!
+  createdBy: String!
+}
+
+input CreateTerraformProviderVersionInput {
+  clientMutationId: String
+  providerPath: String!
+  version: String!
+  protocols: [String!]!
+}
+
+input DeleteTerraformProviderVersionInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}

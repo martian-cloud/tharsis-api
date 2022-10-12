@@ -1,0 +1,37 @@
+type CreateTerraformProviderPlatformPayload {
+  clientMutationId: String
+  providerPlatform: TerraformProviderPlatform
+  problems: [Problem!]!
+}
+
+type DeleteTerraformProviderPlatformPayload {
+  clientMutationId: String
+  providerPlatform: TerraformProviderPlatform
+  problems: [Problem!]!
+}
+
+type TerraformProviderPlatform implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  providerVersion: TerraformProviderVersion!
+  os: String!
+  arch: String!
+  shaSum: String!
+  filename: String!
+  binaryUploaded: Boolean!
+}
+
+input CreateTerraformProviderPlatformInput {
+  clientMutationId: String
+  providerVersionId: String!
+  os: String!
+  arch: String!
+  shaSum: String!
+  filename: String!
+}
+
+input DeleteTerraformProviderPlatformInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}

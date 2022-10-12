@@ -1,0 +1,53 @@
+enum StateVersionSort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type StateVersionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [StateVersionEdge]
+}
+
+type StateVersionEdge {
+  cursor: String!
+  node: StateVersion
+}
+
+type CreateStateVersionPayload {
+  clientMutationId: String
+  stateVersion: StateVersion
+  problems: [Problem!]!
+}
+
+type StateVersionResource {
+  module: String!
+  mode: String!
+  type: String!
+  name: String!
+  provider: String!
+}
+
+type StateVersionDependency {
+  workspacePath: String!
+  workspace: Workspace
+  stateVersion: StateVersion
+}
+
+type StateVersion implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  run: Run
+  outputs: [StateVersionOutput!]!
+  resources: [StateVersionResource!]!
+  dependencies: [StateVersionDependency!]!
+  data: String!
+  createdBy: String!
+}
+
+input CreateStateVersionInput {
+  clientMutationId: String
+  metadata: ResourceMetadataInput
+  state: String!
+  runId: String!
+}

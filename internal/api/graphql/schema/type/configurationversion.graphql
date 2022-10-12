@@ -1,0 +1,20 @@
+type ConfigurationVersion implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  status: String!
+  speculative: Boolean!
+  workspaceId: String!
+  createdBy: String!
+}
+
+type ConfigurationVersionMutationPayload {
+  clientMutationId: String
+  configurationVersion: ConfigurationVersion
+  problems: [Problem!]!
+}
+
+input CreateConfigurationVersionInput {
+  clientMutationId: String
+  workspacePath: String!
+  speculative: Boolean
+}

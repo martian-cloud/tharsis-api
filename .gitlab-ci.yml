@@ -1,0 +1,212 @@
+include:
+  - template: Code-Quality.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+stages:
+  - test
+
+# Only start pipelines on Merge Requests or the default branch
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_MERGE_REQUEST_IID
+      when: always
+    - when: never
+
+.if-not-tharsis-namespace: &if-not-tharsis-namespace
+  if: '$CI_PROJECT_NAMESPACE !~ /^infor-cloud\/martian-cloud\/tharsis($|\/)/'
+
+.cache-template: &cache-template
+  key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+  paths:
+    - ".go/pkg/mod"
+    - ".go/cache"
+
+variables:
+  SECRET_DETECTION_EXCLUDED_PATHS: vendor
+  GO111MODULE: "on"
+  GOPRIVATE: gitlab.com/infor-cloud/martian-cloud/tharsis/*
+  GO_VERSION: "1.18.2"
+  CGO_ENABLED: "0"
+  GOPATH: "$CI_PROJECT_DIR/.go"
+  GOCACHE: "$GOPATH/cache"
+
+default:
+  image: public.ecr.aws/amazonlinux/amazonlinux:latest
+  services: []
+  retry:
+    max: 2
+    when:
+      - unknown_failure
+      - api_failure
+      - stuck_or_timeout_failure
+      - runner_system_failure
+
+tests:
+  image: golang:${GO_VERSION}-alpine
+  needs: []
+  services:
+    - postgres:13.4
+  stage: test
+  variables:
+    POSTGRES_DB: tharsisdbtest
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: $CI_JOB_TOKEN
+    THARSIS_DB_TEST_HOST: postgres
+    THARSIS_DB_TEST_PORT: 5432
+    THARSIS_DB_TEST_SSL_MODE: disable
+    POSTGRES_HOST_AUTH_METHOD: trust
+    LD_FLAG_VAR_PREFIX: gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db
+  before_script:
+    - export PATH=$PATH:$GOPATH/bin
+    - go install golang.org/x/lint/golint@latest
+    - apk add postgresql-client libpq-dev git bash openssh ca-certificates
+    - wget -O - https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
+  script:
+    - /usr/local/bin/migrate -path=db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
+    - go test -tags=integration --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" ./...
+  cache:
+    <<: *cache-template
+  interruptible: true
+
+lint:
+  image: golang:${GO_VERSION}-alpine
+  stage: test
+  before_script:
+    - export PATH=$PATH:$GOPATH/bin
+    - go install golang.org/x/lint/golint@latest
+    - apk add git bash openssh ca-certificates make
+  script:
+    - go mod download
+    - go mod verify
+    - make lint
+  cache:
+    <<: *cache-template
+  interruptible: true
+
+secret_detection:
+  interruptible: true
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+
+gosec-sast:
+  artifacts:
+    paths:
+      - gl-sast-report.json
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+      changes:
+        - "**/*.go"
+        - "*.go"
+  interruptible: true
+
+semgrep-sast:
+  artifacts:
+    paths:
+      - gl-sast-report.json
+  interruptible: true
+
+code_quality:
+  artifacts:
+    paths:
+      - gl-code-quality-report.json
+  tags:
+    - docker
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+      changes:
+        - "**/*.go"
+        - "*.go"
+  interruptible: true
+
+License Scanning:
+  image: golang:${GO_VERSION}-alpine
+  before_script:
+    - export PATH=$PATH:$GOPATH/bin
+    - go install github.com/uw-labs/lichen@latest
+    - apk add git bash openssh ca-certificates make
+  script:
+    - make build-api
+    - |
+      cat <<EOF > lichen.yaml
+      # minimum confidence percentage used during license classification
+      threshold: .80
+
+      override:
+        - path: "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go.git"
+          licenses: ["MPL-2.0"]
+        - path: "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity.git"
+          licenses: ["MPL-2.0"]
+
+      # all permitted licenses - if no list is specified, all licenses are assumed to be allowed
+      allow:
+        - "MIT"
+        - "Apache-2.0"
+        - "0BSD"
+        - "BSD-3-Clause"
+        - "BSD-2-Clause"
+        - "BSD-2-Clause-FreeBSD"
+        - "MPL-2.0"
+        - "ISC"
+        - "PostgreSQL"
+        - "CC-BY-SA-4.0"
+        - "Unicode-DFS-2016"
+      EOF
+
+    - lichen --config lichen.yaml $CI_PROJECT_DIR/apiserver
+  cache:
+    <<: *cache-template
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+      changes:
+        - "**/go.mod"
+        - "**/go.sum"
+        - go.mod
+        - go.sum
+
+gemnasium-dependency_scanning:
+  script:
+    - /analyzer run
+    - cat gl-dependency-scanning-report.json
+  artifacts:
+    reports:
+      dependency_scanning: gl-dependency-scanning-report.json
+    paths: [gl-dependency-scanning-report.json]
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+      exists:
+        - "{Gemfile.lock,*/Gemfile.lock,*/*/Gemfile.lock}"
+        - "{composer.lock,*/composer.lock,*/*/composer.lock}"
+        - "{gems.locked,*/gems.locked,*/*/gems.locked}"
+        - "{go.sum,*/go.sum,*/*/go.sum}"
+        - "{npm-shrinkwrap.json,*/npm-shrinkwrap.json,*/*/npm-shrinkwrap.json}"
+        - "{package-lock.json,*/package-lock.json,*/*/package-lock.json}"
+        - "{yarn.lock,*/yarn.lock,*/*/yarn.lock}"
+        - "{packages.lock.json,*/packages.lock.json,*/*/packages.lock.json}"
+        - "{conan.lock,*/conan.lock,*/*/conan.lock}"
+  interruptible: true
+
+Software Composition Analysis:
+  image: golang:${GO_VERSION}-alpine
+  stage: test
+  before_script:
+    - apk add tar gzip curl git openssh
+  script:
+    - curl -sSL https://download.sourceclear.com/ci.sh | sh
+  rules:
+    - <<: *if-not-tharsis-namespace
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+      changes:
+        - "**/go.mod"
+        - "**/go.sum"
+        - go.mod
+        - go.sum

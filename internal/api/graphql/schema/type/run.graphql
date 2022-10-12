@@ -1,0 +1,106 @@
+enum RunSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+enum RunStatus {
+  applied
+  apply_queued
+  applying
+  canceled
+  errored
+  pending
+  plan_queued
+  planned
+  planned_and_finished
+  planning
+}
+
+type RunConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [RunEdge]
+}
+
+type RunEdge {
+  cursor: String!
+  node: Run
+}
+
+type RunVariable {
+  namespacePath: String
+  category: VariableCategory!
+  hcl: Boolean!
+  key: String!
+  value: String
+}
+
+type Run implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  status: RunStatus!
+  isDestroy: Boolean!
+  workspace: Workspace!
+  configurationVersion: ConfigurationVersion
+  plan: Plan!
+  apply: Apply
+  variables: [RunVariable!]!
+  moduleSource: String
+  moduleVersion: String
+  forceCanceledBy: String
+  forceCanceled: Boolean!
+  forceCancelAvailableAt: Time
+  comment: String!
+  terraformVersion: String!
+}
+
+type RunEvent {
+  action: String!
+  run: Run!
+}
+
+input RunSubscriptionInput {
+  workspacePath: String!
+  runId: String
+}
+
+type RunMutationPayload {
+  clientMutationId: String
+  run: Run
+  problems: [Problem!]!
+}
+
+input RunVariableInput {
+  category: VariableCategory!
+  hcl: Boolean!
+  key: String!
+  value: String!
+}
+
+input CreateRunInput {
+  clientMutationId: String
+  workspacePath: String!
+  configurationVersionId: String
+  isDestroy: Boolean
+  moduleSource: String
+  moduleVersion: String
+  comment: String
+  terraformVersion: String
+  variables: [RunVariableInput!]
+}
+
+input ApplyRunInput {
+  clientMutationId: String
+  runId: String!
+  comment: String
+}
+
+input CancelRunInput {
+  clientMutationId: String
+  runId: String!
+  comment: String
+  force: Boolean
+}

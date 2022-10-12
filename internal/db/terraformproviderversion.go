@@ -1,0 +1,354 @@
+package db
+
+//go:generate mockery --name TerraformProviderVersions --inpackage --case underscore
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/doug-martin/goqu/v9"
+	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+)
+
+// TerraformProviderVersions encapsulates the logic to access terraform provider versions from the database
+type TerraformProviderVersions interface {
+	GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error)
+	GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error)
+	CreateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
+	UpdateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
+	DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error
+}
+
+// TerraformProviderVersionSortableField represents the fields that a provider version can be sorted by
+type TerraformProviderVersionSortableField string
+
+// TerraformProviderVersionSortableField constants
+const (
+	TerraformProviderVersionSortableFieldVersionAsc    TerraformProviderVersionSortableField = "VERSION_ASC"
+	TerraformProviderVersionSortableFieldVersionDesc   TerraformProviderVersionSortableField = "VERSION_DESC"
+	TerraformProviderVersionSortableFieldUpdatedAtAsc  TerraformProviderVersionSortableField = "UPDATED_AT_ASC"
+	TerraformProviderVersionSortableFieldUpdatedAtDesc TerraformProviderVersionSortableField = "UPDATED_AT_DESC"
+	TerraformProviderVersionSortableFieldCreatedAtAsc  TerraformProviderVersionSortableField = "CREATED_AT_ASC"
+	TerraformProviderVersionSortableFieldCreatedAtDesc TerraformProviderVersionSortableField = "CREATED_AT_DESC"
+)
+
+func (ts TerraformProviderVersionSortableField) getFieldDescriptor() *fieldDescriptor {
+	switch ts {
+	case TerraformProviderVersionSortableFieldVersionAsc, TerraformProviderVersionSortableFieldVersionDesc:
+		return &fieldDescriptor{key: "sem_version", table: "terraform_provider_versions", col: "provider_sem_version"}
+	case TerraformProviderVersionSortableFieldUpdatedAtAsc, TerraformProviderVersionSortableFieldUpdatedAtDesc:
+		return &fieldDescriptor{key: "updated_at", table: "terraform_provider_versions", col: "updated_at"}
+	case TerraformProviderVersionSortableFieldCreatedAtAsc, TerraformProviderVersionSortableFieldCreatedAtDesc:
+		return &fieldDescriptor{key: "created_at", table: "terraform_provider_versions", col: "created_at"}
+	default:
+		return nil
+	}
+}
+
+func (ts TerraformProviderVersionSortableField) getSortDirection() SortDirection {
+	if strings.HasSuffix(string(ts), "_DESC") {
+		return DescSort
+	}
+	return AscSort
+}
+
+// TerraformProviderVersionFilter contains the supported fields for filtering TerraformProviderVersion resources
+type TerraformProviderVersionFilter struct {
+	ProviderID               *string
+	SHASumsUploaded          *bool
+	SHASumsSignatureUploaded *bool
+	SemanticVersion          *string
+	Latest                   *bool
+	ProviderVersionIDs       []string
+}
+
+// GetProviderVersionsInput is the input for listing terraform provider versions
+type GetProviderVersionsInput struct {
+	// Sort specifies the field to sort on and direction
+	Sort *TerraformProviderVersionSortableField
+	// PaginationOptions supports cursor based pagination
+	PaginationOptions *PaginationOptions
+	// Filter is used to filter the results
+	Filter *TerraformProviderVersionFilter
+}
+
+// ProviderVersionsResult contains the response data and page information
+type ProviderVersionsResult struct {
+	PageInfo         *PageInfo
+	ProviderVersions []models.TerraformProviderVersion
+}
+
+type terraformProviderVersions struct {
+	dbClient *Client
+}
+
+var providerVersionFieldList = append(metadataFieldList, "provider_id", "provider_sem_version", "gpg_key_id", "gpg_ascii_armor", "protocols", "sha_sums_uploaded", "sha_sums_sig_uploaded", "readme_uploaded", "latest", "created_by")
+
+// NewTerraformProviderVersions returns an instance of the TerraformProviderVersions interface
+func NewTerraformProviderVersions(dbClient *Client) TerraformProviderVersions {
+	return &terraformProviderVersions{dbClient: dbClient}
+}
+
+func (t *terraformProviderVersions) GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error) {
+	return t.getProviderVersion(ctx, goqu.Ex{"terraform_provider_versions.id": id})
+}
+
+func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error) {
+	ex := goqu.Ex{}
+
+	if input.Filter != nil {
+		if input.Filter.ProviderVersionIDs != nil {
+			ex["terraform_provider_versions.id"] = input.Filter.ProviderVersionIDs
+		}
+		if input.Filter.ProviderID != nil {
+			ex["terraform_provider_versions.provider_id"] = *input.Filter.ProviderID
+		}
+		if input.Filter.SHASumsUploaded != nil {
+			ex["terraform_provider_versions.sha_sums_uploaded"] = *input.Filter.SHASumsUploaded
+		}
+		if input.Filter.SHASumsSignatureUploaded != nil {
+			ex["terraform_provider_versions.sha_sums_sig_uploaded"] = *input.Filter.SHASumsSignatureUploaded
+		}
+		if input.Filter.SemanticVersion != nil {
+			ex["terraform_provider_versions.provider_sem_version"] = *input.Filter.SemanticVersion
+		}
+		if input.Filter.Latest != nil {
+			ex["terraform_provider_versions.latest"] = *input.Filter.Latest
+		}
+	}
+
+	query := dialect.From(goqu.T("terraform_provider_versions")).Select(providerVersionFieldList...).Where(ex)
+
+	sortDirection := AscSort
+
+	var sortBy *fieldDescriptor
+	if input.Sort != nil {
+		sortDirection = input.Sort.getSortDirection()
+		sortBy = input.Sort.getFieldDescriptor()
+	}
+
+	qBuilder, err := newPaginatedQueryBuilder(
+		input.PaginationOptions,
+		&fieldDescriptor{key: "id", table: "terraform_provider_versions", col: "id"},
+		sortBy,
+		sortDirection,
+		providerVersionFieldResolver,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := qBuilder.execute(ctx, t.dbClient.getConnection(ctx), query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	// Scan rows
+	results := []models.TerraformProviderVersion{}
+	for rows.Next() {
+		item, err := scanTerraformProviderVersion(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, *item)
+	}
+
+	if err := rows.finalize(&results); err != nil {
+		return nil, err
+	}
+
+	result := ProviderVersionsResult{
+		PageInfo:         rows.getPageInfo(),
+		ProviderVersions: results,
+	}
+
+	return &result, nil
+}
+
+func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error) {
+	timestamp := currentTime()
+
+	protocolsJSON, err := json.Marshal(providerVersion.Protocols)
+	if err != nil {
+		return nil, err
+	}
+
+	sql, _, err := dialect.Insert("terraform_provider_versions").
+		Rows(goqu.Record{
+			"id":                    newResourceID(),
+			"version":               initialResourceVersion,
+			"created_at":            timestamp,
+			"updated_at":            timestamp,
+			"provider_id":           providerVersion.ProviderID,
+			"provider_sem_version":  providerVersion.SemanticVersion,
+			"gpg_key_id":            providerVersion.GPGKeyID,
+			"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
+			"protocols":             protocolsJSON,
+			"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
+			"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
+			"readme_uploaded":       providerVersion.ReadmeUploaded,
+			"created_by":            providerVersion.CreatedBy,
+			"latest":                providerVersion.Latest,
+		}).
+		Returning(providerVersionFieldList...).ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	createdTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	if err != nil {
+		if pgErr := asPgError(err); pgErr != nil {
+			if isUniqueViolation(pgErr) {
+				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("terraform provider version %s already exists", providerVersion.SemanticVersion))
+			}
+		}
+		return nil, err
+	}
+
+	return createdTerraformProviderVersion, nil
+}
+
+func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error) {
+	timestamp := currentTime()
+
+	protocolsJSON, err := json.Marshal(providerVersion.Protocols)
+	if err != nil {
+		return nil, err
+	}
+
+	sql, _, err := dialect.Update("terraform_provider_versions").Set(
+		goqu.Record{
+			"version":               goqu.L("? + ?", goqu.C("version"), 1),
+			"updated_at":            timestamp,
+			"gpg_key_id":            providerVersion.GPGKeyID,
+			"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
+			"protocols":             protocolsJSON,
+			"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
+			"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
+			"readme_uploaded":       providerVersion.ReadmeUploaded,
+			"latest":                providerVersion.Latest,
+		},
+	).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).Returning(providerVersionFieldList...).ToSQL()
+
+	if err != nil {
+		return nil, err
+	}
+
+	updatedTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrOptimisticLockError
+		}
+		return nil, err
+	}
+
+	return updatedTerraformProviderVersion, nil
+}
+
+func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error {
+
+	sql, _, err := dialect.Delete("terraform_provider_versions").Where(
+		goqu.Ex{
+			"id":      providerVersion.Metadata.ID,
+			"version": providerVersion.Metadata.Version,
+		},
+	).Returning(providerVersionFieldList...).ToSQL()
+	if err != nil {
+		return err
+	}
+
+	_, err = scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrOptimisticLockError
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (t *terraformProviderVersions) getProviderVersion(ctx context.Context, exp goqu.Ex) (*models.TerraformProviderVersion, error) {
+	query := dialect.From(goqu.T("terraform_provider_versions")).
+		Select(t.getSelectFields()...).Where(exp)
+
+	sql, _, err := query.ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	providerVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return providerVersion, nil
+}
+
+func (t *terraformProviderVersions) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range providerVersionFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("terraform_provider_versions.%s", field))
+	}
+
+	return selectFields
+}
+
+func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion, error) {
+	providerVersion := &models.TerraformProviderVersion{}
+
+	fields := []interface{}{
+		&providerVersion.Metadata.ID,
+		&providerVersion.Metadata.CreationTimestamp,
+		&providerVersion.Metadata.LastUpdatedTimestamp,
+		&providerVersion.Metadata.Version,
+		&providerVersion.ProviderID,
+		&providerVersion.SemanticVersion,
+		&providerVersion.GPGKeyID,
+		&providerVersion.GPGASCIIArmor,
+		&providerVersion.Protocols,
+		&providerVersion.SHASumsUploaded,
+		&providerVersion.SHASumsSignatureUploaded,
+		&providerVersion.ReadmeUploaded,
+		&providerVersion.Latest,
+		&providerVersion.CreatedBy,
+	}
+
+	err := row.Scan(fields...)
+	if err != nil {
+		return nil, err
+	}
+
+	return providerVersion, nil
+}
+
+func providerVersionFieldResolver(key string, model interface{}) (string, error) {
+	providerVersion, ok := model.(*models.TerraformProviderVersion)
+	if !ok {
+		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected provider version type, got %T", model))
+	}
+
+	val, ok := metadataFieldResolver(key, &providerVersion.Metadata)
+	if !ok {
+		switch key {
+		case "sem_version":
+			val = providerVersion.SemanticVersion
+		default:
+			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
+		}
+	}
+
+	return val, nil
+}

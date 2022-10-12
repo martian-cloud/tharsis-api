@@ -1,0 +1,54 @@
+union Member = User | ServiceAccount | Team
+
+type NamespaceMembership implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  resourcePath: String!
+  member: Member
+  namespace: Namespace
+  role: String!
+}
+
+enum NamespaceMembershipSort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type NamespaceMembershipConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [NamespaceMembershipEdge]
+}
+
+type NamespaceMembershipEdge {
+  cursor: String!
+  node: NamespaceMembership
+}
+
+type NamespaceMembershipMutationPayload {
+  clientMutationId: String
+  namespace: Namespace
+  problems: [Problem!]!
+}
+
+input CreateNamespaceMembershipInput {
+  clientMutationId: String
+  namespacePath: String!
+  username: String
+  serviceAccountId: String
+  teamName: String
+  role: String!
+}
+
+input UpdateNamespaceMembershipInput {
+  clientMutationId: String
+  id: String!
+  role: String!
+  metadata: ResourceMetadataInput
+}
+
+input DeleteNamespaceMembershipInput {
+  clientMutationId: String
+  id: String!
+  metadata: ResourceMetadataInput
+}

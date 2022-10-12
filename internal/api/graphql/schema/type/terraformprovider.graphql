@@ -1,0 +1,71 @@
+enum TerraformProviderSort {
+  NAME_ASC
+  NAME_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type TerraformProviderConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [TerraformProviderEdge]
+}
+
+type TerraformProviderEdge {
+  cursor: String!
+  node: TerraformProvider
+}
+
+type CreateTerraformProviderPayload {
+  clientMutationId: String
+  provider: TerraformProvider
+  problems: [Problem!]!
+}
+
+type UpdateTerraformProviderPayload {
+  clientMutationId: String
+  provider: TerraformProvider
+  problems: [Problem!]!
+}
+
+type DeleteTerraformProviderPayload {
+  clientMutationId: String
+  provider: TerraformProvider
+  problems: [Problem!]!
+}
+
+type TerraformProvider implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  name: String!
+  group: Group!
+  private: Boolean!
+  repositoryUrl: String!
+  registryNamespace: String!
+  resourcePath: String!
+  latestVersion: TerraformProviderVersion
+  versions(after: String, before: String, first: Int, last: Int, sort: TerraformProviderVersionSort): TerraformProviderVersionConnection!
+}
+
+input CreateTerraformProviderInput {
+  clientMutationId: String
+  groupPath: String!
+  name: String!
+  private: Boolean
+  repositoryUrl: String
+}
+
+input UpdateTerraformProviderInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+  name: String
+  private: Boolean
+  repositoryUrl: String
+}
+
+input DeleteTerraformProviderInput {
+  clientMutationId: String
+  id: String!
+}

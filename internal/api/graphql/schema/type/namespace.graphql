@@ -1,0 +1,26 @@
+interface Namespace {
+  id: ID!
+  metadata: ResourceMetadata!
+  name: String!
+  description: String!
+  fullPath: String!
+  memberships: [NamespaceMembership!]!
+  variables: [NamespaceVariable!]!
+  serviceAccounts(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    includeInherited: Boolean
+    search: String
+  ): ServiceAccountConnection!
+  managedIdentities(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: ManagedIdentitySort
+    includeInherited: Boolean
+    search: String
+  ): ManagedIdentityConnection!
+}

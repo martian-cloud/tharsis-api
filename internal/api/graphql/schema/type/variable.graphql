@@ -1,0 +1,55 @@
+enum VariableCategory {
+  terraform
+  environment
+}
+
+type NamespaceVariable implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  namespacePath: String!
+  category: VariableCategory!
+  hcl: Boolean!
+  key: String!
+  value: String
+}
+
+type NamespaceVariableMutationPayload {
+  clientMutationId: String
+  namespace: Namespace
+  problems: [Problem!]!
+}
+
+input CreateNamespaceVariableInput {
+  clientMutationId: String
+  namespacePath: String!
+  category: VariableCategory!
+  hcl: Boolean!
+  key: String!
+  value: String!
+}
+
+input UpdateNamespaceVariableInput {
+  clientMutationId: String
+  id: String!
+  hcl: Boolean!
+  key: String!
+  value: String!
+}
+
+input DeleteNamespaceVariableInput {
+  clientMutationId: String
+  id: String!
+}
+
+input NamespaceVariableInput {
+  hcl: Boolean!
+  key: String!
+  value: String!
+}
+
+input SetNamespaceVariablesInput {
+  clientMutationId: String
+  namespacePath: String!
+  category: VariableCategory!
+  variables: [NamespaceVariableInput!]!
+}

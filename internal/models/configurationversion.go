@@ -1,0 +1,20 @@
+package models
+
+// ConfigurationStatus represents the various states for a ConfigurationVersion resource
+type ConfigurationStatus string
+
+// Configuration version status types
+const (
+	ConfigurationErrored  ConfigurationStatus = "errored"
+	ConfigurationPending  ConfigurationStatus = "pending"
+	ConfigurationUploaded ConfigurationStatus = "uploaded"
+)
+
+// ConfigurationVersion resource represents a terraform configuration that can be used by a single Run
+type ConfigurationVersion struct {
+	Status      ConfigurationStatus
+	WorkspaceID string
+	CreatedBy   string
+	Metadata    ResourceMetadata
+	Speculative bool
+}

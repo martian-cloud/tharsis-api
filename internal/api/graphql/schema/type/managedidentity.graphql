@@ -1,0 +1,148 @@
+enum ManagedIdentitySort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type ManagedIdentityConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ManagedIdentityEdge]
+}
+
+type ManagedIdentityEdge {
+  cursor: String!
+  node: ManagedIdentity
+}
+
+type CreateManagedIdentityPayload {
+  clientMutationId: String
+  managedIdentity: ManagedIdentity
+  problems: [Problem!]!
+}
+
+type UpdateManagedIdentityPayload {
+  clientMutationId: String
+  managedIdentity: ManagedIdentity
+  problems: [Problem!]!
+}
+
+type DeleteManagedIdentityPayload {
+  clientMutationId: String
+  managedIdentity: ManagedIdentity
+  problems: [Problem!]!
+}
+
+type ManagedIdentityAccessRuleMutationPayload {
+  clientMutationId: String
+  accessRule: ManagedIdentityAccessRule
+  problems: [Problem!]!
+}
+
+type AssignManagedIdentityPayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
+type CreateManagedIdentityCredentialsPayload {
+  clientMutationId: String
+  managedIdentityCredentials: ManagedIdentityCredentials
+  problems: [Problem!]!
+}
+
+type ManagedIdentityAccessRule implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  runStage: JobType!
+  allowedUsers: [User!]!
+  allowedServiceAccounts: [ServiceAccount!]!
+  allowedTeams: [Team!]!
+}
+
+type ManagedIdentity implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  type: String!
+  resourcePath: String!
+  name: String!
+  description: String!
+  group: Group!
+  data: String!
+  createdBy: String!
+  accessRules: [ManagedIdentityAccessRule!]!
+}
+
+type ManagedIdentityCredentials {
+  data: String!
+}
+
+input CreateManagedIdentityAccessRuleInput {
+  clientMutationId: String
+  managedIdentityId: String!
+  runStage: JobType!
+  allowedServiceAccounts: [String!]!
+  allowedUsers: [String!]!
+  allowedTeams: [String!]!
+}
+
+input UpdateManagedIdentityAccessRuleInput {
+  clientMutationId: String
+  id: ID!
+  runStage: JobType!
+  allowedServiceAccounts: [String!]!
+  allowedUsers: [String!]!
+  allowedTeams: [String!]!
+}
+
+input DeleteManagedIdentityAccessRuleInput {
+  clientMutationId: String
+  id: ID!
+}
+
+input ManagedIdentityAccessRuleInput {
+  runStage: JobType!
+  allowedServiceAccounts: [String!]!
+  allowedUsers: [String!]!
+  allowedTeams: [String!]!
+}
+
+type ManagedIdentityCredentials {
+  data: String!
+}
+
+input CreateManagedIdentityInput {
+  clientMutationId: String
+  type: String!
+  name: String!
+  description: String!
+  groupPath: String!
+  data: String!
+  accessRules: [ManagedIdentityAccessRuleInput!]
+}
+
+input UpdateManagedIdentityInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+  description: String!
+  data: String!
+}
+
+input DeleteManagedIdentityInput {
+  clientMutationId: String
+  id: ID!
+  force: Boolean
+  metadata: ResourceMetadataInput
+}
+
+input AssignManagedIdentityInput {
+  clientMutationId: String
+  managedIdentityId: String
+  managedIdentityPath: String
+  workspacePath: String!
+}
+
+input CreateManagedIdentityCredentialsInput {
+  clientMutationId: String
+  id: ID!
+}

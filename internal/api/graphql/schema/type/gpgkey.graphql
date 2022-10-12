@@ -1,0 +1,49 @@
+enum GPGKeySort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type GPGKeyConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [GPGKeyEdge]
+}
+
+type GPGKeyEdge {
+  cursor: String!
+  node: GPGKey
+}
+
+type CreateGPGKeyPayload {
+  clientMutationId: String
+  gpgKey: GPGKey
+  problems: [Problem!]!
+}
+
+type DeleteGPGKeyPayload {
+  clientMutationId: String
+  gpgKey: GPGKey
+  problems: [Problem!]!
+}
+
+type GPGKey implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  gpgKeyId: String!
+  fingerprint: String!
+  asciiArmor: String!
+  group: Group!
+  createdBy: String!
+}
+
+input CreateGPGKeyInput {
+  clientMutationId: String
+  asciiArmor: String!
+  groupPath: String!
+}
+
+input DeleteGPGKeyInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}

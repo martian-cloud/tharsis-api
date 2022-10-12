@@ -1,0 +1,113 @@
+enum GroupSort {
+  FULL_PATH_ASC
+  FULL_PATH_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type GroupConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [GroupEdge]
+}
+
+type GroupEdge {
+  cursor: String!
+  node: Group
+}
+
+type CreateGroupPayload {
+  clientMutationId: String
+  group: Group
+  problems: [Problem!]!
+}
+
+type UpdateGroupPayload {
+  clientMutationId: String
+  group: Group
+  problems: [Problem!]!
+}
+
+type DeleteGroupPayload {
+  clientMutationId: String
+  group: Group
+  problems: [Problem!]!
+}
+
+type Group implements Node, Namespace {
+  id: ID!
+  metadata: ResourceMetadata!
+  name: String!
+  description: String!
+  fullPath: String!
+  createdBy: String!
+  parent: Group
+  gpgKeys(
+    after: String,
+    before: String,
+    first: Int,
+    last: Int,
+    includeInherited: Boolean
+  ): GPGKeyConnection!
+  descendentGroups(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: GroupSort
+  ): GroupConnection!
+  workspaces(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: WorkspaceSort
+  ): WorkspaceConnection!
+  serviceAccounts(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    includeInherited: Boolean
+    search: String
+  ): ServiceAccountConnection!
+  managedIdentities(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: ManagedIdentitySort
+    includeInherited: Boolean
+    search: String
+  ): ManagedIdentityConnection!
+  terraformProviders(
+    after: String,
+    before: String,
+    first: Int,
+    last: Int,
+    search: String
+  ): TerraformProviderConnection!
+  memberships: [NamespaceMembership!]!
+  variables: [NamespaceVariable!]!
+}
+
+input CreateGroupInput {
+  clientMutationId: String
+  name: String!
+  parentPath: String
+  description: String!
+}
+
+input UpdateGroupInput {
+  clientMutationId: String
+  groupPath: String!
+  description: String!
+  metadata: ResourceMetadataInput
+}
+
+input DeleteGroupInput {
+  clientMutationId: String
+  groupPath: String!
+  force: Boolean
+  metadata: ResourceMetadataInput
+}

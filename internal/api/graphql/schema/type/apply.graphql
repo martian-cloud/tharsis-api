@@ -1,0 +1,31 @@
+enum ApplyStatus {
+  canceled
+  created
+  errored
+  finished
+  pending
+  queued
+  running
+}
+
+type UpdateApplyPayload {
+  clientMutationId: String
+  apply: Apply
+  problems: [Problem!]!
+}
+
+type Apply implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  status: ApplyStatus!
+  currentJob: Job
+  triggeredBy: String
+  comment: String!
+}
+
+input UpdateApplyInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+  status: ApplyStatus!
+}

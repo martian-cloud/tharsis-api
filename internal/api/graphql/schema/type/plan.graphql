@@ -1,0 +1,36 @@
+enum PlanStatus {
+  canceled
+  queued
+  errored
+  finished
+  pending
+  running
+}
+
+type UpdatePlanPayload {
+  clientMutationId: String
+  plan: Plan
+  problems: [Problem!]!
+}
+
+type Plan implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  status: PlanStatus!
+  hasChanges: Boolean!
+  resourceAdditions: Int!
+  resourceChanges: Int!
+  resourceDestructions: Int!
+  currentJob: Job
+}
+
+input UpdatePlanInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+  status: PlanStatus!
+  hasChanges: Boolean!
+  resourceAdditions: Int!
+  resourceChanges: Int!
+  resourceDestructions: Int!
+}

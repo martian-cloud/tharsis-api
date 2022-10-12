@@ -1,0 +1,75 @@
+type PageInfo {
+  endCursor: String
+  startCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+union MeResponse = User | ServiceAccount
+
+# The Query type represents all of the entry points into the API.
+type Query {
+  me: MeResponse
+  node(id: String!): Node
+  namespace(fullPath: String!): Namespace
+  group(fullPath: String!): Group
+  groups(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    parentPath: String
+    sort: GroupSort
+  ): GroupConnection!
+  workspace(fullPath: String!): Workspace
+  workspaces(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    groupPath: String
+    search: String
+    sort: WorkspaceSort
+  ): WorkspaceConnection!
+  terraformProviders(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: TerraformProviderSort
+  ): TerraformProviderConnection!
+  terraformProvider(registryNamespace: String!, providerName: String!): TerraformProvider
+  terraformProviderVersion(registryNamespace: String!, providerName: String!, version: String): TerraformProviderVersion
+  run(id: String!): Run
+  runs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    workspacePath: String
+    workspaceId: String
+    sort: RunSort
+  ): RunConnection!
+  job(id: String!): Job
+  managedIdentity(id: String!): ManagedIdentity
+  serviceAccount(id: String!): ServiceAccount
+  users(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: UserSort
+  ): UserConnection!
+  configurationVersion(id: String!): ConfigurationVersion
+  team(name: String!): Team
+  teams(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+  ): TeamConnection!
+  terraformCLIVersions: TerraformCLIVersions
+}

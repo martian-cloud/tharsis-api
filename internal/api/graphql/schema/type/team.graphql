@@ -1,0 +1,139 @@
+# Team and friends:
+
+enum TeamSort {
+  NAME_ASC
+  NAME_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type TeamConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [TeamEdge]
+}
+
+type TeamEdge {
+  cursor: String!
+  node: Team
+}
+
+type CreateTeamPayload {
+  clientMutationId: String
+  team: Team
+  problems: [Problem!]!
+}
+
+type UpdateTeamPayload {
+  clientMutationId: String
+  team: Team
+  problems: [Problem!]!
+}
+
+type DeleteTeamPayload {
+  clientMutationId: String
+  team: Team
+  problems: [Problem!]!
+}
+
+type Team {
+  id: ID!
+  metadata: ResourceMetadata!
+  name: String!
+  description: String!
+  scimExternalId: String
+  members(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: TeamMemberSort
+  ): TeamMemberConnection!
+}
+
+input CreateTeamInput {
+  clientMutationId: String
+  name: String!
+  description: String!
+}
+
+input UpdateTeamInput {
+  clientMutationId: String
+  name: String!
+  description: String!
+  metadata: ResourceMetadataInput
+}
+
+input DeleteTeamInput {
+  clientMutationId: String
+  name: String!
+  metadata: ResourceMetadataInput
+}
+
+# TeamMember and friends:
+
+type TeamMember {
+  id: ID!
+  metadata: ResourceMetadata!
+  user: User!
+  team: Team!
+  isMaintainer: Boolean!
+}
+
+enum TeamMemberSort {
+  USERNAME_ASC
+  USERNAME_DESC
+}
+
+type TeamMemberConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [TeamMemberEdge]
+}
+
+type TeamMemberEdge {
+  cursor: String!
+  node: TeamMember
+}
+
+type AddUserToTeamPayload {
+  clientMutationId: String
+  teamMember: TeamMember
+  problems: [Problem!]!
+}
+
+type UpdateTeamMemberPayload {
+  clientMutationId: String
+  teamMember: TeamMember
+  problems: [Problem!]!
+}
+
+type RemoveUserFromTeamPayload {
+  clientMutationId: String
+  teamMember: TeamMember
+  problems: [Problem!]!
+}
+
+input AddUserToTeamInput {
+  clientMutationId: String
+  username: String!
+  teamName: String!
+  isMaintainer: Boolean!
+}
+
+input UpdateTeamMemberInput {
+  clientMutationId: String
+  username: String!
+  teamName: String!
+  isMaintainer: Boolean!
+  metadata: ResourceMetadataInput
+}
+
+input RemoveUserFromTeamInput {
+  clientMutationId: String
+  username: String!
+  teamName: String!
+  metadata: ResourceMetadataInput
+}
+
+# The End.

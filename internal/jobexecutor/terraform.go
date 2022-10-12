@@ -1,0 +1,341 @@
+package jobexecutor
+
+import (
+	"context"
+	"io"
+	"net/url"
+	"path/filepath"
+	"strings"
+
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
+	hcInstall "github.com/hashicorp/hc-install"
+	"github.com/hashicorp/hc-install/fs"
+	"github.com/hashicorp/hc-install/product"
+	"github.com/hashicorp/hc-install/src"
+	"github.com/hashicorp/terraform-exec/tfexec"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/http"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/module"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+)
+
+const (
+	backendOverride = `
+terraform {
+	backend "local" {}
+}
+`
+	// Ensure binary not found error.
+	hcInstallBinaryNotFoundErr = "unable to find, install"
+)
+
+// Untarring of configuration version done with Hashicorp's go-getter library.
+var tgz = getter.TarGzipDecompressor{}
+
+type terraformWorkspace struct {
+	cliDownloader     cliDownloader
+	cancellableCtx    context.Context
+	client            Client
+	jobCfg            *JobConfig
+	workspace         *types.Workspace
+	run               *types.Run
+	jobLogger         *jobLogger
+	managedIdentities *managedIdentities
+	fullEnv           map[string]string
+	workspaceDir      string
+	variables         []types.RunVariable
+	pathsToRemove     []string
+}
+
+func newTerraformWorkspace(
+	cancellableCtx context.Context,
+	jobCfg *JobConfig,
+	workspaceDir string,
+	workspace *types.Workspace,
+	run *types.Run,
+	jobLogger *jobLogger,
+	client Client,
+) *terraformWorkspace {
+	managedIdentities := newManagedIdentities(
+		workspace.FullPath,
+		workspaceDir,
+		jobLogger,
+		client,
+	)
+
+	return &terraformWorkspace{
+		cancellableCtx:    cancellableCtx,
+		jobCfg:            jobCfg,
+		workspaceDir:      workspaceDir,
+		workspace:         workspace,
+		run:               run,
+		jobLogger:         jobLogger,
+		client:            client,
+		managedIdentities: managedIdentities,
+		fullEnv:           map[string]string{},
+		cliDownloader: *newCLIDownloader(
+			http.NewHTTPClient(),
+			client,
+		),
+	}
+}
+
+func (t *terraformWorkspace) close(ctx context.Context) error {
+	// Remove temporary files and directories.
+	for _, toRemove := range t.pathsToRemove {
+		os.RemoveAll(toRemove)
+	}
+
+	// Cleanup managed identity resources
+	return t.managedIdentities.close(ctx)
+}
+
+// init prepares for and does "terraform init".
+func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error) {
+
+	// Get run variables
+	variables, err := t.client.GetRunVariables(ctx, t.run.Metadata.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get run variables %v", err)
+	}
+	t.jobLogger.Infof("Resolved run variables")
+
+	// Add run variables to environment
+	for _, v := range variables {
+		if v.Category == types.EnvironmentVariableCategory {
+			t.fullEnv[v.Key] = *v.Value
+		}
+	}
+
+	// Add built-in variables to environment
+	if envErr := t.setBuiltInEnvVars(ctx); envErr != nil {
+		return nil, envErr
+	}
+
+	t.variables = variables
+
+	managedIdentityEnv, err := t.managedIdentities.initialize(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range managedIdentityEnv {
+		t.fullEnv[k] = v
+	}
+
+	// Handle a possible configuration version.  Configuration version and module
+	// source are mutually exclusive, so downloading to workspaceDir is okay.
+	if t.run.ConfigurationVersionID != nil {
+
+		t.jobLogger.Infof("Downloading configuration version %s \n", *t.run.ConfigurationVersionID)
+
+		if err = t.downloadConfigurationVersion(ctx); err != nil {
+			return nil, err
+		}
+
+	}
+
+	// Handle a possible module source (and maybe version).
+	var resolvedModuleSource *string
+	if t.run.ModuleSource != nil {
+		if t.run.ModuleVersion != nil {
+			// Registry-style module source; version shall have been resolved in service layer.
+
+			t.jobLogger.Infof("Resolving module version %s/%s", *t.run.ModuleSource, *t.run.ModuleVersion)
+
+			presignedURL, rErr := resolveModuleSource(*t.run.ModuleSource, *t.run.ModuleVersion, t.fullEnv)
+			if rErr != nil {
+				return nil, fmt.Errorf("failed to resolve module source: %s", rErr)
+			}
+			resolvedModuleSource = &presignedURL
+		} else {
+			// Non-registry-style module source.
+			resolvedModuleSource = t.run.ModuleSource
+		}
+	}
+
+	// Must pass PATH to fullEnv or Terraform fails when it attempts
+	// to find files in the user's home directory.
+	if val := os.Getenv("PATH"); val != "" {
+		t.fullEnv["PATH"] = val
+	}
+
+	// Convert Terraform version to hcInstall equivalent.
+	version, err := version.NewVersion(t.run.TerraformVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	execPath, err := hcInstall.NewInstaller().Ensure(ctx, []src.Source{&fs.ExactVersion{
+		Product: product.Terraform,
+		Version: version,
+	}})
+	if err != nil {
+		// Ensure command returns a custom error,
+		// must test it using a prefix of the error.
+		if !strings.HasPrefix(err.Error(), hcInstallBinaryNotFoundErr) {
+			return nil, fmt.Errorf("failed to find a Terraform executable: %v", err)
+		}
+
+		t.jobLogger.Infof("Downloading Terraform CLI version %s", t.run.TerraformVersion)
+
+		// Since the binary does not exist, create it.
+		execPath, err = t.cliDownloader.Download(ctx, t.run.TerraformVersion)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download Terraform CLI version %s: %v", t.run.TerraformVersion, err)
+		}
+
+		// Contains the temporary directory that needs to be removed
+		// after the job completes.
+		t.pathsToRemove = append(t.pathsToRemove, filepath.Dir(execPath))
+	}
+
+	tf, err := tfexec.NewTerraform(t.workspaceDir, execPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize tfexec: %v", err)
+	}
+
+	// Set environment variables
+	if err = tf.SetEnv(t.fullEnv); err != nil {
+		return nil, fmt.Errorf("failed to set environment variables: %v", err)
+	}
+
+	tf.SetLogger(log.Default())
+
+	// If we're doing a module source, we have to do two init operations.
+	// The first init operation uses FromModule and backend=false to download the module.
+	// Then, the override file is written.
+	// The second init operation has no init options.
+	// If we're doing a configuration version, the first init operation is skipped.
+
+	if resolvedModuleSource != nil {
+		err = tf.Init(t.cancellableCtx, // Use cancellable context here so that init command can be manually cancelled
+			tfexec.FromModule(*resolvedModuleSource), // Add a -from-module init option.  (Don't try to url.QueryEscape it.)
+			tfexec.Backend(false),                    // Nullify any backend in the original module.
+		)
+		if isCancellationError(err) {
+			return nil, fmt.Errorf("job cancelled while first terraform init command was in progress")
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to run first init command %v", err)
+		}
+	}
+
+	// These output redirections must be done _AFTER_ the above init operation
+	// (which is done only for module source jobs) or Terraform logs the full
+	// final URL that contains a valid (even if temporary) token.
+	tf.SetStdout(t.jobLogger)
+	tf.SetStderr(t.jobLogger)
+
+	// Write an override file to set backend to local.
+	overridePath := filepath.Join(t.workspaceDir, "override.tf")
+	if err = os.WriteFile(overridePath, []byte(backendOverride), 0600); err != nil {
+		return nil, fmt.Errorf("failed to write terraform override file %v", err)
+	}
+
+	// If a current workspace state exists, download it to workspaceDir.
+	// This must happen after the first init or remote module source download refuses to try.
+	if t.workspace.CurrentStateVersion != nil {
+		if err = t.downloadCurrentStateVersion(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// Use cancellable context here so that init command can be manually cancelled
+	err = tf.Init(t.cancellableCtx)
+	if isCancellationError(err) {
+		return nil, fmt.Errorf("job cancelled while terraform init command was in progress")
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to run init command %v", err)
+	}
+
+	return tf, nil
+}
+
+func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) error {
+	tmpDownloadDir, err := os.MkdirTemp("", "downloads")
+	if err != nil {
+		return fmt.Errorf("failed to create temp downloads directory %v", err)
+	}
+	defer os.RemoveAll(tmpDownloadDir)
+
+	cvFilePath := fmt.Sprintf("%s/%s.tar.gz", tmpDownloadDir, *t.run.ConfigurationVersionID)
+
+	cvFile, err := os.Create(cvFilePath)
+	if err != nil {
+		return errors.NewError(
+			errors.EInternal,
+			"Failed to create temporary configuration version file for download",
+			errors.WithErrorErr(err),
+		)
+	}
+
+	defer cvFile.Close()
+
+	cv, err := t.client.GetConfigurationVersion(ctx, *t.run.ConfigurationVersionID)
+	if err != nil {
+		return errors.NewError(
+			errors.EInternal,
+			"Failed to query configuration version from database",
+			errors.WithErrorErr(err),
+		)
+	}
+
+	if err := t.client.DownloadConfigurationVersion(ctx, cv, cvFile); err != nil {
+		return err
+	}
+
+	// Rewind file to start
+	if _, err := cvFile.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	return tgz.Decompress(t.workspaceDir, cvFilePath, true, 0000)
+}
+
+func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) error {
+	stateVersion := t.workspace.CurrentStateVersion
+
+	stateFile, err := os.Create(filepath.Join(t.workspaceDir, "terraform.tfstate"))
+	if err != nil {
+		return errors.NewError(
+			errors.EInternal,
+			"Failed to create temporary file for current terraform state",
+			errors.WithErrorErr(err),
+		)
+	}
+
+	defer stateFile.Close()
+
+	return t.client.DownloadStateVersion(ctx, stateVersion, stateFile)
+}
+
+// setBuiltInEnvVars will add Tharsis built in environment variables for the job.
+func (t *terraformWorkspace) setBuiltInEnvVars(ctx context.Context) error {
+	// Set THARSIS_GROUP_PATH
+	t.fullEnv["THARSIS_GROUP_PATH"] = t.workspace.FullPath[:strings.LastIndex(t.workspace.FullPath, "/")]
+
+	apiURL, err := url.Parse(t.jobCfg.APIEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to parse API URL %v", err)
+	}
+
+	// Set TF_TOKEN_<host>
+	t.fullEnv[module.BuildTokenEnvVar(apiURL.Host)] = t.jobCfg.JobToken
+
+	if t.jobCfg.DiscoveryProtocolHost != "" {
+		t.fullEnv[module.BuildTokenEnvVar(t.jobCfg.DiscoveryProtocolHost)] = t.jobCfg.JobToken
+	}
+
+	// Set THARSIS_ENDPOINT which is used by the Terraform Tharsis Provider
+	t.fullEnv["THARSIS_ENDPOINT"] = t.jobCfg.APIEndpoint
+
+	// Placeholder in case we need to make an API call to get additional variables
+	_ = ctx
+
+	return nil
+}

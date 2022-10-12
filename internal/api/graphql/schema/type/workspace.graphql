@@ -1,0 +1,112 @@
+enum WorkspaceSort {
+  FULL_PATH_ASC
+  FULL_PATH_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type WorkspaceConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [WorkspaceEdge]
+}
+
+type WorkspaceEdge {
+  cursor: String!
+  node: Workspace
+}
+
+type CreateWorkspacePayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
+type UpdateWorkspacePayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
+type DeleteWorkspacePayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
+type WorkspaceEvent {
+  action: String!
+  workspace: Workspace!
+}
+
+input WorkspaceSubscriptionInput {
+  workspacePath: String!
+}
+
+type Workspace implements Node, Namespace {
+  id: ID!
+  metadata: ResourceMetadata!
+  name: String!
+  description: String!
+  fullPath: String!
+  group: Group!
+  dirtyState: Boolean!
+  locked: Boolean!
+  assignedManagedIdentities: [ManagedIdentity!]!
+  managedIdentities(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: ManagedIdentitySort
+    includeInherited: Boolean
+    search: String
+  ): ManagedIdentityConnection!
+  serviceAccounts(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    includeInherited: Boolean
+    search: String
+  ): ServiceAccountConnection!
+  stateVersions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: StateVersionSort
+  ): StateVersionConnection!
+  memberships: [NamespaceMembership!]!
+  variables: [NamespaceVariable!]!
+  currentStateVersion: StateVersion
+  currentJob: Job
+  maxJobDuration: Int!
+  createdBy: String!
+  terraformVersion: String!
+}
+
+input CreateWorkspaceInput {
+  clientMutationId: String
+  name: String!
+  description: String!
+  groupPath: String!
+  maxJobDuration: Int
+  terraformVersion: String
+}
+
+input UpdateWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
+  metadata: ResourceMetadataInput
+  description: String!
+  maxJobDuration: Int
+  terraformVersion: String
+}
+
+input DeleteWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
+  force: Boolean
+  metadata: ResourceMetadataInput
+}

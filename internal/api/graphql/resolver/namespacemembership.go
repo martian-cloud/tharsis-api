@@ -1,0 +1,406 @@
+package resolver
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+
+	graphql "github.com/graph-gophers/graphql-go"
+)
+
+/* Namespace Membership Query Resolvers */
+
+// NamespaceMembershipConnectionQueryArgs are used to query a namespace membership connection
+type NamespaceMembershipConnectionQueryArgs struct {
+	ConnectionQueryArgs
+	NamespacePath string
+}
+
+// NamespaceMembershipEdgeResolver resolves namespace membership edges
+type NamespaceMembershipEdgeResolver struct {
+	edge Edge
+}
+
+// Cursor returns an opaque cursor
+func (r *NamespaceMembershipEdgeResolver) Cursor() (string, error) {
+	namespaceMembership, ok := r.edge.Node.(models.NamespaceMembership)
+	if !ok {
+		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+	}
+	cursor, err := r.edge.CursorFunc(&namespaceMembership)
+	return *cursor, err
+}
+
+// Node returns a namespace membership node
+func (r *NamespaceMembershipEdgeResolver) Node(ctx context.Context) (*NamespaceMembershipResolver, error) {
+	namespaceMembership, ok := r.edge.Node.(models.NamespaceMembership)
+	if !ok {
+		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+	}
+
+	return &NamespaceMembershipResolver{namespaceMembership: &namespaceMembership}, nil
+}
+
+// NamespaceMembershipConnectionResolver resolves a namespace membership connection
+type NamespaceMembershipConnectionResolver struct {
+	connection Connection
+}
+
+// NewNamespaceMembershipConnectionResolver creates a new NamespaceMembershipConnectionResolver
+func NewNamespaceMembershipConnectionResolver(ctx context.Context,
+	input *namespacemembership.GetNamespaceMembershipsForSubjectInput) (*NamespaceMembershipConnectionResolver, error) {
+	service := getNamespaceMembershipService(ctx)
+
+	result, err := service.GetNamespaceMembershipsForSubject(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	namespaceMemberships := result.NamespaceMemberships
+
+	// Create edges
+	edges := make([]Edge, len(namespaceMemberships))
+	for i, namespaceMembership := range namespaceMemberships {
+		edges[i] = Edge{CursorFunc: result.PageInfo.Cursor, Node: namespaceMembership}
+	}
+
+	pageInfo := PageInfo{
+		HasNextPage:     result.PageInfo.HasNextPage,
+		HasPreviousPage: result.PageInfo.HasPreviousPage,
+	}
+
+	if len(namespaceMemberships) > 0 {
+		var err error
+		pageInfo.StartCursor, err = result.PageInfo.Cursor(&namespaceMemberships[0])
+		if err != nil {
+			return nil, err
+		}
+
+		pageInfo.EndCursor, err = result.PageInfo.Cursor(&namespaceMemberships[len(edges)-1])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	connection := Connection{
+		TotalCount: result.PageInfo.TotalCount,
+		PageInfo:   pageInfo,
+		Edges:      edges,
+	}
+
+	return &NamespaceMembershipConnectionResolver{connection: connection}, nil
+}
+
+// TotalCount returns the total result count for the connection
+func (r *NamespaceMembershipConnectionResolver) TotalCount() int32 {
+	return r.connection.TotalCount
+}
+
+// PageInfo returns the connection page information
+func (r *NamespaceMembershipConnectionResolver) PageInfo() *PageInfoResolver {
+	return &PageInfoResolver{pageInfo: r.connection.PageInfo}
+}
+
+// Edges returns the connection edges
+func (r *NamespaceMembershipConnectionResolver) Edges() *[]*NamespaceMembershipEdgeResolver {
+	resolvers := make([]*NamespaceMembershipEdgeResolver, len(r.connection.Edges))
+	for i, edge := range r.connection.Edges {
+		resolvers[i] = &NamespaceMembershipEdgeResolver{edge: edge}
+	}
+	return &resolvers
+}
+
+// MemberResolver results the Member union type
+type MemberResolver struct {
+	result interface{}
+}
+
+// ToUser resolves user member types
+func (r *MemberResolver) ToUser() (*UserResolver, bool) {
+	res, ok := r.result.(*UserResolver)
+	return res, ok
+}
+
+// ToServiceAccount resolvers service account member types
+func (r *MemberResolver) ToServiceAccount() (*ServiceAccountResolver, bool) {
+	res, ok := r.result.(*ServiceAccountResolver)
+	return res, ok
+}
+
+// ToTeam resolves team member types
+func (r *MemberResolver) ToTeam() (*TeamResolver, bool) {
+	res, ok := r.result.(*TeamResolver)
+	return res, ok
+}
+
+// NamespaceMembershipResolver resolves a namespace membership resource
+type NamespaceMembershipResolver struct {
+	namespaceMembership *models.NamespaceMembership
+}
+
+// ID resolver
+func (r *NamespaceMembershipResolver) ID() graphql.ID {
+	return graphql.ID(gid.ToGlobalID(gid.NamespaceMembershipType, r.namespaceMembership.Metadata.ID))
+}
+
+// ResourcePath resolver
+func (r *NamespaceMembershipResolver) ResourcePath() string {
+	return fmt.Sprintf("%s/%s", r.namespaceMembership.Namespace.Path, r.namespaceMembership.Metadata.ID)
+}
+
+// Member resolver
+func (r *NamespaceMembershipResolver) Member(ctx context.Context) (*MemberResolver, error) {
+	// Query for member based on type
+	if r.namespaceMembership.UserID != nil {
+		// Use resource loader to get user
+		user, err := loadUser(ctx, *r.namespaceMembership.UserID)
+		if err != nil {
+			return nil, err
+		}
+		return &MemberResolver{result: &UserResolver{user: user}}, nil
+	}
+
+	if r.namespaceMembership.ServiceAccountID != nil {
+		// Use resource loader to get service account
+		serviceAccount, err := loadServiceAccount(ctx, *r.namespaceMembership.ServiceAccountID)
+		if err != nil {
+			return nil, err
+		}
+		return &MemberResolver{result: &ServiceAccountResolver{serviceAccount: serviceAccount}}, nil
+	}
+
+	if r.namespaceMembership.TeamID != nil {
+		// Use resource loader to get team
+		team, err := loadTeam(ctx, *r.namespaceMembership.TeamID)
+		if err != nil {
+			return nil, err
+		}
+		return &MemberResolver{result: &TeamResolver{team: team}}, nil
+	}
+
+	return nil, errors.NewError(errors.EInvalid, "UserID, ServiceAccountID, or TeamID must be specified")
+}
+
+// Namespace resolver
+func (r *NamespaceMembershipResolver) Namespace(ctx context.Context) (*NamespaceResolver, error) {
+	// Query for member based on type
+	if r.namespaceMembership.Namespace.GroupID != nil {
+		group, err := loadGroup(ctx, *r.namespaceMembership.Namespace.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
+	}
+
+	ws, err := loadWorkspace(ctx, *r.namespaceMembership.Namespace.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return &NamespaceResolver{result: &WorkspaceResolver{workspace: ws}}, nil
+}
+
+// Role resolver
+func (r *NamespaceMembershipResolver) Role() string {
+	return string(r.namespaceMembership.Role)
+}
+
+// Metadata resolver
+func (r *NamespaceMembershipResolver) Metadata() *MetadataResolver {
+	return &MetadataResolver{metadata: &r.namespaceMembership.Metadata}
+}
+
+/* Namespace Membership Mutation Resolvers */
+
+// NamespaceMembershipMutationPayload is the response payload for a namespace membership mutation
+type NamespaceMembershipMutationPayload struct {
+	ClientMutationID    *string
+	NamespaceMembership *models.NamespaceMembership
+	Problems            []Problem
+}
+
+// NamespaceMembershipMutationPayloadResolver resolves a NamespaceMembershipMutationPayload
+type NamespaceMembershipMutationPayloadResolver struct {
+	NamespaceMembershipMutationPayload
+}
+
+// Namespace field resolver
+func (r *NamespaceMembershipMutationPayloadResolver) Namespace(ctx context.Context) (*NamespaceResolver, error) {
+	if r.NamespaceMembershipMutationPayload.NamespaceMembership == nil {
+		return nil, nil
+	}
+	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, r.NamespaceMembership.Namespace.Path)
+	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
+		return nil, err
+	}
+	if group != nil {
+		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
+	}
+
+	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, r.NamespaceMembership.Namespace.Path)
+	if err != nil {
+		return nil, err
+	}
+	return &NamespaceResolver{result: &WorkspaceResolver{workspace: ws}}, nil
+}
+
+// CreateNamespaceMembershipInput is the input for creating a new namespace membership
+type CreateNamespaceMembershipInput struct {
+	ClientMutationID *string
+	Username         *string
+	ServiceAccountID *string
+	TeamName         *string
+	Role             string
+	NamespacePath    string
+}
+
+// UpdateNamespaceMembershipInput is the input for updating a namespace membership
+type UpdateNamespaceMembershipInput struct {
+	ClientMutationID *string
+	Metadata         *MetadataInput
+	ID               string
+	Role             string
+}
+
+// DeleteNamespaceMembershipInput is the input for deleting a namespace membership
+type DeleteNamespaceMembershipInput struct {
+	ClientMutationID *string
+	Metadata         *MetadataInput
+	ID               string
+}
+
+func handleNamespaceMembershipMutationProblem(e error,
+	clientMutationID *string) (*NamespaceMembershipMutationPayloadResolver, error) {
+	problem, err := buildProblem(e)
+	if err != nil {
+		return nil, err
+	}
+	payload := NamespaceMembershipMutationPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
+	return &NamespaceMembershipMutationPayloadResolver{NamespaceMembershipMutationPayload: payload}, nil
+}
+
+func createNamespaceMembershipMutation(ctx context.Context,
+	input *CreateNamespaceMembershipInput) (*NamespaceMembershipMutationPayloadResolver, error) {
+
+	// Verify role is valid
+	role := models.Role(input.Role)
+	if !role.IsValid() {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Role %s is not a valid role", input.Role))
+	}
+
+	createOptions := namespacemembership.CreateNamespaceMembershipInput{
+		NamespacePath: input.NamespacePath,
+		Role:          role,
+	}
+
+	if input.Username != nil {
+		user, err := getUserService(ctx).GetUserByUsername(ctx, *input.Username)
+		if err != nil {
+			return nil, err
+		}
+		createOptions.User = user
+	}
+
+	if input.ServiceAccountID != nil {
+		serviceAccount, err := getSAService(ctx).GetServiceAccountByID(ctx, gid.FromGlobalID(*input.ServiceAccountID))
+		if err != nil {
+			return nil, err
+		}
+		createOptions.ServiceAccount = serviceAccount
+	}
+
+	if input.TeamName != nil {
+		team, err := getTeamService(ctx).GetTeamByName(ctx, *input.TeamName)
+		if err != nil {
+			return nil, err
+		}
+		createOptions.Team = team
+	}
+
+	namespaceMembership, err := getNamespaceMembershipService(ctx).CreateNamespaceMembership(ctx, &createOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := NamespaceMembershipMutationPayload{
+		ClientMutationID:    input.ClientMutationID,
+		NamespaceMembership: namespaceMembership,
+		Problems:            []Problem{},
+	}
+	return &NamespaceMembershipMutationPayloadResolver{NamespaceMembershipMutationPayload: payload}, nil
+}
+
+func updateNamespaceMembershipMutation(ctx context.Context,
+	input *UpdateNamespaceMembershipInput) (*NamespaceMembershipMutationPayloadResolver, error) {
+	service := getNamespaceMembershipService(ctx)
+
+	namespaceMembership, err := service.GetNamespaceMembershipByID(ctx, gid.FromGlobalID(input.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if resource version is specified
+	if input.Metadata != nil {
+		v, cErr := strconv.Atoi(input.Metadata.Version)
+		if cErr != nil {
+			return nil, cErr
+		}
+
+		namespaceMembership.Metadata.Version = v
+	}
+
+	// Verify role is valid
+	role := models.Role(input.Role)
+	if !role.IsValid() {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Role %s is not a valid role", input.Role))
+	}
+
+	namespaceMembership.Role = role
+
+	namespaceMembership, err = service.UpdateNamespaceMembership(ctx, namespaceMembership)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := NamespaceMembershipMutationPayload{
+		ClientMutationID:    input.ClientMutationID,
+		NamespaceMembership: namespaceMembership,
+		Problems:            []Problem{},
+	}
+	return &NamespaceMembershipMutationPayloadResolver{NamespaceMembershipMutationPayload: payload}, nil
+}
+
+func deleteNamespaceMembershipMutation(ctx context.Context,
+	input *DeleteNamespaceMembershipInput) (*NamespaceMembershipMutationPayloadResolver, error) {
+	service := getNamespaceMembershipService(ctx)
+
+	namespaceMembership, err := service.GetNamespaceMembershipByID(ctx, gid.FromGlobalID(input.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if resource version is specified
+	if input.Metadata != nil {
+		v, cErr := strconv.Atoi(input.Metadata.Version)
+		if cErr != nil {
+			return nil, cErr
+		}
+
+		namespaceMembership.Metadata.Version = v
+	}
+
+	if err = service.DeleteNamespaceMembership(ctx, namespaceMembership); err != nil {
+		return nil, err
+	}
+
+	payload := NamespaceMembershipMutationPayload{
+		ClientMutationID:    input.ClientMutationID,
+		NamespaceMembership: namespaceMembership,
+		Problems:            []Problem{},
+	}
+	return &NamespaceMembershipMutationPayloadResolver{NamespaceMembershipMutationPayload: payload}, nil
+}

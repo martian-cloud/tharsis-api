@@ -1,0 +1,6 @@
+type Subscription {
+  workspaceRunEvents(input: RunSubscriptionInput!): RunEvent!
+  workspaceEvents(input: WorkspaceSubscriptionInput!): WorkspaceEvent!
+  jobLogEvents(input: JobLogSubscriptionInput!): JobLogEvent!
+  jobCancellationEvent(input: JobCancellationEventSubscriptionInput!): JobCancellationEvent!
+}

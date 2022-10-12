@@ -1,0 +1,5 @@
+type SCIMTokenPayload {
+  clientMutationId: String
+  token: String
+  problems: [Problem!]!
+}

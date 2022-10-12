@@ -1,0 +1,15 @@
+type TerraformCLIMutationPayload {
+  clientMutationId: String
+  downloadUrl: String!
+  problems: [Problem!]!
+}
+
+type TerraformCLIVersions {
+  versions: [String!]!
+}
+
+input CreateTerraformCLIDownloadURLInput {
+  version: String!
+  os: String!
+  architecture: String!
+}

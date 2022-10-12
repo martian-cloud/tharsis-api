@@ -1,0 +1,695 @@
+package resolver
+
+import (
+	"context"
+)
+
+// RootResolver is the entry point for all top-level operations.
+type RootResolver struct{}
+
+// NewRootResolver creates a root resolver
+func NewRootResolver() *RootResolver {
+	return &RootResolver{}
+}
+
+/* Me query to get current authenticated subject */
+
+// Me query returns the authenticated subject
+func (r RootResolver) Me(ctx context.Context) (*MeResponseResolver, error) {
+	return meQuery(ctx)
+}
+
+/* Node query */
+
+// Node query returns a node by ID
+func (r RootResolver) Node(ctx context.Context, args *struct{ ID string }) (*NodeResolver, error) {
+	return node(ctx, args.ID)
+}
+
+/* Namespace Queries and Mutations */
+
+// Namespace query returns a namespace by full path
+func (r RootResolver) Namespace(ctx context.Context, args *NamespaceQueryArgs) (*NamespaceResolver, error) {
+	return namespaceQuery(ctx, args)
+}
+
+/* Workspace Queries and Mutations */
+
+// Workspace query returns a workspace by full path
+func (r RootResolver) Workspace(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
+	return workspaceQuery(ctx, args)
+}
+
+// Workspaces query returns a workspace connection
+func (r RootResolver) Workspaces(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*WorkspaceConnectionResolver, error) {
+	return workspacesQuery(ctx, args)
+}
+
+// CreateWorkspace creates a new workspace
+func (r RootResolver) CreateWorkspace(ctx context.Context, args *struct{ Input *CreateWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	response, err := createWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateWorkspace updates an existing workspace
+func (r RootResolver) UpdateWorkspace(ctx context.Context, args *struct{ Input *UpdateWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	response, err := updateWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteWorkspace deletes a workspace
+func (r RootResolver) DeleteWorkspace(ctx context.Context, args *struct{ Input *DeleteWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	response, err := deleteWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// WorkspaceEvents subscribes to events for a particular workspace
+func (r RootResolver) WorkspaceEvents(ctx context.Context, args *struct{ Input *WorkspaceSubscriptionInput }) (<-chan *WorkspaceEventResolver, error) {
+	return r.workspaceEventsSubscription(ctx, args.Input)
+}
+
+/* State Version Queries and Mutations */
+
+// CreateStateVersion creates a new state version
+func (r RootResolver) CreateStateVersion(ctx context.Context, args *struct{ Input *CreateStateVersionInput }) (*StateVersionMutationPayloadResolver, error) {
+	response, err := createStateVersionMutation(ctx, args.Input)
+	if err != nil {
+		return handleStateVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Groups Queries and Mutations */
+
+// Group query returns a group by full path
+func (r RootResolver) Group(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {
+	return groupQuery(ctx, args)
+}
+
+// Groups query returns a groups connection
+func (r RootResolver) Groups(ctx context.Context, args *GroupConnectionQueryArgs) (*GroupConnectionResolver, error) {
+	return groupsQuery(ctx, args)
+}
+
+// CreateGroup creates a new group
+func (r RootResolver) CreateGroup(ctx context.Context, args *struct{ Input *CreateGroupInput }) (*GroupMutationPayloadResolver, error) {
+	response, err := createGroupMutation(ctx, args.Input)
+	if err != nil {
+		return handleGroupMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateGroup updates an existing group
+func (r RootResolver) UpdateGroup(ctx context.Context, args *struct{ Input *UpdateGroupInput }) (*GroupMutationPayloadResolver, error) {
+	response, err := updateGroupMutation(ctx, args.Input)
+	if err != nil {
+		return handleGroupMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteGroup deletes a group
+func (r RootResolver) DeleteGroup(ctx context.Context, args *struct{ Input *DeleteGroupInput }) (*GroupMutationPayloadResolver, error) {
+	response, err := deleteGroupMutation(ctx, args.Input)
+	if err != nil {
+		return handleGroupMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Run Queries and Mutations */
+
+// Run query returns a run by ID
+func (r RootResolver) Run(ctx context.Context, args *RunQueryArgs) (*RunResolver, error) {
+	return runQuery(ctx, args)
+}
+
+// Runs query returns a run connection
+func (r RootResolver) Runs(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectionResolver, error) {
+	return runsQuery(ctx, args)
+}
+
+// CreateRun mutation creates a new run
+func (r RootResolver) CreateRun(ctx context.Context, args *struct{ Input *CreateRunInput }) (*RunMutationPayloadResolver, error) {
+	response, err := createRunMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// ApplyRun mutation starts the apply stage for a run
+func (r RootResolver) ApplyRun(ctx context.Context, args *struct{ Input *ApplyRunInput }) (*RunMutationPayloadResolver, error) {
+	response, err := applyRunMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// CancelRun mutation cancels a run
+func (r RootResolver) CancelRun(ctx context.Context, args *struct{ Input *CancelRunInput }) (*RunMutationPayloadResolver, error) {
+	response, err := cancelRunMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Plan Queries and Mutations */
+
+// UpdatePlan updates an existing plan
+func (r RootResolver) UpdatePlan(ctx context.Context, args *struct{ Input *UpdatePlanInput }) (*PlanMutationPayloadResolver, error) {
+	response, err := updatePlanMutation(ctx, args.Input)
+	if err != nil {
+		return handlePlanMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Apply Queries and Mutations */
+
+// UpdateApply updates an existing apply
+func (r RootResolver) UpdateApply(ctx context.Context, args *struct{ Input *UpdateApplyInput }) (*ApplyMutationPayloadResolver, error) {
+	response, err := updateApplyMutation(ctx, args.Input)
+	if err != nil {
+		return handleApplyMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Managed Identity / Credentials Queries and Mutations */
+
+// ManagedIdentity query returns a managed identity
+func (r RootResolver) ManagedIdentity(ctx context.Context, args *ManagedIdentityQueryArgs) (*ManagedIdentityResolver, error) {
+	return managedIdentityQuery(ctx, args)
+}
+
+// CreateManagedIdentityAccessRule creates a new managed identity access rule
+func (r RootResolver) CreateManagedIdentityAccessRule(ctx context.Context, args *struct {
+	Input *CreateManagedIdentityAccessRuleInput
+}) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
+	response, err := createManagedIdentityAccessRuleMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityAccessRuleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateManagedIdentityAccessRule updates an existing managed identity access rule
+func (r RootResolver) UpdateManagedIdentityAccessRule(ctx context.Context, args *struct {
+	Input *UpdateManagedIdentityAccessRuleInput
+}) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
+	response, err := updateManagedIdentityAccessRuleMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityAccessRuleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteManagedIdentityAccessRule deletes an existing managed identity access rule
+func (r RootResolver) DeleteManagedIdentityAccessRule(ctx context.Context, args *struct {
+	Input *DeleteManagedIdentityAccessRuleInput
+}) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
+	response, err := deleteManagedIdentityAccessRuleMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityAccessRuleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// CreateManagedIdentity creates a new managed identity
+func (r RootResolver) CreateManagedIdentity(ctx context.Context, args *struct{ Input *CreateManagedIdentityInput }) (*ManagedIdentityMutationPayloadResolver, error) {
+	response, err := createManagedIdentityMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateManagedIdentity updates an existing managed identity
+func (r RootResolver) UpdateManagedIdentity(ctx context.Context, args *struct{ Input *UpdateManagedIdentityInput }) (*ManagedIdentityMutationPayloadResolver, error) {
+	response, err := updateManagedIdentityMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteManagedIdentity deletes a managed identity
+func (r RootResolver) DeleteManagedIdentity(ctx context.Context, args *struct{ Input *DeleteManagedIdentityInput }) (*ManagedIdentityMutationPayloadResolver, error) {
+	response, err := deleteManagedIdentityMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// AssignManagedIdentity assigns a managed identity to a workspace
+func (r RootResolver) AssignManagedIdentity(ctx context.Context, args *struct{ Input *AssignManagedIdentityInput }) (*AssignManagedIdentityMutationPayloadResolver, error) {
+	response, err := assignManagedIdentityMutation(ctx, args.Input)
+	if err != nil {
+		return handleAssignManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UnassignManagedIdentity un-assigns a managed identity from a workspace
+func (r RootResolver) UnassignManagedIdentity(ctx context.Context, args *struct{ Input *AssignManagedIdentityInput }) (*AssignManagedIdentityMutationPayloadResolver, error) {
+	response, err := unassignManagedIdentityMutation(ctx, args.Input)
+	if err != nil {
+		return handleAssignManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// CreateManagedIdentityCredentials creates credentials for a managed identity
+func (r RootResolver) CreateManagedIdentityCredentials(ctx context.Context, args *struct {
+	Input *CreateManagedIdentityCredentialsInput
+}) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
+	response, err := createManagedIdentityCredentialsMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityCredentialsMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Service Account Queries and Mutations */
+
+// ServiceAccount query returns a service account
+func (r RootResolver) ServiceAccount(ctx context.Context, args *ServiceAccountQueryArgs) (*ServiceAccountResolver, error) {
+	return serviceAccountQuery(ctx, args)
+}
+
+// CreateServiceAccount creates a new service account
+func (r RootResolver) CreateServiceAccount(ctx context.Context, args *struct{ Input *CreateServiceAccountInput }) (*ServiceAccountMutationPayloadResolver, error) {
+	return createServiceAccountMutation(ctx, args.Input)
+}
+
+// UpdateServiceAccount updates an existing service account
+func (r RootResolver) UpdateServiceAccount(ctx context.Context, args *struct{ Input *UpdateServiceAccountInput }) (*ServiceAccountMutationPayloadResolver, error) {
+	return updateServiceAccountMutation(ctx, args.Input)
+}
+
+// DeleteServiceAccount deletes a service account
+func (r RootResolver) DeleteServiceAccount(ctx context.Context, args *struct{ Input *DeleteServiceAccountInput }) (*ServiceAccountMutationPayloadResolver, error) {
+	return deleteServiceAccountMutation(ctx, args.Input)
+}
+
+// WorkspaceRunEvents subscribes to run events for a particular workspace
+func (r RootResolver) WorkspaceRunEvents(ctx context.Context, args *struct{ Input *RunSubscriptionInput }) (<-chan *RunEventResolver, error) {
+	return r.workspaceRunEventsSubscription(ctx, args.Input)
+}
+
+/* Namespace Membership queries and Mutations */
+
+// CreateNamespaceMembership creates a new namespace membership in a namespace
+func (r RootResolver) CreateNamespaceMembership(ctx context.Context,
+	args *struct {
+		Input *CreateNamespaceMembershipInput
+	}) (*NamespaceMembershipMutationPayloadResolver, error) {
+	response, err := createNamespaceMembershipMutation(ctx, args.Input)
+	if err != nil {
+		return handleNamespaceMembershipMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateNamespaceMembership updates an existing namespace membership
+func (r RootResolver) UpdateNamespaceMembership(ctx context.Context,
+	args *struct {
+		Input *UpdateNamespaceMembershipInput
+	}) (*NamespaceMembershipMutationPayloadResolver, error) {
+	response, err := updateNamespaceMembershipMutation(ctx, args.Input)
+	if err != nil {
+		return handleNamespaceMembershipMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteNamespaceMembership updates an existing namespace membership
+func (r RootResolver) DeleteNamespaceMembership(ctx context.Context,
+	args *struct {
+		Input *DeleteNamespaceMembershipInput
+	}) (*NamespaceMembershipMutationPayloadResolver, error) {
+	response, err := deleteNamespaceMembershipMutation(ctx, args.Input)
+	if err != nil {
+		return handleNamespaceMembershipMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Job queries and Mutations */
+
+// Job query returns a single job
+func (r RootResolver) Job(ctx context.Context, args *JobQueryArgs) (*JobResolver, error) {
+	return jobQuery(ctx, args)
+}
+
+// JobLogEvents sets up a subscription for job log events
+func (r RootResolver) JobLogEvents(ctx context.Context, args *struct{ Input *JobLogSubscriptionInput }) (<-chan *JobLogEventResolver, error) {
+	return r.jobLogEventsSubscription(ctx, args.Input)
+}
+
+// JobCancellationEvent sets up a subscription for job cancellation event
+func (r RootResolver) JobCancellationEvent(ctx context.Context, args *struct {
+	Input *JobCancellationEventSubscriptionInput
+}) (<-chan *JobCancellationEventResolver, error) {
+	return r.jobCancellationEventSubscription(ctx, args.Input)
+}
+
+// SaveJobLogs saves job logs
+func (r RootResolver) SaveJobLogs(ctx context.Context, args *struct{ Input *SaveJobLogsInput }) (*SaveJobLogsPayload, error) {
+	response, err := saveJobLogsMutation(ctx, args.Input)
+	if err != nil {
+		return handleSaveJobLogsMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Configuration Version Queries and Mutations */
+
+// ConfigurationVersion query returns a configuration version by ID
+func (r RootResolver) ConfigurationVersion(ctx context.Context, args *ConfigurationVersionQueryArgs) (*ConfigurationVersionResolver, error) {
+	return configurationVersionQuery(ctx, args)
+}
+
+// CreateConfigurationVersion creates a new configuration version
+func (r RootResolver) CreateConfigurationVersion(ctx context.Context, args *struct {
+	Input *CreateConfigurationVersionInput
+}) (*ConfigurationVersionMutationPayloadResolver, error) {
+	response, err := createConfigurationVersionMutation(ctx, args.Input)
+	if err != nil {
+		return handleConfigurationVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Variable Mutations */
+
+// SetNamespaceVariables mutation replaces all the variables for the specified namespace
+func (r RootResolver) SetNamespaceVariables(ctx context.Context, args *struct{ Input *SetNamespaceVariablesInput }) (*VariableMutationPayloadResolver, error) {
+	response, err := setNamespaceVariablesMutation(ctx, args.Input)
+	if err != nil {
+		return handleVariableMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// CreateNamespaceVariable mutation creates a new variable
+func (r RootResolver) CreateNamespaceVariable(ctx context.Context, args *struct{ Input *CreateNamespaceVariableInput }) (*VariableMutationPayloadResolver, error) {
+	response, err := createNamespaceVariableMutation(ctx, args.Input)
+	if err != nil {
+		return handleVariableMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateNamespaceVariable mutation updates an existing variable
+func (r RootResolver) UpdateNamespaceVariable(ctx context.Context, args *struct{ Input *UpdateNamespaceVariableInput }) (*VariableMutationPayloadResolver, error) {
+	response, err := updateNamespaceVariableMutation(ctx, args.Input)
+	if err != nil {
+		return handleVariableMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteNamespaceVariable mutation deletes an existing variable
+func (r RootResolver) DeleteNamespaceVariable(ctx context.Context, args *struct{ Input *DeleteNamespaceVariableInput }) (*VariableMutationPayloadResolver, error) {
+	response, err := deleteNamespaceVariableMutation(ctx, args.Input)
+	if err != nil {
+		return handleVariableMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* User Queries and Mutations */
+
+// Users query returns a user connection
+func (r RootResolver) Users(ctx context.Context, args *UserConnectionQueryArgs) (*UserConnectionResolver, error) {
+	return usersQuery(ctx, args)
+}
+
+/* Teams Queries and Mutations */
+
+// Team query returns a team by name
+func (r RootResolver) Team(ctx context.Context, args *TeamQueryArgs) (*TeamResolver, error) {
+	return teamQuery(ctx, args)
+}
+
+// Teams query returns a teams connection
+func (r RootResolver) Teams(ctx context.Context, args *TeamConnectionQueryArgs) (*TeamConnectionResolver, error) {
+	return teamsQuery(ctx, args)
+}
+
+// CreateTeam creates a new team
+func (r RootResolver) CreateTeam(ctx context.Context, args *struct{ Input *CreateTeamInput }) (*TeamMutationPayloadResolver, error) {
+	response, err := createTeamMutation(ctx, args.Input)
+	if err != nil {
+		return handleTeamMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateTeam updates an existing team
+func (r RootResolver) UpdateTeam(ctx context.Context, args *struct{ Input *UpdateTeamInput }) (*TeamMutationPayloadResolver, error) {
+	response, err := updateTeamMutation(ctx, args.Input)
+	if err != nil {
+		return handleTeamMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTeam deletes a team
+func (r RootResolver) DeleteTeam(ctx context.Context, args *struct{ Input *DeleteTeamInput }) (*TeamMutationPayloadResolver, error) {
+	response, err := deleteTeamMutation(ctx, args.Input)
+	if err != nil {
+		return handleTeamMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* TeamMember queries and Mutations */
+
+// AddUserToTeam adds a user to a team.
+func (r RootResolver) AddUserToTeam(ctx context.Context, args *struct{ Input *AddUserToTeamInput }) (*TeamMemberMutationPayloadResolver, error) {
+	response, err := addUserToTeamMutation(ctx, args.Input)
+	if err != nil {
+		return handleTeamMemberMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateTeamMember updates an existing team member
+func (r RootResolver) UpdateTeamMember(ctx context.Context, args *struct{ Input *UpdateTeamMemberInput }) (*TeamMemberMutationPayloadResolver, error) {
+	response, err := updateTeamMemberMutation(ctx, args.Input)
+	if err != nil {
+		return handleTeamMemberMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// RemoveUserFromTeam removes a user from a team.
+func (r RootResolver) RemoveUserFromTeam(ctx context.Context, args *struct{ Input *RemoveUserFromTeamInput }) (*TeamMemberMutationPayloadResolver, error) {
+	response, err := removeUserFromTeamMutation(ctx, args.Input)
+	if err != nil {
+		return handleTeamMemberMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Terraform Provider Queries and Mutations */
+
+// TerraformProviders query returns a terraform provider connection
+func (r RootResolver) TerraformProviders(ctx context.Context, args *TerraformProviderConnectionQueryArgs) (*TerraformProviderConnectionResolver, error) {
+	return terraformProvidersQuery(ctx, args)
+}
+
+// TerraformProvider query returns a terraform provider by address
+func (r RootResolver) TerraformProvider(ctx context.Context, args *TerraformProviderQueryArgs) (*TerraformProviderResolver, error) {
+	return terraformProviderQuery(ctx, args)
+}
+
+// CreateTerraformProvider creates a new terraform provider
+func (r RootResolver) CreateTerraformProvider(ctx context.Context, args *struct{ Input *CreateTerraformProviderInput }) (*TerraformProviderMutationPayloadResolver, error) {
+	response, err := createTerraformProviderMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateTerraformProvider updates a terraform provider
+func (r RootResolver) UpdateTerraformProvider(ctx context.Context, args *struct{ Input *UpdateTerraformProviderInput }) (*TerraformProviderMutationPayloadResolver, error) {
+	response, err := updateTerraformProviderMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTerraformProvider deletes a terraform provider
+func (r RootResolver) DeleteTerraformProvider(ctx context.Context, args *struct{ Input *DeleteTerraformProviderInput }) (*TerraformProviderMutationPayloadResolver, error) {
+	response, err := deleteTerraformProviderMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Terraform Provider Version Queries and Mutations */
+
+// TerraformProviderVersion query returns a terraform provider version
+func (r RootResolver) TerraformProviderVersion(ctx context.Context, args *TerraformProviderVersionQueryArgs) (*TerraformProviderVersionResolver, error) {
+	return terraformProviderVersionQuery(ctx, args)
+}
+
+// CreateTerraformProviderVersion creates a new terraform provider version
+func (r RootResolver) CreateTerraformProviderVersion(ctx context.Context, args *struct {
+	Input *CreateTerraformProviderVersionInput
+}) (*TerraformProviderVersionMutationPayloadResolver, error) {
+	response, err := createTerraformProviderVersionMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTerraformProviderVersion deletes a terraform provider version
+func (r RootResolver) DeleteTerraformProviderVersion(ctx context.Context, args *struct {
+	Input *DeleteTerraformProviderVersionInput
+}) (*TerraformProviderVersionMutationPayloadResolver, error) {
+	response, err := deleteTerraformProviderVersionMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Terraform Provider Platform Queries and Mutations */
+
+// CreateTerraformProviderPlatform creates a new terraform provider platform
+func (r RootResolver) CreateTerraformProviderPlatform(ctx context.Context, args *struct {
+	Input *CreateTerraformProviderPlatformInput
+}) (*TerraformProviderPlatformMutationPayloadResolver, error) {
+	response, err := createTerraformProviderPlatformMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderPlatformMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTerraformProviderPlatform deletes a terraform provider platform
+func (r RootResolver) DeleteTerraformProviderPlatform(ctx context.Context, args *struct {
+	Input *DeleteTerraformProviderPlatformInput
+}) (*TerraformProviderPlatformMutationPayloadResolver, error) {
+	response, err := deleteTerraformProviderPlatformMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderPlatformMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* GPG Key Queries and Mutations */
+
+// CreateGPGKey creates a new gpg key
+func (r RootResolver) CreateGPGKey(ctx context.Context, args *struct{ Input *CreateGPGKeyInput }) (*GPGKeyMutationPayloadResolver, error) {
+	response, err := createGPGKeyMutation(ctx, args.Input)
+	if err != nil {
+		return handleGPGKeyMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// DeleteGPGKey deletes a gpg key
+func (r RootResolver) DeleteGPGKey(ctx context.Context, args *struct{ Input *DeleteGPGKeyInput }) (*GPGKeyMutationPayloadResolver, error) {
+	response, err := deleteGPGKeyMutation(ctx, args.Input)
+	if err != nil {
+		return handleGPGKeyMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+/* TerraformCLIVersions queries and mutations */
+
+// TerraformCLIVersions queries for available TerraformCLIVersions.
+func (r RootResolver) TerraformCLIVersions(ctx context.Context) (*TerraformCLIVersionsResolver, error) {
+	return terraformCLIVersionsQuery(ctx)
+}
+
+// CreateTerraformCLIDownloadURL create a download URL for a Terraform CLI binary.
+func (r RootResolver) CreateTerraformCLIDownloadURL(ctx context.Context, args *struct {
+	Input *CreateTerraformCLIDownloadURLInput
+}) (*TerraformCLIMutationPayload, error) {
+	response, err := createTerraformCLIDownloadURLMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformCLIMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* SCIM queries and mutations */
+
+// CreateSCIMToken generates a token specifically for provisioning SCIM resources.
+func (r RootResolver) CreateSCIMToken(ctx context.Context) (*SCIMTokenPayload, error) {
+	response, err := createSCIMTokenMutation(ctx)
+	if err != nil {
+		return handleSCIMMutationProblem(err, nil)
+	}
+
+	return response, nil
+}

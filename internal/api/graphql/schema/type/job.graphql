@@ -1,0 +1,56 @@
+enum JobType {
+  plan
+  apply
+}
+
+type JobTimestamps {
+  queuedAt: Time
+  pendingAt: Time
+  runningAt: Time
+  finishedAt: Time
+}
+
+type SaveJobLogsPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+}
+
+type Job implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  status: String!
+  type: JobType!
+  run: Run!
+  workspace: Workspace!
+  timestamps: JobTimestamps!
+  cancelRequested: Boolean!
+  logLastUpdatedAt: Time
+  maxJobDuration: Int!
+  logSize: Int!
+  logs(startOffset: Int!, limit: Int!): String!
+}
+
+type JobLogEvent {
+  action: String!
+  size: Int!
+}
+
+type JobCancellationEvent {
+  job: Job!
+}
+
+input JobLogSubscriptionInput {
+  jobId: String!
+  lastSeenLogSize: Int
+}
+
+input JobCancellationEventSubscriptionInput {
+  jobId: String!
+}
+
+input SaveJobLogsInput {
+  clientMutationId: String
+  logs: String!
+  jobId: String!
+  startOffset: Int!
+}

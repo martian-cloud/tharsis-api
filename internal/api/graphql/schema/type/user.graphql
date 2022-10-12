@@ -1,0 +1,31 @@
+enum UserSort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type UserConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [UserEdge]
+}
+
+type UserEdge {
+  cursor: String!
+  node: User
+}
+
+type User implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  username: String!
+  email: String!
+  namespaceMemberships(
+    after: String
+    before: String
+    first: Int
+    last: Int
+  ): NamespaceMembershipConnection!
+  admin: Boolean!
+  active: Boolean!
+  scimExternalId: String
+}

@@ -1,0 +1,9 @@
+type ResourceMetadata {
+  version: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+input ResourceMetadataInput {
+  version: String!
+}

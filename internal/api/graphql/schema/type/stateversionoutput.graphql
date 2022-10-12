@@ -1,0 +1,8 @@
+type StateVersionOutput implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  name: String!
+  value: String!
+  type: String!
+  sensitive: Boolean!
+}
