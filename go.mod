@@ -46,7 +46,7 @@ require (
 	github.com/zclconf/go-cty v1.10.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20221003200235-27fb6b330f28
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20221003202249-22d91a3f6af2
-	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.1.0
+	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.1.0
 	go.uber.org/zap v1.21.0
 	gopkg.in/yaml.v2 v2.4.0

@@ -37,6 +37,8 @@ variables:
 default:
   image: public.ecr.aws/amazonlinux/amazonlinux:latest
   services: []
+  tags:
+    - oss
   retry:
     max: 2
     when:
@@ -114,6 +116,7 @@ code_quality:
     paths:
       - gl-code-quality-report.json
   tags:
+    - oss
     - docker
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
