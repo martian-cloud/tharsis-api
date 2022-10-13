@@ -20,7 +20,7 @@ type Client interface {
 	GetJob(ctx context.Context, id string) (*types.Job, error)
 	GetWorkspace(ctx context.Context, id string) (*types.Workspace, error)
 	GetRunVariables(ctx context.Context, runID string) ([]types.RunVariable, error)
-	GetManagedIdentities(ctx context.Context, workspacePath string) ([]types.ManagedIdentity, error)
+	GetAssignedManagedIdentities(ctx context.Context, workspacePath string) ([]types.ManagedIdentity, error)
 	GetConfigurationVersion(ctx context.Context, id string) (*types.ConfigurationVersion, error)
 	CreateStateVersion(ctx context.Context, runID string, body io.Reader) (*types.StateVersion, error)
 	CreateManagedIdentityCredentials(ctx context.Context, managedIdentityID string) ([]byte, error)
@@ -81,14 +81,16 @@ func (c *client) CreateManagedIdentityCredentials(ctx context.Context, managedId
 	return credentials, nil
 }
 
-// GetManagedIdentities returns a list of managed identities for a workspace
-func (c *client) GetManagedIdentities(ctx context.Context, workspacePath string) ([]types.ManagedIdentity, error) {
-	workspace, err := c.tharsisClient.Workspaces.GetWorkspace(ctx, &types.GetWorkspaceInput{Path: workspacePath})
+// GetAssignedManagedIdentities returns a list of assigned managed identities for a workspace
+func (c *client) GetAssignedManagedIdentities(ctx context.Context, workspacePath string) ([]types.ManagedIdentity, error) {
+	identitiesOpts := &types.GetAssignedManagedIdentitiesInput{Path: workspacePath}
+
+	identities, err := c.tharsisClient.Workspaces.GetAssignedManagedIdentities(ctx, identitiesOpts)
 	if err != nil {
 		return nil, err
 	}
 
-	return workspace.AssignedManagedIdentities, nil
+	return identities, nil
 }
 
 // GetRun returns a run by ID

@@ -56,9 +56,9 @@ func (l *managedIdentities) close(ctx context.Context) error {
 func (l *managedIdentities) initialize(ctx context.Context) (map[string]string, error) {
 	allEnvVars := map[string]string{}
 
-	identities, err := l.client.GetManagedIdentities(ctx, l.workspacePath)
+	identities, err := l.client.GetAssignedManagedIdentities(ctx, l.workspacePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get managed identities for workspace %v", err)
+		return nil, fmt.Errorf("failed to get assigned managed identities for workspace %v", err)
 	}
 
 	for _, identity := range identities {

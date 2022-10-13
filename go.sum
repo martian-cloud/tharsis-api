@@ -828,8 +828,8 @@ gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20221003202249
 gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20221003202249-22d91a3f6af2/go.mod h1:mMYcru0pfzczcqWk3fo9T4vlucHvOqt6Xb8WGPyJmzM=
 gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0 h1:wjYAvCMMLxWzJvCvVsnlBEHEdHTVlJ/7/pxc37jTEIE=
 gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0/go.mod h1:5KyvfNcn3wC4wot7Bma+v/g+hjw+/nhSGP0fODz7k4Q=
-gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.1.0 h1:QCnI6prkyxuzCocCIQMF6NbyVS2plvY1MhLQHqwx2dw=
-gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.1.0/go.mod h1:DGPccXBXGFc6ntpwhO8p/S8fBHqQsuzIqL0dhMjxRGw=
+gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.2.0 h1:UOKDcVFO/J90QxYGMCqM3wEMvfIoD0YuMCFCAPlSFVc=
+gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.2.0/go.mod h1:DGPccXBXGFc6ntpwhO8p/S8fBHqQsuzIqL0dhMjxRGw=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
