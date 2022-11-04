@@ -18,9 +18,9 @@ import (
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/module"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 

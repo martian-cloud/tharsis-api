@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
@@ -40,24 +41,28 @@ type Service interface {
 	GetNamespaceMembershipsForNamespace(ctx context.Context, namespacePath string) ([]models.NamespaceMembership, error)
 	GetNamespaceMembershipsForSubject(ctx context.Context, input *GetNamespaceMembershipsForSubjectInput) (*db.NamespaceMembershipResult, error)
 	GetNamespaceMembershipByID(ctx context.Context, id string) (*models.NamespaceMembership, error)
+	GetNamespaceMembershipsByIDs(ctx context.Context, ids []string) ([]models.NamespaceMembership, error)
 	CreateNamespaceMembership(ctx context.Context, input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error)
 	UpdateNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error)
 	DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error
 }
 
 type service struct {
-	logger   logger.Logger
-	dbClient *db.Client
+	logger          logger.Logger
+	dbClient        *db.Client
+	activityService activityevent.Service
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:   logger,
-		dbClient: dbClient,
+		logger:          logger,
+		dbClient:        dbClient,
+		activityService: activityService,
 	}
 }
 
@@ -179,6 +184,32 @@ func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*m
 	return namespaceMembership, nil
 }
 
+func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string) ([]models.NamespaceMembership, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get memberships from DB.
+	resp, err := s.dbClient.NamespaceMemberships.GetNamespaceMemberships(ctx,
+		&db.GetNamespaceMembershipsInput{
+			Filter: &db.NamespaceMembershipFilter{
+				NamespaceMembershipIDs: ids,
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, namespaceMembership := range resp.NamespaceMemberships {
+		if err := caller.RequireAccessToInheritedNamespaceResource(ctx, namespaceMembership.Namespace.Path); err != nil {
+			return nil, err
+		}
+	}
+
+	return resp.NamespaceMemberships, nil
+}
+
 func (s *service) CreateNamespaceMembership(ctx context.Context,
 	input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error) {
 	if err := s.requireOwnerAccessToNamespace(ctx, input.NamespacePath); err != nil {
@@ -229,14 +260,48 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		teamID = &input.Team.Metadata.ID
 	}
 
-	namespaceMembership, err := s.dbClient.NamespaceMemberships.CreateNamespaceMembership(ctx, &db.CreateNamespaceMembershipInput{
-		NamespacePath:    input.NamespacePath,
-		Role:             input.Role,
-		UserID:           userID,
-		ServiceAccountID: serviceAccountID,
-		TeamID:           teamID,
-	})
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateNamespaceMembership: %v", txErr)
+		}
+	}()
+
+	namespaceMembership, err := s.dbClient.NamespaceMemberships.CreateNamespaceMembership(txContext,
+		&db.CreateNamespaceMembershipInput{
+			NamespacePath:    input.NamespacePath,
+			Role:             input.Role,
+			UserID:           userID,
+			ServiceAccountID: serviceAccountID,
+			TeamID:           teamID,
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	eventTargetType, eventTargetID := getTargetTypeID(namespaceMembership)
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &input.NamespacePath,
+			Action:        models.ActionCreateMembership,
+			TargetType:    eventTargetType,
+			TargetID:      eventTargetID,
+			Payload: &models.ActivityEventCreateNamespaceMembershipPayload{
+				UserID:           namespaceMembership.UserID,
+				ServiceAccountID: namespaceMembership.ServiceAccountID,
+				TeamID:           namespaceMembership.TeamID,
+				Role:             string(namespaceMembership.Role),
+			},
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -267,8 +332,37 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 		}
 	}
 
-	updatedNamespaceMembership, err := s.dbClient.NamespaceMemberships.UpdateNamespaceMembership(ctx, namespaceMembership)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateNamespaceMembership: %v", txErr)
+		}
+	}()
+
+	updatedNamespaceMembership, err := s.dbClient.NamespaceMemberships.UpdateNamespaceMembership(txContext, namespaceMembership)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &updatedNamespaceMembership.Namespace.Path,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetNamespaceMembership,
+			TargetID:      updatedNamespaceMembership.Metadata.ID,
+			Payload: &models.ActivityEventUpdateNamespaceMembershipPayload{
+				PrevRole: string(currentNamespaceMembership.Role),
+				NewRole:  string(updatedNamespaceMembership.Role),
+			},
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -288,7 +382,39 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 		}
 	}
 
-	return s.dbClient.NamespaceMemberships.DeleteNamespaceMembership(ctx, namespaceMembership)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteNamespaceMembership: %v", txErr)
+		}
+	}()
+
+	if err = s.dbClient.NamespaceMemberships.DeleteNamespaceMembership(txContext, namespaceMembership); err != nil {
+		return err
+	}
+
+	eventTargetType, eventTargetID := getTargetTypeID(namespaceMembership)
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &namespaceMembership.Namespace.Path,
+			Action:        models.ActionRemoveMembership,
+			TargetType:    eventTargetType,
+			TargetID:      eventTargetID,
+			Payload: &models.ActivityEventRemoveNamespaceMembershipPayload{
+				UserID:           namespaceMembership.UserID,
+				ServiceAccountID: namespaceMembership.ServiceAccountID,
+				TeamID:           namespaceMembership.TeamID,
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *models.NamespaceMembership) error {
@@ -344,4 +470,17 @@ func (s *service) requireOwnerAccessToNamespace(ctx context.Context, namespacePa
 		}
 	}
 	return nil
+}
+
+func getTargetTypeID(namespaceMembership *models.NamespaceMembership) (models.ActivityEventTargetType, string) {
+	var eventTargetType models.ActivityEventTargetType
+	var eventTargetID string
+	if namespaceMembership.Namespace.GroupID != nil && *namespaceMembership.Namespace.GroupID != "" {
+		eventTargetType = models.TargetGroup
+		eventTargetID = *namespaceMembership.Namespace.GroupID
+	} else {
+		eventTargetType = models.TargetWorkspace
+		eventTargetID = *namespaceMembership.Namespace.WorkspaceID
+	}
+	return eventTargetType, eventTargetID
 }

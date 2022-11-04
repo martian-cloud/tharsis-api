@@ -11,8 +11,8 @@ import (
 	version "github.com/hashicorp/go-version"
 	tfaddrs "github.com/hashicorp/terraform-registry-address"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/registry/addrs"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/module"
 )
 
 const (

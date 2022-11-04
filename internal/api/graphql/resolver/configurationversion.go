@@ -42,7 +42,7 @@ func (r *ConfigurationVersionResolver) Speculative() bool {
 
 // WorkspaceID resolver
 func (r *ConfigurationVersionResolver) WorkspaceID() string {
-	return r.configurationVersion.WorkspaceID
+	return gid.ToGlobalID(gid.ConfigurationVersionType, r.configurationVersion.WorkspaceID)
 }
 
 // Metadata resolver

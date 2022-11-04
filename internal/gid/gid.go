@@ -36,6 +36,7 @@ const (
 	TerraformProviderVersionType  Type = "TPV"
 	TerraformProviderPlatformType Type = "TPP"
 	GPGKeyType                    Type = "GPG"
+	ActivityEventType             Type = "AE"
 )
 
 // IsValid returns true if this is a valid Type enum
@@ -63,7 +64,8 @@ func (t Type) IsValid() error {
 		TerraformProviderType,
 		TerraformProviderVersionType,
 		TerraformProviderPlatformType,
-		GPGKeyType:
+		GPGKeyType,
+		ActivityEventType:
 		return nil
 	}
 	return errors.NewError(errors.EInvalid, fmt.Sprintf("Invalid ID type %s", t))

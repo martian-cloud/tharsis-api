@@ -3,7 +3,9 @@ package resolver
 import (
 	"context"
 
+	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -226,4 +228,48 @@ func deleteNamespaceVariableMutation(ctx context.Context, input *DeleteNamespace
 
 	payload := VariableMutationPayload{ClientMutationID: input.ClientMutationID, NamespacePath: &variable.NamespacePath, Problems: []Problem{}}
 	return &VariableMutationPayloadResolver{VariableMutationPayload: payload}, nil
+}
+
+/* NamespaceVariable loader */
+
+const namespaceVariableLoaderKey = "namespaceVariable"
+
+// RegisterNamespaceVariableLoader registers a namespaceVariable loader function
+func RegisterNamespaceVariableLoader(collection *loader.Collection) {
+	collection.Register(namespaceVariableLoaderKey, namespaceVariableBatchFunc)
+}
+
+func loadVariable(ctx context.Context, id string) (*models.Variable, error) {
+	ldr, err := loader.Extract(ctx, namespaceVariableLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	namespaceVariable, ok := data.(models.Variable)
+	if !ok {
+		return nil, errors.NewError(errors.EInternal, "Wrong type")
+	}
+
+	return &namespaceVariable, nil
+}
+
+func namespaceVariableBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+
+	variables, err := getVariableService(ctx).GetVariablesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range variables {
+		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
 }

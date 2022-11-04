@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 func TestCreateNamespaceMembership(t *testing.T) {
@@ -32,7 +33,8 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			},
 			expectNamespaceMembership: &models.NamespaceMembership{
 				Namespace: models.MembershipNamespace{
-					Path: "ns1",
+					Path:    "ns1",
+					GroupID: ptr.String("group1"),
 				},
 				Role:   models.OwnerRole,
 				UserID: ptr.String("user1"),
@@ -51,7 +53,8 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			},
 			expectNamespaceMembership: &models.NamespaceMembership{
 				Namespace: models.MembershipNamespace{
-					Path: "ns1/ns11/ns111",
+					Path:    "ns1/ns11/ns111",
+					GroupID: ptr.String("group1"),
 				},
 				Role:             models.OwnerRole,
 				ServiceAccountID: ptr.String("serviceAccount1"),
@@ -70,7 +73,8 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			},
 			expectNamespaceMembership: &models.NamespaceMembership{
 				Namespace: models.MembershipNamespace{
-					Path: "ns1",
+					Path:    "ns1",
+					GroupID: ptr.String("group1"),
 				},
 				Role:             models.OwnerRole,
 				ServiceAccountID: ptr.String("serviceAccount1"),
@@ -168,12 +172,45 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccountID: serviceAccountID,
 			}).Return(test.expectNamespaceMembership, nil)
 
+			mockTransactions := db.MockTransactions{}
+			mockTransactions.Test(t)
+			// The mocks are enabled by the above function.
+
+			mockUsers := db.MockUsers{}
+			mockTransactions.Test(t)
+
+			mockServiceAccounts := db.MockServiceAccounts{}
+			mockServiceAccounts.Test(t)
+
 			dbClient := db.Client{
 				NamespaceMemberships: &mockNamespaceMemberships,
+				Transactions:         &mockTransactions,
+				Users:                &mockUsers,
+				ServiceAccounts:      &mockServiceAccounts,
 			}
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(&models.User{
+				Username: "mock-user",
+				Email:    "mock-user@example.invalid",
+			}, nil)
+
+			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).Return(&models.ServiceAccount{
+				Name: "mock-service-account-name",
+			}, nil)
+
+			// If a new test case is added that uses a team principal, will need to mock GetTeamByID here.
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient)
+			service := NewService(logger, &dbClient, &mockActivityEvents)
 
 			namespaceMembership, err := service.CreateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -326,12 +363,26 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 			mockNamespaceMemberships.On("UpdateNamespaceMembership", mock.Anything, test.input).Return(test.input, nil)
 
+			mockTransactions := db.MockTransactions{}
+			mockTransactions.Test(t)
+			// The mocks are enabled by the above function.
+
 			dbClient := db.Client{
 				NamespaceMemberships: &mockNamespaceMemberships,
+				Transactions:         &mockTransactions,
 			}
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient)
+			service := NewService(logger, &dbClient, &mockActivityEvents)
 
 			namespaceMembership, err := service.UpdateNamespaceMembership(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrorCode != "" {
@@ -360,7 +411,8 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			input: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{ID: "1"},
 				Namespace: models.MembershipNamespace{
-					Path: "ns1",
+					Path:    "ns1",
+					GroupID: ptr.String("group1"),
 				},
 				Role:   models.OwnerRole,
 				UserID: ptr.String("user1"),
@@ -376,7 +428,8 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			input: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{ID: "1"},
 				Namespace: models.MembershipNamespace{
-					Path: "ns1/ns11",
+					Path:    "ns1/ns11",
+					GroupID: ptr.String("group1"),
 				},
 				Role:   models.OwnerRole,
 				UserID: ptr.String("user1"),
@@ -388,7 +441,8 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			input: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{ID: "1"},
 				Namespace: models.MembershipNamespace{
-					Path: "ns1",
+					Path:        "ns1",
+					WorkspaceID: ptr.String("ws1"),
 				},
 				Role:   models.OwnerRole,
 				UserID: ptr.String("user1"),
@@ -404,7 +458,8 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			input: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{ID: "1"},
 				Namespace: models.MembershipNamespace{
-					Path: "ns1",
+					Path:        "ns1",
+					WorkspaceID: ptr.String("ws1"),
 				},
 				Role:   models.DeployerRole,
 				UserID: ptr.String("user1"),
@@ -445,12 +500,26 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 			mockNamespaceMemberships.On("DeleteNamespaceMembership", mock.Anything, test.input).Return(nil)
 
+			mockTransactions := db.MockTransactions{}
+			mockTransactions.Test(t)
+			// The mocks are enabled by the above function.
+
 			dbClient := db.Client{
 				NamespaceMemberships: &mockNamespaceMemberships,
+				Transactions:         &mockTransactions,
 			}
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient)
+			service := NewService(logger, &dbClient, &mockActivityEvents)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 			err := service.DeleteNamespaceMembership(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrorCode != "" {

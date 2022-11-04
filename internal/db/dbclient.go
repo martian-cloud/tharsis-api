@@ -97,6 +97,7 @@ type Client struct {
 	TerraformProviderPlatforms TerraformProviderPlatforms
 	GPGKeys                    GPGKeys
 	SCIMTokens                 SCIMTokens
+	ActivityEvents             ActivityEvents
 }
 
 // NewClient creates a new Client
@@ -161,6 +162,7 @@ func NewClient(
 	dbClient.TerraformProviderPlatforms = NewTerraformProviderPlatforms(dbClient)
 	dbClient.GPGKeys = NewGPGKeys(dbClient)
 	dbClient.SCIMTokens = NewSCIMTokens(dbClient)
+	dbClient.ActivityEvents = NewActivityEvents(dbClient)
 
 	return dbClient, nil
 }
@@ -240,4 +242,12 @@ func metadataFieldResolver(key string, metadata *models.ResourceMetadata) (strin
 // before storing it.
 func currentTime() time.Time {
 	return time.Now().UTC().Round(time.Microsecond)
+}
+
+// stringPtrToString returns empty string for nil pointer.
+func stringPtrToString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }

@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 // CreateProviderInput is the input for creating a terraform provider
@@ -110,9 +111,10 @@ type Service interface {
 }
 
 type service struct {
-	logger        logger.Logger
-	dbClient      *db.Client
-	registryStore RegistryStore
+	logger          logger.Logger
+	dbClient        *db.Client
+	registryStore   RegistryStore
+	activityService activityevent.Service
 }
 
 // NewService creates an instance of Service
@@ -120,11 +122,13 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	registryStore RegistryStore,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
 		registryStore,
+		activityService,
 	}
 }
 
@@ -268,7 +272,39 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 		return nil, err
 	}
 
-	return s.dbClient.TerraformProviders.UpdateProvider(ctx, provider)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateProvider: %v", txErr)
+		}
+	}()
+
+	updatedProvider, err := s.dbClient.TerraformProviders.UpdateProvider(txContext, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := updatedProvider.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetTerraformProvider,
+			TargetID:      updatedProvider.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedProvider, nil
 }
 
 func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput) (*models.TerraformProvider, error) {
@@ -290,14 +326,25 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 	if group.ParentID == "" {
 		rootGroupID = input.GroupID
 	} else {
-		rootGroup, err := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
-		if err != nil {
-			return nil, err
+		rootGroup, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
+		if gErr != nil {
+			return nil, gErr
 		}
 		rootGroupID = rootGroup.Metadata.ID
 	}
 
-	return s.dbClient.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateProvider: %v", txErr)
+		}
+	}()
+
+	createdProvider, err := s.dbClient.TerraformProviders.CreateProvider(txContext, &models.TerraformProvider{
 		Name:          input.Name,
 		GroupID:       input.GroupID,
 		RootGroupID:   rootGroupID,
@@ -305,6 +352,25 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		RepositoryURL: input.RepositoryURL,
 		CreatedBy:     caller.GetSubject(),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &group.FullPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetTerraformProvider,
+			TargetID:      createdProvider.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return createdProvider, nil
 }
 
 func (s *service) DeleteProvider(ctx context.Context, provider *models.TerraformProvider) error {
@@ -317,7 +383,40 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 		return err
 	}
 
-	return s.dbClient.TerraformProviders.DeleteProvider(ctx, provider)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteProvider: %v", txErr)
+		}
+	}()
+
+	err = s.dbClient.TerraformProviders.DeleteProvider(txContext, provider)
+	if err != nil {
+		return err
+	}
+
+	groupPath := provider.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetGroup,
+			TargetID:      provider.GroupID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: provider.Name,
+				ID:   provider.Metadata.ID,
+				Type: string(models.TargetTerraformProvider),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models.TerraformProvider, error) {
@@ -506,7 +605,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.Errorf("failed to rollback tx for CreateProviderVersion: %v", txErr)
 		}
 	}()
 
@@ -538,6 +637,18 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		CreatedBy:       caller.GetSubject(),
 	})
 	if err != nil {
+		return nil, err
+	}
+
+	groupPath := provider.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetTerraformProviderVersion,
+			TargetID:      providerVersion.Metadata.ID,
+		}); err != nil {
 		return nil, err
 	}
 
@@ -617,12 +728,12 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.Errorf("failed to rollback tx for DeleteProviderVersion: %v", txErr)
 		}
 	}()
 
 	// Delete provider version from DB
-	if err := s.dbClient.TerraformProviderVersions.DeleteProviderVersion(txContext, providerVersion); err != nil {
+	if err = s.dbClient.TerraformProviderVersions.DeleteProviderVersion(txContext, providerVersion); err != nil {
 		return err
 	}
 
@@ -634,7 +745,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 			provider.Name,
 		)
 		newLatestVersion.Latest = true
-		if _, err := s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, newLatestVersion); err != nil {
+		if _, err = s.dbClient.TerraformProviderVersions.UpdateProviderVersion(txContext, newLatestVersion); err != nil {
 			return err
 		}
 	}

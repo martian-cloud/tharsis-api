@@ -57,6 +57,7 @@ type ManagedIdentityAccessRule implements Node {
   allowedUsers: [User!]!
   allowedServiceAccounts: [ServiceAccount!]!
   allowedTeams: [Team!]!
+  managedIdentity: ManagedIdentity!
 }
 
 type ManagedIdentity implements Node {

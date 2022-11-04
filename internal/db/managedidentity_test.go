@@ -1359,6 +1359,8 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 		searchID                         string
 	}
 
+	// TODO: Add test cases to cover the expanded functionality of the more general GetManagedIdentityAccessRules function.
+
 	// Do only one positive test case,
 	// because the logic is theoretically the same for all managed identity access rules.
 	testCases := []testCase{
@@ -1376,19 +1378,24 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg2,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			actualManagedIdentityAccessRules, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentityAccessRules(ctx, test.searchID)
+			actualResult, err :=
+				testClient.client.ManagedIdentities.GetManagedIdentityAccessRules(ctx, &GetManagedIdentityAccessRulesInput{
+					Filter: &ManagedIdentityAccessRuleFilter{
+						ManagedIdentityID: &test.searchID,
+					},
+				})
 
 			checkError(t, test.expectMsg, err)
 
 			if test.expectManagedIdentityAccessRules != nil {
+				actualManagedIdentityAccessRules := actualResult.ManagedIdentityAccessRules
 				require.NotNil(t, actualManagedIdentityAccessRules)
 				require.Equal(t, len(test.expectManagedIdentityAccessRules), len(actualManagedIdentityAccessRules))
 				for ix := range test.expectManagedIdentityAccessRules {
@@ -1402,7 +1409,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 					})
 				}
 			} else {
-				assert.Nil(t, actualManagedIdentityAccessRules)
+				assert.Nil(t, actualResult)
 			}
 
 		})

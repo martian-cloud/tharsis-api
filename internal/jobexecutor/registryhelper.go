@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/http"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/module"
+	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 )
 
 const (

@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 )
 
@@ -50,6 +51,7 @@ type service struct {
 	logger                     logger.Logger
 	dbClient                   *db.Client
 	namespaceMembershipService namespacemembership.Service
+	activityService            activityevent.Service
 }
 
 // NewService creates an instance of Service
@@ -57,11 +59,13 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	namespaceMembershipService namespacemembership.Service,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger:                     logger,
 		dbClient:                   dbClient,
 		namespaceMembershipService: namespaceMembershipService,
+		activityService:            activityService,
 	}
 }
 
@@ -222,8 +226,45 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 		}
 	}
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for DeleteGroup: %v", txErr)
+		}
+	}()
+
+	// The foreign key with on cascade delete should remove activity events whose target ID is this group.
+
 	// This will return an error if the group has nested groups or workspaces
-	return s.dbClient.Groups.DeleteGroup(ctx, input.Group)
+	err = s.dbClient.Groups.DeleteGroup(txContext, input.Group)
+	if err != nil {
+		return err
+	}
+
+	// If this group is nested, create an activity event for removal of this group from its parent.
+	if input.Group.ParentID != "" {
+		parentPath := input.Group.GetParentPath()
+		if _, err = s.activityService.CreateActivityEvent(txContext,
+			&activityevent.CreateActivityEventInput{
+				NamespacePath: &parentPath,
+				Action:        models.ActionDeleteChildResource,
+				TargetType:    models.TargetGroup,
+				TargetID:      input.Group.ParentID,
+				Payload: &models.ActivityEventDeleteChildResourcePayload{
+					Name: input.Group.Name,
+					ID:   input.Group.Metadata.ID,
+					Type: string(models.TargetGroup),
+				},
+			}); err != nil {
+			return err
+		}
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models.Group, error) {
@@ -270,6 +311,16 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		return nil, err
 	}
 
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &group.FullPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetGroup,
+			TargetID:      group.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
 	// Add owner namespace membership if this is a top level group
 	if input.ParentID == "" {
 		// Create namespace membership for caller with owner access level
@@ -279,6 +330,8 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 			User:          caller.(*auth.UserCaller).User,
 		}
 
+		// This call to CreateNamespaceMembership creates the activity event for the namespace membership,
+		// so don't create another activity event from this module or there will be duplicates.
 		if _, err := s.namespaceMembershipService.CreateNamespaceMembership(txContext, namespaceMembershipInput); err != nil {
 			return nil, err
 		}
@@ -316,5 +369,36 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 		"fullPath", group.FullPath,
 		"groupID", group.Metadata.ID,
 	)
-	return s.dbClient.Groups.UpdateGroup(ctx, group)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateGroup: %v", txErr)
+		}
+	}()
+
+	updatedGroup, err := s.dbClient.Groups.UpdateGroup(txContext, group)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &updatedGroup.FullPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetGroup,
+			TargetID:      updatedGroup.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedGroup, nil
 }

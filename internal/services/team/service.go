@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 // GetTeamsInput is the input for querying a list of teams
@@ -50,18 +51,21 @@ type Service interface {
 }
 
 type service struct {
-	logger   logger.Logger
-	dbClient *db.Client
+	logger          logger.Logger
+	dbClient        *db.Client
+	activityService activityevent.Service
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:   logger,
-		dbClient: dbClient,
+		logger:          logger,
+		dbClient:        dbClient,
+		activityService: activityService,
 	}
 }
 
@@ -154,8 +158,32 @@ func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Te
 		return nil, err
 	}
 
-	createdTeam, err := s.dbClient.Teams.CreateTeam(ctx, team)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateTeam: %v", txErr)
+		}
+	}()
+
+	createdTeam, err := s.dbClient.Teams.CreateTeam(txContext, team)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			Action:     models.ActionCreate,
+			TargetType: models.TargetTeam,
+			TargetID:   createdTeam.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -173,12 +201,41 @@ func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Te
 		return nil, err
 	}
 
-	if err := caller.RequireTeamUpdateAccess(ctx, team.Metadata.ID); err != nil {
-		return nil, err
+	if rErr := caller.RequireTeamUpdateAccess(ctx, team.Metadata.ID); rErr != nil {
+		return nil, rErr
 	}
 
 	// Validate model
-	if err := team.Validate(); err != nil {
+	if vErr := team.Validate(); vErr != nil {
+		return nil, vErr
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateTeam: %v", txErr)
+		}
+	}()
+
+	updatedTeam, err := s.dbClient.Teams.UpdateTeam(txContext, team)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			Action:     models.ActionUpdate,
+			TargetType: models.TargetTeam,
+			TargetID:   updatedTeam.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +244,7 @@ func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Te
 		"teamName", team.Name,
 		"teamID", team.Metadata.ID,
 	)
-	return s.dbClient.Teams.UpdateTeam(ctx, team)
+	return updatedTeam, nil
 }
 
 func (s *service) DeleteTeam(ctx context.Context, team *models.Team) error {
@@ -297,7 +354,41 @@ func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (
 		"teamID", input.TeamID,
 		"isMaintainer", input.IsMaintainer,
 	)
-	return s.dbClient.TeamMembers.AddUserToTeam(ctx, input)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer AddUserToTeam: %v", txErr)
+		}
+	}()
+
+	addedTeamMember, err := s.dbClient.TeamMembers.AddUserToTeam(txContext, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			Action:     models.ActionAddMember,
+			TargetType: models.TargetTeam,
+			TargetID:   team.Metadata.ID,
+			Payload: &models.ActivityEventAddTeamMemberPayload{
+				UserID:     &input.UserID,
+				Maintainer: input.IsMaintainer,
+			},
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return addedTeamMember, nil
 }
 
 func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember) (*models.TeamMember, error) {
@@ -330,7 +421,41 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember
 		"teamID", input.TeamID,
 		"isMaintainer", input.IsMaintainer,
 	)
-	return s.dbClient.TeamMembers.UpdateTeamMember(ctx, input)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateTeamMember: %v", txErr)
+		}
+	}()
+
+	updatedTeamMember, err := s.dbClient.TeamMembers.UpdateTeamMember(txContext, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			Action:     models.ActionUpdateMember,
+			TargetType: models.TargetTeam,
+			TargetID:   team.Metadata.ID,
+			Payload: &models.ActivityEventUpdateTeamMemberPayload{
+				UserID:     &input.UserID,
+				Maintainer: input.IsMaintainer,
+			},
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedTeamMember, nil
 }
 
 func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMember) error {
@@ -363,7 +488,36 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMemb
 		"teamID", input.TeamID,
 		"isMaintainer", input.IsMaintainer,
 	)
-	return s.dbClient.TeamMembers.RemoveUserFromTeam(ctx, input)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer RemoveUserFromTeam: %v", txErr)
+		}
+	}()
+
+	err = s.dbClient.TeamMembers.RemoveUserFromTeam(txContext, input)
+	if err != nil {
+		return err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			Action:     models.ActionRemoveMember,
+			TargetType: models.TargetTeam,
+			TargetID:   team.Metadata.ID,
+			Payload: &models.ActivityEventRemoveTeamMemberPayload{
+				UserID: &input.UserID,
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 // The End.

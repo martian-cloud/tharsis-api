@@ -325,6 +325,22 @@ func (r *WorkspaceResolver) TerraformVersion() string {
 	return r.workspace.TerraformVersion
 }
 
+// ActivityEvents resolver
+func (r *WorkspaceResolver) ActivityEvents(ctx context.Context,
+	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+
+	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
+	if err != nil {
+		// error is already a Tharsis error
+		return nil, err
+	}
+
+	// Need to filter to this workspace/namespace.
+	input.NamespacePath = &r.workspace.FullPath
+
+	return NewActivityEventConnectionResolver(ctx, input)
+}
+
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
 	workspaceService := getWorkspaceService(ctx)
 
@@ -411,8 +427,8 @@ type UpdateWorkspaceInput struct {
 	Metadata         *MetadataInput
 	MaxJobDuration   *int32
 	TerraformVersion *string
+	Description      *string
 	WorkspacePath    string
-	Description      string
 }
 
 // DeleteWorkspaceInput contains the input for deleting a workspace
@@ -489,7 +505,9 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 	}
 
 	// Update fields
-	ws.Description = input.Description
+	if input.Description != nil {
+		ws.Description = *input.Description
+	}
 
 	ws, err = wsService.UpdateWorkspace(ctx, ws)
 	if err != nil {

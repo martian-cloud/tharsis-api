@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 // CreateGPGKeyInput is the input for creating a GPG key
@@ -42,28 +43,33 @@ type Service interface {
 }
 
 type service struct {
-	logger   logger.Logger
-	dbClient *db.Client
+	logger          logger.Logger
+	dbClient        *db.Client
+	activityService activityevent.Service
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	activityService activityevent.Service,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
+		activityService,
 	)
 }
 
 func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:   logger,
-		dbClient: dbClient,
+		logger:          logger,
+		dbClient:        dbClient,
+		activityService: activityService,
 	}
 }
 
@@ -137,7 +143,7 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 		return err
 	}
 
-	if err := caller.RequireAccessToGroup(ctx, gpgKey.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, gpgKey.GroupID, models.DeployerRole); err != nil {
 		return err
 	}
 
@@ -146,7 +152,44 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 		"groupID", gpgKey.GroupID,
 		"gpgKeyID", gpgKey.Metadata.ID,
 	)
-	return s.dbClient.GPGKeys.DeleteGPGKey(ctx, gpgKey)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteGPGKey: %v", txErr)
+		}
+	}()
+
+	if err = s.dbClient.GPGKeys.DeleteGPGKey(txContext, gpgKey); err != nil {
+		return err
+	}
+
+	// Retrieve the group to get its path.
+	group, err := s.dbClient.Groups.GetGroupByID(txContext, gpgKey.GroupID)
+	if err != nil {
+		return err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &group.FullPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetGroup,
+			TargetID:      group.Metadata.ID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: gpgKey.GetHexGPGKeyID(),
+				ID:   gpgKey.Metadata.ID,
+				Type: string(models.TargetGPGKey),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey, error) {
@@ -202,12 +245,47 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		CreatedBy:   caller.GetSubject(),
 	}
 
+	group, err := s.dbClient.Groups.GetGroupByID(ctx, gpgKey.GroupID)
+	if err != nil {
+		return gpgKey, err
+	}
+
 	s.logger.Infow("Requested creation of a gpg key.",
 		"caller", caller.GetSubject(),
 		"groupID", input.GroupID,
 		"gpgKeyID", gpgKey.GetHexGPGKeyID(),
 	)
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateGPGKey: %v", txErr)
+		}
+	}()
+
 	// Store gpg key in DB
-	return s.dbClient.GPGKeys.CreateGPGKey(ctx, gpgKey)
+	createdKey, err := s.dbClient.GPGKeys.CreateGPGKey(txContext, gpgKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &group.FullPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetGPGKey,
+			TargetID:      createdKey.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return createdKey, nil
 }

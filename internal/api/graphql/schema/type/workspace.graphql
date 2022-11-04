@@ -84,6 +84,20 @@ type Workspace implements Node, Namespace {
   maxJobDuration: Int!
   createdBy: String!
   terraformVersion: String!
+  activityEvents(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    username: String
+    serviceAccountPath: String
+    includeNested: Boolean
+    timeRangeStart: Time
+    timeRangeEnd: Time
+    actions: [ActivityEventAction!]
+    targetTypes: [ActivityEventTargetType!]
+    sort: ActivityEventSort
+  ): ActivityEventConnection!
 }
 
 input CreateWorkspaceInput {
@@ -99,7 +113,7 @@ input UpdateWorkspaceInput {
   clientMutationId: String
   workspacePath: String!
   metadata: ResourceMetadataInput
-  description: String!
+  description: String
   maxJobDuration: Int
   terraformVersion: String
 }

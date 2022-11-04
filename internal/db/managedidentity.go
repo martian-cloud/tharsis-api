@@ -24,7 +24,7 @@ type ManagedIdentities interface {
 	UpdateManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error)
 	GetManagedIdentities(ctx context.Context, input *GetManagedIdentitiesInput) (*ManagedIdentitiesResult, error)
 	DeleteManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) error
-	GetManagedIdentityAccessRules(ctx context.Context, managedIdentityID string) ([]models.ManagedIdentityAccessRule, error)
+	GetManagedIdentityAccessRules(ctx context.Context, input *GetManagedIdentityAccessRulesInput) (*ManagedIdentityAccessRulesResult, error)
 	GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error)
 	CreateManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	UpdateManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
@@ -34,7 +34,7 @@ type ManagedIdentities interface {
 // ManagedIdentitySortableField represents the fields that a managed identity can be sorted by
 type ManagedIdentitySortableField string
 
-// GroupSortableField constants
+// ManagedIdentitySortableField constants
 const (
 	ManagedIdentitySortableFieldCreatedAtAsc  ManagedIdentitySortableField = "CREATED_AT_ASC"
 	ManagedIdentitySortableFieldCreatedAtDesc ManagedIdentitySortableField = "CREATED_AT_DESC"
@@ -60,10 +60,34 @@ func (sf ManagedIdentitySortableField) getSortDirection() SortDirection {
 	return AscSort
 }
 
+// ManagedIdentityAccessRuleSortableField represents the fields that a managed identity access rule can be sorted by
+type ManagedIdentityAccessRuleSortableField string
+
+func (sf ManagedIdentityAccessRuleSortableField) getRuleFieldDescriptor() *fieldDescriptor {
+	switch sf {
+	default:
+		return nil
+	}
+}
+
+func (sf ManagedIdentityAccessRuleSortableField) getRuleSortDirection() SortDirection {
+	if strings.HasSuffix(string(sf), "_DESC") {
+		return DescSort
+	}
+	return AscSort
+}
+
 // ManagedIdentityFilter contains the supported fields for filtering ManagedIdentity resources
 type ManagedIdentityFilter struct {
-	Search         *string
-	NamespacePaths []string
+	Search             *string
+	NamespacePaths     []string
+	ManagedIdentityIDs []string
+}
+
+// ManagedIdentityAccessRuleFilter contains the supported fields for filtering ManagedIdentityAccessRule resources
+type ManagedIdentityAccessRuleFilter struct {
+	ManagedIdentityID            *string
+	ManagedIdentityAccessRuleIDs []string
 }
 
 // GetManagedIdentitiesInput is the input for listing managed identities
@@ -76,10 +100,26 @@ type GetManagedIdentitiesInput struct {
 	Filter *ManagedIdentityFilter
 }
 
+// GetManagedIdentityAccessRulesInput is the input for listing managed identity access rules
+type GetManagedIdentityAccessRulesInput struct {
+	// Sort specifies the field to sort on and direction
+	Sort *ManagedIdentityAccessRuleSortableField
+	// PaginationOptions supports cursor based pagination
+	PaginationOptions *PaginationOptions
+	// Filter is used to filter the results
+	Filter *ManagedIdentityAccessRuleFilter
+}
+
 // ManagedIdentitiesResult contains the response data and page information
 type ManagedIdentitiesResult struct {
 	PageInfo          *PageInfo
 	ManagedIdentities []models.ManagedIdentity
+}
+
+// ManagedIdentityAccessRulesResult contains the response data and page information
+type ManagedIdentityAccessRulesResult struct {
+	PageInfo                   *PageInfo
+	ManagedIdentityAccessRules []models.ManagedIdentityAccessRule
 }
 
 type managedIdentities struct {
@@ -96,18 +136,46 @@ func NewManagedIdentities(dbClient *Client) ManagedIdentities {
 	return &managedIdentities{dbClient: dbClient}
 }
 
-func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context, managedIdentityID string) ([]models.ManagedIdentityAccessRule, error) {
+func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
+	input *GetManagedIdentityAccessRulesInput) (*ManagedIdentityAccessRulesResult, error) {
 	conn := m.dbClient.getConnection(ctx)
+	ex := goqu.And()
 
-	sql, _, err := dialect.From("managed_identity_rules").
+	if input.Filter != nil {
+
+		if input.Filter.ManagedIdentityID != nil {
+			ex = ex.Append(goqu.Ex{"managed_identity_id": input.Filter.ManagedIdentityID})
+		}
+
+		if input.Filter.ManagedIdentityAccessRuleIDs != nil {
+			ex = ex.Append(goqu.I("id").In(input.Filter.ManagedIdentityAccessRuleIDs))
+		}
+	}
+
+	query := dialect.From("managed_identity_rules").
 		Select(managedIdentityRuleFieldList...).
-		Where(goqu.Ex{"managed_identity_id": managedIdentityID}).ToSQL()
+		Where(ex)
 
+	sortDirection := AscSort
+
+	var sortBy *fieldDescriptor
+	if input.Sort != nil {
+		sortDirection = input.Sort.getRuleSortDirection()
+		sortBy = input.Sort.getRuleFieldDescriptor()
+	}
+
+	qBuilder, err := newPaginatedQueryBuilder(
+		input.PaginationOptions,
+		&fieldDescriptor{key: "id", table: "managed_identity_rules", col: "id"},
+		sortBy,
+		sortDirection,
+		managedIdentityAccessRuleFieldResolver,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := conn.Query(ctx, sql)
+	rows, err := qBuilder.execute(ctx, conn, query)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +214,12 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context, m
 		rules[i].AllowedTeamIDs = allowedTeamIDs
 	}
 
-	return rules, nil
+	result := ManagedIdentityAccessRulesResult{
+		PageInfo:                   rows.getPageInfo(),
+		ManagedIdentityAccessRules: rules,
+	}
+
+	return &result, nil
 }
 
 func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
@@ -421,10 +494,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-
 	// Create allowed teams
 	for _, teamID := range rule.AllowedTeamIDs {
 		sql, _, err := dialect.Insert("managed_identity_rule_allowed_teams").
@@ -441,6 +510,10 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		if _, err := tx.Exec(ctx, sql); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
 	}
 
 	updatedRule.AllowedUserIDs = rule.AllowedUserIDs
@@ -548,7 +621,7 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 	return nil
 }
 
-// GetManagedIdentity returns a managedIdentity by ID
+// GetManagedIdentityByID returns a managedIdentity by ID
 func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error) {
 	sql, _, err := goqu.From("managed_identities").
 		Select(m.getSelectFields()...).
@@ -640,6 +713,13 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 						goqu.I("managed_identities.name").Like(search+"%%"),
 					),
 				)
+			}
+		}
+
+		if input.Filter.ManagedIdentityIDs != nil {
+			// This check avoids an SQL syntax error if an empty slice is provided.
+			if len(input.Filter.ManagedIdentityIDs) > 0 {
+				ex = ex.Append(goqu.I("managed_identities.id").In(input.Filter.ManagedIdentityIDs))
 			}
 		}
 	}
@@ -1011,6 +1091,20 @@ func managedIdentityFieldResolver(key string, model interface{}) (string, error)
 	}
 
 	val, ok := metadataFieldResolver(key, &managedIdentity.Metadata)
+	if !ok {
+		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
+	}
+
+	return val, nil
+}
+
+func managedIdentityAccessRuleFieldResolver(key string, model interface{}) (string, error) {
+	rule, ok := model.(*models.ManagedIdentityAccessRule)
+	if !ok {
+		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected ManagedIdentityAccessRule type, got %T", model))
+	}
+
+	val, ok := metadataFieldResolver(key, &rule.Metadata)
 	if !ok {
 		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
 	}

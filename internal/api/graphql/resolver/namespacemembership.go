@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strconv"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 
+	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 
@@ -156,27 +158,33 @@ func (r *NamespaceMembershipResolver) ResourcePath() string {
 // Member resolver
 func (r *NamespaceMembershipResolver) Member(ctx context.Context) (*MemberResolver, error) {
 	// Query for member based on type
-	if r.namespaceMembership.UserID != nil {
+	return makeMemberResolver(ctx, r.namespaceMembership.UserID,
+		r.namespaceMembership.ServiceAccountID, r.namespaceMembership.TeamID)
+}
+
+// makeMemberResolver is also called by the activity event resolver module.
+func makeMemberResolver(ctx context.Context, userID, serviceAccountID, teamID *string) (*MemberResolver, error) {
+	if userID != nil {
 		// Use resource loader to get user
-		user, err := loadUser(ctx, *r.namespaceMembership.UserID)
+		user, err := loadUser(ctx, *userID)
 		if err != nil {
 			return nil, err
 		}
 		return &MemberResolver{result: &UserResolver{user: user}}, nil
 	}
 
-	if r.namespaceMembership.ServiceAccountID != nil {
+	if serviceAccountID != nil {
 		// Use resource loader to get service account
-		serviceAccount, err := loadServiceAccount(ctx, *r.namespaceMembership.ServiceAccountID)
+		serviceAccount, err := loadServiceAccount(ctx, *serviceAccountID)
 		if err != nil {
 			return nil, err
 		}
 		return &MemberResolver{result: &ServiceAccountResolver{serviceAccount: serviceAccount}}, nil
 	}
 
-	if r.namespaceMembership.TeamID != nil {
+	if teamID != nil {
 		// Use resource loader to get team
-		team, err := loadTeam(ctx, *r.namespaceMembership.TeamID)
+		team, err := loadTeam(ctx, *teamID)
 		if err != nil {
 			return nil, err
 		}
@@ -403,4 +411,48 @@ func deleteNamespaceMembershipMutation(ctx context.Context,
 		Problems:            []Problem{},
 	}
 	return &NamespaceMembershipMutationPayloadResolver{NamespaceMembershipMutationPayload: payload}, nil
+}
+
+/* NamespaceMembership loader */
+
+const namespaceMembershipLoaderKey = "namespaceMembership"
+
+// RegisterNamespaceMembershipLoader registers a namespaceMembership loader function
+func RegisterNamespaceMembershipLoader(collection *loader.Collection) {
+	collection.Register(namespaceMembershipLoaderKey, namespaceMembershipBatchFunc)
+}
+
+func loadNamespaceMembership(ctx context.Context, id string) (*models.NamespaceMembership, error) {
+	ldr, err := loader.Extract(ctx, namespaceMembershipLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	namespaceMembership, ok := data.(models.NamespaceMembership)
+	if !ok {
+		return nil, errors.NewError(errors.EInternal, "Wrong type")
+	}
+
+	return &namespaceMembership, nil
+}
+
+func namespaceMembershipBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+
+	namespaceMemberships, err := getNamespaceMembershipService(ctx).GetNamespaceMembershipsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range namespaceMemberships {
+		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
 }

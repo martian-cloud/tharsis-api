@@ -1025,6 +1025,49 @@ func TestGetNamespaceMemberships(t *testing.T) {
 
 		// A namespace path is not required to be a UUID, so no check for UUID format can be done.
 
+		{
+			name: "filter, namespace membership IDs, positive",
+			input: &GetNamespaceMembershipsInput{
+				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
+				Filter: &NamespaceMembershipFilter{
+					NamespaceMembershipIDs: []string{createdWarmupOutput.namespaceMemberships[1].Metadata.ID},
+				},
+			},
+			expectTrails:         []string{allTrails[4]},
+			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, namespace membership IDs, non-existent",
+			input: &GetNamespaceMembershipsInput{
+				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
+				Filter: &NamespaceMembershipFilter{
+					NamespaceMembershipIDs: []string{nonExistentID},
+				},
+			},
+			expectTrails:         []string{},
+			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, namespace membership IDs, invalid",
+			input: &GetNamespaceMembershipsInput{
+				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
+				Filter: &NamespaceMembershipFilter{
+					NamespaceMembershipIDs: []string{invalidID},
+				},
+			},
+			expectMsg:            invalidUUIDMsg2,
+			expectTrails:         []string{},
+			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
 		// Combining filter functions does a logical AND when deciding whether to include a result.
 		// Because there are so many filter fields, do a few combinations but not all possible.
 
@@ -1238,7 +1281,6 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			// GetNamespaceMembershipByID(ctx context.Context, id string) (*models.NamespaceMembership, error)
 			namespaceMembership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)

@@ -4,11 +4,13 @@ import (
 	"context"
 	"strconv"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 
+	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 
@@ -247,4 +249,47 @@ func deleteGPGKeyMutation(ctx context.Context, input *DeleteGPGKeyInput) (*GPGKe
 
 	payload := GPGKeyMutationPayload{ClientMutationID: input.ClientMutationID, GPGKey: gpgKey, Problems: []Problem{}}
 	return &GPGKeyMutationPayloadResolver{GPGKeyMutationPayload: payload}, nil
+}
+
+/* GPG key loader */
+
+const gpgKeyLoaderKey = "gpgKey"
+
+// RegisterGPGKeyLoader registers a GPG key loader function
+func RegisterGPGKeyLoader(collection *loader.Collection) {
+	collection.Register(gpgKeyLoaderKey, gpgKeyBatchFunc)
+}
+
+func loadGPGKey(ctx context.Context, id string) (*models.GPGKey, error) {
+	ldr, err := loader.Extract(ctx, gpgKeyLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	gpgKey, ok := data.(models.GPGKey)
+	if !ok {
+		return nil, errors.NewError(errors.EInternal, "Wrong type")
+	}
+
+	return &gpgKey, nil
+}
+
+func gpgKeyBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+	gpgKeys, err := getGPGKeyService(ctx).GetGPGKeysByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range gpgKeys {
+		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
 }

@@ -34,6 +34,15 @@ func (g *Group) GetRootGroupPath() string {
 	return strings.Split(g.FullPath, "/")[0]
 }
 
+// GetParentPath returns the path for the group's immediate parent.
+func (g *Group) GetParentPath() string {
+	if g.ParentID == "" {
+		return ""
+	}
+	pathParts := strings.Split(g.FullPath, "/")
+	return strings.Join(pathParts[:len(pathParts)-1], "/")
+}
+
 // ExpandPath returns the expanded path list for the group. The expanded path
 // list includes the full path for the group in addition to all parent paths
 func (g *Group) ExpandPath() []string {

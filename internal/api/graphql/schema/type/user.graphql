@@ -28,4 +28,16 @@ type User implements Node {
   admin: Boolean!
   active: Boolean!
   scimExternalId: String
+  activityEvents(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    namespacePath: String
+    timeRangeStart: Time
+    timeRangeEnd: Time
+    actions: [ActivityEventAction!]
+    targetTypes: [ActivityEventTargetType!]
+    sort: ActivityEventSort
+  ): ActivityEventConnection!
 }

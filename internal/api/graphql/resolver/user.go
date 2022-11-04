@@ -174,6 +174,22 @@ func (r *UserResolver) SCIMExternalID() *string {
 	return &r.user.SCIMExternalID
 }
 
+// ActivityEvents resolver
+func (r *UserResolver) ActivityEvents(ctx context.Context,
+	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+
+	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
+	if err != nil {
+		// error is already a Tharsis error
+		return nil, err
+	}
+
+	// Need to filter to this user.
+	input.UserID = &r.user.Metadata.ID
+
+	return NewActivityEventConnectionResolver(ctx, input)
+}
+
 func usersQuery(ctx context.Context, args *UserConnectionQueryArgs) (*UserConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err

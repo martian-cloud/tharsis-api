@@ -220,6 +220,22 @@ func (r *ServiceAccountResolver) OIDCTrustPolicies() []OIDCTrustPolicy {
 	return policies
 }
 
+// ActivityEvents resolver
+func (r *ServiceAccountResolver) ActivityEvents(ctx context.Context,
+	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+
+	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
+	if err != nil {
+		// error is already a Tharsis error
+		return nil, err
+	}
+
+	// Need to filter to this service account.
+	input.ServiceAccountID = &r.serviceAccount.Metadata.ID
+
+	return NewActivityEventConnectionResolver(ctx, input)
+}
+
 func serviceAccountQuery(ctx context.Context, args *ServiceAccountQueryArgs) (*ServiceAccountResolver, error) {
 	saService := getSAService(ctx)
 

@@ -87,6 +87,11 @@ func NewGraphQL(
 	resolver.RegisterTeamLoader(loaderCollection)
 	resolver.RegisterTerraformProviderLoader(loaderCollection)
 	resolver.RegisterTerraformProviderVersionLoader(loaderCollection)
+	resolver.RegisterGPGKeyLoader(loaderCollection)
+	resolver.RegisterManagedIdentityLoader(loaderCollection)
+	resolver.RegisterManagedIdentityAccessRuleLoader(loaderCollection)
+	resolver.RegisterNamespaceMembershipLoader(loaderCollection)
+	resolver.RegisterNamespaceVariableLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers())
 

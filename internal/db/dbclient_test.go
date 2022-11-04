@@ -143,7 +143,7 @@ func (tc *testClient) wipeAllTables(ctx context.Context) error {
 	}
 
 	if len(tableNames) == 0 {
-		return fmt.Errorf("Function wipeAllTables found no tables to truncate.")
+		return fmt.Errorf("function wipeAllTables found no tables to truncate")
 	}
 
 	// Wipe all the tables.
@@ -777,11 +777,50 @@ func createInitialTerraformProviderPlatforms(ctx context.Context, testClient *te
 		versionID, ok := versionSpecs2ID[versionSpecs]
 		if !ok {
 			return nil,
-				fmt.Errorf("createInitialTerraformProviderPlatforms failed to look up version spcs: %s", versionSpecs)
+				fmt.Errorf("createInitialTerraformProviderPlatforms failed to look up version specs: %s", versionSpecs)
 		}
 		input.ProviderVersionID = versionID
 
 		created, err := testClient.client.TerraformProviderPlatforms.CreateProviderPlatform(ctx, &input)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, *created)
+	}
+
+	return result, nil
+}
+
+// createInitialActivityEvents creates some warmup activity events for a test.
+func createInitialActivityEvents(ctx context.Context, testClient *testClient,
+	toCreate []models.ActivityEvent, userMap, serviceAccountMap map[string]string) ([]models.ActivityEvent, error) {
+	result := []models.ActivityEvent{}
+
+	for _, input := range toCreate {
+
+		// Replace username with user ID.
+		if input.UserID != nil {
+			username := *input.UserID
+			userID, ok := userMap[username]
+			if !ok {
+				return nil, fmt.Errorf("Failed to replace username with user ID: %s", username)
+			}
+			input.UserID = ptr.String(userID)
+		}
+
+		// Replace service account name with service account ID.
+		if input.ServiceAccountID != nil {
+			serviceAccountName := *input.ServiceAccountID
+			serviceAccountID, ok := serviceAccountMap[serviceAccountName]
+			if !ok {
+				return nil,
+					fmt.Errorf("Failed to replace service account name with service account ID: %s", serviceAccountName)
+			}
+			input.ServiceAccountID = ptr.String(serviceAccountID)
+		}
+
+		created, err := testClient.client.ActivityEvents.CreateActivityEvent(ctx, &input)
 		if err != nil {
 			return nil, err
 		}

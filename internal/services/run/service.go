@@ -11,15 +11,16 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -155,6 +156,7 @@ type service struct {
 	jobService      job.Service
 	cliService      cli.Service
 	runStateManager *runStateManager
+	activityService activityevent.Service
 }
 
 var (
@@ -175,6 +177,7 @@ func NewService(
 	idp *auth.IdentityProvider,
 	jobService job.Service,
 	cliService cli.Service,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger,
@@ -185,6 +188,7 @@ func NewService(
 		jobService,
 		cliService,
 		newRunStateManager(dbClient, logger),
+		activityService,
 	}
 }
 
@@ -544,6 +548,16 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		)
 	}
 
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &ws.FullPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetRun,
+			TargetID:      run.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 
 	// Create job for initial plan
@@ -844,6 +858,21 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 	if cancelErr != nil {
 		return nil, cancelErr
+	}
+
+	workspace, wErr := s.dbClient.Workspaces.GetWorkspaceByID(ctx, updatedRun.WorkspaceID)
+	if wErr != nil {
+		return nil, wErr
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &workspace.FullPath,
+			Action:        models.ActionCancel,
+			TargetType:    models.TargetRun,
+			TargetID:      updatedRun.Metadata.ID,
+		}); err != nil {
+		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
@@ -1455,10 +1484,16 @@ func (s *service) getLatestJobByRunAndType(ctx context.Context, runID string, jo
 func (s *service) checkManagedIdentityRules(ctx context.Context, managedIdentities []models.ManagedIdentity, runStage models.JobType) error {
 
 	for _, managedIdentity := range managedIdentities {
-		rules, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx, managedIdentity.Metadata.ID)
+		results, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx,
+			&db.GetManagedIdentityAccessRulesInput{
+				Filter: &db.ManagedIdentityAccessRuleFilter{
+					ManagedIdentityID: &managedIdentity.Metadata.ID,
+				},
+			})
 		if err != nil {
 			return err
 		}
+		rules := results.ManagedIdentityAccessRules
 
 		for _, rule := range rules {
 			if rule.RunStage == runStage {

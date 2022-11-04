@@ -171,22 +171,22 @@ func (_m *MockManagedIdentities) GetManagedIdentityAccessRule(ctx context.Contex
 	return r0, r1
 }
 
-// GetManagedIdentityAccessRules provides a mock function with given fields: ctx, managedIdentityID
-func (_m *MockManagedIdentities) GetManagedIdentityAccessRules(ctx context.Context, managedIdentityID string) ([]models.ManagedIdentityAccessRule, error) {
-	ret := _m.Called(ctx, managedIdentityID)
+// GetManagedIdentityAccessRules provides a mock function with given fields: ctx, input
+func (_m *MockManagedIdentities) GetManagedIdentityAccessRules(ctx context.Context, input *GetManagedIdentityAccessRulesInput) (*ManagedIdentityAccessRulesResult, error) {
+	ret := _m.Called(ctx, input)
 
-	var r0 []models.ManagedIdentityAccessRule
-	if rf, ok := ret.Get(0).(func(context.Context, string) []models.ManagedIdentityAccessRule); ok {
-		r0 = rf(ctx, managedIdentityID)
+	var r0 *ManagedIdentityAccessRulesResult
+	if rf, ok := ret.Get(0).(func(context.Context, *GetManagedIdentityAccessRulesInput) *ManagedIdentityAccessRulesResult); ok {
+		r0 = rf(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.ManagedIdentityAccessRule)
+			r0 = ret.Get(0).(*ManagedIdentityAccessRulesResult)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, managedIdentityID)
+	if rf, ok := ret.Get(1).(func(context.Context, *GetManagedIdentityAccessRulesInput) error); ok {
+		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}

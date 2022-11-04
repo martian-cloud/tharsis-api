@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 var (
@@ -63,10 +64,11 @@ type Service interface {
 }
 
 type service struct {
-	logger        logger.Logger
-	dbClient      *db.Client
-	idp           *auth.IdentityProvider
-	getKeySetFunc func(ctx context.Context, issuer string) (jwk.Set, error)
+	logger          logger.Logger
+	dbClient        *db.Client
+	idp             *auth.IdentityProvider
+	getKeySetFunc   func(ctx context.Context, issuer string) (jwk.Set, error)
+	activityService activityevent.Service
 }
 
 // NewService creates an instance of Service
@@ -74,12 +76,14 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	idp *auth.IdentityProvider,
+	activityService activityevent.Service,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
 		idp,
 		getKeySet,
+		activityService,
 	)
 }
 
@@ -88,12 +92,14 @@ func newService(
 	dbClient *db.Client,
 	idp *auth.IdentityProvider,
 	getKeySetFunc func(ctx context.Context, issuer string) (jwk.Set, error),
+	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:        logger,
-		dbClient:      dbClient,
-		idp:           idp,
-		getKeySetFunc: getKeySetFunc,
+		logger:          logger,
+		dbClient:        dbClient,
+		idp:             idp,
+		getKeySetFunc:   getKeySetFunc,
+		activityService: activityService,
 	}
 }
 
@@ -175,8 +181,8 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 		return err
 	}
 
-	if err := caller.RequireAccessToGroup(ctx, serviceAccount.GroupID, models.DeployerRole); err != nil {
-		return err
+	if rErr := caller.RequireAccessToGroup(ctx, serviceAccount.GroupID, models.DeployerRole); rErr != nil {
+		return rErr
 	}
 
 	s.logger.Infow("Requested deletion of a service account.",
@@ -184,7 +190,41 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 		"groupID", serviceAccount.GroupID,
 		"serviceAccountID", serviceAccount.Metadata.ID,
 	)
-	return s.dbClient.ServiceAccounts.DeleteServiceAccount(ctx, serviceAccount)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteServiceAccount: %v", txErr)
+		}
+	}()
+
+	err = s.dbClient.ServiceAccounts.DeleteServiceAccount(txContext, serviceAccount)
+	if err != nil {
+		return err
+	}
+
+	groupPath := serviceAccount.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetGroup,
+			TargetID:      serviceAccount.GroupID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: serviceAccount.Name,
+				ID:   serviceAccount.Metadata.ID,
+				Type: string(models.TargetServiceAccount),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error) {
@@ -239,12 +279,12 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
 		return nil, err
 	}
 
 	// Validate model
-	if err := input.Validate(); err != nil {
+	if err = input.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -256,8 +296,40 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 		"serviceAccountName", input.Name,
 	)
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateServiceAccount: %v", txErr)
+		}
+	}()
+
 	// Store service account in DB
-	return s.dbClient.ServiceAccounts.CreateServiceAccount(ctx, input)
+	createdServiceAccount, err := s.dbClient.ServiceAccounts.CreateServiceAccount(txContext, input)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := createdServiceAccount.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetServiceAccount,
+			TargetID:      createdServiceAccount.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return createdServiceAccount, nil
 }
 
 func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error) {
@@ -266,12 +338,12 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToGroup(ctx, serviceAccount.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, serviceAccount.GroupID, models.DeployerRole); err != nil {
 		return nil, err
 	}
 
 	// Validate model
-	if err := serviceAccount.Validate(); err != nil {
+	if err = serviceAccount.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -281,8 +353,40 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 		"serviceAccountID", serviceAccount.Metadata.ID,
 	)
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateServiceAccount: %v", txErr)
+		}
+	}()
+
 	// Store serviceAccount in DB
-	return s.dbClient.ServiceAccounts.UpdateServiceAccount(ctx, serviceAccount)
+	updatedServiceAccount, err := s.dbClient.ServiceAccounts.UpdateServiceAccount(txContext, serviceAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := updatedServiceAccount.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetServiceAccount,
+			TargetID:      updatedServiceAccount.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedServiceAccount, nil
 }
 
 func (s *service) Login(ctx context.Context, input *LoginInput) (*LoginResponse, error) {

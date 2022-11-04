@@ -693,3 +693,11 @@ func (r RootResolver) CreateSCIMToken(ctx context.Context) (*SCIMTokenPayload, e
 
 	return response, nil
 }
+
+/* ActivityEvents Query */
+
+// ActivityEvents query returns an activity event connection
+func (r RootResolver) ActivityEvents(ctx context.Context,
+	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+	return activityEventsQuery(ctx, args)
+}

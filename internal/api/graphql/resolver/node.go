@@ -120,6 +120,12 @@ func (r *NodeResolver) ToWorkspace() (*WorkspaceResolver, bool) {
 	return res, ok
 }
 
+// ToTeam resolver
+func (r *NodeResolver) ToTeam() (*TeamResolver, bool) {
+	res, ok := r.result.(*TeamResolver)
+	return res, ok
+}
+
 // ToTerraformProvider resolver
 func (r *NodeResolver) ToTerraformProvider() (*TerraformProviderResolver, bool) {
 	res, ok := r.result.(*TerraformProviderResolver)
@@ -141,6 +147,12 @@ func (r *NodeResolver) ToTerraformProviderPlatform() (*TerraformProviderPlatform
 // ToGPGKey resolver
 func (r *NodeResolver) ToGPGKey() (*GPGKeyResolver, bool) {
 	res, ok := r.result.(*GPGKeyResolver)
+	return res, ok
+}
+
+// ToActivityEvent resolver
+func (r *NodeResolver) ToActivityEvent() (*ActivityEventResolver, bool) {
+	res, ok := r.result.(*ActivityEventResolver)
 	return res, ok
 }
 
@@ -269,6 +281,12 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			return nil, err
 		}
 		resolver = &GPGKeyResolver{gpgKey: gpgKey}
+	case gid.TeamType:
+		team, err := getTeamService(ctx).GetTeamByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolver = &TeamResolver{team: team}
 	default:
 		return nil, fmt.Errorf("node query doesn't support type %s", parsedGlobalID.Type)
 	}

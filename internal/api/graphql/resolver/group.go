@@ -315,6 +315,22 @@ func (r *GroupResolver) CreatedBy() string {
 	return r.group.CreatedBy
 }
 
+// ActivityEvents resolver
+func (r *GroupResolver) ActivityEvents(ctx context.Context,
+	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+
+	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
+	if err != nil {
+		// error is already a Tharsis error
+		return nil, err
+	}
+
+	// Need to filter to this group/namespace.
+	input.NamespacePath = &r.group.FullPath
+
+	return NewActivityEventConnectionResolver(ctx, input)
+}
+
 func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {
 	groupService := getGroupService(ctx)
 
@@ -392,8 +408,8 @@ type CreateGroupInput struct {
 type UpdateGroupInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
+	Description      *string
 	GroupPath        string
-	Description      string
 }
 
 // DeleteGroupInput contains the input for deleting a group
@@ -454,7 +470,9 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 	}
 
 	// Update fields
-	group.Description = input.Description
+	if input.Description != nil {
+		group.Description = *input.Description
+	}
 
 	group, err = groupService.UpdateGroup(ctx, group)
 	if err != nil {

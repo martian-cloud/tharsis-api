@@ -21,6 +21,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 type keyPair struct {
@@ -170,9 +171,12 @@ func TestLogin(t *testing.T) {
 				return set, nil
 			}
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
 			testLogger, _ := logger.NewForTest()
 
-			service := newService(testLogger, &dbClient, serviceAccountAuth, getKeySetFunc)
+			service := newService(testLogger, &dbClient, serviceAccountAuth, getKeySetFunc, &mockActivityEvents)
 
 			resp, err := service.Login(ctx, &LoginInput{ServiceAccount: test.serviceAccount, Token: test.token})
 			if err != nil && test.expectErr == nil {

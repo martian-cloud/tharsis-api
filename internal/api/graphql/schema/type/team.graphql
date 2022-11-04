@@ -36,7 +36,7 @@ type DeleteTeamPayload {
   problems: [Problem!]!
 }
 
-type Team {
+type Team implements Node {
   id: ID!
   metadata: ResourceMetadata!
   name: String!

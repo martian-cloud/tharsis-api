@@ -60,6 +60,7 @@ func (sf VariableSortableField) getSortDirection() SortDirection {
 // VariableFilter contains the supported fields for filtering Variable resources
 type VariableFilter struct {
 	NamespacePaths []string
+	VariableIDs    []string
 }
 
 // GetVariablesInput is the input for listing variables
@@ -309,6 +310,13 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 	if input.Filter != nil {
 		if input.Filter.NamespacePaths != nil {
 			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.NamespacePaths))
+		}
+
+		if input.Filter.VariableIDs != nil {
+			// This check avoids an SQL syntax error if an empty slice is provided.
+			if len(input.Filter.VariableIDs) > 0 {
+				ex = ex.Append(goqu.I("namespace_variables.id").In(input.Filter.VariableIDs))
+			}
 		}
 	}
 

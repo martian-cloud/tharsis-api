@@ -87,7 +87,7 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			gotNamespace, err := getNamespaceByGroupID(ctx, testClient.client.conn, test.input)
+			gotNamespace, err := getNamespaceByGroupID(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
 
@@ -171,7 +171,7 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			gotNamespace, err := getNamespaceByWorkspaceID(ctx, testClient.client.conn, test.input)
+			gotNamespace, err := getNamespaceByWorkspaceID(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
 
@@ -266,7 +266,7 @@ func TestGetNamespaceByPath(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			gotNamespace, err := getNamespaceByPath(ctx, testClient.client.conn, test.input)
+			gotNamespace, err := getNamespaceByPath(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
 
@@ -380,7 +380,7 @@ func TestCreateNamespace(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			gotNamespace, err := createNamespace(ctx, testClient.client.conn, test.input)
+			gotNamespace, err := createNamespace(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
 
