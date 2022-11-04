@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 )
 
@@ -59,6 +60,9 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
 			mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
 			createNamespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
@@ -72,13 +76,15 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			dbClient := db.Client{
 				Groups:       &mockGroups,
 				Transactions: &mockTransactions,
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockNamespaceMemberships)
+			service := NewService(logger, &dbClient, &mockNamespaceMemberships, &mockActivityEvents)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, test.caller), &test.input)
 			if test.expectErrorCode != "" {
@@ -146,11 +152,16 @@ func TestCreateNestedGroup(t *testing.T) {
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
 			mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			dbClient := db.Client{
 				Groups:       &mockGroups,
@@ -158,7 +169,7 @@ func TestCreateNestedGroup(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, nil)
+			service := NewService(logger, &dbClient, nil, &mockActivityEvents)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrorCode != "" {

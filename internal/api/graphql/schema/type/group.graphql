@@ -89,6 +89,20 @@ type Group implements Node, Namespace {
   ): TerraformProviderConnection!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
+  activityEvents(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    username: String
+    serviceAccountPath: String
+    includeNested: Boolean
+    timeRangeStart: Time
+    timeRangeEnd: Time
+    actions: [ActivityEventAction!]
+    targetTypes: [ActivityEventTargetType!]
+    sort: ActivityEventSort
+  ): ActivityEventConnection!
 }
 
 input CreateGroupInput {
@@ -101,7 +115,7 @@ input CreateGroupInput {
 input UpdateGroupInput {
   clientMutationId: String
   groupPath: String!
-  description: String!
+  description: String
   metadata: ResourceMetadataInput
 }
 

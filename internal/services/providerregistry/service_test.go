@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
 func TestCreateProviderVersion(t *testing.T) {
@@ -141,6 +142,9 @@ func TestCreateProviderVersion(t *testing.T) {
 			mockProviderVersions := db.MockTerraformProviderVersions{}
 			mockProviderVersions.Test(t)
 
+			mockGroups := db.MockGroups{}
+			mockGroups.Test(t)
+
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -149,7 +153,8 @@ func TestCreateProviderVersion(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: providerID,
 				},
-				GroupID: groupID,
+				GroupID:      groupID,
+				ResourcePath: "testgroup/testprovider",
 			}, nil)
 
 			providerVersionsResult := db.ProviderVersionsResult{
@@ -178,15 +183,25 @@ func TestCreateProviderVersion(t *testing.T) {
 			mockProviderVersions.On("CreateProviderVersion", mock.Anything, mock.Anything).
 				Return(test.expectCreatedProviderVersion, nil)
 
+			mockGroups.On("GetGroupByID", mock.Anything, mock.Anything).Return(&models.Group{
+				FullPath: "testGroupFullPath",
+			}, nil)
+
 			dbClient := db.Client{
 				Transactions:              &mockTransactions,
 				TerraformProviders:        &mockProviders,
 				TerraformProviderVersions: &mockProviderVersions,
+				Groups:                    &mockGroups,
 			}
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil)
+			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents)
 
 			providerVersion, err := service.CreateProviderVersion(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if err != nil {
@@ -375,9 +390,14 @@ func TestDeleteProviderVersion(t *testing.T) {
 				TerraformProviderVersions: &mockProviderVersions,
 			}
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil)
+			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents)
 
 			err := service.DeleteProviderVersion(auth.WithCaller(ctx, &mockCaller), &test.providerVersionToDelete)
 			if err != nil {

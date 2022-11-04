@@ -64,13 +64,14 @@ func (sf NamespaceMembershipSortableField) getSortDirection() SortDirection {
 
 // NamespaceMembershipFilter contains the supported fields for filtering NamespaceMembership resources
 type NamespaceMembershipFilter struct {
-	UserID              *string
-	ServiceAccountID    *string
-	TeamID              *string
-	GroupID             *string
-	WorkspaceID         *string
-	NamespacePathPrefix *string
-	NamespacePaths      []string
+	UserID                 *string
+	ServiceAccountID       *string
+	TeamID                 *string
+	GroupID                *string
+	WorkspaceID            *string
+	NamespacePathPrefix    *string
+	NamespacePaths         []string
+	NamespaceMembershipIDs []string
 }
 
 // GetNamespaceMembershipsInput is the input for listing namespace memberships
@@ -297,6 +298,13 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
 				goqu.I("namespaces.path").Like(*input.Filter.NamespacePathPrefix+"/%%"),
 			))
+		}
+
+		if input.Filter.NamespaceMembershipIDs != nil {
+			// This check avoids an SQL syntax error if an empty slice is provided.
+			if len(input.Filter.NamespaceMembershipIDs) > 0 {
+				ex = ex.Append(goqu.I("namespace_memberships.id").In(input.Filter.NamespaceMembershipIDs))
+			}
 		}
 	}
 

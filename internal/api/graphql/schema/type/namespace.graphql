@@ -23,4 +23,18 @@ interface Namespace {
     includeInherited: Boolean
     search: String
   ): ManagedIdentityConnection!
+  activityEvents(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    username: String
+    serviceAccountPath: String
+    includeNested: Boolean
+    timeRangeStart: Time
+    timeRangeEnd: Time
+    actions: [ActivityEventAction!]
+    targetTypes: [ActivityEventTargetType!]
+    sort: ActivityEventSort
+  ): ActivityEventConnection!
 }

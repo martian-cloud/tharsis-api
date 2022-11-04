@@ -70,6 +70,23 @@ type Query {
     first: Int
     last: Int
     search: String
+    sort: TeamSort
   ): TeamConnection!
   terraformCLIVersions: TerraformCLIVersions
+  # There is no query for an activity event by ID.
+  activityEvents(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    username: String
+    serviceAccountPath: String
+    namespacePath: String
+    includeNested: Boolean
+    timeRangeStart: Time
+    timeRangeEnd: Time
+    actions: [ActivityEventAction!]
+    targetTypes: [ActivityEventTargetType!]
+    sort: ActivityEventSort
+  ): ActivityEventConnection!
 }

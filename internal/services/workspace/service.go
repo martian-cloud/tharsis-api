@@ -17,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 )
 
@@ -132,27 +133,30 @@ const (
 )
 
 type service struct {
-	logger        logger.Logger
-	dbClient      *db.Client
-	artifactStore ArtifactStore
-	eventManager  *events.EventManager
-	cliService    cli.Service
+	logger          logger.Logger
+	dbClient        *db.Client
+	artifactStore   ArtifactStore
+	eventManager    *events.EventManager
+	cliService      cli.Service
+	activityService activityevent.Service
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	artifaceStore ArtifactStore,
+	artifactStore ArtifactStore,
 	eventManager *events.EventManager,
 	cliService cli.Service,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
-		artifaceStore,
+		artifactStore,
 		eventManager,
 		cliService,
+		activityService,
 	}
 }
 
@@ -329,14 +333,14 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		return err
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
 		return err
 	}
 
 	if !force && workspace.CurrentStateVersionID != "" {
-		sv, err := s.GetStateVersion(ctx, workspace.CurrentStateVersionID)
-		if err != nil {
-			return err
+		sv, gErr := s.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+		if gErr != nil {
+			return gErr
 		}
 
 		// A state version could be created by something other than a run e.g. 'terraform import'.
@@ -346,9 +350,9 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 				"current state version was not created by a destroy run")
 		}
 
-		run, err := s.dbClient.Runs.GetRun(ctx, *sv.RunID)
-		if err != nil {
-			return err
+		run, rErr := s.dbClient.Runs.GetRun(ctx, *sv.RunID)
+		if rErr != nil {
+			return rErr
 		}
 
 		if run == nil {
@@ -368,7 +372,42 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		"fullPath", workspace.FullPath,
 		"workspaceID", workspace.Metadata.ID,
 	)
-	return s.dbClient.Workspaces.DeleteWorkspace(ctx, workspace)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteServiceAccount: %v", txErr)
+		}
+	}()
+
+	// The foreign key with on cascade delete should remove activity events whose target ID is this group.
+
+	err = s.dbClient.Workspaces.DeleteWorkspace(txContext, workspace)
+	if err != nil {
+		return err
+	}
+
+	parentGroupPath := workspace.GetGroupPath()
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &parentGroupPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetGroup,
+			TargetID:      workspace.GroupID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: workspace.Name,
+				ID:   workspace.Metadata.ID,
+				Type: string(models.TargetWorkspace),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
@@ -405,8 +444,8 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	// Check if requested Terraform version is supported.
 	if workspace.TerraformVersion != "" {
-		if err := versions.Supported(workspace.TerraformVersion); err != nil {
-			return nil, err
+		if terr := versions.Supported(workspace.TerraformVersion); terr != nil {
+			return nil, terr
 		}
 	}
 
@@ -415,12 +454,42 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		workspace.TerraformVersion = versions.Latest()
 	}
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateWorkspace: %v", txErr)
+		}
+	}()
+
 	s.logger.Infow("Requested creation of a new workspace.",
 		"caller", caller.GetSubject(),
 		"groupID", workspace.GroupID,
 		"workspaceName", workspace.Name,
 	)
-	return s.dbClient.Workspaces.CreateWorkspace(ctx, workspace)
+	createdWorkspace, err := s.dbClient.Workspaces.CreateWorkspace(txContext, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &createdWorkspace.FullPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetWorkspace,
+			TargetID:      createdWorkspace.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return createdWorkspace, nil
 }
 
 func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
@@ -459,7 +528,37 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		"workspaceID", workspace.Metadata.ID,
 	)
 
-	return s.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateWorkspace: %v", txErr)
+		}
+	}()
+
+	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &updatedWorkspace.FullPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetWorkspace,
+			TargetID:      updatedWorkspace.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedWorkspace, nil
 }
 
 func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
@@ -486,7 +585,37 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 		"workspaceID", workspace.Metadata.ID,
 	)
 
-	return s.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer LockWorkspace: %v", txErr)
+		}
+	}()
+
+	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &updatedWorkspace.FullPath,
+			Action:        models.ActionLock,
+			TargetType:    models.TargetWorkspace,
+			TargetID:      updatedWorkspace.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedWorkspace, nil
 }
 
 func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
@@ -518,7 +647,37 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 		"workspaceID", workspace.Metadata.ID,
 	)
 
-	return s.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UnlockWorkspace: %v", txErr)
+		}
+	}()
+
+	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &updatedWorkspace.FullPath,
+			Action:        models.ActionUnlock,
+			TargetType:    models.TargetWorkspace,
+			TargetID:      updatedWorkspace.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedWorkspace, nil
 }
 
 func (s *service) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*models.StateVersion, error) {
@@ -708,6 +867,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	}
 
 	// Update the current state version field on the workspace.
+	// This is a read-only operation, so there's no need to use the transaction context.
 	workspace, wErr := s.getWorkspaceByID(ctx, createdStateVersion.WorkspaceID)
 	if wErr != nil {
 		return nil, wErr
@@ -751,12 +911,23 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	}
 
 	// Upload state version data to object store
-	if err := s.artifactStore.UploadStateVersion(ctx, createdStateVersion, bytes.NewBuffer(decoded)); err != nil {
+	// Does not touch the DB, so no need to use the transaction context.
+	if err = s.artifactStore.UploadStateVersion(ctx, createdStateVersion, bytes.NewBuffer(decoded)); err != nil {
 		return nil, errors.NewError(
 			errors.EInternal,
 			"Failed to write state version to object storage",
 			errors.WithErrorErr(err),
 		)
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &workspace.FullPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetStateVersion,
+			TargetID:      createdStateVersion.Metadata.ID,
+		}); err != nil {
+		return nil, err
 	}
 
 	// Commit the transaction here.  If the upload fails, the transaction will be aborted.

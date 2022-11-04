@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
@@ -343,8 +344,15 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			}
 
 			for _, managedIdentity := range test.managedIdentities {
-				dbClient.MockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, managedIdentity.Metadata.ID).
-					Return(ruleMap[managedIdentity.Metadata.ID], nil)
+				dbClient.MockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything,
+					&db.GetManagedIdentityAccessRulesInput{
+						Filter: &db.ManagedIdentityAccessRuleFilter{
+							ManagedIdentityID: &managedIdentity.Metadata.ID,
+						},
+					}).
+					Return(&db.ManagedIdentityAccessRulesResult{
+						ManagedIdentityAccessRules: ruleMap[managedIdentity.Metadata.ID],
+					}, nil)
 			}
 
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
@@ -381,8 +389,13 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockTeams.On("GetTeams", mock.Anything, mock.Anything).
 				Return(&db.TeamsResult{Teams: test.teams}, nil)
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil)
+			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), &CreateRunInput{
 				WorkspaceID:            ws.Metadata.ID,
@@ -592,8 +605,15 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			}
 
 			for _, managedIdentity := range test.managedIdentities {
-				dbClient.MockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, managedIdentity.Metadata.ID).
-					Return(ruleMap[managedIdentity.Metadata.ID], nil)
+				dbClient.MockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything,
+					&db.GetManagedIdentityAccessRulesInput{
+						Filter: &db.ManagedIdentityAccessRuleFilter{
+							ManagedIdentityID: &managedIdentity.Metadata.ID,
+						},
+					}).
+					Return(&db.ManagedIdentityAccessRulesResult{
+						ManagedIdentityAccessRules: ruleMap[managedIdentity.Metadata.ID],
+					}, nil)
 			}
 
 			apply.Status = models.ApplyCreated // to avoid tripping the state transition checks in UpdateApply, etc.
@@ -609,8 +629,13 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockTeams.On("GetTeams", mock.Anything, mock.Anything).
 				Return(&db.TeamsResult{Teams: []models.Team{}}, nil)
 
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, nil, nil, nil, nil, nil)
+			service := NewService(logger, dbClient.Client, nil, nil, nil, nil, nil, &mockActivityEvents)
 
 			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)
 			if test.expectErrorCode != "" {

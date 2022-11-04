@@ -12,7 +12,6 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 
 	_ "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity" // Placeholder to ensure private packages are being downloaded
-	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql"
@@ -24,9 +23,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
+	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -115,20 +116,24 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 
 	// Services.
 	var (
+		activityService            = activityevent.NewService(dbClient, logger)
 		userService                = user.NewService(logger, dbClient)
-		namespaceMembershipService = namespacemembership.NewService(logger, dbClient)
-		groupService               = group.NewService(logger, dbClient, namespaceMembershipService)
+		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
+		groupService               = group.NewService(logger, dbClient, namespaceMembershipService, activityService)
 		cliService                 = cli.NewService(logger, httpClient, cliStore)
-		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService)
-		jobService                 = job.NewService(logger, dbClient, eventManager, logStore)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService, cliService)
-		managedIdentityService     = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService, jobService)
-		saService                  = serviceaccount.NewService(logger, dbClient, tharsisIDP)
-		variableService            = variable.NewService(logger, dbClient)
-		teamService                = team.NewService(logger, dbClient)
-		providerRegistryService    = providerregistry.NewService(logger, dbClient, providerRegistryStore)
-		gpgKeyService              = gpgkey.NewService(logger, dbClient)
-		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
+		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService,
+			activityService)
+		jobService = job.NewService(logger, dbClient, eventManager, logStore)
+		runService = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService,
+			cliService, activityService)
+		managedIdentityService = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService,
+			jobService, activityService)
+		saService               = serviceaccount.NewService(logger, dbClient, tharsisIDP, activityService)
+		variableService         = variable.NewService(logger, dbClient, activityService)
+		teamService             = team.NewService(logger, dbClient, activityService)
+		providerRegistryService = providerregistry.NewService(logger, dbClient, providerRegistryStore, activityService)
+		gpgKeyService           = gpgkey.NewService(logger, dbClient, activityService)
+		scimService             = scim.NewService(logger, dbClient, tharsisIDP)
 	)
 
 	routeBuilder := api.NewRouteBuilder(
@@ -184,6 +189,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		GPGKeyService:              gpgKeyService,
 		CliService:                 cliService,
 		SCIMService:                scimService,
+		ActivityService:            activityService,
 	}
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.RateLimitStore, cfg.MaxGraphQLComplexity, authenticator, jwtAuthMiddleware)
 	if err != nil {

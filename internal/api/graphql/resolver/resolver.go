@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -45,6 +46,7 @@ type State struct {
 	GPGKeyService              gpgkey.Service
 	CliService                 cli.Service
 	SCIMService                scim.Service
+	ActivityService            activityevent.Service
 }
 
 // Attach is used to attach the resolver state to the context
@@ -125,4 +127,8 @@ func getCLIService(ctx context.Context) cli.Service {
 
 func getSCIMService(ctx context.Context) scim.Service {
 	return extract(ctx).SCIMService
+}
+
+func getActivityService(ctx context.Context) activityevent.Service {
+	return extract(ctx).ActivityService
 }

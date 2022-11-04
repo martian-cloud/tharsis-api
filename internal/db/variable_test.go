@@ -28,13 +28,13 @@ type variableInfo struct {
 // variableInfoIDSlice makes a slice of variableInfo sortable by ID string
 type variableInfoIDSlice []variableInfo
 
-// variableInfoKeySlice makes a slice of variableInfo sortable by last updated time
+// variableInfoKeySlice makes a slice of variableInfo sortable by the key field
 type variableInfoKeySlice []variableInfo
 
 // variableInfoCreateTimeSlice makes a slice of variableInfo sortable by creation time
 type variableInfoCreateTimeSlice []variableInfo
 
-// variableInfoNamespacePathSlice makes a slice of variableInfo sortable by last updated time
+// variableInfoNamespacePathSlice makes a slice of variableInfo sortable by namespace path
 type variableInfoNamespacePathSlice []variableInfo
 
 func TestGetVariables(t *testing.T) {
@@ -407,6 +407,48 @@ func TestGetVariables(t *testing.T) {
 					NamespacePaths: []string{"this-path-does-not-exist"},
 				},
 			},
+			expectVariableIDs:    []string{},
+			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, variable IDs, positive",
+			input: &GetVariablesInput{
+				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
+				Filter: &VariableFilter{
+					VariableIDs: []string{warmupVariables[0].Metadata.ID},
+				},
+			},
+			expectVariableIDs:    []string{allVariableIDsByCreateTime[0]},
+			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, variable IDs, non-existent",
+			input: &GetVariablesInput{
+				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
+				Filter: &VariableFilter{
+					VariableIDs: []string{nonExistentID},
+				},
+			},
+			expectVariableIDs:    []string{},
+			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+		{
+			name: "filter, variable IDs, invalid",
+			input: &GetVariablesInput{
+				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
+				Filter: &VariableFilter{
+					VariableIDs: []string{invalidID},
+				},
+			},
+			expectMsg:            invalidUUIDMsg2,
 			expectVariableIDs:    []string{},
 			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,

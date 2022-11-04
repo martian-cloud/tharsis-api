@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -40,6 +41,7 @@ type Service interface {
 	GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error)
 	GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error)
 	GetManagedIdentities(ctx context.Context, input *GetManagedIdentitiesInput) (*db.ManagedIdentitiesResult, error)
+	GetManagedIdentitiesByIDs(ctx context.Context, ids []string) ([]models.ManagedIdentity, error)
 	CreateManagedIdentity(ctx context.Context, input *types.CreateManagedIdentityInput) (*models.ManagedIdentity, error)
 	UpdateManagedIdentity(ctx context.Context, input *types.UpdateManagedIdentityInput) (*models.ManagedIdentity, error)
 	DeleteManagedIdentity(ctx context.Context, input *DeleteManagedIdentityInput) error
@@ -48,6 +50,7 @@ type Service interface {
 	AddManagedIdentityToWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error
 	RemoveManagedIdentityFromWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error
 	GetManagedIdentityAccessRules(ctx context.Context, managedIdentity *models.ManagedIdentity) ([]models.ManagedIdentityAccessRule, error)
+	GetManagedIdentityAccessRulesByIDs(ctx context.Context, ids []string) ([]models.ManagedIdentityAccessRule, error)
 	GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error)
 	CreateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	UpdateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
@@ -60,6 +63,7 @@ type service struct {
 	delegateMap      map[models.ManagedIdentityType]Delegate
 	workspaceService workspace.Service
 	jobService       job.Service
+	activityService  activityevent.Service
 }
 
 // NewService creates an instance of Service
@@ -69,6 +73,7 @@ func NewService(
 	managedIdentityDelegateMap map[models.ManagedIdentityType]Delegate,
 	workspaceService workspace.Service,
 	jobService job.Service,
+	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger:           logger,
@@ -76,6 +81,7 @@ func NewService(
 		delegateMap:      managedIdentityDelegateMap,
 		workspaceService: workspaceService,
 		jobService:       jobService,
+		activityService:  activityService,
 	}
 }
 
@@ -128,8 +134,8 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 		return err
 	}
 
-	if err := caller.RequireAccessToGroup(ctx, input.ManagedIdentity.GroupID, models.DeployerRole); err != nil {
-		return err
+	if rErr := caller.RequireAccessToGroup(ctx, input.ManagedIdentity.GroupID, models.DeployerRole); rErr != nil {
+		return rErr
 	}
 
 	s.logger.Infow("Requested to delete a managed identity.",
@@ -140,9 +146,9 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	if !input.Force {
 		// Verify that managed identity is not assigned to any workspaces
-		workspaces, err := s.dbClient.Workspaces.GetWorkspacesForManagedIdentity(ctx, input.ManagedIdentity.Metadata.ID)
-		if err != nil {
-			return err
+		workspaces, wErr := s.dbClient.Workspaces.GetWorkspacesForManagedIdentity(ctx, input.ManagedIdentity.Metadata.ID)
+		if wErr != nil {
+			return wErr
 		}
 		if len(workspaces) > 0 {
 			return errors.NewError(
@@ -153,7 +159,40 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 		}
 	}
 
-	return s.dbClient.ManagedIdentities.DeleteManagedIdentity(ctx, input.ManagedIdentity)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteManagedIdentity: %v", txErr)
+		}
+	}()
+
+	err = s.dbClient.ManagedIdentities.DeleteManagedIdentity(txContext, input.ManagedIdentity)
+	if err != nil {
+		return err
+	}
+
+	groupPath := input.ManagedIdentity.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetGroup,
+			TargetID:      input.ManagedIdentity.GroupID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: input.ManagedIdentity.Name,
+				ID:   input.ManagedIdentity.Metadata.ID,
+				Type: string(models.TargetManagedIdentity),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) GetManagedIdentitiesForWorkspace(ctx context.Context, workspaceID string) ([]models.ManagedIdentity, error) {
@@ -216,7 +255,33 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		}
 	}
 
-	if err := s.dbClient.ManagedIdentities.AddManagedIdentityToWorkspace(ctx, managedIdentityID, workspaceID); err != nil {
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer AddManagedIdentityToWorkspace: %v", txErr)
+		}
+	}()
+
+	if aErr := s.dbClient.ManagedIdentities.AddManagedIdentityToWorkspace(txContext,
+		managedIdentityID, workspaceID); aErr != nil {
+		return aErr
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &workspace.FullPath,
+			Action:        models.ActionAdd,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      identity.Metadata.ID,
+		}); err != nil {
+		return err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return err
 	}
 
@@ -235,11 +300,49 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 		return err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, workspaceID, models.DeployerRole); err != nil {
+	if rErr := caller.RequireAccessToWorkspace(ctx, workspaceID, models.DeployerRole); rErr != nil {
+		return rErr
+	}
+
+	// Get managed identity that will be removed
+	identity, err := s.getManagedIdentityByID(ctx, managedIdentityID)
+	if err != nil {
 		return err
 	}
 
-	if err := s.dbClient.ManagedIdentities.RemoveManagedIdentityFromWorkspace(ctx, managedIdentityID, workspaceID); err != nil {
+	// Get workspace
+	workspace, err := s.workspaceService.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return err
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer RemoveManagedIdentityFromWorkspace: %v", txErr)
+		}
+	}()
+
+	if err = s.dbClient.ManagedIdentities.RemoveManagedIdentityFromWorkspace(txContext,
+		managedIdentityID, workspaceID); err != nil {
+		return err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &workspace.FullPath,
+			Action:        models.ActionRemove,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      identity.Metadata.ID,
+		}); err != nil {
+		return err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return err
 	}
 
@@ -303,7 +406,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *types.Create
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.OwnerRole); err != nil {
 		return nil, err
 	}
 
@@ -357,6 +460,18 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *types.Create
 		return nil, err
 	}
 
+	groupPath := managedIdentity.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      managedIdentity.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
 	// Store access rules
 	if input.AccessRules != nil {
 		for _, rule := range input.AccessRules {
@@ -364,13 +479,15 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *types.Create
 				return nil, err
 			}
 
-			if _, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext, &models.ManagedIdentityAccessRule{
-				ManagedIdentityID:        managedIdentity.Metadata.ID,
-				RunStage:                 rule.RunStage,
-				AllowedUserIDs:           rule.AllowedUserIDs,
-				AllowedServiceAccountIDs: rule.AllowedServiceAccountIDs,
-				AllowedTeamIDs:           rule.AllowedTeamIDs,
-			}); err != nil {
+			_, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext,
+				&models.ManagedIdentityAccessRule{
+					ManagedIdentityID:        managedIdentity.Metadata.ID,
+					RunStage:                 rule.RunStage,
+					AllowedUserIDs:           rule.AllowedUserIDs,
+					AllowedServiceAccountIDs: rule.AllowedServiceAccountIDs,
+					AllowedTeamIDs:           rule.AllowedTeamIDs,
+				})
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -381,6 +498,31 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *types.Create
 	}
 
 	return managedIdentity, nil
+}
+
+func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) ([]models.ManagedIdentity, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get identity from DB
+	results, err := s.dbClient.ManagedIdentities.GetManagedIdentities(ctx, &db.GetManagedIdentitiesInput{
+		Filter: &db.ManagedIdentityFilter{
+			ManagedIdentityIDs: ids,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, identity := range results.ManagedIdentities {
+		if err := caller.RequireAccessToInheritedGroupResource(ctx, identity.GroupID); err != nil {
+			return nil, err
+		}
+	}
+
+	return results.ManagedIdentities, nil
 }
 
 func (s *service) UpdateManagedIdentity(ctx context.Context, input *types.UpdateManagedIdentityInput) (*models.ManagedIdentity, error) {
@@ -394,7 +536,7 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *types.Update
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
 		return nil, err
 	}
 
@@ -406,12 +548,12 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *types.Update
 	managedIdentity.Description = input.Description
 
 	// Validate model
-	if err := managedIdentity.Validate(); err != nil {
-		return nil, err
+	if vErr := managedIdentity.Validate(); vErr != nil {
+		return nil, vErr
 	}
 
-	if err := delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); err != nil {
-		return nil, errors.NewError(errors.EInvalid, "Failed to create managed identity", errors.WithErrorErr(err))
+	if sErr := delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); sErr != nil {
+		return nil, errors.NewError(errors.EInvalid, "Failed to create managed identity", errors.WithErrorErr(sErr))
 	}
 
 	s.logger.Infow("Updated a managed identity.",
@@ -420,8 +562,40 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *types.Update
 		"managedIdentityID", managedIdentity.Metadata.ID,
 	)
 
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateManagedIdentity: %v", txErr)
+		}
+	}()
+
 	// Store identity in DB
-	return s.dbClient.ManagedIdentities.UpdateManagedIdentity(ctx, managedIdentity)
+	updatedManagedIdentity, err := s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := updatedManagedIdentity.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      updatedManagedIdentity.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return updatedManagedIdentity, nil
 }
 
 func (s *service) GetManagedIdentityAccessRules(ctx context.Context, managedIdentity *models.ManagedIdentity) ([]models.ManagedIdentityAccessRule, error) {
@@ -430,11 +604,57 @@ func (s *service) GetManagedIdentityAccessRules(ctx context.Context, managedIden
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, managedIdentity.GroupID); err != nil {
+	if err = caller.RequireAccessToInheritedGroupResource(ctx, managedIdentity.GroupID); err != nil {
 		return nil, err
 	}
 
-	return s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx, managedIdentity.Metadata.ID)
+	resp, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx, &db.GetManagedIdentityAccessRulesInput{
+		Filter: &db.ManagedIdentityAccessRuleFilter{
+			ManagedIdentityID: &managedIdentity.Metadata.ID,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.ManagedIdentityAccessRules, nil
+}
+
+func (s *service) GetManagedIdentityAccessRulesByIDs(ctx context.Context,
+	ids []string) ([]models.ManagedIdentityAccessRule, error) {
+	_, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get identity from DB
+	resp, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx, &db.GetManagedIdentityAccessRulesInput{
+		Filter: &db.ManagedIdentityAccessRuleFilter{
+			ManagedIdentityAccessRuleIDs: ids,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the identity IDs.
+	identityIDMap := make(map[string]bool)
+	identityIDs := []string{}
+	for _, rule := range resp.ManagedIdentityAccessRules {
+		identityID := rule.ManagedIdentityID
+		if _, ok := identityIDMap[identityID]; !ok {
+			identityIDMap[identityID] = true
+			identityIDs = append(identityIDs, identityID)
+		}
+	}
+
+	// Make sure caller has permission to see the affected groups.
+	_, err = s.GetManagedIdentitiesByIDs(ctx, identityIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.ManagedIdentityAccessRules, nil
 }
 
 func (s *service) GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
@@ -475,7 +695,7 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
 		return nil, err
 	}
 
@@ -483,8 +703,37 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
-	rule, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, input)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateManagedIdentityAccessRule: %v", txErr)
+		}
+	}()
+
+	rule, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext, input)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := managedIdentity.GetGroupPath()
+
+	// Activity events for creating managed identity access
+	// rules point to the managed identity, not the rule.
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetManagedIdentityAccessRule,
+			TargetID:      rule.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -502,7 +751,7 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
 		return nil, err
 	}
 
@@ -510,8 +759,36 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
-	rule, err := s.dbClient.ManagedIdentities.UpdateManagedIdentityAccessRule(ctx, input)
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer UpdateManagedIdentityAccessRule: %v", txErr)
+		}
+	}()
+
+	rule, err := s.dbClient.ManagedIdentities.UpdateManagedIdentityAccessRule(txContext, input)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := managedIdentity.GetGroupPath()
+
+	// Activity events for updating managed identity access rules point to the rule.
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionUpdate,
+			TargetType:    models.TargetManagedIdentityAccessRule,
+			TargetID:      rule.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -529,11 +806,44 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 		return err
 	}
 
-	if err := caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.DeployerRole); err != nil {
+	if rErr := caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); rErr != nil {
+		return rErr
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
 		return err
 	}
 
-	return s.dbClient.ManagedIdentities.DeleteManagedIdentityAccessRule(ctx, rule)
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for DeleteManagedIdentityAccessRule: %v", txErr)
+		}
+	}()
+
+	err = s.dbClient.ManagedIdentities.DeleteManagedIdentityAccessRule(txContext, rule)
+	if err != nil {
+		return err
+	}
+
+	groupPath := managedIdentity.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      managedIdentity.Metadata.ID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				ID:   rule.Metadata.ID,
+				Name: string(rule.RunStage),
+				Type: string(models.TargetManagedIdentityAccessRule),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) CreateCredentials(ctx context.Context, identity *models.ManagedIdentity) ([]byte, error) {

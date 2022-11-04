@@ -1,0 +1,46 @@
+CREATE TABLE IF NOT EXISTS activity_events (
+    id UUID PRIMARY KEY,
+    version INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    user_id UUID,
+    service_account_id UUID,
+    namespace_id UUID,
+    action VARCHAR NOT NULL,
+    target_type VARCHAR NOT NULL,
+    gpg_key_target_id UUID,
+    group_target_id UUID,
+    managed_identity_target_id UUID,
+    managed_identity_rule_target_id UUID,
+    namespace_membership_target_id UUID,
+    run_target_id UUID,
+    service_account_target_id UUID,
+    state_version_target_id UUID,
+    team_target_id UUID,
+    terraform_provider_target_id UUID,
+    terraform_provider_version_target_id UUID,
+    variable_target_id UUID,
+    workspace_target_id UUID,
+    payload JSONB,
+    CONSTRAINT fk_activity_events_user_id FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_service_account_id FOREIGN KEY(service_account_id) REFERENCES service_accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_namespace_id FOREIGN KEY(namespace_id) REFERENCES namespaces(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_gpg_key_target_id FOREIGN KEY(gpg_key_target_id) REFERENCES gpg_keys(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_group_target_id FOREIGN KEY(group_target_id) REFERENCES groups(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_managed_identity_target_id FOREIGN KEY(managed_identity_target_id) REFERENCES managed_identities(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_managed_identity_rule_target_id FOREIGN KEY(managed_identity_rule_target_id) REFERENCES managed_identity_rules(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_namespace_membership_target_id FOREIGN KEY(namespace_membership_target_id) REFERENCES namespace_memberships(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_run_target_id FOREIGN KEY(run_target_id) REFERENCES runs(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_service_account_target_id FOREIGN KEY(service_account_target_id) REFERENCES service_accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_state_version_target_id FOREIGN KEY(state_version_target_id) REFERENCES state_versions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_team_target_id FOREIGN KEY(team_target_id) REFERENCES teams(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_terraform_provider_target_id FOREIGN KEY(terraform_provider_target_id) REFERENCES terraform_providers(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_terraform_provider_version_target_id FOREIGN KEY(terraform_provider_version_target_id) REFERENCES terraform_provider_versions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_variable_target_id FOREIGN KEY(variable_target_id) REFERENCES namespace_variables(id) ON DELETE CASCADE,
+    CONSTRAINT fk_activity_events_workspace_target_id FOREIGN KEY(workspace_target_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS index_activity_events_on_user_id ON activity_events(user_id);
+CREATE INDEX IF NOT EXISTS index_activity_events_on_service_account_id ON activity_events(service_account_id);
+CREATE INDEX IF NOT EXISTS index_activity_events_on_namespace_id ON activity_events(namespace_id);
+
+-- The End.

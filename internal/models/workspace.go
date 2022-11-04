@@ -1,5 +1,7 @@
 package models
 
+import "strings"
+
 // Workspace represents a terraform workspace
 type Workspace struct {
 	MaxJobDuration        *int32
@@ -25,4 +27,9 @@ func (w *Workspace) Validate() error {
 
 	// Verify description satisfies constraints
 	return verifyValidDescription(w.Description)
+}
+
+// GetGroupPath returns the group path
+func (w *Workspace) GetGroupPath() string {
+	return w.FullPath[:strings.LastIndex(w.FullPath, "/")]
 }

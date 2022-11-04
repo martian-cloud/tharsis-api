@@ -20,3 +20,8 @@ type TerraformProvider struct {
 func (t *TerraformProvider) GetRegistryNamespace() string {
 	return strings.Split(t.ResourcePath, "/")[0]
 }
+
+// GetGroupPath returns the group path
+func (t *TerraformProvider) GetGroupPath() string {
+	return t.ResourcePath[:strings.LastIndex(t.ResourcePath, "/")]
+}

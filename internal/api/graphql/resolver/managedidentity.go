@@ -4,12 +4,14 @@ import (
 	"context"
 	"strconv"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	managedidentitytypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/types"
 
+	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 
@@ -144,6 +146,15 @@ func (r *ManagedIdentityAccessRuleResolver) Metadata() *MetadataResolver {
 // RunStage resolver
 func (r *ManagedIdentityAccessRuleResolver) RunStage() string {
 	return string(r.rule.RunStage)
+}
+
+// ManagedIdentity resolver
+func (r *ManagedIdentityAccessRuleResolver) ManagedIdentity(ctx context.Context) (*ManagedIdentityResolver, error) {
+	mi, err := loadManagedIdentity(ctx, r.rule.ManagedIdentityID)
+	if err != nil {
+		return nil, err
+	}
+	return &ManagedIdentityResolver{managedIdentity: mi}, nil
 }
 
 // AllowedUsers resolver
@@ -818,4 +829,92 @@ func getManagedIdentityAllowedTeamIDs(ctx context.Context, teamNames []string) (
 	}
 
 	return response, nil
+}
+
+/* ManagedIdentity loader */
+
+const managedIdentityLoaderKey = "managedIdentity"
+
+// RegisterManagedIdentityLoader registers a managedIdentity loader function
+func RegisterManagedIdentityLoader(collection *loader.Collection) {
+	collection.Register(managedIdentityLoaderKey, managedIdentityBatchFunc)
+}
+
+func loadManagedIdentity(ctx context.Context, id string) (*models.ManagedIdentity, error) {
+	ldr, err := loader.Extract(ctx, managedIdentityLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	managedIdentity, ok := data.(models.ManagedIdentity)
+	if !ok {
+		return nil, errors.NewError(errors.EInternal, "Wrong type")
+	}
+
+	return &managedIdentity, nil
+}
+
+func managedIdentityBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+
+	managedIdentities, err := getManagedIdentityService(ctx).GetManagedIdentitiesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range managedIdentities {
+		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
+}
+
+/* ManagedIdentityAccessRule loader */
+
+const managedIdentityAccessRuleLoaderKey = "managedIdentityAccessRule"
+
+// RegisterManagedIdentityAccessRuleLoader registers a managedIdentityAccessRule loader function
+func RegisterManagedIdentityAccessRuleLoader(collection *loader.Collection) {
+	collection.Register(managedIdentityAccessRuleLoaderKey, managedIdentityAccessRuleBatchFunc)
+}
+
+func loadManagedIdentityAccessRule(ctx context.Context, id string) (*models.ManagedIdentityAccessRule, error) {
+	ldr, err := loader.Extract(ctx, managedIdentityAccessRuleLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	managedIdentityAccessRule, ok := data.(models.ManagedIdentityAccessRule)
+	if !ok {
+		return nil, errors.NewError(errors.EInternal, "Wrong type")
+	}
+
+	return &managedIdentityAccessRule, nil
+}
+
+func managedIdentityAccessRuleBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+
+	rules, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRulesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range rules {
+		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
 }

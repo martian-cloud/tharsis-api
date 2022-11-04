@@ -1,0 +1,111 @@
+union Initiator = ServiceAccount | User
+
+enum ActivityEventSort {
+  CREATED_ASC
+  CREATED_DESC
+  NAMESPACE_PATH_ASC
+  NAMESPACE_PATH_DESC
+  ACTION_ASC
+  ACTION_DESC
+}
+
+enum ActivityEventAction {
+  ADD
+  APPLY
+  CANCEL
+  CREATE
+  DELETE
+  LOCK
+  REMOVE
+  SET_VARIABLES
+  UNLOCK
+  UPDATE
+  ADD_MEMBER
+  REMOVE_MEMBER
+  UPDATE_MEMBER
+  CREATE_MEMBERSHIP
+  REMOVE_MEMBERSHIP
+  DELETE_CHILD_RESOURCE
+}
+
+enum ActivityEventTargetType {
+  GPG_KEY
+  GROUP
+  MANAGED_IDENTITY
+  MANAGED_IDENTITY_ACCESS_RULE
+  NAMESPACE_MEMBERSHIP
+  RUN
+  SERVICE_ACCOUNT
+  STATE_VERSION
+  TEAM
+  TEAM_MEMBER
+  TERRAFORM_PROVIDER
+  TERRAFORM_PROVIDER_VERSION
+  VARIABLE
+  WORKSPACE
+}
+
+type ActivityEventConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [ActivityEventEdge]
+}
+
+type ActivityEventEdge {
+  cursor: String!
+  node: ActivityEvent
+}
+
+type ActivityEventCreateNamespaceMembershipPayload {
+  member: Member
+  role: String!
+}
+
+type ActivityEventUpdateNamespaceMembershipPayload {
+  prevRole: String!
+  newRole: String!
+}
+
+type ActivityEventRemoveNamespaceMembershipPayload {
+  member: Member
+}
+
+type ActivityEventDeleteChildResourcePayload {
+  name: String!
+	id:   String!
+	type: String!
+}
+
+type ActivityEventAddTeamMemberPayload {
+  user: User
+  maintainer: Boolean!
+}
+
+type ActivityEventRemoveTeamMemberPayload {
+  user: User
+}
+
+type ActivityEventUpdateTeamMemberPayload {
+  user: User
+  maintainer: Boolean!
+}
+
+union ActivityEventPayload = ActivityEventCreateNamespaceMembershipPayload |
+ActivityEventUpdateNamespaceMembershipPayload |
+ActivityEventRemoveNamespaceMembershipPayload |
+ActivityEventDeleteChildResourcePayload |
+ActivityEventAddTeamMemberPayload |
+ActivityEventRemoveTeamMemberPayload |
+ActivityEventUpdateTeamMemberPayload
+
+type ActivityEvent implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  initiator: Initiator!
+  namespacePath: String
+  action: ActivityEventAction!
+  target: Node!
+  targetType: ActivityEventTargetType!
+  targetId: String!
+  payload: ActivityEventPayload
+}
