@@ -149,22 +149,22 @@ func (r *registryStore) upload(ctx context.Context, key string, body io.Reader) 
 }
 
 func getProviderVersionReadmeObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
-	return fmt.Sprintf("registry/providers/%s/%s/README", provider.Name, providerVersion.SemanticVersion)
+	return fmt.Sprintf("registry/providers/%s/%s/README", provider.Metadata.ID, providerVersion.Metadata.ID)
 }
 
 func getProviderVersionSHASumsObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
-	return fmt.Sprintf("registry/providers/%s/%s/SHA256SUMS", provider.Name, providerVersion.SemanticVersion)
+	return fmt.Sprintf("registry/providers/%s/%s/SHA256SUMS", provider.Metadata.ID, providerVersion.Metadata.ID)
 }
 
 func getProviderVersionSHASumsSignatureObjectKey(providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
-	return fmt.Sprintf("registry/providers/%s/%s/SHA256SUMS.sig", provider.Name, providerVersion.SemanticVersion)
+	return fmt.Sprintf("registry/providers/%s/%s/SHA256SUMS.sig", provider.Metadata.ID, providerVersion.Metadata.ID)
 }
 
 func getProviderPlatformObjectKey(providerPlatform *models.TerraformProviderPlatform, providerVersion *models.TerraformProviderVersion, provider *models.TerraformProvider) string {
 	return fmt.Sprintf(
 		"registry/providers/%s/%s/platforms/%s_%s/terraform-provider-%s_%s_%s_%s.zip",
-		provider.Name,
-		providerVersion.SemanticVersion,
+		provider.Metadata.ID,
+		providerVersion.Metadata.ID,
 		providerPlatform.OperatingSystem,
 		providerPlatform.Architecture,
 		provider.Name,
