@@ -341,6 +341,11 @@ func (r *WorkspaceResolver) ActivityEvents(ctx context.Context,
 	return NewActivityEventConnectionResolver(ctx, input)
 }
 
+// PreventDestroyPlan resolver
+func (r *WorkspaceResolver) PreventDestroyPlan() bool {
+	return r.workspace.PreventDestroyPlan
+}
+
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
 	workspaceService := getWorkspaceService(ctx)
 
@@ -413,22 +418,24 @@ func (r *WorkspaceMutationPayloadResolver) Workspace(ctx context.Context) *Works
 
 // CreateWorkspaceInput contains the input for creating a new workspace
 type CreateWorkspaceInput struct {
-	ClientMutationID *string
-	MaxJobDuration   *int32
-	TerraformVersion *string
-	Name             string
-	GroupPath        string
-	Description      string
+	ClientMutationID   *string
+	MaxJobDuration     *int32
+	TerraformVersion   *string
+	PreventDestroyPlan *bool
+	Name               string
+	GroupPath          string
+	Description        string
 }
 
 // UpdateWorkspaceInput contains the input for updating a workspace
 type UpdateWorkspaceInput struct {
-	ClientMutationID *string
-	Metadata         *MetadataInput
-	MaxJobDuration   *int32
-	TerraformVersion *string
-	Description      *string
-	WorkspacePath    string
+	ClientMutationID   *string
+	Metadata           *MetadataInput
+	MaxJobDuration     *int32
+	TerraformVersion   *string
+	Description        *string
+	PreventDestroyPlan *bool
+	WorkspacePath      string
 }
 
 // DeleteWorkspaceInput contains the input for deleting a workspace
@@ -460,12 +467,19 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		terraformVersion = *input.TerraformVersion
 	}
 
+	// Default PreventDestroyPlan to false if not specified.
+	preventDestroyPlan := false
+	if input.PreventDestroyPlan != nil {
+		preventDestroyPlan = *input.PreventDestroyPlan
+	}
+
 	wsCreateOptions := models.Workspace{
-		Name:             input.Name,
-		GroupID:          groupID,
-		Description:      input.Description,
-		MaxJobDuration:   input.MaxJobDuration,
-		TerraformVersion: terraformVersion,
+		Name:               input.Name,
+		GroupID:            groupID,
+		Description:        input.Description,
+		MaxJobDuration:     input.MaxJobDuration,
+		TerraformVersion:   terraformVersion,
+		PreventDestroyPlan: preventDestroyPlan,
 	}
 
 	createdWorkspace, err := getWorkspaceService(ctx).CreateWorkspace(ctx, &wsCreateOptions)
@@ -507,6 +521,11 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 	// Update fields
 	if input.Description != nil {
 		ws.Description = *input.Description
+	}
+
+	// Update PreventDestroyPlan if specified.
+	if input.PreventDestroyPlan != nil {
+		ws.PreventDestroyPlan = *input.PreventDestroyPlan
 	}
 
 	ws, err = wsService.UpdateWorkspace(ctx, ws)

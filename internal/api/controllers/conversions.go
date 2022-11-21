@@ -29,6 +29,7 @@ func TharsisWorkspaceToWorkspace(workspace *models.Workspace) *Workspace {
 			CanUpdate:       true,
 			CanReadSettings: true,
 		},
+		AllowDestroyPlan: !workspace.PreventDestroyPlan,
 	}
 
 	if workspace.CurrentStateVersionID != "" {

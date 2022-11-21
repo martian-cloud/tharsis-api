@@ -98,6 +98,7 @@ type Workspace implements Node, Namespace {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  preventDestroyPlan: Boolean!
 }
 
 input CreateWorkspaceInput {
@@ -107,6 +108,7 @@ input CreateWorkspaceInput {
   groupPath: String!
   maxJobDuration: Int
   terraformVersion: String
+  preventDestroyPlan: Boolean
 }
 
 input UpdateWorkspaceInput {
@@ -116,6 +118,7 @@ input UpdateWorkspaceInput {
   description: String
   maxJobDuration: Int
   terraformVersion: String
+  preventDestroyPlan: Boolean
 }
 
 input DeleteWorkspaceInput {

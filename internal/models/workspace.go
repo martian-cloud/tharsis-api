@@ -16,6 +16,7 @@ type Workspace struct {
 	Metadata              ResourceMetadata
 	DirtyState            bool
 	Locked                bool
+	PreventDestroyPlan    bool
 }
 
 // Validate returns an error if the model is not valid
