@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
+	"sync"
+	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger"
 
@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
@@ -47,10 +48,11 @@ import (
 
 // APIServer represents an instance of a server
 type APIServer struct {
-	router   chi.Router
-	logger   logger.Logger
-	cfg      *config.Config
-	dbClient *db.Client
+	shutdownOnce sync.Once
+	logger       logger.Logger
+	dbClient     *db.Client
+	taskManager  *asynctask.Manager
+	srv          *http.Server
 }
 
 // New creates a new APIServer instance
@@ -100,6 +102,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 	authenticator := auth.NewAuthenticator(userAuth, tharsisIDP, dbClient, cfg.ServiceAccountIssuerURL)
 
 	respWriter := response.NewWriter(logger)
+
+	taskManager := asynctask.Manager{}
 
 	eventManager := events.NewEventManager(dbClient)
 	eventManager.Start(ctx)
@@ -266,10 +270,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 	runner.Start(auth.WithCaller(ctx, &auth.SystemCaller{}))
 
 	return &APIServer{
-		logger:   logger,
-		router:   routeBuilder.Build(),
-		cfg:      cfg,
-		dbClient: dbClient,
+		logger:      logger,
+		dbClient:    dbClient,
+		taskManager: &taskManager,
+		srv: &http.Server{
+			Addr:              fmt.Sprintf(":%v", cfg.ServerPort),
+			Handler:           routeBuilder.Build(),
+			ReadHeaderTimeout: time.Minute,
+		},
 	}, nil
 }
 
@@ -284,15 +292,27 @@ func (api *APIServer) Start() {
 	}()
 
 	// Start main server
-	if err := http.ListenAndServe(fmt.Sprintf(":%v", api.cfg.ServerPort), api.router); err != nil {
-		api.logger.Error(err)
-		os.Exit(-1)
+	if err := api.srv.ListenAndServe(); err != nil {
+		api.logger.Infof("HTTP server ListenAndServe %v", err)
 	}
 }
 
 // Shutdown will shutdown the API server
 func (api *APIServer) Shutdown(ctx context.Context) {
-	api.logger.Info("Starting API shutdown")
-	api.dbClient.Close(ctx)
-	api.logger.Info("Completed API shutdown")
+	api.shutdownOnce.Do(func() {
+		api.logger.Info("Starting HTTP server shutdown")
+
+		// Shutdown HTTP server
+		if err := api.srv.Shutdown(ctx); err != nil {
+			api.logger.Errorf("failed to shutdown HTTP server gracefully: %v", err)
+		}
+
+		api.logger.Info("HTTP server shutdown successfully")
+
+		api.logger.Info("Starting Async Task Manager shutdown")
+		api.taskManager.Shutdown()
+		api.logger.Info("Async Task Manager shutdown successfully")
+
+		api.logger.Info("Completed graceful shutdown")
+	})
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -38,8 +40,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	defer apiServer.Shutdown(ctx)
+	shutdownDone := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+
+		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
+
+		// Wait for signal
+		<-sigint
+
+		// Gracefully shutdown server
+		apiServer.Shutdown(ctx)
+
+		close(shutdownDone)
+	}()
 
 	// Start server
 	apiServer.Start()
+
+	// Wait for shutdown to finish
+	<-shutdownDone
 }
