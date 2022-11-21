@@ -97,6 +97,7 @@ var workspaceFieldList = append(
 	"max_job_duration",
 	"created_by",
 	"terraform_version",
+	"prevent_destroy_plan",
 )
 
 // NewWorkspaces returns an instance of the Workspaces interface
@@ -209,6 +210,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 			"locked":                   workspace.Locked,
 			"max_job_duration":         workspace.MaxJobDuration,
 			"terraform_version":        workspace.TerraformVersion,
+			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 		},
 	).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
 
@@ -268,6 +270,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"max_job_duration":         workspace.MaxJobDuration,
 			"created_by":               workspace.CreatedBy,
 			"terraform_version":        workspace.TerraformVersion,
+			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 		}).
 		Returning(workspaceFieldList...).ToSQL()
 
@@ -458,6 +461,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.MaxJobDuration,
 		&ws.CreatedBy,
 		&ws.TerraformVersion,
+		&ws.PreventDestroyPlan,
 	}
 
 	if withFullPath {

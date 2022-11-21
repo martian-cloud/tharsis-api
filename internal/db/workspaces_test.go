@@ -1246,6 +1246,10 @@ func TestUpdateWorkspace(t *testing.T) {
 		newDirtyState := true
 		newMaxJobDuration := ptr.Int32(int32(400 + (100 * ix)))
 
+		// Test all combinations of old vs. new PreventDestroyPlan values.
+		// The old value is true for ix values of 1 and 3.
+		newPreventDestroyPlan := (ix == 2) || (ix == 3)
+
 		testCases = append(testCases, testCase{
 			name: "positive-" + positiveWorkspace.FullPath,
 			toUpdate: &models.Workspace{
@@ -1258,6 +1262,7 @@ func TestUpdateWorkspace(t *testing.T) {
 				CurrentStateVersionID: newStateVersionID,
 				DirtyState:            newDirtyState,
 				MaxJobDuration:        newMaxJobDuration,
+				PreventDestroyPlan:    newPreventDestroyPlan,
 			},
 			expectUpdated: &models.Workspace{
 				Metadata: models.ResourceMetadata{
@@ -1275,6 +1280,7 @@ func TestUpdateWorkspace(t *testing.T) {
 				DirtyState:            newDirtyState,
 				MaxJobDuration:        newMaxJobDuration,
 				CreatedBy:             positiveWorkspace.CreatedBy,
+				PreventDestroyPlan:    newPreventDestroyPlan,
 			},
 		})
 	}
@@ -1349,11 +1355,7 @@ func TestCreateWorkspace(t *testing.T) {
 		return
 	}
 
-	assert.Equal(t, 1, len(createdWarmupGroups))
-	if len(createdWarmupGroups) != 1 {
-		// No point if warmup group wasn't created.
-		return
-	}
+	require.Equal(t, 1, len(createdWarmupGroups))
 
 	warmupGroup0 := createdWarmupGroups[0]
 	warmupGroupName := warmupGroup0.Name
@@ -1723,29 +1725,34 @@ var standardWarmupGroupsForWorkspaces = []models.Group{
 // The create function will derive the group ID and name from the full path.
 var standardWarmupWorkspaces = []models.Workspace{
 	{
-		Description: "workspace 1 for testing workspace functions",
-		FullPath:    "top-level-group-0-for-workspaces/workspace-1",
-		CreatedBy:   "someone-1",
+		Description:        "workspace 1 for testing workspace functions",
+		FullPath:           "top-level-group-0-for-workspaces/workspace-1",
+		CreatedBy:          "someone-1",
+		PreventDestroyPlan: false,
 	},
 	{
-		Description: "workspace 5 for testing workspace functions",
-		FullPath:    "top-level-group-1-for-workspaces/workspace-5",
-		CreatedBy:   "someone-6",
+		Description:        "workspace 5 for testing workspace functions",
+		FullPath:           "top-level-group-1-for-workspaces/workspace-5",
+		CreatedBy:          "someone-6",
+		PreventDestroyPlan: true,
 	},
 	{
-		Description: "workspace 3 for testing workspace functions",
-		FullPath:    "top-level-group-2-for-workspaces/workspace-3",
-		CreatedBy:   "someone-5",
+		Description:        "workspace 3 for testing workspace functions",
+		FullPath:           "top-level-group-2-for-workspaces/workspace-3",
+		CreatedBy:          "someone-5",
+		PreventDestroyPlan: false,
 	},
 	{
-		Description: "workspace 4 for testing workspace functions",
-		FullPath:    "top-level-group-0-for-workspaces/workspace-4",
-		CreatedBy:   "someone-3",
+		Description:        "workspace 4 for testing workspace functions",
+		FullPath:           "top-level-group-0-for-workspaces/workspace-4",
+		CreatedBy:          "someone-3",
+		PreventDestroyPlan: true,
 	},
 	{
-		Description: "workspace 2 for testing workspace functions",
-		FullPath:    "top-level-group-1-for-workspaces/workspace-2",
-		CreatedBy:   "someone-2",
+		Description:        "workspace 2 for testing workspace functions",
+		FullPath:           "top-level-group-1-for-workspaces/workspace-2",
+		CreatedBy:          "someone-2",
+		PreventDestroyPlan: false,
 	},
 }
 
@@ -1889,6 +1896,7 @@ func compareWorkspaces(t *testing.T, expected, actual *models.Workspace, checkID
 	assert.Equal(t, expected.DirtyState, actual.DirtyState)
 	assert.Equal(t, expected.MaxJobDuration, actual.MaxJobDuration)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
+	assert.Equal(t, expected.PreventDestroyPlan, actual.PreventDestroyPlan)
 }
 
 // The End.

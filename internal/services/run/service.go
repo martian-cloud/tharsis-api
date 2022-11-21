@@ -471,6 +471,14 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		terraformVersion = options.TerraformVersion
 	}
 
+	// Enforce the workspace's option to prevent a destroy run.
+	if options.IsDestroy && ws.PreventDestroyPlan {
+		return nil, errors.NewError(
+			errors.EForbidden,
+			"Workspace does not allow destroy plan",
+		)
+	}
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return nil, err

@@ -410,6 +410,184 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 	}
 }
 
+func TestCreateRunWithPreventDestroy(t *testing.T) {
+	configurationVersionID := "cv1"
+	var duration int32 = 720
+
+	mockAuthorizer := auth.MockAuthorizer{}
+	mockAuthorizer.Test(t)
+
+	// Test cases
+	type testCase struct {
+		name            string
+		workspace       *models.Workspace
+		runInput        *CreateRunInput
+		expectErrorCode string
+	}
+
+	/*
+		Test case template.
+		name            string
+		workspace       *models.Workspace
+		runInput        *CreateRunInput
+		expectErrorCode string
+	*/
+
+	tests := []testCase{
+
+		{
+			name: "non-destroy plan is allowed independent of PreventDestroyPlan",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "test-workspace-metadata-id-1",
+				},
+				MaxJobDuration:     &duration,
+				PreventDestroyPlan: false,
+			},
+			runInput: &CreateRunInput{
+				WorkspaceID:            "test-workspace-metadata-id-1",
+				ConfigurationVersionID: &configurationVersionID,
+				IsDestroy:              false,
+			},
+		},
+
+		{
+			name: "destroy plan is allowed, because PreventDestroyPlan is falsee",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "test-workspace-metadata-id-2",
+				},
+				MaxJobDuration:     &duration,
+				PreventDestroyPlan: false,
+			},
+			runInput: &CreateRunInput{
+				WorkspaceID:            "test-workspace-metadata-id-2",
+				ConfigurationVersionID: &configurationVersionID,
+				IsDestroy:              true,
+			},
+		},
+
+		{
+			name: "non-destroy plan is allowed even when PreventDestroyPlan is true",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "test-workspace-metadata-id-3",
+				},
+				MaxJobDuration:     &duration,
+				PreventDestroyPlan: true,
+			},
+			runInput: &CreateRunInput{
+				WorkspaceID:            "test-workspace-metadata-id-3",
+				ConfigurationVersionID: &configurationVersionID,
+				IsDestroy:              false,
+			},
+		},
+
+		{
+			name: "destroy plan is NOT allowed, because PreventDestroyPlan is true",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "test-workspace-metadata-id-4",
+				},
+				MaxJobDuration:     &duration,
+				PreventDestroyPlan: true,
+			},
+			runInput: &CreateRunInput{
+				WorkspaceID:            "test-workspace-metadata-id-4",
+				ConfigurationVersionID: &configurationVersionID,
+				IsDestroy:              true,
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dbClient := buildDBClientWithMocks(t)
+
+			testCaller := auth.NewUserCaller(
+				&models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "123",
+					},
+					Admin:    false,
+					Username: "user1",
+				},
+				&mockAuthorizer,
+				dbClient.Client, // was nil
+			)
+
+			run := models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: "run1",
+				},
+				WorkspaceID:            test.workspace.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Status:                 models.RunPending,
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			mockAuthorizer.On("RequireAccessToWorkspace",
+				mock.Anything, test.workspace.Metadata.ID, models.DeployerRole).Return(nil)
+
+			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace",
+				mock.Anything, test.workspace.Metadata.ID).Return([]models.ManagedIdentity{}, nil)
+
+			dbClient.MockWorkspaces.On("GetWorkspaceByID",
+				mock.Anything, test.workspace.Metadata.ID).Return(test.workspace, nil)
+
+			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+				Variables: []models.Variable{},
+			}, nil)
+
+			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).Return(&run, nil)
+
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
+				Speculative: false,
+			}, nil)
+
+			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
+				Metadata: models.ResourceMetadata{
+					ID: "plan1",
+				},
+			}, nil)
+
+			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
+				Metadata: models.ResourceMetadata{
+					ID: "apply1",
+				},
+			}, nil)
+			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(nil, nil)
+
+			mockArtifactStore := workspace.MockArtifactStore{}
+			mockArtifactStore.Test(t)
+
+			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents)
+
+			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), test.runInput)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 	var duration int32 = 1
 	ws := &models.Workspace{
