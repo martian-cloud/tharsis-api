@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -409,7 +410,8 @@ type UpdateGroupInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
 	Description      *string
-	GroupPath        string
+	GroupPath        *string
+	ID               *string
 }
 
 // DeleteGroupInput contains the input for deleting a group
@@ -417,7 +419,8 @@ type DeleteGroupInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
 	Force            *bool
-	GroupPath        string
+	GroupPath        *string
+	ID               *string
 }
 
 func handleGroupMutationProblem(e error, clientMutationID *string) (*GroupMutationPayloadResolver, error) {
@@ -454,7 +457,16 @@ func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMu
 func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMutationPayloadResolver, error) {
 	groupService := getGroupService(ctx)
 
-	group, err := groupService.GetGroupByFullPath(ctx, input.GroupPath)
+	var group *models.Group
+	var err error
+	switch {
+	case input.GroupPath != nil:
+		group, err = groupService.GetGroupByFullPath(ctx, *input.GroupPath)
+	case input.ID != nil:
+		group, err = groupService.GetGroupByID(ctx, gid.FromGlobalID(*input.ID))
+	default:
+		err = fmt.Errorf("must specify either GroupPath or ID")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +498,16 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 func deleteGroupMutation(ctx context.Context, input *DeleteGroupInput) (*GroupMutationPayloadResolver, error) {
 	groupService := getGroupService(ctx)
 
-	groupToDelete, err := groupService.GetGroupByFullPath(ctx, input.GroupPath)
+	var groupToDelete *models.Group
+	var err error
+	switch {
+	case input.GroupPath != nil:
+		groupToDelete, err = groupService.GetGroupByFullPath(ctx, *input.GroupPath)
+	case input.ID != nil:
+		groupToDelete, err = groupService.GetGroupByID(ctx, gid.FromGlobalID(*input.ID))
+	default:
+		err = fmt.Errorf("must specify either GroupPath or ID")
+	}
 	if err != nil {
 		return nil, err
 	}
