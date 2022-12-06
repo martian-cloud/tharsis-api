@@ -114,14 +114,16 @@ input CreateGroupInput {
 
 input UpdateGroupInput {
   clientMutationId: String
-  groupPath: String!
+  groupPath: String
+  id: String
   description: String
   metadata: ResourceMetadataInput
 }
 
 input DeleteGroupInput {
   clientMutationId: String
-  groupPath: String!
+  groupPath: String
+  id: String
   force: Boolean
   metadata: ResourceMetadataInput
 }

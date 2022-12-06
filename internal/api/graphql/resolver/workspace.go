@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -435,7 +436,8 @@ type UpdateWorkspaceInput struct {
 	TerraformVersion   *string
 	Description        *string
 	PreventDestroyPlan *bool
-	WorkspacePath      string
+	WorkspacePath      *string
+	ID                 *string
 }
 
 // DeleteWorkspaceInput contains the input for deleting a workspace
@@ -443,7 +445,8 @@ type DeleteWorkspaceInput struct {
 	ClientMutationID *string
 	Force            *bool
 	Metadata         *MetadataInput
-	WorkspacePath    string
+	WorkspacePath    *string
+	ID               *string
 }
 
 func handleWorkspaceMutationProblem(e error, clientMutationID *string) (*WorkspaceMutationPayloadResolver, error) {
@@ -494,7 +497,16 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
 	wsService := getWorkspaceService(ctx)
 
-	ws, err := wsService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	var ws *models.Workspace
+	var err error
+	switch {
+	case input.WorkspacePath != nil:
+		ws, err = wsService.GetWorkspaceByFullPath(ctx, *input.WorkspacePath)
+	case input.ID != nil:
+		ws, err = wsService.GetWorkspaceByID(ctx, gid.FromGlobalID(*input.ID))
+	default:
+		err = fmt.Errorf("must specify either WorkspacePath or ID")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +552,16 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 func deleteWorkspaceMutation(ctx context.Context, input *DeleteWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
 	wsService := getWorkspaceService(ctx)
 
-	ws, err := wsService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	var ws *models.Workspace
+	var err error
+	switch {
+	case input.WorkspacePath != nil:
+		ws, err = wsService.GetWorkspaceByFullPath(ctx, *input.WorkspacePath)
+	case input.ID != nil:
+		ws, err = wsService.GetWorkspaceByID(ctx, gid.FromGlobalID(*input.ID))
+	default:
+		err = fmt.Errorf("must specify either WorkspacePath or ID")
+	}
 	if err != nil {
 		return nil, err
 	}

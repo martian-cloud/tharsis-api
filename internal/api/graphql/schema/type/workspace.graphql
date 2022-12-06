@@ -113,7 +113,8 @@ input CreateWorkspaceInput {
 
 input UpdateWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
+  workspacePath: String
+  id: String
   metadata: ResourceMetadataInput
   description: String
   maxJobDuration: Int
@@ -123,7 +124,8 @@ input UpdateWorkspaceInput {
 
 input DeleteWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
+  workspacePath: String
+  id: String
   force: Boolean
   metadata: ResourceMetadataInput
 }
