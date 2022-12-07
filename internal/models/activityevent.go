@@ -39,6 +39,7 @@ const (
 	TargetTerraformProvider         ActivityEventTargetType = "TERRAFORM_PROVIDER"
 	TargetTerraformProviderVersion  ActivityEventTargetType = "TERRAFORM_PROVIDER_VERSION"
 	TargetVariable                  ActivityEventTargetType = "VARIABLE"
+	TargetVCSProvider               ActivityEventTargetType = "VCS_PROVIDER"
 	TargetWorkspace                 ActivityEventTargetType = "WORKSPACE"
 )
 

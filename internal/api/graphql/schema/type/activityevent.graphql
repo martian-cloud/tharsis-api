@@ -42,6 +42,7 @@ enum ActivityEventTargetType {
   TERRAFORM_PROVIDER
   TERRAFORM_PROVIDER_VERSION
   VARIABLE
+  VCS_PROVIDER
   WORKSPACE
 }
 
@@ -72,8 +73,8 @@ type ActivityEventRemoveNamespaceMembershipPayload {
 
 type ActivityEventDeleteChildResourcePayload {
   name: String!
-	id:   String!
-	type: String!
+  id: String!
+  type: String!
 }
 
 type ActivityEventAddTeamMemberPayload {
@@ -90,13 +91,14 @@ type ActivityEventUpdateTeamMemberPayload {
   maintainer: Boolean!
 }
 
-union ActivityEventPayload = ActivityEventCreateNamespaceMembershipPayload |
-ActivityEventUpdateNamespaceMembershipPayload |
-ActivityEventRemoveNamespaceMembershipPayload |
-ActivityEventDeleteChildResourcePayload |
-ActivityEventAddTeamMemberPayload |
-ActivityEventRemoveTeamMemberPayload |
-ActivityEventUpdateTeamMemberPayload
+union ActivityEventPayload =
+    ActivityEventCreateNamespaceMembershipPayload
+  | ActivityEventUpdateNamespaceMembershipPayload
+  | ActivityEventRemoveNamespaceMembershipPayload
+  | ActivityEventDeleteChildResourcePayload
+  | ActivityEventAddTeamMemberPayload
+  | ActivityEventRemoveTeamMemberPayload
+  | ActivityEventUpdateTeamMemberPayload
 
 type ActivityEvent implements Node {
   id: ID!

@@ -1,0 +1,93 @@
+enum VCSProviderSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+enum VCSProviderType {
+  gitlab
+  github
+}
+
+type VCSProviderConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [VCSProviderEdge]
+}
+
+type VCSProviderEdge {
+  cursor: String!
+  node: VCSProvider
+}
+
+type CreateVCSProviderPayload {
+  clientMutationId: String
+  vcsProvider: VCSProvider
+  problems: [Problem!]!
+}
+
+type UpdateVCSProviderPayload {
+  clientMutationId: String
+  vcsProvider: VCSProvider
+  problems: [Problem!]!
+}
+
+type DeleteVCSProviderPayload {
+  clientMutationId: String
+  vcsProvider: VCSProvider
+  problems: [Problem!]!
+}
+
+type ResetVCSProviderOAuthTokenPayload {
+  clientMutationId: String
+  vcsProvider: VCSProvider
+  problems: [Problem!]!
+}
+
+type VCSProvider implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  name: String!
+  description: String!
+  group: Group!
+  hostname: String!
+  resourcePath: String!
+  type: VCSProviderType!
+  autoCreateWebhooks: Boolean!
+  oAuthAuthorizationUrl: String
+}
+
+input CreateVCSProviderInput {
+  clientMutationId: String
+  name: String!
+  description: String!
+  groupPath: String!
+  hostname: String
+  oAuthClientId: String!
+  oAuthClientSecret: String!
+  type: VCSProviderType!
+  autoCreateWebhooks: Boolean!
+}
+
+input UpdateVCSProviderInput {
+  clientMutationId: String
+  id: ID!
+  description: String
+  oAuthClientId: String
+  oAuthClientSecret: String
+  metadata: ResourceMetadataInput
+}
+
+input DeleteVCSProviderInput {
+  clientMutationId: String
+  id: ID!
+  force: Boolean
+  metadata: ResourceMetadataInput
+}
+
+input ResetVCSProviderOAuthTokenInput {
+  clientMutationId: String
+  providerId: String!
+}

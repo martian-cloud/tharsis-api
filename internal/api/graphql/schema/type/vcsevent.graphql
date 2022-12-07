@@ -1,0 +1,29 @@
+enum VCSEventSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type VCSEventConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [VCSEventEdge]
+}
+
+type VCSEventEdge {
+  cursor: String!
+  node: VCSEvent
+}
+
+type VCSEvent implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  errorMessage: String
+  commitId: String
+  sourceReferenceName: String
+  workspace: Workspace!
+  repositoryUrl: String!
+  type: String!
+  status: String!
+}

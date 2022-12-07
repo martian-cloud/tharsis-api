@@ -15,10 +15,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.26.12
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.8
 	github.com/aws/smithy-go v1.12.0
+	github.com/bmatcuk/doublestar/v4 v4.2.0
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/doug-martin/goqu/v9 v9.18.0
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/cors v1.2.1
+	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gomodule/redigo v1.8.8
 	github.com/google/uuid v1.3.0
@@ -26,6 +28,7 @@ require (
 	github.com/graph-gophers/graphql-go v1.4.0
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-getter v1.6.2
+	github.com/hashicorp/go-slug v0.9.1
 	github.com/hashicorp/go-tfe v1.3.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.4.0
@@ -109,7 +112,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
 	github.com/hashicorp/go-safetemp v1.0.0 // indirect
-	github.com/hashicorp/go-slug v0.9.1 // indirect
 	github.com/hashicorp/terraform-json v0.14.0 // indirect
 	github.com/hashicorp/terraform-svchost v0.0.0-20200729002733-f050f53b9734 // indirect
 	github.com/hasura/go-graphql-client v0.7.2 // indirect

@@ -6,32 +6,74 @@ type Mutation {
   createGroup(input: CreateGroupInput!): CreateGroupPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
   deleteGroup(input: DeleteGroupInput!): DeleteGroupPayload!
-  createManagedIdentity(input: CreateManagedIdentityInput!): CreateManagedIdentityPayload!
-  updateManagedIdentity(input: UpdateManagedIdentityInput!): UpdateManagedIdentityPayload!
-  deleteManagedIdentity(input: DeleteManagedIdentityInput!): DeleteManagedIdentityPayload!
-  assignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
-  unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
-  createManagedIdentityAccessRule(input: CreateManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
-  updateManagedIdentityAccessRule(input: UpdateManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
-  deleteManagedIdentityAccessRule(input: DeleteManagedIdentityAccessRuleInput!): ManagedIdentityAccessRuleMutationPayload!
-  createManagedIdentityCredentials(input: CreateManagedIdentityCredentialsInput!): CreateManagedIdentityCredentialsPayload!
-  createServiceAccount(input: CreateServiceAccountInput!): CreateServiceAccountPayload!
-  updateServiceAccount(input: UpdateServiceAccountInput!): UpdateServiceAccountPayload!
-  deleteServiceAccount(input: DeleteServiceAccountInput!): DeleteServiceAccountPayload!
-  createNamespaceMembership(input: CreateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
-  updateNamespaceMembership(input: UpdateNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
-  deleteNamespaceMembership(input: DeleteNamespaceMembershipInput!): NamespaceMembershipMutationPayload!
+  createManagedIdentity(
+    input: CreateManagedIdentityInput!
+  ): CreateManagedIdentityPayload!
+  updateManagedIdentity(
+    input: UpdateManagedIdentityInput!
+  ): UpdateManagedIdentityPayload!
+  deleteManagedIdentity(
+    input: DeleteManagedIdentityInput!
+  ): DeleteManagedIdentityPayload!
+  assignManagedIdentity(
+    input: AssignManagedIdentityInput!
+  ): AssignManagedIdentityPayload!
+  unassignManagedIdentity(
+    input: AssignManagedIdentityInput!
+  ): AssignManagedIdentityPayload!
+  createManagedIdentityAccessRule(
+    input: CreateManagedIdentityAccessRuleInput!
+  ): ManagedIdentityAccessRuleMutationPayload!
+  updateManagedIdentityAccessRule(
+    input: UpdateManagedIdentityAccessRuleInput!
+  ): ManagedIdentityAccessRuleMutationPayload!
+  deleteManagedIdentityAccessRule(
+    input: DeleteManagedIdentityAccessRuleInput!
+  ): ManagedIdentityAccessRuleMutationPayload!
+  createManagedIdentityCredentials(
+    input: CreateManagedIdentityCredentialsInput!
+  ): CreateManagedIdentityCredentialsPayload!
+  createServiceAccount(
+    input: CreateServiceAccountInput!
+  ): CreateServiceAccountPayload!
+  updateServiceAccount(
+    input: UpdateServiceAccountInput!
+  ): UpdateServiceAccountPayload!
+  deleteServiceAccount(
+    input: DeleteServiceAccountInput!
+  ): DeleteServiceAccountPayload!
+  createNamespaceMembership(
+    input: CreateNamespaceMembershipInput!
+  ): NamespaceMembershipMutationPayload!
+  updateNamespaceMembership(
+    input: UpdateNamespaceMembershipInput!
+  ): NamespaceMembershipMutationPayload!
+  deleteNamespaceMembership(
+    input: DeleteNamespaceMembershipInput!
+  ): NamespaceMembershipMutationPayload!
   createRun(input: CreateRunInput!): RunMutationPayload!
   applyRun(input: ApplyRunInput!): RunMutationPayload!
   cancelRun(input: CancelRunInput!): RunMutationPayload!
   updatePlan(input: UpdatePlanInput!): UpdatePlanPayload!
   updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
-  createConfigurationVersion(input: CreateConfigurationVersionInput!): ConfigurationVersionMutationPayload!
-  createStateVersion(input: CreateStateVersionInput!): CreateStateVersionPayload!
-  createNamespaceVariable(input: CreateNamespaceVariableInput!): NamespaceVariableMutationPayload!
-  updateNamespaceVariable(input: UpdateNamespaceVariableInput!): NamespaceVariableMutationPayload!
-  deleteNamespaceVariable(input: DeleteNamespaceVariableInput!): NamespaceVariableMutationPayload!
-  setNamespaceVariables(input: SetNamespaceVariablesInput!): NamespaceVariableMutationPayload!
+  createConfigurationVersion(
+    input: CreateConfigurationVersionInput!
+  ): ConfigurationVersionMutationPayload!
+  createStateVersion(
+    input: CreateStateVersionInput!
+  ): CreateStateVersionPayload!
+  createNamespaceVariable(
+    input: CreateNamespaceVariableInput!
+  ): NamespaceVariableMutationPayload!
+  updateNamespaceVariable(
+    input: UpdateNamespaceVariableInput!
+  ): NamespaceVariableMutationPayload!
+  deleteNamespaceVariable(
+    input: DeleteNamespaceVariableInput!
+  ): NamespaceVariableMutationPayload!
+  setNamespaceVariables(
+    input: SetNamespaceVariablesInput!
+  ): NamespaceVariableMutationPayload!
   saveJobLogs(input: SaveJobLogsInput!): SaveJobLogsPayload!
   createTeam(input: CreateTeamInput): CreateTeamPayload!
   updateTeam(input: UpdateTeamInput): UpdateTeamPayload!
@@ -39,15 +81,47 @@ type Mutation {
   addUserToTeam(input: AddUserToTeamInput): AddUserToTeamPayload!
   updateTeamMember(input: UpdateTeamMemberInput): UpdateTeamMemberPayload!
   removeUserFromTeam(input: RemoveUserFromTeamInput): RemoveUserFromTeamPayload!
-  createTerraformProvider(input: CreateTerraformProviderInput): CreateTerraformProviderPayload!
-  updateTerraformProvider(input: UpdateTerraformProviderInput): UpdateTerraformProviderPayload!
-  deleteTerraformProvider(input: DeleteTerraformProviderInput): DeleteTerraformProviderPayload!
-  createTerraformProviderVersion(input: CreateTerraformProviderVersionInput): CreateTerraformProviderVersionPayload!
-  deleteTerraformProviderVersion(input: DeleteTerraformProviderVersionInput): DeleteTerraformProviderVersionPayload!
-  createTerraformProviderPlatform(input: CreateTerraformProviderPlatformInput): CreateTerraformProviderPlatformPayload!
-  deleteTerraformProviderPlatform(input: DeleteTerraformProviderPlatformInput): DeleteTerraformProviderPlatformPayload!
+  createTerraformProvider(
+    input: CreateTerraformProviderInput
+  ): CreateTerraformProviderPayload!
+  updateTerraformProvider(
+    input: UpdateTerraformProviderInput
+  ): UpdateTerraformProviderPayload!
+  deleteTerraformProvider(
+    input: DeleteTerraformProviderInput
+  ): DeleteTerraformProviderPayload!
+  createTerraformProviderVersion(
+    input: CreateTerraformProviderVersionInput
+  ): CreateTerraformProviderVersionPayload!
+  deleteTerraformProviderVersion(
+    input: DeleteTerraformProviderVersionInput
+  ): DeleteTerraformProviderVersionPayload!
+  createTerraformProviderPlatform(
+    input: CreateTerraformProviderPlatformInput
+  ): CreateTerraformProviderPlatformPayload!
+  deleteTerraformProviderPlatform(
+    input: DeleteTerraformProviderPlatformInput
+  ): DeleteTerraformProviderPlatformPayload!
   createGPGKey(input: CreateGPGKeyInput!): CreateGPGKeyPayload!
   deleteGPGKey(input: DeleteGPGKeyInput!): DeleteGPGKeyPayload!
-  createTerraformCLIDownloadURL(input: CreateTerraformCLIDownloadURLInput!): TerraformCLIMutationPayload!
-  createSCIMToken(): SCIMTokenPayload!
+  createTerraformCLIDownloadURL(
+    input: CreateTerraformCLIDownloadURLInput!
+  ): TerraformCLIMutationPayload!
+  createSCIMToken: SCIMTokenPayload!
+  createVCSProvider(input: CreateVCSProviderInput!): CreateVCSProviderPayload!
+  updateVCSProvider(input: UpdateVCSProviderInput!): UpdateVCSProviderPayload!
+  deleteVCSProvider(input: DeleteVCSProviderInput!): DeleteVCSProviderPayload!
+  createWorkspaceVCSProviderLink(
+    input: CreateWorkspaceVCSProviderLinkInput!
+  ): CreateWorkspaceVCSProviderLinkPayload!
+  updateWorkspaceVCSProviderLink(
+    input: UpdateWorkspaceVCSProviderLinkInput!
+  ): UpdateWorkspaceVCSProviderLinkPayload!
+  deleteWorkspaceVCSProviderLink(
+    input: DeleteWorkspaceVCSProviderLinkInput!
+  ): DeleteWorkspaceVCSProviderLinkPayload!
+  createVCSRun(input: CreateVCSRunInput!): CreateVCSRunPayload!
+  resetVCSProviderOAuthToken(
+    input: ResetVCSProviderOAuthTokenInput!
+  ): ResetVCSProviderOAuthTokenPayload!
 }

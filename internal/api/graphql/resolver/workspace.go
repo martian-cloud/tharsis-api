@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 
 	"github.com/graph-gophers/dataloader"
@@ -342,9 +343,67 @@ func (r *WorkspaceResolver) ActivityEvents(ctx context.Context,
 	return NewActivityEventConnectionResolver(ctx, input)
 }
 
+// VCSProviders resolver
+func (r *WorkspaceResolver) VCSProviders(ctx context.Context, args *VCSProviderConnectionQueryArgs) (*VCSProviderConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := vcs.GetVCSProvidersInput{
+		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		Search:            args.Search,
+		NamespacePath:     r.workspace.FullPath,
+	}
+
+	if args.Sort != nil {
+		sort := db.VCSProviderSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	if args.IncludeInherited != nil && *args.IncludeInherited {
+		input.IncludeInherited = true
+	}
+
+	return NewVCSProviderConnectionResolver(ctx, &input)
+}
+
+// WorkspaceVCSProviderLink resolver
+func (r *WorkspaceResolver) WorkspaceVCSProviderLink(ctx context.Context) (*WorkspaceVCSProviderLinkResolver, error) {
+	service := getVCSService(ctx)
+
+	link, err := service.GetWorkspaceVCSProviderLinkByWorkspaceID(ctx, r.workspace.Metadata.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &WorkspaceVCSProviderLinkResolver{workspaceVCSProviderLink: link}, nil
+}
+
 // PreventDestroyPlan resolver
 func (r *WorkspaceResolver) PreventDestroyPlan() bool {
 	return r.workspace.PreventDestroyPlan
+}
+
+// VCSEvents resolver
+func (r *WorkspaceResolver) VCSEvents(ctx context.Context, args *VCSEventConnectionQueryArgs) (*VCSEventConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := vcs.GetVCSEventsInput{
+		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		WorkspaceID:       r.workspace.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.VCSEventSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewVCSEventConnectionResolver(ctx, &input)
 }
 
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
@@ -356,10 +415,6 @@ func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceRe
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if ws == nil {
-		return nil, nil
 	}
 
 	return &WorkspaceResolver{workspace: ws}, nil

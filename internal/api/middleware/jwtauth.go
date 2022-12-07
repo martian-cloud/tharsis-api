@@ -38,5 +38,6 @@ func findToken(r *http.Request) string {
 	if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
 		return bearer[7:]
 	}
+
 	return ""
 }

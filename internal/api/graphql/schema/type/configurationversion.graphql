@@ -5,6 +5,7 @@ type ConfigurationVersion implements Node {
   speculative: Boolean!
   workspaceId: String!
   createdBy: String!
+  vcsEvent: VCSEvent
 }
 
 type ConfigurationVersionMutationPayload {

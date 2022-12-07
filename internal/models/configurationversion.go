@@ -12,6 +12,7 @@ const (
 
 // ConfigurationVersion resource represents a terraform configuration that can be used by a single Run
 type ConfigurationVersion struct {
+	VCSEventID  *string
 	Status      ConfigurationStatus
 	WorkspaceID string
 	CreatedBy   string

@@ -51,7 +51,7 @@ func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) 
 
 	results := []models.SCIMToken{}
 	for rows.Next() {
-		item, err := scanToken(rows)
+		item, err := scanSCIMToken(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 		return nil, err
 	}
 
-	createdToken, err := scanToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdToken, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -103,7 +103,7 @@ func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) e
 		return err
 	}
 
-	if _, err = scanToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql)); err != nil {
+	if _, err = scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql)); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -124,7 +124,7 @@ func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToke
 		return nil, err
 	}
 
-	token, err := scanToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	token, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -144,7 +144,7 @@ func (s *scimTokens) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func scanToken(row scanner) (*models.SCIMToken, error) {
+func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
 	token := &models.SCIMToken{}
 
 	fields := []interface{}{

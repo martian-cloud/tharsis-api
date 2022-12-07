@@ -21,10 +21,12 @@ var (
 
 // Valid token types used as private claims for tokens
 // issued by Tharsis.
+// #nosec: G101 -- false flag.
 const (
-	JobTokenType            string = "job"
-	ServiceAccountTokenType string = "service_account"
-	SCIMTokenType           string = "scim"
+	JobTokenType              string = "job"
+	ServiceAccountTokenType   string = "service_account"
+	SCIMTokenType             string = "scim"
+	VCSWorkspaceLinkTokenType string = "vcs_workspace_link"
 )
 
 // Authenticator is used to authenticate JWT tokens
@@ -63,29 +65,39 @@ func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, us
 			return nil, errors.NewError(errors.EUnauthorized, errorReason(vtErr))
 		}
 
-		// TODO: Update the if conditions to look for 'type' field instead
-		// and use the enum strings defined above.
-		if serviceAccountGID, ok := output.PrivateClaims["service_account_id"]; ok {
-			serviceAccountID := gid.FromGlobalID(serviceAccountGID)
+		tokenType, ok := output.PrivateClaims["type"]
+		if !ok {
+			return nil, fmt.Errorf("failed to get token type")
+		}
+
+		switch tokenType {
+		case ServiceAccountTokenType:
+			serviceAccountID := gid.FromGlobalID(output.PrivateClaims["service_account_id"])
 			return NewServiceAccountCaller(
 				serviceAccountID,
 				output.PrivateClaims["service_account_path"],
 				newNamespaceMembershipAuthorizer(a.dbClient, nil, &serviceAccountID, useCache),
 			), nil
-		} else if jobID, ok := output.PrivateClaims["job_id"]; ok {
+		case JobTokenType:
 			return &JobCaller{
-				JobID:       gid.FromGlobalID(jobID),
+				JobID:       gid.FromGlobalID(output.PrivateClaims["job_id"]),
 				RunID:       gid.FromGlobalID(output.PrivateClaims["run_id"]),
 				WorkspaceID: gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
 				dbClient:    a.dbClient,
 			}, nil
-		} else if tokenType, ok := output.PrivateClaims["type"]; ok && tokenType == SCIMTokenType {
+		case SCIMTokenType:
 			scimCaller, sErr := a.verifySCIMTokenClaim(ctx, output.Token)
 			if sErr != nil {
 				return nil, errors.NewError(errors.EUnauthorized, errorReason(sErr))
 			}
 			return scimCaller, nil
-		} else {
+		case VCSWorkspaceLinkTokenType:
+			vcsCaller, sErr := a.verifyVCSToken(ctx, output)
+			if sErr != nil {
+				return nil, errors.NewError(errors.EUnauthorized, errorReason(sErr))
+			}
+			return vcsCaller, nil
+		default:
 			return nil, errors.NewError(errors.EInternal, "Unsupported token type received")
 		}
 	}
@@ -112,6 +124,42 @@ func (a *Authenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Toke
 	}
 
 	return NewSCIMCaller(a.dbClient), nil
+}
+
+// verifyVCSToken verifies a VCS token is known.
+func (a *Authenticator) verifyVCSToken(ctx context.Context, output *VerifyTokenOutput) (*VCSWorkspaceLinkCaller, error) {
+	linkID, ok := output.PrivateClaims["link_id"]
+	if !ok {
+		return nil, fmt.Errorf("failed to get provider link id token claim")
+	}
+
+	link, err := a.dbClient.WorkspaceVCSProviderLinks.GetLinkByID(ctx, gid.FromGlobalID(linkID))
+	if err != nil {
+		return nil, err
+	}
+
+	if link == nil {
+		return nil, fmt.Errorf("vcs token has invalid vcs provider link id")
+	}
+
+	if link.TokenNonce != output.Token.JwtID() {
+		return nil, fmt.Errorf("vcs token has an invalid jti claim")
+	}
+
+	provider, err := a.dbClient.VCSProviders.GetProviderByID(ctx, link.ProviderID)
+	if err != nil {
+		return nil, err
+	}
+
+	if provider == nil {
+		return nil, fmt.Errorf("failed to get provider")
+	}
+
+	return NewVCSWorkspaceLinkCaller(
+		provider,
+		link,
+		a.dbClient,
+	), nil
 }
 
 // ErrorReason will normalize the error message

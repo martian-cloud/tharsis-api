@@ -1,5 +1,7 @@
 package workspace
 
+//go:generate mockery --name Service --inpackage --case underscore
+
 import (
 	"bytes"
 	"context"
@@ -30,6 +32,9 @@ const (
 
 	// lowerLimitMaxJobDuration is the lowest value MaxJobDuration field can be assigned.
 	lowerLimitMaxJobDuration = time.Minute
+
+	tharsisTerraformProviderConfig        = "provider[\"registry.terraform.io/martian-cloud/tharsis\"]"
+	tharsisWorkspaceOutputsDatasourceName = "tharsis_workspace_outputs"
 )
 
 // These error messages must be translated to TFE equivalent by caller.
@@ -95,6 +100,7 @@ type GetStateVersionsInput struct {
 
 // CreateConfigurationVersionInput is the input for creating a new configuration version
 type CreateConfigurationVersionInput struct {
+	VCSEventID  *string
 	WorkspaceID string
 	Speculative bool
 }
@@ -126,11 +132,6 @@ type Service interface {
 	GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error)
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
 }
-
-const (
-	tharsisTerraformProviderConfig        = "provider[\"registry.terraform.io/martian-cloud/tharsis\"]"
-	tharsisWorkspaceOutputsDatasourceName = "tharsis_workspace_outputs"
-)
 
 type service struct {
 	logger          logger.Logger
@@ -518,7 +519,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 	}
 
 	// Check if requested Terraform version is supported.
-	if err := versions.Supported(workspace.TerraformVersion); err != nil {
+	if err = versions.Supported(workspace.TerraformVersion); err != nil {
 		return nil, err
 	}
 
@@ -567,7 +568,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
 		return nil, err
 	}
 
@@ -624,7 +625,7 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
+	if err = caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
 		return nil, err
 	}
 
@@ -1067,6 +1068,7 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 	}
 
 	cv, err := s.dbClient.ConfigurationVersions.CreateConfigurationVersion(ctx, models.ConfigurationVersion{
+		VCSEventID:  options.VCSEventID,
 		WorkspaceID: options.WorkspaceID,
 		Speculative: options.Speculative,
 		Status:      models.ConfigurationPending,

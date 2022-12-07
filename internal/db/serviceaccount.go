@@ -28,7 +28,7 @@ type ServiceAccounts interface {
 // ServiceAccountSortableField represents the fields that a service account can be sorted by
 type ServiceAccountSortableField string
 
-// GroupSortableField constants
+// ServiceAccountSortableField constants
 const (
 	ServiceAccountSortableFieldCreatedAtAsc  ServiceAccountSortableField = "CREATED_AT_ASC"
 	ServiceAccountSortableFieldCreatedAtDesc ServiceAccountSortableField = "CREATED_AT_DESC"

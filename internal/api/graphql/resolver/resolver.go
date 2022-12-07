@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
@@ -46,6 +47,7 @@ type State struct {
 	GPGKeyService              gpgkey.Service
 	CliService                 cli.Service
 	SCIMService                scim.Service
+	VCSService                 vcs.Service
 	ActivityService            activityevent.Service
 }
 
@@ -127,6 +129,10 @@ func getCLIService(ctx context.Context) cli.Service {
 
 func getSCIMService(ctx context.Context) scim.Service {
 	return extract(ctx).SCIMService
+}
+
+func getVCSService(ctx context.Context) vcs.Service {
+	return extract(ctx).VCSService
 }
 
 func getActivityService(ctx context.Context) activityevent.Service {

@@ -113,6 +113,7 @@ var activityEventFieldList = append(metadataFieldList,
 	"variable_target_id",
 	"workspace_target_id",
 	"payload",
+	"vcs_provider_target_id",
 )
 
 // NewActivityEvents returns an instance of the ActivityEvents interface
@@ -260,7 +261,9 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		terraformProviderVersionTargetID *string
 		variableTargetID                 *string
 		workspaceTargetID                *string
+		vcsProviderTargetID              *string
 	)
+
 	switch input.TargetType {
 	case models.TargetGPGKey:
 		gpgKeyTargetID = &input.TargetID
@@ -288,6 +291,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		variableTargetID = &input.TargetID
 	case models.TargetWorkspace:
 		workspaceTargetID = &input.TargetID
+	case models.TargetVCSProvider:
+		vcsProviderTargetID = &input.TargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, fmt.Errorf("invalid target type: %s", input.TargetType)
@@ -323,6 +328,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"variable_target_id":                   variableTargetID,
 		"workspace_target_id":                  workspaceTargetID,
 		"payload":                              payload,
+		"vcs_provider_target_id":               vcsProviderTargetID,
 	}
 
 	sql, _, err := dialect.Insert("activity_events").
@@ -369,6 +375,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 					return nil, errors.NewError(errors.ENotFound, "variable does not exist")
 				case "fk_activity_events_workspace_target_id":
 					return nil, errors.NewError(errors.ENotFound, "workspace does not exist")
+				case "fk_activity_events_vcs_providers_target_id":
+					return nil, errors.NewError(errors.ENotFound, "vcs provider does not exist")
 				}
 			}
 		}
@@ -413,6 +421,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		terraformProviderVersionTargetID *string
 		variableTargetID                 *string
 		workspaceTargetID                *string
+		vcsProviderTargetID              *string
 	)
 
 	fields := []interface{}{
@@ -438,6 +447,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&variableTargetID,
 		&workspaceTargetID,
 		&activityEvent.Payload,
+		&vcsProviderTargetID,
 	}
 
 	// Balance the number of selected fields and fields to scan out.
@@ -477,6 +487,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *variableTargetID
 	case models.TargetWorkspace:
 		activityEvent.TargetID = *workspaceTargetID
+	case models.TargetVCSProvider:
+		activityEvent.TargetID = *vcsProviderTargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, fmt.Errorf("invalid target type: %s", activityEvent.TargetType)

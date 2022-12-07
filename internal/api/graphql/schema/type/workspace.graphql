@@ -99,6 +99,22 @@ type Workspace implements Node, Namespace {
     sort: ActivityEventSort
   ): ActivityEventConnection!
   preventDestroyPlan: Boolean!
+  vcsProviders(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    includeInherited: Boolean
+    search: String
+  ): VCSProviderConnection!
+  workspaceVcsProviderLink: WorkspaceVCSProviderLink
+  vcsEvents(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: VCSEventSort
+  ): VCSEventConnection!
 }
 
 input CreateWorkspaceInput {

@@ -43,10 +43,10 @@ type Group implements Node, Namespace {
   createdBy: String!
   parent: Group
   gpgKeys(
-    after: String,
-    before: String,
-    first: Int,
-    last: Int,
+    after: String
+    before: String
+    first: Int
+    last: Int
     includeInherited: Boolean
   ): GPGKeyConnection!
   descendentGroups(
@@ -81,10 +81,10 @@ type Group implements Node, Namespace {
     search: String
   ): ManagedIdentityConnection!
   terraformProviders(
-    after: String,
-    before: String,
-    first: Int,
-    last: Int,
+    after: String
+    before: String
+    first: Int
+    last: Int
     search: String
   ): TerraformProviderConnection!
   memberships: [NamespaceMembership!]!
@@ -103,6 +103,15 @@ type Group implements Node, Namespace {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  vcsProviders(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: VCSProviderSort
+    includeInherited: Boolean
+  ): VCSProviderConnection!
 }
 
 input CreateGroupInput {

@@ -533,7 +533,7 @@ func verifySumsSignature(checksums, signature io.Reader) error {
 	return nil
 }
 
-// copyToDestination copies the files from destination to source in chunks.
+// copyToDestination copies the files from source to destination in chunks.
 func copyToDestination(destinationFile *os.File, sourceFile io.ReadCloser) error {
 	for {
 		_, err := io.CopyN(destinationFile, sourceFile, 1024)
