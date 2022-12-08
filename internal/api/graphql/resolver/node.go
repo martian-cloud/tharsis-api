@@ -144,6 +144,18 @@ func (r *NodeResolver) ToTerraformProviderPlatform() (*TerraformProviderPlatform
 	return res, ok
 }
 
+// ToTerraformModule resolver
+func (r *NodeResolver) ToTerraformModule() (*TerraformModuleResolver, bool) {
+	res, ok := r.result.(*TerraformModuleResolver)
+	return res, ok
+}
+
+// ToTerraformModuleVersion resolver
+func (r *NodeResolver) ToTerraformModuleVersion() (*TerraformModuleVersionResolver, bool) {
+	res, ok := r.result.(*TerraformModuleVersionResolver)
+	return res, ok
+}
+
 // ToGPGKey resolver
 func (r *NodeResolver) ToGPGKey() (*GPGKeyResolver, bool) {
 	res, ok := r.result.(*GPGKeyResolver)
@@ -293,6 +305,18 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			return nil, err
 		}
 		resolver = &TerraformProviderPlatformResolver{providerPlatform: providerPlatform}
+	case gid.TerraformModuleType:
+		module, err := getModuleRegistryService(ctx).GetModuleByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolver = &TerraformModuleResolver{module: module}
+	case gid.TerraformModuleVersionType:
+		moduleVersion, err := getModuleRegistryService(ctx).GetModuleVersionByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolver = &TerraformModuleVersionResolver{moduleVersion: moduleVersion}
 	case gid.GPGKeyType:
 		gpgKey, err := getGPGKeyService(ctx).GetGPGKeyByID(ctx, parsedGlobalID.ID)
 		if err != nil {

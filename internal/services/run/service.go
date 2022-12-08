@@ -18,7 +18,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -159,6 +158,7 @@ type service struct {
 	cliService      cli.Service
 	runStateManager *runStateManager
 	activityService activityevent.Service
+	moduleResolver  ModuleResolver
 }
 
 var (
@@ -180,6 +180,7 @@ func NewService(
 	jobService job.Service,
 	cliService cli.Service,
 	activityService activityevent.Service,
+	moduleResolver ModuleResolver,
 ) Service {
 	return &service{
 		logger,
@@ -191,6 +192,7 @@ func NewService(
 		cliService,
 		newRunStateManager(dbClient, logger),
 		activityService,
+		moduleResolver,
 	}
 }
 
@@ -432,8 +434,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// If this fails, the transaction will be rolled back, so everything is safe.
 	finalModuleVersion := options.ModuleVersion
 	if options.ModuleSource != nil {
-		moduleResolver := NewModuleResolver(http.NewHTTPClient(), s.logger)
-		resolvedModuleVersion, rmvErr := moduleResolver.ResolveModuleVersion(*options.ModuleSource,
+		resolvedModuleVersion, rmvErr := s.moduleResolver.ResolveModuleVersion(ctx, *options.ModuleSource,
 			options.ModuleVersion, runEnvVars)
 		if rmvErr != nil {
 			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Failed to resolve module source: %v", rmvErr))

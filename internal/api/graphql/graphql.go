@@ -25,7 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
 )
 
-// fieldOverrides is initialized map passed into GetQueryComplexity as a placeholder
+// fieldOverrides is initialized map passed into GetQueryComplexity
 var fieldOverrides = map[string]int{"readme": 1}
 
 type queryComplexityResult struct {
@@ -87,6 +87,8 @@ func NewGraphQL(
 	resolver.RegisterTeamLoader(loaderCollection)
 	resolver.RegisterTerraformProviderLoader(loaderCollection)
 	resolver.RegisterTerraformProviderVersionLoader(loaderCollection)
+	resolver.RegisterTerraformModuleLoader(loaderCollection)
+	resolver.RegisterTerraformModuleVersionLoader(loaderCollection)
 	resolver.RegisterGPGKeyLoader(loaderCollection)
 	resolver.RegisterManagedIdentityLoader(loaderCollection)
 	resolver.RegisterManagedIdentityAccessRuleLoader(loaderCollection)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
@@ -11,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -32,6 +34,7 @@ const (
 
 // State contains the services required by resolvers
 type State struct {
+	Config                     *config.Config
 	GroupService               group.Service
 	WorkspaceService           workspace.Service
 	RunService                 run.Service
@@ -44,6 +47,7 @@ type State struct {
 	Logger                     logger.Logger
 	TeamService                team.Service
 	ProviderRegistryService    providerregistry.Service
+	ModuleRegistryService      moduleregistry.Service
 	GPGKeyService              gpgkey.Service
 	CliService                 cli.Service
 	SCIMService                scim.Service
@@ -110,6 +114,10 @@ func getProviderRegistryService(ctx context.Context) providerregistry.Service {
 	return extract(ctx).ProviderRegistryService
 }
 
+func getModuleRegistryService(ctx context.Context) moduleregistry.Service {
+	return extract(ctx).ModuleRegistryService
+}
+
 // nolint
 func getLogger(ctx context.Context) logger.Logger {
 	return extract(ctx).Logger
@@ -137,4 +145,8 @@ func getVCSService(ctx context.Context) vcs.Service {
 
 func getActivityService(ctx context.Context) activityevent.Service {
 	return extract(ctx).ActivityService
+}
+
+func getConfig(ctx context.Context) *config.Config {
+	return extract(ctx).Config
 }

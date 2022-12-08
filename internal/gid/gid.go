@@ -35,6 +35,8 @@ const (
 	TerraformProviderType         Type = "TP"
 	TerraformProviderVersionType  Type = "TPV"
 	TerraformProviderPlatformType Type = "TPP"
+	TerraformModuleType           Type = "TMO"
+	TerraformModuleVersionType    Type = "TMV"
 	GPGKeyType                    Type = "GPG"
 	ActivityEventType             Type = "AE"
 	VCSProviderType               Type = "VP"
@@ -67,6 +69,8 @@ func (t Type) IsValid() error {
 		TerraformProviderType,
 		TerraformProviderVersionType,
 		TerraformProviderPlatformType,
+		TerraformModuleType,
+		TerraformModuleVersionType,
 		GPGKeyType,
 		ActivityEventType,
 		VCSProviderType,

@@ -4,7 +4,7 @@ ALTER TABLE activity_events
     DROP COLUMN IF EXISTS vcs_provider_target_id;
 
 ALTER TABLE configuration_versions
-    DROP CONSTRAINT fk_vcs_event_id,
+    DROP CONSTRAINT IF EXISTS fk_vcs_event_id,
     DROP COLUMN IF EXISTS vcs_event_id;
 
 DROP TABLE IF EXISTS workspace_vcs_provider_links;

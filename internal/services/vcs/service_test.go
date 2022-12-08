@@ -431,6 +431,7 @@ func TestCreateVCSProvider(t *testing.T) {
 			mockActivityEventService.Test(t)
 
 			mockProviders.On("DefaultAPIHostname").Return(test.expectedProvider.Hostname)
+			mockProviders.On("BuildOAuthAuthorizationURL", mock.Anything).Return("https://redirect-url")
 
 			mockVCSProviders.On("CreateProvider", mock.Anything, test.toCreate).Return(test.expectedProvider, nil)
 
@@ -466,7 +467,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				assert.NotNil(t, response)
-				assert.Equal(t, test.expectedProvider, response)
+				assert.Equal(t, test.expectedProvider, response.VCSProvider)
 			}
 		})
 	}
@@ -1953,6 +1954,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 					Hostname:   "api.github.com",
 					OAuthState: ptr.String("a-new-state"),
 				},
+				OAuthAuthorizationURL: "expected-url",
 			},
 		},
 		{
@@ -1974,6 +1976,16 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 
 			mockVCSProviders.On("UpdateProvider", mock.Anything, sampleVCSProvider).Return(test.expectedResponse.VCSProvider, nil)
 
+			mockProviders := MockProvider{}
+			mockProviders.Test(t)
+
+			mockProviders.On("BuildOAuthAuthorizationURL", mock.Anything).Return("expected-url", nil)
+
+			providerMap := map[models.VCSProviderType]Provider{
+				models.GitLabProviderType: &mockProviders,
+				models.GitHubProviderType: &mockProviders,
+			}
+
 			dbClient := &db.Client{
 				VCSProviders: &mockVCSProviders,
 			}
@@ -1983,7 +1995,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 5000)
 
 			response, err := service.ResetVCSProviderOAuthToken(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2000,45 +2012,31 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 func TestGetOAuthAuthorizationURL(t *testing.T) {
 	testCases := []struct {
 		caller            auth.Caller
-		input             *GetOAuthAuthorizationURLInput
-		expectedURL       *string
+		input             *models.VCSProvider
+		expectedURL       string
 		name              string
 		expectedErrorCode string
 	}{
 		{
 			name:   "positive: vcs provider has a non-nil state value; expect no errors",
 			caller: &auth.SystemCaller{},
-			input: &GetOAuthAuthorizationURLInput{
-				VCSProvider: &models.VCSProvider{
-					Hostname:          sampleProviderHostname,
-					OAuthClientID:     "sample-client-id",
-					OAuthClientSecret: "sample-client-secret",
-					GroupID:           "group-id",
-					OAuthState:        ptr.String("a-state-value"),
-					Type:              models.GitLabProviderType,
-				},
+			input: &models.VCSProvider{
+				Hostname:          sampleProviderHostname,
+				OAuthClientID:     "sample-client-id",
+				OAuthClientSecret: "sample-client-secret",
+				GroupID:           "group-id",
+				OAuthState:        ptr.String("a-state-value"),
+				Type:              models.GitLabProviderType,
 			},
-			expectedURL: ptr.String("expected-url"),
+			expectedURL: "expected-url",
 		},
 		{
 			name:   "positive: vcs provider has a nil state value; expect no errors",
 			caller: &auth.SystemCaller{},
-			input: &GetOAuthAuthorizationURLInput{
-				VCSProvider: &models.VCSProvider{
-					GroupID: "group-id",
-				},
+			input: &models.VCSProvider{
+				GroupID: "group-id",
 			},
-			// Expect both to be nil here.
-		},
-		{
-			name: "negative: without caller, expect error EUnauthorized",
-			input: &GetOAuthAuthorizationURLInput{
-				VCSProvider: &models.VCSProvider{
-					GroupID:    "group-id",
-					OAuthState: ptr.String("a-state-value"),
-				},
-			},
-			expectedErrorCode: errors.EUnauthorized,
+			expectedErrorCode: errors.EInternal,
 		},
 	}
 
@@ -2050,8 +2048,8 @@ func TestGetOAuthAuthorizationURL(t *testing.T) {
 			mockProviders.Test(t)
 
 			buildAuthURLInput := &types.BuildOAuthAuthorizationURLInput{
-				Hostname:           test.input.VCSProvider.Hostname,
-				OAuthClientID:      test.input.VCSProvider.OAuthClientID,
+				Hostname:           test.input.Hostname,
+				OAuthClientID:      test.input.OAuthClientID,
 				OAuthState:         "a-state-value",
 				RedirectURL:        vcsOAuthCallbackURL,
 				UseReadWriteScopes: false,
@@ -2064,9 +2062,13 @@ func TestGetOAuthAuthorizationURL(t *testing.T) {
 				models.GitHubProviderType: &mockProviders,
 			}
 
-			service := newService(nil, nil, nil, providerMap, nil, nil, nil, nil, nil, tharsisURL, 5000)
+			service := &service{
+				vcsProviderMap:      providerMap,
+				tharsisURL:          tharsisURL,
+				repositorySizeLimit: 5000,
+			}
 
-			authURL, err := service.GetOAuthAuthorizationURL(ctx, test.input)
+			authURL, err := service.getOAuthAuthorizationURL(ctx, test.input)
 			if test.expectedErrorCode != "" {
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
 			} else if err != nil {

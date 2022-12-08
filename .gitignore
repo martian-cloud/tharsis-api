@@ -21,7 +21,7 @@
 ## Enter your project specific ignores here
 
 # Martian Cloud Common Ignore
-testdata/*
+testdata/postgres/*
 .env*
 .coverage
 .test-results

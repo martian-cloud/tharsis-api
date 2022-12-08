@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -161,6 +162,12 @@ func (r *TerraformProviderResolver) RepositoryURL() string {
 // RegistryNamespace resolver
 func (r *TerraformProviderResolver) RegistryNamespace(ctx context.Context) string {
 	return r.provider.GetRegistryNamespace()
+}
+
+// Source resolver
+func (r *TerraformProviderResolver) Source(ctx context.Context) string {
+	cfg := getConfig(ctx)
+	return fmt.Sprintf("%s/%s/%s", cfg.ServiceDiscoveryHost, r.provider.GetRegistryNamespace(), r.provider.Name)
 }
 
 // Metadata resolver

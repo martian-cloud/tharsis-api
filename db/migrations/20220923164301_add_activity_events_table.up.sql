@@ -42,5 +42,3 @@ CREATE TABLE IF NOT EXISTS activity_events (
 CREATE INDEX IF NOT EXISTS index_activity_events_on_user_id ON activity_events(user_id);
 CREATE INDEX IF NOT EXISTS index_activity_events_on_service_account_id ON activity_events(service_account_id);
 CREATE INDEX IF NOT EXISTS index_activity_events_on_namespace_id ON activity_events(namespace_id);
-
--- The End.

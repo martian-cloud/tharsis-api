@@ -95,6 +95,8 @@ type Client struct {
 	TerraformProviders         TerraformProviders
 	TerraformProviderVersions  TerraformProviderVersions
 	TerraformProviderPlatforms TerraformProviderPlatforms
+	TerraformModules           TerraformModules
+	TerraformModuleVersions    TerraformModuleVersions
 	GPGKeys                    GPGKeys
 	SCIMTokens                 SCIMTokens
 	VCSProviders               VCSProviders
@@ -163,6 +165,8 @@ func NewClient(
 	dbClient.TerraformProviders = NewTerraformProviders(dbClient)
 	dbClient.TerraformProviderVersions = NewTerraformProviderVersions(dbClient)
 	dbClient.TerraformProviderPlatforms = NewTerraformProviderPlatforms(dbClient)
+	dbClient.TerraformModules = NewTerraformModules(dbClient)
+	dbClient.TerraformModuleVersions = NewTerraformModuleVersions(dbClient)
 	dbClient.GPGKeys = NewGPGKeys(dbClient)
 	dbClient.SCIMTokens = NewSCIMTokens(dbClient)
 	dbClient.VCSProviders = NewVCSProviders(dbClient)

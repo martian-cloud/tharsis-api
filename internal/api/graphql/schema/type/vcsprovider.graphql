@@ -24,6 +24,7 @@ type VCSProviderEdge {
 type CreateVCSProviderPayload {
   clientMutationId: String
   vcsProvider: VCSProvider
+  oAuthAuthorizationUrl: String!
   problems: [Problem!]!
 }
 
@@ -42,6 +43,7 @@ type DeleteVCSProviderPayload {
 type ResetVCSProviderOAuthTokenPayload {
   clientMutationId: String
   vcsProvider: VCSProvider
+  oAuthAuthorizationUrl: String!
   problems: [Problem!]!
 }
 
@@ -56,7 +58,6 @@ type VCSProvider implements Node {
   resourcePath: String!
   type: VCSProviderType!
   autoCreateWebhooks: Boolean!
-  oAuthAuthorizationUrl: String
 }
 
 input CreateVCSProviderInput {

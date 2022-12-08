@@ -34,6 +34,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -95,7 +96,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		return nil, fmt.Errorf("failed to create plugin catalog %v", err)
 	}
 
-	// Used by several services.
 	httpClient := tharsishttp.NewHTTPClient()
 
 	tharsisIDP := auth.NewIdentityProvider(pluginCatalog.JWSProvider, cfg.ServiceAccountIssuerURL)
@@ -104,7 +104,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 
 	respWriter := response.NewWriter(logger)
 
-	taskManager := asynctask.NewManager()
+	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
 
 	eventManager := events.NewEventManager(dbClient)
 	eventManager.Start(ctx)
@@ -112,6 +112,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 	logStore := job.NewLogStore(pluginCatalog.ObjectStore, dbClient)
 	artifactStore := workspace.NewArtifactStore(pluginCatalog.ObjectStore)
 	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
+	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
 
 	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, cfg, pluginCatalog)
@@ -128,14 +129,15 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore)
 		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService, activityService)
 		jobService                 = job.NewService(logger, dbClient, eventManager, logStore)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService, cliService, activityService)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService, jobService, activityService)
 		saService                  = serviceaccount.NewService(logger, dbClient, tharsisIDP, activityService)
 		variableService            = variable.NewService(logger, dbClient, activityService)
 		teamService                = team.NewService(logger, dbClient, activityService)
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, providerRegistryStore, activityService)
+		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, moduleRegistryStore, activityService, taskManager)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, activityService)
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
+		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService, cliService, activityService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL))
 	)
 
 	vcsService, err := vcs.NewService(
@@ -193,6 +195,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 	jwtAuthMiddleware := middleware.NewJwtAuthMiddleware(authenticator, logger, respWriter)
 
 	resolverState := resolver.State{
+		Config:                     cfg,
 		GroupService:               groupService,
 		WorkspaceService:           workspaceService,
 		RunService:                 runService,
@@ -205,6 +208,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		Logger:                     logger,
 		TeamService:                teamService,
 		ProviderRegistryService:    providerRegistryService,
+		ModuleRegistryService:      moduleRegistryService,
 		GPGKeyService:              gpgKeyService,
 		CliService:                 cliService,
 		SCIMService:                scimService,
@@ -273,6 +277,13 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		respWriter,
 		jwtAuthMiddleware,
 		providerRegistryService,
+	))
+	routeBuilder.AddV1Routes(controllers.NewModuleRegistryController(
+		logger,
+		respWriter,
+		jwtAuthMiddleware,
+		moduleRegistryService,
+		cfg.ModuleRegistryMaxUploadSize,
 	))
 	routeBuilder.AddV1Routes(controllers.NewSCIMController(
 		logger,

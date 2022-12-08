@@ -60,7 +60,7 @@ type JobDispatcher struct {
 }
 
 // New creates a JobDispatcher
-func New(ctx context.Context, pluginData map[string]string, logger logger.Logger) (*JobDispatcher, error) {
+func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger) (*JobDispatcher, error) {
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("kubernetes job dispatcher requires plugin data '%s' field", field)
@@ -106,7 +106,7 @@ func New(ctx context.Context, pluginData map[string]string, logger logger.Logger
 		logger:                logger,
 		image:                 pluginData["image"],
 		apiURL:                pluginData["api_url"],
-		discoveryProtocolHost: pluginData["discovery_protocol_host"],
+		discoveryProtocolHost: discoveryProtocolHost,
 		memoryRequest:         memoryRequest,
 		memoryLimit:           memoryLimit,
 		client: &k8sRunner{

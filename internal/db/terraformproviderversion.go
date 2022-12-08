@@ -28,6 +28,7 @@ type TerraformProviderVersionSortableField string
 
 // TerraformProviderVersionSortableField constants
 const (
+	// TODO: remove version sortable field
 	TerraformProviderVersionSortableFieldVersionAsc    TerraformProviderVersionSortableField = "VERSION_ASC"
 	TerraformProviderVersionSortableFieldVersionDesc   TerraformProviderVersionSortableField = "VERSION_DESC"
 	TerraformProviderVersionSortableFieldUpdatedAtAsc  TerraformProviderVersionSortableField = "UPDATED_AT_ASC"

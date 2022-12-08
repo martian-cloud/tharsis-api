@@ -110,6 +110,8 @@ var activityEventFieldList = append(metadataFieldList,
 	"team_target_id",
 	"terraform_provider_target_id",
 	"terraform_provider_version_target_id",
+	"terraform_module_target_id",
+	"terraform_module_version_target_id",
 	"variable_target_id",
 	"workspace_target_id",
 	"payload",
@@ -259,6 +261,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		teamTargetID                     *string
 		terraformProviderTargetID        *string
 		terraformProviderVersionTargetID *string
+		terraformModuleTargetID          *string
+		terraformModuleVersionTargetID   *string
 		variableTargetID                 *string
 		workspaceTargetID                *string
 		vcsProviderTargetID              *string
@@ -287,6 +291,10 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		terraformProviderTargetID = &input.TargetID
 	case models.TargetTerraformProviderVersion:
 		terraformProviderVersionTargetID = &input.TargetID
+	case models.TargetTerraformModule:
+		terraformModuleTargetID = &input.TargetID
+	case models.TargetTerraformModuleVersion:
+		terraformModuleVersionTargetID = &input.TargetID
 	case models.TargetVariable:
 		variableTargetID = &input.TargetID
 	case models.TargetWorkspace:
@@ -325,6 +333,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"team_target_id":                       teamTargetID,
 		"terraform_provider_target_id":         terraformProviderTargetID,
 		"terraform_provider_version_target_id": terraformProviderVersionTargetID,
+		"terraform_module_target_id":           terraformModuleTargetID,
+		"terraform_module_version_target_id":   terraformModuleVersionTargetID,
 		"variable_target_id":                   variableTargetID,
 		"workspace_target_id":                  workspaceTargetID,
 		"payload":                              payload,
@@ -371,6 +381,10 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 					return nil, errors.NewError(errors.ENotFound, "terraform provider does not exist")
 				case "fk_activity_events_terraform_provider_version_target_id":
 					return nil, errors.NewError(errors.ENotFound, "terraform provider version does not exist")
+				case "fk_activity_events_terraform_module_target_id":
+					return nil, errors.NewError(errors.ENotFound, "terraform module does not exist")
+				case "fk_activity_events_terraform_module_version_target_id":
+					return nil, errors.NewError(errors.ENotFound, "terraform module version does not exist")
 				case "fk_activity_events_variable_target_id":
 					return nil, errors.NewError(errors.ENotFound, "variable does not exist")
 				case "fk_activity_events_workspace_target_id":
@@ -419,6 +433,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		teamTargetID                     *string
 		terraformProviderTargetID        *string
 		terraformProviderVersionTargetID *string
+		terraformModuleTargetID          *string
+		terraformModuleVersionTargetID   *string
 		variableTargetID                 *string
 		workspaceTargetID                *string
 		vcsProviderTargetID              *string
@@ -444,6 +460,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&teamTargetID,
 		&terraformProviderTargetID,
 		&terraformProviderVersionTargetID,
+		&terraformModuleTargetID,
+		&terraformModuleVersionTargetID,
 		&variableTargetID,
 		&workspaceTargetID,
 		&activityEvent.Payload,
@@ -483,6 +501,10 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *terraformProviderTargetID
 	case models.TargetTerraformProviderVersion:
 		activityEvent.TargetID = *terraformProviderVersionTargetID
+	case models.TargetTerraformModule:
+		activityEvent.TargetID = *terraformModuleTargetID
+	case models.TargetTerraformModuleVersion:
+		activityEvent.TargetID = *terraformModuleVersionTargetID
 	case models.TargetVariable:
 		activityEvent.TargetID = *variableTargetID
 	case models.TargetWorkspace:

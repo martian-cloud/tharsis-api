@@ -391,6 +391,18 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &TerraformProviderVersionResolver{providerVersion: tfProviderVersion}}, nil
+	case models.TargetTerraformModule:
+		tfModule, err := loadTerraformModule(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &TerraformModuleResolver{module: tfModule}}, nil
+	case models.TargetTerraformModuleVersion:
+		tfModuleVersion, err := loadTerraformModuleVersion(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &TerraformModuleVersionResolver{moduleVersion: tfModuleVersion}}, nil
 	case models.TargetStateVersion:
 		stateVersion, err := loadStateVersion(ctx, r.activityEvent.TargetID)
 		if err != nil {

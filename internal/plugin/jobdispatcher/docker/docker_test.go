@@ -21,7 +21,7 @@ func TestNew(t *testing.T) {
 		"host":    "http://localhost",
 		"image":   "testImage",
 	}
-	dispatcher, err := New(pluginData, logger.New())
+	dispatcher, err := New(pluginData, "http://localhost", logger.New())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

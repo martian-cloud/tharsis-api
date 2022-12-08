@@ -42,7 +42,7 @@ type JobDispatcher struct {
 }
 
 // New creates a JobDispatcher
-func New(pluginData map[string]string, logger logger.Logger) (*JobDispatcher, error) {
+func New(pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger) (*JobDispatcher, error) {
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("docker job dispatcher requires plugin data '%s' field", field)
@@ -67,7 +67,7 @@ func New(pluginData map[string]string, logger logger.Logger) (*JobDispatcher, er
 		image:                 pluginData["image"],
 		bindPath:              pluginData["bind_path"],
 		apiURL:                pluginData["api_url"],
-		discoveryProtocolHost: pluginData["discovery_protocol_host"],
+		discoveryProtocolHost: discoveryProtocolHost,
 		registryUsername:      pluginData["registry_username"],
 		registryPassword:      pluginData["registry_password"],
 		localImage:            localImage,

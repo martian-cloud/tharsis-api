@@ -141,8 +141,8 @@ func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *Terr
 
 	// Attempt to download the CLI release in a goroutine if it doesn't exist.
 	if !exists {
-		s.taskManager.StartTask(func() {
-			if err := s.downloadTerraformCLIRelease(context.Background(), input); err != nil {
+		s.taskManager.StartTask(func(taskCtx context.Context) {
+			if err := s.downloadTerraformCLIRelease(taskCtx, input); err != nil {
 				s.logger.Errorf("error while downloading Terraform CLI release: %v", err)
 			}
 		})

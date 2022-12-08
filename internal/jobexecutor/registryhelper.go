@@ -11,14 +11,11 @@ import (
 )
 
 const (
-	https          = "https" // could not find a net/http-supplied constant
-	suffixDownload = "download"
 	xTerraformGet  = "x-terraform-get"
 )
 
 // resolveModuleSource returns the final pre-signed URL for a module source.
 func resolveModuleSource(moduleSource string, moduleVersion string, variables map[string]string) (string, error) {
-
 	// Separate the pieces of the source module string.
 	// These are equal to the fields of Terraform's addrs.ModuleSourceRegistry.PackageAddr.
 	parts := strings.Split(moduleSource, "/")
@@ -42,28 +39,19 @@ func resolveModuleSource(moduleSource string, moduleVersion string, variables ma
 	httpClient := tharsishttp.NewHTTPClient()
 
 	// Visit the 'well-known' URL for the server in question:
-	apiPath, err := module.GetModuleRegistryEndpointForHost(httpClient, host)
+	registryURL, err := module.GetModuleRegistryEndpointForHost(httpClient, host)
 	if err != nil {
 		return "", err
 	}
 
-	// Build the early leading part of the URL:
-	// apiPath has a leading slash.
-	earlyLeadingURL := url.URL{
-		Scheme: https,
-		Host:   host,
-		Path:   apiPath,
-	}
-
 	// Relative reference based from the above:
-	moreRefURL, err := url.Parse(strings.Join([]string{namespace, sourcePath, targetSystem, ""}, "/"))
+	moreRefURL, err := url.Parse(strings.Join([]string{namespace, sourcePath, targetSystem, moduleVersion, "download"}, "/"))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse relative reference for leading URL: %v", err)
 	}
 
 	// Visit the URL to get the pre-authorized URL for the desired version:
-	preSignedURL, err := getPreSignedURL(*httpClient, token, host,
-		earlyLeadingURL.ResolveReference(moreRefURL).Path, moduleVersion)
+	preSignedURL, err := getPreSignedURL(*httpClient, token, registryURL.ResolveReference(moreRefURL))
 	if err != nil {
 		return "", err
 	}
@@ -73,25 +61,8 @@ func resolveModuleSource(moduleSource string, moduleVersion string, variables ma
 
 // getPreSignedURL returns a string of the pre-signed URL to download the actual module content
 // for example, https://gitlab.com/api/v4/packages/terraform/modules/v1/mygroup/module-001/aws/0.0.1/download
-func getPreSignedURL(httpClient http.Client, token, host, leadingPath, version string) (string, error) {
-
-	// The common base URL, used twice below.  It needs to be the base URL for
-	// both the "... download" and final URLs.  Registry protocol documentation,
-	// says the value of x-terraform-get may be a relative URL:
-	// https://www.terraform.io/internals/module-registry-protocol
-	baseURL := url.URL{
-		Scheme: https,
-		Host:   host,
-		Path:   leadingPath,
-	}
-
-	// Resolve a relative reference from the base URL to the download path.
-	downloadRefString := strings.Join([]string{version, suffixDownload}, "/")
-	downloadRefURL, err := url.Parse(downloadRefString)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse download reference string to URL: %s", downloadRefString)
-	}
-	downloadURLString := baseURL.ResolveReference(downloadRefURL).String()
+func getPreSignedURL(httpClient http.Client, token string, registryURL *url.URL) (string, error) {
+	downloadURLString := registryURL.String()
 
 	req, err := http.NewRequest(http.MethodGet, downloadURLString, nil)
 	if err != nil {
@@ -103,7 +74,7 @@ func getPreSignedURL(httpClient http.Client, token, host, leadingPath, version s
 	if err != nil {
 		if resp.StatusCode == http.StatusUnauthorized {
 			return "", fmt.Errorf("token in environment variable %s is apparently not authorized to access this module",
-				module.BuildTokenEnvVar(host))
+				module.BuildTokenEnvVar(registryURL.Host))
 		}
 		return "", fmt.Errorf("failed to visit download URL: %s", downloadURLString)
 	}
@@ -123,7 +94,7 @@ func getPreSignedURL(httpClient http.Client, token, host, leadingPath, version s
 	}
 
 	// Resolve to the final URL.
-	finalURL := baseURL.ResolveReference(resultRefURL)
+	finalURL := registryURL.ResolveReference(resultRefURL)
 
 	return finalURL.String(), nil
 }

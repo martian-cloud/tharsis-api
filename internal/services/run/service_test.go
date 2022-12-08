@@ -395,7 +395,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents)
+			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents, nil)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), &CreateRunInput{
 				WorkspaceID:            ws.Metadata.ID,
@@ -576,7 +576,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents)
+			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents, nil)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), test.runInput)
 			if test.expectErrorCode != "" {
@@ -813,7 +813,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, nil, nil, nil, nil, nil, &mockActivityEvents)
+			service := NewService(logger, dbClient.Client, nil, nil, nil, nil, nil, &mockActivityEvents, nil)
 
 			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)
 			if test.expectErrorCode != "" {
