@@ -84,7 +84,7 @@ func newTestClient(ctx context.Context, t *testing.T) *testClient {
 
 	logger, _ := logger.NewForTest()
 
-	client, err := NewClient(ctx, TestDBHost, portNum, TestDBName, TestDBMode, TestDBUser, TestDBPass, maxConns, logger)
+	client, err := NewClient(ctx, TestDBHost, portNum, TestDBName, TestDBMode, TestDBUser, TestDBPass, maxConns, false, logger)
 	if err != nil {
 		t.Fatal(err)
 	}

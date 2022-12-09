@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-
 func TestParseSuccess(t *testing.T) {
 	moduleDir, err := os.MkdirTemp("", "module-parse-test")
 	if err != nil {
@@ -22,7 +21,7 @@ func TestParseSuccess(t *testing.T) {
 	  }
 	`
 
-	if err := os.WriteFile(filepath.Join(moduleDir, "main.tf"), []byte(contents), 0600); err != nil {
+	if err = os.WriteFile(filepath.Join(moduleDir, "main.tf"), []byte(contents), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +49,7 @@ func TestParseWithError(t *testing.T) {
 	  }
 	`
 
-	if err := os.WriteFile(filepath.Join(moduleDir, "main.tf"), []byte(contents), 0600); err != nil {
+	if err = os.WriteFile(filepath.Join(moduleDir, "main.tf"), []byte(contents), 0600); err != nil {
 		t.Fatal(err)
 	}
 

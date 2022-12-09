@@ -12,6 +12,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres" // Register Postgres dialect
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
@@ -115,6 +116,7 @@ func NewClient(
 	dbUsername string,
 	dbPassword string,
 	dbMaxConnections int,
+	dbAutoMigrateEnabled bool,
 	logger logger.Logger,
 ) (*Client, error) {
 	dbURI := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", dbUsername, dbPassword, dbHost, dbPort, dbName, dbSslMode)
@@ -138,6 +140,26 @@ func NewClient(
 	}
 
 	logger.Infof("Successfully connected to DB %s", dbHost)
+
+	// Auto migrate-up the DB if enabled.
+	if dbAutoMigrateEnabled {
+		logger.Info("Starting DB migrate")
+
+		migrations, err := newMigrations(logger, cfg.ConnString())
+		if err != nil {
+			return nil, err
+		}
+
+		err = migrations.migrateUp()
+		if err == migrate.ErrNoChange {
+			logger.Info("No migration necessary since DB is already on latest version")
+		} else if err != nil {
+			logger.Errorf("Unable to migrate DB: %v", err)
+			return nil, err
+		} else {
+			logger.Info("Successfully migrated DB to latest version")
+		}
+	}
 
 	dbClient := &Client{
 		conn:   pool,

@@ -1353,10 +1353,10 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	createdHigh := currentTime()
 
 	type testCase struct {
-		expectManagedIdentityAccessRules []models.ManagedIdentityAccessRule
 		expectMsg                        *string
 		name                             string
 		searchID                         string
+		expectManagedIdentityAccessRules []models.ManagedIdentityAccessRule
 	}
 
 	// TODO: Add test cases to cover the expanded functionality of the more general GetManagedIdentityAccessRules function.

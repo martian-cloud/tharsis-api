@@ -546,8 +546,8 @@ func TestGetModules(t *testing.T) {
 					Sort:              test.input.Sort,
 					PaginationOptions: test.input.PaginationOptions,
 					Filter: &db.TerraformModuleFilter{
-						Search:           test.input.Search,
-						GroupID:          &test.input.Group.Metadata.ID,
+						Search:  test.input.Search,
+						GroupID: &test.input.Group.Metadata.ID,
 					},
 				}).Return(&getModulesResponse, nil)
 			}
@@ -1266,13 +1266,13 @@ func TestCreateModuleVersion(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
+		authError                  error
 		latestModuleVersion        *models.TerraformModuleVersion
 		expectUpdatedModuleVersion *models.TerraformModuleVersion
 		expectCreatedModuleVersion *models.TerraformModuleVersion
 		name                       string
-		input                      CreateModuleVersionInput
-		authError                  error
 		expectErrCode              string
+		input                      CreateModuleVersionInput
 	}{
 		{
 			name: "subject does not have deployer role",
@@ -1490,12 +1490,12 @@ func TestDeleteModuleVersion(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
+		authError                  error
 		expectUpdatedModuleVersion *models.TerraformModuleVersion
 		name                       string
+		expectErrCode              string
 		existingModuleVersions     []models.TerraformModuleVersion
 		moduleVersionToDelete      models.TerraformModuleVersion
-		authError                  error
-		expectErrCode              string
 	}{
 		{
 			name: "subject does not have deployer role",
@@ -1822,13 +1822,13 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
+		authError     error
 		input         *models.TerraformModuleVersion
 		data          string
 		name          string
-		shaSum        []byte
 		expectStatus  models.TerraformModuleVersionStatus
-		authError     error
 		expectErrCode string
+		shaSum        []byte
 	}{
 		{
 			name: "subject does not have deployer role",

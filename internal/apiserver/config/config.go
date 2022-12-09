@@ -20,8 +20,9 @@ const (
 	defaultMaxGraphQLComplexity        = 0
 	defaultRateLimitStorePluginType    = "memory"
 	defaultModuleRegistryMaxUploadSize = 1024 * 1024 * 10 // 10 MiB
-	defaultVCSRepositorySizeLimit      = 5 * 1024 * 1024  // 5 MebiBytes in bytes.
+	defaultVCSRepositorySizeLimit      = 1024 * 1024 * 5  // 5 MebiBytes in bytes.
 	defaultAsyncTaskTimeout            = 100              // seconds
+	defaultDBAutoMigrateEnabled        = true
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -64,6 +65,9 @@ type Config struct {
 	TFELoginClientID string `yaml:"tfe_login_client_id" env:"TFE_LOGIN_CLIENT_ID"`
 	TFELoginScopes   string `yaml:"tfe_login_scopes" env:"TFE_LOGIN_SCOPES"`
 
+	// ServiceDiscoveryHost is optional and will default to the APIURL host if it's not defined
+	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
+
 	// The OIDC identity providers
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 
@@ -79,14 +83,14 @@ type Config struct {
 	// Timout for async background tasks
 	AsyncTaskTimeout int `yaml:"async_task_timeout" env:"ASYNC_TASK_TIMEOUT"`
 
-	// VCS repository size limit.
+	// VCS repository size limit
 	VCSRepositorySizeLimit int `yaml:"vcs_repository_size_limit" env:"VCS_REPOSITORY_SIZE_LIMIT"`
 
 	// Enable TFE
 	TFELoginEnabled bool `yaml:"tfe_login_enabled" env:"TFE_LOGIN_ENABLED"`
 
-	// ServiceDiscoveryHost is optional and will default to the APIURL host if it's not defined
-	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
+	// Whether to auto migrate the database
+	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED"`
 }
 
 // Validate validates the application configuration.
@@ -110,6 +114,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		ModuleRegistryMaxUploadSize: defaultModuleRegistryMaxUploadSize,
 		VCSRepositorySizeLimit:      defaultVCSRepositorySizeLimit,
 		AsyncTaskTimeout:            defaultAsyncTaskTimeout,
+		DBAutoMigrateEnabled:        defaultDBAutoMigrateEnabled,
 	}
 
 	// load from YAML config file
