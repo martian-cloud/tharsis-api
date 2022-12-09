@@ -1,5 +1,7 @@
 package run
 
+//go:generate mockery --name Service --inpackage --case underscore
+
 import (
 	"bytes"
 	"context"

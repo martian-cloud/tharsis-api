@@ -42,6 +42,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
 )
@@ -51,7 +52,7 @@ type APIServer struct {
 	shutdownOnce sync.Once
 	logger       logger.Logger
 	dbClient     *db.Client
-	taskManager  *asynctask.Manager
+	taskManager  asynctask.Manager
 	srv          *http.Server
 }
 
@@ -94,7 +95,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		return nil, fmt.Errorf("failed to create plugin catalog %v", err)
 	}
 
-	// Used by CLI service.
+	// Used by several services.
 	httpClient := tharsishttp.NewHTTPClient()
 
 	tharsisIDP := auth.NewIdentityProvider(pluginCatalog.JWSProvider, cfg.ServiceAccountIssuerURL)
@@ -103,7 +104,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 
 	respWriter := response.NewWriter(logger)
 
-	taskManager := asynctask.Manager{}
+	taskManager := asynctask.NewManager()
 
 	eventManager := events.NewEventManager(dbClient)
 	eventManager.Start(ctx)
@@ -124,21 +125,35 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		userService                = user.NewService(logger, dbClient)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
 		groupService               = group.NewService(logger, dbClient, namespaceMembershipService, activityService)
-		cliService                 = cli.NewService(logger, httpClient, cliStore)
-		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService,
-			activityService)
-		jobService = job.NewService(logger, dbClient, eventManager, logStore)
-		runService = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService,
-			cliService, activityService)
-		managedIdentityService = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService,
-			jobService, activityService)
-		saService               = serviceaccount.NewService(logger, dbClient, tharsisIDP, activityService)
-		variableService         = variable.NewService(logger, dbClient, activityService)
-		teamService             = team.NewService(logger, dbClient, activityService)
-		providerRegistryService = providerregistry.NewService(logger, dbClient, providerRegistryStore, activityService)
-		gpgKeyService           = gpgkey.NewService(logger, dbClient, activityService)
-		scimService             = scim.NewService(logger, dbClient, tharsisIDP)
+		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore)
+		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService, activityService)
+		jobService                 = job.NewService(logger, dbClient, eventManager, logStore)
+		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService, cliService, activityService)
+		managedIdentityService     = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService, jobService, activityService)
+		saService                  = serviceaccount.NewService(logger, dbClient, tharsisIDP, activityService)
+		variableService            = variable.NewService(logger, dbClient, activityService)
+		teamService                = team.NewService(logger, dbClient, activityService)
+		providerRegistryService    = providerregistry.NewService(logger, dbClient, providerRegistryStore, activityService)
+		gpgKeyService              = gpgkey.NewService(logger, dbClient, activityService)
+		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
 	)
+
+	vcsService, err := vcs.NewService(
+		ctx,
+		logger,
+		dbClient,
+		tharsisIDP,
+		httpClient,
+		activityService,
+		runService,
+		workspaceService,
+		taskManager,
+		cfg.TharsisAPIURL,
+		cfg.VCSRepositorySizeLimit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize vcs service %v", err)
+	}
 
 	routeBuilder := api.NewRouteBuilder(
 		middleware.PrometheusMiddleware,
@@ -193,8 +208,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		GPGKeyService:              gpgKeyService,
 		CliService:                 cliService,
 		SCIMService:                scimService,
+		VCSService:                 vcsService,
 		ActivityService:            activityService,
 	}
+
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.RateLimitStore, cfg.MaxGraphQLComplexity, authenticator, jwtAuthMiddleware)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
@@ -265,6 +282,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		teamService,
 		scimService,
 	))
+	routeBuilder.AddV1Routes(controllers.NewVCSController(
+		logger,
+		respWriter,
+		authenticator,
+		vcsService,
+	))
 
 	runner := runner.NewRunner(runService, pluginCatalog.JobDispatcher, logger)
 	runner.Start(auth.WithCaller(ctx, &auth.SystemCaller{}))
@@ -272,7 +295,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 	return &APIServer{
 		logger:      logger,
 		dbClient:    dbClient,
-		taskManager: &taskManager,
+		taskManager: taskManager,
 		srv: &http.Server{
 			Addr:              fmt.Sprintf(":%v", cfg.ServerPort),
 			Handler:           routeBuilder.Build(),

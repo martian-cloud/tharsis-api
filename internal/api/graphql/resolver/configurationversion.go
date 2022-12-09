@@ -55,6 +55,20 @@ func (r *ConfigurationVersionResolver) CreatedBy() string {
 	return r.configurationVersion.CreatedBy
 }
 
+// VCSEvent resolver
+func (r *ConfigurationVersionResolver) VCSEvent(ctx context.Context) (*VCSEventResolver, error) {
+	if r.configurationVersion.VCSEventID == nil {
+		return nil, nil
+	}
+
+	event, err := loadVCSEvent(ctx, *r.configurationVersion.VCSEventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VCSEventResolver{vcsEvent: event}, nil
+}
+
 func configurationVersionQuery(ctx context.Context, args *ConfigurationVersionQueryArgs) (*ConfigurationVersionResolver, error) {
 	service := getWorkspaceService(ctx)
 

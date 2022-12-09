@@ -156,6 +156,24 @@ func (r *NodeResolver) ToActivityEvent() (*ActivityEventResolver, bool) {
 	return res, ok
 }
 
+// ToVCSProvider resolver
+func (r *NodeResolver) ToVCSProvider() (*VCSProviderResolver, bool) {
+	res, ok := r.result.(*VCSProviderResolver)
+	return res, ok
+}
+
+// ToWorkspaceVCSProviderLink resolver
+func (r *NodeResolver) ToWorkspaceVCSProviderLink() (*WorkspaceVCSProviderLinkResolver, bool) {
+	res, ok := r.result.(*WorkspaceVCSProviderLinkResolver)
+	return res, ok
+}
+
+// ToVCSEvent resolver
+func (r *NodeResolver) ToVCSEvent() (*VCSEventResolver, bool) {
+	res, ok := r.result.(*VCSEventResolver)
+	return res, ok
+}
+
 func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 	parsedGlobalID, err := gid.ParseGlobalID(globalID)
 	if err != nil {
@@ -287,6 +305,24 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			return nil, err
 		}
 		resolver = &TeamResolver{team: team}
+	case gid.VCSProviderType:
+		vcsProvider, err := getVCSService(ctx).GetVCSProviderByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolver = &VCSProviderResolver{vcsProvider: vcsProvider}
+	case gid.WorkspaceVCSProviderLinkType:
+		link, err := getVCSService(ctx).GetWorkspaceVCSProviderLinkByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolver = &WorkspaceVCSProviderLinkResolver{workspaceVCSProviderLink: link}
+	case gid.VCSEventType:
+		vcsEvent, err := getVCSService(ctx).GetVCSEventByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolver = &VCSEventResolver{vcsEvent: vcsEvent}
 	default:
 		return nil, fmt.Errorf("node query doesn't support type %s", parsedGlobalID.Type)
 	}

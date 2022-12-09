@@ -18,6 +18,7 @@ const (
 	envOidcProviderConfigPrefix     = "THARSIS_OAUTH_PROVIDERS_"
 	defaultMaxGraphQLComplexity     = 0
 	defaultRateLimitStorePluginType = "memory"
+	defaultVCSRepositorySizeLimit   = 5 * 1024 * 1024 // 5 MebiBytes in bytes.
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -69,6 +70,9 @@ type Config struct {
 
 	MaxGraphQLComplexity int `yaml:"max_graphql_complexity" env:"MAX_GRAPHQL_COMPLEXITY"`
 
+	// VCS repository size limit.
+	VCSRepositorySizeLimit int `yaml:"vcs_repository_size_limit" env:"VCS_REPOSITORY_SIZE_LIMIT"`
+
 	// Enable TFE
 	TFELoginEnabled bool `yaml:"tfe_login_enabled" env:"TFE_LOGIN_ENABLED"`
 }
@@ -91,6 +95,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		ServerPort:               defaultServerPort,
 		MaxGraphQLComplexity:     defaultMaxGraphQLComplexity,
 		RateLimitStorePluginType: defaultRateLimitStorePluginType,
+		VCSRepositorySizeLimit:   defaultVCSRepositorySizeLimit,
 	}
 
 	// load from YAML config file

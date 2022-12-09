@@ -92,6 +92,8 @@ func NewGraphQL(
 	resolver.RegisterManagedIdentityAccessRuleLoader(loaderCollection)
 	resolver.RegisterNamespaceMembershipLoader(loaderCollection)
 	resolver.RegisterNamespaceVariableLoader(loaderCollection)
+	resolver.RegisterVCSProviderLoader(loaderCollection)
+	resolver.RegisterVCSEventLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers())
 

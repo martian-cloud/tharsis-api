@@ -97,7 +97,7 @@ func TestCreateSCIMToken(t *testing.T) {
 			mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil)
 
 			logger, _ := logger.NewForTest()
-			identityProvider := auth.NewIdentityProvider(&mockJWSProvider, "https://tharsis.io")
+			identityProvider := auth.NewIdentityProvider(&mockJWSProvider, "https://tharsis.domain")
 			service := NewService(logger, dbClient, identityProvider)
 
 			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, test.caller))

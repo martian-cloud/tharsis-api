@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 
 	"github.com/graph-gophers/dataloader"
@@ -332,6 +333,31 @@ func (r *GroupResolver) ActivityEvents(ctx context.Context,
 	return NewActivityEventConnectionResolver(ctx, input)
 }
 
+// VCSProviders resolver
+func (r *GroupResolver) VCSProviders(ctx context.Context,
+	args *VCSProviderConnectionQueryArgs) (*VCSProviderConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := vcs.GetVCSProvidersInput{
+		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		Search:            args.Search,
+		NamespacePath:     r.group.FullPath,
+	}
+
+	if args.Sort != nil {
+		sort := db.VCSProviderSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	if args.IncludeInherited != nil && *args.IncludeInherited {
+		input.IncludeInherited = true
+	}
+
+	return NewVCSProviderConnectionResolver(ctx, &input)
+}
+
 func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {
 	groupService := getGroupService(ctx)
 
@@ -341,10 +367,6 @@ func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, erro
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if group == nil {
-		return nil, nil
 	}
 
 	return &GroupResolver{group: group}, nil

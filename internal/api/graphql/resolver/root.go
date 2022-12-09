@@ -701,3 +701,105 @@ func (r RootResolver) ActivityEvents(ctx context.Context,
 	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
 	return activityEventsQuery(ctx, args)
 }
+
+/* VCSProvider queries and mutations */
+
+// ResetVCSProviderOAuthToken returns a new OAuth authorization code URL that can
+// be used to reset an OAuth token.
+func (r RootResolver) ResetVCSProviderOAuthToken(ctx context.Context, args *struct {
+	Input *ResetVCSProviderOAuthTokenInput
+}) (*ResetVCSProviderOAuthTokenMutationPayloadResolver, error) {
+	response, err := resetVCSProviderOAuthTokenMutation(ctx, args.Input)
+	if err != nil {
+		return handleResetVCSProviderOAuthTokenMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// CreateVCSProvider creates a new vcs provider
+func (r RootResolver) CreateVCSProvider(ctx context.Context,
+	args *struct{ Input *CreateVCSProviderInput }) (*VCSProviderMutationPayloadResolver, error) {
+	response, err := createVCSProviderMutation(ctx, args.Input)
+	if err != nil {
+		return handleVCSProviderMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateVCSProvider updates a vcs provider
+func (r RootResolver) UpdateVCSProvider(ctx context.Context,
+	args *struct{ Input *UpdateVCSProviderInput }) (*VCSProviderMutationPayloadResolver, error) {
+	response, err := updateVCSProviderMutation(ctx, args.Input)
+	if err != nil {
+		return handleVCSProviderMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteVCSProvider deletes a vcs provider
+func (r RootResolver) DeleteVCSProvider(ctx context.Context,
+	args *struct{ Input *DeleteVCSProviderInput }) (*VCSProviderMutationPayloadResolver, error) {
+	response, err := deleteVCSProviderMutation(ctx, args.Input)
+	if err != nil {
+		return handleVCSProviderMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* VCSProviderLink queries and mutations */
+
+// CreateWorkspaceVCSProviderLink creates a new vcs provider link
+func (r RootResolver) CreateWorkspaceVCSProviderLink(ctx context.Context,
+	args *struct {
+		Input *CreateWorkspaceVCSProviderLinkInput
+	}) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	response, err := createWorkspaceVCSProviderLinkMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateWorkspaceVCSProviderLink updates a vcs provider link
+func (r RootResolver) UpdateWorkspaceVCSProviderLink(ctx context.Context,
+	args *struct {
+		Input *UpdateWorkspaceVCSProviderLinkInput
+	}) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	response, err := updateWorkspaceVCSProviderLinkMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteWorkspaceVCSProviderLink deletes a vcs provider link
+func (r RootResolver) DeleteWorkspaceVCSProviderLink(ctx context.Context,
+	args *struct {
+		Input *DeleteWorkspaceVCSProviderLinkInput
+	}) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	response, err := deleteWorkspaceVCSProviderLinkMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// CreateVCSRun creates a vcs run
+func (r RootResolver) CreateVCSRun(ctx context.Context,
+	args *struct {
+		Input *CreateVCSRunInput
+	}) (*CreateVCSRunMutationPayload, error) {
+	response, err := createVCSRunMutation(ctx, args.Input)
+	if err != nil {
+		return handleVCSRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}

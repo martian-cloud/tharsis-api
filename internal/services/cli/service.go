@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -64,21 +65,24 @@ type Service interface {
 }
 
 type service struct {
-	logger     logger.Logger
-	httpClient *http.Client
-	cliStore   TerraformCLIStore
+	logger      logger.Logger
+	httpClient  *http.Client
+	taskManager asynctask.Manager
+	cliStore    TerraformCLIStore
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	httpClient *http.Client,
+	taskManager asynctask.Manager,
 	cliStore TerraformCLIStore,
 ) Service {
 	return &service{
-		logger:     logger,
-		httpClient: httpClient,
-		cliStore:   cliStore,
+		logger:      logger,
+		httpClient:  httpClient,
+		taskManager: taskManager,
+		cliStore:    cliStore,
 	}
 }
 
@@ -137,11 +141,11 @@ func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *Terr
 
 	// Attempt to download the CLI release in a goroutine if it doesn't exist.
 	if !exists {
-		go func() {
+		s.taskManager.StartTask(func() {
 			if err := s.downloadTerraformCLIRelease(context.Background(), input); err != nil {
 				s.logger.Errorf("error while downloading Terraform CLI release: %v", err)
 			}
-		}()
+		})
 
 		return getTerraformCLIDownloadURL(input), nil
 	}

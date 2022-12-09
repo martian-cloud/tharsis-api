@@ -97,7 +97,10 @@ type Client struct {
 	TerraformProviderPlatforms TerraformProviderPlatforms
 	GPGKeys                    GPGKeys
 	SCIMTokens                 SCIMTokens
+	VCSProviders               VCSProviders
+	WorkspaceVCSProviderLinks  WorkspaceVCSProviderLinks
 	ActivityEvents             ActivityEvents
+	VCSEvents                  VCSEvents
 }
 
 // NewClient creates a new Client
@@ -162,7 +165,10 @@ func NewClient(
 	dbClient.TerraformProviderPlatforms = NewTerraformProviderPlatforms(dbClient)
 	dbClient.GPGKeys = NewGPGKeys(dbClient)
 	dbClient.SCIMTokens = NewSCIMTokens(dbClient)
+	dbClient.VCSProviders = NewVCSProviders(dbClient)
+	dbClient.WorkspaceVCSProviderLinks = NewWorkspaceVCSProviderLinks(dbClient)
 	dbClient.ActivityEvents = NewActivityEvents(dbClient)
+	dbClient.VCSEvents = NewVCSEvents(dbClient)
 
 	return dbClient, nil
 }

@@ -39,8 +39,15 @@ type Query {
     search: String
     sort: TerraformProviderSort
   ): TerraformProviderConnection!
-  terraformProvider(registryNamespace: String!, providerName: String!): TerraformProvider
-  terraformProviderVersion(registryNamespace: String!, providerName: String!, version: String): TerraformProviderVersion
+  terraformProvider(
+    registryNamespace: String!
+    providerName: String!
+  ): TerraformProvider
+  terraformProviderVersion(
+    registryNamespace: String!
+    providerName: String!
+    version: String
+  ): TerraformProviderVersion
   run(id: String!): Run
   runs(
     after: String

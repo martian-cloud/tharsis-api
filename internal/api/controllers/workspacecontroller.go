@@ -59,7 +59,7 @@ func NewWorkspaceController(
 	}
 }
 
-// RegisterRoutes adds health routes to the router
+// RegisterRoutes adds routes to the router.
 func (c *workspaceController) RegisterRoutes(router chi.Router) {
 	// Require JWT authentication
 	router.Use(c.jwtAuthMiddleware)

@@ -74,7 +74,14 @@ type configurationVersions struct {
 	dbClient *Client
 }
 
-var configurationVersionFieldList = append(metadataFieldList, "status", "speculative", "workspace_id", "created_by")
+var configurationVersionFieldList = append(
+	metadataFieldList,
+	"status",
+	"speculative",
+	"workspace_id",
+	"created_by",
+	"vcs_event_id",
+)
 
 // NewConfigurationVersions returns an instance of the ConfigurationVersions interface
 func NewConfigurationVersions(dbClient *Client) ConfigurationVersions {
@@ -172,6 +179,7 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 			"speculative":  configurationVersion.Speculative,
 			"workspace_id": configurationVersion.WorkspaceID,
 			"created_by":   configurationVersion.CreatedBy,
+			"vcs_event_id": configurationVersion.VCSEventID,
 		}).
 		Returning(configurationVersionFieldList...).ToSQL()
 
@@ -228,6 +236,7 @@ func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error)
 		&configurationVersion.Speculative,
 		&configurationVersion.WorkspaceID,
 		&configurationVersion.CreatedBy,
+		&configurationVersion.VCSEventID,
 	)
 	if err != nil {
 		return nil, err
