@@ -162,13 +162,13 @@ func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, cfg *conf
 
 	switch cfg.JobDispatcherPluginType {
 	case "kubernetes":
-		plugin, err = kubernetes.New(ctx, cfg.JobDispatcherPluginData, logger)
+		plugin, err = kubernetes.New(ctx, cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
 	case "ecs":
-		plugin, err = ecs.New(ctx, cfg.JobDispatcherPluginData, logger)
+		plugin, err = ecs.New(ctx, cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
 	case "docker":
-		plugin, err = docker.New(cfg.JobDispatcherPluginData, logger)
+		plugin, err = docker.New(cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
 	case "local":
-		plugin, err = local.New(cfg.JobDispatcherPluginData, logger)
+		plugin, err = local.New(cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
 	default:
 		err = errors.NewError(
 			errors.EInternal,

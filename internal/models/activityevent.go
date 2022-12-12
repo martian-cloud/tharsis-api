@@ -38,6 +38,8 @@ const (
 	TargetTeam                      ActivityEventTargetType = "TEAM"
 	TargetTerraformProvider         ActivityEventTargetType = "TERRAFORM_PROVIDER"
 	TargetTerraformProviderVersion  ActivityEventTargetType = "TERRAFORM_PROVIDER_VERSION"
+	TargetTerraformModule           ActivityEventTargetType = "TERRAFORM_MODULE"
+	TargetTerraformModuleVersion    ActivityEventTargetType = "TERRAFORM_MODULE_VERSION"
 	TargetVariable                  ActivityEventTargetType = "VARIABLE"
 	TargetVCSProvider               ActivityEventTargetType = "VCS_PROVIDER"
 	TargetWorkspace                 ActivityEventTargetType = "WORKSPACE"

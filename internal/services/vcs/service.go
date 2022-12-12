@@ -31,11 +31,12 @@ import (
 )
 
 const (
-	// defaultContextTimeout is the deadline for processing webhook context.
-	defaultContextTimeout = time.Minute
-
 	// defaultSleepDuration is used when polling the API for a status change.
 	defaultSleepDuration = time.Second * 10
+
+	// tokenExpirationLeeway is the headroom given to renew an
+	// access token before it expires.
+	tokenExpirationLeeway = time.Minute
 
 	// oAuthCallBackEndpoint is the Tharsis endpoint VCS providers use
 	// as a callback for completing the OAuth flow.
@@ -79,12 +80,6 @@ type GetVCSEventsInput struct {
 	Sort              *db.VCSEventSortableField
 	PaginationOptions *db.PaginationOptions
 	WorkspaceID       string
-}
-
-// GetOAuthAuthorizationURLInput is the input for retrieving an OAuth
-// authorization URL.
-type GetOAuthAuthorizationURLInput struct {
-	VCSProvider *models.VCSProvider
 }
 
 // CreateVCSProviderInput is the input for creating a VCS provider.
@@ -154,7 +149,14 @@ type ResetVCSProviderOAuthTokenInput struct {
 
 // ResetVCSProviderOAuthTokenResponse is the response for resetting a VCS OAuth token.
 type ResetVCSProviderOAuthTokenResponse struct {
-	VCSProvider *models.VCSProvider
+	VCSProvider           *models.VCSProvider
+	OAuthAuthorizationURL string
+}
+
+// CreateVCSProviderResponse is the response for creating a VCS provider
+type CreateVCSProviderResponse struct {
+	VCSProvider           *models.VCSProvider
+	OAuthAuthorizationURL string
 }
 
 // ProcessWebhookEventInput is the input for processing a webhook event.
@@ -223,7 +225,7 @@ type Service interface {
 	GetVCSProviderByID(ctx context.Context, id string) (*models.VCSProvider, error)
 	GetVCSProviders(ctx context.Context, input *GetVCSProvidersInput) (*db.VCSProvidersResult, error)
 	GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]models.VCSProvider, error)
-	CreateVCSProvider(ctx context.Context, input *CreateVCSProviderInput) (*models.VCSProvider, error)
+	CreateVCSProvider(ctx context.Context, input *CreateVCSProviderInput) (*CreateVCSProviderResponse, error)
 	UpdateVCSProvider(ctx context.Context, input *UpdateVCSProviderInput) (*models.VCSProvider, error)
 	DeleteVCSProvider(ctx context.Context, input *DeleteVCSProviderInput) error
 	GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string) (*models.WorkspaceVCSProviderLink, error)
@@ -236,7 +238,6 @@ type Service interface {
 	GetVCSEventsByIDs(ctx context.Context, idList []string) ([]models.VCSEvent, error)
 	CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) error
 	ProcessWebhookEvent(ctx context.Context, input *ProcessWebhookEventInput) error
-	GetOAuthAuthorizationURL(ctx context.Context, input *GetOAuthAuthorizationURLInput) (*string, error)
 	ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVCSProviderOAuthTokenInput) (*ResetVCSProviderOAuthTokenResponse, error)
 	ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) error
 }
@@ -406,7 +407,7 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 	return result.VCSProviders, nil
 }
 
-func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProviderInput) (*models.VCSProvider, error) {
+func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProviderInput) (*CreateVCSProviderResponse, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -485,7 +486,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		return nil, err
 	}
 
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
 		return nil, err
 	}
 
@@ -496,7 +497,15 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		"type", input.Type,
 	)
 
-	return createdProvider, nil
+	authorizationURL, err := s.getOAuthAuthorizationURL(ctx, createdProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CreateVCSProviderResponse{
+		VCSProvider:           createdProvider,
+		OAuthAuthorizationURL: authorizationURL,
+	}, nil
 }
 
 func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProviderInput) (*models.VCSProvider, error) {
@@ -605,7 +614,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 		}
 
 		// Get a new access token.
-		accessToken, rErr := s.refreshOAuthToken(ctx, provider, input.Provider)
+		accessToken, rErr := s.refreshOAuthToken(ctx, provider, input.Provider, true)
 		if rErr != nil {
 			return fmt.Errorf("failed to refresh access token: %v", rErr)
 		}
@@ -752,7 +761,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	}
 
 	// Get a new access token.
-	accessToken, err := s.refreshOAuthToken(ctx, provider, vp)
+	accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to refresh access token: %v", err)
 	}
@@ -942,7 +951,7 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 		}
 
 		// Get a new access token.
-		accessToken, err := s.refreshOAuthToken(ctx, provider, vp)
+		accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
 		if err != nil {
 			return fmt.Errorf("failed to refresh access token: %v", err)
 		}
@@ -1085,7 +1094,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		return err
 	}
 
-	accessToken, err := s.refreshOAuthToken(ctx, provider, vp)
+	accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
 	if err != nil {
 		return err
 	}
@@ -1128,15 +1137,11 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		return fmt.Errorf("failed to create a vcs event: %v", err)
 	}
 
-	handleVCSRunCallback := func() {
-		// Build a new context with a deadline.
-		ctx, cancel := context.WithTimeout(auth.WithCaller(context.Background(), caller), defaultContextTimeout)
-		defer cancel()
-
+	handleVCSRunCallback := func(ctx context.Context) {
 		// Update the status field beforehand.
 		createdEvent.Status = models.VCSEventFinished
 
-		if err := s.handleVCSRun(ctx, &handleVCSRunInput{
+		if err := s.handleVCSRun(auth.WithCaller(ctx, caller), &handleVCSRunInput{
 			hostname:      vp.Hostname,
 			accessToken:   accessToken,
 			link:          link,
@@ -1239,7 +1244,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		return nil
 	}
 
-	accessToken, err := s.refreshOAuthToken(ctx, provider, vcsCaller.Provider)
+	accessToken, err := s.refreshOAuthToken(ctx, provider, vcsCaller.Provider, false)
 	if err != nil {
 		return fmt.Errorf("failed to refresh access token: %v", err)
 	}
@@ -1270,15 +1275,11 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	}
 
 	// Build a callback for taskManager.
-	handleEventCallback := func() {
-		// Build a new context with a deadline.
-		ctx, cancel := context.WithTimeout(auth.WithCaller(context.Background(), caller), defaultContextTimeout)
-		defer cancel()
-
+	handleEventCallback := func(ctx context.Context) {
 		// Update the status field beforehand.
 		createdEvent.Status = models.VCSEventFinished
 
-		if err := s.handleEvent(ctx, &handleEventInput{
+		if err := s.handleEvent(auth.WithCaller(ctx, caller), &handleEventInput{
 			hostname:            vcsCaller.Provider.Hostname,
 			accessToken:         accessToken,
 			provider:            provider,
@@ -1348,46 +1349,44 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 		return nil, err
 	}
 
-	return &ResetVCSProviderOAuthTokenResponse{VCSProvider: updatedProvider}, err
-}
-
-func (s *service) GetOAuthAuthorizationURL(ctx context.Context, input *GetOAuthAuthorizationURLInput) (*string, error) {
-	caller, err := auth.AuthorizeCaller(ctx)
+	authorizationURL, err := s.getOAuthAuthorizationURL(ctx, updatedProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if a valid state value is available.
-	if input.VCSProvider.OAuthState == nil {
-		return nil, nil
-	}
+	return &ResetVCSProviderOAuthTokenResponse{
+		VCSProvider:           updatedProvider,
+		OAuthAuthorizationURL: authorizationURL,
+	}, err
+}
 
-	// Require deployer role.
-	if err = caller.RequireAccessToGroup(ctx, input.VCSProvider.GroupID, models.DeployerRole); err != nil {
-		return nil, err
+func (s *service) getOAuthAuthorizationURL(ctx context.Context, vcsProvider *models.VCSProvider) (string, error) {
+	// Check if a valid state value is available.
+	if vcsProvider.OAuthState == nil {
+		return "", errors.NewError(errors.EInternal, "oauth state is not set")
 	}
 
 	redirectURL, err := s.getOAuthCallBackURL(ctx)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	provider, err := s.getVCSProvider(input.VCSProvider.Type)
+	provider, err := s.getVCSProvider(vcsProvider.Type)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// Build authorization code URL for the provider which
 	// identity provider can use to complete OAuth flow.
 	authURL := provider.BuildOAuthAuthorizationURL(&types.BuildOAuthAuthorizationURLInput{
-		Hostname:           input.VCSProvider.Hostname,
-		OAuthClientID:      input.VCSProvider.OAuthClientID,
-		OAuthState:         *input.VCSProvider.OAuthState,
+		Hostname:           vcsProvider.Hostname,
+		OAuthClientID:      vcsProvider.OAuthClientID,
+		OAuthState:         *vcsProvider.OAuthState,
 		RedirectURL:        redirectURL,
-		UseReadWriteScopes: input.VCSProvider.AutoCreateWebhooks,
+		UseReadWriteScopes: vcsProvider.AutoCreateWebhooks,
 	})
 
-	return &authURL, nil
+	return authURL, nil
 }
 
 func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) error {
@@ -1472,7 +1471,8 @@ func (s *service) getOAuthCallBackURL(ctx context.Context) (string, error) {
 }
 
 // refreshOAuthToken renews the access token used to interact with the provider.
-func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *models.VCSProvider) (string, error) {
+// skipUpdate can be set to true when provider isn't to be updated.
+func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *models.VCSProvider, skipUpdate bool) (string, error) {
 	if vp.OAuthAccessToken == nil {
 		// OAuthAccessToken could be nil if OAuth token has been reset, but
 		// OAuth flow hasn't been completed yet.
@@ -1487,7 +1487,7 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 		return *vp.OAuthAccessToken, nil
 	}
 
-	if vp.OAuthAccessTokenExpiresAt != nil && vp.OAuthAccessTokenExpiresAt.After(time.Now()) {
+	if vp.OAuthAccessTokenExpiresAt != nil && vp.OAuthAccessTokenExpiresAt.After(time.Now().Add(-tokenExpirationLeeway)) {
 		// Since the access token hasn't expired yet, continue to use it.
 		return *vp.OAuthAccessToken, nil
 	}
@@ -1515,8 +1515,10 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 	vp.OAuthAccessTokenExpiresAt = payload.ExpirationTimestamp
 
 	// Update provider.
-	if _, err = s.dbClient.VCSProviders.UpdateProvider(ctx, vp); err != nil {
-		return "", err
+	if !skipUpdate {
+		if _, err = s.dbClient.VCSProviders.UpdateProvider(ctx, vp); err != nil {
+			return "", err
+		}
 	}
 
 	return payload.AccessToken, nil

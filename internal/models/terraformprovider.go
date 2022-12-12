@@ -16,6 +16,15 @@ type TerraformProvider struct {
 	Private       bool
 }
 
+// Validate returns an error if the model is not valid
+func (t *TerraformProvider) Validate() error {
+	// Verify name satisfies constraints
+	if err := verifyValidName(t.Name); err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetRegistryNamespace returns the provider registry namespace for the terraform provider
 func (t *TerraformProvider) GetRegistryNamespace() string {
 	return strings.Split(t.ResourcePath, "/")[0]

@@ -48,6 +48,25 @@ type Query {
     providerName: String!
     version: String
   ): TerraformProviderVersion
+  terraformModules(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: TerraformModuleSort
+  ): TerraformModuleConnection!
+  terraformModule(
+    registryNamespace: String!,
+    moduleName: String!,
+    system: String!
+  ): TerraformModule
+  terraformModuleVersion(
+    registryNamespace: String!,
+    moduleName: String!,
+    system: String!,
+    version: String
+  ): TerraformModuleVersion
   run(id: String!): Run
   runs(
     after: String

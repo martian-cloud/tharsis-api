@@ -22,7 +22,7 @@ func TestNew(t *testing.T) {
 		"subnets":         "test1,test2",
 		"launch_type":     "fargate",
 	}
-	dispatcher, err := New(context.Background(), pluginData, logger.New())
+	dispatcher, err := New(context.Background(), pluginData, "http://localhost", logger.New())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -43,7 +43,7 @@ func TestNewInvalidLaunchType(t *testing.T) {
 		"subnets":         "test1,test2",
 		"launch_type":     "invalid",
 	}
-	_, err := New(context.Background(), pluginData, logger.New())
+	_, err := New(context.Background(), pluginData, "http://localhost", logger.New())
 	assert.EqualError(t, err, "ECS job dispatcher requires a launch type of ec2 or fargate")
 }
 

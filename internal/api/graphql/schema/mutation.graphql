@@ -102,6 +102,11 @@ type Mutation {
   deleteTerraformProviderPlatform(
     input: DeleteTerraformProviderPlatformInput
   ): DeleteTerraformProviderPlatformPayload!
+  createTerraformModule(input: CreateTerraformModuleInput): CreateTerraformModulePayload!
+  updateTerraformModule(input: UpdateTerraformModuleInput): UpdateTerraformModulePayload!
+  deleteTerraformModule(input: DeleteTerraformModuleInput): DeleteTerraformModulePayload!
+  createTerraformModuleVersion(input: CreateTerraformModuleVersionInput): CreateTerraformModuleVersionPayload!
+  deleteTerraformModuleVersion(input: DeleteTerraformModuleVersionInput): DeleteTerraformModuleVersionPayload!
   createGPGKey(input: CreateGPGKeyInput!): CreateGPGKeyPayload!
   deleteGPGKey(input: DeleteGPGKeyInput!): DeleteGPGKeyPayload!
   createTerraformCLIDownloadURL(

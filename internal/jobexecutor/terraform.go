@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-slug"
 	"github.com/hashicorp/go-version"
 	hcInstall "github.com/hashicorp/hc-install"
 	"github.com/hashicorp/hc-install/fs"
@@ -294,7 +295,7 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 		return err
 	}
 
-	return tgz.Decompress(t.workspaceDir, cvFilePath, true, 0000)
+	return slug.Unpack(cvFile, t.workspaceDir)
 }
 
 func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) error {

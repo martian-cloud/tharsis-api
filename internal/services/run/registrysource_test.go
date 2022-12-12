@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,7 +14,12 @@ import (
 	"github.com/aws/smithy-go/ptr"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 )
 
 // TestResolveModuleVersion tests the various cases for the ResolveModuleVersion function.
@@ -22,7 +28,7 @@ import (
 // The plumbing for that is modeled after the unit test for the publicKeyGetter function in the awskms module.
 //
 // The other HTTP accesses by the underlying Terraform functions are handled by an embedded HTTP server.
-func TestResolveModuleVersion(t *testing.T) {
+func TestResolveModuleVersionRemote(t *testing.T) {
 	apiMapKey := "modules.v1"
 	apiMapVal := "/api/v4/packages/terraform/modules/v1/" // starts and ends with slashes
 
@@ -85,8 +91,7 @@ func TestResolveModuleVersion(t *testing.T) {
 												]
 										}
 								}
-						],
-						"source": "https://gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api"
+						]
 				}
 		]
 	}
@@ -172,10 +177,13 @@ func TestResolveModuleVersion(t *testing.T) {
 
 	// Run the test cases.
 	for _, test := range tests {
+		ctx := context.Background()
+
+		mockModuleService := moduleregistry.NewMockService(t)
 
 		// Resolve the module version.
-		gotVersion, err := NewModuleResolver(properClient, logger.New()).ResolveModuleVersion(
-			test.origSource, test.origVersion, vars)
+		gotVersion, err := NewModuleResolver(mockModuleService, properClient, logger.New(), "http://testserver").
+			ResolveModuleVersion(ctx, test.origSource, test.origVersion, vars)
 
 		// Compare vs. expected results.
 		assert.Equal(t, test.expectError, err)
@@ -183,6 +191,87 @@ func TestResolveModuleVersion(t *testing.T) {
 		if (test.expectVersion != nil) && (gotVersion != nil) {
 			assert.Equal(t, *test.expectVersion, *gotVersion)
 		}
+	}
+}
+
+func TestResolveModuleVersionLocal(t *testing.T) {
+	apiMapKey := "modules.v1"
+	apiMapVal := "/api/v4/packages/terraform/modules/v1/" // starts and ends with slashes
+
+	// Fake API "well-known" map.
+	apiMap := map[string]string{apiMapKey: apiMapVal}
+	apiMapJSON, err := json.Marshal(apiMap)
+	assert.Nil(t, err)
+
+	// Launch the test server to listen for requests to 127.0.0.1.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/terraform.json", func(w http.ResponseWriter, r *http.Request) {
+		_ = r
+		_, _ = w.Write(apiMapJSON)
+	})
+
+	s := httptest.NewTLSServer(mux)
+	defer s.Close()
+
+	serverURL, err := url.Parse(s.URL)
+	require.Nil(t, err)
+
+	properClient := s.Client()
+
+	// Test cases:
+	tests := []struct {
+		version         *string
+		name            string
+		moduleNamespace string
+		moduleName      string
+		moduleSystem    string
+		expectVersion   string
+	}{
+		{
+			name:            "get latest version for local module",
+			moduleNamespace: "ns1",
+			moduleName:      "m1",
+			moduleSystem:    "s1",
+			expectVersion:   "1.0.0",
+		},
+		{
+			name:            "get specific version for local module",
+			moduleNamespace: "ns1",
+			moduleName:      "m1",
+			moduleSystem:    "s1",
+			version:         ptr.String("0.0.1"),
+			expectVersion:   "0.0.1",
+		},
+	}
+
+	// Run the test cases.
+	for _, test := range tests {
+		ctx := context.Background()
+
+		mockModuleService := moduleregistry.NewMockService(t)
+		mockModuleService.On("GetModuleByAddress", mock.Anything, test.moduleNamespace, test.moduleName, test.moduleSystem).Return(&models.TerraformModule{
+			Metadata: models.ResourceMetadata{ID: "123"},
+		}, nil)
+
+		statusFilter := models.TerraformModuleVersionStatusUploaded
+		mockModuleService.On("GetModuleVersions", mock.Anything, &moduleregistry.GetModuleVersionsInput{
+			ModuleID: "123",
+			Status:   &statusFilter,
+		}).Return(&db.ModuleVersionsResult{
+			ModuleVersions: []models.TerraformModuleVersion{
+				{Metadata: models.ResourceMetadata{ID: "mv1"}, SemanticVersion: "0.0.1"},
+				{Metadata: models.ResourceMetadata{ID: "mv1"}, SemanticVersion: "1.0.0"},
+			},
+		}, nil)
+
+		// Resolve the module version.
+		gotVersion, err := NewModuleResolver(mockModuleService, properClient, logger.New(), s.URL).
+			ResolveModuleVersion(ctx, fmt.Sprintf("%s/%s/%s/%s", serverURL.Host, test.moduleNamespace, test.moduleName, test.moduleSystem), test.version, []Variable{})
+
+		require.Nil(t, err)
+
+		require.NotNil(t, gotVersion)
+		assert.Equal(t, test.expectVersion, *gotVersion)
 	}
 }
 

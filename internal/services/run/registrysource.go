@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,28 +12,32 @@ import (
 	version "github.com/hashicorp/go-version"
 	tfaddrs "github.com/hashicorp/terraform-registry-address"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/registry/addrs"
-)
-
-const (
-	https          = "https" // could not find a net/http-supplied constant
-	suffixVersions = "versions"
 )
 
 // ModuleResolver encapsulates the logic to resolve module source version string(s).
 type ModuleResolver interface {
-	ResolveModuleVersion(moduleSource string, moduleVersion *string, variables []Variable) (*string, error)
+	ResolveModuleVersion(ctx context.Context, moduleSource string, moduleVersion *string, variables []Variable) (*string, error)
 }
 
 type moduleResolver struct {
-	httpClient *http.Client
-	logger     logger.Logger
+	httpClient         *http.Client
+	logger             logger.Logger
+	moduleService      moduleregistry.Service
+	tharsisAPIEndpoint string
 }
 
 // NewModuleResolver returns
-func NewModuleResolver(httpClient *http.Client, logger logger.Logger) ModuleResolver {
-	return &moduleResolver{httpClient: httpClient, logger: logger}
+func NewModuleResolver(moduleService moduleregistry.Service, httpClient *http.Client, logger logger.Logger, tharsiAPIEndpoint string) ModuleResolver {
+	return &moduleResolver{
+		moduleService:      moduleService,
+		httpClient:         httpClient,
+		logger:             logger,
+		tharsisAPIEndpoint: tharsiAPIEndpoint,
+	}
 }
 
 // ResolveModuleVersion parses a module source string.  Then, if necessary,
@@ -40,7 +45,7 @@ func NewModuleResolver(httpClient *http.Client, logger logger.Logger) ModuleReso
 //
 // Note: In cases of a registry-style module source, if the module version was not specified
 // by the caller, this function returns a pointer to the final module version.
-func (m *moduleResolver) ResolveModuleVersion(moduleSource string, moduleVersion *string,
+func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource string, moduleVersion *string,
 	variables []Variable) (*string, error) {
 
 	// Determine if local module.
@@ -52,12 +57,12 @@ func (m *moduleResolver) ResolveModuleVersion(moduleSource string, moduleVersion
 	// This will never return an error to the caller, used as a means
 	// of fallthrough.
 	parsedSource, err := tfaddrs.ParseModuleSource(moduleSource)
-	if err == nil {
-		return m.convertModuleSource(moduleVersion, parsedSource, variables)
+	if err != nil {
+		// The source string has been validated as already being a non-registry, remote, Go-Getter-type address.
+		return nil, addrs.ValidateModuleSourceRemote(moduleSource)
 	}
 
-	// The source string has been validated as already being a non-registry, remote, Go-Getter-type address.
-	return nil, addrs.ValidateModuleSourceRemote(moduleSource)
+	return m.convertModuleSource(ctx, moduleVersion, parsedSource, variables)
 }
 
 // convertModuleSource intends to imitate some of the logic from function installRegistryModule
@@ -68,14 +73,11 @@ func (m *moduleResolver) ResolveModuleVersion(moduleSource string, moduleVersion
 //
 // Note: In cases of a registry-style module source, if the module version was not specified
 // by the caller, this function returns a pointer to the final module version.
-func (m *moduleResolver) convertModuleSource(version *string, sourceModule tfaddrs.Module,
+func (m *moduleResolver) convertModuleSource(ctx context.Context, version *string, sourceModule tfaddrs.Module,
 	variables []Variable) (*string, error) {
 
 	// Separate the pieces of sourceModule.
 	host := sourceModule.Package.Host.String()
-	namespace := sourceModule.Package.Namespace
-	sourcePath := sourceModule.Package.Name
-	targetSystem := sourceModule.Package.TargetSystem
 	subdir := sourceModule.Subdir
 
 	// Subdir is not supported.
@@ -91,40 +93,15 @@ func (m *moduleResolver) convertModuleSource(version *string, sourceModule tfadd
 			token = *variable.Value
 		}
 	}
-	if token == "" {
-		return nil, fmt.Errorf("unable to find an authorization token for host %s: an environment variable named \"%s\" must be defined", host, seeking)
-	}
 
 	// Visit the 'well-known' URL for the server in question:
-	apiPath, err := module.GetModuleRegistryEndpointForHost(m.httpClient, host)
+	moduleRegistryURL, err := module.GetModuleRegistryEndpointForHost(m.httpClient, host)
 	if err != nil {
 		return nil, err
 	}
 
-	// Remove leading slash if present.
-	apiPath = strings.TrimPrefix(apiPath, "/")
-
-	// Add trailing slash if not present--needed to make relative reference resolution work.
-	if !strings.HasSuffix(apiPath, "/") {
-		apiPath += "/"
-	}
-
-	// Build the shared leading part of the URL:
-	// apiPath has a leading slash.
-	earlyLeadingURL := url.URL{
-		Scheme: https,
-		Host:   host,
-		Path:   apiPath,
-	}
-
-	// Relative reference based from the above:
-	moreRefURL, err := url.Parse(strings.Join([]string{namespace, sourcePath, targetSystem, ""}, "/"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse relative reference for leading URL: %v", err)
-	}
-
 	// Visit the URL to get a list of versions:
-	versions, err := m.getVersions(token, host, earlyLeadingURL.ResolveReference(moreRefURL).Path)
+	versions, err := m.getVersions(ctx, moduleRegistryURL, token, sourceModule)
 	if err != nil {
 		return nil, err
 	}
@@ -135,34 +112,58 @@ func (m *moduleResolver) convertModuleSource(version *string, sourceModule tfadd
 		return nil, err
 	}
 
-	// When debugging, it is very useful at this point to see what version was chosen.
-
 	return &chosenVersion, nil
 }
 
 // getVersions returns a slice of the versions available on the server
 // for example, https://gitlab.com/api/v4/packages/terraform/modules/v1/mygroup/module-001/aws/versions
-func (m *moduleResolver) getVersions(token, host, leadingPath string) (map[string]bool, error) {
+func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, token string, sourceModule tfaddrs.Module) (map[string]bool, error) {
+	namespace := sourceModule.Package.Namespace
+	moduleName := sourceModule.Package.Name
+	targetSystem := sourceModule.Package.TargetSystem
 
-	// The common base URL:
-	baseURL := url.URL{
-		Scheme: https,
-		Host:   host,
-		Path:   leadingPath,
+	apiURL, err := url.Parse(m.tharsisAPIEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse API URL %v", err)
+	}
+
+	if registryURL.Host == apiURL.Host {
+		module, getModErr := m.moduleService.GetModuleByAddress(ctx, namespace, moduleName, targetSystem)
+		if getModErr != nil {
+			return nil, getModErr
+		}
+
+		statusFilter := models.TerraformModuleVersionStatusUploaded
+		versionsResponse, getModVerErr := m.moduleService.GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
+			ModuleID: module.Metadata.ID,
+			Status:   &statusFilter,
+		})
+		if getModVerErr != nil {
+			return nil, getModVerErr
+		}
+
+		results := map[string]bool{}
+		for _, m := range versionsResponse.ModuleVersions {
+			results[m.SemanticVersion] = true
+		}
+
+		return results, nil
 	}
 
 	// Resolve a relative reference from the base URL to the 'versions' path.
-	versionsRefURL, err := url.Parse(suffixVersions)
+	versionsRefURL, err := url.Parse(strings.Join([]string{namespace, moduleName, targetSystem, "versions"}, "/"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse download reference string to URL: %s", suffixVersions)
+		return nil, fmt.Errorf("failed to parse download reference string to URL: %v", err)
 	}
-	versionsURLString := baseURL.ResolveReference(versionsRefURL).String()
+	versionsURLString := registryURL.ResolveReference(versionsRefURL).String()
 
 	req, err := http.NewRequest(http.MethodGet, versionsURLString, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
-	req.Header.Set("AUTHORIZATION", fmt.Sprintf("Bearer %s", token))
+	if token != "" {
+		req.Header.Set("AUTHORIZATION", fmt.Sprintf("Bearer %s", token))
+	}
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
@@ -170,7 +171,7 @@ func (m *moduleResolver) getVersions(token, host, leadingPath string) (map[strin
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("token in environment variable %s is not authorized to access this module",
-			module.BuildTokenEnvVar(host))
+			module.BuildTokenEnvVar(registryURL.Host))
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("not-ok status from versions URL: %s: %s", versionsURLString, resp.Status)
@@ -271,5 +272,3 @@ func getLatestMatchingVersion(versions map[string]bool, wantVersion *string) (st
 
 	return latestSoFar.String(), nil
 }
-
-// The End.

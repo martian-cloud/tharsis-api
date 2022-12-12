@@ -173,26 +173,15 @@ func (r *VCSProviderResolver) AutoCreateWebhooks() bool {
 	return r.vcsProvider.AutoCreateWebhooks
 }
 
-// OAuthAuthorizationURL resolver
-func (r *VCSProviderResolver) OAuthAuthorizationURL(ctx context.Context) (*string, error) {
-	authURL, err := getVCSService(ctx).GetOAuthAuthorizationURL(ctx, &vcs.GetOAuthAuthorizationURLInput{
-		VCSProvider: r.vcsProvider,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return authURL, nil
-}
-
 /* VCSProvider Mutation Resolvers */
 
 // ResetVCSProviderOAuthTokenMutationPayload is the response payload for
 // resetting a OAuth token.
 type ResetVCSProviderOAuthTokenMutationPayload struct {
-	ClientMutationID *string
-	VCSProvider      *models.VCSProvider
-	Problems         []Problem
+	ClientMutationID      *string
+	VCSProvider           *models.VCSProvider
+	OAuthAuthorizationURL string
+	Problems              []Problem
 }
 
 // ResetVCSProviderOAuthTokenMutationPayloadResolver resolvers a ResetVCSProviderOAuthTokenPayload
@@ -211,9 +200,10 @@ func (r *ResetVCSProviderOAuthTokenMutationPayloadResolver) VCSProvider(ctx cont
 
 // VCSProviderMutationPayload is the response payload for a vcsProvider mutation
 type VCSProviderMutationPayload struct {
-	ClientMutationID *string
-	VCSProvider      *models.VCSProvider
-	Problems         []Problem
+	ClientMutationID      *string
+	VCSProvider           *models.VCSProvider
+	OAuthAuthorizationURL string
+	Problems              []Problem
 }
 
 // VCSProviderMutationPayloadResolver resolvers a VCSProviderMutationPayload
@@ -303,7 +293,12 @@ func resetVCSProviderOAuthTokenMutation(ctx context.Context, input *ResetVCSProv
 		return nil, err
 	}
 
-	payload := ResetVCSProviderOAuthTokenMutationPayload{ClientMutationID: input.ClientMutationID, VCSProvider: response.VCSProvider, Problems: []Problem{}}
+	payload := ResetVCSProviderOAuthTokenMutationPayload{
+		ClientMutationID:      input.ClientMutationID,
+		VCSProvider:           response.VCSProvider,
+		OAuthAuthorizationURL: response.OAuthAuthorizationURL,
+		Problems:              []Problem{},
+	}
 	return &ResetVCSProviderOAuthTokenMutationPayloadResolver{ResetVCSProviderOAuthTokenMutationPayload: payload}, nil
 }
 
@@ -326,12 +321,17 @@ func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInpu
 
 	vcsService := getVCSService(ctx)
 
-	provider, err := vcsService.CreateVCSProvider(ctx, vcsProviderCreateOptions)
+	response, err := vcsService.CreateVCSProvider(ctx, vcsProviderCreateOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	payload := VCSProviderMutationPayload{ClientMutationID: input.ClientMutationID, VCSProvider: provider, Problems: []Problem{}}
+	payload := VCSProviderMutationPayload{
+		ClientMutationID:      input.ClientMutationID,
+		VCSProvider:           response.VCSProvider,
+		OAuthAuthorizationURL: response.OAuthAuthorizationURL,
+		Problems:              []Problem{},
+	}
 	return &VCSProviderMutationPayloadResolver{VCSProviderMutationPayload: payload}, nil
 }
 

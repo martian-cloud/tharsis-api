@@ -643,6 +643,79 @@ func (r RootResolver) DeleteTerraformProviderPlatform(ctx context.Context, args 
 	return response, nil
 }
 
+/* Terraform Module Queries and Mutations */
+
+// TerraformModules query returns a terraform module connection
+func (r RootResolver) TerraformModules(ctx context.Context, args *TerraformModuleConnectionQueryArgs) (*TerraformModuleConnectionResolver, error) {
+	return terraformModulesQuery(ctx, args)
+}
+
+// TerraformModule query returns a terraform module by address
+func (r RootResolver) TerraformModule(ctx context.Context, args *TerraformModuleQueryArgs) (*TerraformModuleResolver, error) {
+	return terraformModuleQuery(ctx, args)
+}
+
+// CreateTerraformModule creates a new terraform module
+func (r RootResolver) CreateTerraformModule(ctx context.Context, args *struct{ Input *CreateTerraformModuleInput }) (*TerraformModuleMutationPayloadResolver, error) {
+	response, err := createTerraformModuleMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateTerraformModule updates a terraform module
+func (r RootResolver) UpdateTerraformModule(ctx context.Context, args *struct{ Input *UpdateTerraformModuleInput }) (*TerraformModuleMutationPayloadResolver, error) {
+	response, err := updateTerraformModuleMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTerraformModule deletes a terraform module
+func (r RootResolver) DeleteTerraformModule(ctx context.Context, args *struct{ Input *DeleteTerraformModuleInput }) (*TerraformModuleMutationPayloadResolver, error) {
+	response, err := deleteTerraformModuleMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Terraform Module Version Queries and Mutations */
+
+// TerraformModuleVersion query returns a terraform module version
+func (r RootResolver) TerraformModuleVersion(ctx context.Context, args *TerraformModuleVersionQueryArgs) (*TerraformModuleVersionResolver, error) {
+	return terraformModuleVersionQuery(ctx, args)
+}
+
+// CreateTerraformModuleVersion creates a new terraform module version
+func (r RootResolver) CreateTerraformModuleVersion(ctx context.Context, args *struct {
+	Input *CreateTerraformModuleVersionInput
+}) (*TerraformModuleVersionMutationPayloadResolver, error) {
+	response, err := createTerraformModuleVersionMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTerraformModuleVersion deletes a terraform module version
+func (r RootResolver) DeleteTerraformModuleVersion(ctx context.Context, args *struct {
+	Input *DeleteTerraformModuleVersionInput
+}) (*TerraformModuleVersionMutationPayloadResolver, error) {
+	response, err := deleteTerraformModuleVersionMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleVersionMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* GPG Key Queries and Mutations */
 
 // CreateGPGKey creates a new gpg key

@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
@@ -272,6 +273,10 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 		return nil, err
 	}
 
+	if vErr := provider.Validate(); vErr != nil {
+		return nil, vErr
+	}
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return nil, err
@@ -333,6 +338,19 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		rootGroupID = rootGroup.Metadata.ID
 	}
 
+	providerToCreate := &models.TerraformProvider{
+		Name:          input.Name,
+		GroupID:       input.GroupID,
+		RootGroupID:   rootGroupID,
+		Private:       input.Private,
+		RepositoryURL: input.RepositoryURL,
+		CreatedBy:     caller.GetSubject(),
+	}
+
+	if vErr := providerToCreate.Validate(); vErr != nil {
+		return nil, vErr
+	}
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		return nil, err
@@ -344,14 +362,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		}
 	}()
 
-	createdProvider, err := s.dbClient.TerraformProviders.CreateProvider(txContext, &models.TerraformProvider{
-		Name:          input.Name,
-		GroupID:       input.GroupID,
-		RootGroupID:   rootGroupID,
-		Private:       input.Private,
-		RepositoryURL: input.RepositoryURL,
-		CreatedBy:     caller.GetSubject(),
-	})
+	createdProvider, err := s.dbClient.TerraformProviders.CreateProvider(txContext, providerToCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +627,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		if sErr != nil {
 			return nil, sErr
 		}
-		if isSemverGreaterThan(semVersion, prevSemVersion) {
+		if semver.IsSemverGreaterThan(semVersion, prevSemVersion) {
 			isLatest = true
 			// Remove latest from version
 			prevLatest.Latest = false
@@ -715,7 +726,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 				return csErr
 			}
 
-			if isSemverGreaterThan(currentSemver, latestSemver) {
+			if semver.IsSemverGreaterThan(currentSemver, latestSemver) {
 				newLatestVersion = &vCopy
 			}
 		}
@@ -1220,10 +1231,4 @@ func (s *service) getProviderVersionByID(ctx context.Context, id string) (*model
 	}
 
 	return version, nil
-}
-
-func isSemverGreaterThan(v1 *version.Version, v2 *version.Version) bool {
-	// A non pre-release version will always take precedence over a latest pre-release version
-	return (v1.Prerelease() == "" && v2.Prerelease() != "") ||
-		((v1.Prerelease() == "" || v2.Prerelease() != "") && v1.GreaterThan(v2))
 }

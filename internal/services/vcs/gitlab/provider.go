@@ -532,7 +532,7 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 
 	// Parse timestamps.
 	createdAtUnix := time.Unix(tokenResp.CreatedAt, 0)
-	expiresAtDuration := time.Duration(tokenResp.ExpiresIn)
+	expiresAtDuration := time.Duration(tokenResp.ExpiresIn) // GitLab's expiration is 7200s.
 	expirationTimestamp := createdAtUnix.Add(time.Second * expiresAtDuration)
 
 	return &types.AccessTokenPayload{

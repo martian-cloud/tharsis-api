@@ -209,7 +209,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := New(tt.args.ctx, tt.args.pluginData, tt.args.logger)
+			got, err := New(tt.args.ctx, tt.args.pluginData, "http://localhost", tt.args.logger)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 				return

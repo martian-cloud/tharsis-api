@@ -43,6 +43,7 @@ type TerraformProvider implements Node {
   private: Boolean!
   repositoryUrl: String!
   registryNamespace: String!
+  source: String!
   resourcePath: String!
   latestVersion: TerraformProviderVersion
   versions(after: String, before: String, first: Int, last: Int, sort: TerraformProviderVersionSort): TerraformProviderVersionConnection!
