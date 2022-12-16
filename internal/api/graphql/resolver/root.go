@@ -876,3 +876,10 @@ func (r RootResolver) CreateVCSRun(ctx context.Context,
 
 	return response, nil
 }
+
+/* Auth Settings Query */
+
+// AuthSettings returns the configured auth settings
+func (r RootResolver) AuthSettings(ctx context.Context) *AuthSettingsResolver {
+	return authSettingsQuery(ctx)
+}

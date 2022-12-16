@@ -115,4 +115,5 @@ type Query {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  authSettings: AuthSettings
 }

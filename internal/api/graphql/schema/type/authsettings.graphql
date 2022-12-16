@@ -1,0 +1,7 @@
+type AuthSettings {
+  oidcIssuerUrl: String
+  oidcClientId: String
+  oidcUsernameClaim: String
+  oidcScope: String
+  oidcLogoutUrl: String
+}

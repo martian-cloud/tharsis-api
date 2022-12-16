@@ -4,6 +4,8 @@ package auth
 
 import (
 	"context"
+	"net/http"
+	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -207,4 +209,15 @@ func HandleCaller(
 	default:
 		return errors.NewError(errors.EForbidden, "Invalid caller type")
 	}
+}
+
+// FindToken returns the bearer token from an HTTP request
+func FindToken(r *http.Request) string {
+	// Get token from authorization header.
+	bearer := r.Header.Get("Authorization")
+	if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
+		return bearer[7:]
+	}
+
+	return ""
 }

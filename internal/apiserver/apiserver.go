@@ -217,7 +217,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		ActivityService:            activityService,
 	}
 
-	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.RateLimitStore, cfg.MaxGraphQLComplexity, authenticator, jwtAuthMiddleware)
+	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.RateLimitStore, cfg.MaxGraphQLComplexity, authenticator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}

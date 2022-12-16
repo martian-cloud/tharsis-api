@@ -30,6 +30,8 @@ type IdpConfig struct {
 	IssuerURL     string `yaml:"issuer_url"`
 	ClientID      string `yaml:"client_id"`
 	UsernameClaim string `yaml:"username_claim"`
+	Scope         string `yaml:"scope"`
+	LogoutURL     string `yaml:"logout_url"`
 }
 
 // Config represents an application configuration.
@@ -232,9 +234,13 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 
 			clientIDKey := envOidcProviderConfigPrefix + index + "_CLIENT_ID"
 			usernameClaimKey := envOidcProviderConfigPrefix + index + "_USERNAME_CLAIM"
+			scopeKey := envOidcProviderConfigPrefix + index + "_SCOPE"
+			logoutKey := envOidcProviderConfigPrefix + index + "_LOGOUT_URL"
 
 			clientID := os.Getenv(clientIDKey)
 			usernameClaim := os.Getenv(usernameClaimKey)
+			scope := os.Getenv(scopeKey)
+			logoutURL := os.Getenv(logoutKey)
 
 			if clientID == "" {
 				return nil, errors.New(clientIDKey + " environment variable is required")
@@ -248,6 +254,8 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 				IssuerURL:     issuerURL,
 				ClientID:      clientID,
 				UsernameClaim: usernameClaim,
+				Scope:         scope,
+				LogoutURL:     logoutURL,
 			})
 		}
 	}
