@@ -4,8 +4,8 @@ VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null 
 PACKAGES := $(shell go list ./... | grep -v /vendor/)
 LDFLAGS := -ldflags "-X main.Version=${VERSION}"
 
-DB_URI ?= postgres://postgres:postgres@localhost:5432/tharsis?sslmode=disable
-MIGRATE := docker run -v $(shell pwd)/db/migrations:/migrations --network host migrate/migrate:v4.15.2 -path=/migrations/ -database "$(DB_URI)"
+DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable
+MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.15.2 -path=/migrations/ -database "$(DB_URI)"
 
 .PHONY: build-api
 build-api:  ## build the binaries

@@ -19,9 +19,9 @@ LAUNCH_LOCAL_IF_ZERO="$(echo "${THARSIS_DB_TEST_HOST}" | wc -w)"
 THARSIS_DB_TEST_CONTAINER_PORT=5432
 THARSIS_DB_TEST_INSTANCE_NAME=postgres-integration-test-server
 
-: ${THARSIS_DB_TEST_URI:="postgres://${THARSIS_DB_TEST_USERNAME}:${THARSIS_DB_TEST_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${THARSIS_DB_TEST_NAME}?sslmode=${THARSIS_DB_TEST_SSL_MODE}"}
+: ${THARSIS_DB_TEST_URI:="pgx://${THARSIS_DB_TEST_USERNAME}:${THARSIS_DB_TEST_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${THARSIS_DB_TEST_NAME}?sslmode=${THARSIS_DB_TEST_SSL_MODE}"}
 
-THARSIS_DB_TEST_MIGRATE="docker run --rm -v $(pwd)/db/migrations:/migrations --network host migrate/migrate:v4.15.2 -path=/migrations/ -database ${THARSIS_DB_TEST_URI}"
+THARSIS_DB_TEST_MIGRATE="docker run --rm -v $(pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.15.2 -path=/migrations/ -database ${THARSIS_DB_TEST_URI}"
 
 if [ ${LAUNCH_LOCAL_IF_ZERO} == 0 ]; then
 	docker run -d --rm --name ${THARSIS_DB_TEST_INSTANCE_NAME}                 \

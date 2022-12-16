@@ -85,6 +85,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		cfg.DBUsername,
 		cfg.DBPassword,
 		cfg.DBMaxConnections,
+		cfg.DBAutoMigrateEnabled,
 		logger,
 	)
 	if err != nil {
