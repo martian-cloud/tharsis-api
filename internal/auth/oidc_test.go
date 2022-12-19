@@ -68,7 +68,7 @@ func TestGetOpenIDConfig(t *testing.T) {
 
 			issuer = s.URL
 
-			resp, err := GetOpenIDConfig(ctx, issuer)
+			resp, err := NewOpenIDConfigFetcher().GetOpenIDConfig(ctx, issuer)
 			if err != nil {
 				assert.True(t, test.expectErr)
 				return

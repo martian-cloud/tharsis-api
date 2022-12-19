@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -24,6 +25,10 @@ import (
 const (
 	// For security reasons, this is not configurable.
 	presignURLExpiration = 1 * time.Minute
+
+	// defaultAWSPartitionID is used when nothing is specified
+	// for the AWS partition ID in the endpoint resolver.
+	defaultAWSPartitionID = "aws"
 )
 
 // ObjectStore implementation for AWS S3
@@ -47,9 +52,43 @@ func New(ctx context.Context, logger logger.Logger, pluginData map[string]string
 		return nil, fmt.Errorf("s3 object store plugin is missing the 'region' field")
 	}
 
-	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	accessKeyID := pluginData["aws_access_key_id"]
+	secretKey := pluginData["aws_secret_access_key"]
+
+	// Make sure secretKey is specified when using accessKeyID.
+	if accessKeyID != "" && secretKey == "" {
+		return nil, fmt.Errorf("s3 object store plugin is missing 'aws_secret_access_key' field but using 'aws_access_key_id'")
+	}
+
+	// Use a custom endpoint resolver.
+	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(_, region string, _ ...interface{}) (aws.Endpoint, error) {
+		partitionID := defaultAWSPartitionID // Default
+		if id, ok := pluginData["aws_partition_id"]; ok {
+			partitionID = id
+		}
+
+		if endpoint, ok := pluginData["endpoint"]; ok {
+			return aws.Endpoint{
+				PartitionID:       partitionID,
+				SigningRegion:     region,
+				URL:               endpoint,
+				HostnameImmutable: true,
+			}, nil
+		}
+
+		// Allows fallback to default resolution.
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	})
+
+	// Otherwise, use default config.
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithDefaultRegion(region), config.WithEndpointResolverWithOptions(endpointResolver))
 	if err != nil {
 		return nil, err
+	}
+
+	// Use custom credentials.
+	if accessKeyID != "" {
+		awsCfg.Credentials = credentials.NewStaticCredentialsProvider(accessKeyID, secretKey, "")
 	}
 
 	client := s3.NewFromConfig(awsCfg)

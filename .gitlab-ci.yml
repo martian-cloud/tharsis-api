@@ -6,6 +6,7 @@ include:
 
 stages:
   - test
+  - publish
 
 # Only start pipelines on Merge Requests or the default branch
 workflow:
@@ -46,6 +47,88 @@ default:
       - api_failure
       - stuck_or_timeout_failure
       - runner_system_failure
+
+publish api docker:
+  image: docker:stable
+  services:
+    - docker:dind
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
+
+      # Version is based on semantic versioning
+      full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
+      major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
+      major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
+
+      # Build registry URIs.
+      registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+      api_uri="$registry_uri"/api
+
+      docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+
+      echo "Building tharsis-api image"
+      docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
+
+      # Version tag API images.
+      docker image tag api:latest $api_uri:$full_version
+      docker image tag api:latest $api_uri:$major_version
+      docker image tag api:latest $api_uri:$major_minor_version
+
+      echo "Pushing tharsis-api versioned image to registry"
+      docker image push --all-tags "$api_uri"
+
+      latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
+      if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
+        then
+          echo "Build is latest, tagging and pushing images as latest"
+          docker image tag api:latest $api_uri:latest
+          docker image push $api_uri:latest
+      fi
+
+publish job-executor docker:
+  image: docker:stable
+  services:
+    - docker:dind
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
+
+      # Version is based on semantic versioning
+      full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
+      major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
+      major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
+
+      # Build registry URIs.
+      registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+      job_executor_uri="$registry_uri"/job-executor
+
+      docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+
+      echo "Building tharsis-job-executor image"
+      docker build --target job-executor -t job-executor:latest --build-arg goversion=$GO_VERSION --no-cache .
+
+      # Version tag job executor images.
+      docker image tag job-executor:latest $job_executor_uri:$full_version
+      docker image tag job-executor:latest $job_executor_uri:$major_version
+      docker image tag job-executor:latest $job_executor_uri:$major_minor_version
+
+      echo "Pushing tharsis-job-executor versioned image to registry"
+      docker image push --all-tags "$job_executor_uri"
+
+      latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
+      if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
+        then
+          echo "Build is latest, tagging and pushing images as latest"
+          docker image tag job-executor:latest $job_executor_uri:latest
+          docker image push $job_executor_uri:latest
+      fi
 
 tests:
   image: golang:${GO_VERSION}-alpine

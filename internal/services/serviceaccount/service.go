@@ -64,11 +64,12 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	idp             *auth.IdentityProvider
-	getKeySetFunc   func(ctx context.Context, issuer string) (jwk.Set, error)
-	activityService activityevent.Service
+	logger              logger.Logger
+	dbClient            *db.Client
+	idp                 *auth.IdentityProvider
+	openIDConfigFetcher *auth.OpenIDConfigFetcher
+	getKeySetFunc       func(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error)
+	activityService     activityevent.Service
 }
 
 // NewService creates an instance of Service
@@ -76,12 +77,14 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	idp *auth.IdentityProvider,
+	openIDConfigFetcher *auth.OpenIDConfigFetcher,
 	activityService activityevent.Service,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
 		idp,
+		openIDConfigFetcher,
 		getKeySet,
 		activityService,
 	)
@@ -91,15 +94,17 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	idp *auth.IdentityProvider,
-	getKeySetFunc func(ctx context.Context, issuer string) (jwk.Set, error),
+	openIDConfigFetcher *auth.OpenIDConfigFetcher,
+	getKeySetFunc func(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error),
 	activityService activityevent.Service,
 ) Service {
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		idp:             idp,
-		getKeySetFunc:   getKeySetFunc,
-		activityService: activityService,
+		logger:              logger,
+		dbClient:            dbClient,
+		idp:                 idp,
+		openIDConfigFetcher: openIDConfigFetcher,
+		getKeySetFunc:       getKeySetFunc,
+		activityService:     activityService,
 	}
 }
 
@@ -417,7 +422,7 @@ func (s *service) Login(ctx context.Context, input *LoginInput) (*LoginResponse,
 	}
 
 	// Get issuer JWK response
-	keySet, err := s.getKeySetFunc(ctx, trustPolicy.Issuer)
+	keySet, err := s.getKeySetFunc(ctx, trustPolicy.Issuer, s.openIDConfigFetcher)
 	if err != nil {
 		return nil, err
 	}
@@ -486,11 +491,11 @@ func (s *service) findMatchingTrustPolicy(issuer string, policies []models.OIDCT
 	return nil
 }
 
-func getKeySet(ctx context.Context, issuer string) (jwk.Set, error) {
+func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error) {
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	oidcConfig, err := auth.GetOpenIDConfig(fetchCtx, issuer)
+	oidcConfig, err := configFetcher.GetOpenIDConfig(fetchCtx, issuer)
 	if err != nil {
 		return nil, errors.NewError(errors.EInternal, fmt.Sprintf("Failed to get OIDC discovery document for issuer %s; %v", issuer, err))
 	}
