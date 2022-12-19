@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,7 +19,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/resolver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/schema"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -66,7 +67,6 @@ func NewGraphQL(
 	ratelimitStore ratelimitstore.Store,
 	maxGraphqlComplexity int,
 	authenticator *auth.Authenticator,
-	jwtAuthMiddleware middleware.Handler,
 ) (*GraphQL, error) {
 	schemaStr, err := schema.String()
 	if err != nil {
@@ -108,14 +108,13 @@ func NewGraphQL(
 			loaders:       loaderCollection,
 		},
 		maxGraphqlComplexity: maxGraphqlComplexity,
+		authenticator:        authenticator,
 	}
-
-	httpHandlerWithAuth := jwtAuthMiddleware(&httpHandler)
 
 	return &GraphQL{
 		Logger: logger,
 		handlerFunc: newSubscriptionHandler(
-			httpHandlerWithAuth,
+			&httpHandler,
 			schema,
 			authenticator,
 			resolverState,
@@ -139,6 +138,7 @@ type httpHandler struct {
 	logger               logger.Logger
 	ctxGenerator         *contextGenerator
 	rateLimitStore       ratelimitstore.Store
+	authenticator        *auth.Authenticator
 	maxGraphqlComplexity int
 }
 
@@ -149,17 +149,36 @@ var (
 )
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx, err := h.ctxGenerator.BuildContext(r.Context(), r)
+	caller, err := h.authenticator.Authenticate(r.Context(), auth.FindToken(r), true)
+	// Do not return an unauthorized error here since the service layer is responsible for determining
+	// if a request requires an authenticated user
+	if err != nil && errors.ErrorCode(err) != errors.EUnauthorized {
+		respond(w, errorJSON(fmt.Sprintf("server error: %v", err)), http.StatusInternalServerError)
+		return
+	}
+
+	parentCtx := r.Context()
+	if caller != nil {
+		parentCtx = auth.WithCaller(parentCtx, caller)
+	}
+	ctx, err := h.ctxGenerator.BuildContext(parentCtx, r)
 	if err != nil {
 		respond(w, errorJSON(err.Error()), http.StatusInternalServerError)
 		return
 	}
 
-	// get caller to pass into rateLimit
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		respond(w, errorJSON(err.Error()), http.StatusForbidden)
-		return
+	var subject string
+	if caller != nil {
+		subject = caller.GetSubject()
+	} else {
+		// If this is an unauthenticated request, we will use the callers IP for rate limiting
+		var ip string
+		ip, err = getSourceIP(r)
+		if err != nil {
+			respond(w, errorJSON(fmt.Sprintf("error finding client IP: %v", err)), http.StatusBadRequest)
+			return
+		}
+		subject = fmt.Sprintf("anonymous-%s", ip)
 	}
 
 	req, err := parse(r)
@@ -189,7 +208,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var res *graphql.Response
 
 			// Rate limit query
-			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, caller.GetSubject())
+			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, subject)
 			if qcErr != nil {
 				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
 				respond(w, errorJSON(qcErr.Error()), http.StatusInternalServerError)
@@ -231,7 +250,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if e != nil && e.Err != nil {
 				// Log error message
 				code := errors.ErrorCode(e.Err)
-				if code != errors.EForbidden && code != errors.ETooManyRequests {
+				if code != errors.EUnauthorized && code != errors.EForbidden && code != errors.ETooManyRequests {
 					h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
 				}
 
@@ -317,4 +336,40 @@ func errorJSON(msg string) []byte {
 	buf := bytes.Buffer{}
 	fmt.Fprintf(&buf, `{"error": "%s"}`, msg)
 	return buf.Bytes()
+}
+
+func getSourceIP(req *http.Request) (string, error) {
+	// Check the Forward header
+	forwardedHeader := req.Header.Get("Forwarded")
+	if forwardedHeader != "" {
+		parts := strings.Split(forwardedHeader, ",")
+		firstPart := strings.TrimSpace(parts[0])
+		subParts := strings.Split(firstPart, ";")
+		for _, part := range subParts {
+			normalisedPart := strings.ToLower(strings.TrimSpace(part))
+			if strings.HasPrefix(normalisedPart, "for=") {
+				return normalisedPart[4:], nil
+			}
+		}
+	}
+
+	// Check the X-Forwarded-For header
+	xForwardedForHeader := req.Header.Get("X-Forwarded-For")
+	if xForwardedForHeader != "" {
+		parts := strings.Split(xForwardedForHeader, ",")
+		firstPart := strings.TrimSpace(parts[0])
+		return firstPart, nil
+	}
+
+	// Check on the request
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return "", err
+	}
+
+	if host == "::1" {
+		return "127.0.0.1", nil
+	}
+
+	return host, nil
 }

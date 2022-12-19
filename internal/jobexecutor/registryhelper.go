@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	xTerraformGet  = "x-terraform-get"
+	xTerraformGet = "x-terraform-get"
 )
 
 // resolveModuleSource returns the final pre-signed URL for a module source.
