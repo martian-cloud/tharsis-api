@@ -70,6 +70,9 @@ type Config struct {
 	// ServiceDiscoveryHost is optional and will default to the APIURL host if it's not defined
 	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
 
+	// AdminUserEmail is optional and will create a system admin user with this email.
+	AdminUserEmail string `yaml:"admin_user_email" env:"ADMIN_USER_EMAIL"`
+
 	// The OIDC identity providers
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 

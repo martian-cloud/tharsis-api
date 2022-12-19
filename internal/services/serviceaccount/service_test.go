@@ -165,7 +165,9 @@ func TestLogin(t *testing.T) {
 
 			serviceAccountAuth := auth.NewIdentityProvider(&mockJWSProvider, "https://tharsis.io")
 
-			getKeySetFunc := func(_ context.Context, _ string) (jwk.Set, error) {
+			configFetcher := auth.NewOpenIDConfigFetcher()
+
+			getKeySetFunc := func(_ context.Context, _ string, _ *auth.OpenIDConfigFetcher) (jwk.Set, error) {
 				set := jwk.NewSet()
 				set.Add(validKeyPair.pub)
 				return set, nil
@@ -176,7 +178,7 @@ func TestLogin(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := newService(testLogger, &dbClient, serviceAccountAuth, getKeySetFunc, &mockActivityEvents)
+			service := newService(testLogger, &dbClient, serviceAccountAuth, configFetcher, getKeySetFunc, &mockActivityEvents)
 
 			resp, err := service.Login(ctx, &LoginInput{ServiceAccount: test.serviceAccount, Token: test.token})
 			if err != nil && test.expectErr == nil {

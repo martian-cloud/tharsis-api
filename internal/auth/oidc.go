@@ -7,7 +7,31 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
+
+const (
+	// retryWaitMin is the minimum amount of seconds retryablehttp
+	// client will wait before attempting to make another connection.
+	// Default min is 2 seconds.
+	retryWaitMin = time.Second * 5
+)
+
+// OpenIDConfigFetcher implements functions to fetch
+// OpenID configuration from an issuer.
+type OpenIDConfigFetcher struct {
+	Client *retryablehttp.Client
+}
+
+// NewOpenIDConfigFetcher returns a new NewOpenIDConfigFetcher
+func NewOpenIDConfigFetcher() *OpenIDConfigFetcher {
+	// Retryablehttp client defaults to 4 retries.
+	client := retryablehttp.NewClient()
+	client.RetryWaitMin = retryWaitMin
+	return &OpenIDConfigFetcher{Client: client}
+}
 
 // OIDCConfiguration contains the OIDC information for an identity provider
 type OIDCConfiguration struct {
@@ -18,15 +42,16 @@ type OIDCConfiguration struct {
 }
 
 // GetOpenIDConfig returns the IDP config from the OIDC discovery document
-func GetOpenIDConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error) {
+func (o *OpenIDConfigFetcher) GetOpenIDConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error) {
 	wellKnownURI := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 
-	req, err := http.NewRequest("GET", wellKnownURI, nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, "GET", wellKnownURI, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build OIDC request: %v", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	// Use retryablehttp client so we can retry incase request fails.
+	resp, err := o.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request OIDC discovery document: %v", err)
 	}

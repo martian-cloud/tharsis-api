@@ -26,6 +26,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -59,9 +60,11 @@ type APIServer struct {
 
 // New creates a new APIServer instance
 func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APIServer, error) {
+	openIDConfigFetcher := auth.NewOpenIDConfigFetcher()
+
 	var oauthProviders []auth.IdentityProviderConfig
 	for _, idpConfig := range cfg.OauthProviders {
-		idp, err := auth.GetOpenIDConfig(ctx, idpConfig.IssuerURL)
+		idp, err := openIDConfigFetcher.GetOpenIDConfig(ctx, idpConfig.IssuerURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get OIDC config for issuer %s %v", idpConfig.IssuerURL, err)
 		}
@@ -131,7 +134,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService, activityService)
 		jobService                 = job.NewService(logger, dbClient, eventManager, logStore)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService, jobService, activityService)
-		saService                  = serviceaccount.NewService(logger, dbClient, tharsisIDP, activityService)
+		saService                  = serviceaccount.NewService(logger, dbClient, tharsisIDP, openIDConfigFetcher, activityService)
 		variableService            = variable.NewService(logger, dbClient, activityService)
 		teamService                = team.NewService(logger, dbClient, activityService)
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, providerRegistryStore, activityService)
@@ -161,6 +164,27 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 	routeBuilder := api.NewRouteBuilder(
 		middleware.PrometheusMiddleware,
 	)
+
+	// Create the admin user if an email is provided.
+	if cfg.AdminUserEmail != "" {
+		user, uErr := dbClient.Users.GetUserByEmail(ctx, cfg.AdminUserEmail)
+		if uErr != nil {
+			return nil, uErr
+		}
+		if user == nil {
+			if _, err = dbClient.Users.CreateUser(ctx, &models.User{
+				Username: auth.ParseUsername(cfg.AdminUserEmail),
+				Email:    cfg.AdminUserEmail,
+				Admin:    true,
+				Active:   true,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to create admin user: %v", err)
+			}
+			logger.Infof("User with email %s created.", cfg.AdminUserEmail)
+		} else {
+			logger.Infof("User with email %s already exists. Skipping creation.", cfg.AdminUserEmail)
+		}
+	}
 
 	if cfg.TFELoginEnabled {
 		var loginIdp *auth.IdentityProviderConfig
