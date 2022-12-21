@@ -15,6 +15,26 @@ Tharsis is a remote Terraform backend that provides state management and a full 
 
 Instructions on building a binary from source can be found [here](https://gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-docs/-/blob/main/docs/setup/api/install.md).
 
+## Installing locally (Requires Docker)
+
+In order to use Tharsis locally, a `docker-compose.yml` file is available under the `docker-compose` directory. The use of this requires the installation of Docker. Learn more [here](https://docs.docker.com/get-docker/).
+
+    1. Clone the repository and change to 'docker-compose' directory.
+    2. Use 'docker compose up' command to launch Tharsis using Docker. We could additionally, pass in a `-d` flag to the command to launch everything in the background like so 'docker compose up -d'.
+
+At this point, Docker should begin pulling down all the images needed to provision Tharsis. Once this is complete, the Tharsis UI will be available at `http://localhost:3000/`.
+
+Now, the Tharsis CLI can be used to interact with Tharsis. To configure the CLI, use the following command to create a profile and sign in using the [KeyCloak](https://www.keycloak.org/) identity provider (IDP):
+
+```bash
+tharsis configure --profile local --endpoint-url http://localhost:6560
+tharsis -p local sso login
+```
+
+At the KeyCloak login screen use `martian` for both the username and password to complete authentication.
+
+**Congratulations! The Tharsis CLI is now ready to issue commands, use the `-h` flag for more info!**
+
 ## Documentation
 
 - Tharsis API documentation is available at https://gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-docs/-/blob/main/docs.
@@ -25,7 +45,7 @@ If you've discovered a security vulnerability in the Tharsis API, please let us 
 
 ## Statement of support
 
-Please submit any bugs or feature requests for Tharsis.  Of course, MR's are even better.  :)
+Please submit any bugs or feature requests for Tharsis. Of course, MR's are even better. :)
 
 ## License
 

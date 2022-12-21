@@ -49,10 +49,12 @@ default:
       - runner_system_failure
 
 publish api docker:
-  image: docker:stable
+  image: docker:latest
   services:
     - docker:dind
   stage: publish
+  before_script:
+    - apk add git
   rules:
     - if: $CI_COMMIT_TAG
   script:
@@ -74,26 +76,31 @@ publish api docker:
       docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
 
       # Version tag API images.
+      echo "Version tagging the api image"
       docker image tag api:latest $api_uri:$full_version
       docker image tag api:latest $api_uri:$major_version
       docker image tag api:latest $api_uri:$major_minor_version
 
       echo "Pushing tharsis-api versioned image to registry"
-      docker image push --all-tags "$api_uri"
+      docker image push $api_uri:$full_version
+      docker image push $api_uri:$major_version
+      docker image push $api_uri:$major_minor_version
 
       latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
       if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
         then
-          echo "Build is latest, tagging and pushing images as latest"
+          echo "Build is latest, tagging and pushing image as latest"
           docker image tag api:latest $api_uri:latest
           docker image push $api_uri:latest
       fi
 
 publish job-executor docker:
-  image: docker:stable
+  image: docker:latest
   services:
     - docker:dind
   stage: publish
+  before_script:
+    - apk add git
   rules:
     - if: $CI_COMMIT_TAG
   script:
@@ -111,21 +118,24 @@ publish job-executor docker:
 
       docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
-      echo "Building tharsis-job-executor image"
+      echo "Building job-executor image"
       docker build --target job-executor -t job-executor:latest --build-arg goversion=$GO_VERSION --no-cache .
 
       # Version tag job executor images.
+      echo "Version tagging the job-executor image"
       docker image tag job-executor:latest $job_executor_uri:$full_version
       docker image tag job-executor:latest $job_executor_uri:$major_version
       docker image tag job-executor:latest $job_executor_uri:$major_minor_version
 
-      echo "Pushing tharsis-job-executor versioned image to registry"
-      docker image push --all-tags "$job_executor_uri"
+      echo "Pushing job-executor versioned image to registry"
+      docker image push $job_executor_uri:$full_version
+      docker image push $job_executor_uri:$major_version
+      docker image push $job_executor_uri:$major_minor_version
 
       latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
       if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
         then
-          echo "Build is latest, tagging and pushing images as latest"
+          echo "Build is latest, tagging and pushing image as latest"
           docker image tag job-executor:latest $job_executor_uri:latest
           docker image push $job_executor_uri:latest
       fi

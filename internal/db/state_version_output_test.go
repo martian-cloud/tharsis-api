@@ -169,9 +169,9 @@ func TestGetStateVersionOutputs(t *testing.T) {
 
 	type testCase struct {
 		expectMsg                 *string
-		expectStateVersionOutputs []models.StateVersionOutput
 		name                      string
 		searchID                  string
+		expectStateVersionOutputs []models.StateVersionOutput
 	}
 
 	testCases := []testCase{
@@ -427,11 +427,6 @@ func createWarmupStateVersionOutputs(ctx context.Context, testClient *testClient
 	resultRuns, err := createInitialRuns(ctx, testClient, input.runs, resultWorkspaces[0].Metadata.ID)
 	if err != nil {
 		return nil, err
-	}
-
-	runIDs := []string{}
-	for _, run := range resultRuns {
-		runIDs = append(runIDs, run.Metadata.ID)
 	}
 
 	runMap := map[string]string{}

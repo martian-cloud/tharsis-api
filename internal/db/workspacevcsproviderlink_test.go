@@ -48,10 +48,10 @@ func TestGetLinksByProviderID(t *testing.T) {
 	createdHigh := currentTime()
 
 	type testCase struct {
-		expectLinks []models.WorkspaceVCSProviderLink
 		expectMsg   *string
 		name        string
 		searchID    string
+		expectLinks []models.WorkspaceVCSProviderLink
 	}
 
 	positiveProvider := warmupItems.providers[0]
