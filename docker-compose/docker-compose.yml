@@ -1,0 +1,147 @@
+version: '3.9'
+
+services:
+  # Tharsis database.
+  postgres:
+    image: postgres:15-alpine
+    container_name: tharsis-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=tharsis
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/data/postgres
+    networks:
+      - tharsis
+
+  # Keycloak database
+  kc_postgres:
+    image: postgres:alpine
+    container_name: keycloak-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - kc_postgres_data:/var/lib/data/postgres
+    networks:
+      - tharsis
+
+  # Identity provider.
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: tharsis-idp
+    restart: unless-stopped
+    command: "start-dev --import-realm"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - DB_DATABASE=keycloak
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_URL=postgres://postgres:postgres@kc_postgres:5432/keycloak?sslmode=disable
+    volumes:
+      - $PWD/tharsis-realm.json:/opt/keycloak/data/import/tharsis-realm.json:ro
+    networks:
+      - tharsis
+    ports:
+      - "6530:8080"
+    depends_on:
+      - kc_postgres
+
+  # Object storage.
+  minio:
+    image: minio/minio:latest
+    container_name: tharsis-store
+    restart: unless-stopped
+    command: "server /data"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=miniopassword
+      - MINIO_CONSOLE_ADDRESS=:9010
+    volumes:
+      - minio:/data
+    networks:
+      - tharsis
+    ports:
+      - "9000:9000" # API
+      - "127.0.0.1:9010:9010" # UI
+
+  ## minioconsole creates object storage bucket.
+  minioconsole:
+    image: minio/mc:latest
+    container_name: tharsis-mc
+    entrypoint: /bin/sh -c  " /usr/bin/mc config host add minio http://minio:9000 minioadmin miniopassword;  /usr/bin/mc mb --ignore-existing minio/tharsis-objects;  exit 0;  "
+    networks:
+      - tharsis
+    depends_on:
+      - minio
+
+  api:
+    image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/api:latest
+    container_name: tharsis-api
+    restart: unless-stopped
+    environment:
+      - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://host.docker.internal:6530/realms/tharsis
+      - THARSIS_OAUTH_PROVIDERS_0_CLIENT_ID=tharsis
+      - THARSIS_OAUTH_PROVIDERS_0_USERNAME_CLAIM=preferred_username
+      - THARSIS_OAUTH_PROVIDERS_0_SCOPE=openid profile email
+      - THARSIS_OAUTH_PROVIDERS_0_LOGOUT_URL=http://host.docker.internal:6530/realms/tharsis/protocol/openid-connect/logout
+      - THARSIS_TFE_LOGIN_ENABLED=true
+      - THARSIS_TFE_LOGIN_CLIENT_ID=tharsis
+      - THARSIS_TFE_LOGIN_SCOPES=openid tharsis
+      - THARSIS_ADMIN_USER_EMAIL=martian@tharsis.local
+      - THARSIS_DB_USERNAME=postgres
+      - THARSIS_DB_NAME=tharsis
+      - THARSIS_DB_PASSWORD=postgres
+      - THARSIS_DB_HOST=postgres
+      - THARSIS_DB_PORT=5432
+      - THARSIS_DB_SSL_MODE=disable
+      - THARSIS_OBJECT_STORE_PLUGIN_TYPE=aws_s3
+      - THARSIS_OBJECT_STORE_PLUGIN_DATA_REGION=us-east-1
+      - THARSIS_OBJECT_STORE_PLUGIN_DATA_BUCKET=tharsis-objects
+      - THARSIS_OBJECT_STORE_PLUGIN_DATA_AWS_ACCESS_KEY_ID=minioadmin
+      - THARSIS_OBJECT_STORE_PLUGIN_DATA_AWS_SECRET_ACCESS_KEY=miniopassword
+      - THARSIS_OBJECT_STORE_PLUGIN_DATA_ENDPOINT=http://host.docker.internal:9000
+      - THARSIS_JWS_PROVIDER_PLUGIN_TYPE=memory
+      - THARSIS_API_URL=http://localhost:6560
+      - THARSIS_SERVICE_ACCOUNT_ISSUER_URL=http://localhost:6560
+      - THARSIS_JOB_DISPATCHER_PLUGIN_TYPE=docker
+      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_API_URL=http://host.docker.internal:6560
+      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_HOST=unix:///var/run/docker.sock
+      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
+      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_LOCAL_IMAGE=false # Set to true if using local image.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Required for job-executor.
+    networks:
+      - tharsis
+    ports:
+      - "127.0.0.1:6560:8000"
+    depends_on:
+      - minio
+      - keycloak
+      - postgres
+
+  ui:
+    image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-ui:latest
+    container_name: tharsis-ui
+    restart: unless-stopped
+    environment:
+      - THARSIS_API_ENDPOINT=http://localhost:6560
+    networks:
+      - tharsis
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      - api
+
+networks:
+  tharsis:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  kc_postgres_data:
+  minio:

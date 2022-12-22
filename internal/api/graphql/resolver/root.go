@@ -716,6 +716,44 @@ func (r RootResolver) DeleteTerraformModuleVersion(ctx context.Context, args *st
 	return response, nil
 }
 
+/* Terraform Module Attestation Mutations */
+
+// CreateTerraformModuleAttestation creates a new terraform module attestation
+func (r RootResolver) CreateTerraformModuleAttestation(ctx context.Context, args *struct {
+	Input *CreateTerraformModuleAttestationInput
+}) (*TerraformModuleAttestationMutationPayloadResolver, error) {
+	response, err := createTerraformModuleAttestationMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleAttestationMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateTerraformModuleAttestation updates an existing terraform module attestation
+func (r RootResolver) UpdateTerraformModuleAttestation(ctx context.Context, args *struct {
+	Input *UpdateTerraformModuleAttestationInput
+}) (*TerraformModuleAttestationMutationPayloadResolver, error) {
+	response, err := updateTerraformModuleAttestationMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleAttestationMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteTerraformModuleAttestation deletes a terraform module attestation
+func (r RootResolver) DeleteTerraformModuleAttestation(ctx context.Context, args *struct {
+	Input *DeleteTerraformModuleAttestationInput
+}) (*TerraformModuleAttestationMutationPayloadResolver, error) {
+	response, err := deleteTerraformModuleAttestationMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformModuleAttestationMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* GPG Key Queries and Mutations */
 
 // CreateGPGKey creates a new gpg key

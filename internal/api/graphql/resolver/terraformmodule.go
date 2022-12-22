@@ -210,6 +210,27 @@ func (r *TerraformModuleResolver) Versions(ctx context.Context, args *TerraformM
 	return NewTerraformModuleVersionConnectionResolver(ctx, input)
 }
 
+// Attestations resolver
+func (r *TerraformModuleResolver) Attestations(ctx context.Context, args *TerraformModuleAttestationConnectionQueryArgs) (*TerraformModuleAttestationConnectionResolver, error) {
+	input := &moduleregistry.GetModuleAttestationsInput{
+		PaginationOptions: &db.PaginationOptions{
+			First:  args.First,
+			Last:   args.Last,
+			Before: args.Before,
+			After:  args.After,
+		},
+		ModuleID: r.module.Metadata.ID,
+		Digest:   args.Digest,
+	}
+
+	if args.Sort != nil {
+		sort := db.TerraformModuleAttestationSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewTerraformModuleAttestationConnectionResolver(ctx, input)
+}
+
 // LatestVersion resolver
 func (r *TerraformModuleResolver) LatestVersion(ctx context.Context) (*TerraformModuleVersionResolver, error) {
 	versionsResp, err := getModuleRegistryService(ctx).GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{

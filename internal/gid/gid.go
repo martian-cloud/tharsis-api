@@ -13,35 +13,36 @@ type Type string
 
 // Type constants
 const (
-	ApplyType                     Type = "A"
-	ConfigurationVersionType      Type = "C"
-	GroupType                     Type = "G"
-	JobType                       Type = "J"
-	JobLogDescriptorType          Type = "JL"
-	ManagedIdentityType           Type = "M"
-	ManagedIdentityAccessRuleType Type = "MR"
-	NamespaceMembershipType       Type = "NM"
-	PlanType                      Type = "P"
-	RunType                       Type = "R"
-	RunnerType                    Type = "RNR"
-	ServiceAccountType            Type = "SA"
-	StateVersionType              Type = "SV"
-	StateVersionOutputType        Type = "SO"
-	TeamType                      Type = "T"
-	TeamMemberType                Type = "TM"
-	UserType                      Type = "U"
-	VariableType                  Type = "V"
-	WorkspaceType                 Type = "W"
-	TerraformProviderType         Type = "TP"
-	TerraformProviderVersionType  Type = "TPV"
-	TerraformProviderPlatformType Type = "TPP"
-	TerraformModuleType           Type = "TMO"
-	TerraformModuleVersionType    Type = "TMV"
-	GPGKeyType                    Type = "GPG"
-	ActivityEventType             Type = "AE"
-	VCSProviderType               Type = "VP"
-	WorkspaceVCSProviderLinkType  Type = "WPL"
-	VCSEventType                  Type = "VE"
+	ApplyType                      Type = "A"
+	ConfigurationVersionType       Type = "C"
+	GroupType                      Type = "G"
+	JobType                        Type = "J"
+	JobLogDescriptorType           Type = "JL"
+	ManagedIdentityType            Type = "M"
+	ManagedIdentityAccessRuleType  Type = "MR"
+	NamespaceMembershipType        Type = "NM"
+	PlanType                       Type = "P"
+	RunType                        Type = "R"
+	RunnerType                     Type = "RNR"
+	ServiceAccountType             Type = "SA"
+	StateVersionType               Type = "SV"
+	StateVersionOutputType         Type = "SO"
+	TeamType                       Type = "T"
+	TeamMemberType                 Type = "TM"
+	UserType                       Type = "U"
+	VariableType                   Type = "V"
+	WorkspaceType                  Type = "W"
+	TerraformProviderType          Type = "TP"
+	TerraformProviderVersionType   Type = "TPV"
+	TerraformProviderPlatformType  Type = "TPP"
+	TerraformModuleType            Type = "TMO"
+	TerraformModuleVersionType     Type = "TMV"
+	TerraformModuleAttestationType Type = "TMA"
+	GPGKeyType                     Type = "GPG"
+	ActivityEventType              Type = "AE"
+	VCSProviderType                Type = "VP"
+	WorkspaceVCSProviderLinkType   Type = "WPL"
+	VCSEventType                   Type = "VE"
 )
 
 // IsValid returns true if this is a valid Type enum
@@ -71,6 +72,7 @@ func (t Type) IsValid() error {
 		TerraformProviderPlatformType,
 		TerraformModuleType,
 		TerraformModuleVersionType,
+		TerraformModuleAttestationType,
 		GPGKeyType,
 		ActivityEventType,
 		VCSProviderType,
