@@ -84,11 +84,11 @@ services:
     container_name: tharsis-api
     restart: unless-stopped
     environment:
-      - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://host.docker.internal:6530/realms/tharsis
+      - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://kubernetes.docker.internal:6530/realms/tharsis
       - THARSIS_OAUTH_PROVIDERS_0_CLIENT_ID=tharsis
       - THARSIS_OAUTH_PROVIDERS_0_USERNAME_CLAIM=preferred_username
       - THARSIS_OAUTH_PROVIDERS_0_SCOPE=openid profile email
-      - THARSIS_OAUTH_PROVIDERS_0_LOGOUT_URL=http://host.docker.internal:6530/realms/tharsis/protocol/openid-connect/logout
+      - THARSIS_OAUTH_PROVIDERS_0_LOGOUT_URL=http://kubernetes.docker.internal:6530/realms/tharsis/protocol/openid-connect/logout
       - THARSIS_TFE_LOGIN_ENABLED=true
       - THARSIS_TFE_LOGIN_CLIENT_ID=tharsis
       - THARSIS_TFE_LOGIN_SCOPES=openid tharsis

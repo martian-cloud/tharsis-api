@@ -17,7 +17,7 @@ func main() {
 	// create root logger tagged with server version
 	logger := logger.New().With("version", Version)
 
-	logger.Info("Starting Job Executor with version %s...", Version)
+	logger.Infof("Starting Job Executor with version %s...", Version)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
