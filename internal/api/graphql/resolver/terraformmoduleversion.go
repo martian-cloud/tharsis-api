@@ -212,6 +212,28 @@ func (r *TerraformModuleVersionResolver) ConfigurationDetails(ctx context.Contex
 	return metadata, nil
 }
 
+// Attestations resolver
+func (r *TerraformModuleVersionResolver) Attestations(ctx context.Context, args *TerraformModuleAttestationConnectionQueryArgs) (*TerraformModuleAttestationConnectionResolver, error) {
+	digest := r.moduleVersion.GetSHASumHex()
+	input := &moduleregistry.GetModuleAttestationsInput{
+		PaginationOptions: &db.PaginationOptions{
+			First:  args.First,
+			Last:   args.Last,
+			Before: args.Before,
+			After:  args.After,
+		},
+		ModuleID: r.moduleVersion.ModuleID,
+		Digest:   &digest,
+	}
+
+	if args.Sort != nil {
+		sort := db.TerraformModuleAttestationSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewTerraformModuleAttestationConnectionResolver(ctx, input)
+}
+
 // CreatedBy resolver
 func (r *TerraformModuleVersionResolver) CreatedBy() string {
 	return r.moduleVersion.CreatedBy

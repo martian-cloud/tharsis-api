@@ -39,11 +39,11 @@ func TestGetTokenByNonce(t *testing.T) {
 			searchNonce:     createdWarmupToken.Nonce,
 			expectSCIMToken: true,
 		},
-		testCase{
+		{
 			name:        "negative, non-existent Nonce",
 			searchNonce: nonExistentID,
 		},
-		testCase{
+		{
 			name:        "defective-nonce",
 			searchNonce: invalidID,
 			expectMsg:   invalidUUIDMsg1,

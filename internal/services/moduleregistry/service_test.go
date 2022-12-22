@@ -2111,3 +2111,518 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateModuleAttestation(t *testing.T) {
+	moduleID := "module123"
+	groupID := "group123"
+
+	validAttestationData := "eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5pbi10b3RvK2pzb24iLCJwYXlsb2FkIjoiZXlKZmRIbHdaU0k2SW1oMGRIQnpPaTh2YVc0dGRHOTBieTVwYnk5VGRHRjBaVzFsYm5RdmRqQXVNU0lzSW5CeVpXUnBZMkYwWlZSNWNHVWlPaUpqYjNOcFoyNHVjMmxuYzNSdmNtVXVaR1YyTDJGMGRHVnpkR0YwYVc5dUwzWXhJaXdpYzNWaWFtVmpkQ0k2VzNzaWJtRnRaU0k2SW1Kc2IySWlMQ0prYVdkbGMzUWlPbnNpYzJoaE1qVTJJam9pTjJGbE5EY3haV1F4T0RNNU5UTXpPVFUzTW1ZMU1qWTFZamd6TlRnMk1HVXlPR0V5WmpnMU1ERTJORFUxTWpFMFkySXlNVFJpWVdabE5EUXlNbU0zWkNKOWZWMHNJbkJ5WldScFkyRjBaU0k2ZXlKRVlYUmhJam9pZTF3aWRtVnlhV1pwWldSY0lqcDBjblZsZlZ4dUlpd2lWR2x0WlhOMFlXMXdJam9pTWpBeU1pMHhNaTB4TWxReE5EbzFOam8wTVZvaWZYMD0iLCJzaWduYXR1cmVzIjpbeyJrZXlpZCI6IiIsInNpZyI6Ik1FVUNJUURIZGk2UkI2YktESVlPZ3duZkwvaVU5UlQ2a2xyaGRUaEt1NHkzK29JZGNBSWdaVmRQeUczaGhsQTJNZnJxYTkvVUsrOFF4c2d4T2pYcGxGd2JxWW1nQnkwPSJ9XX0="
+
+	hash := sha256.New()
+
+	// Compute the checksum.
+	_, err := io.Copy(hash, strings.NewReader(validAttestationData))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test cases
+	tests := []struct {
+		authError                      error
+		expectCreatedModuleAttestation *models.TerraformModuleAttestation
+		name                           string
+		expectErrCode                  string
+		input                          CreateModuleAttestationInput
+	}{
+		{
+			name: "subject does not have deployer role",
+			input: CreateModuleAttestationInput{
+				ModuleID: moduleID,
+			},
+			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "should create module attestation",
+			input: CreateModuleAttestationInput{
+				ModuleID:        moduleID,
+				Description:     "test",
+				AttestationData: validAttestationData,
+			},
+			expectCreatedModuleAttestation: &models.TerraformModuleAttestation{
+				CreatedBy:     "mockSubject",
+				ModuleID:      moduleID,
+				Description:   "test",
+				SchemaType:    "https://in-toto.io/Statement/v0.1",
+				PredicateType: "cosign.sigstore.dev/attestation/v1",
+				DataSHASum:    hash.Sum(nil),
+				Data:          validAttestationData,
+				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
+			},
+		},
+		{
+			name: "invalid payload type",
+			input: CreateModuleAttestationInput{
+				ModuleID:        moduleID,
+				AttestationData: "eyJwYXlsb2FkVHlwZSI6ImludmFsaWQiLCJwYXlsb2FkIjoiZXlKZmRIbHdaU0k2SW1oMGRIQnpPaTh2YVc0dGRHOTBieTVwYnk5VGRHRjBaVzFsYm5RdmRqQXVNU0lzSW5CeVpXUnBZMkYwWlZSNWNHVWlPaUpqYjNOcFoyNHVjMmxuYzNSdmNtVXVaR1YyTDJGMGRHVnpkR0YwYVc5dUwzWXhJaXdpYzNWaWFtVmpkQ0k2VzNzaWJtRnRaU0k2SW1Kc2IySWlMQ0prYVdkbGMzUWlPbnNpYzJoaE1qVTJJam9pTjJGbE5EY3haV1F4T0RNNU5UTXpPVFUzTW1ZMU1qWTFZamd6TlRnMk1HVXlPR0V5WmpnMU1ERTJORFUxTWpFMFkySXlNVFJpWVdabE5EUXlNbU0zWkNKOWZWMHNJbkJ5WldScFkyRjBaU0k2ZXlKRVlYUmhJam9pZTF3aWRtVnlhV1pwWldSY0lqcDBjblZsZlZ4dUlpd2lWR2x0WlhOMFlXMXdJam9pTWpBeU1pMHhNaTB4TWxReE5EbzFOam8wTVZvaWZYMD0iLCJzaWduYXR1cmVzIjpbeyJrZXlpZCI6IiIsInNpZyI6Ik1FVUNJUURIZGk2UkI2YktESVlPZ3duZkwvaVU5UlQ2a2xyaGRUaEt1NHkzK29JZGNBSWdaVmRQeUczaGhsQTJNZnJxYTkvVUsrOFF4c2d4T2pYcGxGd2JxWW1nQnkwPSJ9XX0",
+			},
+			expectErrCode: errors.EInvalid,
+		},
+		{
+			name: "invalid dsse format",
+			input: CreateModuleAttestationInput{
+				ModuleID:        moduleID,
+				AttestationData: "eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5pbi10b3RvK2pzb24iLCJpbnZhbGlkRmllbGQiOiJleUpmZEhsd1pTSTZJbWgwZEhCek9pOHZhVzR0ZEc5MGJ5NXBieTlUZEdGMFpXMWxiblF2ZGpBdU1TSXNJbkJ5WldScFkyRjBaVlI1Y0dVaU9pSmpiM05wWjI0dWMybG5jM1J2Y21VdVpHVjJMMkYwZEdWemRHRjBhVzl1TDNZeElpd2ljM1ZpYW1WamRDSTZXM3NpYm1GdFpTSTZJbUpzYjJJaUxDSmthV2RsYzNRaU9uc2ljMmhoTWpVMklqb2lOMkZsTkRjeFpXUXhPRE01TlRNek9UVTNNbVkxTWpZMVlqZ3pOVGcyTUdVeU9HRXlaamcxTURFMk5EVTFNakUwWTJJeU1UUmlZV1psTkRReU1tTTNaQ0o5ZlYwc0luQnlaV1JwWTJGMFpTSTZleUpFWVhSaElqb2llMXdpZG1WeWFXWnBaV1JjSWpwMGNuVmxmVnh1SWl3aVZHbHRaWE4wWVcxd0lqb2lNakF5TWkweE1pMHhNbFF4TkRvMU5qbzBNVm9pZlgwPSIsInNpZ25hdHVyZXMiOlt7ImtleWlkIjoiIiwic2lnIjoiTUVVQ0lRREhkaTZSQjZiS0RJWU9nd25mTC9pVTlSVDZrbHJoZFRoS3U0eTMrb0lkY0FJZ1pWZFB5RzNoaGxBMk1mcnFhOS9VSys4UXhzZ3hPalhwbEZ3YnFZbWdCeTA9In1dfQ",
+			},
+			expectErrCode: errors.EInvalid,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("GetSubject").Return("mockSubject")
+
+			mockModules := db.NewMockTerraformModules(t)
+			mockModuleAttestations := db.NewMockTerraformModuleAttestations(t)
+
+			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
+				Metadata: models.ResourceMetadata{
+					ID: moduleID,
+				},
+				GroupID:      groupID,
+				ResourcePath: "testgroup/testmodule",
+			}, nil)
+
+			mockActivityEvents := activityevent.NewMockService(t)
+
+			if test.expectErrCode == "" {
+				mockModuleAttestations.On("CreateModuleAttestation", mock.Anything, test.expectCreatedModuleAttestation).
+					Return(test.expectCreatedModuleAttestation, nil)
+			}
+
+			dbClient := db.Client{
+				TerraformModules:            mockModules,
+				TerraformModuleAttestations: mockModuleAttestations,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, nil)
+
+			moduleAttestation, err := service.CreateModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.input)
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectCreatedModuleAttestation.DataSHASum, moduleAttestation.DataSHASum)
+		})
+	}
+}
+
+func TestGetModuleAttestationByID(t *testing.T) {
+	moduleAttestationID := "module-attestation-1"
+	moduleID := "module-1"
+	groupID := "group-1"
+	// Test cases
+	tests := []struct {
+		expectModuleAttestation *models.TerraformModuleAttestation
+		expectModule            *models.TerraformModule
+		name                    string
+		authError               error
+		expectErrCode           string
+	}{
+		{
+			name: "get attestation for private module",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			expectModuleAttestation: &models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
+				ModuleID: moduleID,
+			},
+		},
+		{
+			name: "get attestation for public module",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  false,
+			},
+			expectModuleAttestation: &models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
+				ModuleID: moduleID,
+			},
+		},
+		{
+			name: "subject does not have access to private module version",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			expectModuleAttestation: &models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
+				ModuleID: moduleID,
+			},
+			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "module attestation not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+
+			if test.expectModule != nil && test.expectModule.Private {
+				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+			}
+
+			mockModules := db.NewMockTerraformModules(t)
+			mockModuleAttestations := db.NewMockTerraformModuleAttestations(t)
+
+			if test.expectModule != nil {
+				mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(test.expectModule, nil)
+			}
+
+			mockModuleAttestations.On("GetModuleAttestationByID", mock.Anything, moduleAttestationID).Return(test.expectModuleAttestation, nil)
+
+			dbClient := db.Client{
+				TerraformModules:            mockModules,
+				TerraformModuleAttestations: mockModuleAttestations,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
+
+			moduleAttestation, err := service.GetModuleAttestationByID(auth.WithCaller(ctx, mockCaller), moduleAttestationID)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectModuleAttestation, moduleAttestation)
+		})
+	}
+}
+
+func TestGetModuleAttestations(t *testing.T) {
+	moduleAttestationID := "module-attestation-1"
+	moduleID := "module-1"
+	groupID := "group-1"
+	// Test cases
+	tests := []struct {
+		expectModuleAttestation *models.TerraformModuleAttestation
+		expectModule            *models.TerraformModule
+		name                    string
+		authError               error
+		expectErrCode           string
+	}{
+		{
+			name: "get attestations for private module",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			expectModuleAttestation: &models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
+				ModuleID: moduleID,
+			},
+		},
+		{
+			name: "get attestations for public module",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  false,
+			},
+			expectModuleAttestation: &models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
+				ModuleID: moduleID,
+			},
+		},
+		{
+			name: "subject does not have access to private module",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+			expectModuleAttestation: &models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
+				ModuleID: moduleID,
+			},
+			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "module doesn't have any attestations",
+			expectModule: &models.TerraformModule{
+				Metadata: models.ResourceMetadata{ID: moduleID},
+				GroupID:  groupID,
+				Name:     "test-module",
+				Private:  true,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+
+			if test.expectModule != nil && test.expectModule.Private {
+				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+			}
+
+			mockModules := db.NewMockTerraformModules(t)
+			mockModuleAttestations := db.NewMockTerraformModuleAttestations(t)
+
+			if test.expectModule != nil {
+				mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(test.expectModule, nil)
+			}
+
+			getModuleAttestationsResponse := db.ModuleAttestationsResult{
+				ModuleAttestations: []models.TerraformModuleAttestation{},
+			}
+
+			if test.expectModuleAttestation != nil {
+				getModuleAttestationsResponse.ModuleAttestations = append(getModuleAttestationsResponse.ModuleAttestations, *test.expectModuleAttestation)
+			}
+
+			if test.authError == nil {
+				mockModuleAttestations.On("GetModuleAttestations", mock.Anything, &db.GetModuleAttestationsInput{
+					Filter: &db.TerraformModuleAttestationFilter{
+						ModuleID: &moduleID,
+					},
+				}).Return(&getModuleAttestationsResponse, nil)
+			}
+
+			dbClient := db.Client{
+				TerraformModules:            mockModules,
+				TerraformModuleAttestations: mockModuleAttestations,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := NewService(testLogger, &dbClient, nil, nil, nil)
+
+			response, err := service.GetModuleAttestations(auth.WithCaller(ctx, mockCaller), &GetModuleAttestationsInput{
+				ModuleID: moduleID,
+			})
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if test.expectModuleAttestation != nil {
+				assert.Equal(t, 1, len(response.ModuleAttestations))
+				assert.Equal(t, test.expectModuleAttestation, &response.ModuleAttestations[0])
+			} else {
+				assert.Equal(t, 0, len(response.ModuleAttestations))
+			}
+		})
+	}
+}
+
+func TestUpdateModuleAttestation(t *testing.T) {
+	moduleID := "module123"
+	groupID := "group123"
+
+	// Test cases
+	tests := []struct {
+		authError                 error
+		name                      string
+		expectErrCode             string
+		moduleAttestationToUpdate models.TerraformModuleAttestation
+	}{
+		{
+			name: "subject does not have deployer role",
+			moduleAttestationToUpdate: models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: "1"},
+				ModuleID: moduleID,
+			},
+			authError:     errors.NewError(errors.EForbidden, "Forbidden"),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "attestation should be updated",
+			moduleAttestationToUpdate: models.TerraformModuleAttestation{
+				Metadata:    models.ResourceMetadata{ID: "1"},
+				ModuleID:    moduleID,
+				Description: "updated description",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("GetSubject").Return("mockSubject")
+
+			mockModules := db.MockTerraformModules{}
+			mockModules.Test(t)
+
+			mockModuleAttestations := db.MockTerraformModuleAttestations{}
+			mockModuleAttestations.Test(t)
+
+			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
+				Metadata: models.ResourceMetadata{
+					ID: moduleID,
+				},
+				GroupID: groupID,
+			}, nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			if test.expectErrCode == "" {
+				mockModuleAttestations.On("UpdateModuleAttestation", mock.Anything, &test.moduleAttestationToUpdate).Return(&test.moduleAttestationToUpdate, nil)
+			}
+
+			dbClient := db.Client{
+				TerraformModules:            &mockModules,
+				TerraformModuleAttestations: &mockModuleAttestations,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents, nil)
+
+			updatedAttestation, err := service.UpdateModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.moduleAttestationToUpdate)
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.moduleAttestationToUpdate.Description, updatedAttestation.Description)
+		})
+	}
+}
+
+func TestDeleteModuleAttestation(t *testing.T) {
+	moduleID := "module123"
+	groupID := "group123"
+
+	// Test cases
+	tests := []struct {
+		authError                 error
+		name                      string
+		expectErrCode             string
+		moduleAttestationToDelete models.TerraformModuleAttestation
+	}{
+		{
+			name: "subject does not have deployer role",
+			moduleAttestationToDelete: models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: "1"},
+				ModuleID: moduleID,
+			},
+			authError:     errors.NewError(errors.EForbidden, "Forbidden"),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "attestation should be deleted",
+			moduleAttestationToDelete: models.TerraformModuleAttestation{
+				Metadata: models.ResourceMetadata{ID: "1"},
+				ModuleID: moduleID,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("GetSubject").Return("mockSubject")
+
+			mockModules := db.MockTerraformModules{}
+			mockModules.Test(t)
+
+			mockModuleAttestations := db.MockTerraformModuleAttestations{}
+			mockModuleAttestations.Test(t)
+
+			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
+				Metadata: models.ResourceMetadata{
+					ID: moduleID,
+				},
+				GroupID: groupID,
+			}, nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			if test.expectErrCode == "" {
+				mockModuleAttestations.On("DeleteModuleAttestation", mock.Anything, &test.moduleAttestationToDelete).Return(nil)
+			}
+
+			dbClient := db.Client{
+				TerraformModules:            &mockModules,
+				TerraformModuleAttestations: &mockModuleAttestations,
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents, nil)
+
+			err := service.DeleteModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.moduleAttestationToDelete)
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

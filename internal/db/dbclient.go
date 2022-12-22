@@ -73,37 +73,38 @@ const (
 
 // Client acts as a facade for the database
 type Client struct {
-	conn                       *pgxpool.Pool
-	logger                     logger.Logger
-	Events                     Events
-	Groups                     Groups
-	Runs                       Runs
-	Jobs                       Jobs
-	Plans                      Plans
-	Applies                    Applies
-	ConfigurationVersions      ConfigurationVersions
-	StateVersionOutputs        StateVersionOutputs
-	Workspaces                 Workspaces
-	StateVersions              StateVersions
-	ManagedIdentities          ManagedIdentities
-	ServiceAccounts            ServiceAccounts
-	Users                      Users
-	NamespaceMemberships       NamespaceMemberships
-	Teams                      Teams
-	TeamMembers                TeamMembers
-	Transactions               Transactions
-	Variables                  Variables
-	TerraformProviders         TerraformProviders
-	TerraformProviderVersions  TerraformProviderVersions
-	TerraformProviderPlatforms TerraformProviderPlatforms
-	TerraformModules           TerraformModules
-	TerraformModuleVersions    TerraformModuleVersions
-	GPGKeys                    GPGKeys
-	SCIMTokens                 SCIMTokens
-	VCSProviders               VCSProviders
-	WorkspaceVCSProviderLinks  WorkspaceVCSProviderLinks
-	ActivityEvents             ActivityEvents
-	VCSEvents                  VCSEvents
+	conn                        *pgxpool.Pool
+	logger                      logger.Logger
+	Events                      Events
+	Groups                      Groups
+	Runs                        Runs
+	Jobs                        Jobs
+	Plans                       Plans
+	Applies                     Applies
+	ConfigurationVersions       ConfigurationVersions
+	StateVersionOutputs         StateVersionOutputs
+	Workspaces                  Workspaces
+	StateVersions               StateVersions
+	ManagedIdentities           ManagedIdentities
+	ServiceAccounts             ServiceAccounts
+	Users                       Users
+	NamespaceMemberships        NamespaceMemberships
+	Teams                       Teams
+	TeamMembers                 TeamMembers
+	Transactions                Transactions
+	Variables                   Variables
+	TerraformProviders          TerraformProviders
+	TerraformProviderVersions   TerraformProviderVersions
+	TerraformProviderPlatforms  TerraformProviderPlatforms
+	TerraformModules            TerraformModules
+	TerraformModuleVersions     TerraformModuleVersions
+	TerraformModuleAttestations TerraformModuleAttestations
+	GPGKeys                     GPGKeys
+	SCIMTokens                  SCIMTokens
+	VCSProviders                VCSProviders
+	WorkspaceVCSProviderLinks   WorkspaceVCSProviderLinks
+	ActivityEvents              ActivityEvents
+	VCSEvents                   VCSEvents
 }
 
 // NewClient creates a new Client
@@ -189,6 +190,7 @@ func NewClient(
 	dbClient.TerraformProviderPlatforms = NewTerraformProviderPlatforms(dbClient)
 	dbClient.TerraformModules = NewTerraformModules(dbClient)
 	dbClient.TerraformModuleVersions = NewTerraformModuleVersions(dbClient)
+	dbClient.TerraformModuleAttestations = NewTerraformModuleAttestations(dbClient)
 	dbClient.GPGKeys = NewGPGKeys(dbClient)
 	dbClient.SCIMTokens = NewSCIMTokens(dbClient)
 	dbClient.VCSProviders = NewVCSProviders(dbClient)

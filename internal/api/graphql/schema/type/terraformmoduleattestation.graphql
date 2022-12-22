@@ -1,0 +1,65 @@
+enum TerraformModuleAttestationSort {
+  PREDICATE_TYPE_ASC
+  PREDICATE_TYPE_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+type TerraformModuleAttestationConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [TerraformModuleAttestationEdge]
+}
+
+type TerraformModuleAttestationEdge {
+  cursor: String!
+  node: TerraformModuleAttestation
+}
+
+type CreateTerraformModuleAttestationPayload {
+  clientMutationId: String
+  moduleAttestation: TerraformModuleAttestation
+  problems: [Problem!]!
+}
+
+type UpdateTerraformModuleAttestationPayload {
+  clientMutationId: String
+  moduleAttestation: TerraformModuleAttestation
+  problems: [Problem!]!
+}
+
+type DeleteTerraformModuleAttestationPayload {
+  clientMutationId: String
+  moduleAttestation: TerraformModuleAttestation
+  problems: [Problem!]!
+}
+
+type TerraformModuleAttestation implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  description: String!
+  module: TerraformModule!
+  schemaType: String!
+  predicateType: String!
+  digests: [String!]!
+  data: String!
+}
+
+input CreateTerraformModuleAttestationInput {
+  clientMutationId: String
+  modulePath: String!
+  description: String
+  attestationData: String!
+}
+
+input UpdateTerraformModuleAttestationInput {
+  clientMutationId: String
+  id: String!
+  description: String!
+}
+
+input DeleteTerraformModuleAttestationInput {
+  clientMutationId: String
+  id: String!
+}

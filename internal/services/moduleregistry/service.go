@@ -5,6 +5,7 @@ package moduleregistry
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/hashicorp/go-slug"
 	"github.com/hashicorp/go-version"
+	"github.com/in-toto/in-toto-golang/in_toto"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -43,6 +45,13 @@ type CreateModuleVersionInput struct {
 	SHASum          []byte
 }
 
+// CreateModuleAttestationInput is the input for creating a terraform module attestation
+type CreateModuleAttestationInput struct {
+	ModuleID        string
+	Description     string
+	AttestationData string
+}
+
 // GetModulesInput is the input for getting a list of terraform modules
 type GetModulesInput struct {
 	// Sort specifies the field to sort on and direction
@@ -65,6 +74,27 @@ type GetModuleVersionsInput struct {
 	ModuleID          string
 }
 
+// GetModuleAttestationsInput is the input for getting a list of module attestations
+type GetModuleAttestationsInput struct {
+	Sort              *db.TerraformModuleAttestationSortableField
+	PaginationOptions *db.PaginationOptions
+	Digest            *string
+	ModuleID          string
+}
+
+const (
+	// IntotoPayloadType is the type identifier for the in-toto format
+	IntotoPayloadType = "application/vnd.in-toto+json"
+	// MaxModuleAttestationSize is the max size in bytes for a module attestation
+	MaxModuleAttestationSize = 1024 * 10
+)
+
+var (
+	// SupportedIntotoStatementTypes contains a list of in-toto statement types that are
+	// supported for module attestations
+	SupportedIntotoStatementTypes = []string{"https://in-toto.io/Statement/v0.1"}
+)
+
 // Service implements all module registry functionality
 type Service interface {
 	GetModuleByID(ctx context.Context, id string) (*models.TerraformModule, error)
@@ -75,6 +105,11 @@ type Service interface {
 	CreateModule(ctx context.Context, input *CreateModuleInput) (*models.TerraformModule, error)
 	UpdateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error)
 	DeleteModule(ctx context.Context, module *models.TerraformModule) error
+	GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error)
+	GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*db.ModuleAttestationsResult, error)
+	CreateModuleAttestation(ctx context.Context, input *CreateModuleAttestationInput) (*models.TerraformModuleAttestation, error)
+	UpdateModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error)
+	DeleteModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) error
 	GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error)
 	GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*db.ModuleVersionsResult, error)
 	GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]models.TerraformModuleVersion, error)
@@ -90,6 +125,20 @@ type handleCallerFunc func(
 	userHandler func(ctx context.Context, caller *auth.UserCaller) error,
 	serviceAccountHandler func(ctx context.Context, caller *auth.ServiceAccountCaller) error,
 ) error
+
+// dsseEnvelope captures for signing format described in the following specification:
+// https://github.com/secure-systems-lab/signing-spec/blob/master/envelope.md
+type dsseEnvelope struct {
+	PayloadType string          `json:"payloadType"`
+	Payload     string          `json:"payload"`
+	Signatures  []dsseSignature `json:"signatures"`
+}
+
+// dssSignature represents an in-toto signature from the DSSE specification
+type dsseSignature struct {
+	KeyID string `json:"keyid"`
+	Sig   string `json:"sig"`
+}
 
 type service struct {
 	logger          logger.Logger
@@ -314,6 +363,233 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 	}
 
 	return updatedModule, nil
+}
+
+func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModuleAttestationInput) (*models.TerraformModuleAttestation, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	module, err := s.getModuleByID(ctx, input.ModuleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+		return nil, err
+	}
+
+	hash := sha256.New()
+
+	// Compute the checksum.
+	size, err := io.Copy(hash, strings.NewReader(input.AttestationData))
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the module attestation data is below the size limit
+	if size > MaxModuleAttestationSize {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("module attestation of size %d exceeds max size limit of %d bytes", size, MaxModuleAttestationSize))
+	}
+
+	decodedSig, err := base64.StdEncoding.DecodeString(input.AttestationData)
+	if err != nil {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("failed to decode attestation data: %v", err))
+	}
+
+	// Decode DSSE Envelope
+	env := dsseEnvelope{}
+	if err = json.Unmarshal(decodedSig, &env); err != nil {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("attestation data is not in dsse format: %v", err))
+	}
+
+	if env.PayloadType != IntotoPayloadType {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid payloadType %s on envelope; expected %s", env.PayloadType, IntotoPayloadType))
+	}
+
+	// Get the expected digest from the attestation
+	decodedPredicate, err := base64.StdEncoding.DecodeString(env.Payload)
+	if err != nil {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("decoding dsse envelope payload: %v", err))
+	}
+	var statement in_toto.Statement
+	if err = json.Unmarshal(decodedPredicate, &statement); err != nil {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("decoding predicate: %v", err))
+	}
+
+	foundSupportedType := false
+	for _, statementType := range SupportedIntotoStatementTypes {
+		if statementType == statement.Type {
+			foundSupportedType = true
+			break
+		}
+	}
+
+	if !foundSupportedType {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("in-toto statement type %s not supported; exected one of %s", statement.Type, strings.Join(SupportedIntotoStatementTypes, ", ")))
+	}
+
+	// Compare the actual and expected
+	if statement.Subject == nil || len(statement.Subject) == 0 {
+		return nil, errors.NewError(errors.EInvalid, "in-toto statement is missing subject")
+	}
+
+	digests := []string{}
+	for _, subject := range statement.Subject {
+		digest, ok := subject.Digest["sha256"]
+		if !ok {
+			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("subject %s is missing sha256 digest", subject.Name))
+		}
+		digests = append(digests, digest)
+	}
+
+	attestationToCreate := models.TerraformModuleAttestation{
+		ModuleID:      input.ModuleID,
+		Description:   input.Description,
+		Data:          input.AttestationData,
+		DataSHASum:    hash.Sum(nil),
+		SchemaType:    statement.Type,
+		PredicateType: statement.PredicateType,
+		Digests:       digests,
+		CreatedBy:     caller.GetSubject(),
+	}
+
+	if err = attestationToCreate.Validate(); err != nil {
+		return nil, err
+	}
+
+	createdAttestation, err := s.dbClient.TerraformModuleAttestations.CreateModuleAttestation(ctx, &attestationToCreate)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Infow("Created a module attestation.",
+		"caller", caller.GetSubject(),
+		"moduleID", input.ModuleID,
+		"modulePath", module.ResourcePath,
+		"moduleAttestationID", createdAttestation.Metadata.ID,
+	)
+
+	return createdAttestation, nil
+}
+
+func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	module, err := s.getModuleByID(ctx, attestation.ModuleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+		return nil, err
+	}
+
+	updatedAttestation, err := s.dbClient.TerraformModuleAttestations.UpdateModuleAttestation(ctx, attestation)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Infow("Updated module attestation.",
+		"caller", caller.GetSubject(),
+		"moduleID", module.Metadata.ID,
+		"modulePath", module.ResourcePath,
+		"moduleAttestationID", attestation.Metadata.ID,
+	)
+
+	return updatedAttestation, nil
+}
+
+func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	moduleAttestation, err := s.dbClient.TerraformModuleAttestations.GetModuleAttestationByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if moduleAttestation == nil {
+		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("module with id %s not found", id))
+	}
+
+	module, err := s.getModuleByID(ctx, moduleAttestation.ModuleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if module.Private {
+		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+			return nil, err
+		}
+	}
+
+	return moduleAttestation, nil
+}
+
+func (s *service) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*db.ModuleAttestationsResult, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	module, err := s.getModuleByID(ctx, input.ModuleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if module.Private {
+		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+			return nil, err
+		}
+	}
+
+	dbInput := db.GetModuleAttestationsInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.TerraformModuleAttestationFilter{
+			ModuleID: &input.ModuleID,
+			Digest:   input.Digest,
+		},
+	}
+
+	return s.dbClient.TerraformModuleAttestations.GetModuleAttestations(ctx, &dbInput)
+}
+
+func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) error {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	module, err := s.getModuleByID(ctx, attestation.ModuleID)
+	if err != nil {
+		return err
+	}
+
+	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+		return err
+	}
+
+	err = s.dbClient.TerraformModuleAttestations.DeleteModuleAttestation(ctx, attestation)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infow("Deleted module attestation.",
+		"caller", caller.GetSubject(),
+		"moduleID", module.Metadata.ID,
+		"modulePath", module.ResourcePath,
+		"moduleAttestationID", attestation.Metadata.ID,
+	)
+
+	return nil
 }
 
 func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*models.TerraformModule, error) {

@@ -41,6 +41,29 @@ func (_m *MockService) CreateModule(ctx context.Context, input *CreateModuleInpu
 	return r0, r1
 }
 
+// CreateModuleAttestation provides a mock function with given fields: ctx, input
+func (_m *MockService) CreateModuleAttestation(ctx context.Context, input *CreateModuleAttestationInput) (*models.TerraformModuleAttestation, error) {
+	ret := _m.Called(ctx, input)
+
+	var r0 *models.TerraformModuleAttestation
+	if rf, ok := ret.Get(0).(func(context.Context, *CreateModuleAttestationInput) *models.TerraformModuleAttestation); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformModuleAttestation)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *CreateModuleAttestationInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateModuleVersion provides a mock function with given fields: ctx, input
 func (_m *MockService) CreateModuleVersion(ctx context.Context, input *CreateModuleVersionInput) (*models.TerraformModuleVersion, error) {
 	ret := _m.Called(ctx, input)
@@ -78,6 +101,20 @@ func (_m *MockService) DeleteModule(ctx context.Context, module *models.Terrafor
 	return r0
 }
 
+// DeleteModuleAttestation provides a mock function with given fields: ctx, attestation
+func (_m *MockService) DeleteModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) error {
+	ret := _m.Called(ctx, attestation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleAttestation) error); ok {
+		r0 = rf(ctx, attestation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteModuleVersion provides a mock function with given fields: ctx, moduleVersion
 func (_m *MockService) DeleteModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) error {
 	ret := _m.Called(ctx, moduleVersion)
@@ -90,6 +127,52 @@ func (_m *MockService) DeleteModuleVersion(ctx context.Context, moduleVersion *m
 	}
 
 	return r0
+}
+
+// GetModuleAttestationByID provides a mock function with given fields: ctx, id
+func (_m *MockService) GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error) {
+	ret := _m.Called(ctx, id)
+
+	var r0 *models.TerraformModuleAttestation
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformModuleAttestation); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformModuleAttestation)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetModuleAttestations provides a mock function with given fields: ctx, input
+func (_m *MockService) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*db.ModuleAttestationsResult, error) {
+	ret := _m.Called(ctx, input)
+
+	var r0 *db.ModuleAttestationsResult
+	if rf, ok := ret.Get(0).(func(context.Context, *GetModuleAttestationsInput) *db.ModuleAttestationsResult); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*db.ModuleAttestationsResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *GetModuleAttestationsInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // GetModuleByAddress provides a mock function with given fields: ctx, namespace, name, system
@@ -336,6 +419,29 @@ func (_m *MockService) UpdateModule(ctx context.Context, module *models.Terrafor
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformModule) error); ok {
 		r1 = rf(ctx, module)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateModuleAttestation provides a mock function with given fields: ctx, attestation
+func (_m *MockService) UpdateModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error) {
+	ret := _m.Called(ctx, attestation)
+
+	var r0 *models.TerraformModuleAttestation
+	if rf, ok := ret.Get(0).(func(context.Context, *models.TerraformModuleAttestation) *models.TerraformModuleAttestation); ok {
+		r0 = rf(ctx, attestation)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformModuleAttestation)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *models.TerraformModuleAttestation) error); ok {
+		r1 = rf(ctx, attestation)
 	} else {
 		r1 = ret.Error(1)
 	}

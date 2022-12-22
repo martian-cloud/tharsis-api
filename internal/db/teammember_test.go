@@ -315,10 +315,10 @@ func TestAddUserToTeam(t *testing.T) {
 	teamNames2IDs := reverseMap(createdWarmupOutput.teamIDs2Name)
 
 	type testCase struct {
-		name        string
 		input       *models.TeamMember
 		expectMsg   *string
 		expectAdded *models.TeamMember
+		name        string
 	}
 
 	/*
@@ -466,10 +466,10 @@ func TestUpdateTeamMember(t *testing.T) {
 	}
 
 	type testCase struct {
-		name          string
 		input         *models.TeamMember
 		expectMsg     *string
 		expectUpdated *models.TeamMember
+		name          string
 	}
 
 	/*
