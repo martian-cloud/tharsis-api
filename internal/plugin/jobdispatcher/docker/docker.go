@@ -60,7 +60,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 
 	client, err := dockerclient.NewClientWithOpts(dockerclient.WithHost(pluginData["host"]), dockerclient.WithAPIVersionNegotiation())
 	if err != nil {
-		return nil, fmt.Errorf("job dispatcher failed to initialized docker cli: %v", err)
+		return nil, fmt.Errorf("job dispatcher failed to initialize docker cli: %v", err)
 	}
 
 	return &JobDispatcher{

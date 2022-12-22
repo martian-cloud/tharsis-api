@@ -52,7 +52,7 @@ func (a *Authenticator) Close(ctx context.Context) error {
 	return nil
 }
 
-// Authenticate configures the environment with the identity information used by the AWS terraform provider
+// Authenticate configures the environment with the identity information used by the Azure terraform provider
 func (a *Authenticator) Authenticate(ctx context.Context, managedIdentity *types.ManagedIdentity, creds []byte) (map[string]string, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(string(managedIdentity.Data))
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/awsfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/azurefederated"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/tharsisfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
@@ -39,6 +40,9 @@ func newManagedIdentities(
 			},
 			types.ManagedIdentityAzureFederated: func() (managedidentity.Authenticator, error) {
 				return azurefederated.New(jobLogger), nil
+			},
+			types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
+				return tharsisfederated.New(), nil
 			},
 		},
 	}

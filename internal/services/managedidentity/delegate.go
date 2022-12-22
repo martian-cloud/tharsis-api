@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/awsfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/azurefederated"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/tharsisfederated"
 )
 
 // Delegate handles the logic for a specific type of managed identity
@@ -27,9 +28,14 @@ func NewManagedIdentityDelegateMap(ctx context.Context, cfg *config.Config, plug
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize %s managed identity handler %v", models.ManagedIdentityAWSFederated, err)
 	}
+	tharsisHandler, err := tharsisfederated.New(ctx, pluginCatalog.JWSProvider, cfg.ServiceAccountIssuerURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize %s managed identity handler %v", models.ManagedIdentityTharsisFederated, err)
+	}
 
 	return map[models.ManagedIdentityType]Delegate{
-		models.ManagedIdentityAzureFederated: azureHandler,
-		models.ManagedIdentityAWSFederated:   awsHandler,
+		models.ManagedIdentityAzureFederated:   azureHandler,
+		models.ManagedIdentityAWSFederated:     awsHandler,
+		models.ManagedIdentityTharsisFederated: tharsisHandler,
 	}, nil
 }
