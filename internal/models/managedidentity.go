@@ -7,8 +7,9 @@ type ManagedIdentityType string
 
 // Managed Identity Types
 const (
-	ManagedIdentityAzureFederated ManagedIdentityType = "azure_federated"
-	ManagedIdentityAWSFederated   ManagedIdentityType = "aws_federated"
+	ManagedIdentityAzureFederated   ManagedIdentityType = "azure_federated"
+	ManagedIdentityAWSFederated     ManagedIdentityType = "aws_federated"
+	ManagedIdentityTharsisFederated ManagedIdentityType = "tharsis_federated"
 )
 
 // ManagedIdentityAccessRule is used to restrict access to a managed identity

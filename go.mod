@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.17.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.26.12
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.8
-	github.com/aws/smithy-go v1.12.0
+	github.com/aws/smithy-go v1.13.5
 	github.com/bmatcuk/doublestar/v4 v4.2.0
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/doug-martin/goqu/v9 v9.18.0
@@ -49,13 +49,13 @@ require (
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799
 	github.com/prometheus/client_golang v1.12.2
 	github.com/qiangxue/go-env v1.0.1
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/http-swagger v1.3.0
 	github.com/zclconf/go-cty v1.10.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20221003200235-27fb6b330f28
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20221003202249-22d91a3f6af2
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.2.0
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.8.0
 	go.uber.org/zap v1.21.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.24.2
@@ -118,7 +118,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/terraform-json v0.14.0 // indirect
 	github.com/hashicorp/terraform-svchost v0.0.0-20200729002733-f050f53b9734 // indirect
-	github.com/hasura/go-graphql-client v0.7.2 // indirect
+	github.com/hasura/go-graphql-client v0.8.1 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -152,7 +152,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/stretchr/objx v0.4.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/swaggo/files v0.0.0-20220610200504-28940afbdbfe // indirect
 	github.com/swaggo/swag v1.8.3 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect

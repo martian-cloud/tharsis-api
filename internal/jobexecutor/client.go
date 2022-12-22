@@ -146,7 +146,7 @@ func (c *client) SaveJobLogs(ctx context.Context, jobID string, startOffset int,
 
 // GetWorkspace returns a workspace by ID
 func (c *client) GetWorkspace(ctx context.Context, path string) (*types.Workspace, error) {
-	workspace, err := c.tharsisClient.Workspaces.GetWorkspace(ctx, &types.GetWorkspaceInput{Path: path})
+	workspace, err := c.tharsisClient.Workspaces.GetWorkspace(ctx, &types.GetWorkspaceInput{Path: &path})
 	if err != nil {
 		return nil, err
 	}
