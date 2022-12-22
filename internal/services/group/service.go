@@ -180,12 +180,12 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 
 	if input.Group.ParentID == "" {
 		// Require owner role to delete top level groups
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.OwnerRole); err != nil {
+		if err := caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.OwnerRole); err != nil {
 			return err
 		}
 	} else {
 		// Require deployer role to delete nested groups
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.DeployerRole); err != nil {
+		if err := caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.DeployerRole); err != nil {
 			return err
 		}
 	}
@@ -199,9 +199,9 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 	if !input.Force {
 		// Check if this group has any sub-groups or workspaces
 
-		subgroups, gErr := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{Filter: &db.GroupFilter{ParentID: &input.Group.Metadata.ID}})
-		if gErr != nil {
-			return gErr
+		subgroups, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{Filter: &db.GroupFilter{ParentID: &input.Group.Metadata.ID}})
+		if err != nil {
+			return err
 		}
 
 		if len(subgroups.Groups) > 0 {
@@ -212,9 +212,9 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 			)
 		}
 
-		workspaces, wErr := s.dbClient.Workspaces.GetWorkspaces(ctx, &db.GetWorkspacesInput{Filter: &db.WorkspaceFilter{GroupID: &input.Group.Metadata.ID}})
-		if wErr != nil {
-			return wErr
+		workspaces, err := s.dbClient.Workspaces.GetWorkspaces(ctx, &db.GetWorkspacesInput{Filter: &db.WorkspaceFilter{GroupID: &input.Group.Metadata.ID}})
+		if err != nil {
+			return err
 		}
 
 		if len(workspaces.Workspaces) > 0 {
@@ -355,12 +355,12 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, group.FullPath, models.DeployerRole); err != nil {
+	if err := caller.RequireAccessToNamespace(ctx, group.FullPath, models.DeployerRole); err != nil {
 		return nil, err
 	}
 
 	// Validate model
-	if err = group.Validate(); err != nil {
+	if err := group.Validate(); err != nil {
 		return nil, err
 	}
 
