@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -38,6 +39,7 @@ type JobDispatcher struct {
 	registryPassword      string
 	apiURL                string
 	discoveryProtocolHost string
+	extraHosts            []string
 	localImage            bool
 }
 
@@ -58,6 +60,11 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		}
 	}
 
+	var extraHosts = []string{}
+	if _, ok := pluginData["extra_hosts"]; ok {
+		extraHosts = append(extraHosts, strings.Split(pluginData["extra_hosts"], ",")...)
+	}
+
 	client, err := dockerclient.NewClientWithOpts(dockerclient.WithHost(pluginData["host"]), dockerclient.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("job dispatcher failed to initialize docker cli: %v", err)
@@ -70,6 +77,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		discoveryProtocolHost: discoveryProtocolHost,
 		registryUsername:      pluginData["registry_username"],
 		registryPassword:      pluginData["registry_password"],
+		extraHosts:            extraHosts,
 		localImage:            localImage,
 		client:                client,
 		logger:                logger,
@@ -94,6 +102,10 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 	}
 
 	hostConfig := &container.HostConfig{}
+
+	if len(j.extraHosts) > 0 {
+		hostConfig.ExtraHosts = j.extraHosts
+	}
 
 	if j.bindPath != "" {
 		hostConfig.Binds = []string{j.bindPath}
