@@ -2,6 +2,7 @@ package jobexecutor
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"fmt"
@@ -199,5 +200,8 @@ func (j *JobExecutor) waitForJobCancellation(ctx context.Context) (bool, error) 
 	}
 
 	event := <-eventChannel
+	if event == nil {
+		return false, errors.New("channel closed")
+	}
 	return event.Job.CancelRequested, nil
 }

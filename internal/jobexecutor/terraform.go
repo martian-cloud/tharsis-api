@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-slug"
 	"github.com/hashicorp/go-version"
 	hcInstall "github.com/hashicorp/hc-install"
@@ -34,9 +33,6 @@ terraform {
 	// Ensure binary not found error.
 	hcInstallBinaryNotFoundErr = "unable to find, install"
 )
-
-// Untarring of configuration version done with Hashicorp's go-getter library.
-var tgz = getter.TarGzipDecompressor{}
 
 type terraformWorkspace struct {
 	cliDownloader     cliDownloader
