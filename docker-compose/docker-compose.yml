@@ -84,11 +84,11 @@ services:
     container_name: tharsis-api
     restart: unless-stopped
     environment:
-      - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://kubernetes.docker.internal:6530/realms/tharsis
+      - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://localhost:6530/realms/tharsis
       - THARSIS_OAUTH_PROVIDERS_0_CLIENT_ID=tharsis
       - THARSIS_OAUTH_PROVIDERS_0_USERNAME_CLAIM=preferred_username
       - THARSIS_OAUTH_PROVIDERS_0_SCOPE=openid profile email
-      - THARSIS_OAUTH_PROVIDERS_0_LOGOUT_URL=http://kubernetes.docker.internal:6530/realms/tharsis/protocol/openid-connect/logout
+      - THARSIS_OAUTH_PROVIDERS_0_LOGOUT_URL=http://localhost:6530/realms/tharsis/protocol/openid-connect/logout
       - THARSIS_TFE_LOGIN_ENABLED=true
       - THARSIS_TFE_LOGIN_CLIENT_ID=tharsis
       - THARSIS_TFE_LOGIN_SCOPES=openid tharsis
@@ -104,13 +104,14 @@ services:
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_BUCKET=tharsis-objects
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_AWS_ACCESS_KEY_ID=minioadmin
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_AWS_SECRET_ACCESS_KEY=miniopassword
-      - THARSIS_OBJECT_STORE_PLUGIN_DATA_ENDPOINT=http://host.docker.internal:9000
+      - THARSIS_OBJECT_STORE_PLUGIN_DATA_ENDPOINT=http://localhost:9000
       - THARSIS_JWS_PROVIDER_PLUGIN_TYPE=memory
       - THARSIS_API_URL=http://localhost:6560
       - THARSIS_SERVICE_ACCOUNT_ISSUER_URL=http://localhost:6560
       - THARSIS_JOB_DISPATCHER_PLUGIN_TYPE=docker
-      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_API_URL=http://host.docker.internal:6560
+      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_API_URL=http://localhost:6560
       - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_HOST=unix:///var/run/docker.sock
+      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_EXTRA_HOSTS=localhost:host-gateway
       - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
       - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_LOCAL_IMAGE=false # Set to true if using local image.
     volumes:
@@ -118,7 +119,9 @@ services:
     networks:
       - tharsis
     ports:
-      - "127.0.0.1:6560:8000"
+      - "6560:8000"
+    extra_hosts:
+      - "localhost:host-gateway"
     depends_on:
       - minio
       - keycloak
