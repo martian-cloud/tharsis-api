@@ -170,7 +170,7 @@ func (p *PlanHandler) createVarsFile(ctx context.Context) (string, error) {
 	// First write HCL variables
 	fileContents := ""
 	for _, v := range p.terraformWorkspace.variables {
-		if v.Category == types.TerraformVariableCategory && v.Hcl {
+		if v.Category == types.TerraformVariableCategory && v.HCL {
 			fileContents += fmt.Sprintf("%s = %s\n", v.Key, *v.Value)
 		}
 	}
@@ -184,7 +184,7 @@ func (p *PlanHandler) createVarsFile(ctx context.Context) (string, error) {
 
 	// Use hclwriter for string values to provide HCL character escaping
 	for _, v := range p.terraformWorkspace.variables {
-		if v.Category == types.TerraformVariableCategory && !v.Hcl {
+		if v.Category == types.TerraformVariableCategory && !v.HCL {
 			rootBody.SetAttributeValue(v.Key, cty.StringVal(*v.Value))
 		}
 	}
