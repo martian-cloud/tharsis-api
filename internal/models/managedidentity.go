@@ -42,10 +42,7 @@ func (m *ManagedIdentity) Validate() error {
 	}
 
 	// Verify description satisfies constraints
-	if err := verifyValidDescription(m.Description); err != nil {
-		return err
-	}
-	return nil
+	return verifyValidDescription(m.Description)
 }
 
 // GetGroupPath returns the group path

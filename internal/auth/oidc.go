@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	// retryWaitMin is the minimum amount of seconds retryablehttp
+	// retryWaitMinimum is the minimum amount of seconds retryablehttp
 	// client will wait before attempting to make another connection.
 	// Default min is 2 seconds.
-	retryWaitMin = time.Second * 5
+	retryWaitMinimum = time.Second * 5
 )
 
 // OpenIDConfigFetcher implements functions to fetch
@@ -29,7 +29,7 @@ type OpenIDConfigFetcher struct {
 func NewOpenIDConfigFetcher() *OpenIDConfigFetcher {
 	// Retryablehttp client defaults to 4 retries.
 	client := retryablehttp.NewClient()
-	client.RetryWaitMin = retryWaitMin
+	client.RetryWaitMin = retryWaitMinimum
 	return &OpenIDConfigFetcher{Client: client}
 }
 

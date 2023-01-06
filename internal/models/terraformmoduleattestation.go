@@ -16,9 +16,5 @@ type TerraformModuleAttestation struct {
 // Validate returns an error if the model is not valid
 func (t *TerraformModuleAttestation) Validate() error {
 	// Verify description satisfies constraints
-	if err := verifyValidDescription(t.Description); err != nil {
-		return err
-	}
-
-	return nil
+	return verifyValidDescription(t.Description)
 }

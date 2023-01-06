@@ -41,8 +41,8 @@ var (
 	groupPath = "a/resource"
 
 	// Random commit IDs for testing processingWebhook logic.
-	sampleBeforeCommit string = "64b317c5bcfc637cca23b25f38501571f2a02b21"
-	sampleAfterCommit  string = "64b317c5bcfc637cca80b25f38501571f2a02b21"
+	sampleBeforeCommit = "64b317c5bcfc637cca23b25f38501571f2a02b21"
+	sampleAfterCommit  = "64b317c5bcfc637cca80b25f38501571f2a02b21"
 
 	// OAuth token fields for a vcs provider.
 	sampleOAuthAccessToken                    = "an-access-token"
