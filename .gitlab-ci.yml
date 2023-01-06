@@ -1,12 +1,17 @@
 include:
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/SAST-IaC.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: Code-Quality.gitlab-ci.yml
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Security/Secret-Detection.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  # Commented out as we are using our own tool for license scanning
+  # - template: Jobs/License-Scanning.gitlab-ci.yml
 
 stages:
   - test
   - publish
+  - container_scanning
 
 # Only start pipelines on Merge Requests or the default branch
 workflow:
@@ -19,27 +24,16 @@ workflow:
       when: always
     - when: never
 
-.if-not-tharsis-namespace: &if-not-tharsis-namespace
-  if: '$CI_PROJECT_NAMESPACE !~ /^infor-cloud\/martian-cloud\/tharsis($|\/)/'
-
-.cache-template: &cache-template
-  key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-  paths:
-    - ".go/pkg/mod"
-    - ".go/cache"
-
 variables:
-  SECRET_DETECTION_EXCLUDED_PATHS: vendor
-  GO111MODULE: "on"
-  GOPRIVATE: gitlab.com/infor-cloud/martian-cloud/tharsis/*
   GO_VERSION: "1.18.2"
   CGO_ENABLED: "0"
-  GOPATH: "$CI_PROJECT_DIR/.go"
+  GOPATH_RELATIVE_PATH: .go
+  GOPATH: "$CI_PROJECT_DIR/$GOPATH_RELATIVE_PATH"
   GOCACHE: "$GOPATH/cache"
+  SAST_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH, docker-compose"
+  SECRET_DETECTION_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH"
 
 default:
-  image: public.ecr.aws/amazonlinux/amazonlinux:latest
-  services: []
   tags:
     - oss
   retry:
@@ -49,6 +43,40 @@ default:
       - api_failure
       - stuck_or_timeout_failure
       - runner_system_failure
+  interruptible: true
+
+.cache-template: &cache-template
+  key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+  paths:
+    - ".go/pkg/mod"
+    - ".go/cache"
+
+#################################
+##            RULES            ##
+#################################
+
+.on_merge_request_and_merged_events:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_PIPELINE_SOURCE == "merge_request_event"'
+
+.on_tag_events:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+.on_default_branch_and_merge_train_with_golang_changes:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+      changes:
+        - "**/go.mod"
+        - "**/go.sum"
+        - go.mod
+        - go.sum
+
+#################################
+##            BUILD            ##
+#################################
 
 publish api docker:
   image: docker:latest
@@ -61,7 +89,7 @@ publish api docker:
   before_script:
     - apk add git
   rules:
-    - if: $CI_COMMIT_TAG
+    - !reference [.on_tag_events, rules]
   script:
     - |
       echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
@@ -98,6 +126,7 @@ publish api docker:
           docker image tag api:latest $api_uri:latest
           docker image push $api_uri:latest
       fi
+  interruptible: false
 
 publish job-executor docker:
   image: docker:latest
@@ -110,7 +139,7 @@ publish job-executor docker:
   before_script:
     - apk add git
   rules:
-    - if: $CI_COMMIT_TAG
+    - !reference [.on_tag_events, rules]
   script:
     - |
       echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
@@ -147,6 +176,7 @@ publish job-executor docker:
           docker image tag job-executor:latest $job_executor_uri:latest
           docker image push $job_executor_uri:latest
       fi
+  interruptible: false
 
 tests:
   image: golang:${GO_VERSION}-alpine
@@ -163,154 +193,144 @@ tests:
     THARSIS_DB_TEST_SSL_MODE: disable
     POSTGRES_HOST_AUTH_METHOD: trust
     LD_FLAG_VAR_PREFIX: gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db
+    KUBERNETES_MEMORY_REQUEST: 2Gi
+    KUBERNETES_MEMORY_LIMIT: 4Gi
   before_script:
     - export PATH=$PATH:$GOPATH/bin
-    - go install golang.org/x/lint/golint@latest
     - apk add postgresql-client libpq-dev git bash openssh ca-certificates
+    - go install github.com/jstemmer/go-junit-report@latest
+    - go install github.com/boumenot/gocover-cobertura@latest
     - wget -O - https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
   script:
-    - /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
-    - go test -tags=integration --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" ./...
+    - |
+        set -x
+        /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
+        go test \
+          -tags=integration \
+          --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
+          -covermode=atomic \
+          -coverpkg gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/... \
+          -v \
+          -coverprofile .coverage \
+          ./... 2>&1 | tee .test-results
+
+        go tool cover -func .coverage | tail
+        go-junit-report -set-exit-code < .test-results > .xunit-results.xml
+        gocover-cobertura < .coverage > coverage.xml
+  artifacts:
+    when: always
+    reports:
+      junit: .xunit-results.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  coverage: '/\(statements\)\s*(\d+(?:\.\d+)?%)/'
   cache:
     <<: *cache-template
-  interruptible: true
 
 lint:
   image: golang:${GO_VERSION}-alpine
   stage: test
   before_script:
     - export PATH=$PATH:$GOPATH/bin
-    - go install golang.org/x/lint/golint@latest
-    - apk add git bash openssh ca-certificates make
+    - apk add git bash openssh ca-certificates
+    - go install github.com/mgechev/revive@latest
   script:
     - go mod download
-    - go mod verify
-    - make lint
+    - |
+        # Set similar rules as golint, subject to change
+        cat <<EOF > config.toml
+        ignoreGeneratedHeader = false
+        severity = "warning"
+        confidence = 0.8
+        errorCode = 0
+        warningCode = 0
+
+        [rule.blank-imports]
+        [rule.context-as-argument]
+        [rule.context-keys-type]
+        [rule.dot-imports]
+        [rule.error-return]
+        [rule.error-strings]
+        [rule.error-naming]
+        [rule.exported]
+        [rule.if-return]
+        [rule.increment-decrement]
+        [rule.var-naming]
+        [rule.var-declaration]
+        # [rule.package-comments]
+        [rule.range]
+        [rule.receiver-naming]
+        [rule.time-naming]
+        [rule.unexported-return]
+        [rule.indent-error-flow]
+        [rule.errorf]
+        EOF
+    - revive -config config.toml -set_exit_status $(go list ./... | grep -v /vendor/)
   cache:
     <<: *cache-template
-  interruptible: true
 
-secret_detection:
-  interruptible: true
-  rules:
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+#################################
+##            SAST             ##
+#################################
 
-gosec-sast:
-  artifacts:
-    paths:
-      - gl-sast-report.json
+container_scanning:
+  stage: container_scanning
+  variables:
+    CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:latest"
+    GIT_STRATEGY: fetch
   rules:
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-      changes:
-        - "**/*.go"
-        - "*.go"
-  interruptible: true
+    - !reference [.on_tag_events, rules]
+
+gemnasium-dependency_scanning:
+  variables:
+    DS_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH"
+  rules:
+    - !reference [.on_merge_request_and_merged_events, rules]
 
 semgrep-sast:
-  artifacts:
-    paths:
-      - gl-sast-report.json
-  interruptible: true
+  before_script:
+    - |
+      echo "*_test.go" >> /semgrepignore
+  rules:
+    - !reference [.on_merge_request_and_merged_events, rules]
+
+kics-iac-sast:
+  rules:
+    - !reference [.on_merge_request_and_merged_events, rules]
+
+secret_detection:
+  rules:
+    - !reference [.on_merge_request_and_merged_events, rules]
 
 code_quality:
-  artifacts:
-    paths:
-      - gl-code-quality-report.json
   tags:
     - oss
     - docker
+  artifacts:
+    paths: [gl-code-quality-report.json]
   rules:
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-      changes:
-        - "**/*.go"
-        - "*.go"
-  interruptible: true
+    - !reference [.on_default_branch_and_merge_train_with_golang_changes, rules]
 
-License Scanning:
+license_scanning:
+  stage: test
   image: golang:${GO_VERSION}-alpine
+  allow_failure: true
   before_script:
     - export PATH=$PATH:$GOPATH/bin
+    - apk add git bash openssh ca-certificates make jq
     - go install github.com/uw-labs/lichen@latest
-    - apk add git bash openssh ca-certificates make
   script:
     - make build-api
-    - |
-      cat <<EOF > lichen.yaml
-      # minimum confidence percentage used during license classification
-      threshold: .80
-
-      override:
-        - path: "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go.git"
-          licenses: ["MPL-2.0"]
-        - path: "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity.git"
-          licenses: ["MPL-2.0"]
-
-      # all permitted licenses - if no list is specified, all licenses are assumed to be allowed
-      allow:
-        - "MIT"
-        - "Apache-2.0"
-        - "0BSD"
-        - "BSD-3-Clause"
-        - "BSD-2-Clause"
-        - "BSD-2-Clause-FreeBSD"
-        - "MPL-2.0"
-        - "ISC"
-        - "PostgreSQL"
-        - "CC-BY-SA-4.0"
-        - "Unicode-DFS-2016"
-      EOF
-
-    - lichen --config lichen.yaml $CI_PROJECT_DIR/apiserver
+    - lichen -j lichen.json $CI_PROJECT_DIR/apiserver
+    - >
+        jq '{"version": "2.1","licenses": [ . | .Modules[] | .Licenses[] | {"id": .Name,"name": .Name, "url": ("https://opensource.org/licenses/" + .Name) } ] | unique,"dependencies":[ . | .Modules[] | {"name": .Path, "version": .Version, "package_manager": "go","path": "go.sum","licenses": [ .Licenses[] | .Name]}]}' lichen.json > gl-license-scanning-report.json
   cache:
     <<: *cache-template
-  interruptible: true
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: on_success
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-      changes:
-        - "**/go.mod"
-        - "**/go.sum"
-        - go.mod
-        - go.sum
-
-gemnasium-dependency_scanning:
-  script:
-    - /analyzer run
-    - cat gl-dependency-scanning-report.json
   artifacts:
     reports:
-      dependency_scanning: gl-dependency-scanning-report.json
-    paths: [gl-dependency-scanning-report.json]
+      license_scanning: gl-license-scanning-report.json
+    paths: [gl-license-scanning-report.json]
+  dependencies: []
   rules:
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-      exists:
-        - "{Gemfile.lock,*/Gemfile.lock,*/*/Gemfile.lock}"
-        - "{composer.lock,*/composer.lock,*/*/composer.lock}"
-        - "{gems.locked,*/gems.locked,*/*/gems.locked}"
-        - "{go.sum,*/go.sum,*/*/go.sum}"
-        - "{npm-shrinkwrap.json,*/npm-shrinkwrap.json,*/*/npm-shrinkwrap.json}"
-        - "{package-lock.json,*/package-lock.json,*/*/package-lock.json}"
-        - "{yarn.lock,*/yarn.lock,*/*/yarn.lock}"
-        - "{packages.lock.json,*/packages.lock.json,*/*/packages.lock.json}"
-        - "{conan.lock,*/conan.lock,*/*/conan.lock}"
-  interruptible: true
-
-Software Composition Analysis:
-  image: golang:${GO_VERSION}-alpine
-  stage: test
-  before_script:
-    - apk add tar gzip curl git openssh
-  script:
-    - curl -sSL https://download.sourceclear.com/ci.sh | sh
-  rules:
-    - <<: *if-not-tharsis-namespace
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: on_success
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-      changes:
-        - "**/go.mod"
-        - "**/go.sum"
-        - go.mod
-        - go.sum
+    - !reference [.on_default_branch_and_merge_train_with_golang_changes, rules]

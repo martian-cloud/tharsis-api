@@ -20,10 +20,7 @@ func (g *Group) Validate() error {
 	}
 
 	// Verify description satisfies constraints
-	if err := verifyValidDescription(g.Description); err != nil {
-		return err
-	}
-	return nil
+	return verifyValidDescription(g.Description)
 }
 
 // GetRootGroupPath returns the root path for the group

@@ -239,11 +239,7 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 		return err
 	}
 
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		return err
-	}
-
-	return nil
+	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
 func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*models.Variable, error) {

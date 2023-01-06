@@ -11,10 +11,5 @@ type Team struct {
 // Validate returns an error if the model is not valid
 func (t *Team) Validate() error {
 	// Verify description satisfies constraints
-	if err := verifyValidDescription(t.Description); err != nil {
-		return err
-	}
-	return nil
+	return verifyValidDescription(t.Description)
 }
-
-// The End.

@@ -19,11 +19,7 @@ type TerraformModule struct {
 
 // Validate returns an error if the model is not valid
 func (t *TerraformModule) Validate() error {
-	// Verify name satisfies constraints
-	if err := verifyValidName(t.Name); err != nil {
-		return err
-	}
-	return nil
+	return verifyValidName(t.Name)
 }
 
 // GetRegistryNamespace returns the module registry namespace for the terraform module
