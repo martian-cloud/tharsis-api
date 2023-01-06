@@ -34,8 +34,8 @@ variables:
   SECRET_DETECTION_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH"
 
 default:
-  tags:
-    - oss
+  # tags:
+  #   - oss
   retry:
     max: 2
     when:
@@ -61,7 +61,7 @@ default:
 
 .on_tag_events:
   rules:
-    - if: '$CI_COMMIT_TAG'
+    - if: "$CI_COMMIT_TAG"
 
 .on_default_branch_and_merge_train_with_golang_changes:
   rules:
@@ -88,6 +88,8 @@ publish api docker:
     KUBERNETES_MEMORY_LIMIT: 4Gi
   before_script:
     - apk add git
+  tags:
+    - docker
   rules:
     - !reference [.on_tag_events, rules]
   script:
@@ -133,6 +135,8 @@ publish job-executor docker:
   services:
     - docker:dind
   stage: publish
+  tags:
+    - docker
   variables:
     KUBERNETES_MEMORY_REQUEST: 2Gi
     KUBERNETES_MEMORY_LIMIT: 4Gi
@@ -203,20 +207,20 @@ tests:
     - wget -O - https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
   script:
     - |
-        set -x
-        /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
-        go test \
-          -tags=integration \
-          --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
-          -covermode=atomic \
-          -coverpkg gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/... \
-          -v \
-          -coverprofile .coverage \
-          ./... 2>&1 | tee .test-results
+      set -x
+      /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
+      go test \
+        -tags=integration \
+        --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
+        -covermode=atomic \
+        -coverpkg gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/... \
+        -v \
+        -coverprofile .coverage \
+        ./... 2>&1 | tee .test-results
 
-        go tool cover -func .coverage | tail
-        go-junit-report -set-exit-code < .test-results > .xunit-results.xml
-        gocover-cobertura < .coverage > coverage.xml
+      go tool cover -func .coverage | tail
+      go-junit-report -set-exit-code < .test-results > .xunit-results.xml
+      gocover-cobertura < .coverage > coverage.xml
   artifacts:
     when: always
     reports:
@@ -238,34 +242,34 @@ lint:
   script:
     - go mod download
     - |
-        # Set similar rules as golint, subject to change
-        cat <<EOF > config.toml
-        ignoreGeneratedHeader = false
-        severity = "warning"
-        confidence = 0.8
-        errorCode = 0
-        warningCode = 0
+      # Set similar rules as golint, subject to change
+      cat <<EOF > config.toml
+      ignoreGeneratedHeader = false
+      severity = "warning"
+      confidence = 0.8
+      errorCode = 0
+      warningCode = 0
 
-        [rule.blank-imports]
-        [rule.context-as-argument]
-        [rule.context-keys-type]
-        [rule.dot-imports]
-        [rule.error-return]
-        [rule.error-strings]
-        [rule.error-naming]
-        [rule.exported]
-        [rule.if-return]
-        [rule.increment-decrement]
-        [rule.var-naming]
-        [rule.var-declaration]
-        # [rule.package-comments]
-        [rule.range]
-        [rule.receiver-naming]
-        [rule.time-naming]
-        [rule.unexported-return]
-        [rule.indent-error-flow]
-        [rule.errorf]
-        EOF
+      [rule.blank-imports]
+      [rule.context-as-argument]
+      [rule.context-keys-type]
+      [rule.dot-imports]
+      [rule.error-return]
+      [rule.error-strings]
+      [rule.error-naming]
+      [rule.exported]
+      [rule.if-return]
+      [rule.increment-decrement]
+      [rule.var-naming]
+      [rule.var-declaration]
+      # [rule.package-comments]
+      [rule.range]
+      [rule.receiver-naming]
+      [rule.time-naming]
+      [rule.unexported-return]
+      [rule.indent-error-flow]
+      [rule.errorf]
+      EOF
     - revive -config config.toml -set_exit_status $(go list ./... | grep -v /vendor/)
   cache:
     <<: *cache-template
@@ -324,7 +328,7 @@ license_scanning:
     - make build-api
     - lichen -j lichen.json $CI_PROJECT_DIR/apiserver
     - >
-        jq '{"version": "2.1","licenses": [ . | .Modules[] | .Licenses[] | {"id": .Name,"name": .Name, "url": ("https://opensource.org/licenses/" + .Name) } ] | unique,"dependencies":[ . | .Modules[] | {"name": .Path, "version": .Version, "package_manager": "go","path": "go.sum","licenses": [ .Licenses[] | .Name]}]}' lichen.json > gl-license-scanning-report.json
+      jq '{"version": "2.1","licenses": [ . | .Modules[] | .Licenses[] | {"id": .Name,"name": .Name, "url": ("https://opensource.org/licenses/" + .Name) } ] | unique,"dependencies":[ . | .Modules[] | {"name": .Path, "version": .Version, "package_manager": "go","path": "go.sum","licenses": [ .Licenses[] | .Name]}]}' lichen.json > gl-license-scanning-report.json
   cache:
     <<: *cache-template
   artifacts:
