@@ -83,9 +83,12 @@ publish api docker:
   services:
     - docker:dind
   stage: publish
+  tags:
+    - oss
+    - docker
   variables:
-    KUBERNETES_MEMORY_REQUEST: 2Gi
-    KUBERNETES_MEMORY_LIMIT: 4Gi
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "1"
   before_script:
     - apk add git
   rules:
@@ -133,9 +136,12 @@ publish job-executor docker:
   services:
     - docker:dind
   stage: publish
+  tags:
+    - oss
+    - docker
   variables:
-    KUBERNETES_MEMORY_REQUEST: 2Gi
-    KUBERNETES_MEMORY_LIMIT: 4Gi
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "1"
   before_script:
     - apk add git
   rules:
