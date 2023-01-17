@@ -205,13 +205,18 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Loop through the parsed queries from the request.
 		// These queries are executed in separate goroutines so they process in parallel.
 		go func(i int, q query) {
+			defer wg.Done()
 			var res *graphql.Response
 
 			// Rate limit query
 			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, subject)
 			if qcErr != nil {
 				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
-				respond(w, errorJSON(qcErr.Error()), http.StatusInternalServerError)
+				err := errors.NewError(
+					errors.EInternal,
+					qcErr.Error(),
+				)
+				responses[i] = &graphql.Response{Errors: []*grapherrors.QueryError{{Err: err, Message: errors.ErrorMessage(err)}}}
 				return
 			}
 
@@ -236,7 +241,6 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			res.Extensions["cost"] = queryComplexity
 
 			responses[i] = res
-			wg.Done()
 		}(i, q)
 	}
 
@@ -250,7 +254,10 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if e != nil && e.Err != nil {
 				// Log error message
 				code := errors.ErrorCode(e.Err)
-				if code != errors.EUnauthorized && code != errors.EForbidden && code != errors.ETooManyRequests {
+				if code == errors.EInternal {
+					respond(w, errorJSON(e.Message), http.StatusInternalServerError)
+					return
+				} else if code != errors.EUnauthorized && code != errors.EForbidden && code != errors.ETooManyRequests {
 					h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
 				}
 
