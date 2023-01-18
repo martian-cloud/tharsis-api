@@ -5,6 +5,8 @@ include:
   - template: Jobs/SAST-IaC.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: Code-Quality.gitlab-ci.yml
+  - template: DAST-API.gitlab-ci.yml
+  - template: API-Fuzzing.gitlab-ci.yml
   # Commented out as we are using our own tool for license scanning
   # - template: Jobs/License-Scanning.gitlab-ci.yml
 
@@ -12,6 +14,9 @@ stages:
   - test
   - publish
   - container_scanning
+  - trigger
+  - dast
+  - fuzz
 
 # Only start pipelines on Merge Requests or the default branch
 workflow:
@@ -32,6 +37,8 @@ variables:
   GOCACHE: "$GOPATH/cache"
   SAST_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH, docker-compose"
   SECRET_DETECTION_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH"
+  # Used for test builds of the container and scanning
+  IMAGE_TAG: "$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
 
 default:
   tags:
@@ -74,12 +81,18 @@ default:
         - go.mod
         - go.sum
 
+.on_default_branch_and_merge_train:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+
 #################################
 ##            BUILD            ##
 #################################
 
 publish api docker:
   image: docker:latest
+  needs: []
   services:
     - docker:dind
   stage: publish
@@ -92,47 +105,55 @@ publish api docker:
   before_script:
     - apk add git
   rules:
+    - !reference [.on_default_branch_and_merge_train, rules]
     - !reference [.on_tag_events, rules]
   script:
     - |
-      echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
+        # Build registry URIs.
+        registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+        api_uri="$registry_uri"/api
 
-      # Version is based on semantic versioning
-      full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
-      major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
-      major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
+        docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
-      # Build registry URIs.
-      registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
-      api_uri="$registry_uri"/api
+        echo "Building tharsis-api image"
+        docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
 
-      docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+        if [ ! -z "$CI_COMMIT_TAG" ]; then
+          echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
 
-      echo "Building tharsis-api image"
-      docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
+          # Version is based on semantic versioning
+          full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
+          major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
+          major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
 
-      # Version tag API images.
-      echo "Version tagging the api image"
-      docker image tag api:latest $api_uri:$full_version
-      docker image tag api:latest $api_uri:$major_version
-      docker image tag api:latest $api_uri:$major_minor_version
+          # Version tag API images.
+          echo "Version tagging the api image"
+          docker image tag api:latest $api_uri:$full_version
+          docker image tag api:latest $api_uri:$major_version
+          docker image tag api:latest $api_uri:$major_minor_version
 
-      echo "Pushing tharsis-api versioned image to registry"
-      docker image push $api_uri:$full_version
-      docker image push $api_uri:$major_version
-      docker image push $api_uri:$major_minor_version
+          echo "Pushing tharsis-api versioned image to registry"
+          docker image push $api_uri:$full_version
+          docker image push $api_uri:$major_version
+          docker image push $api_uri:$major_minor_version
 
-      latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
-      if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
-        then
-          echo "Build is latest, tagging and pushing image as latest"
-          docker image tag api:latest $api_uri:latest
-          docker image push $api_uri:latest
-      fi
+          latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
+          if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
+            then
+              echo "Build is latest, tagging and pushing image as latest"
+              docker image tag api:latest $api_uri:latest
+              docker image push $api_uri:latest
+          fi
+        else
+          echo "This is a normal commit so $IMAGE_TAG tag will be pushed to GitLab registry"
+          docker image tag api:latest $api_uri:$IMAGE_TAG
+          docker image push $api_uri:$IMAGE_TAG
+        fi
   interruptible: false
 
 publish job-executor docker:
   image: docker:latest
+  needs: []
   services:
     - docker:dind
   stage: publish
@@ -276,6 +297,16 @@ lint:
   cache:
     <<: *cache-template
 
+build_aio_container_image:
+  stage: trigger
+  rules:
+    - !reference [.on_default_branch_and_merge_train, rules]
+  needs:
+    - publish api docker
+  trigger:
+    project: infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker
+    strategy: depend
+
 #################################
 ##            SAST             ##
 #################################
@@ -316,7 +347,7 @@ code_quality:
   artifacts:
     paths: [gl-code-quality-report.json]
   rules:
-    - !reference [.on_default_branch_and_merge_train_with_golang_changes, rules]
+    - !reference [.on_default_branch_and_merge_train, rules]
 
 license_scanning:
   stage: test
@@ -340,3 +371,67 @@ license_scanning:
   dependencies: []
   rules:
     - !reference [.on_default_branch_and_merge_train_with_golang_changes, rules]
+
+dast_api:
+  services:
+    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+      alias: tharsis
+  variables:
+    DAST_API_GRAPHQL: /graphql
+    DAST_API_TARGET_URL: http://tharsis:8000/
+    DAST_API_OVERRIDES_FILE: dast-api-overrides.json
+    KUBERNETES_CPU_REQUEST: "2"
+    KUBERNETES_CPU_LIMIT: "4"
+    KUBERNETES_MEMORY_REQUEST: "500Mi"
+    KUBERNETES_MEMORY_LIMIT: "1Gi"
+    KUBERNETES_SERVICE_CPU_REQUEST: "250m"
+    KUBERNETES_SERVICE_CPU_LIMIT: "500m"
+    KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
+    JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
+  needs:
+    - build_aio_container_image
+  before_script:
+    - |
+        apk add curl jq
+        timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
+        THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
+          -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
+          --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
+          --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
+        export THARSIS_STATIC_TOKEN
+        echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
+  rules:
+    - !reference [.on_default_branch_and_merge_train, rules]
+
+apifuzzer_fuzz:
+  services:
+    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+      alias: tharsis
+  variables:
+    FUZZAPI_GRAPHQL: /graphql
+    FUZZAPI_TARGET_URL: http://tharsis:8000/
+    FUZZAPI_OVERRIDES_FILE: dast-api-overrides.json
+    KUBERNETES_CPU_REQUEST: "2"
+    KUBERNETES_CPU_LIMIT: "4"
+    KUBERNETES_MEMORY_REQUEST: "500Mi"
+    KUBERNETES_MEMORY_LIMIT: "1Gi"
+    KUBERNETES_SERVICE_CPU_REQUEST: "250m"
+    KUBERNETES_SERVICE_CPU_LIMIT: "500m"
+    KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
+    JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
+  needs:
+    - build_aio_container_image
+  before_script:
+    - |
+        apk add curl jq
+        timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
+        THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
+          -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
+          --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
+          --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
+        export THARSIS_STATIC_TOKEN
+        echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
+  rules:
+    - !reference [.on_default_branch_and_merge_train, rules]
