@@ -184,7 +184,7 @@ type ResetVCSProviderOAuthTokenMutationPayload struct {
 	Problems              []Problem
 }
 
-// ResetVCSProviderOAuthTokenMutationPayloadResolver resolvers a ResetVCSProviderOAuthTokenPayload
+// ResetVCSProviderOAuthTokenMutationPayloadResolver resolves a ResetVCSProviderOAuthTokenPayload
 type ResetVCSProviderOAuthTokenMutationPayloadResolver struct {
 	ResetVCSProviderOAuthTokenMutationPayload
 }
@@ -206,7 +206,7 @@ type VCSProviderMutationPayload struct {
 	Problems              []Problem
 }
 
-// VCSProviderMutationPayloadResolver resolvers a VCSProviderMutationPayload
+// VCSProviderMutationPayloadResolver resolves a VCSProviderMutationPayload
 type VCSProviderMutationPayloadResolver struct {
 	VCSProviderMutationPayload
 }

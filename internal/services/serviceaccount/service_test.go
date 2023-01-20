@@ -29,7 +29,7 @@ type keyPair struct {
 	pub  jwk.Key
 }
 
-func TestLogin(t *testing.T) {
+func TestCreateToken(t *testing.T) {
 	validKeyPair := createKeyPair(t)
 	invalidKeyPair := createKeyPair(t)
 
@@ -57,13 +57,13 @@ func TestLogin(t *testing.T) {
 		token          []byte
 	}{
 		{
-			name:           "login with service account resource path",
+			name:           "create service account token with service account resource path",
 			serviceAccount: "groupA/serviceAccount1",
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
 		},
 		{
-			name:           "login with service account ID",
+			name:           "create service account token with service account ID",
 			serviceAccount: serviceAccountID,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
@@ -73,14 +73,14 @@ func TestLogin(t *testing.T) {
 			serviceAccount: serviceAccountID,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      errors.New("Failed to verify token \"sub\" not satisfied: values do not match"),
+			expectErr:      errors.New("of the trust policies for issuer https://test.tharsis, none was satisfied"),
 		},
 		{
 			name:           "expired token",
 			serviceAccount: serviceAccountID,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(-time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      errors.New("Failed to verify token exp not satisfied"),
+			expectErr:      expiredTokenError,
 		},
 		{
 			name:           "no matching trust policy",
@@ -92,14 +92,14 @@ func TestLogin(t *testing.T) {
 					BoundClaims: map[string]string{},
 				},
 			},
-			expectErr: failedLoginError,
+			expectErr: failedCreateTokenError,
 		},
 		{
 			name:           "empty trust policy",
 			serviceAccount: serviceAccountID,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         []models.OIDCTrustPolicy{},
-			expectErr:      failedLoginError,
+			expectErr:      failedCreateTokenError,
 		},
 		{
 			name:           "invalid token",
@@ -120,7 +120,75 @@ func TestLogin(t *testing.T) {
 			serviceAccount: "groupA/serviceAccount1",
 			token:          createJWT(t, invalidKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      failedLoginError,
+			expectErr:      failedCreateTokenError,
+		},
+		{
+			name:           "negative: multiple trust policies with same issuer: all mismatch",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "noMatchSubject", time.Now().Add(time.Minute)),
+			policy: []models.OIDCTrustPolicy{
+				{
+					Issuer:      issuer,
+					BoundClaims: map[string]string{"sub": "firstSubject"},
+				},
+				{
+					Issuer:      issuer,
+					BoundClaims: map[string]string{"sub": "secondSubject"},
+				},
+			},
+			expectErr: errors.New("of the trust policies for issuer https://test.tharsis, none was satisfied"),
+		},
+		{
+			name:           "positive: multiple trust policies with same issuer: match first",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "firstSubject", time.Now().Add(time.Minute)),
+			policy: []models.OIDCTrustPolicy{
+				{
+					Issuer:      issuer,
+					BoundClaims: map[string]string{"sub": "firstSubject"},
+				},
+				{
+					Issuer:      issuer,
+					BoundClaims: map[string]string{"sub": "secondSubject"},
+				},
+			},
+		},
+		{
+			name:           "positive: multiple trust policies with same issuer: match second",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "secondSubject", time.Now().Add(time.Minute)),
+			policy: []models.OIDCTrustPolicy{
+				{
+					Issuer:      issuer,
+					BoundClaims: map[string]string{"sub": "firstSubject"},
+				},
+				{
+					Issuer:      issuer,
+					BoundClaims: map[string]string{"sub": "secondSubject"},
+				},
+			},
+		},
+		{
+			name:           "positive: trust policy issuer has forward slash, token issuer does not",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          createJWT(t, validKeyPair.priv, keyID, "https://test.tharsis", sub, time.Now().Add(time.Minute)),
+			policy: []models.OIDCTrustPolicy{
+				{
+					Issuer:      "https://test.tharsis/",
+					BoundClaims: map[string]string{},
+				},
+			},
+		},
+		{
+			name:           "positive: token issuer has forward slash, trust policy issuer does not",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          createJWT(t, validKeyPair.priv, keyID, "https://test.tharsis/", sub, time.Now().Add(time.Minute)),
+			policy: []models.OIDCTrustPolicy{
+				{
+					Issuer:      "https://test.tharsis",
+					BoundClaims: map[string]string{},
+				},
+			},
 		},
 	}
 	for _, test := range tests {
@@ -180,14 +248,15 @@ func TestLogin(t *testing.T) {
 
 			service := newService(testLogger, &dbClient, serviceAccountAuth, configFetcher, getKeySetFunc, &mockActivityEvents)
 
-			resp, err := service.Login(ctx, &LoginInput{ServiceAccount: test.serviceAccount, Token: test.token})
+			resp, err := service.CreateToken(ctx, &CreateTokenInput{ServiceAccount: test.serviceAccount, Token: test.token})
 			if err != nil && test.expectErr == nil {
 				t.Fatal(err)
 			}
 
 			if test.expectErr == nil {
-				expected := LoginResponse{
-					Token: []byte("signedtoken"),
+				expected := CreateTokenResponse{
+					Token:     []byte("signedtoken"),
+					ExpiresIn: int32(serviceAccountLoginDuration / time.Second),
 				}
 
 				assert.Equal(t, &expected, resp)

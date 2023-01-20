@@ -284,7 +284,7 @@ type TerraformModuleVersionMutationPayload struct {
 	Problems         []Problem
 }
 
-// TerraformModuleVersionMutationPayloadResolver resolvers a TerraformModuleVersionMutationPayload
+// TerraformModuleVersionMutationPayloadResolver resolves a TerraformModuleVersionMutationPayload
 type TerraformModuleVersionMutationPayloadResolver struct {
 	TerraformModuleVersionMutationPayload
 }

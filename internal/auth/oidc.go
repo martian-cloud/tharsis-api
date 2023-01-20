@@ -43,7 +43,8 @@ type OIDCConfiguration struct {
 
 // GetOpenIDConfig returns the IDP config from the OIDC discovery document
 func (o *OpenIDConfigFetcher) GetOpenIDConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error) {
-	wellKnownURI := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
+	normalizedIssuer := strings.TrimSuffix(issuer, "/")
+	wellKnownURI := normalizedIssuer + "/.well-known/openid-configuration"
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, "GET", wellKnownURI, nil)
 	if err != nil {
@@ -72,7 +73,7 @@ func (o *OpenIDConfigFetcher) GetOpenIDConfig(ctx context.Context, issuer string
 		return nil, fmt.Errorf("unable to parse OIDC discovery document: %v", err)
 	}
 
-	if cfg.Issuer != issuer {
+	if strings.TrimSuffix(cfg.Issuer, "/") != normalizedIssuer {
 		return nil, fmt.Errorf("OIDC issuer does not match the issuer returned by the OIDC discovery document, expected %q got %q", issuer, cfg.Issuer)
 	}
 

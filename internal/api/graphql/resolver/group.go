@@ -406,7 +406,7 @@ type GroupMutationPayload struct {
 	Problems         []Problem
 }
 
-// GroupMutationPayloadResolver resolvers a GroupMutationPayload
+// GroupMutationPayloadResolver resolves a GroupMutationPayload
 type GroupMutationPayloadResolver struct {
 	GroupMutationPayload
 }

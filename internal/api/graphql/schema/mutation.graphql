@@ -42,6 +42,9 @@ type Mutation {
   deleteServiceAccount(
     input: DeleteServiceAccountInput!
   ): DeleteServiceAccountPayload!
+  serviceAccountCreateToken(
+    input: ServiceAccountCreateTokenInput!
+  ): ServiceAccountCreateTokenPayload!
   createNamespaceMembership(
     input: CreateNamespaceMembershipInput!
   ): NamespaceMembershipMutationPayload!

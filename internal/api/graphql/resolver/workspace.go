@@ -459,7 +459,7 @@ type WorkspaceMutationPayload struct {
 	Problems         []Problem
 }
 
-// WorkspaceMutationPayloadResolver resolvers a WorkspaceMutationPayload
+// WorkspaceMutationPayloadResolver resolves a WorkspaceMutationPayload
 type WorkspaceMutationPayloadResolver struct {
 	WorkspaceMutationPayload
 }

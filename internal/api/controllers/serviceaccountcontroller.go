@@ -51,7 +51,7 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resp, err := c.saService.Login(r.Context(), &serviceaccount.LoginInput{
+	resp, err := c.saService.CreateToken(r.Context(), &serviceaccount.CreateTokenInput{
 		ServiceAccount: *req.ServiceAccountPath,
 		Token:          []byte(*req.Token),
 	})

@@ -7,17 +7,19 @@ type ProblemType string
 
 // Problem constants
 const (
-	Conflict   ProblemType = "CONFLICT"
-	BadRequest ProblemType = "BAD_REQUEST"
-	NotFound   ProblemType = "NOT_FOUND"
-	Forbidden  ProblemType = "FORBIDDEN"
+	Conflict     ProblemType = "CONFLICT"
+	BadRequest   ProblemType = "BAD_REQUEST"
+	NotFound     ProblemType = "NOT_FOUND"
+	Forbidden    ProblemType = "FORBIDDEN"
+	Unauthorized ProblemType = "UNAUTHORIZED"
 )
 
 var tharsisErrorToProblemType = map[string]ProblemType{
-	errors.EInvalid:   BadRequest,
-	errors.EConflict:  Conflict,
-	errors.ENotFound:  NotFound,
-	errors.EForbidden: Forbidden,
+	errors.EInvalid:      BadRequest,
+	errors.EConflict:     Conflict,
+	errors.ENotFound:     NotFound,
+	errors.EForbidden:    Forbidden,
+	errors.EUnauthorized: Unauthorized,
 }
 
 // Problem is used to represent a user facing issue

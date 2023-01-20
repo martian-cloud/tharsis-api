@@ -8,6 +8,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 )
 
+const (
+	maximumTrustPolicies = 10
+)
+
 // OIDCTrustPolicy defined the IDP that can be used for logging into the service account
 type OIDCTrustPolicy struct {
 	BoundClaims map[string]string
@@ -38,11 +42,14 @@ func (s *ServiceAccount) Validate() error {
 	}
 
 	// Verify at least one trust policy is defined
-	if len(s.OIDCTrustPolicies) == 0 {
+	policyCount := len(s.OIDCTrustPolicies)
+	if policyCount == 0 {
 		return errors.NewError(errors.EInvalid, "A minimum of one OIDC trust policy is required")
 	}
-
-	issuerMap := map[string]bool{}
+	if policyCount > maximumTrustPolicies {
+		return errors.NewError(errors.EInvalid,
+			fmt.Sprintf("%d exceeds the limit of %d OIDC trust policies", policyCount, maximumTrustPolicies))
+	}
 
 	for _, policy := range s.OIDCTrustPolicies {
 		// Verify issuer is defined
@@ -54,14 +61,6 @@ func (s *ServiceAccount) Validate() error {
 		if _, err := url.ParseRequestURI(policy.Issuer); err != nil {
 			return errors.NewError(errors.EInvalid, "Invalid issuer URL")
 		}
-
-		// Verify that issuer URL hasn't already been defined
-		if ok := issuerMap[policy.Issuer]; ok {
-			return errors.NewError(errors.EInvalid, fmt.Sprintf("Issuer %s can only be included in a single trust policy for this service account", policy.Issuer))
-		}
-
-		/// Add issuer URL to map
-		issuerMap[policy.Issuer] = true
 
 		// Verify at least one claim is present in each trust policy
 		if len(policy.BoundClaims) == 0 {
