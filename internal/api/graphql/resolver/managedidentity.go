@@ -331,7 +331,7 @@ type ManagedIdentityMutationPayload struct {
 	Problems         []Problem
 }
 
-// ManagedIdentityMutationPayloadResolver resolvers a ManagedIdentityMutationPayload
+// ManagedIdentityMutationPayloadResolver resolves a ManagedIdentityMutationPayload
 type ManagedIdentityMutationPayloadResolver struct {
 	ManagedIdentityMutationPayload
 }

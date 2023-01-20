@@ -327,6 +327,18 @@ func (r RootResolver) DeleteServiceAccount(ctx context.Context, args *struct{ In
 	return deleteServiceAccountMutation(ctx, args.Input)
 }
 
+// ServiceAccountCreateToken creates a token for a service account
+func (r RootResolver) ServiceAccountCreateToken(ctx context.Context, args *struct {
+	Input *ServiceAccountCreateTokenInput
+}) (*ServiceAccountCreateTokenPayload, error) {
+	response, err := serviceAccountCreateTokenMutation(ctx, args.Input)
+	if err != nil {
+		return handleServiceAccountCreateTokenProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // WorkspaceRunEvents subscribes to run events for a particular workspace
 func (r RootResolver) WorkspaceRunEvents(ctx context.Context, args *struct{ Input *RunSubscriptionInput }) (<-chan *RunEventResolver, error) {
 	return r.workspaceRunEventsSubscription(ctx, args.Input)

@@ -263,13 +263,13 @@ type ServiceAccountMutationPayload struct {
 	Problems         []Problem
 }
 
-// ServiceAccountMutationPayloadResolver resolvers a ServiceAccountMutationPayload
+// ServiceAccountMutationPayloadResolver resolves a ServiceAccountMutationPayload
 type ServiceAccountMutationPayloadResolver struct {
 	ServiceAccountMutationPayload
 }
 
 // ServiceAccount field resolver
-func (r *ServiceAccountMutationPayloadResolver) ServiceAccount(ctx context.Context) *ServiceAccountResolver {
+func (r *ServiceAccountMutationPayloadResolver) ServiceAccount() *ServiceAccountResolver {
 	if r.ServiceAccountMutationPayload.ServiceAccount == nil {
 		return nil
 	}
@@ -481,4 +481,48 @@ func serviceAccountBatchFunc(ctx context.Context, ids []string) (loader.DataBatc
 	}
 
 	return batch, nil
+}
+
+/* Service account create token mutation resolvers */
+
+// ServiceAccountCreateTokenInput contains the input for the service account create token mutation.
+type ServiceAccountCreateTokenInput struct {
+	ClientMutationID   *string
+	ServiceAccountPath string
+	Token              string
+}
+
+// ServiceAccountCreateTokenPayload is the response payload for the service account create token mutation
+type ServiceAccountCreateTokenPayload struct {
+	ClientMutationID *string
+	Token            *string
+	ExpiresIn        *int32
+	Problems         []Problem
+}
+
+func serviceAccountCreateTokenMutation(ctx context.Context,
+	input *ServiceAccountCreateTokenInput) (*ServiceAccountCreateTokenPayload, error) {
+	saService := getSAService(ctx)
+
+	resp, err := saService.CreateToken(ctx, &serviceaccount.CreateTokenInput{
+		ServiceAccount: input.ServiceAccountPath,
+		Token:          []byte(input.Token),
+	})
+	if err != nil {
+		return nil, err
+	}
+	// resp cannot be nil when err is nil
+
+	stringToken := string(resp.Token)
+	payload := ServiceAccountCreateTokenPayload{Token: &stringToken, ExpiresIn: &resp.ExpiresIn, Problems: []Problem{}}
+	return &payload, nil
+}
+
+func handleServiceAccountCreateTokenProblem(e error, clientMutationID *string) (*ServiceAccountCreateTokenPayload, error) {
+	problem, err := buildProblem(e)
+	if err != nil {
+		return nil, err
+	}
+	payload := ServiceAccountCreateTokenPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
+	return &payload, nil
 }

@@ -19,22 +19,33 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 )
 
-var (
-	failedLoginError = errors.NewError(errors.EUnauthorized, "Failed to login to service account due to one of the "+
-		"following reasons: the service account does not exist; the JWT token used to login is invalid; the issuer "+
-		"for the token is not a valid issuer.")
+const (
+	failedToVerifyJWSSignature = "failed to verify jws signature"
+	expiredTokenDetector       = "Failed to verify token exp not satisfied"
 )
 
-// LoginInput for logging into a service account
-type LoginInput struct {
+var (
+	serviceAccountLoginDuration = 1 * time.Hour
+
+	failedCreateTokenError = errors.NewError(errors.EUnauthorized, "Failed to create service account token due to one of the "+
+		"following reasons: the service account does not exist; the JWT token used as input is invalid; the issuer "+
+		"for the token is not a valid issuer.")
+
+	expiredTokenError = errors.NewError(errors.EUnauthorized,
+		"Failed to create service account token due to an expired token.")
+)
+
+// CreateTokenInput for logging into a service account
+type CreateTokenInput struct {
 	// ServiceAccount ID or resource path
 	ServiceAccount string
 	Token          []byte
 }
 
-// LoginResponse returned after logging into a service account
-type LoginResponse struct {
-	Token []byte
+// CreateTokenResponse returned after logging into a service account
+type CreateTokenResponse struct {
+	Token     []byte
+	ExpiresIn int32 // seconds
 }
 
 // GetServiceAccountsInput is the input for querying a list of service accounts
@@ -60,7 +71,7 @@ type Service interface {
 	CreateServiceAccount(ctx context.Context, input *models.ServiceAccount) (*models.ServiceAccount, error)
 	UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error)
 	DeleteServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) error
-	Login(ctx context.Context, input *LoginInput) (*LoginResponse, error)
+	CreateToken(ctx context.Context, input *CreateTokenInput) (*CreateTokenResponse, error)
 }
 
 type service struct {
@@ -394,101 +405,108 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 	return updatedServiceAccount, nil
 }
 
-func (s *service) Login(ctx context.Context, input *LoginInput) (*LoginResponse, error) {
+func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*CreateTokenResponse, error) {
 	// Parse token
 	token, err := jwt.Parse(input.Token)
 	if err != nil {
 		return nil, errors.NewError(errors.EUnauthorized, fmt.Sprintf("Failed to decode token %v", err))
 	}
 
-	// Check if token if from a valid issuer associated with the service account
-	if token.Issuer() == "" {
+	// Check if token is from a valid issuer associated with the service account
+	issuer := token.Issuer()
+	if issuer == "" {
 		return nil, errors.NewError(errors.EUnauthorized, "JWT is missing issuer claim")
 	}
 
 	// Get service account
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByPath(ctx, input.ServiceAccount)
 	if err != nil || serviceAccount == nil {
-		s.logger.Infof("Failed login to service account; resource path %s does not exist", input.ServiceAccount)
-		return nil, failedLoginError
+		s.logger.Infof("Failed to create token for service account; resource path %s does not exist", input.ServiceAccount)
+		return nil, failedCreateTokenError
 	}
 
-	issuer := token.Issuer()
-
-	trustPolicy := s.findMatchingTrustPolicy(issuer, serviceAccount.OIDCTrustPolicies)
-	if trustPolicy == nil {
-		s.logger.Infof("Failed login to service account %s; issuer %s not found in trust policy", serviceAccount.ResourcePath, issuer)
-		return nil, failedLoginError
+	trustPolicies := s.findMatchingTrustPolicies(issuer, serviceAccount.OIDCTrustPolicies)
+	if len(trustPolicies) == 0 {
+		s.logger.Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.ResourcePath, issuer)
+		return nil, failedCreateTokenError
 	}
 
-	// Get issuer JWK response
-	keySet, err := s.getKeySetFunc(ctx, trustPolicy.Issuer, s.openIDConfigFetcher)
-	if err != nil {
-		return nil, err
-	}
+	// One satisfied trust policy is sufficient for service account token creation.
+	// However, must keep all the failures in case everything fails.
+	mismatchesFound := []string{}
+	for _, trustPolicy := range trustPolicies {
 
-	// Set default key to RS256 if it's not specified in JWK set
-	iter := keySet.Iterate(ctx)
-	for iter.Next(ctx) {
-		key := iter.Pair().Value.(jwk.Key)
-		if err = key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
-			return nil, err
-		}
-	}
+		err := s.verifyOneTrustPolicy(ctx, input.Token, trustPolicy, serviceAccount)
+		if err != nil {
 
-	options := []jwt.ParseOption{
-		jwt.WithKeySet(keySet),
-		jwt.WithValidate(true),
-	}
-	for k, v := range trustPolicy.BoundClaims {
-		if k == "aud" {
-			options = append(options, jwt.WithAudience(v))
+			// Catch bubbled-up invalid token signature errors here.
+			if strings.Contains(err.Error(), failedToVerifyJWSSignature) {
+				s.logger.Infof("Failed to create token for service account %s due to invalid token signature",
+					serviceAccount.ResourcePath)
+				return nil, failedCreateTokenError
+			}
+
+			// Catch token expiration here.  An expired token will be expired for all trust policies.
+			if strings.Contains(err.Error(), expiredTokenDetector) {
+				s.logger.Infof("Failed to create token for service account %s due to expired token",
+					serviceAccount.ResourcePath)
+				return nil, expiredTokenError
+			}
+
+			// Record this claim mismatch in case no other, later trust policy is satisfied
+			mismatchesFound = append(mismatchesFound, err.Error())
 		} else {
-			options = append(options, jwt.WithClaimValue(k, v))
+			// The input token satisfied this trust policy, so the service account token creation succeeded.
+
+			// Generate service account token
+			expiration := time.Now().Add(serviceAccountLoginDuration)
+			serviceAccountToken, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
+				Expiration: &expiration,
+				Subject:    serviceAccount.ResourcePath,
+				Claims: map[string]string{
+					"service_account_name": serviceAccount.Name,
+					"service_account_path": serviceAccount.ResourcePath,
+					"service_account_id":   gid.ToGlobalID(gid.ServiceAccountType, serviceAccount.Metadata.ID),
+					"type":                 auth.ServiceAccountTokenType,
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			return &CreateTokenResponse{
+				Token:     serviceAccountToken,
+				ExpiresIn: int32(serviceAccountLoginDuration / time.Second),
+			}, nil
 		}
 	}
 
-	// Parse and Verify token
-	if _, err = jwt.Parse(input.Token, options...); err != nil {
-		if strings.Contains(err.Error(), "failed to verify jws signature") {
-			s.logger.Infof("Login to service account %s failed due to invalid token signature", serviceAccount.ResourcePath)
-			return nil, failedLoginError
-		}
-		return nil, errors.NewError(errors.EUnauthorized, fmt.Sprintf("Failed to verify token %v", err))
-	}
+	// Log all the mismatches found so we can look them up if needed.
+	s.logger.Infof("failed to create service account token for issuer %s; %s", issuer, strings.Join(mismatchesFound, "; "))
 
-	// Generate service account token
-	expiration := time.Now().Add(1 * time.Hour)
-	serviceAccountToken, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
-		Expiration: &expiration,
-		Subject:    serviceAccount.ResourcePath,
-		Claims: map[string]string{
-			"service_account_name": serviceAccount.Name,
-			"service_account_path": serviceAccount.ResourcePath,
-			"service_account_id":   gid.ToGlobalID(gid.ServiceAccountType, serviceAccount.Metadata.ID),
-			"type":                 auth.ServiceAccountTokenType,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &LoginResponse{
-		Token: serviceAccountToken,
-	}, nil
+	// We know there was at least one trust policy checked, otherwise we would have returned before the for loop.
+	// To get here, all of the trust policies that were checked must have failed.
+	return nil, errors.NewError(errors.EUnauthorized,
+		fmt.Sprintf("of the trust policies for issuer %s, none was satisfied", issuer))
 }
 
-func (s *service) findMatchingTrustPolicy(issuer string, policies []models.OIDCTrustPolicy) *models.OIDCTrustPolicy {
+// findMatchingTrustPolicies returns a slice of the policies that have a matching issuer.
+// If no match is found, it returns an empty slice.
+// Trailing forward slashes are ignored on both sides of the comparison.
+// Claims are not checked.
+func (s *service) findMatchingTrustPolicies(issuer string, policies []models.OIDCTrustPolicy) []models.OIDCTrustPolicy {
+	result := []models.OIDCTrustPolicy{}
 	normalizedIssuer := issuer
 	if !strings.HasPrefix(issuer, "https://") {
 		normalizedIssuer = fmt.Sprintf("https://%s", issuer)
 	}
+	normalizedIssuer = strings.TrimSuffix(normalizedIssuer, "/")
 	for _, p := range policies {
-		if normalizedIssuer == p.Issuer {
-			return &p
+		if normalizedIssuer == strings.TrimSuffix(p.Issuer, "/") {
+			result = append(result, p)
 		}
 	}
-	return nil
+	return result
 }
 
 func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error) {
@@ -510,4 +528,44 @@ func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDCon
 	}
 
 	return keySet, nil
+}
+
+// verifyOneTrustPolicy verifies a token vs. one trust policy.
+func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, trustPolicy models.OIDCTrustPolicy,
+	serviceAccount *models.ServiceAccount) error {
+
+	// Get issuer JWK response
+	keySet, err := s.getKeySetFunc(ctx, trustPolicy.Issuer, s.openIDConfigFetcher)
+	if err != nil {
+		return err
+	}
+
+	// Set default key to RS256 if it's not specified in JWK set
+	iter := keySet.Iterate(ctx)
+	for iter.Next(ctx) {
+		key := iter.Pair().Value.(jwk.Key)
+		if err = key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+			return err
+		}
+	}
+
+	options := []jwt.ParseOption{
+		jwt.WithKeySet(keySet),
+		jwt.WithValidate(true),
+	}
+	for k, v := range trustPolicy.BoundClaims {
+		if k == "aud" {
+			options = append(options, jwt.WithAudience(v))
+		} else {
+			options = append(options, jwt.WithClaimValue(k, v))
+		}
+	}
+
+	// Parse and Verify token
+	if _, err = jwt.Parse(inputToken, options...); err != nil {
+		return errors.NewError(errors.EUnauthorized,
+			fmt.Sprintf("Failed to verify token %v", err))
+	}
+
+	return nil
 }

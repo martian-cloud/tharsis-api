@@ -169,7 +169,7 @@ type GPGKeyMutationPayload struct {
 	Problems         []Problem
 }
 
-// GPGKeyMutationPayloadResolver resolvers a GPGKeyMutationPayload
+// GPGKeyMutationPayloadResolver resolves a GPGKeyMutationPayload
 type GPGKeyMutationPayloadResolver struct {
 	GPGKeyMutationPayload
 }

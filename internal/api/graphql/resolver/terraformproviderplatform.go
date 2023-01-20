@@ -72,7 +72,7 @@ type TerraformProviderPlatformMutationPayload struct {
 	Problems         []Problem
 }
 
-// TerraformProviderPlatformMutationPayloadResolver resolvers a TerraformProviderPlatformMutationPayload
+// TerraformProviderPlatformMutationPayloadResolver resolves a TerraformProviderPlatformMutationPayload
 type TerraformProviderPlatformMutationPayloadResolver struct {
 	TerraformProviderPlatformMutationPayload
 }

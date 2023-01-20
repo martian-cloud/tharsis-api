@@ -106,7 +106,7 @@ type WorkspaceVCSProviderLinkMutationPayload struct {
 	Problems         []Problem
 }
 
-// WorkspaceVCSProviderLinkMutationPayloadResolver resolvers a WorkspaceVCSProviderLinkMutationPayload
+// WorkspaceVCSProviderLinkMutationPayloadResolver resolver a WorkspaceVCSProviderLinkMutationPayload
 type WorkspaceVCSProviderLinkMutationPayloadResolver struct {
 	webhookToken []byte
 	webhookURL   *string

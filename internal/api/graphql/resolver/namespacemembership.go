@@ -128,7 +128,7 @@ func (r *MemberResolver) ToUser() (*UserResolver, bool) {
 	return res, ok
 }
 
-// ToServiceAccount resolvers service account member types
+// ToServiceAccount resolves service account member types
 func (r *MemberResolver) ToServiceAccount() (*ServiceAccountResolver, bool) {
 	res, ok := r.result.(*ServiceAccountResolver)
 	return res, ok

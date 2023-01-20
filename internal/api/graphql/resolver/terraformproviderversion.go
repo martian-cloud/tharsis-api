@@ -264,7 +264,7 @@ type TerraformProviderVersionMutationPayload struct {
 	Problems         []Problem
 }
 
-// TerraformProviderVersionMutationPayloadResolver resolvers a TerraformProviderVersionMutationPayload
+// TerraformProviderVersionMutationPayloadResolver resolves a TerraformProviderVersionMutationPayload
 type TerraformProviderVersionMutationPayloadResolver struct {
 	TerraformProviderVersionMutationPayload
 }
