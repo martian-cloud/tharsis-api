@@ -213,8 +213,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if qcErr != nil {
 				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
 				err := errors.NewError(
-					errors.EInternal,
-					qcErr.Error(),
+					errors.EInvalid,
+					"invalid graphql query: "+strings.TrimPrefix(qcErr.Error(), "graphql: syntax error: "),
 				)
 				responses[i] = &graphql.Response{Errors: []*grapherrors.QueryError{{Err: err, Message: errors.ErrorMessage(err)}}}
 				return
@@ -252,15 +252,14 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, response := range responses {
 		for _, e := range response.Errors {
 			if e != nil && e.Err != nil {
-				// Log error message
-				code := errors.ErrorCode(e.Err)
-				if code == errors.EInternal {
-					respond(w, errorJSON(e.Message), http.StatusInternalServerError)
-					return
-				} else if code != errors.EUnauthorized && code != errors.EForbidden && code != errors.ETooManyRequests {
+				switch errors.ErrorCode(e.Err) {
+				case
+					errors.EUnauthorized,
+					errors.EForbidden,
+					errors.ETooManyRequests:
+					// Log error message
 					h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
 				}
-
 				e.Extensions = getErrExtensions(e.Err)
 			}
 		}
