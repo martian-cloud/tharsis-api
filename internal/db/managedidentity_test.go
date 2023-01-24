@@ -72,6 +72,14 @@ func TestGetManagedIdentityByID(t *testing.T) {
 		// No point if warmup objects weren't all created.
 		return
 	}
+
+	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	assert.Nil(t, err)
+	if err != nil {
+		return
+	}
+	assert.NotNil(t, createdAlias)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -88,6 +96,11 @@ func TestGetManagedIdentityByID(t *testing.T) {
 			name:                  "positive",
 			searchID:              positiveManagedIdentity.Metadata.ID,
 			expectManagedIdentity: &positiveManagedIdentity,
+		},
+		{
+			name:                  "positive: successfully retrieve a managed identity alias",
+			searchID:              createdAlias.Metadata.ID,
+			expectManagedIdentity: createdAlias,
 		},
 		{
 			name:     "negative, non-existent ID",
@@ -149,6 +162,14 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 		// No point if warmup objects weren't all created.
 		return
 	}
+
+	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	assert.Nil(t, err)
+	if err != nil {
+		return
+	}
+	assert.NotNil(t, createdAlias)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -165,6 +186,11 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 			name:                  "positive",
 			searchID:              positiveManagedIdentity.ResourcePath,
 			expectManagedIdentity: &positiveManagedIdentity,
+		},
+		{
+			name:                  "positive: successfully retrieve a managed identity alias",
+			searchID:              createdAlias.ResourcePath,
+			expectManagedIdentity: createdAlias,
 		},
 		{
 			name:     "negative, non-existent ID",
@@ -221,6 +247,14 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 		// No point if warmup objects weren't all created.
 		return
 	}
+
+	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	assert.Nil(t, err)
+	if err != nil {
+		return
+	}
+	assert.NotNil(t, createdAlias)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -243,7 +277,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 			name:                    "positive",
 			workspaceID:             warmupItems.workspaces[0].Metadata.ID,
 			addToWorkspace:          true,
-			expectManagedIdentities: []models.ManagedIdentity{positiveManagedIdentity},
+			expectManagedIdentities: []models.ManagedIdentity{positiveManagedIdentity, *createdAlias},
 		},
 		{
 			name:                    "negative, non-existent ID",
@@ -261,11 +295,13 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			// If specified, add the managed identity to the workspace.
+			// If specified, add the managed identities to the workspace.
 			if test.addToWorkspace {
-				err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
-					warmupItems.managedIdentities[0].Metadata.ID, warmupItems.workspaces[0].Metadata.ID)
-				require.Nil(t, err)
+				for _, identity := range test.expectManagedIdentities {
+					err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
+						identity.Metadata.ID, warmupItems.workspaces[0].Metadata.ID)
+					require.Nil(t, err)
+				}
 			}
 
 			actualManagedIdentities, err :=
@@ -537,6 +573,24 @@ func TestCreateManagedIdentity(t *testing.T) {
 	warmupGroup := warmupItems.groups[0]
 	warmupGroupID := warmupGroup.Metadata.ID
 
+	aliasGroup := warmupItems.groups[1]
+	aliasGroupID := aliasGroup.Metadata.ID
+
+	// Create a managed identity prior to running tests so an alias can use it.
+	aliasSourceIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Type:        models.ManagedIdentityAWSFederated,
+		Name:        "a-managed-identity-for-testing-aliases",
+		Description: "A description for this managed identity",
+		GroupID:     warmupGroupID,
+		CreatedBy:   "creator-of-managed-identities",
+		Data:        []byte("some-data-for-the-source-managed-identity"),
+	})
+	assert.Nil(t, err)
+	if err != nil {
+		return
+	}
+	assert.NotNil(t, aliasSourceIdentity)
+
 	type testCase struct {
 		toCreate      *models.ManagedIdentity
 		expectCreated *models.ManagedIdentity
@@ -593,13 +647,37 @@ func TestCreateManagedIdentity(t *testing.T) {
 		},
 
 		{
+			name: "create a managed identity alias",
+			toCreate: &models.ManagedIdentity{
+				Name:          "positive-create-managed-identity-alias",
+				GroupID:       aliasGroupID,
+				AliasSourceID: &aliasSourceIdentity.Metadata.ID,
+				CreatedBy:     "creator-of-managed-identities",
+			},
+			expectCreated: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					Version:           initialResourceVersion,
+					CreationTimestamp: &now,
+				},
+				Type:          aliasSourceIdentity.Type,
+				ResourcePath:  aliasGroup.FullPath + "/positive-create-managed-identity-alias",
+				Name:          "positive-create-managed-identity-alias",
+				Description:   aliasSourceIdentity.Description,
+				GroupID:       aliasGroupID,
+				Data:          aliasSourceIdentity.Data,
+				CreatedBy:     "creator-of-managed-identities",
+				AliasSourceID: &aliasSourceIdentity.Metadata.ID,
+			},
+		},
+
+		{
 			name: "duplicate name in same group",
 			toCreate: &models.ManagedIdentity{
 				Name:    "positive-create-managed-identity-nearly-empty",
 				GroupID: warmupGroupID,
 				// Resource path is not used when creating the object, but it is returned.
 			},
-			expectMsg: ptr.String("managed identity name already exists in the specified group"),
+			expectMsg: ptr.String("managed identity already exists in the specified group"),
 		},
 
 		{
@@ -625,7 +703,6 @@ func TestCreateManagedIdentity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			actualCreated, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, test.toCreate)
-
 			checkError(t, test.expectMsg, err)
 
 			if test.expectCreated != nil {
@@ -783,6 +860,16 @@ func TestGetManagedIdentities(t *testing.T) {
 		// No point if warmup objects weren't all created.
 		return
 	}
+
+	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	assert.Nil(t, err)
+	if err != nil {
+		return
+	}
+	assert.NotNil(t, createdAlias)
+
+	// Append the slice to the created alias.
+	warmupItems.managedIdentities = append(warmupItems.managedIdentities, *createdAlias)
 	allManagedIdentityInfos := managedIdentityInfoFromManagedIdentities(warmupItems.managedIdentities)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -1117,7 +1204,7 @@ func TestGetManagedIdentities(t *testing.T) {
 					Search: ptr.String("5"),
 				},
 			},
-			expectManagedIdentityIDs: allManagedIdentityIDsByName[4:],
+			expectManagedIdentityIDs: allManagedIdentityIDsByName[4:5],
 			expectPageInfo:           PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
@@ -1161,6 +1248,19 @@ func TestGetManagedIdentities(t *testing.T) {
 			},
 			expectManagedIdentityIDs: []string{},
 			expectPageInfo:           PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectHasStartCursor:     true,
+			expectHasEndCursor:       true,
+		},
+		{
+			name: "filter, search for a managed identity alias, positive",
+			input: &GetManagedIdentitiesInput{
+				Sort: ptrManagedIdentitySortableField(ManagedIdentitySortableFieldCreatedAtAsc),
+				Filter: &ManagedIdentityFilter{
+					Search: &createdAlias.ResourcePath,
+				},
+			},
+			expectManagedIdentityIDs: []string{createdAlias.Metadata.ID},
+			expectPageInfo:           PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor:     true,
 			expectHasEndCursor:       true,
 		},
@@ -1350,6 +1450,14 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 		// No point if warmup objects weren't all created.
 		return
 	}
+
+	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	assert.Nil(t, err)
+	if err != nil {
+		return
+	}
+	assert.NotNil(t, createdAlias)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -1367,6 +1475,11 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 		{
 			name:                             "positive",
 			searchID:                         warmupItems.managedIdentities[0].Metadata.ID,
+			expectManagedIdentityAccessRules: warmupItems.rules[0:1],
+		},
+		{
+			name:                             "positive: successfully retrieve access rules for a managed identity alias",
+			searchID:                         createdAlias.Metadata.ID,
 			expectManagedIdentityAccessRules: warmupItems.rules[0:1],
 		},
 		{
@@ -1818,6 +1931,11 @@ var standardWarmupGroupsForManagedIdentities = []models.Group{
 		FullPath:    "top-level-group-0-for-managed-identities",
 		CreatedBy:   "someone-g0",
 	},
+	{
+		Description: "top level group 1 for testing managed identity aliases",
+		FullPath:    "top-level-group-1-for-managed-identity-aliases",
+		CreatedBy:   "someone-g1",
+	},
 }
 
 // Standard warmup workspace(s) for tests in this module:
@@ -2063,6 +2181,22 @@ func managedIdentityIDsFromManagedIdentityInfos(managedIdentityInfos []managedId
 		result = append(result, managedIdentityInfo.managedIdentityID)
 	}
 	return result
+}
+
+// createWarmupManagedIdentityAlias creates an managed identity alias. An alias must be created after
+// the identity being aliased already exists.
+func createWarmupManagedIdentityAlias(ctx context.Context, testClient *testClient, warmupItems *warmupManagedIdentities) (*models.ManagedIdentity, error) {
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       warmupItems.groups[0].Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &warmupItems.managedIdentities[0].Metadata.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return createdAlias, nil
 }
 
 // compareManagedIdentities compares two managed identity objects, including bounds for creation and updated times.

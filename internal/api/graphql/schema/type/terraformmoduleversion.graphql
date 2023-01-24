@@ -29,55 +29,55 @@ type DeleteTerraformModuleVersionPayload {
 }
 
 type TerraformModuleConfigurationDetailsVariable {
-   name: String!
-   type: String!
-   description: String!
-   default: String
-   required: Boolean!
-   sensitive: Boolean!
+  name: String!
+  type: String!
+  description: String!
+  default: String
+  required: Boolean!
+  sensitive: Boolean!
 }
 
 type TerraformModuleConfigurationDetailsOutput {
-   name: String!
-   description: String!
-   sensitive: Boolean!
+  name: String!
+  description: String!
+  sensitive: Boolean!
 }
 
 type TerraformModuleConfigurationDetailsProviderRef {
-   name: String!
-   alias: String!
+  name: String!
+  alias: String!
 }
 
 type TerraformModuleConfigurationDetailsProviderRequirement {
-   source: String!
-   versionConstraints: [String!]!
-   configurationAliases: [TerraformModuleConfigurationDetailsProviderRef!]!
+  source: String!
+  versionConstraints: [String!]!
+  configurationAliases: [TerraformModuleConfigurationDetailsProviderRef!]!
 }
 
 type TerraformModuleConfigurationDetailsResource {
-   mode: String!
-   name: String!
-   type: String!
-   provider: TerraformModuleConfigurationDetailsProviderRef!
+  mode: String!
+  name: String!
+  type: String!
+  provider: TerraformModuleConfigurationDetailsProviderRef!
 }
 
 type TerraformModuleConfigurationDetailsModuleCall {
-   name: String!
-   source: String!
-   version: String!
+  name: String!
+  source: String!
+  version: String!
 }
 
 type TerraformModuleConfigurationDetails {
-   path: String!
-   readme: String!
-   requiredCore: [String!]!
-   variables: [TerraformModuleConfigurationDetailsVariable!]!
-   outputs: [TerraformModuleConfigurationDetailsOutput!]!
-   requiredProviders: [TerraformModuleConfigurationDetailsProviderRequirement!]!
-   providerConfigs: [TerraformModuleConfigurationDetailsProviderRef!]!
-   managedResources: [TerraformModuleConfigurationDetailsResource!]!
-   dataResources: [TerraformModuleConfigurationDetailsResource!]!
-   moduleCalls: [TerraformModuleConfigurationDetailsModuleCall!]!
+  path: String!
+  readme: String!
+  requiredCore: [String!]!
+  variables: [TerraformModuleConfigurationDetailsVariable!]!
+  outputs: [TerraformModuleConfigurationDetailsOutput!]!
+  requiredProviders: [TerraformModuleConfigurationDetailsProviderRequirement!]!
+  providerConfigs: [TerraformModuleConfigurationDetailsProviderRef!]!
+  managedResources: [TerraformModuleConfigurationDetailsResource!]!
+  dataResources: [TerraformModuleConfigurationDetailsResource!]!
+  moduleCalls: [TerraformModuleConfigurationDetailsModuleCall!]!
 }
 
 type TerraformModuleVersion implements Node {
@@ -94,7 +94,13 @@ type TerraformModuleVersion implements Node {
   submodules: [String!]!
   examples: [String!]!
   configurationDetails(path: String!): TerraformModuleConfigurationDetails
-  attestations(after: String, before: String, first: Int, last: Int, sort: TerraformModuleAttestationSort): TerraformModuleAttestationConnection!
+  attestations(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: TerraformModuleAttestationSort
+  ): TerraformModuleAttestationConnection!
 }
 
 input CreateTerraformModuleVersionInput {

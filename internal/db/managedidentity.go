@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -45,9 +46,9 @@ const (
 func (sf ManagedIdentitySortableField) getFieldDescriptor() *fieldDescriptor {
 	switch sf {
 	case ManagedIdentitySortableFieldCreatedAtAsc, ManagedIdentitySortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "managed_identities", col: "created_at"}
+		return &fieldDescriptor{key: "created_at", table: "t1", col: "created_at"}
 	case ManagedIdentitySortableFieldUpdatedAtAsc, ManagedIdentitySortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "managed_identities", col: "updated_at"}
+		return &fieldDescriptor{key: "updated_at", table: "t1", col: "updated_at"}
 	default:
 		return nil
 	}
@@ -80,6 +81,7 @@ func (sf ManagedIdentityAccessRuleSortableField) getRuleSortDirection() SortDire
 // ManagedIdentityFilter contains the supported fields for filtering ManagedIdentity resources
 type ManagedIdentityFilter struct {
 	Search             *string
+	AliasSourceID      *string
 	NamespacePaths     []string
 	ManagedIdentityIDs []string
 }
@@ -127,8 +129,14 @@ type managedIdentities struct {
 }
 
 var (
-	managedIdentityFieldList     = append(metadataFieldList, "name", "description", "type", "group_id", "data", "created_by")
+	managedIdentityFieldList     = append(metadataFieldList, "name", "description", "type", "group_id", "data", "created_by", "alias_source_id")
 	managedIdentityRuleFieldList = append(metadataFieldList, "run_stage", "managed_identity_id")
+)
+
+// Table aliases used with several queries.
+var (
+	t1 = goqu.From("managed_identities").As("t1")
+	t2 = goqu.T("managed_identities").As("t2")
 )
 
 // NewManagedIdentities returns an instance of the ManagedIdentity interface
@@ -144,7 +152,18 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 	if input.Filter != nil {
 
 		if input.Filter.ManagedIdentityID != nil {
-			ex = ex.Append(goqu.Ex{"managed_identity_id": input.Filter.ManagedIdentityID})
+			ex = ex.Append(
+				goqu.Or(
+					goqu.I("managed_identity_id").
+						Eq(dialect.From("managed_identities").
+							Select("managed_identities.alias_source_id").
+							Where(goqu.Ex{"managed_identities.id": input.Filter.ManagedIdentityID})),
+					goqu.I("managed_identity_id").
+						Eq(dialect.From("managed_identities").
+							Select("managed_identities.id").
+							Where(goqu.Ex{"managed_identities.id": input.Filter.ManagedIdentityID})),
+				),
+			)
 		}
 
 		if input.Filter.ManagedIdentityAccessRuleIDs != nil {
@@ -547,10 +566,11 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 }
 
 func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context, workspaceID string) ([]models.ManagedIdentity, error) {
-	sql, _, err := dialect.From("managed_identities").
-		Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"managed_identities.id": goqu.I("workspace_managed_identity_relation.managed_identity_id")})).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
+	sql, _, err := dialect.From(t1).
+		Select(m.getSelectFields(true)...).
+		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"t1.id": goqu.I("workspace_managed_identity_relation.managed_identity_id")})).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
+		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(goqu.Ex{"workspace_managed_identity_relation.workspace_id": workspaceID}).ToSQL()
 
 	if err != nil {
@@ -567,7 +587,7 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 	// Scan rows
 	results := []models.ManagedIdentity{}
 	for rows.Next() {
-		item, err := scanManagedIdentity(rows, true)
+		item, err := scanManagedIdentity(rows, true, true)
 		if err != nil {
 			return nil, err
 		}
@@ -623,17 +643,18 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 
 // GetManagedIdentityByID returns a managedIdentity by ID
 func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error) {
-	sql, _, err := goqu.From("managed_identities").
-		Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
-		Where(goqu.Ex{"managed_identities.id": id}).
+	sql, _, err := goqu.From(t1).
+		Select(m.getSelectFields(true)...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
+		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
+		Where(goqu.Ex{"t1.id": id}).
 		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true, true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -641,23 +662,25 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 		}
 		return nil, err
 	}
+
 	return managedIdentity, nil
 }
 
 // GetManagedIdentity returns a managedIdentity by namespace path and name.
 func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error) {
 	index := strings.LastIndex(path, "/")
-	sql, _, err := goqu.From("managed_identities").
-		Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
-		Where(goqu.Ex{"managed_identities.name": path[index+1:], "namespaces.path": path[:index]}).
+	sql, _, err := goqu.From(t1).
+		Select(m.getSelectFields(true)...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
+		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
+		Where(goqu.Ex{"t1.name": path[index+1:], "namespaces.path": path[:index]}).
 		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true, true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -692,11 +715,11 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("managed_identities.name").Like(managedIdentityName+"%%"),
+								goqu.I("t1.name").Like(managedIdentityName+"%%"),
 							),
 							goqu.Or(
 								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("managed_identities.name").Like(managedIdentityName+"%%"),
+								goqu.I("t1.name").Like(managedIdentityName+"%%"),
 							),
 						),
 					)
@@ -710,23 +733,28 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 				ex = ex.Append(
 					goqu.Or(
 						goqu.I("namespaces.path").Like(search+"%%"),
-						goqu.I("managed_identities.name").Like(search+"%%"),
+						goqu.I("t1.name").Like(search+"%%"),
 					),
 				)
 			}
 		}
 
+		if input.Filter.AliasSourceID != nil {
+			ex = ex.Append(goqu.Ex{"t1.alias_source_id": *input.Filter.AliasSourceID})
+		}
+
 		if input.Filter.ManagedIdentityIDs != nil {
 			// This check avoids an SQL syntax error if an empty slice is provided.
 			if len(input.Filter.ManagedIdentityIDs) > 0 {
-				ex = ex.Append(goqu.I("managed_identities.id").In(input.Filter.ManagedIdentityIDs))
+				ex = ex.Append(goqu.I("t1.id").In(input.Filter.ManagedIdentityIDs))
 			}
 		}
 	}
 
-	query := dialect.From("managed_identities").
-		Select(m.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("namespaces.group_id")})).
+	query := dialect.From(t1).
+		Select(m.getSelectFields(true)...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
+		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(ex)
 
 	sortDirection := AscSort
@@ -739,7 +767,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 
 	qBuilder, err := newPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "managed_identities", col: "id"},
+		&fieldDescriptor{key: "id", table: "t1", col: "id"},
 		sortBy,
 		sortDirection,
 		managedIdentityFieldResolver,
@@ -759,7 +787,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 	// Scan rows
 	results := []models.ManagedIdentity{}
 	for rows.Next() {
-		item, err := scanManagedIdentity(rows, true)
+		item, err := scanManagedIdentity(rows, true, true)
 		if err != nil {
 			return nil, err
 		}
@@ -782,6 +810,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 // CreateManagedIdentity creates a new managedIdentity
 func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error) {
 	timestamp := currentTime()
+	createdID := newResourceID()
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
@@ -798,31 +827,45 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 
 	sql, _, err := dialect.Insert("managed_identities").
 		Rows(goqu.Record{
-			"id":          newResourceID(),
-			"version":     initialResourceVersion,
-			"created_at":  timestamp,
-			"updated_at":  timestamp,
-			"name":        managedIdentity.Name,
-			"description": managedIdentity.Description,
-			"type":        managedIdentity.Type,
-			"group_id":    managedIdentity.GroupID,
-			"data":        managedIdentity.Data,
-			"created_by":  managedIdentity.CreatedBy,
-		}).
-		Returning(managedIdentityFieldList...).ToSQL()
+			"id":              createdID,
+			"version":         initialResourceVersion,
+			"created_at":      timestamp,
+			"updated_at":      timestamp,
+			"name":            managedIdentity.Name,
+			"description":     managedIdentity.Description,
+			"type":            managedIdentity.Type,
+			"group_id":        managedIdentity.GroupID,
+			"data":            managedIdentity.Data,
+			"created_by":      managedIdentity.CreatedBy,
+			"alias_source_id": managedIdentity.AliasSourceID,
+		}).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	createdManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql), false)
-
-	if err != nil {
+	if _, err = tx.Exec(ctx, sql); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, "managed identity name already exists in the specified group")
+				return nil, errors.NewError(errors.EConflict, "managed identity already exists in the specified group")
 			}
 		}
+		return nil, err
+	}
+
+	// A separate query allows backfilling empty columns in the alias with that of the source managed identity.
+	sql, _, err = dialect.From(t1).
+		Select(m.getSelectFields(false)...).
+		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
+		Where(goqu.Ex{"t1.id": createdID}).
+		ToSQL()
+
+	if err != nil {
+		return nil, err
+	}
+
+	createdManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql), true, false)
+	if err != nil {
 		return nil, err
 	}
 
@@ -871,7 +914,7 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 		return nil, err
 	}
 
-	updatedManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql), false)
+	updatedManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql), false, false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -907,7 +950,7 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 		return err
 	}
 
-	if _, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false, false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -924,13 +967,17 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 	return nil
 }
 
-func (m *managedIdentities) getSelectFields() []interface{} {
+func (m *managedIdentities) getSelectFields(withNamespacePath bool) []interface{} {
 	selectFields := []interface{}{}
 	for _, field := range managedIdentityFieldList {
-		selectFields = append(selectFields, fmt.Sprintf("managed_identities.%s", field))
+		selectFields = append(selectFields, fmt.Sprintf("t1.%s", field))
 	}
 
-	selectFields = append(selectFields, "namespaces.path")
+	selectFields = append(selectFields, "t2.description", "t2.type", "t2.data")
+
+	if withNamespacePath {
+		selectFields = append(selectFields, "namespaces.path")
+	}
 
 	return selectFields
 }
@@ -1032,7 +1079,13 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedTeamIDs(ctx conte
 	return results, nil
 }
 
-func scanManagedIdentity(row scanner, withResourcePath bool) (*models.ManagedIdentity, error) {
+func scanManagedIdentity(row scanner, withAliasFields, withResourcePath bool) (*models.ManagedIdentity, error) {
+	var (
+		aliasSourceDescription sql.NullString
+		aliasSourceType        sql.NullString
+		aliasSourceData        sql.NullString
+	)
+
 	managedIdentity := &models.ManagedIdentity{}
 
 	fields := []interface{}{
@@ -1046,7 +1099,15 @@ func scanManagedIdentity(row scanner, withResourcePath bool) (*models.ManagedIde
 		&managedIdentity.GroupID,
 		&managedIdentity.Data,
 		&managedIdentity.CreatedBy,
+		&managedIdentity.AliasSourceID,
 	}
+
+	if withAliasFields {
+		fields = append(fields, &aliasSourceDescription)
+		fields = append(fields, &aliasSourceType)
+		fields = append(fields, &aliasSourceData)
+	}
+
 	var path string
 	if withResourcePath {
 		fields = append(fields, &path)
@@ -1059,6 +1120,18 @@ func scanManagedIdentity(row scanner, withResourcePath bool) (*models.ManagedIde
 
 	if withResourcePath {
 		managedIdentity.ResourcePath = buildManagedIdentityResourcePath(path, managedIdentity.Name)
+	}
+
+	if aliasSourceDescription.Valid {
+		managedIdentity.Description = aliasSourceDescription.String
+	}
+
+	if aliasSourceType.Valid {
+		managedIdentity.Type = models.ManagedIdentityType(aliasSourceType.String)
+	}
+
+	if aliasSourceData.Valid {
+		managedIdentity.Data = []byte(aliasSourceData.String)
 	}
 
 	return managedIdentity, nil

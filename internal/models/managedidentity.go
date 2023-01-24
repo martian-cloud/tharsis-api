@@ -24,14 +24,15 @@ type ManagedIdentityAccessRule struct {
 
 // ManagedIdentity is used to provide identities to terraform providers
 type ManagedIdentity struct {
-	Metadata     ResourceMetadata
-	Type         ManagedIdentityType
-	ResourcePath string
-	Name         string
-	Description  string
-	GroupID      string
-	CreatedBy    string
-	Data         []byte
+	Type          ManagedIdentityType
+	ResourcePath  string
+	Name          string
+	Description   string
+	GroupID       string
+	CreatedBy     string
+	AliasSourceID *string
+	Metadata      ResourceMetadata
+	Data          []byte
 }
 
 // Validate returns an error if the model is not valid
@@ -48,4 +49,9 @@ func (m *ManagedIdentity) Validate() error {
 // GetGroupPath returns the group path
 func (m *ManagedIdentity) GetGroupPath() string {
 	return m.ResourcePath[:strings.LastIndex(m.ResourcePath, "/")]
+}
+
+// IsAlias returns true is managed identity is an alias.
+func (m *ManagedIdentity) IsAlias() bool {
+	return m.AliasSourceID != nil
 }
