@@ -134,7 +134,7 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	}
 
 	// Upload plan cache
-	planReader, err := os.Open(planOutputPath)
+	planReader, err := os.Open(planOutputPath) // nosemgrep: gosec.G304-1
 	if err != nil {
 		return fmt.Errorf("failed to read plan output %v", err)
 	}

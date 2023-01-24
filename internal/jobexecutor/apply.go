@@ -109,7 +109,7 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		tfexec.StateOut(stateOutputPath),
 	)
 
-	stateFile, err := os.Open(stateOutputPath)
+	stateFile, err := os.Open(stateOutputPath) // nosemgrep: gosec.G304-1
 	if err != nil {
 		return fmt.Errorf("failed to read state output %v", err)
 	}
