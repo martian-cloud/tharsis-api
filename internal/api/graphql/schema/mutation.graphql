@@ -33,6 +33,12 @@ type Mutation {
   createManagedIdentityCredentials(
     input: CreateManagedIdentityCredentialsInput!
   ): CreateManagedIdentityCredentialsPayload!
+  createManagedIdentityAlias(
+    input: CreateManagedIdentityAliasInput!
+  ): CreateManagedIdentityAliasPayload!
+  deleteManagedIdentityAlias(
+    input: DeleteManagedIdentityAliasInput!
+  ): DeleteManagedIdentityAliasPayload!
   createServiceAccount(
     input: CreateServiceAccountInput!
   ): CreateServiceAccountPayload!
@@ -105,14 +111,30 @@ type Mutation {
   deleteTerraformProviderPlatform(
     input: DeleteTerraformProviderPlatformInput
   ): DeleteTerraformProviderPlatformPayload!
-  createTerraformModule(input: CreateTerraformModuleInput): CreateTerraformModulePayload!
-  updateTerraformModule(input: UpdateTerraformModuleInput): UpdateTerraformModulePayload!
-  deleteTerraformModule(input: DeleteTerraformModuleInput): DeleteTerraformModulePayload!
-  createTerraformModuleVersion(input: CreateTerraformModuleVersionInput): CreateTerraformModuleVersionPayload!
-  deleteTerraformModuleVersion(input: DeleteTerraformModuleVersionInput): DeleteTerraformModuleVersionPayload!
-  createTerraformModuleAttestation(input: CreateTerraformModuleAttestationInput): CreateTerraformModuleAttestationPayload!
-  updateTerraformModuleAttestation(input: UpdateTerraformModuleAttestationInput): UpdateTerraformModuleAttestationPayload!
-  deleteTerraformModuleAttestation(input: DeleteTerraformModuleAttestationInput): DeleteTerraformModuleAttestationPayload!
+  createTerraformModule(
+    input: CreateTerraformModuleInput
+  ): CreateTerraformModulePayload!
+  updateTerraformModule(
+    input: UpdateTerraformModuleInput
+  ): UpdateTerraformModulePayload!
+  deleteTerraformModule(
+    input: DeleteTerraformModuleInput
+  ): DeleteTerraformModulePayload!
+  createTerraformModuleVersion(
+    input: CreateTerraformModuleVersionInput
+  ): CreateTerraformModuleVersionPayload!
+  deleteTerraformModuleVersion(
+    input: DeleteTerraformModuleVersionInput
+  ): DeleteTerraformModuleVersionPayload!
+  createTerraformModuleAttestation(
+    input: CreateTerraformModuleAttestationInput
+  ): CreateTerraformModuleAttestationPayload!
+  updateTerraformModuleAttestation(
+    input: UpdateTerraformModuleAttestationInput
+  ): UpdateTerraformModuleAttestationPayload!
+  deleteTerraformModuleAttestation(
+    input: DeleteTerraformModuleAttestationInput
+  ): DeleteTerraformModuleAttestationPayload!
   createGPGKey(input: CreateGPGKeyInput!): CreateGPGKeyPayload!
   deleteGPGKey(input: DeleteGPGKeyInput!): DeleteGPGKeyPayload!
   createTerraformCLIDownloadURL(

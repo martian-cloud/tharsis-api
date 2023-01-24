@@ -243,6 +243,28 @@ func (r RootResolver) DeleteManagedIdentityAccessRule(ctx context.Context, args 
 	return response, nil
 }
 
+// CreateManagedIdentityAlias creates a managed identity alias
+func (r RootResolver) CreateManagedIdentityAlias(ctx context.Context, args *struct {
+	Input *CreateManagedIdentityAliasInput
+}) (*ManagedIdentityMutationPayloadResolver, error) {
+	response, err := createManagedIdentityAliasMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteManagedIdentityAlias deletes a managed identity alias
+func (r RootResolver) DeleteManagedIdentityAlias(ctx context.Context, args *struct{ Input *DeleteManagedIdentityInput }) (*ManagedIdentityMutationPayloadResolver, error) {
+	response, err := deleteManagedIdentityAliasMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // CreateManagedIdentity creates a new managed identity
 func (r RootResolver) CreateManagedIdentity(ctx context.Context, args *struct{ Input *CreateManagedIdentityInput }) (*ManagedIdentityMutationPayloadResolver, error) {
 	response, err := createManagedIdentityMutation(ctx, args.Input)

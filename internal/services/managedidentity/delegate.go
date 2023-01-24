@@ -1,5 +1,7 @@
 package managedidentity
 
+//go:generate mockery --name Delegate --inpackage --case underscore
+
 import (
 	"context"
 	"fmt"

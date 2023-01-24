@@ -14,6 +14,18 @@ type ManagedIdentityEdge {
   node: ManagedIdentity
 }
 
+type CreateManagedIdentityAliasPayload {
+  clientMutationId: String
+  managedIdentity: ManagedIdentity
+  problems: [Problem!]!
+}
+
+type DeleteManagedIdentityAliasPayload {
+  clientMutationId: String
+  managedIdentity: ManagedIdentity
+  problems: [Problem!]!
+}
+
 type CreateManagedIdentityPayload {
   clientMutationId: String
   managedIdentity: ManagedIdentity
@@ -70,7 +82,16 @@ type ManagedIdentity implements Node {
   group: Group!
   data: String!
   createdBy: String!
+  aliasSource: ManagedIdentity
+  isAlias: Boolean!
   accessRules: [ManagedIdentityAccessRule!]!
+  aliases(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: ManagedIdentitySort
+  ): ManagedIdentityConnection!
 }
 
 type ManagedIdentityCredentials {
@@ -119,6 +140,21 @@ input CreateManagedIdentityInput {
   groupPath: String!
   data: String!
   accessRules: [ManagedIdentityAccessRuleInput!]
+}
+
+input CreateManagedIdentityAliasInput {
+  clientMutationId: String
+  name: String!
+  aliasSourceId: String
+  aliasSourcePath: String
+  groupPath: String!
+}
+
+input DeleteManagedIdentityAliasInput {
+  clientMutationId: String
+  id: ID!
+  force: Boolean
+  metadata: ResourceMetadataInput
 }
 
 input UpdateManagedIdentityInput {

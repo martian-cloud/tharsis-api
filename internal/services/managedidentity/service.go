@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
@@ -24,16 +23,47 @@ type GetManagedIdentitiesInput struct {
 	PaginationOptions *db.PaginationOptions
 	// Search returns only the managed identities with a name or resource path that starts with the value of search
 	Search *string
-	// NamespacePath is the namespace to return service accounts for
+	// AliasSourceID is used to return aliases for a given managed identity
+	AliasSourceID *string
+	// NamespacePath is the namespace to return managed identities for
 	NamespacePath string
 	// IncludeInherited includes inherited managed identities in the result
 	IncludeInherited bool
 }
 
-// DeleteManagedIdentityInput is the input for deleting a managed identity
+// DeleteManagedIdentityInput is the input for deleting a managed identity or alias.
 type DeleteManagedIdentityInput struct {
 	ManagedIdentity *models.ManagedIdentity
 	Force           bool
+}
+
+// CreateManagedIdentityInput contains the fields for creating a new managed identity
+type CreateManagedIdentityInput struct {
+	Type        models.ManagedIdentityType
+	Name        string
+	Description string
+	GroupID     string
+	Data        []byte
+	AccessRules []struct {
+		RunStage                 models.JobType
+		AllowedUserIDs           []string
+		AllowedServiceAccountIDs []string
+		AllowedTeamIDs           []string
+	}
+}
+
+// UpdateManagedIdentityInput contains the fields for updating a managed identity
+type UpdateManagedIdentityInput struct {
+	ID          string
+	Description string
+	Data        []byte
+}
+
+// CreateManagedIdentityAliasInput is the input for creating a managed identity alias.
+type CreateManagedIdentityAliasInput struct {
+	Group         *models.Group
+	Name          string
+	AliasSourceID string
 }
 
 // Service implements managed identity functionality
@@ -42,8 +72,8 @@ type Service interface {
 	GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error)
 	GetManagedIdentities(ctx context.Context, input *GetManagedIdentitiesInput) (*db.ManagedIdentitiesResult, error)
 	GetManagedIdentitiesByIDs(ctx context.Context, ids []string) ([]models.ManagedIdentity, error)
-	CreateManagedIdentity(ctx context.Context, input *types.CreateManagedIdentityInput) (*models.ManagedIdentity, error)
-	UpdateManagedIdentity(ctx context.Context, input *types.UpdateManagedIdentityInput) (*models.ManagedIdentity, error)
+	CreateManagedIdentity(ctx context.Context, input *CreateManagedIdentityInput) (*models.ManagedIdentity, error)
+	UpdateManagedIdentity(ctx context.Context, input *UpdateManagedIdentityInput) (*models.ManagedIdentity, error)
 	DeleteManagedIdentity(ctx context.Context, input *DeleteManagedIdentityInput) error
 	CreateCredentials(ctx context.Context, identity *models.ManagedIdentity) ([]byte, error)
 	GetManagedIdentitiesForWorkspace(ctx context.Context, workspaceID string) ([]models.ManagedIdentity, error)
@@ -55,6 +85,8 @@ type Service interface {
 	CreateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	UpdateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	DeleteManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) error
+	CreateManagedIdentityAlias(ctx context.Context, input *CreateManagedIdentityAliasInput) (*models.ManagedIdentity, error)
+	DeleteManagedIdentityAlias(ctx context.Context, input *DeleteManagedIdentityInput) error
 }
 
 type service struct {
@@ -91,12 +123,26 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
-		return nil, err
+	if input.NamespacePath != "" {
+		if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
+			return nil, err
+		}
+	} else if input.AliasSourceID != nil {
+		sourceIdentity, gErr := s.getManagedIdentityByID(ctx, *input.AliasSourceID)
+		if gErr != nil {
+			return nil, gErr
+		}
+
+		if err = caller.RequireAccessToGroup(ctx, sourceIdentity.GroupID, models.ViewerRole); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.NewError(errors.EInvalid, "Either NamespacePath or AliasSourceID must be defined")
 	}
 
 	filter := &db.ManagedIdentityFilter{
-		Search: input.Search,
+		Search:        input.Search,
+		AliasSourceID: input.AliasSourceID,
 	}
 
 	if input.IncludeInherited {
@@ -110,7 +156,7 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 		}
 
 		filter.NamespacePaths = paths
-	} else {
+	} else if input.NamespacePath != "" {
 		// This will return an empty result for workspace namespaces because workspaces
 		// don't have managed identities directly associated (i.e. only group namespaces do)
 		filter.NamespacePaths = []string{input.NamespacePath}
@@ -132,6 +178,11 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return err
+	}
+
+	// Don't allow deleting an alias.
+	if input.ManagedIdentity.IsAlias() {
+		return errors.NewError(errors.EInvalid, "Only a source managed identity can be deleted, not an alias")
 	}
 
 	if rErr := caller.RequireAccessToGroup(ctx, input.ManagedIdentity.GroupID, models.DeployerRole); rErr != nil {
@@ -240,7 +291,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 
 	// Verify that the managed identity's group is in the group hierarchy of the workspace
 	if !strings.HasPrefix(workspace.FullPath, fmt.Sprintf("%s/", groupPath)) {
-		return fmt.Errorf("managed identity %s is not available to workspace %s", managedIdentityID, workspaceID)
+		return errors.NewError(errors.EInvalid, fmt.Sprintf("Managed identity %s is not available to workspace %s", managedIdentityID, workspaceID))
 	}
 
 	identitiesInWorkspace, err := s.GetManagedIdentitiesForWorkspace(ctx, workspaceID)
@@ -346,7 +397,7 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 		return err
 	}
 
-	s.logger.Infow("Deleted a managed identity from workspace.",
+	s.logger.Infow("Removed a managed identity from workspace.",
 		"caller", caller.GetSubject(),
 		"workspaceID", workspaceID,
 		"managedIdentityID", managedIdentityID,
@@ -400,7 +451,181 @@ func (s *service) GetManagedIdentityByPath(ctx context.Context, path string) (*m
 	return identity, nil
 }
 
-func (s *service) CreateManagedIdentity(ctx context.Context, input *types.CreateManagedIdentityInput) (*models.ManagedIdentity, error) {
+func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateManagedIdentityAliasInput) (*models.ManagedIdentity, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Require owner role for target group (group being shared to).
+	if err = caller.RequireAccessToGroup(ctx, input.Group.Metadata.ID, models.OwnerRole); err != nil {
+		return nil, err
+	}
+
+	aliasSourceIdentity, err := s.getManagedIdentityByID(ctx, input.AliasSourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure an alias isn't being aliased.
+	if aliasSourceIdentity.IsAlias() {
+		return nil, errors.NewError(errors.EInvalid, "An alias managed identity must not be created from another alias")
+	}
+
+	sourceGroup, err := s.dbClient.Groups.GetGroupByID(ctx, aliasSourceIdentity.GroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Shouldn't happen.
+	if sourceGroup == nil {
+		return nil, errors.NewError(errors.EInternal, fmt.Sprintf("Group associated with managed identity ID %s not found", aliasSourceIdentity.Metadata.ID))
+	}
+
+	// Require owner role for source group (group source managed identity belongs to).
+	if err = caller.RequireAccessToGroup(ctx, sourceGroup.Metadata.ID, models.OwnerRole); err != nil {
+		return nil, err
+	}
+
+	// Verify managed identity isn't being aliased within same namespace it's already available in.
+	if strings.HasPrefix(input.Group.FullPath, sourceGroup.FullPath+"/") || input.Group.FullPath == sourceGroup.FullPath {
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Source managed identity %s is already available within namespace", aliasSourceIdentity.Name))
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateMangedIdentityAlias: %v", txErr)
+		}
+	}()
+
+	toCreate := &models.ManagedIdentity{
+		GroupID:       input.Group.Metadata.ID,
+		AliasSourceID: &aliasSourceIdentity.Metadata.ID,
+		Name:          input.Name,
+		CreatedBy:     caller.GetSubject(),
+	}
+
+	if err = toCreate.Validate(); err != nil {
+		return nil, err
+	}
+
+	createdAlias, err := s.dbClient.ManagedIdentities.CreateManagedIdentity(ctx, toCreate)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPath := createdAlias.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionCreate,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      createdAlias.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	s.logger.Infow("Created a managed identity alias.",
+		"caller", caller.GetSubject(),
+		"groupID", input.Group.Metadata.ID,
+		"aliasID", createdAlias.Metadata.ID,
+	)
+
+	return createdAlias, nil
+}
+
+func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteManagedIdentityInput) error {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Only allow deleting managed identity aliases.
+	if !input.ManagedIdentity.IsAlias() {
+		return errors.NewError(errors.EInvalid, "Only an alias may be deleted, not a source managed identity")
+	}
+
+	// First check whether they're an owner for alias' group.
+	if err = caller.RequireAccessToGroup(ctx, input.ManagedIdentity.GroupID, models.OwnerRole); err != nil {
+		aliasSource, gErr := s.getManagedIdentityByID(ctx, *input.ManagedIdentity.AliasSourceID)
+		if gErr != nil {
+			return gErr
+		}
+
+		// Now check if they're an owner of group of the source managed identity.
+		if err = caller.RequireAccessToGroup(ctx, aliasSource.GroupID, models.OwnerRole); err != nil {
+			return err
+		}
+	}
+
+	s.logger.Infow("Requested to delete a managed identity alias.",
+		"caller", caller.GetSubject(),
+		"groupID", input.ManagedIdentity.GroupID,
+		"aliasID", input.ManagedIdentity.Metadata.ID,
+	)
+
+	if !input.Force {
+		// Verify that managed identity alias is not assigned to any workspaces
+		workspaces, wErr := s.dbClient.Workspaces.GetWorkspacesForManagedIdentity(ctx, input.ManagedIdentity.Metadata.ID)
+		if wErr != nil {
+			return wErr
+		}
+		if len(workspaces) > 0 {
+			return errors.NewError(
+				errors.EConflict,
+				fmt.Sprintf("This managed identity alias can't be deleted because it's currently assigned to %d workspaces. "+
+					"Setting force to true will automatically remove this managed identity alias from all workspaces it's assigned to.", len(workspaces)),
+			)
+		}
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer DeleteManagedIdentityAlias: %v", txErr)
+		}
+	}()
+
+	err = s.dbClient.ManagedIdentities.DeleteManagedIdentity(txContext, input.ManagedIdentity)
+	if err != nil {
+		return err
+	}
+
+	groupPath := input.ManagedIdentity.GetGroupPath()
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionDeleteChildResource,
+			TargetType:    models.TargetGroup,
+			TargetID:      input.ManagedIdentity.GroupID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: input.ManagedIdentity.Name,
+				ID:   input.ManagedIdentity.Metadata.ID,
+				Type: string(models.TargetManagedIdentity),
+			},
+		}); err != nil {
+		return err
+	}
+
+	return s.dbClient.Transactions.CommitTx(txContext)
+}
+
+func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManagedIdentityInput) (*models.ManagedIdentity, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -525,7 +750,7 @@ func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) (
 	return results.ManagedIdentities, nil
 }
 
-func (s *service) UpdateManagedIdentity(ctx context.Context, input *types.UpdateManagedIdentityInput) (*models.ManagedIdentity, error) {
+func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManagedIdentityInput) (*models.ManagedIdentity, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -534,6 +759,11 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *types.Update
 	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Don't allow updates to a managed identity alias.
+	if managedIdentity.IsAlias() {
+		return nil, errors.NewError(errors.EInvalid, "Only a source managed identity can be updated, not an alias")
 	}
 
 	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
@@ -695,6 +925,11 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
+	// Don't allow creating access rules for an aliased identity.
+	if managedIdentity.IsAlias() {
+		return nil, errors.NewError(errors.EInvalid, "Access rules can be created only for source managed identities, not for aliases")
+	}
+
 	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
 		return nil, err
 	}
@@ -751,6 +986,11 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
+	// Don't allow updating access rules for managed identity aliases.
+	if managedIdentity.IsAlias() {
+		return nil, errors.NewError(errors.EInvalid, "Access rules can be updated only for source managed identities, not for aliases")
+	}
+
 	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
 		return nil, err
 	}
@@ -804,6 +1044,11 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 	managedIdentity, err := s.getManagedIdentityByID(ctx, rule.ManagedIdentityID)
 	if err != nil {
 		return err
+	}
+
+	// Don't allow access rule deletion for aliases.
+	if managedIdentity.IsAlias() {
+		return errors.NewError(errors.EInvalid, "Access rules can be deleted only for source managed identities, not for aliases")
 	}
 
 	if rErr := caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); rErr != nil {
@@ -898,7 +1143,7 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 func (s *service) getDelegate(delegateType models.ManagedIdentityType) (Delegate, error) {
 	delegate, ok := s.delegateMap[delegateType]
 	if !ok {
-		return nil, fmt.Errorf("managed identity with type %s is not supported", delegateType)
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("managed identity with type %s is not supported", delegateType))
 	}
 	return delegate, nil
 }
@@ -908,6 +1153,10 @@ func (s *service) verifyServiceAccountAccessForGroup(ctx context.Context, servic
 		sa, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, id)
 		if err != nil {
 			return err
+		}
+
+		if sa == nil {
+			return errors.NewError(errors.ENotFound, fmt.Sprintf("Service account with ID %s not found", id))
 		}
 
 		saGroupPath := sa.GetGroupPath()

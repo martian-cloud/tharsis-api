@@ -47,8 +47,21 @@ type TerraformModule implements Node {
   registryNamespace: String!
   resourcePath: String!
   latestVersion: TerraformModuleVersion
-  versions(after: String, before: String, first: Int, last: Int, sort: TerraformModuleVersionSort): TerraformModuleVersionConnection!
-  attestations(after: String, before: String, first: Int, last: Int, digest: String, sort: TerraformModuleAttestationSort): TerraformModuleAttestationConnection!
+  versions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: TerraformModuleVersionSort
+  ): TerraformModuleVersionConnection!
+  attestations(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    digest: String
+    sort: TerraformModuleAttestationSort
+  ): TerraformModuleAttestationConnection!
 }
 
 input CreateTerraformModuleInput {

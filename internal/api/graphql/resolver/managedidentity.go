@@ -5,11 +5,11 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
-	managedidentitytypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/types"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -274,6 +274,44 @@ func (r *ManagedIdentityResolver) CreatedBy() string {
 	return r.managedIdentity.CreatedBy
 }
 
+// AliasSource resolver
+func (r *ManagedIdentityResolver) AliasSource(ctx context.Context) (*ManagedIdentityResolver, error) {
+	if r.managedIdentity.AliasSourceID == nil {
+		return nil, nil
+	}
+
+	identity, err := loadManagedIdentity(ctx, *r.managedIdentity.AliasSourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ManagedIdentityResolver{managedIdentity: identity}, nil
+}
+
+// Aliases resolver
+func (r *ManagedIdentityResolver) Aliases(ctx context.Context, args *ManagedIdentityConnectionQueryArgs) (*ManagedIdentityConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := managedidentity.GetManagedIdentitiesInput{
+		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		AliasSourceID:     &r.managedIdentity.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.ManagedIdentitySortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewManagedIdentityConnectionResolver(ctx, &input)
+}
+
+// IsAlias resolver
+func (r *ManagedIdentityResolver) IsAlias() bool {
+	return r.managedIdentity.IsAlias()
+}
+
 // ManagedIdentityCredentialsResolver resolves managed identity credentials
 type ManagedIdentityCredentialsResolver struct {
 	managedIdentityCredentials *ManagedIdentityCredentials
@@ -457,6 +495,15 @@ type CreateManagedIdentityCredentialsInput struct {
 	ID               string
 }
 
+// CreateManagedIdentityAliasInput is the input for creating a managed identity alias.
+type CreateManagedIdentityAliasInput struct {
+	ClientMutationID *string
+	Name             string
+	AliasSourceID    *string
+	AliasSourcePath  *string
+	GroupPath        string
+}
+
 func handleManagedIdentityAccessRuleMutationProblem(e error, clientMutationID *string) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -575,6 +622,78 @@ func deleteManagedIdentityAccessRuleMutation(ctx context.Context, input *DeleteM
 	return &ManagedIdentityAccessRuleMutationPayloadResolver{ManagedIdentityAccessRuleMutationPayload: payload}, nil
 }
 
+func createManagedIdentityAliasMutation(ctx context.Context, input *CreateManagedIdentityAliasInput) (*ManagedIdentityMutationPayloadResolver, error) {
+	identityService := getManagedIdentityService(ctx)
+	groupService := getGroupService(ctx)
+
+	group, err := groupService.GetGroupByFullPath(ctx, input.GroupPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var identityID string
+	if input.AliasSourceID != nil && *input.AliasSourceID != "" {
+		identityID = gid.FromGlobalID(*input.AliasSourceID)
+	} else if input.AliasSourcePath != nil {
+		id, gErr := getManagedIdentityIDByPath(ctx, *input.AliasSourcePath)
+		if gErr != nil {
+			return nil, gErr
+		}
+
+		identityID = id
+	} else {
+		return nil, errors.NewError(errors.EInvalid, "Either aliasSourceId or aliasSourcePath is required")
+	}
+
+	createOptions := &managedidentity.CreateManagedIdentityAliasInput{
+		Name:          input.Name,
+		Group:         group,
+		AliasSourceID: identityID,
+	}
+
+	createdManagedIdentity, err := identityService.CreateManagedIdentityAlias(ctx, createOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := ManagedIdentityMutationPayload{ClientMutationID: input.ClientMutationID, ManagedIdentity: createdManagedIdentity, Problems: []Problem{}}
+	return &ManagedIdentityMutationPayloadResolver{ManagedIdentityMutationPayload: payload}, nil
+}
+
+func deleteManagedIdentityAliasMutation(ctx context.Context, input *DeleteManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
+	managedIdentityService := getManagedIdentityService(ctx)
+
+	mi, err := managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(input.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if resource version is specified
+	if input.Metadata != nil {
+		v, err := strconv.Atoi(input.Metadata.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		mi.Metadata.Version = v
+	}
+
+	deleteOptions := managedidentity.DeleteManagedIdentityInput{
+		ManagedIdentity: mi,
+	}
+
+	if input.Force != nil {
+		deleteOptions.Force = *input.Force
+	}
+
+	if err := managedIdentityService.DeleteManagedIdentityAlias(ctx, &deleteOptions); err != nil {
+		return nil, err
+	}
+
+	payload := ManagedIdentityMutationPayload{ClientMutationID: input.ClientMutationID, ManagedIdentity: mi, Problems: []Problem{}}
+	return &ManagedIdentityMutationPayloadResolver{ManagedIdentityMutationPayload: payload}, nil
+}
+
 func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
 
 	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
@@ -583,7 +702,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 	}
 	groupID := group.Metadata.ID
 
-	managedIdentityCreateOptions := managedidentitytypes.CreateManagedIdentityInput{
+	managedIdentityCreateOptions := managedidentity.CreateManagedIdentityInput{
 		Type:        models.ManagedIdentityType(input.Type),
 		Name:        input.Name,
 		Description: input.Description,
@@ -644,7 +763,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 func updateManagedIdentityMutation(ctx context.Context, input *UpdateManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
 	managedIdentityService := getManagedIdentityService(ctx)
 
-	managedIdentity, err := managedIdentityService.UpdateManagedIdentity(ctx, &managedidentitytypes.UpdateManagedIdentityInput{
+	managedIdentity, err := managedIdentityService.UpdateManagedIdentity(ctx, &managedidentity.UpdateManagedIdentityInput{
 		ID:          gid.FromGlobalID(input.ID),
 		Description: input.Description,
 		Data:        []byte(input.Data),
