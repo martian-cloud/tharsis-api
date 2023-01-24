@@ -239,7 +239,7 @@ func loadModuleMetadata(dir string, relativePath string) (*ModuleConfigurationDe
 	}
 
 	if len(matches) > 0 {
-		readmeFile, err := os.Open(matches[0])
+		readmeFile, err := os.Open(matches[0]) // nosemgrep: gosec.G304-1
 		if err != nil {
 			return nil, nil, err
 		}

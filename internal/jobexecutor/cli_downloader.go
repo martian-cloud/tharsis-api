@@ -239,7 +239,7 @@ func (c *cliDownloader) Download(ctx context.Context, terraformVersion string) (
 	execPath := getBinaryPath(finalDirectory)
 
 	// Make the binary an executable. Gives full permissions to owner.
-	if err := os.Chmod(execPath, 0700); err != nil {
+	if err := os.Chmod(execPath, 0700); err != nil { // nosemgrep: gosec.G304-1, gosec.G302-1
 		return "", err
 	}
 

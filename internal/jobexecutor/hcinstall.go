@@ -444,8 +444,12 @@ func unzip(reader io.Reader, finalDirectory, zipFileName string) error {
 		fileName := filepath.Clean(file.Name)
 
 		// Create the destination file. Ex: terraform_1.2.2_linux_amd64/terraform
-		execPath := filepath.Join(finalDirectory, fileName)
-		destinationFile, err := os.OpenFile(execPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		execPath, err := sanitizedArchivePath(finalDirectory, fileName)
+		if err != nil {
+			return err
+		}
+
+		destinationFile, err := os.OpenFile(execPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode()) // nosemgrep: gosec.G304-1
 		if err != nil {
 			return err
 		}

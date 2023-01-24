@@ -1735,7 +1735,7 @@ func (s *service) createUploadConfigurationVersion(ctx context.Context,
 	}
 
 	// Open a reader on the tar.gz file.
-	tarRdr, err := os.Open(moduleTar)
+	tarRdr, err := os.Open(moduleTar) // nosemgrep: gosec.G304-1
 	if err != nil {
 		return "", err
 	}
@@ -1958,7 +1958,7 @@ func makeModuleTar(modulePath string) (string, error) {
 	tarPath := tarFile.Name()
 
 	// Open a writer to the temporary tar.gz file.
-	tgzFileWriter, err := os.OpenFile(tarPath, tarFlagWrite, tarMode)
+	tgzFileWriter, err := os.OpenFile(tarPath, tarFlagWrite, tarMode) // nosemgrep: gosec.G304-1
 	if err != nil {
 		return "", err
 	}

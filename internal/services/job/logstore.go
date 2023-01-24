@@ -64,7 +64,7 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 		)
 	}
 
-	writer, err := os.OpenFile(filePath, os.O_RDWR, 0644)
+	writer, err := os.OpenFile(filePath, os.O_RDWR, 0600) // nosemgrep: gosec.G304-1
 	if err != nil {
 		return errors.NewError(
 			errors.EInternal,
