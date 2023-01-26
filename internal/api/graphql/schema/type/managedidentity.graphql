@@ -82,6 +82,7 @@ type ManagedIdentity implements Node {
   group: Group!
   data: String!
   createdBy: String!
+  aliasSourceId: String
   aliasSource: ManagedIdentity
   isAlias: Boolean!
   accessRules: [ManagedIdentityAccessRule!]!
