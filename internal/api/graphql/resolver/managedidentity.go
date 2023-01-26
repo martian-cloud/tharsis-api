@@ -274,6 +274,16 @@ func (r *ManagedIdentityResolver) CreatedBy() string {
 	return r.managedIdentity.CreatedBy
 }
 
+// AliasSourceID resolver
+func (r *ManagedIdentityResolver) AliasSourceID(ctx context.Context) *string {
+	if r.managedIdentity.AliasSourceID == nil {
+		return nil
+	}
+
+	aliasID := gid.ToGlobalID(gid.ManagedIdentityType, *r.managedIdentity.AliasSourceID)
+	return &aliasID
+}
+
 // AliasSource resolver
 func (r *ManagedIdentityResolver) AliasSource(ctx context.Context) (*ManagedIdentityResolver, error) {
 	if r.managedIdentity.AliasSourceID == nil {
