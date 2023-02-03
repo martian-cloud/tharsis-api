@@ -168,6 +168,7 @@ type UpdateWorkspaceVCSProviderLinkInput struct {
 type DeleteWorkspaceVCSProviderLinkInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
+	Force            *bool
 	ID               string
 }
 
@@ -294,7 +295,15 @@ func deleteWorkspaceVCSProviderLinkMutation(ctx context.Context, input *DeleteWo
 		link.Metadata.Version = v
 	}
 
-	if err = vcsService.DeleteWorkspaceVCSProviderLink(ctx, &vcs.DeleteWorkspaceVCSProviderLinkInput{Link: link}); err != nil {
+	toDelete := &vcs.DeleteWorkspaceVCSProviderLinkInput{
+		Link: link,
+	}
+
+	if input.Force != nil {
+		toDelete.Force = *input.Force
+	}
+
+	if err = vcsService.DeleteWorkspaceVCSProviderLink(ctx, toDelete); err != nil {
 		return nil, err
 	}
 

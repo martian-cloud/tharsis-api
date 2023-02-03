@@ -1330,13 +1330,14 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 			name:   "positive: valid input, manually configured provider; expect no errors",
 			caller: &auth.SystemCaller{},
 			input: &DeleteWorkspaceVCSProviderLinkInput{
-				&models.WorkspaceVCSProviderLink{
+				Link: &models.WorkspaceVCSProviderLink{
 					Metadata: models.ResourceMetadata{
 						ID: resourceUUID,
 					},
 					ProviderID:  "provider-id",
 					WorkspaceID: "workspace-id",
 				},
+				Force: true,
 			},
 			existingProvider: &models.VCSProvider{
 				AutoCreateWebhooks: false, // Manually configured provider.
@@ -1346,7 +1347,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 			name:   "positive: valid input, automatically configured provider; expect no errors",
 			caller: &auth.SystemCaller{},
 			input: &DeleteWorkspaceVCSProviderLinkInput{
-				&models.WorkspaceVCSProviderLink{
+				Link: &models.WorkspaceVCSProviderLink{
 					Metadata: models.ResourceMetadata{
 						ID: resourceUUID,
 					},
@@ -1355,6 +1356,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 					RepositoryPath: "owner/repository",
 					WebhookID:      "webhook-id",
 				},
+				Force: false,
 			},
 			deleteWebhookInput: &types.DeleteWebhookInput{
 				Hostname:       "api.github.com",
