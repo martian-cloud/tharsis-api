@@ -751,7 +751,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 			errors.EInvalid,
 			"OAuth flow must be completed before linking a workspace to a VCS provider. "+
 				"Either use the original authorization URL when VCS provider was created "+
-				"request another one",
+				"or request another one",
 		)
 	}
 

@@ -1,6 +1,12 @@
 package models
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+)
 
 // ManagedIdentityType represents the supported managed identity types
 type ManagedIdentityType string
@@ -12,14 +18,64 @@ const (
 	ManagedIdentityTharsisFederated ManagedIdentityType = "tharsis_federated"
 )
 
+// ManagedIdentityAccessRuleType represents the supported managed identity rule types
+type ManagedIdentityAccessRuleType string
+
+// Managed Identity Rule Types
+const (
+	ManagedIdentityAccessRuleEligiblePrincipals ManagedIdentityAccessRuleType = "eligible_principals"
+	ManagedIdentityAccessRuleModuleAttestation  ManagedIdentityAccessRuleType = "module_attestation"
+)
+
+// ManagedIdentityAccessRuleModuleAttestationPolicy is used in access rules to verify that a
+// module has an in-toto attestation that is signed with the specified public key and an optional
+// predicate type
+type ManagedIdentityAccessRuleModuleAttestationPolicy struct {
+	PredicateType *string `json:"predicateType,omitempty"`
+	PublicKey     string  `json:"publicKey"`
+}
+
 // ManagedIdentityAccessRule is used to restrict access to a managed identity
 type ManagedIdentityAccessRule struct {
-	Metadata                 ResourceMetadata
-	RunStage                 JobType
-	ManagedIdentityID        string
-	AllowedUserIDs           []string
-	AllowedServiceAccountIDs []string
-	AllowedTeamIDs           []string
+	Metadata                  ResourceMetadata
+	Type                      ManagedIdentityAccessRuleType
+	RunStage                  JobType
+	ManagedIdentityID         string
+	ModuleAttestationPolicies []ManagedIdentityAccessRuleModuleAttestationPolicy
+	AllowedUserIDs            []string
+	AllowedServiceAccountIDs  []string
+	AllowedTeamIDs            []string
+}
+
+// Validate returns an error if the model is not valid
+func (m *ManagedIdentityAccessRule) Validate() error {
+	switch m.Type {
+	case ManagedIdentityAccessRuleEligiblePrincipals:
+		if len(m.ModuleAttestationPolicies) > 0 {
+			return errors.NewError(errors.EInvalid, "eligible principals rule type does not support module attestation policies")
+		}
+	case ManagedIdentityAccessRuleModuleAttestation:
+		if len(m.ModuleAttestationPolicies) == 0 {
+			return errors.NewError(errors.EInvalid, "a minimum of one module attestation policy is required for rule type module_attestation")
+		}
+
+		for _, policy := range m.ModuleAttestationPolicies {
+			if _, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(policy.PublicKey)); err != nil {
+				return errors.NewError(errors.EInvalid, fmt.Sprintf("invalid public key: %v", err))
+			}
+			if policy.PredicateType != nil && *policy.PredicateType == "" {
+				return errors.NewError(errors.EInvalid, "predicate type cannot be an empty string")
+			}
+		}
+
+		if len(m.AllowedServiceAccountIDs) > 0 || len(m.AllowedUserIDs) > 0 || len(m.AllowedTeamIDs) > 0 {
+			return errors.NewError(errors.EInvalid, "module attestation rule type does not support allowed users, service accounts, or teams")
+		}
+	default:
+		return errors.NewError(errors.EInvalid, fmt.Sprintf("rule type %s is not supported", m.Type))
+	}
+
+	return nil
 }
 
 // ManagedIdentity is used to provide identities to terraform providers

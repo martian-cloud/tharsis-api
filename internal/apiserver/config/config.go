@@ -67,7 +67,7 @@ type Config struct {
 	TFELoginClientID string `yaml:"tfe_login_client_id" env:"TFE_LOGIN_CLIENT_ID"`
 	TFELoginScopes   string `yaml:"tfe_login_scopes" env:"TFE_LOGIN_SCOPES"`
 
-	// ServiceDiscoveryHost is optional and will default to the APIURL host if it's not defined
+	// ServiceDiscoveryHost is optional and will default to the API URL host if it's not defined
 	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
 
 	// AdminUserEmail is optional and will create a system admin user with this email.

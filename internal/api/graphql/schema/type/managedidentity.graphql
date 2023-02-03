@@ -3,6 +3,11 @@ enum ManagedIdentitySort {
   UPDATED_AT_DESC
 }
 
+enum ManagedIdentityAccessRuleType {
+  eligible_principals
+  module_attestation
+}
+
 type ManagedIdentityConnection {
   totalCount: Int!
   pageInfo: PageInfo!
@@ -62,13 +67,20 @@ type CreateManagedIdentityCredentialsPayload {
   problems: [Problem!]!
 }
 
+type ManagedIdentityAccessRuleModuleAttestationPolicy {
+  publicKey: String!
+  predicateType: String
+}
+
 type ManagedIdentityAccessRule implements Node {
   id: ID!
   metadata: ResourceMetadata!
+  type: ManagedIdentityAccessRuleType!
   runStage: JobType!
-  allowedUsers: [User!]!
-  allowedServiceAccounts: [ServiceAccount!]!
-  allowedTeams: [Team!]!
+  moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicy!]
+  allowedUsers: [User!]
+  allowedServiceAccounts: [ServiceAccount!]
+  allowedTeams: [Team!]
   managedIdentity: ManagedIdentity!
 }
 
@@ -102,19 +114,22 @@ type ManagedIdentityCredentials {
 input CreateManagedIdentityAccessRuleInput {
   clientMutationId: String
   managedIdentityId: String!
+  type: ManagedIdentityAccessRuleType!
   runStage: JobType!
-  allowedServiceAccounts: [String!]!
-  allowedUsers: [String!]!
-  allowedTeams: [String!]!
+  moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicyInput!]
+  allowedServiceAccounts: [String!]
+  allowedUsers: [String!]
+  allowedTeams: [String!]
 }
 
 input UpdateManagedIdentityAccessRuleInput {
   clientMutationId: String
   id: ID!
   runStage: JobType!
-  allowedServiceAccounts: [String!]!
-  allowedUsers: [String!]!
-  allowedTeams: [String!]!
+  moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicyInput!]
+  allowedServiceAccounts: [String!]
+  allowedUsers: [String!]
+  allowedTeams: [String!]
 }
 
 input DeleteManagedIdentityAccessRuleInput {
@@ -122,11 +137,18 @@ input DeleteManagedIdentityAccessRuleInput {
   id: ID!
 }
 
+input ManagedIdentityAccessRuleModuleAttestationPolicyInput {
+  publicKey: String!
+  predicateType: String
+}
+
 input ManagedIdentityAccessRuleInput {
   runStage: JobType!
-  allowedServiceAccounts: [String!]!
-  allowedUsers: [String!]!
-  allowedTeams: [String!]!
+  type: ManagedIdentityAccessRuleType!
+  moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicyInput!]
+  allowedServiceAccounts: [String!]
+  allowedUsers: [String!]
+  allowedTeams: [String!]
 }
 
 type ManagedIdentityCredentials {

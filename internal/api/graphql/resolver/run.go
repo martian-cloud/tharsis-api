@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -11,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
@@ -227,6 +229,14 @@ func (r *RunResolver) ModuleSource(ctx context.Context) *string {
 // ModuleVersion resolver
 func (r *RunResolver) ModuleVersion(ctx context.Context) *string {
 	return r.run.ModuleVersion
+}
+
+// ModuleDigest resolver
+func (r *RunResolver) ModuleDigest(ctx context.Context) *string {
+	if r.run.ModuleDigest == nil {
+		return nil
+	}
+	return ptr.String(hex.EncodeToString(r.run.ModuleDigest))
 }
 
 // ForceCanceledBy resolver

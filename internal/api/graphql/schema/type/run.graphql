@@ -50,6 +50,7 @@ type Run implements Node {
   variables: [RunVariable!]!
   moduleSource: String
   moduleVersion: String
+  moduleDigest: String
   forceCanceledBy: String
   forceCanceled: Boolean!
   forceCancelAvailableAt: Time

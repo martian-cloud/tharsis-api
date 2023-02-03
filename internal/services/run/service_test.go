@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -12,6 +13,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
@@ -95,14 +98,13 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 
 func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 	configurationVersionID := "cv1"
-	var duration int32 = 720
 
 	ws := &models.Workspace{
 		Metadata: models.ResourceMetadata{
 			ID: "ws1",
 		},
 		FullPath:       "groupA/ws1",
-		MaxJobDuration: &duration,
+		MaxJobDuration: ptr.Int32(60),
 	}
 
 	run := models.Run{
@@ -114,186 +116,38 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 		Status:                 models.RunPending,
 	}
 
-	mockAuthorizer := auth.MockAuthorizer{}
-	mockAuthorizer.Test(t)
-
-	mockAuthorizer.On("RequireAccessToWorkspace", mock.Anything, ws.Metadata.ID, models.DeployerRole).Return(nil)
-
-	// Needed to move creation of userCaller and serviceAccountCaller inside the loop.
-
 	// Test cases
 	tests := []struct {
-		name              string
-		caller            string
-		expectErrorCode   string
-		teams             []models.Team
-		managedIdentities []models.ManagedIdentity
-		rules             []models.ManagedIdentityAccessRule
+		name                 string
+		expectErrorCode      string
+		enforceRulesResponse error
+		managedIdentities    []models.ManagedIdentity
 	}{
 		{
-			name: "user is forbidden to create run because managed identity access rule doesn't allow it",
+			name: "run is created because all managed identity rules are satisfied",
 			managedIdentities: []models.ManagedIdentity{
 				{
 					Metadata: models.ResourceMetadata{
 						ID: "1",
 					},
-					ResourcePath: "groupA/1",
 				},
 			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobPlanType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{},
-				},
-			},
-			caller:          "user",
-			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name: "user is allowed to create run because username is in managed identity access rule",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobPlanType,
-					AllowedUserIDs:           []string{"123"},
-					AllowedServiceAccountIDs: []string{},
-				},
-			},
-			caller: "user",
+			name:              "run is created because there are no managed identities",
+			managedIdentities: []models.ManagedIdentity{},
 		},
 		{
-			name: "user is allowed to create run because user is team member and team is in managed identity access rule",
-			teams: []models.Team{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "42",
-					},
-				},
-			},
+			name: "run is not created because a managed identity rule is not satisfied",
 			managedIdentities: []models.ManagedIdentity{
 				{
 					Metadata: models.ResourceMetadata{
 						ID: "1",
 					},
-					ResourcePath: "groupA/1",
 				},
 			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobPlanType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{},
-					AllowedTeamIDs:           []string{"42"},
-				},
-			},
-			caller: "user",
-		},
-		{
-			name: "user is prohibited from creating a run because the managed identity access rule requires a team the user is not a member of",
-			teams: []models.Team{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "42",
-					},
-				},
-			},
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobPlanType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{},
-					AllowedTeamIDs:           []string{"789"},
-				},
-			},
-			caller:          "user",
-			expectErrorCode: errors.EForbidden,
-		},
-		{
-			name: "user is allowed to create run because managed identity doesn't have any access rules",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules:  []models.ManagedIdentityAccessRule{},
-			caller: "user",
-		},
-		{
-			name: "service account is forbidden to create run because managed identity access rule doesn't allow it",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobPlanType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{},
-				},
-			},
-			caller:          "serviceAccount",
-			expectErrorCode: errors.EForbidden,
-		},
-		{
-			name: "service account is allowed to create run because service account is in managed identity access rule",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobPlanType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{"sa1"},
-				},
-			},
-			caller: "serviceAccount",
-		},
-		{
-			name: "service account is allowed to create run because managed identity doesn't have any access rules",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules:  []models.ManagedIdentityAccessRule{},
-			caller: "serviceAccount",
+			enforceRulesResponse: errors.NewError(errors.EForbidden, "rule not satisfied"),
+			expectErrorCode:      errors.EForbidden,
 		},
 	}
 
@@ -301,29 +155,9 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
-			// Select userCaller or serviceAccountCaller.
-			var testCaller auth.Caller
-			switch test.caller {
-			case "user":
-				testCaller = auth.NewUserCaller(
-					&models.User{
-						Metadata: models.ResourceMetadata{
-							ID: "123",
-						},
-						Admin:    false,
-						Username: "user1",
-					},
-					&mockAuthorizer,
-					dbClient.Client, // was nil
-				)
-
-			case "serviceAccount":
-				testCaller = auth.NewServiceAccountCaller(
-					"sa1",
-					"groupA/sa1",
-					&mockAuthorizer,
-				)
-			}
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequireAccessToWorkspace", mock.Anything, ws.Metadata.ID, models.DeployerRole).Return(nil)
+			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -333,27 +167,6 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).Return(test.managedIdentities, nil)
-
-			ruleMap := map[string][]models.ManagedIdentityAccessRule{}
-
-			for _, rule := range test.rules {
-				if _, ok := ruleMap[rule.ManagedIdentityID]; !ok {
-					ruleMap[rule.ManagedIdentityID] = []models.ManagedIdentityAccessRule{}
-				}
-				ruleMap[rule.ManagedIdentityID] = append(ruleMap[rule.ManagedIdentityID], rule)
-			}
-
-			for _, managedIdentity := range test.managedIdentities {
-				dbClient.MockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything,
-					&db.GetManagedIdentityAccessRulesInput{
-						Filter: &db.ManagedIdentityAccessRuleFilter{
-							ManagedIdentityID: &managedIdentity.Metadata.ID,
-						},
-					}).
-					Return(&db.ManagedIdentityAccessRulesResult{
-						ManagedIdentityAccessRules: ruleMap[managedIdentity.Metadata.ID],
-					}, nil)
-			}
 
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
 
@@ -386,18 +199,37 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-			dbClient.MockTeams.On("GetTeams", mock.Anything, mock.Anything).
-				Return(&db.TeamsResult{Teams: test.teams}, nil)
-
 			mockActivityEvents := activityevent.MockService{}
 			mockActivityEvents.Test(t)
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents, nil)
+			mockModuleService := moduleregistry.NewMockService(t)
+			mockModuleResolver := NewMockModuleResolver(t)
+			ruleEnforcer := rules.NewMockRuleEnforcer(t)
 
-			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), &CreateRunInput{
+			for _, mi := range test.managedIdentities {
+				miCopy := mi
+				ruleEnforcer.On("EnforceRules", mock.Anything, &miCopy, mock.Anything).Return(test.enforceRulesResponse)
+			}
+
+			logger, _ := logger.NewForTest()
+			service := newService(
+				logger,
+				dbClient.Client,
+				&mockArtifactStore,
+				nil,
+				nil,
+				nil,
+				nil,
+				&mockActivityEvents,
+				mockModuleService,
+				mockModuleResolver,
+				nil,
+				ruleEnforcer,
+			)
+
+			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
 				WorkspaceID:            ws.Metadata.ID,
 				ConfigurationVersionID: &configurationVersionID,
 			})
@@ -576,7 +408,8 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents, nil)
+
+			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents, nil, nil)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), test.runInput)
 			if test.expectErrorCode != "" {
@@ -611,160 +444,50 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 		},
 	}
 
-	mockAuthorizer := auth.MockAuthorizer{}
-	mockAuthorizer.Test(t)
-
-	mockAuthorizer.On("RequireAccessToWorkspace", mock.Anything, ws.Metadata.ID, models.DeployerRole).Return(nil)
-
-	// Needed to move creation of userCaller and serviceAccountCaller inside the loop.
-
 	// Test cases
 	tests := []struct {
-		name              string
-		caller            string
-		expectErrorCode   string
-		managedIdentities []models.ManagedIdentity
-		rules             []models.ManagedIdentityAccessRule
+		name                 string
+		expectErrorCode      string
+		enforceRulesResponse error
+		managedIdentities    []models.ManagedIdentity
 	}{
 		{
-			name: "user is forbidden to apply run because managed identity access rule doesn't allow it",
+			name: "apply is created because all managed identity rules are satisfied",
 			managedIdentities: []models.ManagedIdentity{
 				{
 					Metadata: models.ResourceMetadata{
 						ID: "1",
 					},
-					ResourcePath: "groupA/1",
 				},
 			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobApplyType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{},
-				},
-			},
-			caller:          "user",
-			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name: "user is allowed to apply run because username is in managed identity access rule",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobApplyType,
-					AllowedUserIDs:           []string{"123"},
-					AllowedServiceAccountIDs: []string{},
-				},
-			},
-			caller: "user",
+			name:              "apply is created because there are no managed identities",
+			managedIdentities: []models.ManagedIdentity{},
 		},
 		{
-			name: "user is allowed to apply run because managed identity doesn't have any access rules",
+			name: "apply is not created because a managed identity rule is not satisfied",
 			managedIdentities: []models.ManagedIdentity{
 				{
 					Metadata: models.ResourceMetadata{
 						ID: "1",
 					},
-					ResourcePath: "groupA/1",
 				},
 			},
-			rules:  []models.ManagedIdentityAccessRule{},
-			caller: "user",
-		},
-		{
-			name: "service account is forbidden to apply run because managed identity access rule doesn't allow it",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobApplyType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{"sa2"},
-				},
-			},
-			caller:          "serviceAccount",
-			expectErrorCode: errors.EForbidden,
-		},
-		{
-			name: "service account is allowed to apply run because service account is in managed identity access rule",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules: []models.ManagedIdentityAccessRule{
-				{
-					ManagedIdentityID:        "1",
-					RunStage:                 models.JobApplyType,
-					AllowedUserIDs:           []string{},
-					AllowedServiceAccountIDs: []string{"sa1"},
-				},
-			},
-			caller: "serviceAccount",
-		},
-		{
-			name: "service account is allowed to apply run because managed identity doesn't have any access rules",
-			managedIdentities: []models.ManagedIdentity{
-				{
-					Metadata: models.ResourceMetadata{
-						ID: "1",
-					},
-					ResourcePath: "groupA/1",
-				},
-			},
-			rules:  []models.ManagedIdentityAccessRule{},
-			caller: "serviceAccount",
+			enforceRulesResponse: errors.NewError(errors.EForbidden, "rule not satisfied"),
+			expectErrorCode:      errors.EForbidden,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			dbClient := buildDBClientWithMocks(t)
 
-			// Select userCaller or serviceAccountCaller.
-			var testCaller auth.Caller
-			switch test.caller {
-			case "user":
-				testCaller = auth.NewUserCaller(
-					&models.User{
-						Metadata: models.ResourceMetadata{
-							ID: "123",
-						},
-						Admin:    false,
-						Username: "user1",
-					},
-					&mockAuthorizer,
-					dbClient.Client,
-				)
-			case "serviceAccount":
-				testCaller = auth.NewServiceAccountCaller(
-					"sa1",
-					"groupA/sa1",
-					&mockAuthorizer,
-				)
-			}
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequireAccessToWorkspace", mock.Anything, ws.Metadata.ID, models.DeployerRole).Return(nil)
+			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
-			ctx, cancel := context.WithCancel(auth.WithCaller(context.Background(), testCaller))
+			ctx, cancel := context.WithCancel(auth.WithCaller(context.Background(), mockCaller))
 			defer cancel()
 
 			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -773,26 +496,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).Return(test.managedIdentities, nil)
 
-			ruleMap := map[string][]models.ManagedIdentityAccessRule{}
-
-			for _, rule := range test.rules {
-				if _, ok := ruleMap[rule.ManagedIdentityID]; !ok {
-					ruleMap[rule.ManagedIdentityID] = []models.ManagedIdentityAccessRule{}
-				}
-				ruleMap[rule.ManagedIdentityID] = append(ruleMap[rule.ManagedIdentityID], rule)
-			}
-
-			for _, managedIdentity := range test.managedIdentities {
-				dbClient.MockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything,
-					&db.GetManagedIdentityAccessRulesInput{
-						Filter: &db.ManagedIdentityAccessRuleFilter{
-							ManagedIdentityID: &managedIdentity.Metadata.ID,
-						},
-					}).
-					Return(&db.ManagedIdentityAccessRulesResult{
-						ManagedIdentityAccessRules: ruleMap[managedIdentity.Metadata.ID],
-					}, nil)
-			}
+			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
 
 			apply.Status = models.ApplyCreated // to avoid tripping the state transition checks in UpdateApply, etc.
 
@@ -804,16 +508,35 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(nil, nil)
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, run.WorkspaceID).Return(ws, nil)
 
-			dbClient.MockTeams.On("GetTeams", mock.Anything, mock.Anything).
-				Return(&db.TeamsResult{Teams: []models.Team{}}, nil)
-
 			mockActivityEvents := activityevent.MockService{}
 			mockActivityEvents.Test(t)
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
+			mockModuleService := moduleregistry.NewMockService(t)
+			mockModuleResolver := NewMockModuleResolver(t)
+			ruleEnforcer := rules.NewMockRuleEnforcer(t)
+
+			for _, mi := range test.managedIdentities {
+				miCopy := mi
+				ruleEnforcer.On("EnforceRules", mock.Anything, &miCopy, mock.Anything).Return(test.enforceRulesResponse)
+			}
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient.Client, nil, nil, nil, nil, nil, &mockActivityEvents, nil)
+			service := newService(
+				logger,
+				dbClient.Client,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				&mockActivityEvents,
+				mockModuleService,
+				mockModuleResolver,
+				newRunStateManager(dbClient.Client, logger),
+				ruleEnforcer,
+			)
 
 			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)
 			if test.expectErrorCode != "" {

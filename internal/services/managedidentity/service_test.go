@@ -1084,6 +1084,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 	createAccessRuleInput := &models.ManagedIdentityAccessRule{
 		ManagedIdentityID:        sampleManagedIdentity.Metadata.ID,
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 		RunStage:                 models.JobPlanType,
 		AllowedUserIDs:           []string{"user-1-id", "user-2-id"},
 		AllowedServiceAccountIDs: []string{"service-account-1-id"},
@@ -1108,12 +1109,15 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID:     "some-group-id",
 				Data:        []byte("some-data"),
 				AccessRules: []struct {
-					RunStage                 models.JobType
-					AllowedUserIDs           []string
-					AllowedServiceAccountIDs []string
-					AllowedTeamIDs           []string
+					Type                      models.ManagedIdentityAccessRuleType
+					RunStage                  models.JobType
+					ModuleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+					AllowedUserIDs            []string
+					AllowedServiceAccountIDs  []string
+					AllowedTeamIDs            []string
 				}{
 					{
+						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 						RunStage:                 models.JobPlanType,
 						AllowedUserIDs:           []string{"user-1-id", "user-2-id"},
 						AllowedServiceAccountIDs: []string{"service-account-1-id"},
@@ -1132,12 +1136,15 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID:     "some-group-id",
 				Data:        []byte("some-data"),
 				AccessRules: []struct {
-					RunStage                 models.JobType
-					AllowedUserIDs           []string
-					AllowedServiceAccountIDs []string
-					AllowedTeamIDs           []string
+					Type                      models.ManagedIdentityAccessRuleType
+					RunStage                  models.JobType
+					ModuleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+					AllowedUserIDs            []string
+					AllowedServiceAccountIDs  []string
+					AllowedTeamIDs            []string
 				}{
 					{
+						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 						RunStage:                 models.JobPlanType,
 						AllowedUserIDs:           []string{"user-1-id", "user-2-id"},
 						AllowedServiceAccountIDs: []string{"non-existent-service-account"},
@@ -1156,12 +1163,15 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID:     "some-group-id",
 				Data:        []byte("some-data"),
 				AccessRules: []struct {
-					RunStage                 models.JobType
-					AllowedUserIDs           []string
-					AllowedServiceAccountIDs []string
-					AllowedTeamIDs           []string
+					Type                      models.ManagedIdentityAccessRuleType
+					RunStage                  models.JobType
+					ModuleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+					AllowedUserIDs            []string
+					AllowedServiceAccountIDs  []string
+					AllowedTeamIDs            []string
 				}{
 					{
+						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 						RunStage:                 models.JobPlanType,
 						AllowedUserIDs:           []string{"user-1-id", "user-2-id"},
 						AllowedServiceAccountIDs: []string{"outside-scope-1"},
@@ -1517,6 +1527,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 			Metadata: models.ResourceMetadata{
 				ID: "some-access-rule",
 			},
+			Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 			RunStage:                 models.JobPlanType,
 			ManagedIdentityID:        sampleManagedIdentity.Metadata.ID,
 			AllowedUserIDs:           []string{"user-id-1"},
@@ -1605,6 +1616,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 			Metadata: models.ResourceMetadata{
 				ID: "an-access-rule-1",
 			},
+			Type:              models.ManagedIdentityAccessRuleEligiblePrincipals,
 			RunStage:          models.JobApplyType,
 			ManagedIdentityID: "some-managed-identity-id",
 			AllowedUserIDs:    []string{"some-user-1"},
@@ -1723,6 +1735,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "some-access-rule",
 		},
+		Type:              models.ManagedIdentityAccessRuleEligiblePrincipals,
 		RunStage:          models.JobPlanType,
 		ManagedIdentityID: sampleManagedIdentity.Metadata.ID,
 		AllowedUserIDs:    []string{"user-id-1"},
@@ -1805,6 +1818,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "some-managed-identity-access-rule-id",
 		},
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 		RunStage:                 models.JobApplyType,
 		ManagedIdentityID:        sampleManagedIdentity.Metadata.ID,
 		AllowedUserIDs:           []string{"user-id-1"},
@@ -1951,6 +1965,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "some-managed-identity-access-rule-id",
 		},
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 		RunStage:                 models.JobApplyType,
 		ManagedIdentityID:        sampleManagedIdentity.Metadata.ID,
 		AllowedUserIDs:           []string{"user-id-1"},
@@ -2092,6 +2107,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "some-managed-identity-access-rule-id",
 		},
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 		RunStage:                 models.JobApplyType,
 		ManagedIdentityID:        sampleManagedIdentity.Metadata.ID,
 		AllowedUserIDs:           []string{"user-id-1"},

@@ -28,6 +28,7 @@ type Run struct {
 	ForceCanceledBy        *string
 	ModuleVersion          *string
 	ModuleSource           *string
+	ModuleDigest           []byte // This is only set for modules stored in the Tharsis module registry
 	CreatedBy              string
 	PlanID                 string
 	ApplyID                string

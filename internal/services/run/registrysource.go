@@ -1,5 +1,7 @@
 package run
 
+//go:generate mockery --name ModuleResolver --inpackage --case underscore
+
 import (
 	"context"
 	"encoding/json"
@@ -18,9 +20,20 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/registry/addrs"
 )
 
+// ModuleRegistrySource is the parsed Terraform module source
+type ModuleRegistrySource struct {
+	RegistryURL  *url.URL
+	ModuleID     *string // This field is only set for modules in the tharsis module registry
+	Host         string
+	Namespace    string
+	Name         string
+	TargetSystem string
+}
+
 // ModuleResolver encapsulates the logic to resolve module source version string(s).
 type ModuleResolver interface {
-	ResolveModuleVersion(ctx context.Context, moduleSource string, moduleVersion *string, variables []Variable) (*string, error)
+	ParseModuleRegistrySource(ctx context.Context, moduleSource string) (*ModuleRegistrySource, error)
+	ResolveModuleVersion(ctx context.Context, source *ModuleRegistrySource, wantVersion *string, variables []Variable) (string, error)
 }
 
 type moduleResolver struct {
@@ -40,14 +53,7 @@ func NewModuleResolver(moduleService moduleregistry.Service, httpClient *http.Cl
 	}
 }
 
-// ResolveModuleVersion parses a module source string.  Then, if necessary,
-// it converts it to a go-getter-style source string.
-//
-// Note: In cases of a registry-style module source, if the module version was not specified
-// by the caller, this function returns a pointer to the final module version.
-func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource string, moduleVersion *string,
-	variables []Variable) (*string, error) {
-
+func (m *moduleResolver) ParseModuleRegistrySource(ctx context.Context, moduleSource string) (*ModuleRegistrySource, error) {
 	// Determine if local module.
 	if addrs.IsModuleSourceLocal(moduleSource) {
 		return nil, fmt.Errorf("local modules are not supported")
@@ -62,36 +68,11 @@ func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource 
 		return nil, addrs.ValidateModuleSourceRemote(moduleSource)
 	}
 
-	return m.convertModuleSource(ctx, moduleVersion, parsedSource, variables)
-}
-
-// convertModuleSource intends to imitate some of the logic from function installRegistryModule
-// from https://github.com/hashicorp/terraform/blob/main/internal/initwd/module_install.go
-//
-// The sequence of URLs to visit was found by downloading a module that pulls a submodule
-// from a Gitlab registry with environment variable TF_LOG to 'trace'.
-//
-// Note: In cases of a registry-style module source, if the module version was not specified
-// by the caller, this function returns a pointer to the final module version.
-func (m *moduleResolver) convertModuleSource(ctx context.Context, version *string, sourceModule tfaddrs.Module,
-	variables []Variable) (*string, error) {
-
-	// Separate the pieces of sourceModule.
-	host := sourceModule.Package.Host.String()
-	subdir := sourceModule.Subdir
+	host := parsedSource.Package.Host.String()
 
 	// Subdir is not supported.
-	if subdir != "" {
+	if parsedSource.Subdir != "" {
 		return nil, fmt.Errorf("subdir not supported when reading module from registry")
-	}
-
-	// Get the auth token for the specified host.
-	var token string
-	seeking := module.BuildTokenEnvVar(host)
-	for _, variable := range variables {
-		if variable.Key == seeking {
-			token = *variable.Value
-		}
 	}
 
 	// Visit the 'well-known' URL for the server in question:
@@ -100,46 +81,42 @@ func (m *moduleResolver) convertModuleSource(ctx context.Context, version *strin
 		return nil, err
 	}
 
-	// Visit the URL to get a list of versions:
-	versions, err := m.getVersions(ctx, moduleRegistryURL, token, sourceModule)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get or verify the version.
-	chosenVersion, err := getLatestMatchingVersion(versions, version)
-	if err != nil {
-		return nil, err
-	}
-
-	return &chosenVersion, nil
-}
-
-// getVersions returns a slice of the versions available on the server
-// for example, https://gitlab.com/api/v4/packages/terraform/modules/v1/mygroup/module-001/aws/versions
-func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, token string, sourceModule tfaddrs.Module) (map[string]bool, error) {
-	namespace := sourceModule.Package.Namespace
-	moduleName := sourceModule.Package.Name
-	targetSystem := sourceModule.Package.TargetSystem
-
 	apiURL, err := url.Parse(m.tharsisAPIEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse API URL %v", err)
 	}
 
-	if registryURL.Host == apiURL.Host {
-		module, getModErr := m.moduleService.GetModuleByAddress(ctx, namespace, moduleName, targetSystem)
+	var moduleID *string
+	if moduleRegistryURL.Host == apiURL.Host {
+		module, getModErr := m.moduleService.GetModuleByAddress(ctx, parsedSource.Package.Namespace, parsedSource.Package.Name, parsedSource.Package.TargetSystem)
 		if getModErr != nil {
 			return nil, getModErr
 		}
+		moduleID = &module.Metadata.ID
+	}
 
+	return &ModuleRegistrySource{
+		Host:         host,
+		Namespace:    parsedSource.Package.Namespace,
+		Name:         parsedSource.Package.Name,
+		TargetSystem: parsedSource.Package.TargetSystem,
+		RegistryURL:  moduleRegistryURL,
+		ModuleID:     moduleID,
+	}, nil
+}
+
+func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource *ModuleRegistrySource, wantVersion *string,
+	variables []Variable) (string, error) {
+
+	var versions map[string]bool
+	if moduleSource.ModuleID != nil {
 		statusFilter := models.TerraformModuleVersionStatusUploaded
 		versionsResponse, getModVerErr := m.moduleService.GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
-			ModuleID: module.Metadata.ID,
+			ModuleID: *moduleSource.ModuleID,
 			Status:   &statusFilter,
 		})
 		if getModVerErr != nil {
-			return nil, getModVerErr
+			return "", getModVerErr
 		}
 
 		results := map[string]bool{}
@@ -147,8 +124,41 @@ func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, 
 			results[m.SemanticVersion] = true
 		}
 
-		return results, nil
+		versions = results
+	} else {
+		// Get the auth token for the specified host.
+		var token string
+		seeking := module.BuildTokenEnvVar(moduleSource.Host)
+		for _, variable := range variables {
+			if variable.Key == seeking {
+				token = *variable.Value
+			}
+		}
+
+		// Visit the URL to get a list of versions:
+		results, err := m.getVersions(ctx, moduleSource.RegistryURL, token, moduleSource)
+		if err != nil {
+			return "", err
+		}
+
+		versions = results
 	}
+
+	// Get or verify the version.
+	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion)
+	if err != nil {
+		return "", err
+	}
+
+	return chosenVersion, nil
+}
+
+// getVersions returns a slice of the versions available on the server
+// for example, https://gitlab.com/api/v4/packages/terraform/modules/v1/mygroup/module-001/aws/versions
+func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, token string, sourceModule *ModuleRegistrySource) (map[string]bool, error) {
+	namespace := sourceModule.Namespace
+	moduleName := sourceModule.Name
+	targetSystem := sourceModule.TargetSystem
 
 	// Resolve a relative reference from the base URL to the 'versions' path.
 	versionsRefURL, err := url.Parse(strings.Join([]string{namespace, moduleName, targetSystem, "versions"}, "/"))

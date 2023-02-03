@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -130,7 +131,7 @@ type managedIdentities struct {
 
 var (
 	managedIdentityFieldList     = append(metadataFieldList, "name", "description", "type", "group_id", "data", "created_by", "alias_source_id")
-	managedIdentityRuleFieldList = append(metadataFieldList, "run_stage", "managed_identity_id")
+	managedIdentityRuleFieldList = append(metadataFieldList, "run_stage", "managed_identity_id", "type", "module_attestation_policies")
 )
 
 // Table aliases used with several queries.
@@ -298,15 +299,25 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 		}
 	}()
 
+	var moduleAttestationPolicies interface{}
+	if rule.ModuleAttestationPolicies != nil {
+		moduleAttestationPolicies, err = json.Marshal(rule.ModuleAttestationPolicies)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Create rule
 	sql, _, err := dialect.Insert("managed_identity_rules").
 		Rows(goqu.Record{
-			"id":                  newResourceID(),
-			"version":             initialResourceVersion,
-			"created_at":          timestamp,
-			"updated_at":          timestamp,
-			"managed_identity_id": rule.ManagedIdentityID,
-			"run_stage":           rule.RunStage,
+			"id":                          newResourceID(),
+			"version":                     initialResourceVersion,
+			"created_at":                  timestamp,
+			"updated_at":                  timestamp,
+			"type":                        rule.Type,
+			"managed_identity_id":         rule.ManagedIdentityID,
+			"run_stage":                   rule.RunStage,
+			"module_attestation_policies": moduleAttestationPolicies,
 		}).
 		Returning(managedIdentityRuleFieldList...).ToSQL()
 
@@ -406,11 +417,20 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		}
 	}()
 
+	var moduleAttestationPolicies interface{}
+	if rule.ModuleAttestationPolicies != nil {
+		moduleAttestationPolicies, err = json.Marshal(rule.ModuleAttestationPolicies)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	sql, _, err := goqu.Update("managed_identity_rules").Set(
 		goqu.Record{
-			"version":    goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at": timestamp,
-			"run_stage":  rule.RunStage,
+			"version":                     goqu.L("? + ?", goqu.C("version"), 1),
+			"updated_at":                  timestamp,
+			"run_stage":                   rule.RunStage,
+			"module_attestation_policies": moduleAttestationPolicies,
 		},
 	).Where(goqu.Ex{"id": rule.Metadata.ID, "version": rule.Metadata.Version}).Returning(managedIdentityRuleFieldList...).ToSQL()
 
@@ -1147,6 +1167,8 @@ func scanManagedIdentityRule(row scanner) (*models.ManagedIdentityAccessRule, er
 		&rule.Metadata.Version,
 		&rule.RunStage,
 		&rule.ManagedIdentityID,
+		&rule.Type,
+		&rule.ModuleAttestationPolicies,
 	}
 
 	err := row.Scan(fields...)

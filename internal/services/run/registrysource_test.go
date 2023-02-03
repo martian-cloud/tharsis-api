@@ -181,16 +181,25 @@ func TestResolveModuleVersionRemote(t *testing.T) {
 
 		mockModuleService := moduleregistry.NewMockService(t)
 
+		resolver := NewModuleResolver(mockModuleService, properClient, logger.New(), "http://testserver")
+
+		parsedSource, err := resolver.ParseModuleRegistrySource(ctx, test.origSource)
+		require.Nil(t, err)
+
+		if test.expectVersion == nil {
+			require.Nil(t, parsedSource)
+			return
+		}
+
+		require.NotNil(t, parsedSource)
+
 		// Resolve the module version.
-		gotVersion, err := NewModuleResolver(mockModuleService, properClient, logger.New(), "http://testserver").
-			ResolveModuleVersion(ctx, test.origSource, test.origVersion, vars)
+		gotVersion, err := resolver.
+			ResolveModuleVersion(ctx, parsedSource, test.origVersion, vars)
 
 		// Compare vs. expected results.
 		assert.Equal(t, test.expectError, err)
-		assert.Equal(t, (test.expectVersion == nil), (gotVersion == nil))
-		if (test.expectVersion != nil) && (gotVersion != nil) {
-			assert.Equal(t, *test.expectVersion, *gotVersion)
-		}
+		assert.Equal(t, *test.expectVersion, gotVersion)
 	}
 }
 
@@ -264,14 +273,19 @@ func TestResolveModuleVersionLocal(t *testing.T) {
 			},
 		}, nil)
 
+		resolver := NewModuleResolver(mockModuleService, properClient, logger.New(), s.URL)
+
+		parsedSource, err := resolver.ParseModuleRegistrySource(ctx, fmt.Sprintf("%s/%s/%s/%s", serverURL.Host, test.moduleNamespace, test.moduleName, test.moduleSystem))
+		require.Nil(t, err)
+
 		// Resolve the module version.
-		gotVersion, err := NewModuleResolver(mockModuleService, properClient, logger.New(), s.URL).
-			ResolveModuleVersion(ctx, fmt.Sprintf("%s/%s/%s/%s", serverURL.Host, test.moduleNamespace, test.moduleName, test.moduleSystem), test.version, []Variable{})
+		gotVersion, err := resolver.
+			ResolveModuleVersion(ctx, parsedSource, test.version, []Variable{})
 
 		require.Nil(t, err)
 
 		require.NotNil(t, gotVersion)
-		assert.Equal(t, test.expectVersion, *gotVersion)
+		assert.Equal(t, test.expectVersion, gotVersion)
 	}
 }
 

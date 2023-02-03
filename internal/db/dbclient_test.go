@@ -31,6 +31,9 @@ const (
 
 	// Maximum number of DB connections--intended to mirror the CI environment
 	maxConns = 4
+
+	// The table name used to store the current migration schema version
+	migrationSchemaTable = "schema_migrations"
 )
 
 var (
@@ -84,7 +87,7 @@ func newTestClient(ctx context.Context, t *testing.T) *testClient {
 
 	logger, _ := logger.NewForTest()
 
-	client, err := NewClient(ctx, TestDBHost, portNum, TestDBName, TestDBMode, TestDBUser, TestDBPass, maxConns, false, logger)
+	client, err := NewClient(ctx, TestDBHost, portNum, TestDBName, TestDBMode, TestDBUser, TestDBPass, maxConns, true, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +142,9 @@ func (tc *testClient) wipeAllTables(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		tableNames = append(tableNames, model.tableName)
+		if model.tableName != migrationSchemaTable {
+			tableNames = append(tableNames, model.tableName)
+		}
 	}
 
 	if len(tableNames) == 0 {
