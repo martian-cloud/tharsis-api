@@ -1679,15 +1679,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 		},
 
 		{
-			name: "duplicate run stage",
-			toCreate: &models.ManagedIdentityAccessRule{
-				RunStage:          models.JobApplyType,
-				ManagedIdentityID: positiveManagedIdentity.Metadata.ID,
-			},
-			expectMsg: ptr.String("Rule for run stage apply already exists"),
-		},
-
-		{
 			name: "non-existent managed identity ID",
 			toCreate: &models.ManagedIdentityAccessRule{
 				ManagedIdentityID: nonExistentID,
@@ -2037,6 +2028,7 @@ var standardWarmupManagedIdentities = []models.ManagedIdentity{
 var standardWarmupManagedIdentityAccessRules = []models.ManagedIdentityAccessRule{
 	{
 		RunStage:                 models.JobPlanType,
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
 		ManagedIdentityID:        "1-managed-identity-0",        // will be fixed later
 		AllowedUserIDs:           []string{"user-0"},            // will be fixed later
 		AllowedServiceAccountIDs: []string{"service-account-0"}, // will be fixed later

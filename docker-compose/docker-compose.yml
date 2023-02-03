@@ -10,8 +10,9 @@ services:
       - POSTGRES_DB=tharsis
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - PGDATA=/var/lib/postgresql/data
     volumes:
-      - postgres_data:/var/lib/data/postgres
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - tharsis
 
@@ -24,8 +25,9 @@ services:
       - POSTGRES_DB=keycloak
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - PGDATA=/var/lib/postgresql/data
     volumes:
-      - kc_postgres_data:/var/lib/data/postgres
+      - kc_postgres_data:/var/lib/postgresql/data
     networks:
       - tharsis
 
@@ -34,16 +36,12 @@ services:
     image: quay.io/keycloak/keycloak:latest
     container_name: tharsis-idp
     restart: unless-stopped
-    command: "start-dev --import-realm"
+    command: "start-dev --db=postgres --db-url-host=keycloak-db --db-username=postgres --db-password=postgres --import-realm"
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
-      - DB_DATABASE=keycloak
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_URL=postgres://postgres:postgres@kc_postgres:5432/keycloak?sslmode=disable
     volumes:
-      - $PWD/tharsis-realm.json:/opt/keycloak/data/import/tharsis-realm.json:ro
+      - ./tharsis-realm.json:/opt/keycloak/data/import/tharsis-realm.json:ro
     networks:
       - tharsis
     ports:
@@ -83,6 +81,7 @@ services:
     image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/api:latest
     container_name: tharsis-api
     restart: unless-stopped
+    user: 0:0
     environment:
       - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://localhost:6530/realms/tharsis
       - THARSIS_OAUTH_PROVIDERS_0_CLIENT_ID=tharsis

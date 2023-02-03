@@ -49,13 +49,15 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/qiangxue/go-env v1.0.1
+	github.com/secure-systems-lab/go-securesystemslib v0.4.0
+	github.com/sigstore/sigstore v1.5.0
 	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/http-swagger v1.3.3
 	github.com/zclconf/go-cty v1.12.1
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20221003200235-27fb6b330f28
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20221003202249-22d91a3f6af2
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.12.0
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.13.0
 	go.uber.org/zap v1.24.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.26.1
@@ -108,6 +110,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-containerregistry v0.12.1 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.1 // indirect
@@ -136,6 +139,7 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
+	github.com/letsencrypt/boulder v0.0.0-20221109233200-85aa52084eaf // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -151,12 +155,13 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
-	github.com/secure-systems-lab/go-securesystemslib v0.4.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/swaggo/files v1.0.0 // indirect
 	github.com/swaggo/swag v1.8.9 // indirect
+	github.com/theupdateframework/go-tuf v0.5.2-0.20220930112810-3890c1e7ace4 // indirect
+	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
@@ -177,6 +182,7 @@ require (
 	google.golang.org/grpc v1.52.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect

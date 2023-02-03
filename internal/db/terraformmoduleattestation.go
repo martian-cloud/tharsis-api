@@ -168,7 +168,8 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 		return nil, err
 	}
 
-	sql, _, err := dialect.Insert("terraform_module_attestations").
+	sql, args, err := dialect.Insert("terraform_module_attestations").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":             newResourceID(),
 			"version":        initialResourceVersion,
@@ -188,7 +189,7 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 		return nil, err
 	}
 
-	createdModuleAttestation, err := scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdModuleAttestation, err := scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {

@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/hashicorp/go-slug"
 	"github.com/hashicorp/go-version"
 	hcInstall "github.com/hashicorp/hc-install"
@@ -18,7 +19,7 @@ import (
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
@@ -141,15 +142,22 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	var resolvedModuleSource *string
 	if t.run.ModuleSource != nil {
 		if t.run.ModuleVersion != nil {
-			// Registry-style module source; version shall have been resolved in service layer.
-
+			// Registry-style module source; version is always defined in this case
 			t.jobLogger.Infof("Resolving module version %s/%s", *t.run.ModuleSource, *t.run.ModuleVersion)
 
 			presignedURL, rErr := resolveModuleSource(*t.run.ModuleSource, *t.run.ModuleVersion, t.fullEnv)
 			if rErr != nil {
 				return nil, fmt.Errorf("failed to resolve module source: %s", rErr)
 			}
-			resolvedModuleSource = &presignedURL
+
+			if t.run.ModuleDigest != nil {
+				// Add required checksum if module digest is defined. The go-getter library will verify the checksum when
+				// downloading the module
+				t.jobLogger.Infof("Module digest: %s", *t.run.ModuleDigest)
+				resolvedModuleSource = ptr.String(fmt.Sprintf("%s&checksum=sha256:%s", presignedURL, *t.run.ModuleDigest))
+			} else {
+				resolvedModuleSource = &presignedURL
+			}
 		} else {
 			// Non-registry-style module source.
 			resolvedModuleSource = t.run.ModuleSource
@@ -218,7 +226,13 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		if isCancellationError(err) {
 			return nil, fmt.Errorf("job cancelled while first terraform init command was in progress")
 		} else if err != nil {
-			return nil, fmt.Errorf("failed to run first init command %v", err)
+			if strings.Contains(err.Error(), "Checksums did not match") && t.run.ModuleDigest != nil {
+				return nil, fmt.Errorf(
+					"failed to download root module: checksum did not match expected value of %s",
+					*t.run.ModuleDigest,
+				)
+			}
+			return nil, fmt.Errorf("failed to download root module %v", err)
 		}
 	}
 
@@ -264,10 +278,8 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 
 	cvFile, err := os.Create(cvFilePath)
 	if err != nil {
-		return errors.NewError(
-			errors.EInternal,
-			"Failed to create temporary configuration version file for download",
-			errors.WithErrorErr(err),
+		return fmt.Errorf(
+			"failed to create temporary configuration version file for download: %v", err,
 		)
 	}
 
@@ -275,10 +287,9 @@ func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) e
 
 	cv, err := t.client.GetConfigurationVersion(ctx, *t.run.ConfigurationVersionID)
 	if err != nil {
-		return errors.NewError(
-			errors.EInternal,
-			"Failed to query configuration version from database",
-			errors.WithErrorErr(err),
+		return fmt.Errorf(
+			"failed to query configuration version from database: %v",
+			err,
 		)
 	}
 
@@ -299,10 +310,9 @@ func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) er
 
 	stateFile, err := os.Create(filepath.Join(t.workspaceDir, "terraform.tfstate"))
 	if err != nil {
-		return errors.NewError(
-			errors.EInternal,
-			"Failed to create temporary file for current terraform state",
-			errors.WithErrorErr(err),
+		return fmt.Errorf(
+			"failed to create temporary file for current terraform state: %v",
+			err,
 		)
 	}
 

@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -143,9 +144,22 @@ func (r *ManagedIdentityAccessRuleResolver) Metadata() *MetadataResolver {
 	return &MetadataResolver{metadata: &r.rule.Metadata}
 }
 
+// Type resolver
+func (r *ManagedIdentityAccessRuleResolver) Type() string {
+	return string(r.rule.Type)
+}
+
 // RunStage resolver
 func (r *ManagedIdentityAccessRuleResolver) RunStage() string {
 	return string(r.rule.RunStage)
+}
+
+// ModuleAttestationPolicies resolver
+func (r *ManagedIdentityAccessRuleResolver) ModuleAttestationPolicies() *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy {
+	if r.rule.ModuleAttestationPolicies == nil {
+		return nil
+	}
+	return &r.rule.ModuleAttestationPolicies
 }
 
 // ManagedIdentity resolver
@@ -158,7 +172,7 @@ func (r *ManagedIdentityAccessRuleResolver) ManagedIdentity(ctx context.Context)
 }
 
 // AllowedUsers resolver
-func (r *ManagedIdentityAccessRuleResolver) AllowedUsers(ctx context.Context) ([]*UserResolver, error) {
+func (r *ManagedIdentityAccessRuleResolver) AllowedUsers(ctx context.Context) (*[]*UserResolver, error) {
 	resolvers := []*UserResolver{}
 
 	for _, userID := range r.rule.AllowedUserIDs {
@@ -169,11 +183,11 @@ func (r *ManagedIdentityAccessRuleResolver) AllowedUsers(ctx context.Context) ([
 		resolvers = append(resolvers, &UserResolver{user: user})
 	}
 
-	return resolvers, nil
+	return &resolvers, nil
 }
 
 // AllowedServiceAccounts resolver
-func (r *ManagedIdentityAccessRuleResolver) AllowedServiceAccounts(ctx context.Context) ([]*ServiceAccountResolver, error) {
+func (r *ManagedIdentityAccessRuleResolver) AllowedServiceAccounts(ctx context.Context) (*[]*ServiceAccountResolver, error) {
 	resolvers := []*ServiceAccountResolver{}
 
 	for _, serviceAccountID := range r.rule.AllowedServiceAccountIDs {
@@ -184,11 +198,11 @@ func (r *ManagedIdentityAccessRuleResolver) AllowedServiceAccounts(ctx context.C
 		resolvers = append(resolvers, &ServiceAccountResolver{serviceAccount: sa})
 	}
 
-	return resolvers, nil
+	return &resolvers, nil
 }
 
 // AllowedTeams resolver
-func (r *ManagedIdentityAccessRuleResolver) AllowedTeams(ctx context.Context) ([]*TeamResolver, error) {
+func (r *ManagedIdentityAccessRuleResolver) AllowedTeams(ctx context.Context) (*[]*TeamResolver, error) {
 	resolvers := []*TeamResolver{}
 
 	for _, teamID := range r.rule.AllowedTeamIDs {
@@ -199,7 +213,7 @@ func (r *ManagedIdentityAccessRuleResolver) AllowedTeams(ctx context.Context) ([
 		resolvers = append(resolvers, &TeamResolver{team: team})
 	}
 
-	return resolvers, nil
+	return &resolvers, nil
 }
 
 // ManagedIdentityResolver resolves a managedIdentity resource
@@ -434,22 +448,25 @@ func (r *ManagedIdentityCredentialsMutationPayloadResolver) ManagedIdentityCrede
 
 // CreateManagedIdentityAccessRuleInput is the input for creating a new access rule
 type CreateManagedIdentityAccessRuleInput struct {
-	ClientMutationID       *string
-	ManagedIdentityID      string
-	RunStage               models.JobType
-	AllowedUsers           []string
-	AllowedServiceAccounts []string
-	AllowedTeams           []string
+	ClientMutationID          *string
+	AllowedTeams              *[]string
+	ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
+	AllowedUsers              *[]string
+	AllowedServiceAccounts    *[]string
+	Type                      models.ManagedIdentityAccessRuleType
+	RunStage                  models.JobType
+	ManagedIdentityID         string
 }
 
 // UpdateManagedIdentityAccessRuleInput is the input for updating an existing access rule
 type UpdateManagedIdentityAccessRuleInput struct {
-	ClientMutationID       *string
-	ID                     string
-	RunStage               models.JobType
-	AllowedUsers           []string
-	AllowedServiceAccounts []string
-	AllowedTeams           []string
+	ClientMutationID          *string
+	ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
+	AllowedUsers              *[]string
+	AllowedServiceAccounts    *[]string
+	AllowedTeams              *[]string
+	ID                        string
+	RunStage                  models.JobType
 }
 
 // DeleteManagedIdentityAccessRuleInput is the input for deleting an access rule
@@ -462,10 +479,12 @@ type DeleteManagedIdentityAccessRuleInput struct {
 type CreateManagedIdentityInput struct {
 	ClientMutationID *string
 	AccessRules      *[]struct {
-		RunStage               models.JobType
-		AllowedUsers           []string
-		AllowedServiceAccounts []string
-		AllowedTeams           []string
+		ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
+		AllowedUsers              *[]string
+		AllowedServiceAccounts    *[]string
+		AllowedTeams              *[]string
+		Type                      models.ManagedIdentityAccessRuleType
+		RunStage                  models.JobType
 	}
 	Type        string
 	Name        string
@@ -551,27 +570,54 @@ func handleManagedIdentityCredentialsMutationProblem(e error, clientMutationID *
 }
 
 func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateManagedIdentityAccessRuleInput) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
-	allowedUserIDs, err := getManagedIdentityAllowedUserIDs(ctx, input.AllowedUsers)
-	if err != nil {
-		return nil, err
-	}
+	var allowedUserIDs, allowedServiceAccountIDs, allowedTeamIDs []string
+	var moduleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+	var err error
 
-	allowedServiceAccountIDs, err := getManagedIdentityAllowedServiceAccountIDs(ctx, input.AllowedServiceAccounts)
-	if err != nil {
-		return nil, err
-	}
+	switch input.Type {
+	case models.ManagedIdentityAccessRuleEligiblePrincipals:
+		if input.AllowedUsers != nil {
+			allowedUserIDs, err = getManagedIdentityAllowedUserIDs(ctx, *input.AllowedUsers)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			allowedUserIDs = []string{}
+		}
 
-	allowedTeamIDs, err := getManagedIdentityAllowedTeamIDs(ctx, input.AllowedTeams)
-	if err != nil {
-		return nil, err
+		if input.AllowedServiceAccounts != nil {
+			allowedServiceAccountIDs, err = getManagedIdentityAllowedServiceAccountIDs(ctx, *input.AllowedServiceAccounts)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			allowedServiceAccountIDs = []string{}
+		}
+
+		if input.AllowedTeams != nil {
+			allowedTeamIDs, err = getManagedIdentityAllowedTeamIDs(ctx, *input.AllowedTeams)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			allowedTeamIDs = []string{}
+		}
+	case models.ManagedIdentityAccessRuleModuleAttestation:
+		if input.ModuleAttestationPolicies != nil {
+			moduleAttestationPolicies = *input.ModuleAttestationPolicies
+		}
+	default:
+		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid managed identity rule type: %s", input.Type))
 	}
 
 	rule := models.ManagedIdentityAccessRule{
-		ManagedIdentityID:        gid.FromGlobalID(input.ManagedIdentityID),
-		RunStage:                 input.RunStage,
-		AllowedUserIDs:           allowedUserIDs,
-		AllowedServiceAccountIDs: allowedServiceAccountIDs,
-		AllowedTeamIDs:           allowedTeamIDs,
+		ManagedIdentityID:         gid.FromGlobalID(input.ManagedIdentityID),
+		Type:                      input.Type,
+		RunStage:                  input.RunStage,
+		ModuleAttestationPolicies: moduleAttestationPolicies,
+		AllowedUserIDs:            allowedUserIDs,
+		AllowedServiceAccountIDs:  allowedServiceAccountIDs,
+		AllowedTeamIDs:            allowedTeamIDs,
 	}
 
 	createdRule, err := getManagedIdentityService(ctx).CreateManagedIdentityAccessRule(ctx, &rule)
@@ -584,27 +630,53 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 }
 
 func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateManagedIdentityAccessRuleInput) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
-	allowedUserIDs, err := getManagedIdentityAllowedUserIDs(ctx, input.AllowedUsers)
-	if err != nil {
-		return nil, err
-	}
-
-	allowedServiceAccountIDs, err := getManagedIdentityAllowedServiceAccountIDs(ctx, input.AllowedServiceAccounts)
-	if err != nil {
-		return nil, err
-	}
-
-	allowedTeamIDs, err := getManagedIdentityAllowedTeamIDs(ctx, input.AllowedTeams)
-	if err != nil {
-		return nil, err
-	}
+	var allowedUserIDs, allowedServiceAccountIDs, allowedTeamIDs []string
+	var moduleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+	var err error
 
 	rule, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRule(ctx, gid.FromGlobalID(input.ID))
 	if err != nil {
 		return nil, err
 	}
 
+	switch rule.Type {
+	case models.ManagedIdentityAccessRuleEligiblePrincipals:
+		if input.AllowedUsers != nil {
+			allowedUserIDs, err = getManagedIdentityAllowedUserIDs(ctx, *input.AllowedUsers)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			allowedUserIDs = []string{}
+		}
+
+		if input.AllowedServiceAccounts != nil {
+			allowedServiceAccountIDs, err = getManagedIdentityAllowedServiceAccountIDs(ctx, *input.AllowedServiceAccounts)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			allowedServiceAccountIDs = []string{}
+		}
+
+		if input.AllowedTeams != nil {
+			allowedTeamIDs, err = getManagedIdentityAllowedTeamIDs(ctx, *input.AllowedTeams)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			allowedTeamIDs = []string{}
+		}
+	case models.ManagedIdentityAccessRuleModuleAttestation:
+		if input.ModuleAttestationPolicies != nil {
+			moduleAttestationPolicies = *input.ModuleAttestationPolicies
+		}
+	default:
+		return nil, errors.NewError(errors.EInternal, fmt.Sprintf("unexpected managed identity rule type: %s", rule.Type))
+	}
+
 	rule.RunStage = input.RunStage
+	rule.ModuleAttestationPolicies = moduleAttestationPolicies
 	rule.AllowedUserIDs = allowedUserIDs
 	rule.AllowedServiceAccountIDs = allowedServiceAccountIDs
 	rule.AllowedTeamIDs = allowedTeamIDs
@@ -719,42 +791,72 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 		GroupID:     groupID,
 		Data:        []byte(input.Data),
 		AccessRules: []struct {
-			RunStage                 models.JobType
-			AllowedUserIDs           []string
-			AllowedServiceAccountIDs []string
-			AllowedTeamIDs           []string
+			Type                      models.ManagedIdentityAccessRuleType
+			RunStage                  models.JobType
+			ModuleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+			AllowedUserIDs            []string
+			AllowedServiceAccountIDs  []string
+			AllowedTeamIDs            []string
 		}{},
 	}
 
 	if input.AccessRules != nil {
 		for _, r := range *input.AccessRules {
-			allowedUsersIDs, miErr := getManagedIdentityAllowedUserIDs(ctx, r.AllowedUsers)
-			if miErr != nil {
-				return nil, miErr
-			}
+			var allowedUserIDs, allowedServiceAccountIDs, allowedTeamIDs []string
+			var moduleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
 
-			allowedServiceAccountIDs, miErr := getManagedIdentityAllowedServiceAccountIDs(ctx, r.AllowedServiceAccounts)
-			if miErr != nil {
-				return nil, miErr
-			}
+			switch r.Type {
+			case models.ManagedIdentityAccessRuleEligiblePrincipals:
+				if r.AllowedUsers != nil {
+					allowedUserIDs, err = getManagedIdentityAllowedUserIDs(ctx, *r.AllowedUsers)
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					allowedUserIDs = []string{}
+				}
 
-			allowedTeamIDs, miErr := getManagedIdentityAllowedTeamIDs(ctx, r.AllowedTeams)
-			if miErr != nil {
-				return nil, miErr
+				if r.AllowedServiceAccounts != nil {
+					allowedServiceAccountIDs, err = getManagedIdentityAllowedServiceAccountIDs(ctx, *r.AllowedServiceAccounts)
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					allowedServiceAccountIDs = []string{}
+				}
+
+				if r.AllowedTeams != nil {
+					allowedTeamIDs, err = getManagedIdentityAllowedTeamIDs(ctx, *r.AllowedTeams)
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					allowedTeamIDs = []string{}
+				}
+			case models.ManagedIdentityAccessRuleModuleAttestation:
+				if r.ModuleAttestationPolicies != nil {
+					moduleAttestationPolicies = *r.ModuleAttestationPolicies
+				}
+			default:
+				return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid managed identity rule type: %s", input.Type))
 			}
 
 			managedIdentityCreateOptions.AccessRules = append(
 				managedIdentityCreateOptions.AccessRules,
 				struct {
-					RunStage                 models.JobType
-					AllowedUserIDs           []string
-					AllowedServiceAccountIDs []string
-					AllowedTeamIDs           []string
+					Type                      models.ManagedIdentityAccessRuleType
+					RunStage                  models.JobType
+					ModuleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+					AllowedUserIDs            []string
+					AllowedServiceAccountIDs  []string
+					AllowedTeamIDs            []string
 				}{
-					RunStage:                 r.RunStage,
-					AllowedUserIDs:           allowedUsersIDs,
-					AllowedServiceAccountIDs: allowedServiceAccountIDs,
-					AllowedTeamIDs:           allowedTeamIDs,
+					Type:                      r.Type,
+					RunStage:                  r.RunStage,
+					ModuleAttestationPolicies: moduleAttestationPolicies,
+					AllowedUserIDs:            allowedUserIDs,
+					AllowedServiceAccountIDs:  allowedServiceAccountIDs,
+					AllowedTeamIDs:            allowedTeamIDs,
 				})
 		}
 	}

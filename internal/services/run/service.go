@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
@@ -24,6 +25,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
@@ -158,7 +161,9 @@ type service struct {
 	cliService      cli.Service
 	runStateManager *runStateManager
 	activityService activityevent.Service
+	moduleService   moduleregistry.Service
 	moduleResolver  ModuleResolver
+	ruleEnforcer    rules.RuleEnforcer
 }
 
 var (
@@ -180,7 +185,38 @@ func NewService(
 	jobService job.Service,
 	cliService cli.Service,
 	activityService activityevent.Service,
+	moduleService moduleregistry.Service,
 	moduleResolver ModuleResolver,
+) Service {
+	return newService(
+		logger,
+		dbClient,
+		artifactStore,
+		eventManager,
+		idp,
+		jobService,
+		cliService,
+		activityService,
+		moduleService,
+		moduleResolver,
+		newRunStateManager(dbClient, logger),
+		rules.NewRuleEnforcer(dbClient),
+	)
+}
+
+func newService(
+	logger logger.Logger,
+	dbClient *db.Client,
+	artifactStore workspace.ArtifactStore,
+	eventManager *events.EventManager,
+	idp *auth.IdentityProvider,
+	jobService job.Service,
+	cliService cli.Service,
+	activityService activityevent.Service,
+	moduleService moduleregistry.Service,
+	moduleResolver ModuleResolver,
+	runStateManager *runStateManager,
+	ruleEnforcer rules.RuleEnforcer,
 ) Service {
 	return &service{
 		logger,
@@ -190,9 +226,11 @@ func NewService(
 		idp,
 		jobService,
 		cliService,
-		newRunStateManager(dbClient, logger),
+		runStateManager,
 		activityService,
+		moduleService,
 		moduleResolver,
+		ruleEnforcer,
 	}
 }
 
@@ -399,17 +437,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
-	// Check if any managed identities are assigned to this workspace
-	managedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, options.WorkspaceID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Verify that subject has permission to create a plan for all of the assigned managed identities
-	if err = s.checkManagedIdentityRules(ctx, managedIdentities, models.JobPlanType); err != nil {
-		return nil, err
-	}
-
 	// Build run variables
 	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables)
 	if err != nil {
@@ -432,14 +459,47 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// This requires the run variables in order to have the token(s) for getting version numbers.
 	// Handle the case where the run uses a module source rather than a configuration version.
 	// If this fails, the transaction will be rolled back, so everything is safe.
-	finalModuleVersion := options.ModuleVersion
+	var moduleVersion *string
+	var moduleDigest []byte
+	var moduleRegistrySource *ModuleRegistrySource
 	if options.ModuleSource != nil {
-		resolvedModuleVersion, rmvErr := s.moduleResolver.ResolveModuleVersion(ctx, *options.ModuleSource,
-			options.ModuleVersion, runEnvVars)
-		if rmvErr != nil {
-			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Failed to resolve module source: %v", rmvErr))
+		moduleRegistrySource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *options.ModuleSource)
+		if err != nil {
+			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Failed to resolve module source: %v", err))
 		}
-		finalModuleVersion = resolvedModuleVersion
+
+		// registry source will be nil if this is a remote module source that doesn't use the terraform module registry protocol
+		if moduleRegistrySource != nil {
+			var resolvedVersion string
+			resolvedVersion, err = s.moduleResolver.ResolveModuleVersion(ctx, moduleRegistrySource, options.ModuleVersion, runEnvVars)
+			if err != nil {
+				return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Failed to resolve module source: %v", err))
+			}
+			moduleVersion = &resolvedVersion
+
+			// If this is a module stored in the local tharsis registry, we need to get the module version digest to pin the run to it to
+			// prevent the module package from changing after the run has been created. This is an additional protection that is only available
+			// for modules in the tharsis module registry
+			if moduleRegistrySource.ModuleID != nil {
+				var versionsResponse *db.ModuleVersionsResult
+				versionsResponse, err = s.moduleService.GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
+					PaginationOptions: &db.PaginationOptions{
+						First: ptr.Int32(1),
+					},
+					ModuleID:        *moduleRegistrySource.ModuleID,
+					SemanticVersion: &resolvedVersion,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				if len(versionsResponse.ModuleVersions) == 0 {
+					return nil, errors.NewError(errors.EInternal, fmt.Sprintf("unable to find the module package for module %s with semantic version %s", *options.ModuleSource, resolvedVersion))
+				}
+
+				moduleDigest = versionsResponse.ModuleVersions[0].SHASum
+			}
+		}
 	}
 
 	// Retrieve workspace to find Terraform version and max job duration.
@@ -480,6 +540,26 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			errors.EForbidden,
 			"Workspace does not allow destroy plan",
 		)
+	}
+
+	// Check if any managed identities are assigned to this workspace
+	managedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	runDetails := &rules.RunDetails{
+		RunStage:     models.JobPlanType,
+		ModuleDigest: moduleDigest,
+	}
+
+	if moduleRegistrySource != nil {
+		runDetails.ModuleID = moduleRegistrySource.ModuleID
+	}
+
+	// Verify that subject has permission to create a plan for all of the assigned managed identities
+	if err = s.enforceManagedIdentityRules(ctx, managedIdentities, runDetails); err != nil {
+		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -526,7 +606,8 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		Status:                 models.RunPlanQueued,
 		CreatedBy:              caller.GetSubject(),
 		ModuleSource:           options.ModuleSource,
-		ModuleVersion:          finalModuleVersion,
+		ModuleVersion:          moduleVersion,
+		ModuleDigest:           moduleDigest,
 		PlanID:                 plan.Metadata.ID,
 		TerraformVersion:       terraformVersion,
 	}
@@ -636,9 +717,28 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		return nil, err
 	}
 
-	// Verify that subject has permission to create a plan for all of the assigned managed identities
-	if err = s.checkManagedIdentityRules(ctx, managedIdentities, models.JobApplyType); err != nil {
-		return nil, err
+	if len(managedIdentities) > 0 {
+		runDetails := &rules.RunDetails{
+			RunStage:     models.JobApplyType,
+			ModuleDigest: run.ModuleDigest,
+		}
+
+		var moduleSource *ModuleRegistrySource
+		if run.ModuleSource != nil {
+			moduleSource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *run.ModuleSource)
+			if err != nil {
+				return nil, err
+			}
+
+			if moduleSource != nil {
+				runDetails.ModuleID = moduleSource.ModuleID
+			}
+		}
+
+		// Verify that subject has permission to create a plan for all of the assigned managed identities
+		if err = s.enforceManagedIdentityRules(ctx, managedIdentities, runDetails); err != nil {
+			return nil, err
+		}
 	}
 
 	// Get apply resource
@@ -1492,92 +1592,11 @@ func (s *service) getLatestJobByRunAndType(ctx context.Context, runID string, jo
 	return job, nil
 }
 
-func (s *service) checkManagedIdentityRules(ctx context.Context, managedIdentities []models.ManagedIdentity, runStage models.JobType) error {
-
-	for _, managedIdentity := range managedIdentities {
-		results, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(ctx,
-			&db.GetManagedIdentityAccessRulesInput{
-				Filter: &db.ManagedIdentityAccessRuleFilter{
-					ManagedIdentityID: &managedIdentity.Metadata.ID,
-				},
-			})
-		if err != nil {
+func (s *service) enforceManagedIdentityRules(ctx context.Context, managedIdentities []models.ManagedIdentity, runDetails *rules.RunDetails) error {
+	for _, mi := range managedIdentities {
+		miCopy := mi
+		if err := s.ruleEnforcer.EnforceRules(ctx, &miCopy, runDetails); err != nil {
 			return err
-		}
-		rules := results.ManagedIdentityAccessRules
-
-		for _, rule := range rules {
-			if rule.RunStage == runStage {
-				// Check if subject is allowed to use this managed identity
-				if err := auth.HandleCaller(
-					ctx,
-					func(ctx context.Context, c *auth.UserCaller) error {
-						found := false
-						for _, userID := range rule.AllowedUserIDs {
-							if c.User.Metadata.ID == userID {
-								found = true
-								break
-							}
-						}
-
-						// Check whether there is an intersection between the
-						// calling user's teams and this access rule's allowed teams.
-						userCallerTeams, err := c.GetTeams(ctx)
-						if err != nil {
-							return err
-						}
-						// The time spent converting from slice to map is expected to be minor.
-						userCallerTeamsMap := map[string]bool{}
-						for _, callerTeamID := range userCallerTeams {
-							userCallerTeamsMap[callerTeamID.Metadata.ID] = true
-						}
-						for _, teamID := range rule.AllowedTeamIDs {
-							if _, ok := userCallerTeamsMap[teamID]; ok {
-								found = true
-								break
-							}
-						}
-
-						if !found {
-							return errors.NewError(
-								errors.EForbidden,
-								fmt.Sprintf(
-									"User %s is not authorized to create %s with managed identity %s",
-									c.User.Username,
-									runStage,
-									managedIdentity.ResourcePath,
-								),
-							)
-						}
-
-						return nil
-					},
-					func(_ context.Context, c *auth.ServiceAccountCaller) error {
-						found := false
-						for _, serviceAccountID := range rule.AllowedServiceAccountIDs {
-							if c.ServiceAccountID == serviceAccountID {
-								found = true
-								break
-							}
-						}
-						if !found {
-							return errors.NewError(
-								errors.EForbidden,
-								fmt.Sprintf(
-									"Service account %s is not authorized to create %s with managed identity %s",
-									c.ServiceAccountPath,
-									runStage,
-									managedIdentity.ResourcePath,
-								),
-							)
-						}
-
-						return nil
-					},
-				); err != nil {
-					return err
-				}
-			}
 		}
 	}
 

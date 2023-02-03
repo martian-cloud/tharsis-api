@@ -141,7 +141,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, moduleRegistryStore, activityService, taskManager)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, activityService)
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService, cliService, activityService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL))
+		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, tharsisIDP, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL))
 	)
 
 	vcsService, err := vcs.NewService(

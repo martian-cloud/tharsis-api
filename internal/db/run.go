@@ -95,6 +95,7 @@ var runFieldList = append(
 	"apply_id",
 	"module_source",
 	"module_version",
+	"module_digest",
 	"force_canceled_by",
 	"force_cancel_available_at",
 	"force_canceled",
@@ -270,7 +271,8 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("runs").
+	sql, args, err := dialect.Insert("runs").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                        newResourceID(),
 			"version":                   initialResourceVersion,
@@ -286,6 +288,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 			"apply_id":                  nullableString(run.ApplyID),
 			"module_source":             run.ModuleSource,
 			"module_version":            run.ModuleVersion,
+			"module_digest":             run.ModuleDigest,
 			"force_canceled_by":         run.ForceCanceledBy,
 			"force_cancel_available_at": run.ForceCancelAvailableAt,
 			"force_canceled":            run.ForceCanceled,
@@ -299,7 +302,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		return nil, err
 	}
 
-	createdRun, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdRun, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		r.dbClient.logger.Error(err)
@@ -312,28 +315,31 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
 	timestamp := currentTime()
 
-	sql, _, err := goqu.Update("runs").Set(
-		goqu.Record{
-			"version":                   goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":                timestamp,
-			"status":                    run.Status,
-			"is_destroy":                run.IsDestroy,
-			"has_changes":               run.HasChanges,
-			"plan_id":                   nullableString(run.PlanID),
-			"apply_id":                  nullableString(run.ApplyID),
-			"module_source":             run.ModuleSource,
-			"module_version":            run.ModuleVersion,
-			"force_canceled_by":         run.ForceCanceledBy,
-			"force_cancel_available_at": run.ForceCancelAvailableAt,
-			"force_canceled":            run.ForceCanceled,
-		},
-	).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).Returning(runFieldList...).ToSQL()
+	sql, args, err := dialect.Update("runs").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":                   goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":                timestamp,
+				"status":                    run.Status,
+				"is_destroy":                run.IsDestroy,
+				"has_changes":               run.HasChanges,
+				"plan_id":                   nullableString(run.PlanID),
+				"apply_id":                  nullableString(run.ApplyID),
+				"module_source":             run.ModuleSource,
+				"module_version":            run.ModuleVersion,
+				"module_digest":             run.ModuleDigest,
+				"force_canceled_by":         run.ForceCanceledBy,
+				"force_cancel_available_at": run.ForceCancelAvailableAt,
+				"force_canceled":            run.ForceCanceled,
+			},
+		).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).Returning(r.getSelectFields()...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedRun, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedRun, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -359,8 +365,6 @@ func scanRun(row scanner) (*models.Run, error) {
 	var forceCanceledBy sql.NullString
 	var planID sql.NullString
 	var applyID sql.NullString
-	var moduleSource sql.NullString
-	var moduleVersion sql.NullString
 
 	run := &models.Run{}
 
@@ -377,8 +381,9 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.CreatedBy,
 		&planID,
 		&applyID,
-		&moduleSource,
-		&moduleVersion,
+		&run.ModuleSource,
+		&run.ModuleVersion,
+		&run.ModuleDigest,
 		&forceCanceledBy,
 		&forceCancelAvailableAt,
 		&run.ForceCanceled,
@@ -400,13 +405,6 @@ func scanRun(row scanner) (*models.Run, error) {
 
 	if applyID.Valid {
 		run.ApplyID = applyID.String
-	}
-
-	if moduleSource.Valid {
-		run.ModuleSource = &moduleSource.String
-	}
-	if moduleVersion.Valid {
-		run.ModuleVersion = &moduleVersion.String
 	}
 
 	if forceCanceledBy.Valid {

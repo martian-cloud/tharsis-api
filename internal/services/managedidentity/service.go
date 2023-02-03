@@ -45,10 +45,12 @@ type CreateManagedIdentityInput struct {
 	GroupID     string
 	Data        []byte
 	AccessRules []struct {
-		RunStage                 models.JobType
-		AllowedUserIDs           []string
-		AllowedServiceAccountIDs []string
-		AllowedTeamIDs           []string
+		Type                      models.ManagedIdentityAccessRuleType
+		RunStage                  models.JobType
+		ModuleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
+		AllowedUserIDs            []string
+		AllowedServiceAccountIDs  []string
+		AllowedTeamIDs            []string
 	}
 }
 
@@ -700,18 +702,25 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 	// Store access rules
 	if input.AccessRules != nil {
 		for _, rule := range input.AccessRules {
-			if err := s.verifyServiceAccountAccessForGroup(ctx, rule.AllowedServiceAccountIDs, managedIdentity.GetGroupPath()); err != nil {
+			if err = s.verifyServiceAccountAccessForGroup(ctx, rule.AllowedServiceAccountIDs, managedIdentity.GetGroupPath()); err != nil {
 				return nil, err
 			}
 
-			_, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext,
-				&models.ManagedIdentityAccessRule{
-					ManagedIdentityID:        managedIdentity.Metadata.ID,
-					RunStage:                 rule.RunStage,
-					AllowedUserIDs:           rule.AllowedUserIDs,
-					AllowedServiceAccountIDs: rule.AllowedServiceAccountIDs,
-					AllowedTeamIDs:           rule.AllowedTeamIDs,
-				})
+			ruleToCreate := models.ManagedIdentityAccessRule{
+				Type:                      rule.Type,
+				ManagedIdentityID:         managedIdentity.Metadata.ID,
+				RunStage:                  rule.RunStage,
+				ModuleAttestationPolicies: rule.ModuleAttestationPolicies,
+				AllowedUserIDs:            rule.AllowedUserIDs,
+				AllowedServiceAccountIDs:  rule.AllowedServiceAccountIDs,
+				AllowedTeamIDs:            rule.AllowedTeamIDs,
+			}
+
+			if err = ruleToCreate.Validate(); err != nil {
+				return nil, err
+			}
+
+			_, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext, &ruleToCreate)
 			if err != nil {
 				return nil, err
 			}
@@ -920,6 +929,10 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, err
 	}
 
+	if err = input.Validate(); err != nil {
+		return nil, err
+	}
+
 	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ManagedIdentityID)
 	if err != nil {
 		return nil, err
@@ -978,6 +991,10 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = input.Validate(); err != nil {
 		return nil, err
 	}
 
