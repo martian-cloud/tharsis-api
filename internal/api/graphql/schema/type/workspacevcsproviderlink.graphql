@@ -67,6 +67,7 @@ input UpdateWorkspaceVCSProviderLinkInput {
 input DeleteWorkspaceVCSProviderLinkInput {
   clientMutationId: String
   id: ID!
+  force: Boolean
   metadata: ResourceMetadataInput
 }
 

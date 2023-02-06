@@ -125,7 +125,8 @@ type UpdateWorkspaceVCSProviderLinkInput struct {
 
 // DeleteWorkspaceVCSProviderLinkInput is the input for deleting a workspace VCS provider link.
 type DeleteWorkspaceVCSProviderLinkInput struct {
-	Link *models.WorkspaceVCSProviderLink
+	Link  *models.WorkspaceVCSProviderLink
+	Force bool
 }
 
 // CreateWorkspaceVCSProviderLinkResponse is the response for creating a workspace vcs provider link.
@@ -952,8 +953,9 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 
 		// Get a new access token.
 		accessToken, err := s.refreshOAuthToken(ctx, provider, vp, false)
-		if err != nil {
-			return fmt.Errorf("failed to refresh access token: %v", err)
+		if err != nil && !input.Force {
+			return fmt.Errorf("error refreshing access token. "+
+				"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err)
 		}
 
 		// Delete the existing webhook.
@@ -962,8 +964,9 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 			AccessToken:    accessToken,
 			RepositoryPath: input.Link.RepositoryPath,
 			WebhookID:      input.Link.WebhookID,
-		}); err != nil {
-			return err
+		}); err != nil && !input.Force {
+			return fmt.Errorf("error deleting webhook. "+
+				"Setting force to true will delete this link but webhooks may have to be deleted manually: %v", err)
 		}
 	}
 
