@@ -105,6 +105,7 @@ func TestDispatchJob(t *testing.T) {
 			discoveryProtocolHost := "test.com"
 			token := "token1"
 			image := "testimage"
+			memoryLimit := uint64(0)
 
 			client := mockClient{}
 			client.Test(t)
@@ -128,6 +129,7 @@ func TestDispatchJob(t *testing.T) {
 					fmt.Sprintf("JOB_ID=%s", test.jobID),
 					fmt.Sprintf("JOB_TOKEN=%s", token),
 					fmt.Sprintf("DISCOVERY_PROTOCOL_HOST=%s", discoveryProtocolHost),
+					fmt.Sprintf("MEMORY_LIMIT=%d", memoryLimit),
 				},
 			}, hostConfig, mock.Anything, mock.Anything, "").Return(test.retOutput, test.containerCreateRetErr)
 

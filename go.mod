@@ -46,8 +46,10 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.1
 	github.com/jackc/pgx/v4 v4.17.2
 	github.com/lestrrat-go/jwx v1.2.25
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/procfs v0.9.0
 	github.com/qiangxue/go-env v1.0.1
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0
 	github.com/sigstore/sigstore v1.5.0
@@ -98,6 +100,7 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+	github.com/dustin/go-humanize v1.0.1
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
@@ -154,7 +157,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
