@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/dustin/go-humanize"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -41,6 +42,7 @@ type JobDispatcher struct {
 	discoveryProtocolHost string
 	extraHosts            []string
 	localImage            bool
+	memoryLimit           int64 // in bytes, zero means unlimited
 }
 
 // New creates a JobDispatcher
@@ -65,6 +67,18 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		extraHosts = append(extraHosts, strings.Split(pluginData["extra_hosts"], ",")...)
 	}
 
+	var memoryLimit int64
+	if mLimit, ok := pluginData["memory_limit"]; ok {
+		tmp, mErr := humanize.ParseBytes(mLimit)
+		memoryLimit = int64(tmp)
+		if mErr != nil {
+			return nil, fmt.Errorf("failed to parse job dispatcher 'memory_limit' config: %w", mErr)
+		}
+		if memoryLimit < 0 {
+			return nil, fmt.Errorf("invalid value for 'memory_limit' config: %s", mLimit)
+		}
+	}
+
 	client, err := dockerclient.NewClientWithOpts(dockerclient.WithHost(pluginData["host"]), dockerclient.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("job dispatcher failed to initialize docker cli: %v", err)
@@ -81,6 +95,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		localImage:            localImage,
 		client:                client,
 		logger:                logger,
+		memoryLimit:           memoryLimit,
 	}, nil
 }
 
@@ -111,6 +126,11 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		hostConfig.Binds = []string{j.bindPath}
 	}
 
+	if j.memoryLimit != 0 {
+		hostConfig.Resources.Memory = j.memoryLimit
+		hostConfig.Resources.MemorySwap = j.memoryLimit
+	}
+
 	resp, err := j.client.ContainerCreate(ctx, &container.Config{
 		Image: j.image,
 		Env: []string{
@@ -118,6 +138,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 			fmt.Sprintf("JOB_ID=%s", jobID),
 			fmt.Sprintf("JOB_TOKEN=%s", token),
 			fmt.Sprintf("DISCOVERY_PROTOCOL_HOST=%s", j.discoveryProtocolHost),
+			fmt.Sprintf("MEMORY_LIMIT=%d", j.memoryLimit),
 		},
 	}, hostConfig, nil, nil, "")
 	if err != nil {

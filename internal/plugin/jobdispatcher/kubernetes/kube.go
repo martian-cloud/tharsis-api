@@ -161,6 +161,10 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 									Name:  "DISCOVERY_PROTOCOL_HOST",
 									Value: j.discoveryProtocolHost,
 								},
+								{
+									Name:  "MEMORY_LIMIT",
+									Value: j.memoryLimit.String(),
+								},
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{

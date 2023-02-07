@@ -3,11 +3,11 @@ package jobexecutor
 import (
 	"context"
 	"errors"
-	"os"
-
 	"fmt"
+	"os"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
@@ -62,6 +62,28 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 
 	jobLogger.start()
 
+	// Get the memory limit if one has been passed in.
+	memoryLimit := uint64(0)
+	sLimit := os.Getenv("MEMORY_LIMIT")
+	if sLimit != "" {
+		var pErr error
+		memoryLimit, pErr = humanize.ParseBytes(sLimit)
+		if pErr != nil {
+			return fmt.Errorf("invalid memory limit: MEMORY_LIMIT was %s: %w", sLimit, pErr)
+		}
+	}
+
+	// If there is a defined memory limit, create a memory monitor and launch it.
+	var memoryMonitor MemoryMonitor
+	if memoryLimit > 0 {
+		memoryMonitor, err = NewMemoryMonitor(jobLogger, memoryLimit)
+		if err != nil {
+			return err
+		}
+		memoryMonitor.Start(ctx)
+		defer memoryMonitor.Stop()
+	}
+
 	workspaceDir, err := os.MkdirTemp("", "tfworkspace")
 	if err != nil {
 		return fmt.Errorf("failed to create temp workspace dir %v", err)
@@ -77,8 +99,8 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	}
 
 	// Execute job
-	if err := handler.Execute(ctx); err != nil {
-		j.onError(ctx, jobLogger, handler, err)
+	if eErr := handler.Execute(ctx); eErr != nil {
+		j.onError(ctx, jobLogger, handler, eErr)
 		return nil
 	}
 
