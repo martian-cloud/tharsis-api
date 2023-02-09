@@ -119,7 +119,9 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 		}
 	}
 
-	query := dialect.From(goqu.T("teams")).Select(teamFieldList...).Where(ex)
+	query := dialect.From(goqu.T("teams")).
+		Select(teamFieldList...).
+		Where(ex)
 
 	// Don't want to pay the cost to do an inner join unless necessary.
 	if (input.Filter != nil) && (input.Filter.UserID != nil) {
@@ -182,7 +184,8 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("teams").
+	sql, args, err := dialect.Insert("teams").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":               newResourceID(),
 			"version":          initialResourceVersion,
@@ -197,7 +200,7 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 		return nil, err
 	}
 
-	createdTeam, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdTeam, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -213,21 +216,23 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("teams").Set(
-		goqu.Record{
-			"version":          goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":       timestamp,
-			"name":             team.Name,
-			"description":      team.Description,
-			"scim_external_id": nullableString(team.SCIMExternalID),
-		},
-	).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...).ToSQL()
+	sql, args, err := dialect.Update("teams").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":          goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":       timestamp,
+				"name":             team.Name,
+				"description":      team.Description,
+				"scim_external_id": nullableString(team.SCIMExternalID),
+			},
+		).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedTeam, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedTeam, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -241,17 +246,19 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 
 func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
 
-	sql, _, err := dialect.Delete("teams").Where(
-		goqu.Ex{
-			"id":      team.Metadata.ID,
-			"version": team.Metadata.Version,
-		},
-	).Returning(teamFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("teams").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      team.Metadata.ID,
+				"version": team.Metadata.Version,
+			},
+		).Returning(teamFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err == pgx.ErrNoRows {
 		return ErrOptimisticLockError
 	}
@@ -261,14 +268,16 @@ func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
 
 func (t *teams) getTeam(ctx context.Context, exp goqu.Ex) (*models.Team, error) {
 	query := dialect.From(goqu.T("teams")).
-		Select(teamFieldList...).Where(exp)
+		Prepared(true).
+		Select(teamFieldList...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	team, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	team, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

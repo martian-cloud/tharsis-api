@@ -1468,6 +1468,8 @@ gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0 h1:
 gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0/go.mod h1:5KyvfNcn3wC4wot7Bma+v/g+hjw+/nhSGP0fODz7k4Q=
 gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.13.0 h1:g4cqH5JGDf22juC5e9mARx9iN1VQ0T9XNzwrTQSIcOE=
 gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.13.0/go.mod h1:n2382odD8a3QZt07347B0wCohmGJiR4yDPuTOwuDpmA=
+gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.14.0 h1:myu3pHYJU5lYxcTZYy1YG2x4+gItHcQgJIw0opVdd7M=
+gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.14.0/go.mod h1:n2382odD8a3QZt07347B0wCohmGJiR4yDPuTOwuDpmA=
 gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b/go.mod h1:T3BPAOm2cqquPa0MKWeNkmOM5RQsRhkrwMWonFMN7fE=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=

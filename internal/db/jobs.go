@@ -153,7 +153,9 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 		}
 	}
 
-	query := dialect.From(goqu.T("jobs")).Select(jobFieldList...).Where(ex)
+	query := dialect.From(goqu.T("jobs")).
+		Select(jobFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -208,29 +210,31 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("jobs").Set(
-		goqu.Record{
-			"version":             goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":          timestamp,
-			"status":              job.Status,
-			"type":                job.Type,
-			"workspace_id":        job.WorkspaceID,
-			"run_id":              job.RunID,
-			"cancel_requested":    job.CancelRequested,
-			"cancel_requested_at": job.CancelRequestedTimestamp,
-			"queued_at":           job.Timestamps.QueuedTimestamp,
-			"pending_at":          job.Timestamps.PendingTimestamp,
-			"running_at":          job.Timestamps.RunningTimestamp,
-			"finished_at":         job.Timestamps.FinishedTimestamp,
-			"runner_id":           nullableString(job.RunnerID),
-		},
-	).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).Returning(jobFieldList...).ToSQL()
+	sql, args, err := dialect.Update("jobs").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":             goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":          timestamp,
+				"status":              job.Status,
+				"type":                job.Type,
+				"workspace_id":        job.WorkspaceID,
+				"run_id":              job.RunID,
+				"cancel_requested":    job.CancelRequested,
+				"cancel_requested_at": job.CancelRequestedTimestamp,
+				"queued_at":           job.Timestamps.QueuedTimestamp,
+				"pending_at":          job.Timestamps.PendingTimestamp,
+				"running_at":          job.Timestamps.RunningTimestamp,
+				"finished_at":         job.Timestamps.FinishedTimestamp,
+				"runner_id":           nullableString(job.RunnerID),
+			},
+		).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).Returning(jobFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -245,7 +249,8 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("jobs").
+	sql, args, err := dialect.Insert("jobs").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                  newResourceID(),
 			"version":             initialResourceVersion,
@@ -270,7 +275,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		return nil, err
 	}
 
-	createdJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		return nil, err
@@ -281,15 +286,16 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*models.JobLogDescriptor, error) {
 	query := dialect.From(goqu.T("job_log_descriptors")).
-		Select(jobLogDescriptorFieldList...).Where(goqu.Ex{"job_id": jobID})
+		Prepared(true).
+		Select(jobLogDescriptorFieldList...).
+		Where(goqu.Ex{"job_id": jobID})
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	descriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql))
+	descriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -303,15 +309,16 @@ func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*m
 
 func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobLogDescriptor, error) {
 	query := dialect.From(goqu.T("job_log_descriptors")).
-		Select(jobLogDescriptorFieldList...).Where(goqu.Ex{"id": id})
+		Prepared(true).
+		Select(jobLogDescriptorFieldList...).
+		Where(goqu.Ex{"id": id})
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	descriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql))
+	descriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -326,7 +333,8 @@ func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobL
 func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("job_log_descriptors").
+	sql, args, err := dialect.Insert("job_log_descriptors").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":         newResourceID(),
 			"version":    initialResourceVersion,
@@ -341,7 +349,7 @@ func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 		return nil, err
 	}
 
-	createdDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		return nil, err
@@ -353,7 +361,8 @@ func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("job_log_descriptors").
+	sql, args, err := dialect.Update("job_log_descriptors").
+		Prepared(true).
 		Set(
 			goqu.Record{
 				"version":    goqu.L("? + ?", goqu.C("version"), 1),
@@ -368,7 +377,7 @@ func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 		return nil, err
 	}
 
-	updatedDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -383,17 +392,18 @@ func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, error) {
 	var count int
 	query := dialect.From(goqu.T("jobs")).
+		Prepared(true).
 		Select(goqu.COUNT("*")).Where(goqu.Ex{
 		"runner_id": runnerID,
 		"status":    []string{string(models.JobPending), string(models.JobRunning)},
 	})
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return 0, err
 	}
 
-	err = j.dbClient.getConnection(ctx).QueryRow(ctx, sql).Scan(&count)
+	err = j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -402,15 +412,16 @@ func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, 
 
 func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 	query := dialect.From(goqu.T("jobs")).
-		Select(jobFieldList...).Where(exp)
+		Prepared(true).
+		Select(jobFieldList...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql))
+	job, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

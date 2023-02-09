@@ -57,13 +57,13 @@ type gitLabWebhookRequest struct {
 		SourceBranch string `json:"source_branch"`
 		// Allows filtering merge requests based on action.
 		Action string `json:"action"`
-	} `json:"object_attributes"`
 
-	// Used only for merge requests.
-	LastCommit struct {
-		// Contains the ID for the head commit.
-		ID string `json:"id"`
-	} `json:"last_commit"`
+		// Used only for merge requests.
+		LastCommit struct {
+			// Contains the ID for the head commit.
+			ID string `json:"id"`
+		} `json:"last_commit"`
+	} `json:"object_attributes"`
 
 	Before string `json:"before"` // Commit SHA before push event.
 	After  string `json:"after"`  // Commit SHA after push event.
@@ -198,7 +198,7 @@ func (c *vcsController) gitLabHandler(r *http.Request) error {
 
 	return c.vcsService.ProcessWebhookEvent(r.Context(), &vcs.ProcessWebhookEventInput{
 		Action:           req.ObjectAttributes.Action,
-		LatestCommitID:   req.LastCommit.ID,
+		HeadCommitID:     req.ObjectAttributes.LastCommit.ID,
 		EventHeader:      r.Header.Get(gitLabEventHeader),
 		SourceRepository: req.ObjectAttributes.Source.PathWithNamespace,
 		SourceBranch:     req.ObjectAttributes.SourceBranch,
@@ -217,7 +217,7 @@ func (c *vcsController) gitHubHandler(r *http.Request) error {
 
 	return c.vcsService.ProcessWebhookEvent(r.Context(), &vcs.ProcessWebhookEventInput{
 		Action:           req.Action,
-		LatestCommitID:   req.PullRequest.Head.CommitSHA,
+		HeadCommitID:     req.PullRequest.Head.CommitSHA,
 		EventHeader:      r.Header.Get(gitHubEventHeader),
 		SourceRepository: req.PullRequest.Head.Repo.SourceRepository,
 		SourceBranch:     req.PullRequest.Head.SourceBranch,

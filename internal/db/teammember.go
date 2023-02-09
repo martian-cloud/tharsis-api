@@ -109,7 +109,9 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 		}
 	}
 
-	query := dialect.From(goqu.T("team_members")).Select(teamMemberFieldList...).Where(ex)
+	query := dialect.From(goqu.T("team_members")).
+		Select(teamMemberFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -163,7 +165,8 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.TeamMember) (*models.TeamMember, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("team_members").
+	sql, args, err := dialect.Insert("team_members").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":            newResourceID(),
 			"version":       initialResourceVersion,
@@ -178,7 +181,7 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 		return nil, err
 	}
 
-	createdTeamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdTeamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -215,19 +218,21 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 func (tm *teamMembers) UpdateTeamMember(ctx context.Context, teamMember *models.TeamMember) (*models.TeamMember, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("team_members").Set(
-		goqu.Record{
-			"version":       goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":    timestamp,
-			"is_maintainer": teamMember.IsMaintainer,
-		},
-	).Where(goqu.Ex{"id": teamMember.Metadata.ID, "version": teamMember.Metadata.Version}).
+	sql, args, err := dialect.Update("team_members").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":       goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":    timestamp,
+				"is_maintainer": teamMember.IsMaintainer,
+			},
+		).Where(goqu.Ex{"id": teamMember.Metadata.ID, "version": teamMember.Metadata.Version}).
 		Returning(teamMemberFieldList...).ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	updatedTeamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedTeamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -241,17 +246,19 @@ func (tm *teamMembers) UpdateTeamMember(ctx context.Context, teamMember *models.
 
 func (tm *teamMembers) RemoveUserFromTeam(ctx context.Context, teamMember *models.TeamMember) error {
 
-	sql, _, err := dialect.Delete("team_members").Where(
-		goqu.Ex{
-			"id":      teamMember.Metadata.ID,
-			"version": teamMember.Metadata.Version,
-		},
-	).Returning(teamMemberFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("team_members").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      teamMember.Metadata.ID,
+				"version": teamMember.Metadata.Version,
+			},
+		).Returning(teamMemberFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -264,14 +271,16 @@ func (tm *teamMembers) RemoveUserFromTeam(ctx context.Context, teamMember *model
 
 func (tm *teamMembers) getTeamMember(ctx context.Context, exp exp.Expression) (*models.TeamMember, error) {
 	query := dialect.From(goqu.T("team_members")).
-		Select(teamMemberFieldList...).Where(exp)
+		Prepared(true).
+		Select(teamMemberFieldList...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	teamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	teamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

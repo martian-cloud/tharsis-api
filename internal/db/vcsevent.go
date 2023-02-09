@@ -109,7 +109,9 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 		}
 	}
 
-	query := dialect.From("vcs_events").Select(ve.getSelectFields()...).Where(ex)
+	query := dialect.From("vcs_events").
+		Select(ve.getSelectFields()...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -164,7 +166,8 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("vcs_events").
+	sql, args, err := dialect.Insert("vcs_events").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                    newResourceID(),
 			"version":               initialResourceVersion,
@@ -183,7 +186,7 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 		return nil, err
 	}
 
-	createdEvent, err := scanVCSEvent(ve.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdEvent, err := scanVCSEvent(ve.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
@@ -202,21 +205,23 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("vcs_events").Set(
-		goqu.Record{
-			"version":       goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":    timestamp,
-			"status":        event.Status,
-			"error_message": event.ErrorMessage,
-		},
-	).Where(goqu.Ex{"id": event.Metadata.ID, "version": event.Metadata.Version}).
+	sql, args, err := dialect.Update("vcs_events").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":       goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":    timestamp,
+				"status":        event.Status,
+				"error_message": event.ErrorMessage,
+			},
+		).Where(goqu.Ex{"id": event.Metadata.ID, "version": event.Metadata.Version}).
 		Returning(vcsEventsFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedEvent, err := scanVCSEvent(ve.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedEvent, err := scanVCSEvent(ve.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -229,12 +234,17 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 }
 
 func (ve *vcsEvents) getEvent(ctx context.Context, exp goqu.Ex) (*models.VCSEvent, error) {
-	sql, _, err := dialect.From(goqu.T("vcs_events")).Select(ve.getSelectFields()...).Where(exp).ToSQL()
+	sql, args, err := dialect.From(goqu.T("vcs_events")).
+		Prepared(true).
+		Select(ve.getSelectFields()...).
+		Where(exp).
+		ToSQL()
+
 	if err != nil {
 		return nil, err
 	}
 
-	event, err := scanVCSEvent(ve.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	event, err := scanVCSEvent(ve.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

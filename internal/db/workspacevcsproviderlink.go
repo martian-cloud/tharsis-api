@@ -50,14 +50,17 @@ func NewWorkspaceVCSProviderLinks(dbClient *Client) WorkspaceVCSProviderLinks {
 }
 
 func (wpl *workspaceVCSProviderLinks) GetLinksByProviderID(ctx context.Context, providerID string) ([]models.WorkspaceVCSProviderLink, error) {
-	sql, _, err := dialect.From("workspace_vcs_provider_links").Select(wpl.getSelectFields()...).
-		Where(goqu.Ex{"workspace_vcs_provider_links.provider_id": providerID}).ToSQL()
+	sql, args, err := dialect.From("workspace_vcs_provider_links").
+		Prepared(true).
+		Select(wpl.getSelectFields()...).
+		Where(goqu.Ex{"workspace_vcs_provider_links.provider_id": providerID}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := wpl.dbClient.getConnection(ctx).Query(ctx, sql)
+	rows, err := wpl.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +98,8 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 		return nil, err
 	}
 
-	sql, _, err := dialect.Insert("workspace_vcs_provider_links").
+	sql, args, err := dialect.Insert("workspace_vcs_provider_links").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                    newResourceID(),
 			"version":               initialResourceVersion,
@@ -119,7 +123,7 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 		return nil, err
 	}
 
-	createdLink, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdLink, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -150,26 +154,28 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 		return nil, err
 	}
 
-	sql, _, err := dialect.Update("workspace_vcs_provider_links").Set(
-		goqu.Record{
-			"version":               goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":            timestamp,
-			"auto_speculative_plan": link.AutoSpeculativePlan,
-			"module_directory":      link.ModuleDirectory,
-			"webhook_id":            nullableString(link.WebhookID),
-			"branch":                link.Branch,
-			"tag_regex":             link.TagRegex,
-			"glob_patterns":         globPatternsJSON,
-			"webhook_disabled":      link.WebhookDisabled,
-		},
-	).Where(goqu.Ex{"id": link.Metadata.ID, "version": link.Metadata.Version}).
+	sql, args, err := dialect.Update("workspace_vcs_provider_links").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":               goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":            timestamp,
+				"auto_speculative_plan": link.AutoSpeculativePlan,
+				"module_directory":      link.ModuleDirectory,
+				"webhook_id":            nullableString(link.WebhookID),
+				"branch":                link.Branch,
+				"tag_regex":             link.TagRegex,
+				"glob_patterns":         globPatternsJSON,
+				"webhook_disabled":      link.WebhookDisabled,
+			},
+		).Where(goqu.Ex{"id": link.Metadata.ID, "version": link.Metadata.Version}).
 		Returning(workspaceVCSProviderLinksFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedLink, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedLink, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -182,18 +188,20 @@ func (wpl *workspaceVCSProviderLinks) UpdateLink(ctx context.Context, link *mode
 }
 
 func (wpl *workspaceVCSProviderLinks) DeleteLink(ctx context.Context, provider *models.WorkspaceVCSProviderLink) error {
-	sql, _, err := dialect.Delete("workspace_vcs_provider_links").Where(
-		goqu.Ex{
-			"id":      provider.Metadata.ID,
-			"version": provider.Metadata.Version,
-		},
-	).Returning(workspaceVCSProviderLinksFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("workspace_vcs_provider_links").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      provider.Metadata.ID,
+				"version": provider.Metadata.Version,
+			},
+		).Returning(workspaceVCSProviderLinksFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql)); err != nil {
+	if _, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -205,14 +213,17 @@ func (wpl *workspaceVCSProviderLinks) DeleteLink(ctx context.Context, provider *
 }
 
 func (wpl *workspaceVCSProviderLinks) getLink(ctx context.Context, exp goqu.Ex) (*models.WorkspaceVCSProviderLink, error) {
-	query := dialect.From(goqu.T("workspace_vcs_provider_links")).Select(wpl.getSelectFields()...).Where(exp)
+	query := dialect.From(goqu.T("workspace_vcs_provider_links")).
+		Prepared(true).
+		Select(wpl.getSelectFields()...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	link, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	link, err := scanLink(wpl.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

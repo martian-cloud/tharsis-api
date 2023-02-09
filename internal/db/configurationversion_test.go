@@ -16,11 +16,6 @@ import (
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
 
-var (
-	// returned for some invalid UUID cases
-	invalidUUIDMsg4 = ptr.String("ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
-)
-
 // configurationVersionInfo aids convenience in accessing the information TestGetConfigurationVersions
 // needs about the warmup configuration versions.
 type configurationVersionInfo struct {
@@ -671,7 +666,7 @@ func TestUpdateConfigurationVersion(t *testing.T) {
 					Version: positiveConfigurationVersion.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg4,
 		},
 	}
 

@@ -252,7 +252,8 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 		}
 	}()
 
-	sql, _, err := dialect.Insert("terraform_modules").
+	sql, args, err := dialect.Insert("terraform_modules").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":            newResourceID(),
 			"version":       initialResourceVersion,
@@ -271,7 +272,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 		return nil, err
 	}
 
-	createdModule, err := scanTerraformModule(tx.QueryRow(ctx, sql), false)
+	createdModule, err := scanTerraformModule(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -312,21 +313,23 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 		}
 	}()
 
-	sql, _, err := dialect.Update("terraform_modules").Set(
-		goqu.Record{
-			"version":    goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at": timestamp,
-			"name":       module.Name,
-			"private":    module.Private,
-			"repo_url":   module.RepositoryURL,
-		},
-	).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).Returning(moduleFieldList...).ToSQL()
+	sql, args, err := dialect.Update("terraform_modules").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":    goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at": timestamp,
+				"name":       module.Name,
+				"private":    module.Private,
+				"repo_url":   module.RepositoryURL,
+			},
+		).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).Returning(moduleFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedModule, err := scanTerraformModule(tx.QueryRow(ctx, sql), false)
+	updatedModule, err := scanTerraformModule(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -357,17 +360,19 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 
 func (t *terraformModules) DeleteModule(ctx context.Context, module *models.TerraformModule) error {
 
-	sql, _, err := dialect.Delete("terraform_modules").Where(
-		goqu.Ex{
-			"id":      module.Metadata.ID,
-			"version": module.Metadata.Version,
-		},
-	).Returning(moduleFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("terraform_modules").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      module.Metadata.ID,
+				"version": module.Metadata.Version,
+			},
+		).Returning(moduleFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	_, err = scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -380,16 +385,17 @@ func (t *terraformModules) DeleteModule(ctx context.Context, module *models.Terr
 
 func (t *terraformModules) getModule(ctx context.Context, exp goqu.Ex) (*models.TerraformModule, error) {
 	query := dialect.From(goqu.T("terraform_modules")).
+		Prepared(true).
 		Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	module, err := scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	module, err := scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

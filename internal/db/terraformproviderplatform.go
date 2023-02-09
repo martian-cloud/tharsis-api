@@ -170,7 +170,8 @@ func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, i
 func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*models.TerraformProviderPlatform, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("terraform_provider_platforms").
+	sql, args, err := dialect.Insert("terraform_provider_platforms").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                  newResourceID(),
 			"version":             initialResourceVersion,
@@ -189,7 +190,7 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 		return nil, err
 	}
 
-	createdProviderPlatform, err := scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdProviderPlatform, err := scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -208,19 +209,21 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*models.TerraformProviderPlatform, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("terraform_provider_platforms").Set(
-		goqu.Record{
-			"version":         goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":      timestamp,
-			"binary_uploaded": providerPlatform.BinaryUploaded,
-		},
-	).Where(goqu.Ex{"id": providerPlatform.Metadata.ID, "version": providerPlatform.Metadata.Version}).Returning(providerPlatformFieldList...).ToSQL()
+	sql, args, err := dialect.Update("terraform_provider_platforms").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":         goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":      timestamp,
+				"binary_uploaded": providerPlatform.BinaryUploaded,
+			},
+		).Where(goqu.Ex{"id": providerPlatform.Metadata.ID, "version": providerPlatform.Metadata.Version}).Returning(providerPlatformFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedProviderPlatform, err := scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedProviderPlatform, err := scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -234,17 +237,19 @@ func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context,
 
 func (t *terraformProviderPlatforms) DeleteProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) error {
 
-	sql, _, err := dialect.Delete("terraform_provider_platforms").Where(
-		goqu.Ex{
-			"id":      providerPlatform.Metadata.ID,
-			"version": providerPlatform.Metadata.Version,
-		},
-	).Returning(providerPlatformFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("terraform_provider_platforms").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      providerPlatform.Metadata.ID,
+				"version": providerPlatform.Metadata.Version,
+			},
+		).Returning(providerPlatformFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -257,14 +262,16 @@ func (t *terraformProviderPlatforms) DeleteProviderPlatform(ctx context.Context,
 
 func (t *terraformProviderPlatforms) getProviderPlatform(ctx context.Context, exp goqu.Ex) (*models.TerraformProviderPlatform, error) {
 	query := dialect.From(goqu.T("terraform_provider_platforms")).
-		Select(t.getSelectFields()...).Where(exp)
+		Prepared(true).
+		Select(t.getSelectFields()...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	providerPlatform, err := scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	providerPlatform, err := scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

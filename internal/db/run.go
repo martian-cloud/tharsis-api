@@ -111,13 +111,17 @@ func NewRuns(dbClient *Client) Runs {
 
 // GetRun returns a run by ID
 func (r *runs) GetRun(ctx context.Context, id string) (*models.Run, error) {
-	sql, _, err := goqu.From("runs").Select(runFieldList...).Where(goqu.Ex{"id": id}).ToSQL()
+	sql, args, err := dialect.From("runs").
+		Prepared(true).
+		Select(runFieldList...).
+		Where(goqu.Ex{"id": id}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	run, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	run, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

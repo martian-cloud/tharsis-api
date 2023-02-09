@@ -73,12 +73,18 @@ type getProjectResponse struct {
 	DefaultBranch string `json:"default_branch"`
 }
 
-// getDiffsResponse is the response struct for retrieving diff(s).
+// getDiffsResponse is the response struct for retrieving diffs.
 type getDiffsResponse struct {
 	Diffs []struct {
 		OldPath string `json:"old_path"`
 		NewPath string `json:"new_path"`
 	} `json:"diffs"`
+}
+
+// getDiffResponse is the response struct for retrieving diff.
+type getDiffResponse struct {
+	OldPath string `json:"old_path"`
+	NewPath string `json:"new_path"`
 }
 
 // createWebhookResponse is the response struct for creating
@@ -326,13 +332,13 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 		}
 	}()
 
-	diffResp := getDiffsResponse{}
+	diffResp := []getDiffResponse{}
 	if err = json.NewDecoder(resp.Body).Decode(&diffResp); err != nil {
 		return nil, err
 	}
 
 	return &types.GetDiffsPayload{
-		AlteredFiles: createChangesMap(&diffResp),
+		AlteredFiles: createChangesMap(nil, diffResp),
 	}, nil
 }
 
@@ -404,7 +410,7 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 	}
 
 	return &types.GetDiffsPayload{
-		AlteredFiles: createChangesMap(&diffResp),
+		AlteredFiles: createChangesMap(&diffResp, nil),
 	}, nil
 }
 
@@ -675,9 +681,21 @@ func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhook
 }
 
 // createChangesMap creates a unique map of files that have been altered.
-func createChangesMap(diffResp *getDiffsResponse) map[string]struct{} {
+func createChangesMap(diffsResp *getDiffsResponse, diffResp []getDiffResponse) map[string]struct{} {
 	changesMap := map[string]struct{}{}
-	for _, diff := range diffResp.Diffs {
+
+	if diffsResp != nil {
+		for _, diff := range diffsResp.Diffs {
+			if _, ok := changesMap[diff.OldPath]; !ok {
+				changesMap[diff.OldPath] = struct{}{}
+			}
+			if _, ok := changesMap[diff.NewPath]; !ok {
+				changesMap[diff.NewPath] = struct{}{}
+			}
+		}
+	}
+
+	for _, diff := range diffResp {
 		if _, ok := changesMap[diff.OldPath]; !ok {
 			changesMap[diff.OldPath] = struct{}{}
 		}

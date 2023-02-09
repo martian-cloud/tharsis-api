@@ -648,6 +648,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		Description: input.Description,
 		GroupID:     input.GroupID,
 		CreatedBy:   caller.GetSubject(),
+		Data:        []byte{}, // Required or identity will fail to create.
 	}
 
 	// Validate model

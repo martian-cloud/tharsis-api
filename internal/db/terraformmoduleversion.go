@@ -131,7 +131,9 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 		}
 	}
 
-	query := dialect.From(goqu.T("terraform_module_versions")).Select(moduleVersionFieldList...).Where(ex)
+	query := dialect.From(goqu.T("terraform_module_versions")).
+		Select(moduleVersionFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -302,17 +304,19 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 
 func (t *terraformModuleVersions) DeleteModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) error {
 
-	sql, _, err := dialect.Delete("terraform_module_versions").Where(
-		goqu.Ex{
-			"id":      moduleVersion.Metadata.ID,
-			"version": moduleVersion.Metadata.Version,
-		},
-	).Returning(moduleVersionFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("terraform_module_versions").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      moduleVersion.Metadata.ID,
+				"version": moduleVersion.Metadata.Version,
+			},
+		).Returning(moduleVersionFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -325,14 +329,16 @@ func (t *terraformModuleVersions) DeleteModuleVersion(ctx context.Context, modul
 
 func (t *terraformModuleVersions) getModuleVersion(ctx context.Context, exp goqu.Ex) (*models.TerraformModuleVersion, error) {
 	query := dialect.From(goqu.T("terraform_module_versions")).
-		Select(t.getSelectFields()...).Where(exp)
+		Prepared(true).
+		Select(t.getSelectFields()...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	moduleVersion, err := scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	moduleVersion, err := scanTerraformModuleVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

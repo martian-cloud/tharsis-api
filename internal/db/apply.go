@@ -84,13 +84,16 @@ func NewApplies(dbClient *Client) Applies {
 }
 
 func (a *applies) GetApply(ctx context.Context, id string) (*models.Apply, error) {
-	sql, _, err := dialect.From("applies").Select(applyFieldList...).Where(goqu.Ex{"id": id}).ToSQL()
+	sql, args, err := dialect.From("applies").
+		Prepared(true).
+		Select(applyFieldList...).
+		Where(goqu.Ex{"id": id}).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	apply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	apply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -110,7 +113,9 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 		}
 	}
 
-	query := dialect.From("applies").Select(applyFieldList...).Where(ex)
+	query := dialect.From("applies").
+		Select(applyFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -165,7 +170,8 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("applies").
+	sql, args, err := dialect.Insert("applies").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
 			"version":      initialResourceVersion,
@@ -182,7 +188,7 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 		return nil, err
 	}
 
-	createdApply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdApply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		a.dbClient.logger.Error(err)
@@ -194,21 +200,23 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("applies").Set(
-		goqu.Record{
-			"version":      goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":   timestamp,
-			"status":       apply.Status,
-			"comment":      apply.Comment,
-			"triggered_by": nullableString(apply.TriggeredBy),
-		},
-	).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).Returning(applyFieldList...).ToSQL()
+	sql, args, err := dialect.Update("applies").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":      goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":   timestamp,
+				"status":       apply.Status,
+				"comment":      apply.Comment,
+				"triggered_by": nullableString(apply.TriggeredBy),
+			},
+		).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).Returning(applyFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedApply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedApply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

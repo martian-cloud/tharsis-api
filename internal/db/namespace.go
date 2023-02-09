@@ -34,12 +34,16 @@ func getNamespaceByPath(ctx context.Context, conn connection, path string) (*nam
 }
 
 func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceRow, error) {
-	sql, _, err := goqu.From("namespaces").Select(namespaceFieldList...).Where(ex).ToSQL()
+	sql, args, err := dialect.From("namespaces").
+		Prepared(true).
+		Select(namespaceFieldList...).
+		Where(ex).
+		ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	namespace, err := scanNamespace(conn.QueryRow(ctx, sql))
+	namespace, err := scanNamespace(conn.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -53,7 +57,8 @@ func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceR
 func createNamespace(ctx context.Context, conn connection, namespace *namespaceRow) (*namespaceRow, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("namespaces").
+	sql, args, err := dialect.Insert("namespaces").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
 			"version":      initialResourceVersion,
@@ -69,7 +74,7 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 		return nil, err
 	}
 
-	createdNamespace, err := scanNamespace(conn.QueryRow(ctx, sql))
+	createdNamespace, err := scanNamespace(conn.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {

@@ -1663,7 +1663,6 @@ func TestGetWorkspacesForManagedIdentity(t *testing.T) {
 		testCase{
 			name:                 "negative, invalid",
 			managedIdentityID:    invalidID,
-			expectMsg:            invalidUUIDMsg1,
 			expectWorkspacePaths: []string{},
 		},
 	)

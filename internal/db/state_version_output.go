@@ -31,7 +31,8 @@ func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 	stateVersionOutput *models.StateVersionOutput) (*models.StateVersionOutput, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("state_version_outputs").
+	sql, args, err := dialect.Insert("state_version_outputs").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":               newResourceID(),
 			"version":          initialResourceVersion,
@@ -49,7 +50,7 @@ func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 		return nil, err
 	}
 
-	createdStateVersionOutput, err := scanStateVersionOutput(ro.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdStateVersionOutput, err := scanStateVersionOutput(ro.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		ro.dbClient.logger.Error(err)
@@ -61,14 +62,17 @@ func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 // GetStateVersionOutputs returns a slice of state version outputs.  It does _NOT_ do pagination.
 func (ro *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 	stateVersionID string) ([]models.StateVersionOutput, error) {
-	sql, _, err := goqu.From("state_version_outputs").Select(stateVersionOutputFieldList...).
-		Where(goqu.Ex{"state_version_id": stateVersionID}).ToSQL()
+	sql, args, err := dialect.From("state_version_outputs").
+		Prepared(true).
+		Select(stateVersionOutputFieldList...).
+		Where(goqu.Ex{"state_version_id": stateVersionID}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := ro.dbClient.getConnection(ctx).Query(ctx, sql)
+	rows, err := ro.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,14 +94,16 @@ func (ro *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 // GetStateVersionOutputByName returns a state version output by name
 func (ro *stateVersionOutputs) GetStateVersionOutputByName(ctx context.Context,
 	stateVersionID, outputName string) (*models.StateVersionOutput, error) {
-	sql, _, err := goqu.From("state_version_outputs").Select(stateVersionOutputFieldList...).
-		Where(goqu.Ex{"state_version_id": stateVersionID, "name": outputName}).ToSQL()
+	sql, args, err := dialect.From("state_version_outputs").
+		Select(stateVersionOutputFieldList...).
+		Where(goqu.Ex{"state_version_id": stateVersionID, "name": outputName}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	stateVersionOutput, err := scanStateVersionOutput(ro.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	stateVersionOutput, err := scanStateVersionOutput(ro.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		return nil, err

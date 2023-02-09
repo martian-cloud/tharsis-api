@@ -966,7 +966,7 @@ func TestUpdateJob(t *testing.T) {
 				RunID:    warmupRuns[0].Metadata.ID,
 				RunnerID: standardWarmupRunnerIDForJobs,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg4,
 		},
 	}
 

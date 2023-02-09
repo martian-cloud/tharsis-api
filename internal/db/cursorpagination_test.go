@@ -27,6 +27,7 @@ func TestExecute(t *testing.T) {
 		expectSQL           string
 		expectCountSQL      string
 		expectErrCode       string
+		expectArguments     []interface{}
 		resultCount         int
 		expectedResultCount int
 		expectHasNextPage   bool
@@ -42,6 +43,7 @@ func TestExecute(t *testing.T) {
 			paginationOptions:   PaginationOptions{},
 			resultCount:         10,
 			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" ASC`,
+			expectArguments:     nil,
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   false,
 			expectHasPrevPage:   false,
@@ -51,7 +53,8 @@ func TestExecute(t *testing.T) {
 			name:                "limit results by first",
 			paginationOptions:   PaginationOptions{First: int32Ptr(5)},
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" ASC LIMIT 6`,
+			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" ASC LIMIT ?`,
+			expectArguments:     []interface{}{int64(6)},
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   false,
@@ -61,7 +64,8 @@ func TestExecute(t *testing.T) {
 			name:                "limit results by last",
 			paginationOptions:   PaginationOptions{Last: int32Ptr(5)},
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" DESC LIMIT 6`,
+			expectSQL:           `SELECT * FROM "tests" ORDER BY "tests"."id" DESC LIMIT ?`,
+			expectArguments:     []interface{}{int64(6)},
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   false,
 			expectHasPrevPage:   true,
@@ -73,7 +77,8 @@ func TestExecute(t *testing.T) {
 			sortByField:         &fieldDescriptor{key: "name", table: "tests", col: "name"},
 			sortDirection:       AscSort,
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" > 'test1') OR (("tests"."id" > '1') AND ("tests"."name" = 'test1'))) ORDER BY "tests"."name" ASC, "tests"."id" ASC LIMIT 6`,
+			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" > ?) OR (("tests"."id" > ?) AND ("tests"."name" = ?))) ORDER BY "tests"."name" ASC, "tests"."id" ASC LIMIT ?`,
+			expectArguments:     []interface{}{"test1", "1", "test1", int64(6)},
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   true,
@@ -85,7 +90,8 @@ func TestExecute(t *testing.T) {
 			sortByField:         &fieldDescriptor{key: "name", table: "tests", col: "name"},
 			sortDirection:       DescSort,
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" < 'test1') OR (("tests"."id" < '1') AND ("tests"."name" = 'test1'))) ORDER BY "tests"."name" DESC, "tests"."id" DESC LIMIT 6`,
+			expectSQL:           `SELECT * FROM "tests" WHERE (("tests"."name" < ?) OR (("tests"."id" < ?) AND ("tests"."name" = ?))) ORDER BY "tests"."name" DESC, "tests"."id" DESC LIMIT ?`,
+			expectArguments:     []interface{}{"test1", "1", "test1", int64(6)},
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   true,
@@ -95,7 +101,8 @@ func TestExecute(t *testing.T) {
 			name:                "limit results by last with before cursor",
 			paginationOptions:   PaginationOptions{Last: int32Ptr(5), Before: buildTestCursor("1", "")},
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" < '1') ORDER BY "tests"."id" ASC LIMIT 6`,
+			expectSQL:           `SELECT * FROM "tests" WHERE ("tests"."id" < ?) ORDER BY "tests"."id" ASC LIMIT ?`,
+			expectArguments:     []interface{}{"1", int64(6)},
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   false,
@@ -105,7 +112,8 @@ func TestExecute(t *testing.T) {
 			name:                "limit results by first with before cursor",
 			paginationOptions:   PaginationOptions{First: int32Ptr(5), Before: buildTestCursor("1", "")},
 			resultCount:         6,
-			expectSQL:           `SELECT * FROM (SELECT * FROM "tests" WHERE ("tests"."id" < '1') ORDER BY "tests"."id" DESC LIMIT 6) AS "t1" ORDER BY "id" ASC`,
+			expectSQL:           `SELECT * FROM (SELECT * FROM "tests" WHERE ("tests"."id" < ?) ORDER BY "tests"."id" DESC LIMIT ?) AS "t1" ORDER BY "id" ASC`,
+			expectArguments:     []interface{}{"1", int64(6)},
 			expectCountSQL:      `SELECT COUNT(*) FROM "tests"`,
 			expectHasNextPage:   true,
 			expectHasPrevPage:   true,
@@ -135,8 +143,12 @@ func TestExecute(t *testing.T) {
 			mockDBConn := Mockconnection{}
 			mockDBConn.Test(t)
 
-			mockDBConn.On("Query", mock.Anything, test.expectSQL).Return(&mockRows, nil)
-			mockDBConn.On("QueryRow", mock.Anything, test.expectCountSQL).Return(&mockCountRows, nil)
+			// Query function expects arguments as individual elements.
+			queryArguments := []interface{}{mock.Anything, test.expectSQL}
+			queryArguments = append(queryArguments, test.expectArguments...)
+
+			mockDBConn.On("Query", queryArguments...).Return(&mockRows, nil)
+			mockDBConn.On("QueryRow", mock.Anything, mock.Anything).Return(&mockCountRows, nil)
 
 			qBuilder, err := newPaginatedQueryBuilder(
 				&test.paginationOptions,

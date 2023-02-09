@@ -239,7 +239,8 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 		}
 	}()
 
-	sql, _, err := dialect.Insert("terraform_providers").
+	sql, args, err := dialect.Insert("terraform_providers").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":            newResourceID(),
 			"version":       initialResourceVersion,
@@ -257,7 +258,7 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 		return nil, err
 	}
 
-	createdProvider, err := scanTerraformProvider(tx.QueryRow(ctx, sql), false)
+	createdProvider, err := scanTerraformProvider(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -298,21 +299,23 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 		}
 	}()
 
-	sql, _, err := dialect.Update("terraform_providers").Set(
-		goqu.Record{
-			"version":    goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at": timestamp,
-			"name":       provider.Name,
-			"private":    provider.Private,
-			"repo_url":   provider.RepositoryURL,
-		},
-	).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).Returning(providerFieldList...).ToSQL()
+	sql, args, err := dialect.Update("terraform_providers").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":    goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at": timestamp,
+				"name":       provider.Name,
+				"private":    provider.Private,
+				"repo_url":   provider.RepositoryURL,
+			},
+		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).Returning(providerFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedProvider, err := scanTerraformProvider(tx.QueryRow(ctx, sql), false)
+	updatedProvider, err := scanTerraformProvider(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -338,17 +341,19 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 
 func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *models.TerraformProvider) error {
 
-	sql, _, err := dialect.Delete("terraform_providers").Where(
-		goqu.Ex{
-			"id":      provider.Metadata.ID,
-			"version": provider.Metadata.Version,
-		},
-	).Returning(providerFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("terraform_providers").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      provider.Metadata.ID,
+				"version": provider.Metadata.Version,
+			},
+		).Returning(providerFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	_, err = scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -361,16 +366,17 @@ func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *model
 
 func (t *terraformProviders) getProvider(ctx context.Context, exp goqu.Ex) (*models.TerraformProvider, error) {
 	query := dialect.From(goqu.T("terraform_providers")).
+		Prepared(true).
 		Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	provider, err := scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	provider, err := scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

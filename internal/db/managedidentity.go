@@ -245,7 +245,8 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
 	conn := m.dbClient.getConnection(ctx)
 
-	sql, _, err := dialect.From("managed_identity_rules").
+	sql, args, err := dialect.From("managed_identity_rules").
+		Prepared(true).
 		Select(managedIdentityRuleFieldList...).
 		Where(goqu.Ex{"id": ruleID}).ToSQL()
 
@@ -253,7 +254,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ru
 		return nil, err
 	}
 
-	rule, err := scanManagedIdentityRule(conn.QueryRow(ctx, sql))
+	rule, err := scanManagedIdentityRule(conn.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -308,7 +309,8 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 	}
 
 	// Create rule
-	sql, _, err := dialect.Insert("managed_identity_rules").
+	sql, args, err := dialect.Insert("managed_identity_rules").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                          newResourceID(),
 			"version":                     initialResourceVersion,
@@ -325,7 +327,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 		return nil, err
 	}
 
-	createdRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql))
+	createdRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -338,7 +340,8 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 
 	// Create allowed users
 	for _, userID := range rule.AllowedUserIDs {
-		sql, _, err := dialect.Insert("managed_identity_rule_allowed_users").
+		sql, args, err := dialect.Insert("managed_identity_rule_allowed_users").
+			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": createdRule.Metadata.ID,
@@ -349,14 +352,15 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 			return nil, err
 		}
 
-		if _, err := tx.Exec(ctx, sql); err != nil {
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return nil, err
 		}
 	}
 
 	// Create allowed service accounts
 	for _, serviceAccountID := range rule.AllowedServiceAccountIDs {
-		sql, _, err := dialect.Insert("managed_identity_rule_allowed_service_accounts").
+		sql, args, err := dialect.Insert("managed_identity_rule_allowed_service_accounts").
+			Prepared(true).
 			Rows(goqu.Record{
 				"id":                 newResourceID(),
 				"rule_id":            createdRule.Metadata.ID,
@@ -367,14 +371,15 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 			return nil, err
 		}
 
-		if _, err := tx.Exec(ctx, sql); err != nil {
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return nil, err
 		}
 	}
 
 	// Create allowed teams
 	for _, teamID := range rule.AllowedTeamIDs {
-		sql, _, err := dialect.Insert("managed_identity_rule_allowed_teams").
+		sql, args, err := dialect.Insert("managed_identity_rule_allowed_teams").
+			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": createdRule.Metadata.ID,
@@ -385,7 +390,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 			return nil, err
 		}
 
-		if _, err := tx.Exec(ctx, sql); err != nil {
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return nil, err
 		}
 	}
@@ -425,20 +430,22 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		}
 	}
 
-	sql, _, err := goqu.Update("managed_identity_rules").Set(
-		goqu.Record{
-			"version":                     goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":                  timestamp,
-			"run_stage":                   rule.RunStage,
-			"module_attestation_policies": moduleAttestationPolicies,
-		},
-	).Where(goqu.Ex{"id": rule.Metadata.ID, "version": rule.Metadata.Version}).Returning(managedIdentityRuleFieldList...).ToSQL()
+	sql, args, err := dialect.Update("managed_identity_rules").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":                     goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":                  timestamp,
+				"run_stage":                   rule.RunStage,
+				"module_attestation_policies": moduleAttestationPolicies,
+			},
+		).Where(goqu.Ex{"id": rule.Metadata.ID, "version": rule.Metadata.Version}).Returning(managedIdentityRuleFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql))
+	updatedRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -453,53 +460,60 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 	}
 
 	// Delete allowed users
-	deleteAllowedUsersSQL, _, err := dialect.Delete("managed_identity_rule_allowed_users").Where(
-		goqu.Ex{
-			"rule_id": rule.Metadata.ID,
-		},
-	).ToSQL()
+	deleteAllowedUsersSQL, args, err := dialect.Delete("managed_identity_rule_allowed_users").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"rule_id": rule.Metadata.ID,
+			},
+		).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err = tx.Exec(ctx, deleteAllowedUsersSQL); err != nil {
+	if _, err = tx.Exec(ctx, deleteAllowedUsersSQL, args...); err != nil {
 		return nil, err
 	}
 
 	// Delete allowed service accounts
-	deleteAllowedServiceAccountsSQL, _, err := dialect.Delete("managed_identity_rule_allowed_service_accounts").Where(
-		goqu.Ex{
-			"rule_id": rule.Metadata.ID,
-		},
-	).ToSQL()
+	deleteAllowedServiceAccountsSQL, args, err := dialect.Delete("managed_identity_rule_allowed_service_accounts").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"rule_id": rule.Metadata.ID,
+			},
+		).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err = tx.Exec(ctx, deleteAllowedServiceAccountsSQL); err != nil {
+	if _, err = tx.Exec(ctx, deleteAllowedServiceAccountsSQL, args...); err != nil {
 		return nil, err
 	}
 
 	// Delete allowed teams
-	deleteAllowedTeamsSQL, _, err := dialect.Delete("managed_identity_rule_allowed_teams").Where(
-		goqu.Ex{
-			"rule_id": rule.Metadata.ID,
-		},
-	).ToSQL()
+	deleteAllowedTeamsSQL, args, err := dialect.Delete("managed_identity_rule_allowed_teams").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"rule_id": rule.Metadata.ID,
+			},
+		).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := tx.Exec(ctx, deleteAllowedTeamsSQL); err != nil {
+	if _, err := tx.Exec(ctx, deleteAllowedTeamsSQL, args...); err != nil {
 		return nil, err
 	}
 
 	// Create allowed users
 	for _, userID := range rule.AllowedUserIDs {
-		sql, _, err := dialect.Insert("managed_identity_rule_allowed_users").
+		sql, args, err := dialect.Insert("managed_identity_rule_allowed_users").
+			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": rule.Metadata.ID,
@@ -510,14 +524,15 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			return nil, err
 		}
 
-		if _, err := tx.Exec(ctx, sql); err != nil {
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return nil, err
 		}
 	}
 
 	// Create allowed service accounts
 	for _, serviceAccountID := range rule.AllowedServiceAccountIDs {
-		sql, _, err := dialect.Insert("managed_identity_rule_allowed_service_accounts").
+		sql, args, err := dialect.Insert("managed_identity_rule_allowed_service_accounts").
+			Prepared(true).
 			Rows(goqu.Record{
 				"id":                 newResourceID(),
 				"rule_id":            rule.Metadata.ID,
@@ -528,14 +543,15 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			return nil, err
 		}
 
-		if _, err := tx.Exec(ctx, sql); err != nil {
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return nil, err
 		}
 	}
 
 	// Create allowed teams
 	for _, teamID := range rule.AllowedTeamIDs {
-		sql, _, err := dialect.Insert("managed_identity_rule_allowed_teams").
+		sql, args, err := dialect.Insert("managed_identity_rule_allowed_teams").
+			Prepared(true).
 			Rows(goqu.Record{
 				"id":      newResourceID(),
 				"rule_id": rule.Metadata.ID,
@@ -546,7 +562,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			return nil, err
 		}
 
-		if _, err := tx.Exec(ctx, sql); err != nil {
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return nil, err
 		}
 	}
@@ -563,18 +579,20 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 }
 
 func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) error {
-	sql, _, err := dialect.Delete("managed_identity_rules").Where(
-		goqu.Ex{
-			"id":      rule.Metadata.ID,
-			"version": rule.Metadata.Version,
-		},
-	).Returning(managedIdentityRuleFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("managed_identity_rules").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      rule.Metadata.ID,
+				"version": rule.Metadata.Version,
+			},
+		).Returning(managedIdentityRuleFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanManagedIdentityRule(m.dbClient.getConnection(ctx).QueryRow(ctx, sql)); err != nil {
+	if _, err := scanManagedIdentityRule(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -586,7 +604,8 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 }
 
 func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context, workspaceID string) ([]models.ManagedIdentity, error) {
-	sql, _, err := dialect.From(t1).
+	sql, args, err := dialect.From(t1).
+		Prepared(true).
 		Select(m.getSelectFields(true)...).
 		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"t1.id": goqu.I("workspace_managed_identity_relation.managed_identity_id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
@@ -597,7 +616,7 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 		return nil, err
 	}
 
-	rows, err := m.dbClient.getConnection(ctx).Query(ctx, sql)
+	rows, err := m.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +638,8 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 }
 
 func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error {
-	sql, _, err := dialect.Insert("workspace_managed_identity_relation").
+	sql, args, err := dialect.Insert("workspace_managed_identity_relation").
+		Prepared(true).
 		Rows(goqu.Record{
 			"managed_identity_id": managedIdentityID,
 			"workspace_id":        workspaceID,
@@ -629,7 +649,7 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 		return err
 	}
 
-	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql); err != nil {
+	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				return errors.NewError(errors.EConflict, "managed identity already assigned to workspace")
@@ -642,7 +662,8 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 }
 
 func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error {
-	sql, _, err := dialect.Delete("workspace_managed_identity_relation").
+	sql, args, err := dialect.Delete("workspace_managed_identity_relation").
+		Prepared(true).
 		Where(
 			goqu.Ex{
 				"managed_identity_id": managedIdentityID,
@@ -654,7 +675,7 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 		return err
 	}
 
-	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql); err != nil {
+	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		return err
 	}
 
@@ -663,7 +684,8 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 
 // GetManagedIdentityByID returns a managedIdentity by ID
 func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error) {
-	sql, _, err := goqu.From(t1).
+	sql, args, err := dialect.From(t1).
+		Prepared(true).
 		Select(m.getSelectFields(true)...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
@@ -674,7 +696,7 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 		return nil, err
 	}
 
-	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true, true)
+	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true, true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -689,7 +711,8 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 // GetManagedIdentity returns a managedIdentity by namespace path and name.
 func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error) {
 	index := strings.LastIndex(path, "/")
-	sql, _, err := goqu.From(t1).
+	sql, args, err := dialect.From(t1).
+		Prepared(true).
 		Select(m.getSelectFields(true)...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
@@ -700,7 +723,7 @@ func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path s
 		return nil, err
 	}
 
-	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true, true)
+	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true, true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -845,7 +868,8 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 		}
 	}()
 
-	sql, _, err := dialect.Insert("managed_identities").
+	sql, args, err := dialect.Insert("managed_identities").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":              createdID,
 			"version":         initialResourceVersion,
@@ -864,7 +888,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 		return nil, err
 	}
 
-	if _, err = tx.Exec(ctx, sql); err != nil {
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				return nil, errors.NewError(errors.EConflict, "managed identity already exists in the specified group")
@@ -874,7 +898,8 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	}
 
 	// A separate query allows backfilling empty columns in the alias with that of the source managed identity.
-	sql, _, err = dialect.From(t1).
+	sql, args, err = dialect.From(t1).
+		Prepared(true).
 		Select(m.getSelectFields(false)...).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(goqu.Ex{"t1.id": createdID}).
@@ -884,7 +909,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 		return nil, err
 	}
 
-	createdManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql), true, false)
+	createdManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql, args...), true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -921,20 +946,22 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 		}
 	}()
 
-	sql, _, err := goqu.Update("managed_identities").Set(
-		goqu.Record{
-			"version":     goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":  timestamp,
-			"description": managedIdentity.Description,
-			"data":        managedIdentity.Data,
-		},
-	).Where(goqu.Ex{"id": managedIdentity.Metadata.ID, "version": managedIdentity.Metadata.Version}).Returning(managedIdentityFieldList...).ToSQL()
+	sql, args, err := dialect.Update("managed_identities").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":     goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":  timestamp,
+				"description": managedIdentity.Description,
+				"data":        managedIdentity.Data,
+			},
+		).Where(goqu.Ex{"id": managedIdentity.Metadata.ID, "version": managedIdentity.Metadata.Version}).Returning(managedIdentityFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql), false, false)
+	updatedManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql, args...), false, false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -959,18 +986,20 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 }
 
 func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) error {
-	sql, _, err := dialect.Delete("managed_identities").Where(
-		goqu.Ex{
-			"id":      managedIdentity.Metadata.ID,
-			"version": managedIdentity.Metadata.Version,
-		},
-	).Returning(managedIdentityFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("managed_identities").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      managedIdentity.Metadata.ID,
+				"version": managedIdentity.Metadata.Version,
+			},
+		).Returning(managedIdentityFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false, false); err != nil {
+	if _, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false, false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -1007,7 +1036,8 @@ func buildManagedIdentityResourcePath(groupPath string, name string) string {
 }
 
 func (m *managedIdentities) getManagedIdentityAccessRuleAllowedUserIDs(ctx context.Context, conn connection, ruleID string) ([]string, error) {
-	sql, _, err := dialect.From("managed_identity_rule_allowed_users").
+	sql, args, err := dialect.From("managed_identity_rule_allowed_users").
+		Prepared(true).
 		Select("user_id").
 		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
 
@@ -1015,7 +1045,7 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedUserIDs(ctx conte
 		return nil, err
 	}
 
-	rows, err := conn.Query(ctx, sql)
+	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1038,7 +1068,8 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedUserIDs(ctx conte
 }
 
 func (m *managedIdentities) getManagedIdentityAccessRuleAllowedServiceAccountIDs(ctx context.Context, conn connection, ruleID string) ([]string, error) {
-	sql, _, err := dialect.From("managed_identity_rule_allowed_service_accounts").
+	sql, args, err := dialect.From("managed_identity_rule_allowed_service_accounts").
+		Prepared(true).
 		Select("service_account_id").
 		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
 
@@ -1046,7 +1077,7 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedServiceAccountIDs
 		return nil, err
 	}
 
-	rows, err := conn.Query(ctx, sql)
+	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1069,7 +1100,8 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedServiceAccountIDs
 }
 
 func (m *managedIdentities) getManagedIdentityAccessRuleAllowedTeamIDs(ctx context.Context, conn connection, ruleID string) ([]string, error) {
-	sql, _, err := dialect.From("managed_identity_rule_allowed_teams").
+	sql, args, err := dialect.From("managed_identity_rule_allowed_teams").
+		Prepared(true).
 		Select("team_id").
 		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
 
@@ -1077,7 +1109,7 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedTeamIDs(ctx conte
 		return nil, err
 	}
 
-	rows, err := conn.Query(ctx, sql)
+	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}

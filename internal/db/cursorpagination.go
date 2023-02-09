@@ -242,25 +242,25 @@ func (p *paginatedQueryBuilder) execute(ctx context.Context, conn connection, qu
 		query = goqu.From(query).Order(p.buildOuterReverseOrderBy()...)
 	}
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.Prepared(true).ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
 	// Build count query
-	countSQL, _, err := originalQuery.Select(goqu.COUNT("*")).ToSQL()
+	countSQL, countArgs, err := originalQuery.Prepared(true).Select(goqu.COUNT("*")).ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	row := conn.QueryRow(ctx, countSQL)
+	row := conn.QueryRow(ctx, countSQL, countArgs...)
 
 	var count int32
 	if err = row.Scan(&count); err != nil {
 		return nil, errors.NewError(errors.EInternal, "Failed to scan query count result", errors.WithErrorErr(err))
 	}
 
-	rows, err := conn.Query(ctx, sql)
+	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}

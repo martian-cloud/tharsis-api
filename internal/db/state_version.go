@@ -94,7 +94,9 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 		}
 	}
 
-	query := dialect.From("state_versions").Select(stateVersionFieldList...).Where(ex)
+	query := dialect.From("state_versions").
+		Select(stateVersionFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -147,13 +149,17 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 }
 
 func (s *stateVersions) GetStateVersionByRunID(ctx context.Context, runID string) (*models.StateVersion, error) {
-	sql, _, err := dialect.From("state_versions").Select(stateVersionFieldList...).Where(goqu.Ex{"run_id": runID}).ToSQL()
+	sql, args, err := dialect.From("state_versions").
+		Prepared(true).
+		Select(stateVersionFieldList...).
+		Where(goqu.Ex{"run_id": runID}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -166,13 +172,17 @@ func (s *stateVersions) GetStateVersionByRunID(ctx context.Context, runID string
 
 func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error) {
 
-	sql, _, err := dialect.From("state_versions").Select(stateVersionFieldList...).Where(goqu.Ex{"id": id}).ToSQL()
+	sql, args, err := dialect.From("state_versions").
+		Prepared(true).
+		Select(stateVersionFieldList...).
+		Where(goqu.Ex{"id": id}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -186,7 +196,8 @@ func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models
 func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("state_versions").
+	sql, args, err := dialect.Insert("state_versions").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
 			"version":      initialResourceVersion,
@@ -202,7 +213,7 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 		return nil, err
 	}
 
-	createdStateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdStateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		s.dbClient.logger.Error(err)

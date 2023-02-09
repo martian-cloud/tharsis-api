@@ -97,7 +97,9 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 		}
 	}
 
-	query := dialect.From("configuration_versions").Select(configurationVersionFieldList...).Where(ex)
+	query := dialect.From("configuration_versions").
+		Select(configurationVersionFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -151,14 +153,17 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 
 func (c *configurationVersions) GetConfigurationVersion(ctx context.Context, id string) (*models.ConfigurationVersion, error) {
 
-	sql, _, err := dialect.From("configuration_versions").Select(configurationVersionFieldList...).Where(goqu.Ex{"id": id}).ToSQL()
+	sql, args, err := dialect.From("configuration_versions").
+		Prepared(true).
+		Select(configurationVersionFieldList...).
+		Where(goqu.Ex{"id": id}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	configurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql))
+	configurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		return nil, err
@@ -169,7 +174,8 @@ func (c *configurationVersions) GetConfigurationVersion(ctx context.Context, id 
 func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("configuration_versions").
+	sql, args, err := dialect.Insert("configuration_versions").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":           newResourceID(),
 			"version":      initialResourceVersion,
@@ -187,7 +193,7 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 		return nil, err
 	}
 
-	createdConfigurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdConfigurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		c.dbClient.logger.Error(err)
 		return nil, err
@@ -198,21 +204,23 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("configuration_versions").Set(
-		goqu.Record{
-			"version":      goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":   timestamp,
-			"status":       configurationVersion.Status,
-			"speculative":  configurationVersion.Speculative,
-			"workspace_id": configurationVersion.WorkspaceID,
-		},
-	).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).Returning(configurationVersionFieldList...).ToSQL()
+	sql, args, err := dialect.Update("configuration_versions").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":      goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":   timestamp,
+				"status":       configurationVersion.Status,
+				"speculative":  configurationVersion.Speculative,
+				"workspace_id": configurationVersion.WorkspaceID,
+			},
+		).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).Returning(configurationVersionFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedConfigurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedConfigurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
