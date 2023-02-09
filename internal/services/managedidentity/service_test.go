@@ -1080,6 +1080,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 		GroupID:     "some-group-id",
 		CreatedBy:   mockSubject,
 		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte{},
 	}
 
 	createAccessRuleInput := &models.ManagedIdentityAccessRule{

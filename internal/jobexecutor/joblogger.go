@@ -60,7 +60,7 @@ func (j *jobLogger) Errorf(format string, a ...interface{}) {
 
 // Write will append the data to the log buffer
 func (j *jobLogger) Write(data []byte) (n int, err error) {
-	j.logger.Info("JOB OUTPUT: %s", string(data))
+	j.logger.Infof("JOB OUTPUT: %s", string(data))
 	return j.buffer.Write(data)
 }
 

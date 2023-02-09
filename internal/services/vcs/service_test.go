@@ -1772,7 +1772,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 				SourceBranch:     "feature/branch",
 				TargetBranch:     "main",
 				Action:           "opened",
-				LatestCommitID:   "sample-commit-id",
+				HeadCommitID:     "sample-commit-id",
 			},
 			equivalentEventType: models.MergeRequestEventType,
 			createEventInput: &models.VCSEvent{
@@ -1802,7 +1802,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 				SourceBranch:     "feature/branch",
 				TargetBranch:     "main",
 				Action:           "opened",
-				LatestCommitID:   "sample-commit-id",
+				HeadCommitID:     "sample-commit-id",
 			},
 			equivalentEventType: models.MergeRequestEventType,
 			createEventInput: &models.VCSEvent{
@@ -2372,7 +2372,7 @@ func Test_handleEvent(t *testing.T) {
 					SourceBranch:     "feature/branch",
 					TargetBranch:     "main",
 					Action:           "opened",
-					LatestCommitID:   "some-commit-id",
+					HeadCommitID:     "some-commit-id",
 				},
 				workspace: sampleWorkspace,
 				vcsEvent: &models.VCSEvent{
@@ -2404,7 +2404,7 @@ func Test_handleEvent(t *testing.T) {
 					SourceBranch:     "feature/branch",
 					TargetBranch:     "main",
 					Action:           "opened",
-					LatestCommitID:   "some-commit-id",
+					HeadCommitID:     "some-commit-id",
 				},
 				workspace: sampleWorkspace,
 				vcsEvent: &models.VCSEvent{
@@ -2437,7 +2437,7 @@ func Test_handleEvent(t *testing.T) {
 					SourceBranch:     "feature/branch",
 					TargetBranch:     "main",
 					Action:           "opened",
-					LatestCommitID:   "some-commit-id",
+					HeadCommitID:     "some-commit-id",
 				},
 				workspace: sampleWorkspace,
 				vcsEvent: &models.VCSEvent{
@@ -2474,7 +2474,7 @@ func Test_handleEvent(t *testing.T) {
 					SourceBranch:     "feature/branch",
 					TargetBranch:     "main",
 					Action:           "opened",
-					LatestCommitID:   "some-commit-id",
+					HeadCommitID:     "some-commit-id",
 				},
 				workspace: sampleWorkspace,
 				vcsEvent: &models.VCSEvent{
@@ -2527,7 +2527,7 @@ func Test_handleEvent(t *testing.T) {
 			}
 
 			if test.input.vcsEvent.Type.Equals(models.MergeRequestEventType) {
-				getDiffInput.Ref = test.input.processInput.LatestCommitID
+				getDiffInput.Ref = test.input.processInput.HeadCommitID
 			}
 
 			getArchiveInput := &types.GetArchiveInput{

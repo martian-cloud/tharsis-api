@@ -238,17 +238,19 @@ func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Contex
 
 func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) error {
 
-	sql, _, err := dialect.Delete("terraform_module_attestations").Where(
-		goqu.Ex{
-			"id":      moduleAttestation.Metadata.ID,
-			"version": moduleAttestation.Metadata.Version,
-		},
-	).Returning(moduleAttestationFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("terraform_module_attestations").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      moduleAttestation.Metadata.ID,
+				"version": moduleAttestation.Metadata.Version,
+			},
+		).Returning(moduleAttestationFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -261,15 +263,16 @@ func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Contex
 
 func (t *terraformModuleAttestations) getModuleAttestation(ctx context.Context, exp goqu.Ex) (*models.TerraformModuleAttestation, error) {
 	query := dialect.From(goqu.T("terraform_module_attestations")).
+		Prepared(true).
 		Select(t.getSelectFields()...).
 		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	moduleAttestation, err := scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	moduleAttestation, err := scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

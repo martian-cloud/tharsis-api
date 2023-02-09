@@ -64,12 +64,11 @@ func TestGetLinksByProviderID(t *testing.T) {
 		{
 			name:     "negative, non-existent ID",
 			searchID: nonExistentID,
-			// expect link and error to be nil
+			// expect error to be nil
 		},
 		{
-			name:      "defective-id",
-			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			name:     "defective-id",
+			searchID: invalidID,
 		},
 	}
 

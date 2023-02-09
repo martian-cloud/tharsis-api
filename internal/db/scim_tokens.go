@@ -37,12 +37,15 @@ func (s *scimTokens) GetTokenByNonce(ctx context.Context, nonce string) (*models
 }
 
 func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) {
-	sql, _, err := goqu.From("scim_tokens").Select(s.getSelectFields()...).ToSQL()
+	sql, args, err := dialect.From("scim_tokens").
+		Prepared(true).
+		Select(s.getSelectFields()...).
+		ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := s.dbClient.getConnection(ctx).Query(ctx, sql)
+	rows, err := s.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +68,8 @@ func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) 
 func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (*models.SCIMToken, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("scim_tokens").
+	sql, args, err := dialect.Insert("scim_tokens").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":         newResourceID(),
 			"version":    initialResourceVersion,
@@ -79,7 +83,7 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 		return nil, err
 	}
 
-	createdToken, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdToken, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -93,17 +97,19 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 }
 
 func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) error {
-	sql, _, err := dialect.Delete("scim_tokens").Where(
-		goqu.Ex{
-			"id":      token.Metadata.ID,
-			"version": token.Metadata.Version,
-		},
-	).Returning(scimTokensFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("scim_tokens").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      token.Metadata.ID,
+				"version": token.Metadata.Version,
+			},
+		).Returning(scimTokensFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	if _, err = scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql)); err != nil {
+	if _, err = scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -115,7 +121,8 @@ func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) e
 }
 
 func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToken, error) {
-	sql, _, err := goqu.From("scim_tokens").
+	sql, args, err := dialect.From("scim_tokens").
+		Prepared(true).
 		Select(s.getSelectFields()...).
 		Where(exp).
 		ToSQL()
@@ -124,7 +131,7 @@ func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToke
 		return nil, err
 	}
 
-	token, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	token, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

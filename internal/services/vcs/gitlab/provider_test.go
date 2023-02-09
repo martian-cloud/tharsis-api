@@ -326,9 +326,9 @@ func TestGetDiff(t *testing.T) {
 	testCases := []struct {
 		expectedError   error
 		input           *types.GetDiffInput
-		response        *getDiffsResponse
 		expectedPayload *types.GetDiffsPayload
 		name            string
+		response        []getDiffResponse
 	}{
 		{
 			name: "positive: input is valid; expect no errors",
@@ -338,22 +338,14 @@ func TestGetDiff(t *testing.T) {
 				RepositoryPath: "owner/repository",
 				Ref:            "main",
 			},
-			response: &getDiffsResponse{
-				Diffs: []struct {
-					OldPath string `json:"old_path"`
-					NewPath string `json:"new_path"`
-				}{
-					struct {
-						OldPath string "json:\"old_path\""
-						NewPath string "json:\"new_path\""
-					}{
-						OldPath: "file.txt",
-						NewPath: "file.txt",
-					},
-					{
-						OldPath: "other.txt",
-						NewPath: "another.txt",
-					},
+			response: []getDiffResponse{
+				{
+					OldPath: "file.txt",
+					NewPath: "file.txt",
+				},
+				{
+					OldPath: "other.txt",
+					NewPath: "another.txt",
 				},
 			},
 			expectedPayload: &types.GetDiffsPayload{

@@ -102,7 +102,8 @@ func NewNamespaceMemberships(dbClient *Client) NamespaceMemberships {
 }
 
 func (m *namespaceMemberships) GetNamespaceMembershipByID(ctx context.Context, id string) (*models.NamespaceMembership, error) {
-	sql, _, err := goqu.From("namespace_memberships").
+	sql, args, err := dialect.From("namespace_memberships").
+		Prepared(true).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
 		Select(m.getSelectFields()...).
 		Where(goqu.Ex{"namespace_memberships.id": id}).ToSQL()
@@ -111,7 +112,7 @@ func (m *namespaceMemberships) GetNamespaceMembershipByID(ctx context.Context, i
 		return nil, err
 	}
 
-	namespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	namespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -155,7 +156,8 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		record["team_id"] = input.TeamID
 	}
 
-	sql, _, err := dialect.Insert("namespace_memberships").
+	sql, args, err := dialect.Insert("namespace_memberships").
+		Prepared(true).
 		Rows(record).
 		Returning(namespaceMembershipFieldList...).ToSQL()
 
@@ -163,7 +165,7 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
-	createdNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	createdNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -197,7 +199,8 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 	namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("namespace_memberships").
+	sql, args, err := dialect.Update("namespace_memberships").
+		Prepared(true).
 		Set(goqu.Record{
 			"version":    goqu.L("? + ?", goqu.C("version"), 1),
 			"updated_at": timestamp,
@@ -209,7 +212,7 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
-	updatedNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	updatedNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -229,18 +232,20 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 }
 
 func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error {
-	sql, _, err := dialect.Delete("namespace_memberships").Where(
-		goqu.Ex{
-			"id":      namespaceMembership.Metadata.ID,
-			"version": namespaceMembership.Metadata.Version,
-		},
-	).Returning(namespaceMembershipFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("namespace_memberships").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      namespaceMembership.Metadata.ID,
+				"version": namespaceMembership.Metadata.Version,
+			},
+		).Returning(namespaceMembershipFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}

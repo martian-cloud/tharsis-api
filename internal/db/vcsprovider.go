@@ -235,7 +235,8 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 		}
 	}()
 
-	sql, _, err := dialect.Insert("vcs_providers").
+	sql, args, err := dialect.Insert("vcs_providers").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                            newResourceID(),
 			"version":                       initialResourceVersion,
@@ -260,7 +261,7 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 		return nil, err
 	}
 
-	createdProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql), false)
+	createdProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -305,26 +306,28 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 		}
 	}()
 
-	sql, _, err := dialect.Update("vcs_providers").Set(
-		goqu.Record{
-			"version":                       goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":                    timestamp,
-			"description":                   nullableString(provider.Description),
-			"oauth_client_id":               provider.OAuthClientID,
-			"oauth_client_secret":           provider.OAuthClientSecret,
-			"oauth_state":                   provider.OAuthState,
-			"oauth_access_token":            provider.OAuthAccessToken,
-			"oauth_refresh_token":           provider.OAuthRefreshToken,
-			"oauth_access_token_expires_at": provider.OAuthAccessTokenExpiresAt,
-		},
-	).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
+	sql, args, err := dialect.Update("vcs_providers").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":                       goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":                    timestamp,
+				"description":                   nullableString(provider.Description),
+				"oauth_client_id":               provider.OAuthClientID,
+				"oauth_client_secret":           provider.OAuthClientSecret,
+				"oauth_state":                   provider.OAuthState,
+				"oauth_access_token":            provider.OAuthAccessToken,
+				"oauth_refresh_token":           provider.OAuthRefreshToken,
+				"oauth_access_token_expires_at": provider.OAuthAccessTokenExpiresAt,
+			},
+		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
 		Returning(vcsProvidersFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql), false)
+	updatedProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -349,18 +352,20 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 }
 
 func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCSProvider) error {
-	sql, _, err := dialect.Delete("vcs_providers").Where(
-		goqu.Ex{
-			"id":      provider.Metadata.ID,
-			"version": provider.Metadata.Version,
-		},
-	).Returning(vcsProvidersFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("vcs_providers").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      provider.Metadata.ID,
+				"version": provider.Metadata.Version,
+			},
+		).Returning(vcsProvidersFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -381,7 +386,8 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 }
 
 func (vp *vcsProviders) getProvider(ctx context.Context, exp goqu.Ex) (*models.VCSProvider, error) {
-	sql, _, err := dialect.From(goqu.T("vcs_providers")).
+	sql, args, err := dialect.From(goqu.T("vcs_providers")).
+		Prepared(true).
 		Select(vp.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp).
@@ -391,7 +397,7 @@ func (vp *vcsProviders) getProvider(ctx context.Context, exp goqu.Ex) (*models.V
 		return nil, err
 	}
 
-	provider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	provider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

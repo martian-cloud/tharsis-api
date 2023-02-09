@@ -285,11 +285,6 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 			expectManagedIdentities: []models.ManagedIdentity{},
 			// expect error to be nil
 		},
-		{
-			name:        "negative, invalid ID",
-			workspaceID: invalidID,
-			expectMsg:   invalidUUIDMsg1,
-		},
 	}
 
 	for _, test := range testCases {
@@ -606,6 +601,8 @@ func TestCreateManagedIdentity(t *testing.T) {
 			toCreate: &models.ManagedIdentity{
 				Name:    "positive-create-managed-identity-nearly-empty",
 				GroupID: warmupGroupID,
+				Type:    models.ManagedIdentityAWSFederated,
+				Data:    []byte("some-data"),
 				// Resource path is not used when creating the object, but it is returned.
 			},
 			expectCreated: &models.ManagedIdentity{
@@ -616,7 +613,8 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Name:         "positive-create-managed-identity-nearly-empty",
 				GroupID:      warmupGroupID,
 				ResourcePath: warmupGroup.FullPath + "/positive-create-managed-identity-nearly-empty",
-				Data:         []byte{},
+				Type:         models.ManagedIdentityAWSFederated,
+				Data:         []byte("some-data"),
 			},
 		},
 
@@ -675,6 +673,8 @@ func TestCreateManagedIdentity(t *testing.T) {
 			toCreate: &models.ManagedIdentity{
 				Name:    "positive-create-managed-identity-nearly-empty",
 				GroupID: warmupGroupID,
+				Type:    models.ManagedIdentityAWSFederated,
+				Data:    []byte("some-data"),
 				// Resource path is not used when creating the object, but it is returned.
 			},
 			expectMsg: ptr.String("managed identity already exists in the specified group"),
@@ -685,6 +685,8 @@ func TestCreateManagedIdentity(t *testing.T) {
 			toCreate: &models.ManagedIdentity{
 				Name:    "non-existent-group-id",
 				GroupID: nonExistentID,
+				Type:    models.ManagedIdentityAzureFederated,
+				Data:    []byte("some-data"),
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"managed_identities\" violates foreign key constraint \"fk_group_id\" (SQLSTATE 23503)"),
 		},
@@ -774,6 +776,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 					Version: positiveManagedIdentity.Metadata.Version,
 				},
 				Description: "updated description",
+				Type:        positiveManagedIdentity.Type,
 				Data:        []byte("updated data"),
 			},
 			expectManagedIdentity: &models.ManagedIdentity{
@@ -787,6 +790,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				Name:         "1-managed-identity-0",
 				Description:  "updated description",
 				GroupID:      warmupGroup.Metadata.ID,
+				Type:         positiveManagedIdentity.Type,
 				Data:         []byte("updated data"),
 				CreatedBy:    positiveManagedIdentity.CreatedBy,
 			},
@@ -1992,6 +1996,8 @@ var standardWarmupManagedIdentities = []models.ManagedIdentity{
 		Description: "managed identity 0 for testing managed identities",
 		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
 		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
 		// Resource path is not used when creating the object, but it is returned.
 	},
 	{
@@ -1999,6 +2005,8 @@ var standardWarmupManagedIdentities = []models.ManagedIdentity{
 		Description: "managed identity 1 for testing managed identities",
 		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
 		CreatedBy:   "someone-sa1",
+		Type:        models.ManagedIdentityAzureFederated,
+		Data:        []byte("managed-identity-1-data"),
 		// Resource path is not used when creating the object, but it is returned.
 	},
 	{
@@ -2006,6 +2014,8 @@ var standardWarmupManagedIdentities = []models.ManagedIdentity{
 		Description: "managed identity 2 for testing managed identities",
 		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
 		CreatedBy:   "someone-sa2",
+		Type:        models.ManagedIdentityTharsisFederated,
+		Data:        []byte("managed-identity-2-data"),
 		// Resource path is not used when creating the object, but it is returned.
 	},
 	{
@@ -2013,6 +2023,8 @@ var standardWarmupManagedIdentities = []models.ManagedIdentity{
 		Description: "managed identity 3 for testing managed identities",
 		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
 		CreatedBy:   "someone-sa3",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-3-data"),
 		// Resource path is not used when creating the object, but it is returned.
 	},
 	{
@@ -2020,6 +2032,8 @@ var standardWarmupManagedIdentities = []models.ManagedIdentity{
 		Description: "managed identity 4 for testing managed identities",
 		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
 		CreatedBy:   "someone-sa4",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-4-data"),
 		// Resource path is not used when creating the object, but it is returned.
 	},
 }

@@ -167,7 +167,7 @@ type ProcessWebhookEventInput struct {
 	SourceRepository string // Repository from which the MR originated.
 	SourceBranch     string // Source branch from which the MR originated.
 	TargetBranch     string // Branch this MR is for.
-	LatestCommitID   string // Head commit for an MR.
+	HeadCommitID     string // Head commit for an MR.
 	Before           string // Commit SHA before the change (can be empty).
 	After            string // Commit SHA after the change  (can be empty).
 	Ref              string // Ref name starting with refs/heads or similar.
@@ -1258,7 +1258,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	// Use the ref and commit ID appropriate for an MR / PR.
 	if eventType.Equals(models.MergeRequestEventType) {
 		ref = input.SourceBranch
-		commitID = input.LatestCommitID
+		commitID = input.HeadCommitID
 	}
 
 	// Create the VCS event with 'pending' status.
@@ -1866,7 +1866,7 @@ func getAlteredFiles(ctx context.Context, input *handleEventInput) (map[string]s
 		// an MR event, for that we can use the latest commit of the MR.
 		ref := input.processInput.After
 		if input.vcsEvent.Type.Equals(models.MergeRequestEventType) {
-			ref = input.processInput.LatestCommitID
+			ref = input.processInput.HeadCommitID
 		}
 
 		// No parent or 'before' hash i.e. first branch commit.

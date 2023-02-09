@@ -60,6 +60,9 @@ var (
 
 	// returned for some other invalid UUID cases
 	emptyUUIDMsg2 = ptr.String("Failed to scan query count result: ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
+
+	// returned for some invalid UUID cases
+	invalidUUIDMsg4 = ptr.String("ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
 )
 
 type testClient struct {

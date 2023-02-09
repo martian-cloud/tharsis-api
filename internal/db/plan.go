@@ -85,13 +85,17 @@ func NewPlans(dbClient *Client) Plans {
 // GetPlan returns a plan by name
 func (p *plans) GetPlan(ctx context.Context, id string) (*models.Plan, error) {
 
-	sql, _, err := dialect.From("plans").Select(planFieldList...).Where(goqu.Ex{"id": id}).ToSQL()
+	sql, args, err := dialect.From("plans").
+		Prepared(true).
+		Select(planFieldList...).
+		Where(goqu.Ex{"id": id}).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	plan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	plan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -112,7 +116,9 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 		}
 	}
 
-	query := dialect.From("plans").Select(planFieldList...).Where(ex)
+	query := dialect.From("plans").
+		Select(planFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -168,7 +174,8 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("plans").
+	sql, args, err := dialect.Insert("plans").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                    newResourceID(),
 			"version":               initialResourceVersion,
@@ -187,7 +194,7 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 		return nil, err
 	}
 
-	createdPlan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdPlan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		p.dbClient.logger.Error(err)
@@ -200,23 +207,25 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("plans").Set(
-		goqu.Record{
-			"version":               goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":            timestamp,
-			"status":                plan.Status,
-			"has_changes":           plan.HasChanges,
-			"resource_additions":    plan.ResourceAdditions,
-			"resource_changes":      plan.ResourceChanges,
-			"resource_destructions": plan.ResourceDestructions,
-		},
-	).Where(goqu.Ex{"id": plan.Metadata.ID, "version": plan.Metadata.Version}).Returning(planFieldList...).ToSQL()
+	sql, args, err := dialect.Update("plans").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":               goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":            timestamp,
+				"status":                plan.Status,
+				"has_changes":           plan.HasChanges,
+				"resource_additions":    plan.ResourceAdditions,
+				"resource_changes":      plan.ResourceChanges,
+				"resource_destructions": plan.ResourceDestructions,
+			},
+		).Where(goqu.Ex{"id": plan.Metadata.ID, "version": plan.Metadata.Version}).Returning(planFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedPlan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedPlan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

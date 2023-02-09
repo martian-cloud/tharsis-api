@@ -122,7 +122,9 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 		}
 	}
 
-	query := dialect.From(goqu.T("terraform_provider_versions")).Select(providerVersionFieldList...).Where(ex)
+	query := dialect.From(goqu.T("terraform_provider_versions")).
+		Select(providerVersionFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -182,7 +184,8 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	sql, _, err := dialect.Insert("terraform_provider_versions").
+	sql, args, err := dialect.Insert("terraform_provider_versions").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                    newResourceID(),
 			"version":               initialResourceVersion,
@@ -204,7 +207,7 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	createdTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -225,25 +228,27 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	sql, _, err := dialect.Update("terraform_provider_versions").Set(
-		goqu.Record{
-			"version":               goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":            timestamp,
-			"gpg_key_id":            providerVersion.GPGKeyID,
-			"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
-			"protocols":             protocolsJSON,
-			"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
-			"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
-			"readme_uploaded":       providerVersion.ReadmeUploaded,
-			"latest":                providerVersion.Latest,
-		},
-	).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).Returning(providerVersionFieldList...).ToSQL()
+	sql, args, err := dialect.Update("terraform_provider_versions").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":               goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":            timestamp,
+				"gpg_key_id":            providerVersion.GPGKeyID,
+				"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
+				"protocols":             protocolsJSON,
+				"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
+				"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
+				"readme_uploaded":       providerVersion.ReadmeUploaded,
+				"latest":                providerVersion.Latest,
+			},
+		).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).Returning(providerVersionFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -257,17 +262,19 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 
 func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error {
 
-	sql, _, err := dialect.Delete("terraform_provider_versions").Where(
-		goqu.Ex{
-			"id":      providerVersion.Metadata.ID,
-			"version": providerVersion.Metadata.Version,
-		},
-	).Returning(providerVersionFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("terraform_provider_versions").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      providerVersion.Metadata.ID,
+				"version": providerVersion.Metadata.Version,
+			},
+		).Returning(providerVersionFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -280,14 +287,16 @@ func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, p
 
 func (t *terraformProviderVersions) getProviderVersion(ctx context.Context, exp goqu.Ex) (*models.TerraformProviderVersion, error) {
 	query := dialect.From(goqu.T("terraform_provider_versions")).
-		Select(t.getSelectFields()...).Where(exp)
+		Prepared(true).
+		Select(t.getSelectFields()...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	providerVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	providerVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

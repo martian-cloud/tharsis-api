@@ -55,26 +55,7 @@ func TestCreateStateVersionOutput(t *testing.T) {
 	now := currentTime()
 	testCases := []testCase{
 
-		{
-			name: "positive, nearly empty",
-			toCreate: &models.StateVersionOutput{
-				Name:           "positive-nearly-empty",
-				StateVersionID: warmupItems.stateVersions[0].Metadata.ID,
-			},
-			expectCreated: &models.StateVersionOutput{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				Name:           "positive-nearly-empty",
-				StateVersionID: warmupItems.stateVersions[0].Metadata.ID,
-				Value:          []byte{},
-				Type:           []byte{},
-			},
-		},
-
 		// Duplicates are not prohibited by the DB, so don't do a duplicate test case.
-
 		{
 			name: "positive, full",
 			toCreate: &models.StateVersionOutput{
@@ -101,6 +82,8 @@ func TestCreateStateVersionOutput(t *testing.T) {
 			name: "non-existent state version ID",
 			toCreate: &models.StateVersionOutput{
 				Name:           "non-existent-state-version-id",
+				Value:          []byte("non-existent-value"),
+				Type:           []byte("non-existent-type"),
 				StateVersionID: nonExistentID,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"state_version_outputs\" violates foreign key constraint \"fk_state_version_id\" (SQLSTATE 23503)"),
@@ -189,9 +172,9 @@ func TestGetStateVersionOutputs(t *testing.T) {
 		},
 
 		{
-			name:      "defective-ID",
-			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			name:                      "defective-ID",
+			searchID:                  invalidID,
+			expectStateVersionOutputs: []models.StateVersionOutput{},
 		},
 	}
 

@@ -91,7 +91,7 @@ func NewVariables(dbClient *Client) Variables {
 }
 
 func (m *variables) GetVariableByID(ctx context.Context, id string) (*models.Variable, error) {
-	sql, _, err := goqu.From("namespace_variables").
+	sql, _, err := dialect.From("namespace_variables").
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
 		Select(m.getSelectFields()...).
 		Where(goqu.Ex{"namespace_variables.id": id}).ToSQL()
@@ -136,7 +136,8 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 		"hcl":          input.Hcl,
 	}
 
-	sql, _, err := dialect.Insert("namespace_variables").
+	sql, args, err := dialect.Insert("namespace_variables").
+		Prepared(true).
 		Rows(record).
 		Returning(variableFieldList...).ToSQL()
 
@@ -144,7 +145,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 		return nil, err
 	}
 
-	createdVariable, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	createdVariable, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -196,14 +197,16 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 		})
 	}
 
-	sql, _, err := dialect.Insert("namespace_variables").
-		Rows(records).ToSQL()
+	sql, args, err := dialect.Insert("namespace_variables").
+		Prepared(true).
+		Rows(records).
+		ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql); err != nil {
+	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				return errors.NewError(
@@ -227,7 +230,8 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variable) (*models.Variable, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("namespace_variables").
+	sql, args, err := dialect.Update("namespace_variables").
+		Prepared(true).
 		Set(goqu.Record{
 			"version":    goqu.L("? + ?", goqu.C("version"), 1),
 			"updated_at": timestamp,
@@ -241,7 +245,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 		return nil, err
 	}
 
-	updatedVariable, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	updatedVariable, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -264,18 +268,20 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 }
 
 func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variable) error {
-	sql, _, err := dialect.Delete("namespace_variables").Where(
-		goqu.Ex{
-			"id":      variable.Metadata.ID,
-			"version": variable.Metadata.Version,
-		},
-	).Returning(variableFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("namespace_variables").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      variable.Metadata.ID,
+				"version": variable.Metadata.Version,
+			},
+		).Returning(variableFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -287,9 +293,10 @@ func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variabl
 }
 
 func (m *variables) DeleteVariables(ctx context.Context, namespacePath string, category models.VariableCategory) error {
-	sql, _, err := goqu.Delete("namespace_variables").
+	sql, args, err := dialect.Delete("namespace_variables").
+		Prepared(true).
 		Where(goqu.Ex{
-			"namespace_id": goqu.From("namespaces").Select("id").Where(goqu.Ex{"path": namespacePath}),
+			"namespace_id": dialect.From("namespaces").Select("id").Where(goqu.Ex{"path": namespacePath}),
 			"category":     string(category),
 		}).ToSQL()
 
@@ -297,7 +304,7 @@ func (m *variables) DeleteVariables(ctx context.Context, namespacePath string, c
 		return err
 	}
 
-	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql); err != nil {
+	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		return err
 	}
 

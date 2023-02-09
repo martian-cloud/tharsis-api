@@ -238,7 +238,8 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		return nil, err
 	}
 
-	sql, _, err := dialect.Insert("service_accounts").
+	sql, args, err := dialect.Insert("service_accounts").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                  newResourceID(),
 			"version":             initialResourceVersion,
@@ -256,7 +257,7 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		return nil, err
 	}
 
-	createdServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql), false)
+	createdServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -310,20 +311,22 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 		}
 	}()
 
-	sql, _, err := goqu.Update("service_accounts").Set(
-		goqu.Record{
-			"version":             goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":          timestamp,
-			"description":         serviceAccount.Description,
-			"oidc_trust_policies": trustPoliciesJSON,
-		},
-	).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).Returning(serviceAccountFieldList...).ToSQL()
+	sql, args, err := dialect.Update("service_accounts").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":             goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":          timestamp,
+				"description":         serviceAccount.Description,
+				"oidc_trust_policies": trustPoliciesJSON,
+			},
+		).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).Returning(serviceAccountFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql), false)
+	updatedServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -348,18 +351,20 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 }
 
 func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) error {
-	sql, _, err := dialect.Delete("service_accounts").Where(
-		goqu.Ex{
-			"id":      serviceAccount.Metadata.ID,
-			"version": serviceAccount.Metadata.Version,
-		},
-	).Returning(serviceAccountFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("service_accounts").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      serviceAccount.Metadata.ID,
+				"version": serviceAccount.Metadata.Version,
+			},
+		).Returning(serviceAccountFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -380,7 +385,8 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 }
 
 func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*models.ServiceAccount, error) {
-	sql, _, err := goqu.From("service_accounts").
+	sql, args, err := dialect.From("service_accounts").
+		Prepared(true).
 		Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp).
@@ -390,7 +396,7 @@ func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*m
 		return nil, err
 	}
 
-	serviceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	serviceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

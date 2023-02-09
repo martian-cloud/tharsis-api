@@ -199,26 +199,28 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("workspaces").Set(
-		goqu.Record{
-			"version":                  goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":               timestamp,
-			"description":              nullableString(workspace.Description),
-			"current_job_id":           nullableString(workspace.CurrentJobID),
-			"current_state_version_id": nullableString(workspace.CurrentStateVersionID),
-			"dirty_state":              workspace.DirtyState,
-			"locked":                   workspace.Locked,
-			"max_job_duration":         workspace.MaxJobDuration,
-			"terraform_version":        workspace.TerraformVersion,
-			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
-		},
-	).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
+	sql, args, err := dialect.Update("workspaces").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":                  goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":               timestamp,
+				"description":              nullableString(workspace.Description),
+				"current_job_id":           nullableString(workspace.CurrentJobID),
+				"current_state_version_id": nullableString(workspace.CurrentStateVersionID),
+				"dirty_state":              workspace.DirtyState,
+				"locked":                   workspace.Locked,
+				"max_job_duration":         workspace.MaxJobDuration,
+				"terraform_version":        workspace.TerraformVersion,
+				"prevent_destroy_plan":     workspace.PreventDestroyPlan,
+			},
+		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -254,7 +256,8 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("workspaces").
+	sql, args, err := dialect.Insert("workspaces").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":                       newResourceID(),
 			"version":                  initialResourceVersion,
@@ -278,7 +281,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 		return nil, err
 	}
 
-	createdWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql), false)
+	createdWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -317,18 +320,20 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 }
 
 func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Workspace) error {
-	sql, _, err := dialect.Delete("workspaces").Where(
-		goqu.Ex{
-			"id":      workspace.Metadata.ID,
-			"version": workspace.Metadata.Version,
-		},
-	).Returning(workspaceFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("workspaces").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      workspace.Metadata.ID,
+				"version": workspace.Metadata.Version,
+			},
+		).Returning(workspaceFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -340,7 +345,8 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 }
 
 func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, managedIdentityID string) ([]models.Workspace, error) {
-	sql, _, err := dialect.From("workspaces").
+	sql, args, err := dialect.From("workspaces").
+		Prepared(true).
 		Select(w.getSelectFields()...).
 		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_managed_identity_relation.workspace_id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
@@ -350,7 +356,7 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 		return nil, err
 	}
 
-	rows, err := w.dbClient.getConnection(ctx).Query(ctx, sql)
+	rows, err := w.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -373,17 +379,17 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 
 func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Workspace, error) {
 	query := dialect.From(goqu.T("workspaces")).
+		Prepared(true).
 		Select(w.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
 		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	workspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql), true)
+	workspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

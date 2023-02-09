@@ -107,17 +107,17 @@ func (u *users) GetUserBySCIMExternalID(ctx context.Context, scimExternalID stri
 
 func (u *users) GetUserByExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error) {
 	query := dialect.From(goqu.T("users")).
+		Prepared(true).
 		Select(u.getSelectFields()...).
 		InnerJoin(goqu.T("user_external_identities"), goqu.On(goqu.Ex{"users.id": goqu.I("user_external_identities.user_id")})).
 		Where(goqu.Ex{"user_external_identities.external_id": externalID, "user_external_identities.issuer": issuer})
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql))
+	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -132,7 +132,8 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("user_external_identities").
+	sql, args, err := dialect.Insert("user_external_identities").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":          newResourceID(),
 			"version":     initialResourceVersion,
@@ -147,7 +148,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 		return err
 	}
 
-	_, err = u.dbClient.getConnection(ctx).Exec(ctx, sql)
+	_, err = u.dbClient.getConnection(ctx).Exec(ctx, sql, args...)
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -179,7 +180,9 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		}
 	}
 
-	query := dialect.From(goqu.T("users")).Select(userFieldList...).Where(ex)
+	query := dialect.From(goqu.T("users")).
+		Select(userFieldList...).
+		Where(ex)
 
 	sortDirection := AscSort
 
@@ -234,22 +237,24 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("users").Set(
-		goqu.Record{
-			"version":          goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":       timestamp,
-			"username":         user.Username,
-			"email":            user.Email,
-			"scim_external_id": nullableString(user.SCIMExternalID),
-			"active":           user.Active,
-		},
-	).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
+	sql, args, err := dialect.Update("users").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":          goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":       timestamp,
+				"username":         user.Username,
+				"email":            user.Email,
+				"scim_external_id": nullableString(user.SCIMExternalID),
+				"active":           user.Active,
+			},
+		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	updatedUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -269,7 +274,8 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("users").
+	sql, args, err := dialect.Insert("users").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":               newResourceID(),
 			"version":          initialResourceVersion,
@@ -287,7 +293,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 		return nil, err
 	}
 
-	createdUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -302,18 +308,20 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 }
 
 func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
-	sql, _, err := dialect.Delete("users").Where(
-		goqu.Ex{
-			"id":      user.Metadata.ID,
-			"version": user.Metadata.Version,
-		},
-	).Returning(userFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("users").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      user.Metadata.ID,
+				"version": user.Metadata.Version,
+			},
+		).Returning(userFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql)); err != nil {
+	if _, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
 		}
@@ -326,15 +334,16 @@ func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
 
 func (u *users) getUser(ctx context.Context, exp goqu.Ex) (*models.User, error) {
 	query := dialect.From(goqu.T("users")).
-		Select(userFieldList...).Where(exp)
+		Prepared(true).
+		Select(userFieldList...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(
-		ctx, sql))
+	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

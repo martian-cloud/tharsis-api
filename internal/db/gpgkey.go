@@ -159,7 +159,8 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGKey) (*models.GPGKey, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("gpg_keys").
+	sql, args, err := dialect.Insert("gpg_keys").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":          newResourceID(),
 			"version":     initialResourceVersion,
@@ -176,7 +177,7 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 		return nil, err
 	}
 
-	createdKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	createdKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -194,17 +195,19 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 
 func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error {
 
-	sql, _, err := dialect.Delete("gpg_keys").Where(
-		goqu.Ex{
-			"id":      gpgKey.Metadata.ID,
-			"version": gpgKey.Metadata.Version,
-		},
-	).Returning(gpgKeyFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("gpg_keys").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      gpgKey.Metadata.ID,
+				"version": gpgKey.Metadata.Version,
+			},
+		).Returning(gpgKeyFieldList...).ToSQL()
 	if err != nil {
 		return err
 	}
 
-	_, err = scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	_, err = scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrOptimisticLockError
@@ -217,14 +220,16 @@ func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGK
 
 func (t *terraformGPGKeys) getGPGKey(ctx context.Context, exp goqu.Ex) (*models.GPGKey, error) {
 	query := dialect.From(goqu.T("gpg_keys")).
-		Select(t.getSelectFields()...).Where(exp)
+		Prepared(true).
+		Select(t.getSelectFields()...).
+		Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	gpgKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	gpgKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

@@ -203,7 +203,8 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Insert("groups").
+	sql, args, err := dialect.Insert("groups").
+		Prepared(true).
 		Rows(goqu.Record{
 			"id":          newResourceID(),
 			"version":     initialResourceVersion,
@@ -220,7 +221,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 		return nil, err
 	}
 
-	createdGroup, err := scanGroup(tx.QueryRow(ctx, sql), false)
+	createdGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
@@ -265,19 +266,21 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.Group, error) {
 	timestamp := currentTime()
 
-	sql, _, err := dialect.Update("groups").Set(
-		goqu.Record{
-			"version":     goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":  timestamp,
-			"description": nullableString(group.Description),
-		},
-	).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
+	sql, args, err := dialect.Update("groups").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":     goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":  timestamp,
+				"description": nullableString(group.Description),
+			},
+		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
 
-	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -297,18 +300,20 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 }
 
 func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
-	sql, _, err := dialect.Delete("groups").Where(
-		goqu.Ex{
-			"id":      group.Metadata.ID,
-			"version": group.Metadata.Version,
-		},
-	).Returning(groupFieldList...).ToSQL()
+	sql, args, err := dialect.Delete("groups").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"id":      group.Metadata.ID,
+				"version": group.Metadata.Version,
+			},
+		).Returning(groupFieldList...).ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql), false); err != nil {
+	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
 				return errors.NewError(errors.EConflict, "all nested groups and workspaces must be deleted before this group can be deleted")
@@ -327,15 +332,16 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 
 func (g *groups) getGroup(ctx context.Context, exp exp.Expression) (*models.Group, error) {
 	query := dialect.From(goqu.T("groups")).
+		Prepared(true).
 		Select(g.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).Where(exp)
 
-	sql, _, err := query.ToSQL()
+	sql, args, err := query.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	group, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql), true)
+	group, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

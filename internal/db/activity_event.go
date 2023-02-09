@@ -152,10 +152,12 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 			}
 		}
 		if input.Filter.TimeRangeStart != nil {
-			ex = ex.Append(goqu.I("activity_events.created_at").Gte(*input.Filter.TimeRangeStart))
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("activity_events.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
 		if input.Filter.TimeRangeEnd != nil {
-			ex = ex.Append(goqu.I("activity_events.created_at").Lte(*input.Filter.TimeRangeEnd))
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("activity_events.created_at").Lte(input.Filter.TimeRangeEnd.UTC()))
 		}
 		if input.Filter.Actions != nil {
 			ex = ex.Append(goqu.I("activity_events.action").In(input.Filter.Actions))
@@ -341,14 +343,15 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"vcs_provider_target_id":               vcsProviderTargetID,
 	}
 
-	sql, _, err := dialect.Insert("activity_events").
+	sql, args, err := dialect.Insert("activity_events").
+		Prepared(true).
 		Rows(record).
 		Returning(m.getSelectFields(false)...).ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	createdActivityEvent, err := scanActivityEvent(m.dbClient.getConnection(ctx).QueryRow(ctx, sql), false)
+	createdActivityEvent, err := scanActivityEvent(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
