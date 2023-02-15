@@ -55,6 +55,7 @@ type VCSProvider implements Node {
   description: String!
   group: Group!
   hostname: String!
+  groupPath: String!
   resourcePath: String!
   type: VCSProviderType!
   autoCreateWebhooks: Boolean!

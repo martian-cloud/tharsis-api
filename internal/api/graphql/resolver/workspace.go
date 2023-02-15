@@ -141,6 +141,11 @@ func (r *WorkspaceResolver) Name() string {
 	return r.workspace.Name
 }
 
+// GroupPath resolver
+func (r *WorkspaceResolver) GroupPath() string {
+	return r.workspace.GetGroupPath()
+}
+
 // FullPath resolver
 func (r *WorkspaceResolver) FullPath() string {
 	return r.workspace.FullPath

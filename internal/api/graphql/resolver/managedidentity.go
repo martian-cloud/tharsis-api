@@ -226,6 +226,11 @@ func (r *ManagedIdentityResolver) ID() graphql.ID {
 	return graphql.ID(gid.ToGlobalID(gid.ManagedIdentityType, r.managedIdentity.Metadata.ID))
 }
 
+// GroupPath resolver
+func (r *ManagedIdentityResolver) GroupPath() string {
+	return r.managedIdentity.GetGroupPath()
+}
+
 // ResourcePath resolver
 func (r *ManagedIdentityResolver) ResourcePath() string {
 	return r.managedIdentity.ResourcePath

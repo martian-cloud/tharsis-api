@@ -149,6 +149,11 @@ func (r *TerraformProviderResolver) CreatedBy() string {
 	return r.provider.CreatedBy
 }
 
+// GroupPath resolver
+func (r *TerraformProviderResolver) GroupPath() string {
+	return r.provider.GetGroupPath()
+}
+
 // ResourcePath resolver
 func (r *TerraformProviderResolver) ResourcePath() string {
 	return r.provider.ResourcePath
