@@ -352,7 +352,6 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 			goqu.Record{
 				"version":    goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at": timestamp,
-				"name":       module.Name,
 				"private":    module.Private,
 				"repo_url":   module.RepositoryURL,
 			},
