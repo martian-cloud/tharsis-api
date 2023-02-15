@@ -155,6 +155,11 @@ func (r *TerraformModuleResolver) CreatedBy() string {
 	return r.module.CreatedBy
 }
 
+// GroupPath resolver
+func (r *TerraformModuleResolver) GroupPath() string {
+	return r.module.GetGroupPath()
+}
+
 // ResourcePath resolver
 func (r *TerraformModuleResolver) ResourcePath() string {
 	return r.module.ResourcePath

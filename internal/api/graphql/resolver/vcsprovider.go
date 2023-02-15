@@ -123,6 +123,11 @@ func (r *VCSProviderResolver) ID() graphql.ID {
 	return graphql.ID(gid.ToGlobalID(gid.VCSProviderType, r.vcsProvider.Metadata.ID))
 }
 
+// GroupPath resolver
+func (r *VCSProviderResolver) GroupPath() string {
+	return r.vcsProvider.GetGroupPath()
+}
+
 // ResourcePath resolver
 func (r *VCSProviderResolver) ResourcePath() string {
 	return r.vcsProvider.ResourcePath

@@ -146,6 +146,11 @@ func (r *ServiceAccountResolver) ID() graphql.ID {
 	return graphql.ID(gid.ToGlobalID(gid.ServiceAccountType, r.serviceAccount.Metadata.ID))
 }
 
+// GroupPath resolver
+func (r *ServiceAccountResolver) GroupPath() string {
+	return r.serviceAccount.GetGroupPath()
+}
+
 // ResourcePath resolver
 func (r *ServiceAccountResolver) ResourcePath() string {
 	return r.serviceAccount.ResourcePath

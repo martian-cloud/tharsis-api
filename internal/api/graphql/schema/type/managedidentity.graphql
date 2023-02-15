@@ -88,6 +88,7 @@ type ManagedIdentity implements Node {
   id: ID!
   metadata: ResourceMetadata!
   type: String!
+  groupPath: String!
   resourcePath: String!
   name: String!
   description: String!

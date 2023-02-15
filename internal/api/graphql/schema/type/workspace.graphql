@@ -48,6 +48,7 @@ type Workspace implements Node, Namespace {
   metadata: ResourceMetadata!
   name: String!
   description: String!
+  groupPath: String!
   fullPath: String!
   group: Group!
   dirtyState: Boolean!

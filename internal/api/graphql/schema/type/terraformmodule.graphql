@@ -45,6 +45,7 @@ type TerraformModule implements Node {
   private: Boolean!
   repositoryUrl: String!
   registryNamespace: String!
+  groupPath: String!
   resourcePath: String!
   latestVersion: TerraformModuleVersion
   versions(
