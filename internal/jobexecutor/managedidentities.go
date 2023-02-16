@@ -39,7 +39,7 @@ func newManagedIdentities(
 				return awsfederated.New()
 			},
 			types.ManagedIdentityAzureFederated: func() (managedidentity.Authenticator, error) {
-				return azurefederated.New(jobLogger), nil
+				return azurefederated.New()
 			},
 			types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
 				return tharsisfederated.New(), nil
