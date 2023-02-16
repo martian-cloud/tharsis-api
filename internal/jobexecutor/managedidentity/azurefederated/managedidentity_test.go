@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/azurefederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
@@ -22,8 +19,7 @@ func TestAuthenticate(t *testing.T) {
 	clientID := "client1"
 	tenantID := "tenant1"
 
-	logger, _ := logger.NewForTest()
-	authenticator := New(logger)
+	authenticator, _ := New()
 
 	defer authenticator.Close(ctx)
 
@@ -46,40 +42,20 @@ func TestAuthenticate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify local server is running
-	req, err := http.NewRequest("GET", env["ARM_OIDC_REQUEST_URL"], nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Because the temporary file path/name is generated inside the authenticator,
+	// this has to query the returned environment variable to get to the file.
+	filePath := env["AZURE_FEDERATED_TOKEN_FILE"]
 
-	req.Header.Add("Authorization", fmt.Sprintf("bearer %s", token))
-
-	req = req.WithContext(ctx)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var resp tokenResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, string(token), resp.Value)
+	data, _ := os.ReadFile(filePath)
+	assert.Equal(t, []byte("tokendata"), data)
 
 	assert.Equal(t, map[string]string{
-		"ARM_TENANT_ID":          tenantID,
-		"ARM_CLIENT_ID":          clientID,
-		"ARM_USE_OIDC":           "true",
-		"ARM_OIDC_REQUEST_TOKEN": string(token),
-		"ARM_OIDC_REQUEST_URL":   env["ARM_OIDC_REQUEST_URL"],
+		"ARM_TENANT_ID":              tenantID,
+		"ARM_CLIENT_ID":              clientID,
+		"ARM_USE_OIDC":               "true",
+		"ARM_OIDC_TOKEN":             string(token),
+		"AZURE_CLIENT_ID":            clientID,
+		"AZURE_TENANT_ID":            tenantID,
+		"AZURE_FEDERATED_TOKEN_FILE": filePath,
 	}, env)
 }
