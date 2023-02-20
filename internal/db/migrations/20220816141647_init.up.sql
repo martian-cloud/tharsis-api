@@ -302,7 +302,7 @@ CREATE TABLE state_versions (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     workspace_id UUID NOT NULL,
-    run_id UUID NOT NULL,
+    run_id UUID,
     created_by VARCHAR NOT NULL,
     CONSTRAINT fk_workspace_id FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
     CONSTRAINT fk_run_id FOREIGN KEY(run_id) REFERENCES runs(id)
