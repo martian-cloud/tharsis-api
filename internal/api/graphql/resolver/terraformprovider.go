@@ -47,7 +47,7 @@ func (r *TerraformProviderEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a provider node
-func (r *TerraformProviderEdgeResolver) Node(ctx context.Context) (*TerraformProviderResolver, error) {
+func (r *TerraformProviderEdgeResolver) Node() (*TerraformProviderResolver, error) {
 	provider, ok := r.edge.Node.(models.TerraformProvider)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -165,7 +165,7 @@ func (r *TerraformProviderResolver) RepositoryURL() string {
 }
 
 // RegistryNamespace resolver
-func (r *TerraformProviderResolver) RegistryNamespace(ctx context.Context) string {
+func (r *TerraformProviderResolver) RegistryNamespace() string {
 	return r.provider.GetRegistryNamespace()
 }
 
@@ -273,7 +273,7 @@ type TerraformProviderMutationPayloadResolver struct {
 }
 
 // Provider field resolver
-func (r *TerraformProviderMutationPayloadResolver) Provider(ctx context.Context) *TerraformProviderResolver {
+func (r *TerraformProviderMutationPayloadResolver) Provider() *TerraformProviderResolver {
 	if r.TerraformProviderMutationPayload.Provider == nil {
 		return nil
 	}

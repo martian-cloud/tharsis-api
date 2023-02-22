@@ -53,7 +53,7 @@ func (r *TerraformModuleVersionEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a moduleVersion node
-func (r *TerraformModuleVersionEdgeResolver) Node(ctx context.Context) (*TerraformModuleVersionResolver, error) {
+func (r *TerraformModuleVersionEdgeResolver) Node() (*TerraformModuleVersionResolver, error) {
 	moduleVersion, ok := r.edge.Node.(models.TerraformModuleVersion)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -290,7 +290,7 @@ type TerraformModuleVersionMutationPayloadResolver struct {
 }
 
 // ModuleVersion field resolver
-func (r *TerraformModuleVersionMutationPayloadResolver) ModuleVersion(ctx context.Context) *TerraformModuleVersionResolver {
+func (r *TerraformModuleVersionMutationPayloadResolver) ModuleVersion() *TerraformModuleVersionResolver {
 	if r.TerraformModuleVersionMutationPayload.ModuleVersion == nil {
 		return nil
 	}

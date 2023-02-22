@@ -46,7 +46,7 @@ func (r *TerraformProviderVersionEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a providerVersion node
-func (r *TerraformProviderVersionEdgeResolver) Node(ctx context.Context) (*TerraformProviderVersionResolver, error) {
+func (r *TerraformProviderVersionEdgeResolver) Node() (*TerraformProviderVersionResolver, error) {
 	providerVersion, ok := r.edge.Node.(models.TerraformProviderVersion)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -270,7 +270,7 @@ type TerraformProviderVersionMutationPayloadResolver struct {
 }
 
 // ProviderVersion field resolver
-func (r *TerraformProviderVersionMutationPayloadResolver) ProviderVersion(ctx context.Context) *TerraformProviderVersionResolver {
+func (r *TerraformProviderVersionMutationPayloadResolver) ProviderVersion() *TerraformProviderVersionResolver {
 	if r.TerraformProviderVersionMutationPayload.ProviderVersion == nil {
 		return nil
 	}

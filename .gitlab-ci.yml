@@ -364,7 +364,17 @@ license_scanning:
     - go install github.com/uw-labs/lichen@latest
   script:
     - make build-api
-    - lichen -j lichen.json $CI_PROJECT_DIR/apiserver
+    - |
+        cat <<EOF > lichen.yaml
+        # minimum confidence percentage used during license classification
+        threshold: .80
+
+        override:
+          - path: "github.com/pjbgf/sha1cd"
+            version: "v0.2.3"
+            licenses: ["Apache-2.0"]
+        EOF
+    - lichen --config lichen.yaml -j lichen.json $CI_PROJECT_DIR/apiserver
     - >
         jq '{"version": "2.1","licenses": [ . | .Modules[] | .Licenses[] | {"id": .Name,"name": .Name, "url": ("https://opensource.org/licenses/" + .Name) } ] | unique,"dependencies":[ . | .Modules[] | {"name": .Path, "version": .Version, "package_manager": "go","path": "go.sum","licenses": [ .Licenses[] | .Name]}]}' lichen.json > gl-license-scanning-report.json
   cache:

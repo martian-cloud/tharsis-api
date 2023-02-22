@@ -75,7 +75,7 @@ type ApplyMutationPayloadResolver struct {
 }
 
 // Apply field resolver
-func (r *ApplyMutationPayloadResolver) Apply(ctx context.Context) *ApplyResolver {
+func (r *ApplyMutationPayloadResolver) Apply() *ApplyResolver {
 	if r.ApplyMutationPayload.Apply == nil {
 		return nil
 	}

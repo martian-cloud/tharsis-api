@@ -51,7 +51,7 @@ func (r *GroupEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a group node
-func (r *GroupEdgeResolver) Node(ctx context.Context) (*GroupResolver, error) {
+func (r *GroupEdgeResolver) Node() (*GroupResolver, error) {
 	group, ok := r.edge.Node.(models.Group)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -319,8 +319,8 @@ func (r *GroupResolver) CreatedBy() string {
 
 // ActivityEvents resolver
 func (r *GroupResolver) ActivityEvents(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
-
+	args *ActivityEventConnectionQueryArgs,
+) (*ActivityEventConnectionResolver, error) {
 	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
 	if err != nil {
 		// error is already a Tharsis error
@@ -335,7 +335,8 @@ func (r *GroupResolver) ActivityEvents(ctx context.Context,
 
 // VCSProviders resolver
 func (r *GroupResolver) VCSProviders(ctx context.Context,
-	args *VCSProviderConnectionQueryArgs) (*VCSProviderConnectionResolver, error) {
+	args *VCSProviderConnectionQueryArgs,
+) (*VCSProviderConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err
 	}
@@ -412,7 +413,7 @@ type GroupMutationPayloadResolver struct {
 }
 
 // Group field resolver
-func (r *GroupMutationPayloadResolver) Group(ctx context.Context) *GroupResolver {
+func (r *GroupMutationPayloadResolver) Group() *GroupResolver {
 	if r.GroupMutationPayload.Group == nil {
 		return nil
 	}

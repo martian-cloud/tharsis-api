@@ -52,7 +52,7 @@ func (r *ManagedIdentityEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a managedIdentity node
-func (r *ManagedIdentityEdgeResolver) Node(ctx context.Context) (*ManagedIdentityResolver, error) {
+func (r *ManagedIdentityEdgeResolver) Node() (*ManagedIdentityResolver, error) {
 	managedIdentity, ok := r.edge.Node.(models.ManagedIdentity)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -252,12 +252,12 @@ func (r *ManagedIdentityResolver) Metadata() *MetadataResolver {
 }
 
 // Type resolver
-func (r *ManagedIdentityResolver) Type(ctx context.Context) string {
+func (r *ManagedIdentityResolver) Type() string {
 	return string(r.managedIdentity.Type)
 }
 
 // Data resolver
-func (r *ManagedIdentityResolver) Data(ctx context.Context) string {
+func (r *ManagedIdentityResolver) Data() string {
 	return string(r.managedIdentity.Data)
 }
 
@@ -294,7 +294,7 @@ func (r *ManagedIdentityResolver) CreatedBy() string {
 }
 
 // AliasSourceID resolver
-func (r *ManagedIdentityResolver) AliasSourceID(ctx context.Context) *string {
+func (r *ManagedIdentityResolver) AliasSourceID() *string {
 	if r.managedIdentity.AliasSourceID == nil {
 		return nil
 	}
@@ -384,7 +384,7 @@ type ManagedIdentityAccessRuleMutationPayloadResolver struct {
 }
 
 // AccessRule field resolver
-func (r *ManagedIdentityAccessRuleMutationPayloadResolver) AccessRule(ctx context.Context) *ManagedIdentityAccessRuleResolver {
+func (r *ManagedIdentityAccessRuleMutationPayloadResolver) AccessRule() *ManagedIdentityAccessRuleResolver {
 	if r.ManagedIdentityAccessRuleMutationPayload.AccessRule == nil {
 		return nil
 	}
@@ -404,7 +404,7 @@ type ManagedIdentityMutationPayloadResolver struct {
 }
 
 // ManagedIdentity field resolver
-func (r *ManagedIdentityMutationPayloadResolver) ManagedIdentity(ctx context.Context) *ManagedIdentityResolver {
+func (r *ManagedIdentityMutationPayloadResolver) ManagedIdentity() *ManagedIdentityResolver {
 	if r.ManagedIdentityMutationPayload.ManagedIdentity == nil {
 		return nil
 	}
@@ -424,7 +424,7 @@ type AssignManagedIdentityMutationPayloadResolver struct {
 }
 
 // Workspace field resolver
-func (r *AssignManagedIdentityMutationPayloadResolver) Workspace(ctx context.Context) *WorkspaceResolver {
+func (r *AssignManagedIdentityMutationPayloadResolver) Workspace() *WorkspaceResolver {
 	if r.AssignManagedIdentityMutationPayload.Workspace == nil {
 		return nil
 	}
@@ -444,7 +444,7 @@ type ManagedIdentityCredentialsMutationPayloadResolver struct {
 }
 
 // ManagedIdentityCredentials field resolver
-func (r *ManagedIdentityCredentialsMutationPayloadResolver) ManagedIdentityCredentials(ctx context.Context) *ManagedIdentityCredentialsResolver {
+func (r *ManagedIdentityCredentialsMutationPayloadResolver) ManagedIdentityCredentials() *ManagedIdentityCredentialsResolver {
 	if r.ManagedIdentityCredentialsMutationPayload.ManagedIdentityCredentials == nil {
 		return nil
 	}
@@ -782,7 +782,6 @@ func deleteManagedIdentityAliasMutation(ctx context.Context, input *DeleteManage
 }
 
 func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
-
 	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
 	if err != nil {
 		return nil, err
@@ -990,7 +989,8 @@ func unassignManagedIdentityMutation(ctx context.Context, input *AssignManagedId
 }
 
 func createManagedIdentityCredentialsMutation(ctx context.Context,
-	input *CreateManagedIdentityCredentialsInput) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
+	input *CreateManagedIdentityCredentialsInput,
+) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
 	managedIdentityService := getManagedIdentityService(ctx)
 
 	managedIdentity, err := managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(input.ID))
@@ -1096,7 +1096,6 @@ func loadManagedIdentity(ctx context.Context, id string) (*models.ManagedIdentit
 }
 
 func managedIdentityBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-
 	managedIdentities, err := getManagedIdentityService(ctx).GetManagedIdentitiesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
@@ -1140,7 +1139,6 @@ func loadManagedIdentityAccessRule(ctx context.Context, id string) (*models.Mana
 }
 
 func managedIdentityAccessRuleBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-
 	rules, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRulesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err

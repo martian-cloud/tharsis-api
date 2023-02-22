@@ -78,7 +78,7 @@ type TerraformProviderPlatformMutationPayloadResolver struct {
 }
 
 // ProviderPlatform field resolver
-func (r *TerraformProviderPlatformMutationPayloadResolver) ProviderPlatform(ctx context.Context) *TerraformProviderPlatformResolver {
+func (r *TerraformProviderPlatformMutationPayloadResolver) ProviderPlatform() *TerraformProviderPlatformResolver {
 	if r.TerraformProviderPlatformMutationPayload.ProviderPlatform == nil {
 		return nil
 	}

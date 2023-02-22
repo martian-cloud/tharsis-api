@@ -82,7 +82,7 @@ type PlanMutationPayloadResolver struct {
 }
 
 // Plan field resolver
-func (r *PlanMutationPayloadResolver) Plan(ctx context.Context) *PlanResolver {
+func (r *PlanMutationPayloadResolver) Plan() *PlanResolver {
 	if r.PlanMutationPayload.Plan == nil {
 		return nil
 	}

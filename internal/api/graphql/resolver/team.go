@@ -43,7 +43,7 @@ func (r *TeamEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a team node
-func (r *TeamEdgeResolver) Node(ctx context.Context) (*TeamResolver, error) {
+func (r *TeamEdgeResolver) Node() (*TeamResolver, error) {
 	team, ok := r.edge.Node.(models.Team)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -382,7 +382,7 @@ func (r *TeamMemberEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a team member node
-func (r *TeamMemberEdgeResolver) Node(ctx context.Context) (*TeamMemberResolver, error) {
+func (r *TeamMemberEdgeResolver) Node() (*TeamMemberResolver, error) {
 	teamMember, ok := r.edge.Node.(models.TeamMember)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -398,8 +398,8 @@ type TeamMemberConnectionResolver struct {
 
 // NewTeamMemberConnectionResolver creates a new TeamMemberConnectionResolver
 func NewTeamMemberConnectionResolver(ctx context.Context,
-	input *team.GetTeamMembersInput) (*TeamMemberConnectionResolver, error) {
-
+	input *team.GetTeamMembersInput,
+) (*TeamMemberConnectionResolver, error) {
 	result, err := getTeamService(ctx).GetTeamMembers(ctx,
 		&db.GetTeamMembersInput{Filter: &db.TeamMemberFilter{TeamIDs: []string{*input.TeamID}}})
 	if err != nil {
@@ -515,7 +515,7 @@ type TeamMemberMutationPayloadResolver struct {
 }
 
 // TeamMember field resolver
-func (r *TeamMemberMutationPayloadResolver) TeamMember(ctx context.Context) *TeamMemberResolver {
+func (r *TeamMemberMutationPayloadResolver) TeamMember() *TeamMemberResolver {
 	if r.TeamMemberMutationPayload.TeamMember == nil {
 		return nil
 	}
@@ -558,7 +558,6 @@ func handleTeamMemberMutationProblem(e error, clientMutationID *string) (*TeamMe
 }
 
 func addUserToTeamMutation(ctx context.Context, input *AddUserToTeamInput) (*TeamMemberMutationPayloadResolver, error) {
-
 	team, err := getTeamService(ctx).GetTeamByName(ctx, input.TeamName)
 	if err != nil {
 		// This catches both access errors and team not found.
@@ -641,5 +640,3 @@ func removeUserFromTeamMutation(ctx context.Context, input *RemoveUserFromTeamIn
 	payload := TeamMemberMutationPayload{ClientMutationID: input.ClientMutationID, TeamMember: teamMember, Problems: []Problem{}}
 	return &TeamMemberMutationPayloadResolver{TeamMemberMutationPayload: payload}, nil
 }
-
-// The End.

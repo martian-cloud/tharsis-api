@@ -37,7 +37,7 @@ func (r *StateVersionEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a state version node
-func (r *StateVersionEdgeResolver) Node(ctx context.Context) (*StateVersionResolver, error) {
+func (r *StateVersionEdgeResolver) Node() (*StateVersionResolver, error) {
 	stateVersion, ok := r.edge.Node.(models.StateVersion)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -265,7 +265,7 @@ type StateVersionMutationPayloadResolver struct {
 }
 
 // StateVersion field resolver
-func (r *StateVersionMutationPayloadResolver) StateVersion(ctx context.Context) *StateVersionResolver {
+func (r *StateVersionMutationPayloadResolver) StateVersion() *StateVersionResolver {
 	if r.StateVersionMutationPayload.StateVersion == nil {
 		return nil
 	}
@@ -290,7 +290,6 @@ func handleStateVersionMutationProblem(e error, clientMutationID *string) (*Stat
 }
 
 func createStateVersionMutation(ctx context.Context, input *CreateStateVersionInput) (*StateVersionMutationPayloadResolver, error) {
-
 	run, err := getRunService(ctx).GetRun(ctx, gid.FromGlobalID(input.RunID))
 	if err != nil {
 		return nil, err
@@ -356,5 +355,3 @@ func stateVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch,
 
 	return batch, nil
 }
-
-// The End.

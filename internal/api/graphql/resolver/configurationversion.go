@@ -102,7 +102,7 @@ type ConfigurationVersionMutationPayloadResolver struct {
 }
 
 // ConfigurationVersion field resolver
-func (r *ConfigurationVersionMutationPayloadResolver) ConfigurationVersion(ctx context.Context) *ConfigurationVersionResolver {
+func (r *ConfigurationVersionMutationPayloadResolver) ConfigurationVersion() *ConfigurationVersionResolver {
 	if r.ConfigurationVersionMutationPayload.ConfigurationVersion == nil {
 		return nil
 	}

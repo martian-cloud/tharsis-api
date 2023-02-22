@@ -48,7 +48,7 @@ func (r *TerraformModuleEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a module node
-func (r *TerraformModuleEdgeResolver) Node(ctx context.Context) (*TerraformModuleResolver, error) {
+func (r *TerraformModuleEdgeResolver) Node() (*TerraformModuleResolver, error) {
 	module, ok := r.edge.Node.(models.TerraformModule)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -300,7 +300,7 @@ type TerraformModuleMutationPayloadResolver struct {
 }
 
 // Module field resolver
-func (r *TerraformModuleMutationPayloadResolver) Module(ctx context.Context) *TerraformModuleResolver {
+func (r *TerraformModuleMutationPayloadResolver) Module() *TerraformModuleResolver {
 	if r.TerraformModuleMutationPayload.Module == nil {
 		return nil
 	}

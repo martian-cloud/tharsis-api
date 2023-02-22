@@ -210,7 +210,8 @@ func (r RootResolver) ManagedIdentity(ctx context.Context, args *ManagedIdentity
 // CreateManagedIdentityAccessRule creates a new managed identity access rule
 func (r RootResolver) CreateManagedIdentityAccessRule(ctx context.Context, args *struct {
 	Input *CreateManagedIdentityAccessRuleInput
-}) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
+},
+) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
 	response, err := createManagedIdentityAccessRuleMutation(ctx, args.Input)
 	if err != nil {
 		return handleManagedIdentityAccessRuleMutationProblem(err, args.Input.ClientMutationID)
@@ -222,7 +223,8 @@ func (r RootResolver) CreateManagedIdentityAccessRule(ctx context.Context, args 
 // UpdateManagedIdentityAccessRule updates an existing managed identity access rule
 func (r RootResolver) UpdateManagedIdentityAccessRule(ctx context.Context, args *struct {
 	Input *UpdateManagedIdentityAccessRuleInput
-}) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
+},
+) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
 	response, err := updateManagedIdentityAccessRuleMutation(ctx, args.Input)
 	if err != nil {
 		return handleManagedIdentityAccessRuleMutationProblem(err, args.Input.ClientMutationID)
@@ -234,7 +236,8 @@ func (r RootResolver) UpdateManagedIdentityAccessRule(ctx context.Context, args 
 // DeleteManagedIdentityAccessRule deletes an existing managed identity access rule
 func (r RootResolver) DeleteManagedIdentityAccessRule(ctx context.Context, args *struct {
 	Input *DeleteManagedIdentityAccessRuleInput
-}) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
+},
+) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
 	response, err := deleteManagedIdentityAccessRuleMutation(ctx, args.Input)
 	if err != nil {
 		return handleManagedIdentityAccessRuleMutationProblem(err, args.Input.ClientMutationID)
@@ -246,7 +249,8 @@ func (r RootResolver) DeleteManagedIdentityAccessRule(ctx context.Context, args 
 // CreateManagedIdentityAlias creates a managed identity alias
 func (r RootResolver) CreateManagedIdentityAlias(ctx context.Context, args *struct {
 	Input *CreateManagedIdentityAliasInput
-}) (*ManagedIdentityMutationPayloadResolver, error) {
+},
+) (*ManagedIdentityMutationPayloadResolver, error) {
 	response, err := createManagedIdentityAliasMutation(ctx, args.Input)
 	if err != nil {
 		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
@@ -318,7 +322,8 @@ func (r RootResolver) UnassignManagedIdentity(ctx context.Context, args *struct{
 // CreateManagedIdentityCredentials creates credentials for a managed identity
 func (r RootResolver) CreateManagedIdentityCredentials(ctx context.Context, args *struct {
 	Input *CreateManagedIdentityCredentialsInput
-}) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
+},
+) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
 	response, err := createManagedIdentityCredentialsMutation(ctx, args.Input)
 	if err != nil {
 		return handleManagedIdentityCredentialsMutationProblem(err, args.Input.ClientMutationID)
@@ -352,7 +357,8 @@ func (r RootResolver) DeleteServiceAccount(ctx context.Context, args *struct{ In
 // ServiceAccountCreateToken creates a token for a service account
 func (r RootResolver) ServiceAccountCreateToken(ctx context.Context, args *struct {
 	Input *ServiceAccountCreateTokenInput
-}) (*ServiceAccountCreateTokenPayload, error) {
+},
+) (*ServiceAccountCreateTokenPayload, error) {
 	response, err := serviceAccountCreateTokenMutation(ctx, args.Input)
 	if err != nil {
 		return handleServiceAccountCreateTokenProblem(err, args.Input.ClientMutationID)
@@ -372,7 +378,8 @@ func (r RootResolver) WorkspaceRunEvents(ctx context.Context, args *struct{ Inpu
 func (r RootResolver) CreateNamespaceMembership(ctx context.Context,
 	args *struct {
 		Input *CreateNamespaceMembershipInput
-	}) (*NamespaceMembershipMutationPayloadResolver, error) {
+	},
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	response, err := createNamespaceMembershipMutation(ctx, args.Input)
 	if err != nil {
 		return handleNamespaceMembershipMutationProblem(err, args.Input.ClientMutationID)
@@ -385,7 +392,8 @@ func (r RootResolver) CreateNamespaceMembership(ctx context.Context,
 func (r RootResolver) UpdateNamespaceMembership(ctx context.Context,
 	args *struct {
 		Input *UpdateNamespaceMembershipInput
-	}) (*NamespaceMembershipMutationPayloadResolver, error) {
+	},
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	response, err := updateNamespaceMembershipMutation(ctx, args.Input)
 	if err != nil {
 		return handleNamespaceMembershipMutationProblem(err, args.Input.ClientMutationID)
@@ -398,7 +406,8 @@ func (r RootResolver) UpdateNamespaceMembership(ctx context.Context,
 func (r RootResolver) DeleteNamespaceMembership(ctx context.Context,
 	args *struct {
 		Input *DeleteNamespaceMembershipInput
-	}) (*NamespaceMembershipMutationPayloadResolver, error) {
+	},
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	response, err := deleteNamespaceMembershipMutation(ctx, args.Input)
 	if err != nil {
 		return handleNamespaceMembershipMutationProblem(err, args.Input.ClientMutationID)
@@ -422,7 +431,8 @@ func (r RootResolver) JobLogEvents(ctx context.Context, args *struct{ Input *Job
 // JobCancellationEvent sets up a subscription for job cancellation event
 func (r RootResolver) JobCancellationEvent(ctx context.Context, args *struct {
 	Input *JobCancellationEventSubscriptionInput
-}) (<-chan *JobCancellationEventResolver, error) {
+},
+) (<-chan *JobCancellationEventResolver, error) {
 	return r.jobCancellationEventSubscription(ctx, args.Input)
 }
 
@@ -446,7 +456,8 @@ func (r RootResolver) ConfigurationVersion(ctx context.Context, args *Configurat
 // CreateConfigurationVersion creates a new configuration version
 func (r RootResolver) CreateConfigurationVersion(ctx context.Context, args *struct {
 	Input *CreateConfigurationVersionInput
-}) (*ConfigurationVersionMutationPayloadResolver, error) {
+},
+) (*ConfigurationVersionMutationPayloadResolver, error) {
 	response, err := createConfigurationVersionMutation(ctx, args.Input)
 	if err != nil {
 		return handleConfigurationVersionMutationProblem(err, args.Input.ClientMutationID)
@@ -630,7 +641,8 @@ func (r RootResolver) TerraformProviderVersion(ctx context.Context, args *Terraf
 // CreateTerraformProviderVersion creates a new terraform provider version
 func (r RootResolver) CreateTerraformProviderVersion(ctx context.Context, args *struct {
 	Input *CreateTerraformProviderVersionInput
-}) (*TerraformProviderVersionMutationPayloadResolver, error) {
+},
+) (*TerraformProviderVersionMutationPayloadResolver, error) {
 	response, err := createTerraformProviderVersionMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderVersionMutationProblem(err, args.Input.ClientMutationID)
@@ -642,7 +654,8 @@ func (r RootResolver) CreateTerraformProviderVersion(ctx context.Context, args *
 // DeleteTerraformProviderVersion deletes a terraform provider version
 func (r RootResolver) DeleteTerraformProviderVersion(ctx context.Context, args *struct {
 	Input *DeleteTerraformProviderVersionInput
-}) (*TerraformProviderVersionMutationPayloadResolver, error) {
+},
+) (*TerraformProviderVersionMutationPayloadResolver, error) {
 	response, err := deleteTerraformProviderVersionMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderVersionMutationProblem(err, args.Input.ClientMutationID)
@@ -656,7 +669,8 @@ func (r RootResolver) DeleteTerraformProviderVersion(ctx context.Context, args *
 // CreateTerraformProviderPlatform creates a new terraform provider platform
 func (r RootResolver) CreateTerraformProviderPlatform(ctx context.Context, args *struct {
 	Input *CreateTerraformProviderPlatformInput
-}) (*TerraformProviderPlatformMutationPayloadResolver, error) {
+},
+) (*TerraformProviderPlatformMutationPayloadResolver, error) {
 	response, err := createTerraformProviderPlatformMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderPlatformMutationProblem(err, args.Input.ClientMutationID)
@@ -668,7 +682,8 @@ func (r RootResolver) CreateTerraformProviderPlatform(ctx context.Context, args 
 // DeleteTerraformProviderPlatform deletes a terraform provider platform
 func (r RootResolver) DeleteTerraformProviderPlatform(ctx context.Context, args *struct {
 	Input *DeleteTerraformProviderPlatformInput
-}) (*TerraformProviderPlatformMutationPayloadResolver, error) {
+},
+) (*TerraformProviderPlatformMutationPayloadResolver, error) {
 	response, err := deleteTerraformProviderPlatformMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderPlatformMutationProblem(err, args.Input.ClientMutationID)
@@ -729,7 +744,8 @@ func (r RootResolver) TerraformModuleVersion(ctx context.Context, args *Terrafor
 // CreateTerraformModuleVersion creates a new terraform module version
 func (r RootResolver) CreateTerraformModuleVersion(ctx context.Context, args *struct {
 	Input *CreateTerraformModuleVersionInput
-}) (*TerraformModuleVersionMutationPayloadResolver, error) {
+},
+) (*TerraformModuleVersionMutationPayloadResolver, error) {
 	response, err := createTerraformModuleVersionMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformModuleVersionMutationProblem(err, args.Input.ClientMutationID)
@@ -741,7 +757,8 @@ func (r RootResolver) CreateTerraformModuleVersion(ctx context.Context, args *st
 // DeleteTerraformModuleVersion deletes a terraform module version
 func (r RootResolver) DeleteTerraformModuleVersion(ctx context.Context, args *struct {
 	Input *DeleteTerraformModuleVersionInput
-}) (*TerraformModuleVersionMutationPayloadResolver, error) {
+},
+) (*TerraformModuleVersionMutationPayloadResolver, error) {
 	response, err := deleteTerraformModuleVersionMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformModuleVersionMutationProblem(err, args.Input.ClientMutationID)
@@ -755,7 +772,8 @@ func (r RootResolver) DeleteTerraformModuleVersion(ctx context.Context, args *st
 // CreateTerraformModuleAttestation creates a new terraform module attestation
 func (r RootResolver) CreateTerraformModuleAttestation(ctx context.Context, args *struct {
 	Input *CreateTerraformModuleAttestationInput
-}) (*TerraformModuleAttestationMutationPayloadResolver, error) {
+},
+) (*TerraformModuleAttestationMutationPayloadResolver, error) {
 	response, err := createTerraformModuleAttestationMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformModuleAttestationMutationProblem(err, args.Input.ClientMutationID)
@@ -767,7 +785,8 @@ func (r RootResolver) CreateTerraformModuleAttestation(ctx context.Context, args
 // UpdateTerraformModuleAttestation updates an existing terraform module attestation
 func (r RootResolver) UpdateTerraformModuleAttestation(ctx context.Context, args *struct {
 	Input *UpdateTerraformModuleAttestationInput
-}) (*TerraformModuleAttestationMutationPayloadResolver, error) {
+},
+) (*TerraformModuleAttestationMutationPayloadResolver, error) {
 	response, err := updateTerraformModuleAttestationMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformModuleAttestationMutationProblem(err, args.Input.ClientMutationID)
@@ -779,7 +798,8 @@ func (r RootResolver) UpdateTerraformModuleAttestation(ctx context.Context, args
 // DeleteTerraformModuleAttestation deletes a terraform module attestation
 func (r RootResolver) DeleteTerraformModuleAttestation(ctx context.Context, args *struct {
 	Input *DeleteTerraformModuleAttestationInput
-}) (*TerraformModuleAttestationMutationPayloadResolver, error) {
+},
+) (*TerraformModuleAttestationMutationPayloadResolver, error) {
 	response, err := deleteTerraformModuleAttestationMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformModuleAttestationMutationProblem(err, args.Input.ClientMutationID)
@@ -818,7 +838,8 @@ func (r RootResolver) TerraformCLIVersions(ctx context.Context) (*TerraformCLIVe
 // CreateTerraformCLIDownloadURL create a download URL for a Terraform CLI binary.
 func (r RootResolver) CreateTerraformCLIDownloadURL(ctx context.Context, args *struct {
 	Input *CreateTerraformCLIDownloadURLInput
-}) (*TerraformCLIMutationPayload, error) {
+},
+) (*TerraformCLIMutationPayload, error) {
 	response, err := createTerraformCLIDownloadURLMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformCLIMutationProblem(err, args.Input.ClientMutationID)
@@ -843,7 +864,8 @@ func (r RootResolver) CreateSCIMToken(ctx context.Context) (*SCIMTokenPayload, e
 
 // ActivityEvents query returns an activity event connection
 func (r RootResolver) ActivityEvents(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+	args *ActivityEventConnectionQueryArgs,
+) (*ActivityEventConnectionResolver, error) {
 	return activityEventsQuery(ctx, args)
 }
 
@@ -853,7 +875,8 @@ func (r RootResolver) ActivityEvents(ctx context.Context,
 // be used to reset an OAuth token.
 func (r RootResolver) ResetVCSProviderOAuthToken(ctx context.Context, args *struct {
 	Input *ResetVCSProviderOAuthTokenInput
-}) (*ResetVCSProviderOAuthTokenMutationPayloadResolver, error) {
+},
+) (*ResetVCSProviderOAuthTokenMutationPayloadResolver, error) {
 	response, err := resetVCSProviderOAuthTokenMutation(ctx, args.Input)
 	if err != nil {
 		return handleResetVCSProviderOAuthTokenMutationProblem(err, args.Input.ClientMutationID)
@@ -864,7 +887,8 @@ func (r RootResolver) ResetVCSProviderOAuthToken(ctx context.Context, args *stru
 
 // CreateVCSProvider creates a new vcs provider
 func (r RootResolver) CreateVCSProvider(ctx context.Context,
-	args *struct{ Input *CreateVCSProviderInput }) (*VCSProviderMutationPayloadResolver, error) {
+	args *struct{ Input *CreateVCSProviderInput },
+) (*VCSProviderMutationPayloadResolver, error) {
 	response, err := createVCSProviderMutation(ctx, args.Input)
 	if err != nil {
 		return handleVCSProviderMutationProblem(err, args.Input.ClientMutationID)
@@ -875,7 +899,8 @@ func (r RootResolver) CreateVCSProvider(ctx context.Context,
 
 // UpdateVCSProvider updates a vcs provider
 func (r RootResolver) UpdateVCSProvider(ctx context.Context,
-	args *struct{ Input *UpdateVCSProviderInput }) (*VCSProviderMutationPayloadResolver, error) {
+	args *struct{ Input *UpdateVCSProviderInput },
+) (*VCSProviderMutationPayloadResolver, error) {
 	response, err := updateVCSProviderMutation(ctx, args.Input)
 	if err != nil {
 		return handleVCSProviderMutationProblem(err, args.Input.ClientMutationID)
@@ -886,7 +911,8 @@ func (r RootResolver) UpdateVCSProvider(ctx context.Context,
 
 // DeleteVCSProvider deletes a vcs provider
 func (r RootResolver) DeleteVCSProvider(ctx context.Context,
-	args *struct{ Input *DeleteVCSProviderInput }) (*VCSProviderMutationPayloadResolver, error) {
+	args *struct{ Input *DeleteVCSProviderInput },
+) (*VCSProviderMutationPayloadResolver, error) {
 	response, err := deleteVCSProviderMutation(ctx, args.Input)
 	if err != nil {
 		return handleVCSProviderMutationProblem(err, args.Input.ClientMutationID)
@@ -901,7 +927,8 @@ func (r RootResolver) DeleteVCSProvider(ctx context.Context,
 func (r RootResolver) CreateWorkspaceVCSProviderLink(ctx context.Context,
 	args *struct {
 		Input *CreateWorkspaceVCSProviderLinkInput
-	}) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	},
+) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
 	response, err := createWorkspaceVCSProviderLinkMutation(ctx, args.Input)
 	if err != nil {
 		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
@@ -914,7 +941,8 @@ func (r RootResolver) CreateWorkspaceVCSProviderLink(ctx context.Context,
 func (r RootResolver) UpdateWorkspaceVCSProviderLink(ctx context.Context,
 	args *struct {
 		Input *UpdateWorkspaceVCSProviderLinkInput
-	}) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	},
+) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
 	response, err := updateWorkspaceVCSProviderLinkMutation(ctx, args.Input)
 	if err != nil {
 		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
@@ -927,7 +955,8 @@ func (r RootResolver) UpdateWorkspaceVCSProviderLink(ctx context.Context,
 func (r RootResolver) DeleteWorkspaceVCSProviderLink(ctx context.Context,
 	args *struct {
 		Input *DeleteWorkspaceVCSProviderLinkInput
-	}) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
+	},
+) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
 	response, err := deleteWorkspaceVCSProviderLinkMutation(ctx, args.Input)
 	if err != nil {
 		return handleWorkspaceVCSProviderLinkMutationProblem(err, args.Input.ClientMutationID)
@@ -940,7 +969,8 @@ func (r RootResolver) DeleteWorkspaceVCSProviderLink(ctx context.Context,
 func (r RootResolver) CreateVCSRun(ctx context.Context,
 	args *struct {
 		Input *CreateVCSRunInput
-	}) (*CreateVCSRunMutationPayload, error) {
+	},
+) (*CreateVCSRunMutationPayload, error) {
 	response, err := createVCSRunMutation(ctx, args.Input)
 	if err != nil {
 		return handleVCSRunMutationProblem(err, args.Input.ClientMutationID)

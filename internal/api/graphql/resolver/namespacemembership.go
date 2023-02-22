@@ -39,7 +39,7 @@ func (r *NamespaceMembershipEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a namespace membership node
-func (r *NamespaceMembershipEdgeResolver) Node(ctx context.Context) (*NamespaceMembershipResolver, error) {
+func (r *NamespaceMembershipEdgeResolver) Node() (*NamespaceMembershipResolver, error) {
 	namespaceMembership, ok := r.edge.Node.(models.NamespaceMembership)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -55,7 +55,8 @@ type NamespaceMembershipConnectionResolver struct {
 
 // NewNamespaceMembershipConnectionResolver creates a new NamespaceMembershipConnectionResolver
 func NewNamespaceMembershipConnectionResolver(ctx context.Context,
-	input *namespacemembership.GetNamespaceMembershipsForSubjectInput) (*NamespaceMembershipConnectionResolver, error) {
+	input *namespacemembership.GetNamespaceMembershipsForSubjectInput,
+) (*NamespaceMembershipConnectionResolver, error) {
 	service := getNamespaceMembershipService(ctx)
 
 	result, err := service.GetNamespaceMembershipsForSubject(ctx, input)
@@ -282,7 +283,8 @@ type DeleteNamespaceMembershipInput struct {
 }
 
 func handleNamespaceMembershipMutationProblem(e error,
-	clientMutationID *string) (*NamespaceMembershipMutationPayloadResolver, error) {
+	clientMutationID *string,
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
 		return nil, err
@@ -292,8 +294,8 @@ func handleNamespaceMembershipMutationProblem(e error,
 }
 
 func createNamespaceMembershipMutation(ctx context.Context,
-	input *CreateNamespaceMembershipInput) (*NamespaceMembershipMutationPayloadResolver, error) {
-
+	input *CreateNamespaceMembershipInput,
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	// Verify role is valid
 	role := models.Role(input.Role)
 	if !role.IsValid() {
@@ -343,7 +345,8 @@ func createNamespaceMembershipMutation(ctx context.Context,
 }
 
 func updateNamespaceMembershipMutation(ctx context.Context,
-	input *UpdateNamespaceMembershipInput) (*NamespaceMembershipMutationPayloadResolver, error) {
+	input *UpdateNamespaceMembershipInput,
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	service := getNamespaceMembershipService(ctx)
 
 	namespaceMembership, err := service.GetNamespaceMembershipByID(ctx, gid.FromGlobalID(input.ID))
@@ -383,7 +386,8 @@ func updateNamespaceMembershipMutation(ctx context.Context,
 }
 
 func deleteNamespaceMembershipMutation(ctx context.Context,
-	input *DeleteNamespaceMembershipInput) (*NamespaceMembershipMutationPayloadResolver, error) {
+	input *DeleteNamespaceMembershipInput,
+) (*NamespaceMembershipMutationPayloadResolver, error) {
 	service := getNamespaceMembershipService(ctx)
 
 	namespaceMembership, err := service.GetNamespaceMembershipByID(ctx, gid.FromGlobalID(input.ID))
@@ -442,7 +446,6 @@ func loadNamespaceMembership(ctx context.Context, id string) (*models.NamespaceM
 }
 
 func namespaceMembershipBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-
 	namespaceMemberships, err := getNamespaceMembershipService(ctx).GetNamespaceMembershipsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err

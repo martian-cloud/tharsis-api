@@ -45,7 +45,7 @@ func (r *ActivityEventEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns an activity event node
-func (r *ActivityEventEdgeResolver) Node(ctx context.Context) (*ActivityEventResolver, error) {
+func (r *ActivityEventEdgeResolver) Node() (*ActivityEventResolver, error) {
 	activityEvent, ok := r.edge.Node.(models.ActivityEvent)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -61,7 +61,8 @@ type ActivityEventConnectionResolver struct {
 
 // NewActivityEventConnectionResolver creates a new ActivityEventConnectionResolver
 func NewActivityEventConnectionResolver(ctx context.Context,
-	input *activityevent.GetActivityEventsInput) (*ActivityEventConnectionResolver, error) {
+	input *activityevent.GetActivityEventsInput,
+) (*ActivityEventConnectionResolver, error) {
 	activityService := getActivityService(ctx)
 
 	result, err := activityService.GetActivityEvents(ctx, input)
@@ -431,7 +432,7 @@ func (r *ActivityEventResolver) TargetID() string {
 }
 
 // Payload resolver
-func (r *ActivityEventResolver) Payload(ctx context.Context) (*ActivityEventPayloadResolver, error) {
+func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error) {
 	if r.activityEvent.Payload != nil {
 		switch {
 
@@ -513,7 +514,7 @@ func (r *ActivityEventCreateNamespaceMembershipPayloadResolver) Member(ctx conte
 }
 
 // Role resolver
-func (r *ActivityEventCreateNamespaceMembershipPayloadResolver) Role(ctx context.Context) string {
+func (r *ActivityEventCreateNamespaceMembershipPayloadResolver) Role() string {
 	return r.payload.Role
 }
 
@@ -556,7 +557,6 @@ func (r *ActivityEventDeleteChildResourcePayloadResolver) Type() string {
 }
 
 func activityEventsQuery(ctx context.Context, args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
-
 	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
 	if err != nil {
 		// If needed, the error is already a Tharsis error.
@@ -571,7 +571,8 @@ func activityEventsQuery(ctx context.Context, args *ActivityEventConnectionQuery
 // getActivityEventsInputFromQueryArgs is for the convenience of other modules in this package
 // Other modules may need to modify the input before creating a resolver.
 func getActivityEventsInputFromQueryArgs(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*activityevent.GetActivityEventsInput, error) {
+	args *ActivityEventConnectionQueryArgs,
+) (*activityevent.GetActivityEventsInput, error) {
 	if err := args.Validate(); err != nil {
 		// if needed, the error is already a Tharsis error
 		return nil, err
@@ -637,5 +638,3 @@ func getActivityEventsInputFromQueryArgs(ctx context.Context,
 }
 
 /* ActivityEvent Mutation Resolvers do not exist. */
-
-// The End.

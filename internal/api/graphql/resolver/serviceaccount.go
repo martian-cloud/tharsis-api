@@ -59,7 +59,7 @@ func (r *ServiceAccountEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a serviceAccount node
-func (r *ServiceAccountEdgeResolver) Node(ctx context.Context) (*ServiceAccountResolver, error) {
+func (r *ServiceAccountEdgeResolver) Node() (*ServiceAccountResolver, error) {
 	serviceAccount, ok := r.edge.Node.(models.ServiceAccount)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -188,7 +188,8 @@ func (r *ServiceAccountResolver) CreatedBy() string {
 
 // NamespaceMemberships resolver
 func (r *ServiceAccountResolver) NamespaceMemberships(ctx context.Context,
-	args *ConnectionQueryArgs) (*NamespaceMembershipConnectionResolver, error) {
+	args *ConnectionQueryArgs,
+) (*NamespaceMembershipConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err
 	}
@@ -227,8 +228,8 @@ func (r *ServiceAccountResolver) OIDCTrustPolicies() []OIDCTrustPolicy {
 
 // ActivityEvents resolver
 func (r *ServiceAccountResolver) ActivityEvents(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
-
+	args *ActivityEventConnectionQueryArgs,
+) (*ActivityEventConnectionResolver, error) {
 	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
 	if err != nil {
 		// error is already a Tharsis error
@@ -506,7 +507,8 @@ type ServiceAccountCreateTokenPayload struct {
 }
 
 func serviceAccountCreateTokenMutation(ctx context.Context,
-	input *ServiceAccountCreateTokenInput) (*ServiceAccountCreateTokenPayload, error) {
+	input *ServiceAccountCreateTokenInput,
+) (*ServiceAccountCreateTokenPayload, error) {
 	saService := getSAService(ctx)
 
 	resp, err := saService.CreateToken(ctx, &serviceaccount.CreateTokenInput{
