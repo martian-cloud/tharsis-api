@@ -345,7 +345,13 @@ func (api *APIServer) Start() {
 	go func() {
 		// Serve Prometheus endpoint on its own port since it
 		// won't be publicly exposed
-		if err := http.ListenAndServe(":9090", promhttp.Handler()); err != nil {
+		promServer := &http.Server{
+			Addr:              ":9090",
+			Handler:           promhttp.Handler(),
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+
+		if err := promServer.ListenAndServe(); err != nil {
 			api.logger.Error(err)
 		}
 	}()
