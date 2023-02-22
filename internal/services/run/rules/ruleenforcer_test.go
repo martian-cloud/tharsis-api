@@ -23,7 +23,9 @@ func TestEnforceRules(t *testing.T) {
 		ResourcePath: "test-group/test-managed-identity",
 	}
 
+	runID := "run-1"
 	moduleID := "module-1"
+	currentStateVersionID := "state-version-1"
 	pubKey := "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE998KMh+Icdiqo9sz7KT/dyvImVQs\nJRWsKi78jT0htK6/B5bgxaNWYX1FElTrdEwVlF3AhU0n1gdffZkerSduIQ==\n-----END PUBLIC KEY-----"
 	validModuleDigestHex := "7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"
 	validAttestation := "eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5pbi10b3RvK2pzb24iLCJwYXlsb2FkIjoiZXlKZmRIbHdaU0k2SW1oMGRIQnpPaTh2YVc0dGRHOTBieTVwYnk5VGRHRjBaVzFsYm5RdmRqQXVNU0lzSW5CeVpXUnBZMkYwWlZSNWNHVWlPaUpqYjNOcFoyNHVjMmxuYzNSdmNtVXVaR1YyTDJGMGRHVnpkR0YwYVc5dUwzWXhJaXdpYzNWaWFtVmpkQ0k2VzNzaWJtRnRaU0k2SW1Kc2IySWlMQ0prYVdkbGMzUWlPbnNpYzJoaE1qVTJJam9pTjJGbE5EY3haV1F4T0RNNU5UTXpPVFUzTW1ZMU1qWTFZamd6TlRnMk1HVXlPR0V5WmpnMU1ERTJORFUxTWpFMFkySXlNVFJpWVdabE5EUXlNbU0zWkNKOWZWMHNJbkJ5WldScFkyRjBaU0k2ZXlKRVlYUmhJam9pZTF3aWRtVnlhV1pwWldSY0lqcDBjblZsZlZ4dUlpd2lWR2x0WlhOMFlXMXdJam9pTWpBeU1pMHhNaTB4TWxReE5EbzFOam8wTVZvaWZYMD0iLCJzaWduYXR1cmVzIjpbeyJrZXlpZCI6IiIsInNpZyI6Ik1FVUNJUURIZGk2UkI2YktESVlPZ3duZkwvaVU5UlQ2a2xyaGRUaEt1NHkzK29JZGNBSWdaVmRQeUczaGhsQTJNZnJxYTkvVUsrOFF4c2d4T2pYcGxGd2JxWW1nQnkwPSJ9XX0="
@@ -37,6 +39,8 @@ func TestEnforceRules(t *testing.T) {
 	tests := []struct {
 		callerType      string
 		runDetails      *RunDetails
+		stateVersion    *models.StateVersion
+		stateVersionRun *models.Run
 		name            string
 		expectErrorCode string
 		rules           []models.ManagedIdentityAccessRule
@@ -461,6 +465,141 @@ func TestEnforceRules(t *testing.T) {
 			},
 			expectErrorCode: errors.EForbidden,
 		},
+		{
+			name:       "workspace's current state version was created manually",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+				},
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				// RunID field being empty means it was created manually.
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "workspace's current state version was created without a module source",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+				},
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				RunID: &runID,
+			},
+			stateVersionRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				// ModuleSource field being nil means there was no module being used.
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "workspace's current state version was created by another module than expected",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+				ModuleSource:          ptr.String("some-module-source"),
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+				},
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				RunID: &runID,
+			},
+			stateVersionRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				ModuleSource: ptr.String("some-other-module-source"),
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "run associated with workspace's current state version was a destroy type",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+				},
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				RunID: &runID,
+			},
+			stateVersionRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				IsDestroy: true,
+			},
+			attestations: []models.TerraformModuleAttestation{
+				{
+					ModuleID:      moduleID,
+					SchemaType:    "https://in-toto.io/Statement/v0.1",
+					PredicateType: "cosign.sigstore.dev/attestation/v1",
+					Digests:       []string{validModuleDigestHex},
+					Data:          validAttestation,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -494,6 +633,8 @@ func TestEnforceRules(t *testing.T) {
 			defer cancel()
 
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
+			mockStateVersions := db.NewMockStateVersions(t)
+			mockRuns := db.NewMockRuns(t)
 			mockTerraformModuleAttestations := db.NewMockTerraformModuleAttestations(t)
 			mockTeams := db.NewMockTeams(t)
 
@@ -505,7 +646,7 @@ func TestEnforceRules(t *testing.T) {
 				ManagedIdentityAccessRules: test.rules,
 			}, nil)
 
-			if test.runDetails.ModuleID != nil {
+			if test.attestations != nil {
 				// Determine how many times the mock will be called
 				callCount := 0
 				for _, rule := range test.rules {
@@ -526,6 +667,14 @@ func TestEnforceRules(t *testing.T) {
 				}, nil).Times(callCount)
 			}
 
+			if test.stateVersion != nil {
+				mockStateVersions.On("GetStateVersion", mock.Anything, currentStateVersionID).Return(test.stateVersion, nil)
+
+				if test.stateVersionRun != nil {
+					mockRuns.On("GetRun", mock.Anything, runID).Return(test.stateVersionRun, nil)
+				}
+			}
+
 			if test.teams != nil {
 				mockTeams.On("GetTeams", ctx, mock.Anything).
 					Return(&db.TeamsResult{Teams: test.teams}, nil).Maybe()
@@ -537,6 +686,8 @@ func TestEnforceRules(t *testing.T) {
 			dbClient.ManagedIdentities = mockManagedIdentities
 			dbClient.TerraformModuleAttestations = mockTerraformModuleAttestations
 			dbClient.Teams = mockTeams
+			dbClient.StateVersions = mockStateVersions
+			dbClient.Runs = mockRuns
 
 			enforcer := NewRuleEnforcer(&dbClient)
 

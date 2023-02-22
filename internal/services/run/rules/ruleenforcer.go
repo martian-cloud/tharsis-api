@@ -32,9 +32,11 @@ type ruleTypeHandler func(ctx context.Context, dbClient *db.Client, rule *models
 
 // RunDetails is the input for enforcing rules
 type RunDetails struct {
-	RunStage     models.JobType
-	ModuleID     *string
-	ModuleDigest []byte
+	ModuleID              *string
+	ModuleSource          *string
+	CurrentStateVersionID *string
+	RunStage              models.JobType
+	ModuleDigest          []byte
 }
 
 type ruleEnforcer struct {
@@ -195,6 +197,36 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 
 	if input.ModuleDigest == nil {
 		return "", errors.New("module digest must be defined when checking module attestation rules for a module in the Tharsis registry")
+	}
+
+	// Perform some additional checks with the state version to ensure it hasn't been altered
+	// except with a run created from the same module source.
+	if input.CurrentStateVersionID != nil {
+		stateVersion, err := dbClient.StateVersions.GetStateVersion(ctx, *input.CurrentStateVersionID)
+		if err != nil {
+			return "", err
+		}
+
+		if stateVersion == nil {
+			return "", fmt.Errorf("failed to get state version with ID %s", *input.CurrentStateVersionID)
+		}
+
+		if stateVersion.RunID == nil {
+			return "workspace's current state version was modified manually which is not permitted when using module attestation rules", nil
+		}
+
+		run, err := dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
+		if err != nil {
+			return "", err
+		}
+
+		if run == nil {
+			return "", fmt.Errorf("failed to get run with ID %s associated with state version %s", *stateVersion.RunID, *input.CurrentStateVersionID)
+		}
+
+		if !run.IsDestroy && (run.ModuleSource == nil || *run.ModuleSource != *input.ModuleSource) {
+			return "workspace's current state version was either not created by a module source or a different module source than expected", nil
+		}
 	}
 
 	moduleDigest := hex.EncodeToString(input.ModuleDigest)
