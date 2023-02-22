@@ -548,9 +548,16 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
+	var currentStateVersionID *string
+	if ws.CurrentStateVersionID != "" {
+		currentStateVersionID = &ws.CurrentStateVersionID
+	}
+
 	runDetails := &rules.RunDetails{
-		RunStage:     models.JobPlanType,
-		ModuleDigest: moduleDigest,
+		RunStage:              models.JobPlanType,
+		ModuleDigest:          moduleDigest,
+		CurrentStateVersionID: currentStateVersionID,
+		ModuleSource:          options.ModuleSource,
 	}
 
 	if moduleRegistrySource != nil {
@@ -717,10 +724,26 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		return nil, err
 	}
 
+	// Retrieve workspace to find max job duration and current state version ID.
+	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, run.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if ws == nil {
+		return nil, fmt.Errorf("failed to get workspace ID %s associated with run ID %s", run.WorkspaceID, run.Metadata.ID)
+	}
+
+	var currentStateVersionID *string
+	if ws.CurrentStateVersionID != "" {
+		currentStateVersionID = &ws.CurrentStateVersionID
+	}
+
 	if len(managedIdentities) > 0 {
 		runDetails := &rules.RunDetails{
-			RunStage:     models.JobApplyType,
-			ModuleDigest: run.ModuleDigest,
+			RunStage:              models.JobApplyType,
+			ModuleDigest:          run.ModuleDigest,
+			CurrentStateVersionID: currentStateVersionID,
 		}
 
 		var moduleSource *ModuleRegistrySource
@@ -732,6 +755,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 			if moduleSource != nil {
 				runDetails.ModuleID = moduleSource.ModuleID
+				runDetails.ModuleSource = run.ModuleSource
 			}
 		}
 
@@ -775,23 +799,6 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 			errors.EInternal,
 			"Failed to update apply resource",
 			errors.WithErrorErr(err),
-		)
-	}
-
-	// Retrieve workspace to find max job duration.
-	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(txContext, run.WorkspaceID)
-	if err != nil {
-		return nil, errors.NewError(
-			errors.EInternal,
-			"Failed to get workspace associated with run",
-			errors.WithErrorErr(err),
-		)
-	}
-
-	if ws == nil {
-		return nil, errors.NewError(
-			errors.EInternal,
-			"Failed to get workspace associated with run",
 		)
 	}
 
