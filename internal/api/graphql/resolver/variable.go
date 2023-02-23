@@ -259,7 +259,6 @@ func loadVariable(ctx context.Context, id string) (*models.Variable, error) {
 }
 
 func namespaceVariableBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-
 	variables, err := getVariableService(ctx).GetVariablesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err

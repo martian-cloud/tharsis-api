@@ -48,8 +48,8 @@ func (r *StateVersionOutputResolver) Metadata() *MetadataResolver {
 /* State Version Output Queries */
 
 func getStateVersionOutputs(ctx context.Context,
-	stateVersionID string) ([]*StateVersionOutputResolver, error) {
-
+	stateVersionID string,
+) ([]*StateVersionOutputResolver, error) {
 	result, err := getWorkspaceService(ctx).GetStateVersionOutputs(ctx, stateVersionID)
 	if err != nil {
 		return nil, err
@@ -66,5 +66,3 @@ func getStateVersionOutputs(ctx context.Context,
 
 	return resolvers, nil
 }
-
-// The End.

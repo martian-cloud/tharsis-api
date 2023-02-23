@@ -38,7 +38,7 @@ func (r *GPGKeyEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a gpgKey node
-func (r *GPGKeyEdgeResolver) Node(ctx context.Context) (*GPGKeyResolver, error) {
+func (r *GPGKeyEdgeResolver) Node() (*GPGKeyResolver, error) {
 	gpgKey, ok := r.edge.Node.(models.GPGKey)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -175,7 +175,7 @@ type GPGKeyMutationPayloadResolver struct {
 }
 
 // GPGKey field resolver
-func (r *GPGKeyMutationPayloadResolver) GPGKey(ctx context.Context) *GPGKeyResolver {
+func (r *GPGKeyMutationPayloadResolver) GPGKey() *GPGKeyResolver {
 	if r.GPGKeyMutationPayload.GPGKey == nil {
 		return nil
 	}

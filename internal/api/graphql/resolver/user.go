@@ -37,7 +37,7 @@ func (r *UserEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a user node
-func (r *UserEdgeResolver) Node(ctx context.Context) (*UserResolver, error) {
+func (r *UserEdgeResolver) Node() (*UserResolver, error) {
 	user, ok := r.edge.Node.(models.User)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -141,7 +141,8 @@ func (r *UserResolver) Metadata() *MetadataResolver {
 
 // NamespaceMemberships resolver
 func (r *UserResolver) NamespaceMemberships(ctx context.Context,
-	args *ConnectionQueryArgs) (*NamespaceMembershipConnectionResolver, error) {
+	args *ConnectionQueryArgs,
+) (*NamespaceMembershipConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err
 	}
@@ -176,8 +177,8 @@ func (r *UserResolver) SCIMExternalID() *string {
 
 // ActivityEvents resolver
 func (r *UserResolver) ActivityEvents(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
-
+	args *ActivityEventConnectionQueryArgs,
+) (*ActivityEventConnectionResolver, error) {
 	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
 	if err != nil {
 		// error is already a Tharsis error

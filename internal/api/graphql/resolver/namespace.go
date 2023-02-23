@@ -120,7 +120,8 @@ func (r *NamespaceResolver) ManagedIdentities(ctx context.Context, args *Managed
 
 // ActivityEvents resolver
 func (r *NamespaceResolver) ActivityEvents(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
+	args *ActivityEventConnectionQueryArgs,
+) (*ActivityEventConnectionResolver, error) {
 	switch v := r.result.(type) {
 	case *GroupResolver:
 		return v.ActivityEvents(ctx, args)
@@ -128,7 +129,6 @@ func (r *NamespaceResolver) ActivityEvents(ctx context.Context,
 		return v.ActivityEvents(ctx, args)
 	}
 	return nil, r.invalidNamespaceType()
-
 }
 
 // ToGroup resolves the group namespace type

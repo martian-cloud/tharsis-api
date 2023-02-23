@@ -35,7 +35,7 @@ func (r *TerraformModuleAttestationEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a module attestation node
-func (r *TerraformModuleAttestationEdgeResolver) Node(ctx context.Context) (*TerraformModuleAttestationResolver, error) {
+func (r *TerraformModuleAttestationEdgeResolver) Node() (*TerraformModuleAttestationResolver, error) {
 	moduleAttestation, ok := r.edge.Node.(models.TerraformModuleAttestation)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -181,7 +181,7 @@ type TerraformModuleAttestationMutationPayloadResolver struct {
 }
 
 // ModuleAttestation field resolver
-func (r *TerraformModuleAttestationMutationPayloadResolver) ModuleAttestation(ctx context.Context) *TerraformModuleAttestationResolver {
+func (r *TerraformModuleAttestationMutationPayloadResolver) ModuleAttestation() *TerraformModuleAttestationResolver {
 	if r.TerraformModuleAttestationMutationPayload.ModuleAttestation == nil {
 		return nil
 	}

@@ -36,7 +36,7 @@ func (r *VCSProviderEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a vcsProvider node
-func (r *VCSProviderEdgeResolver) Node(ctx context.Context) (*VCSProviderResolver, error) {
+func (r *VCSProviderEdgeResolver) Node() (*VCSProviderResolver, error) {
 	vcsProvider, ok := r.edge.Node.(models.VCSProvider)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -195,7 +195,7 @@ type ResetVCSProviderOAuthTokenMutationPayloadResolver struct {
 }
 
 // VCSProvider field resolver
-func (r *ResetVCSProviderOAuthTokenMutationPayloadResolver) VCSProvider(ctx context.Context) *VCSProviderResolver {
+func (r *ResetVCSProviderOAuthTokenMutationPayloadResolver) VCSProvider() *VCSProviderResolver {
 	if r.ResetVCSProviderOAuthTokenMutationPayload.VCSProvider == nil {
 		return nil
 	}
@@ -217,7 +217,7 @@ type VCSProviderMutationPayloadResolver struct {
 }
 
 // VCSProvider field resolver
-func (r *VCSProviderMutationPayloadResolver) VCSProvider(ctx context.Context) *VCSProviderResolver {
+func (r *VCSProviderMutationPayloadResolver) VCSProvider() *VCSProviderResolver {
 	if r.VCSProviderMutationPayload.VCSProvider == nil {
 		return nil
 	}

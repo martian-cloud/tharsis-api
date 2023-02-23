@@ -49,7 +49,7 @@ func (r *WorkspaceEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a workspace node
-func (r *WorkspaceEdgeResolver) Node(ctx context.Context) (*WorkspaceResolver, error) {
+func (r *WorkspaceEdgeResolver) Node() (*WorkspaceResolver, error) {
 	workspace, ok := r.edge.Node.(models.Workspace)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
@@ -286,7 +286,6 @@ func (r *WorkspaceResolver) ManagedIdentities(ctx context.Context, args *Managed
 
 // CurrentStateVersion resolver
 func (r *WorkspaceResolver) CurrentStateVersion(ctx context.Context) (*StateVersionResolver, error) {
-
 	// Current state version can be empty string, so return a nil resolver.
 	if r.workspace.CurrentStateVersionID == "" {
 		return nil, nil
@@ -334,8 +333,8 @@ func (r *WorkspaceResolver) TerraformVersion() string {
 
 // ActivityEvents resolver
 func (r *WorkspaceResolver) ActivityEvents(ctx context.Context,
-	args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {
-
+	args *ActivityEventConnectionQueryArgs,
+) (*ActivityEventConnectionResolver, error) {
 	input, err := getActivityEventsInputFromQueryArgs(ctx, args)
 	if err != nil {
 		// error is already a Tharsis error
@@ -470,7 +469,7 @@ type WorkspaceMutationPayloadResolver struct {
 }
 
 // Workspace field resolver
-func (r *WorkspaceMutationPayloadResolver) Workspace(ctx context.Context) *WorkspaceResolver {
+func (r *WorkspaceMutationPayloadResolver) Workspace() *WorkspaceResolver {
 	if r.WorkspaceMutationPayload.Workspace == nil {
 		return nil
 	}

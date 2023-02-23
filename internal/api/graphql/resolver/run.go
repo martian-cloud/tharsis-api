@@ -222,17 +222,17 @@ func (r *RunResolver) Variables(ctx context.Context) ([]*RunVariableResolver, er
 }
 
 // ModuleSource resolver
-func (r *RunResolver) ModuleSource(ctx context.Context) *string {
+func (r *RunResolver) ModuleSource() *string {
 	return r.run.ModuleSource
 }
 
 // ModuleVersion resolver
-func (r *RunResolver) ModuleVersion(ctx context.Context) *string {
+func (r *RunResolver) ModuleVersion() *string {
 	return r.run.ModuleVersion
 }
 
 // ModuleDigest resolver
-func (r *RunResolver) ModuleDigest(ctx context.Context) *string {
+func (r *RunResolver) ModuleDigest() *string {
 	if r.run.ModuleDigest == nil {
 		return nil
 	}
@@ -367,7 +367,7 @@ type RunMutationPayloadResolver struct {
 }
 
 // Run field resolver
-func (r *RunMutationPayloadResolver) Run(ctx context.Context) *RunResolver {
+func (r *RunMutationPayloadResolver) Run() *RunResolver {
 	if r.RunMutationPayload.Run == nil {
 		return nil
 	}
@@ -602,5 +602,3 @@ func runBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
 
 	return batch, nil
 }
-
-// The End.

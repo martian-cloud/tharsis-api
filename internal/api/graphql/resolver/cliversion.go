@@ -52,8 +52,8 @@ type CreateTerraformCLIDownloadURLInput struct {
 }
 
 func createTerraformCLIDownloadURLMutation(ctx context.Context,
-	input *CreateTerraformCLIDownloadURLInput) (*TerraformCLIMutationPayload, error) {
-
+	input *CreateTerraformCLIDownloadURLInput,
+) (*TerraformCLIMutationPayload, error) {
 	// Prepare input.
 	downloadInput := &cli.TerraformCLIVersionsInput{
 		Version:      input.Version,

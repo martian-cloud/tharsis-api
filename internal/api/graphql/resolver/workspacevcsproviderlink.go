@@ -114,7 +114,7 @@ type WorkspaceVCSProviderLinkMutationPayloadResolver struct {
 }
 
 // VCSProviderLink field resolver
-func (r *WorkspaceVCSProviderLinkMutationPayloadResolver) VCSProviderLink(ctx context.Context) *WorkspaceVCSProviderLinkResolver {
+func (r *WorkspaceVCSProviderLinkMutationPayloadResolver) VCSProviderLink() *WorkspaceVCSProviderLinkResolver {
 	if r.WorkspaceVCSProviderLinkMutationPayload.VCSProviderLink == nil {
 		return nil
 	}
@@ -133,7 +133,7 @@ func (r *WorkspaceVCSProviderLinkMutationPayloadResolver) WebhookToken() *string
 }
 
 // WebhookURL field resolver
-func (r *WorkspaceVCSProviderLinkMutationPayloadResolver) WebhookURL(ctx context.Context) *string {
+func (r *WorkspaceVCSProviderLinkMutationPayloadResolver) WebhookURL() *string {
 	return r.webhookURL
 }
 

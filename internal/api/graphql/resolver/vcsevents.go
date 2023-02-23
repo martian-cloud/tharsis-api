@@ -34,7 +34,7 @@ func (r *VCSEventEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a vcsEvent node
-func (r *VCSEventEdgeResolver) Node(ctx context.Context) (*VCSEventResolver, error) {
+func (r *VCSEventEdgeResolver) Node() (*VCSEventResolver, error) {
 	vcsEvent, ok := r.edge.Node.(models.VCSEvent)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
