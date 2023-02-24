@@ -40,6 +40,7 @@ require (
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20230201191712-8cad743c8c26
 	github.com/hashicorp/terraform-exec v0.18.0
 	github.com/hashicorp/terraform-registry-address v0.1.0
+	github.com/hashicorp/terraform-svchost v0.1.0
 	github.com/in-toto/in-toto-golang v0.6.0
 	github.com/jackc/pgconn v1.14.0
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
@@ -125,7 +126,6 @@ require (
 	github.com/hashicorp/go-safetemp v1.0.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/terraform-json v0.15.0 // indirect
-	github.com/hashicorp/terraform-svchost v0.1.0 // indirect
 	github.com/hasura/go-graphql-client v0.9.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect

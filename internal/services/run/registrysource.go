@@ -106,8 +106,8 @@ func (m *moduleResolver) ParseModuleRegistrySource(ctx context.Context, moduleSo
 }
 
 func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource *ModuleRegistrySource, wantVersion *string,
-	variables []Variable) (string, error) {
-
+	variables []Variable,
+) (string, error) {
 	var versions map[string]bool
 	if moduleSource.ModuleID != nil {
 		statusFilter := models.TerraformModuleVersionStatusUploaded
@@ -128,10 +128,12 @@ func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource 
 	} else {
 		// Get the auth token for the specified host.
 		var token string
-		seeking := module.BuildTokenEnvVar(moduleSource.Host)
-		for _, variable := range variables {
-			if variable.Key == seeking {
-				token = *variable.Value
+		seeking, err := module.BuildTokenEnvVar(moduleSource.Host)
+		if err == nil {
+			for _, variable := range variables {
+				if variable.Key == seeking {
+					token = *variable.Value
+				}
 			}
 		}
 
@@ -180,8 +182,9 @@ func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, 
 		return nil, fmt.Errorf("failed to visit versions URL: %s", versionsURLString)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("token in environment variable %s is not authorized to access this module",
-			module.BuildTokenEnvVar(registryURL.Host))
+		// Since we were able to make the request, we can assume the host is correct
+		envVar, _ := module.BuildTokenEnvVar(registryURL.Host)
+		return nil, fmt.Errorf("token in environment variable %s is not authorized to access this module", envVar)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("not-ok status from versions URL: %s: %s", versionsURLString, resp.Status)
@@ -221,7 +224,6 @@ func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, 
 // Otherwise, it returns the latest version that matches the wanted version constraints.
 // However, it prefers an exact match if there is one.
 func getLatestMatchingVersion(versions map[string]bool, wantVersion *string) (string, error) {
-
 	// First, check for an exact match of a single specified version.
 	if wantVersion != nil {
 		_, ok := versions[*wantVersion]
