@@ -2,14 +2,13 @@ package jobexecutor
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
-
-	"fmt"
-	"log"
-	"os"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/hashicorp/go-slug"
@@ -95,7 +94,6 @@ func (t *terraformWorkspace) close(ctx context.Context) error {
 
 // init prepares for and does "terraform init".
 func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error) {
-
 	// Get run variables
 	variables, err := t.client.GetRunVariables(ctx, t.run.Metadata.ID)
 	if err != nil {
@@ -244,7 +242,7 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 
 	// Write an override file to set backend to local.
 	overridePath := filepath.Join(t.workspaceDir, "override.tf")
-	if err = os.WriteFile(overridePath, []byte(backendOverride), 0600); err != nil {
+	if err = os.WriteFile(overridePath, []byte(backendOverride), 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write terraform override file %v", err)
 	}
 
@@ -332,10 +330,18 @@ func (t *terraformWorkspace) setBuiltInEnvVars(ctx context.Context) error {
 	}
 
 	// Set TF_TOKEN_<host>
-	t.fullEnv[module.BuildTokenEnvVar(apiURL.Host)] = t.jobCfg.JobToken
+	apiEncHost, err := module.BuildTokenEnvVar(apiURL.Host)
+	if err != nil {
+		return fmt.Errorf("failed to encode API URL for environment variable: %v", err)
+	}
+	t.fullEnv[apiEncHost] = t.jobCfg.JobToken
 
 	if t.jobCfg.DiscoveryProtocolHost != "" {
-		t.fullEnv[module.BuildTokenEnvVar(t.jobCfg.DiscoveryProtocolHost)] = t.jobCfg.JobToken
+		if dpEncHost, err := module.BuildTokenEnvVar(t.jobCfg.DiscoveryProtocolHost); err == nil {
+			t.fullEnv[dpEncHost] = t.jobCfg.JobToken
+		} else {
+			t.jobLogger.logger.Infof("failed to encode Discovery Protocol Host: %v", err)
+		}
 	}
 
 	// Set THARSIS_ENDPOINT which is used by the Terraform Tharsis Provider

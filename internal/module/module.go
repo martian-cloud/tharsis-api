@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	svchost "github.com/hashicorp/terraform-svchost"
 )
 
 const (
@@ -71,13 +73,21 @@ func GetModuleRegistryEndpointForHost(httpClient *http.Client, host string) (*ur
 	return moduleURL, nil
 }
 
-// TODO: Post-MVP, other character conversions are required.  See here:
-// https://www.terraform.io/cli/config/config-file#environment-variable-credentials
-// Also, it could be argued this function should be moved to its own module within this package.
-
 // BuildTokenEnvVar builds the environment variable name to supply the authorization token for the specified host.
-func BuildTokenEnvVar(host string) string {
-	return tfTokenVarPrefix + strings.ReplaceAll(host, ".", "_")
-}
+// For reasoning for implementatino - https://www.terraform.io/cli/config/config-file#environment-variable-credentials
+func BuildTokenEnvVar(host string) (string, error) {
+	// Use HashiCorp's svchost package to help us consistently convert from unicode to ASCII using punycode.
+	hostname, err := svchost.ForComparison(host)
+	if err != nil {
+		return "", err
+	}
 
-// The End.
+	// Periods must be encoded as underscores
+	encHost := strings.ReplaceAll(hostname.String(), ".", "_")
+
+	// Hyphens are usually invalid as variable names, se we encode them as double underscores
+	encHost = strings.ReplaceAll(encHost, "-", "__")
+
+	// Build the environment variable by prefixing with `TF_TOKEN_` to the encoded hostname
+	return tfTokenVarPrefix + encHost, nil
+}

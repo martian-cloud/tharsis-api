@@ -28,7 +28,11 @@ func resolveModuleSource(moduleSource string, moduleVersion string, variables ma
 	targetSystem := parts[3]
 
 	// Get the auth token for the specified host.
-	wantVar := module.BuildTokenEnvVar(host)
+	wantVar, err := module.BuildTokenEnvVar(host)
+	if err != nil {
+		return "", fmt.Errorf("unable to find an authorization token for host %s; invalid host %v", host, err)
+	}
+
 	token, ok := variables[wantVar]
 	if !ok {
 		return "", fmt.Errorf("unable to find an authorization token for host %s; expected environment variable %s",
@@ -73,8 +77,9 @@ func getPreSignedURL(httpClient http.Client, token string, registryURL *url.URL)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		if resp.StatusCode == http.StatusUnauthorized {
-			return "", fmt.Errorf("token in environment variable %s is apparently not authorized to access this module",
-				module.BuildTokenEnvVar(registryURL.Host))
+			// Since we were able to make the request, we can assume the host is correct
+			envVar, _ := module.BuildTokenEnvVar(registryURL.Host)
+			return "", fmt.Errorf("token in environment variable '%s' is apparently not authorized to access this module", envVar)
 		}
 		return "", fmt.Errorf("failed to visit download URL: %s", downloadURLString)
 	}
@@ -98,5 +103,3 @@ func getPreSignedURL(httpClient http.Client, token string, registryURL *url.URL)
 
 	return finalURL.String(), nil
 }
-
-// The End.
