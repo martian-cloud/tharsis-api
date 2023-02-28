@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,8 +22,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 )
-
-//const defaultLogReadLimit = 1024 * 1024 // 1 MiB
 
 type runController struct {
 	respWriter        response.Writer
@@ -103,7 +103,21 @@ func (c *runController) UploadPlan(w http.ResponseWriter, r *http.Request) {
 
 func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	var req gotfe.RunCreateOptions
-	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
+
+	// Read the response for re-use if variables use broken api
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		c.respWriter.RespondWithError(w, err)
+		return
+	}
+
+	if err = jsonapi.UnmarshalPayload(io.NopCloser(bytes.NewReader(body)), &req); err != nil {
+		c.respWriter.RespondWithError(w, err)
+		return
+	}
+
+	variables, err := parseRunVariables(req, body)
+	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
 	}
@@ -111,6 +125,7 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	options := &run.CreateRunInput{
 		WorkspaceID: gid.FromGlobalID(req.Workspace.ID),
 		Comment:     req.Message,
+		Variables:   variables,
 	}
 	if req.ConfigurationVersion != nil {
 		id := gid.FromGlobalID(req.ConfigurationVersion.ID)
@@ -127,6 +142,58 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c.respWriter.RespondWithJSONAPI(w, TharsisRunToRun(run), http.StatusCreated)
+}
+
+func parseRunVariables(req gotfe.RunCreateOptions, body []byte) ([]run.Variable, error) {
+	variables := []run.Variable{}
+
+	for _, v := range req.Variables {
+		if v == nil || v.Key == "" {
+			continue
+		}
+		val := v.Value
+		variables = append(variables, run.Variable{
+			Key:      v.Key,
+			Value:    &val,
+			Category: models.TerraformVariableCategory,
+			Hcl:      true,
+		})
+	}
+
+	// If variables are in the req and none were parsed, it is using a terraform version that's broken
+	if len(req.Variables) > 0 && len(variables) == 0 {
+		var altReq struct {
+			Data struct {
+				Attributes struct {
+					Variables []*struct {
+						Key   string `json:"Key,omitempty"`
+						Value string `json:"Value,omitempty"`
+					} `json:"variables,omitempty"`
+				} `json:"attributes,omitempty"`
+			} `json:"data,omitempty"`
+		}
+
+		if err := json.Unmarshal(body, &altReq); err != nil {
+			// We should never hit this error since jsonapi already does a json decode
+			return nil, fmt.Errorf("invalid create run request: %w", err)
+		}
+
+		for _, v := range altReq.Data.Attributes.Variables {
+			if v == nil {
+				continue
+			}
+
+			val := v.Value
+			variables = append(variables, run.Variable{
+				Key:      v.Key,
+				Value:    &val,
+				Category: models.TerraformVariableCategory,
+				Hcl:      true,
+			})
+		}
+	}
+
+	return variables, nil
 }
 
 func (c *runController) ApplyRun(w http.ResponseWriter, r *http.Request) {

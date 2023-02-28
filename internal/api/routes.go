@@ -55,11 +55,23 @@ func (rb *RouteBuilder) AddBaseRoutes(controller controllers.Controller) *RouteB
 	return rb
 }
 
+// UseV1Middlewares adds middlewares to the v1 router
+func (rb *RouteBuilder) UseV1Middlewares(middlewares ...func(http.Handler) http.Handler) *RouteBuilder {
+	rb.v1Router.Use(middlewares...)
+	return rb
+}
+
 // AddV1Routes adds the controllers routes to the /v1 path
 func (rb *RouteBuilder) AddV1Routes(controller controllers.Controller) *RouteBuilder {
 	// Use Group to create fresh middleware stack
 	rb.v1Router.Group(func(groupRouter chi.Router) {
 		controller.RegisterRoutes(groupRouter)
 	})
+	return rb
+}
+
+// AddV1HandlerFunc adds a handler function to the v1 router for a specific pattern
+func (rb *RouteBuilder) AddV1HandlerFunc(method, pattern string, handler http.HandlerFunc) *RouteBuilder {
+	rb.v1Router.Method(method, pattern, handler)
 	return rb
 }
