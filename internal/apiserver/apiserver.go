@@ -49,6 +49,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
 )
 
+var (
+	tfpAPIEndpointHeader  = "TFP-API-Version"
+	tfpAPIEndpointVersion = "2.5.0"
+)
+
 // APIServer represents an instance of a server
 type APIServer struct {
 	shutdownOnce sync.Once
@@ -248,6 +253,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 
 	routeBuilder.AddBaseHandler("/graphql", graphqlHandler)
 	routeBuilder.AddBaseHandlerFunc("GET", "/swagger/*", httpSwagger.WrapHandler)
+
+	// Terraform Backend Ping Endpoint
+	routeBuilder.AddV1HandlerFunc("GET", "/ping", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(tfpAPIEndpointHeader, tfpAPIEndpointVersion)
+		w.WriteHeader(http.StatusOK)
+	})
 
 	// Controllers.
 	routeBuilder.AddBaseRoutes(controllers.NewHealthController(
