@@ -284,7 +284,6 @@ func (r *TerraformProviderMutationPayloadResolver) Provider() *TerraformProvider
 type UpdateTerraformProviderInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
-	Name             *string
 	RepositoryURL    *string
 	Private          *bool
 	ID               string
@@ -364,10 +363,6 @@ func updateTerraformProviderMutation(ctx context.Context, input *UpdateTerraform
 	}
 
 	// Update fields
-	if input.Name != nil {
-		provider.Name = *input.Name
-	}
-
 	if input.Private != nil {
 		provider.Private = *input.Private
 	}

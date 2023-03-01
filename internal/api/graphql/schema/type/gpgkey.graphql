@@ -34,6 +34,8 @@ type GPGKey implements Node {
   asciiArmor: String!
   group: Group!
   createdBy: String!
+  groupPath: String!
+  resourcePath: String!
 }
 
 input CreateGPGKeyInput {
