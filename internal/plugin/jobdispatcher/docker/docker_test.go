@@ -45,7 +45,7 @@ func TestDispatchJob(t *testing.T) {
 		expectTaskID          string
 		expectErrorMsg        string
 		expectAuthStr         string
-		retOutput             dockercontainer.ContainerCreateCreatedBody
+		retOutput             dockercontainer.CreateResponse
 		localImage            bool
 	}{
 		{
@@ -53,7 +53,7 @@ func TestDispatchJob(t *testing.T) {
 			jobID:      "job1",
 			localImage: true,
 			bindPath:   "/test",
-			retOutput: dockercontainer.ContainerCreateCreatedBody{
+			retOutput: dockercontainer.CreateResponse{
 				ID: "123",
 			},
 			expectTaskID: "123",
@@ -62,7 +62,7 @@ func TestDispatchJob(t *testing.T) {
 			name:       "remote image no auth",
 			jobID:      "job1",
 			localImage: false,
-			retOutput: dockercontainer.ContainerCreateCreatedBody{
+			retOutput: dockercontainer.CreateResponse{
 				ID: "123",
 			},
 			expectTaskID: "123",
@@ -73,7 +73,7 @@ func TestDispatchJob(t *testing.T) {
 			localImage: false,
 			username:   "admin",
 			password:   "secret",
-			retOutput: dockercontainer.ContainerCreateCreatedBody{
+			retOutput: dockercontainer.CreateResponse{
 				ID: "123",
 			},
 			expectTaskID:  "123",
@@ -88,7 +88,7 @@ func TestDispatchJob(t *testing.T) {
 		{
 			name:  "container start error",
 			jobID: "job1",
-			retOutput: dockercontainer.ContainerCreateCreatedBody{
+			retOutput: dockercontainer.CreateResponse{
 				ID: "123",
 			},
 			containerStartRetErr: fmt.Errorf("Failed to start container"),

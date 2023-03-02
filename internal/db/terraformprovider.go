@@ -305,7 +305,6 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 			goqu.Record{
 				"version":    goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at": timestamp,
-				"name":       provider.Name,
 				"private":    provider.Private,
 				"repo_url":   provider.RepositoryURL,
 			},

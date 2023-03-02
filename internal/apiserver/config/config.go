@@ -19,7 +19,7 @@ const (
 	envOidcProviderConfigPrefix        = "THARSIS_OAUTH_PROVIDERS_"
 	defaultMaxGraphQLComplexity        = 0
 	defaultRateLimitStorePluginType    = "memory"
-	defaultModuleRegistryMaxUploadSize = 1024 * 1024 * 10 // 10 MiB
+	defaultModuleRegistryMaxUploadSize = 1024 * 1024 * 25 // 25 MiB
 	defaultVCSRepositorySizeLimit      = 1024 * 1024 * 5  // 5 MebiBytes in bytes.
 	defaultAsyncTaskTimeout            = 100              // seconds
 	defaultDBAutoMigrateEnabled        = true

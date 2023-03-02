@@ -173,6 +173,9 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 	if err != nil {
 		return err
 	}
+	if group == nil {
+		return fmt.Errorf("group ID does not exist: %s", gpgKey.GroupID)
+	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
@@ -235,9 +238,16 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid number of public keys found, expected 1 but found %d", len(entityList)))
 	}
 
-	primaryKey := entityList[0].PrimaryKey
+	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, fmt.Errorf("group ID does not exist: %s", input.GroupID)
+	}
 
-	gpgKey := &models.GPGKey{
+	primaryKey := entityList[0].PrimaryKey
+	toCreate := &models.GPGKey{
 		GroupID:     input.GroupID,
 		GPGKeyID:    primaryKey.KeyId,
 		Fingerprint: fmt.Sprintf("%016X", primaryKey.Fingerprint),
@@ -245,15 +255,10 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		CreatedBy:   caller.GetSubject(),
 	}
 
-	group, err := s.dbClient.Groups.GetGroupByID(ctx, gpgKey.GroupID)
-	if err != nil {
-		return gpgKey, err
-	}
-
 	s.logger.Infow("Requested creation of a gpg key.",
 		"caller", caller.GetSubject(),
 		"groupID", input.GroupID,
-		"gpgKeyID", gpgKey.GetHexGPGKeyID(),
+		"gpgKeyID", toCreate.GetHexGPGKeyID(),
 	)
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -268,7 +273,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	}()
 
 	// Store gpg key in DB
-	createdKey, err := s.dbClient.GPGKeys.CreateGPGKey(txContext, gpgKey)
+	createdKey, err := s.dbClient.GPGKeys.CreateGPGKey(txContext, toCreate)
 	if err != nil {
 		return nil, err
 	}

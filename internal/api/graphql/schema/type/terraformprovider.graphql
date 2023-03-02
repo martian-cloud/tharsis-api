@@ -68,7 +68,6 @@ input UpdateTerraformProviderInput {
   clientMutationId: String
   id: ID!
   metadata: ResourceMetadataInput
-  name: String
   private: Boolean
   repositoryUrl: String
 }

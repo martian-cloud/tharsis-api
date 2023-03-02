@@ -160,6 +160,16 @@ func (r *GPGKeyResolver) CreatedBy() string {
 	return r.gpgKey.CreatedBy
 }
 
+// GroupPath resolver
+func (r *GPGKeyResolver) GroupPath() string {
+	return r.gpgKey.GetGroupPath()
+}
+
+// ResourcePath resolver
+func (r *GPGKeyResolver) ResourcePath() string {
+	return r.gpgKey.ResourcePath
+}
+
 /* GPGKey Mutation Resolvers */
 
 // GPGKeyMutationPayload is the response payload for a gpgKey mutation

@@ -488,6 +488,8 @@ type CreateWorkspaceInput struct {
 }
 
 // UpdateWorkspaceInput contains the input for updating a workspace
+// Find the workspace via either ID or WorkspacePath.
+// Modify the other fields.
 type UpdateWorkspaceInput struct {
 	ClientMutationID   *string
 	Metadata           *MetadataInput
