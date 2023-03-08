@@ -275,7 +275,7 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 			}
 
 			// Verify signature
-			if _, err = dssev.Verify(&env); err != nil {
+			if _, err = dssev.Verify(ctx, &env); err != nil {
 				diagnostics = append(diagnostics, "signature is not valid for required public key")
 				continue
 			}

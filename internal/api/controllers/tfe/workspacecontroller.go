@@ -1,4 +1,4 @@
-package controllers
+package tfe
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	gotfe "github.com/hashicorp/go-tfe"
 	"github.com/hashicorp/jsonapi"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
@@ -32,6 +33,7 @@ type workspaceController struct {
 	managedIdentityService managedidentity.Service
 	variableService        variable.Service
 	tharsisAPIURL          string
+	tfeVersionedPath       string
 }
 
 // NewWorkspaceController creates an instance of workspaceController
@@ -45,7 +47,8 @@ func NewWorkspaceController(
 	managedIdentityService managedidentity.Service,
 	variableService variable.Service,
 	tharsisAPIURL string,
-) Controller {
+	tfeVersionedPath string,
+) controllers.Controller {
 	return &workspaceController{
 		respWriter,
 		jwtAuthMiddleware,
@@ -56,6 +59,7 @@ func NewWorkspaceController(
 		managedIdentityService,
 		variableService,
 		tharsisAPIURL,
+		tfeVersionedPath,
 	}
 }
 
@@ -70,11 +74,8 @@ func (c *workspaceController) RegisterRoutes(router chi.Router) {
 	router.Get("/organizations/{organization}/workspaces/{workspace}", c.GetWorkspace)
 	router.Get("/workspaces/{workspaceId}/current-state-version", c.GetWorkspaceCurrentStateVersion)
 	router.Get("/configuration-versions/{configurationVersionId}", c.GetConfigurationVersion)
-	router.Get("/state-versions/{stateVersionId}", c.GetStateVersion)
-	router.Get("/state-versions/{stateVersionId}/content", c.GetStateVersionContent)
 
 	router.Get("/configuration-versions/{configurationVersionId}/content", c.DownloadConfigurationVersion)
-	router.Get("/state-versions/{stateVersionId}/content", c.DownloadStateVersion)
 
 	router.Put("/workspaces/{workspaceId}/configuration-versions/{configurationVersionId}/upload", c.UploadConfigurationVersion)
 
@@ -193,7 +194,7 @@ func (c *workspaceController) GetWorkspaceCurrentStateVersion(w http.ResponseWri
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
 }
 
 func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Request) {
@@ -214,18 +215,6 @@ func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Re
 	}
 
 	c.respWriter.RespondWithJSONAPI(w, runs.Runs, http.StatusOK)
-}
-
-func (c *workspaceController) GetStateVersion(w http.ResponseWriter, r *http.Request) {
-	stateVersionID := gid.FromGlobalID(chi.URLParam(r, "stateVersionId"))
-
-	sv, err := c.workspaceService.GetStateVersion(r.Context(), stateVersionID)
-	if err != nil {
-		c.respWriter.RespondWithError(w, err)
-		return
-	}
-
-	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL), http.StatusOK)
 }
 
 func (c *workspaceController) LockWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -281,45 +270,7 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL), http.StatusCreated)
-}
-
-func (c *workspaceController) GetStateVersionContent(w http.ResponseWriter, r *http.Request) {
-	stateVersionID := gid.FromGlobalID(chi.URLParam(r, "stateVersionId"))
-
-	result, err := c.workspaceService.GetStateVersionContent(r.Context(), stateVersionID)
-	if err != nil {
-		c.respWriter.RespondWithError(w, err)
-		return
-	}
-
-	defer result.Close()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if _, err := io.Copy(w, result); err != nil {
-		c.respWriter.RespondWithError(w, err)
-		return
-	}
-}
-
-func (c *workspaceController) DownloadStateVersion(w http.ResponseWriter, r *http.Request) {
-	stateVersionID := gid.FromGlobalID(chi.URLParam(r, "stateVersionId"))
-
-	result, err := c.workspaceService.GetStateVersionContent(r.Context(), stateVersionID)
-	if err != nil {
-		c.respWriter.RespondWithError(w, err)
-		return
-	}
-
-	defer result.Close()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if _, err := io.Copy(w, result); err != nil {
-		c.respWriter.RespondWithError(w, err)
-		return
-	}
+	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusCreated)
 }
 
 func (c *workspaceController) DownloadConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -364,7 +315,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, c.tharsisAPIURL), http.StatusCreated)
+	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusCreated)
 }
 
 func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -376,7 +327,7 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, c.tharsisAPIURL), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
 }
 
 func (c *workspaceController) UploadConfigurationVersion(w http.ResponseWriter, r *http.Request) {
