@@ -15,15 +15,16 @@ func BuildTFEServiceDiscoveryHandler(
 	idp *auth.IdentityProviderConfig,
 	loginScopes string,
 	apiEndpoint string,
+	tfeBasePath string,
 ) (http.HandlerFunc, error) {
 	// Build response
 	resp := map[string]interface{}{
 		"modules.v1":   fmt.Sprintf("%s/v1/module-registry/modules/", apiEndpoint),
 		"providers.v1": fmt.Sprintf("%s/v1/provider-registry/providers/", apiEndpoint),
-		"state.v2":     fmt.Sprintf("%s/v1/", apiEndpoint),
-		"tfe.v2":       fmt.Sprintf("%s/v1/", apiEndpoint),
-		"tfe.v2.1":     fmt.Sprintf("%s/v1/", apiEndpoint),
-		"tfe.v2.2":     fmt.Sprintf("%s/v1/", apiEndpoint),
+		"state.v2":     fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
+		"tfe.v2":       fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
+		"tfe.v2.1":     fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
+		"tfe.v2.2":     fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
 	}
 
 	if idp != nil {

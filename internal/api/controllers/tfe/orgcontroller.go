@@ -1,4 +1,4 @@
-package controllers
+package tfe
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	gotfe "github.com/hashicorp/go-tfe"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -15,22 +16,20 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 )
 
-var (
-	// EntitlementSettings represents the entitlements for a particular user
-	EntitlementSettings = gotfe.Entitlements{
-		ID:                    "1",
-		Agents:                true,
-		AuditLogging:          true,
-		CostEstimation:        true,
-		Operations:            true,
-		PrivateModuleRegistry: true,
-		SSO:                   true,
-		Sentinel:              true,
-		StateStorage:          true,
-		Teams:                 true,
-		VCSIntegrations:       true,
-	}
-)
+// EntitlementSettings represents the entitlements for a particular user
+var EntitlementSettings = gotfe.Entitlements{
+	ID:                    "1",
+	Agents:                true,
+	AuditLogging:          true,
+	CostEstimation:        true,
+	Operations:            true,
+	PrivateModuleRegistry: true,
+	SSO:                   true,
+	Sentinel:              true,
+	StateStorage:          true,
+	Teams:                 true,
+	VCSIntegrations:       true,
+}
 
 type orgController struct {
 	respWriter        response.Writer
@@ -47,7 +46,7 @@ func NewOrgController(
 	jwtAuthMiddleware middleware.Handler,
 	runService run.Service,
 	groupService group.Service,
-) Controller {
+) controllers.Controller {
 	return &orgController{respWriter, jwtAuthMiddleware, logger, runService, groupService}
 }
 

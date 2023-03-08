@@ -14,6 +14,7 @@ import (
 	_ "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity" // Placeholder to ensure private packages are being downloaded
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
+	tfecontrollers "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers/tfe"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/resolver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
@@ -52,6 +53,9 @@ import (
 var (
 	tfpAPIEndpointHeader  = "TFP-API-Version"
 	tfpAPIEndpointVersion = "2.5.0"
+
+	tfeBasePath    = "/tfe"
+	tfeVersionPath = "/v2"
 )
 
 // APIServer represents an instance of a server
@@ -168,7 +172,18 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 
 	routeBuilder := api.NewRouteBuilder(
 		middleware.PrometheusMiddleware,
-	)
+	).WithSubRouter("/v1").
+		WithSubRouter(tfeBasePath,
+			middleware.NewCommonHeadersMiddleware(map[string]string{
+				tfpAPIEndpointHeader: tfpAPIEndpointVersion,
+			}),
+		)
+
+	v1RouteBuilder := routeBuilder.SubRouteBuilder("/v1")
+
+	// set up terraform /v2 routes
+	routeBuilder.SubRouteBuilder(tfeBasePath).WithSubRouter(tfeVersionPath)
+	terraformV2RouteBuilder := routeBuilder.SubRouteBuilder(tfeBasePath).SubRouteBuilder(tfeVersionPath)
 
 	// Create the admin user if an email is provided.
 	if cfg.AdminUserEmail != "" {
@@ -210,12 +225,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 			)
 		}
 
-		tfeHandler, sdErr := tfe.BuildTFEServiceDiscoveryHandler(logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL)
+		tfeHandler, sdErr := tfe.BuildTFEServiceDiscoveryHandler(logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL, tfeBasePath)
 		if sdErr != nil {
 			return nil, fmt.Errorf("failed to build TFE discovery document handler %v", sdErr)
 		}
 
-		routeBuilder.AddBaseHandlerFunc(
+		routeBuilder.AddHandlerFunc(
 			"GET",
 			"/.well-known/terraform.json",
 			tfeHandler,
@@ -251,26 +266,34 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}
 
-	routeBuilder.AddBaseHandler("/graphql", graphqlHandler)
-	routeBuilder.AddBaseHandlerFunc("GET", "/swagger/*", httpSwagger.WrapHandler)
+	routeBuilder.AddHandler("/graphql", graphqlHandler)
+	routeBuilder.AddHandlerFunc("GET", "/swagger/*", httpSwagger.WrapHandler)
 
 	// Terraform Backend Ping Endpoint
-	routeBuilder.AddV1HandlerFunc("GET", "/ping", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set(tfpAPIEndpointHeader, tfpAPIEndpointVersion)
+	terraformV2RouteBuilder.AddHandlerFunc("GET", "/ping", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
 	// Controllers.
-	routeBuilder.AddBaseRoutes(controllers.NewHealthController(
+	routeBuilder.AddRoutes(controllers.NewHealthController(
 		respWriter,
 	))
-	routeBuilder.AddBaseRoutes(controllers.NewOIDCController(
+	routeBuilder.AddRoutes(controllers.NewOIDCController(
 		respWriter,
 		pluginCatalog.JWSProvider,
 		cfg.TharsisAPIURL,
 	))
 
-	routeBuilder.AddV1Routes(controllers.NewRunController(
+	// TFE Controllers
+	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewStateController(
+		logger,
+		respWriter,
+		jwtAuthMiddleware,
+		workspaceService,
+		cfg.TharsisAPIURL,
+		tfeBasePath+tfeVersionPath,
+	))
+	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewRunController(
 		logger,
 		respWriter,
 		jwtAuthMiddleware,
@@ -278,21 +301,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		runService,
 		cfg.TharsisAPIURL,
 	))
-	routeBuilder.AddV1Routes(controllers.NewJobController(
-		logger,
-		respWriter,
-		jwtAuthMiddleware,
-		pluginCatalog.JWSProvider,
-		jobService,
-	))
-	routeBuilder.AddV1Routes(controllers.NewOrgController(
+	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewOrgController(
 		logger,
 		respWriter,
 		jwtAuthMiddleware,
 		runService,
 		groupService,
 	))
-	routeBuilder.AddV1Routes(controllers.NewWorkspaceController(
+	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewWorkspaceController(
 		logger,
 		respWriter,
 		jwtAuthMiddleware,
@@ -302,26 +318,42 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		managedIdentityService,
 		variableService,
 		cfg.TharsisAPIURL,
+		tfeBasePath+tfeVersionPath,
 	))
-	routeBuilder.AddV1Routes(controllers.NewServiceAccountController(
+
+	// Tharsis Controllers
+	v1RouteBuilder.AddRoutes(controllers.NewRunController(
+		logger,
+		respWriter,
+		jwtAuthMiddleware,
+		runService,
+	))
+	v1RouteBuilder.AddRoutes(controllers.NewJobController(
+		logger,
+		respWriter,
+		jwtAuthMiddleware,
+		pluginCatalog.JWSProvider,
+		jobService,
+	))
+	v1RouteBuilder.AddRoutes(controllers.NewServiceAccountController(
 		logger,
 		respWriter,
 		saService,
 	))
-	routeBuilder.AddV1Routes(controllers.NewProviderRegistryController(
+	v1RouteBuilder.AddRoutes(controllers.NewProviderRegistryController(
 		logger,
 		respWriter,
 		jwtAuthMiddleware,
 		providerRegistryService,
 	))
-	routeBuilder.AddV1Routes(controllers.NewModuleRegistryController(
+	v1RouteBuilder.AddRoutes(controllers.NewModuleRegistryController(
 		logger,
 		respWriter,
 		jwtAuthMiddleware,
 		moduleRegistryService,
 		cfg.ModuleRegistryMaxUploadSize,
 	))
-	routeBuilder.AddV1Routes(controllers.NewSCIMController(
+	v1RouteBuilder.AddRoutes(controllers.NewSCIMController(
 		logger,
 		respWriter,
 		jwtAuthMiddleware,
@@ -329,7 +361,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		teamService,
 		scimService,
 	))
-	routeBuilder.AddV1Routes(controllers.NewVCSController(
+	v1RouteBuilder.AddRoutes(controllers.NewVCSController(
 		logger,
 		respWriter,
 		authenticator,
@@ -345,7 +377,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		taskManager: taskManager,
 		srv: &http.Server{
 			Addr:              fmt.Sprintf(":%v", cfg.ServerPort),
-			Handler:           routeBuilder.Build(),
+			Handler:           routeBuilder.Router(),
 			ReadHeaderTimeout: time.Minute,
 		},
 	}, nil

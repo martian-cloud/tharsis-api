@@ -1,4 +1,4 @@
-package controllers
+package tfe
 
 import (
 	"fmt"
@@ -40,7 +40,7 @@ func TharsisWorkspaceToWorkspace(workspace *models.Workspace) *Workspace {
 }
 
 // TharsisStateVersionToStateVersion converts a tharsis state version to a TFE state version
-func TharsisStateVersionToStateVersion(sv *models.StateVersion, tharsisAPIURL string) *gotfe.StateVersion {
+func TharsisStateVersionToStateVersion(sv *models.StateVersion, tharsisAPIURL, tfeStateVersionedPath string) *gotfe.StateVersion {
 	resp := &gotfe.StateVersion{
 		ID: gid.ToGlobalID(gid.StateVersionType, sv.Metadata.ID),
 	}
@@ -55,7 +55,7 @@ func TharsisStateVersionToStateVersion(sv *models.StateVersion, tharsisAPIURL st
 	}
 
 	if tharsisAPIURL != "" {
-		resp.DownloadURL = fmt.Sprintf("%s/v1/state-versions/%s/content", tharsisAPIURL, gid.ToGlobalID(gid.StateVersionType, sv.Metadata.ID))
+		resp.DownloadURL = fmt.Sprintf("%s%s/state-versions/%s/content", tharsisAPIURL, tfeStateVersionedPath, gid.ToGlobalID(gid.StateVersionType, sv.Metadata.ID))
 	}
 
 	return resp
@@ -100,7 +100,7 @@ func TharsisRunToRun(run *models.Run) *Run {
 }
 
 // TharsisCVToCV converts a tharsis configuration version to a TFE configuration version
-func TharsisCVToCV(cv *models.ConfigurationVersion, tharsisAPIURL string) *gotfe.ConfigurationVersion {
+func TharsisCVToCV(cv *models.ConfigurationVersion, tharsisAPIURL, tfeWorkspacesVersionedPath string) *gotfe.ConfigurationVersion {
 	cvGID := gid.ToGlobalID(gid.ConfigurationVersionType, cv.Metadata.ID)
 	return &gotfe.ConfigurationVersion{
 		ID:            cvGID,
@@ -108,8 +108,9 @@ func TharsisCVToCV(cv *models.ConfigurationVersion, tharsisAPIURL string) *gotfe
 		Speculative:   cv.Speculative,
 		AutoQueueRuns: false,
 		UploadURL: fmt.Sprintf(
-			"%s/v1/workspaces/%s/configuration-versions/%s/upload",
+			"%s%s/workspaces/%s/configuration-versions/%s/upload",
 			tharsisAPIURL,
+			tfeWorkspacesVersionedPath,
 			gid.ToGlobalID(gid.WorkspaceType, cv.WorkspaceID),
 			cvGID,
 		),
