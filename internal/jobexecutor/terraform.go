@@ -203,8 +203,12 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		return nil, fmt.Errorf("failed to initialize tfexec: %v", err)
 	}
 
+	if err = t.mapSupportedTerraformEnvConfiguration(tf); err != nil {
+		return nil, err
+	}
+
 	// Set environment variables
-	if err = tf.SetEnv(t.fullEnv); err != nil {
+	if err = tf.SetEnv(tfexec.CleanEnv(t.fullEnv)); err != nil {
 		return nil, fmt.Errorf("failed to set environment variables: %v", err)
 	}
 
@@ -263,6 +267,45 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	}
 
 	return tf, nil
+}
+
+// mapSupportedTerraformEnvConfiguration
+func (t *terraformWorkspace) mapSupportedTerraformEnvConfiguration(tf *tfexec.Terraform) error {
+	var (
+		supportedTFSettings = map[string]func(string) error{
+			"TF_LOG":          tf.SetLog,
+			"TF_LOG_CORE":     tf.SetLogCore,
+			"TF_LOG_PROVIDER": tf.SetLogProvider,
+		}
+
+		logPathSet = false
+	)
+
+	// Instead of just iterating over the map and applying the setting,
+	// we should report to the user when they use an unsupported environment
+	// variable for configuration.
+	for _, env := range tfexec.ProhibitedEnv(t.fullEnv) {
+		fn, ok := supportedTFSettings[env]
+		if !ok {
+			t.jobLogger.Errorf("Environment variable %s is not currently supported by the job executor", env)
+			continue
+		}
+
+		// In case we enable additional settings, check for TF_LOG
+		if strings.HasPrefix(env, "TF_LOG") && !logPathSet {
+			if err := tf.SetLogPath(os.Stderr.Name()); err != nil {
+				return fmt.Errorf("failed to set log path: %w", err)
+			}
+			logPathSet = true
+		}
+
+		if err := fn(t.fullEnv[env]); err != nil {
+			// return on first instance of failure
+			return fmt.Errorf("failed to set %s: %w", env, err)
+		}
+	}
+
+	return nil
 }
 
 func (t *terraformWorkspace) downloadConfigurationVersion(ctx context.Context) error {
