@@ -256,7 +256,7 @@ func updateWorkspaceVCSProviderLinkMutation(ctx context.Context, input *UpdateWo
 		link.TagRegex = input.TagRegex
 	}
 
-	if input.Branch != nil {
+	if input.Branch != nil && *input.Branch != "" {
 		link.Branch = *input.Branch
 	}
 

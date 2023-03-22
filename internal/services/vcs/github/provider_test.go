@@ -24,6 +24,9 @@ const (
 	sampleValidToken    = types.BearerAuthPrefix + "an-access-token"
 )
 
+// customProviderURL is a url.URL for a custom provider instance.
+var customProviderURL = url.URL{Scheme: "https", Host: "example.com", Path: "/instances/github"}
+
 // roundTripFunc implements the RoundTripper interface.
 type roundTripFunc func(r *http.Request) *http.Response
 
@@ -40,11 +43,11 @@ func newTestClient(fn roundTripFunc) *http.Client {
 	}
 }
 
-func TestDefaultAPIHostname(t *testing.T) {
+func TestDefaultURL(t *testing.T) {
 	provider, err := New(context.TODO(), nil, nil, "")
 	assert.Nil(t, err)
 
-	assert.Equal(t, defaultAPIHostname, provider.DefaultAPIHostname())
+	assert.Equal(t, defaultURL, provider.DefaultURL())
 }
 
 func TestMergeRequestActionIsSupported(t *testing.T) {
@@ -140,7 +143,7 @@ func TestBuildOAuthAuthorizationURL(t *testing.T) {
 		{
 			name: "positive: valid input with read-write scopes; expect authorization URL",
 			input: &types.BuildOAuthAuthorizationURLInput{
-				Hostname:           defaultAPIHostname,
+				ProviderURL:        defaultURL,
 				OAuthClientID:      "an-oauth-client-id",
 				OAuthState:         "an-oauth-state",
 				RedirectURL:        "https://tharsis.domain/v1/vcs/auth/callback",
@@ -151,13 +154,26 @@ func TestBuildOAuthAuthorizationURL(t *testing.T) {
 		{
 			name: "positive: valid input without read-write scopes; expect authorization URL",
 			input: &types.BuildOAuthAuthorizationURLInput{
-				Hostname:           defaultAPIHostname,
+				ProviderURL:        defaultURL,
 				OAuthClientID:      "an-oauth-client-id",
 				OAuthState:         "an-oauth-state",
 				RedirectURL:        "https://tharsis.domain/v1/vcs/auth/callback",
 				UseReadWriteScopes: false,
 			},
 			expectedURL: expectedAuthorizationCodeURL,
+		},
+		{
+			name: "positive: valid input with custom provider URL; expect authorization URL",
+			input: &types.BuildOAuthAuthorizationURLInput{
+				ProviderURL:        customProviderURL, // Theoretical GitHub instance hosted under a path.
+				OAuthClientID:      "an-oauth-client-id",
+				OAuthState:         "an-oauth-state",
+				RedirectURL:        "https://tharsis.domain/v1/vcs/auth/callback",
+				UseReadWriteScopes: true,
+			},
+			expectedURL: customProviderURL.String() + "/login/oauth/authorize?client_id=an-oauth-client-id" +
+				"&redirect_uri=https%3A%2F%2Ftharsis.domain%2Fv1%2Fvcs%2Fauth%2Fcallback" +
+				"&scope=repo+read%3Auser&state=an-oauth-state",
 		},
 	}
 
@@ -166,25 +182,49 @@ func TestBuildOAuthAuthorizationURL(t *testing.T) {
 			provider, err := New(context.TODO(), nil, nil, "")
 			assert.Nil(t, err)
 
-			actualURL := provider.BuildOAuthAuthorizationURL(test.input)
-			assert.NotEmpty(t, actualURL)
+			actualURL, err := provider.BuildOAuthAuthorizationURL(test.input)
+			assert.Nil(t, err)
 			assert.Equal(t, test.expectedURL, actualURL)
 		})
 	}
 }
 
 func TestBuildRepositoryURL(t *testing.T) {
-	provider, err := New(context.TODO(), nil, nil, "")
-	assert.Nil(t, err)
+	repositoryPath := "/owner/repository"
 
-	repositoryURL := provider.BuildRepositoryURL(&types.BuildRepositoryURLInput{
-		Hostname:       defaultAPIHostname,
-		RepositoryPath: "owner/repository",
-	})
+	testCases := []struct {
+		name        string
+		input       *types.BuildRepositoryURLInput
+		expectedURL string
+	}{
+		{
+			name: "repository URL with provider's default API URL",
+			input: &types.BuildRepositoryURLInput{
+				ProviderURL:    defaultURL,
+				RepositoryPath: repositoryPath,
+			},
+			expectedURL: "https://github.com" + repositoryPath, // "api." prefix should be stripped.
+		},
+		{
+			name: "repository URL with custom API URL",
+			input: &types.BuildRepositoryURLInput{
+				ProviderURL:    customProviderURL,
+				RepositoryPath: repositoryPath,
+			},
+			expectedURL: customProviderURL.String() + repositoryPath,
+		},
+	}
 
-	expectedURL := "https://github.com/owner/repository"
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			provider, err := New(context.TODO(), nil, nil, "")
+			assert.Nil(t, err)
 
-	assert.Equal(t, expectedURL, repositoryURL)
+			actualURL, err := provider.BuildRepositoryURL(test.input)
+			assert.Nil(t, err)
+			assert.Equal(t, test.expectedURL, actualURL)
+		})
+	}
 }
 
 func TestTestConnection(t *testing.T) {
@@ -196,27 +236,35 @@ func TestTestConnection(t *testing.T) {
 		name          string
 	}{
 		{
-			name: "positive: token and hostname are valid; expect no errors",
+			name: "positive: token and URL are valid; expect no errors",
 			input: &types.TestConnectionInput{
-				Hostname:    defaultAPIHostname,
+				ProviderURL: defaultURL,
 				AccessToken: "an-access-token",
 			},
 		},
 		{
-			name: "negative: token or hostname is invalid; expect error",
+			name: "positive: token and URL are valid for a custom instance; expect no errors",
 			input: &types.TestConnectionInput{
-				Hostname:    defaultAPIHostname,
+				ProviderURL: customProviderURL,
+				AccessToken: "an-access-token",
+			},
+		},
+		{
+			name: "negative: token or URL is invalid; expect error",
+			input: &types.TestConnectionInput{
+				ProviderURL: defaultURL,
 				AccessToken: "an-invalid-access-token",
 			},
-			expectedError: fmt.Errorf("failed to connect to VCS provider at hostname: %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to connect to VCS provider. Response status: %s", "401"),
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
-				assert.Equal(t, "/user", r.URL.Path)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Path+"/user", r.URL.Path)
 
 				if r.Header.Get(authorizationHeader) != sampleValidToken {
 					return &http.Response{
@@ -261,7 +309,21 @@ func TestGetProject(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.GetProjectInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+			},
+			response: &getProjectResponse{
+				DefaultBranch: "main",
+			},
+			expectedPayload: &types.GetProjectPayload{
+				DefaultBranch: "main",
+			},
+		},
+		{
+			name: "positive: input is valid with custom github instance; expect no errors",
+			input: &types.GetProjectInput{
+				ProviderURL:    customProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 			},
@@ -275,11 +337,11 @@ func TestGetProject(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.GetProjectInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
 				AccessToken:    "some-token",
 				RepositoryPath: "owner/repo",
 			},
-			expectedError: fmt.Errorf("failed to query for project at hostname: %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to query for project. Response status: %s", "401"),
 		},
 	}
 
@@ -287,11 +349,13 @@ func TestGetProject(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/repos/",
 					test.input.RepositoryPath,
 				)
 
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				if r.Header.Get(authorizationHeader) != sampleValidToken {
@@ -345,7 +409,35 @@ func TestGetDiff(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.GetDiffInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				Ref:            "main",
+			},
+			response: &getDiffsResponse{
+				Files: []struct {
+					Filename string `json:"filename"`
+				}{
+					struct {
+						Filename string "json:\"filename\""
+					}{
+						Filename: "file.txt", // The changed file(s).
+					},
+					{
+						Filename: "file.txt",
+					},
+				},
+			},
+			expectedPayload: &types.GetDiffsPayload{
+				AlteredFiles: map[string]struct{}{
+					"file.txt": {}, // We should see the same file only once.
+				},
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider url; expect no errors",
+			input: &types.GetDiffInput{
+				ProviderURL:    customProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				Ref:            "main",
@@ -373,12 +465,12 @@ func TestGetDiff(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.GetDiffInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
 				AccessToken:    "some-token",
 				RepositoryPath: "owner/repo",
 				Ref:            "feature/branch",
 			},
-			expectedError: fmt.Errorf("failed to get diff at hostname: %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to get diff. Response status: %s", "401"),
 		},
 	}
 
@@ -386,12 +478,14 @@ func TestGetDiff(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/repos",
 					test.input.RepositoryPath,
 					"commits",
 					test.input.Ref,
 				)
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				if r.Header.Get(authorizationHeader) != sampleValidToken {
@@ -445,7 +539,36 @@ func TestGetDiffs(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.GetDiffsInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				BaseRef:        "base-commit-id",
+				HeadRef:        "head-commit-id",
+			},
+			response: &getDiffsResponse{
+				Files: []struct {
+					Filename string `json:"filename"`
+				}{
+					struct {
+						Filename string "json:\"filename\""
+					}{
+						Filename: "file.txt", // The changed file(s).
+					},
+					{
+						Filename: "file.txt",
+					},
+				},
+			},
+			expectedPayload: &types.GetDiffsPayload{
+				AlteredFiles: map[string]struct{}{
+					"file.txt": {}, // We should see the same file only once.
+				},
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider instance; expect no errors",
+			input: &types.GetDiffsInput{
+				ProviderURL:    customProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				BaseRef:        "base-commit-id",
@@ -474,13 +597,13 @@ func TestGetDiffs(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.GetDiffsInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
 				AccessToken:    "some-token",
 				RepositoryPath: "owner/repo",
 				BaseRef:        "base-commit-id",
 				HeadRef:        "head-commit-id",
 			},
-			expectedError: fmt.Errorf("failed to get diffs at hostname: %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to get diffs. Response status: %s", "401"),
 		},
 	}
 
@@ -488,12 +611,14 @@ func TestGetDiffs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/repos",
 					test.input.RepositoryPath,
 					"compare",
 					test.input.BaseRef+"..."+test.input.HeadRef,
 				)
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				if r.Header.Get(authorizationHeader) != sampleValidToken {
@@ -545,7 +670,16 @@ func TestGetArchive(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.GetArchiveInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				Ref:            "main", // Attempting to download main branch.
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider URL; expect no errors",
+			input: &types.GetArchiveInput{
+				ProviderURL:    customProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				Ref:            "main", // Attempting to download main branch.
@@ -554,12 +688,12 @@ func TestGetArchive(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.GetArchiveInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
 				AccessToken:    "some-token",
 				RepositoryPath: "owner/repo",
 				Ref:            "feature/branch",
 			},
-			expectedError: fmt.Errorf("failed to get repository archive at hostname %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to get repository archive. Response status: %s", "401"),
 		},
 	}
 
@@ -567,13 +701,15 @@ func TestGetArchive(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/",
 					"repos",
 					test.input.RepositoryPath,
 					"tarball",
 					test.input.Ref,
 				)
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				if r.Header.Get(authorizationHeader) != sampleValidToken {
@@ -620,7 +756,25 @@ func TestCreateAccessToken(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.CreateAccessTokenInput{
-				Hostname:          defaultAPIHostname,
+				ProviderURL:       defaultURL,
+				ClientID:          "some-client-id",
+				ClientSecret:      "some-client-secret",
+				AuthorizationCode: "some-authorization-code",
+				RedirectURI:       "https://tharsis.domain/v1/vcs/auth/callback",
+				// Other fields aren't used for GitHub.
+			},
+			response: &createAccessTokenResponse{
+				AccessToken: "some-access-token",
+			},
+			expectedPayload: &types.AccessTokenPayload{
+				AccessToken: "some-access-token",
+				// RefreshToken isn't used for GitHub.
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider URL; expect no errors",
+			input: &types.CreateAccessTokenInput{
+				ProviderURL:       customProviderURL,
 				ClientID:          "some-client-id",
 				ClientSecret:      "some-client-secret",
 				AuthorizationCode: "some-authorization-code",
@@ -638,13 +792,13 @@ func TestCreateAccessToken(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.CreateAccessTokenInput{
-				Hostname:          defaultAPIHostname,
+				ProviderURL:       defaultURL,
 				ClientID:          "invalid",
 				ClientSecret:      "invalid",
 				AuthorizationCode: "invalid",
 				RedirectURI:       "https://tharsis.domain/v1/vcs/auth/callback",
 			},
-			expectedError: fmt.Errorf("failed to create access token at hostname: %s. Response status: %s", defaultAPIHostname, "400"),
+			expectedError: fmt.Errorf("failed to create access token. Response status: %s", "400"),
 		},
 	}
 
@@ -652,6 +806,7 @@ func TestCreateAccessToken(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/",
 					"login",
 					"oauth",
@@ -659,7 +814,8 @@ func TestCreateAccessToken(t *testing.T) {
 				)
 
 				// Host will be without 'api.' prefix.
-				assert.Equal(t, strings.Trim(defaultAPIHostname, "api."), r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, strings.TrimPrefix(test.input.ProviderURL.Host, "api."), r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				// Parse the queries.
@@ -735,7 +891,22 @@ func TestCreateWebhook(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.CreateWebhookInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				WebhookToken:   []byte("webhook-auth-token"),
+			},
+			response: &createWebhookResponse{
+				ID: 50,
+			},
+			expectedPayload: &types.WebhookPayload{
+				WebhookID: "50",
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider URL; expect no errors",
+			input: &types.CreateWebhookInput{
+				ProviderURL:    customProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				WebhookToken:   []byte("webhook-auth-token"),
@@ -750,12 +921,12 @@ func TestCreateWebhook(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.CreateWebhookInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
 				AccessToken:    "some-token",
 				RepositoryPath: "owner/repo",
 				WebhookToken:   []byte("webhook-auth-token"),
 			},
-			expectedError: fmt.Errorf("failed to create webhook at hostname: %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to create webhook. Response status: %s", "401"),
 		},
 	}
 
@@ -763,12 +934,14 @@ func TestCreateWebhook(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/repos",
 					test.input.RepositoryPath,
 					"hooks",
 				)
 
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				// Validate request body.
@@ -828,7 +1001,16 @@ func TestDeleteWebhook(t *testing.T) {
 		{
 			name: "positive: input is valid; expect no errors",
 			input: &types.DeleteWebhookInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
+				AccessToken:    "an-access-token",
+				RepositoryPath: "owner/repository",
+				WebhookID:      "50",
+			},
+		},
+		{
+			name: "positive: input is valid with custom provider instance; expect no errors",
+			input: &types.DeleteWebhookInput{
+				ProviderURL:    customProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				WebhookID:      "50",
@@ -837,12 +1019,12 @@ func TestDeleteWebhook(t *testing.T) {
 		{
 			name: "negative: input is invalid; expect error",
 			input: &types.DeleteWebhookInput{
-				Hostname:       defaultAPIHostname,
+				ProviderURL:    defaultURL,
 				AccessToken:    "some-token",
 				RepositoryPath: "owner/repo",
 				WebhookID:      "50",
 			},
-			expectedError: fmt.Errorf("failed to delete webhook at hostname: %s. Response status: %s", defaultAPIHostname, "401"),
+			expectedError: fmt.Errorf("failed to delete webhook. Response status: %s", "401"),
 		},
 	}
 
@@ -850,13 +1032,15 @@ func TestDeleteWebhook(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := newTestClient(func(r *http.Request) *http.Response {
 				expectedPath := path.Join(
+					test.input.ProviderURL.Path,
 					"/repos",
 					test.input.RepositoryPath,
 					"hooks",
 					test.input.WebhookID,
 				)
 
-				assert.Equal(t, defaultAPIHostname, r.URL.Host)
+				assert.Equal(t, test.input.ProviderURL.Scheme, r.URL.Scheme)
+				assert.Equal(t, test.input.ProviderURL.Host, r.URL.Host)
 				assert.Equal(t, expectedPath, r.URL.Path)
 
 				if r.Header.Get(authorizationHeader) != sampleValidToken {

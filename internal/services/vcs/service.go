@@ -84,7 +84,7 @@ type GetVCSEventsInput struct {
 
 // CreateVCSProviderInput is the input for creating a VCS provider.
 type CreateVCSProviderInput struct {
-	Hostname           *string
+	URL                *string
 	Name               string
 	Description        string
 	GroupID            string
@@ -186,7 +186,7 @@ type handleEventInput struct {
 	link                *models.WorkspaceVCSProviderLink
 	workspace           *models.Workspace
 	vcsEvent            *models.VCSEvent
-	hostname            string
+	providerURL         url.URL
 	accessToken         string
 	repositorySizeLimit int
 }
@@ -194,7 +194,7 @@ type handleEventInput struct {
 // downloadRepositoryArchiveInput is the input for downloading a repository archive.
 type downloadRepositoryArchiveInput struct {
 	provider            Provider
-	hostname            string
+	providerURL         url.URL
 	accessToken         string
 	repositoryPath      string
 	referenceName       string
@@ -208,7 +208,7 @@ type handleVCSRunInput struct {
 	vcsEvent      *models.VCSEvent
 	provider      Provider
 	accessToken   string
-	hostname      string
+	providerURL   url.URL
 	referenceName string
 	isDestroy     bool
 }
@@ -425,12 +425,19 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		return nil, err
 	}
 
-	// Use the default hostname if nothing provided.
-	var hostname string
-	if input.Hostname == nil {
-		hostname = provider.DefaultAPIHostname()
+	// Use the default providerURL if nothing provided.
+	var providerURL url.URL
+	if input.URL == nil {
+		providerURL = provider.DefaultURL()
 	} else {
-		hostname = *input.Hostname
+		parsedURL, uErr := url.Parse(*input.URL)
+		if uErr != nil || (parsedURL.Scheme == "") || (parsedURL.Host == "") {
+			return nil, errors.NewError(errors.EInvalid, "Invalid provider URL")
+		}
+
+		// Remove any trailing backslash.
+		parsedURL.Path = strings.TrimSuffix(parsedURL.Path, "/")
+		providerURL = *parsedURL
 	}
 
 	// Use a UUID for the state.
@@ -458,7 +465,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		Description:        input.Description,
 		CreatedBy:          caller.GetSubject(),
 		GroupID:            input.GroupID,
-		Hostname:           hostname,
+		URL:                providerURL,
 		OAuthClientID:      input.OAuthClientID,
 		OAuthClientSecret:  input.OAuthClientSecret,
 		OAuthState:         &oAuthStateString,
@@ -622,7 +629,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 
 		for _, link := range links {
 			err = provider.DeleteWebhook(ctx, &types.DeleteWebhookInput{
-				Hostname:       input.Provider.Hostname,
+				ProviderURL:    input.Provider.URL,
 				AccessToken:    accessToken,
 				RepositoryPath: link.RepositoryPath,
 				WebhookID:      link.WebhookID,
@@ -769,7 +776,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	// Get the project, this also validates the repository exists.
 	payload, gErr := provider.GetProject(ctx, &types.GetProjectInput{
-		Hostname:       vp.Hostname,
+		ProviderURL:    vp.URL,
 		AccessToken:    accessToken,
 		RepositoryPath: input.RepositoryPath,
 	})
@@ -778,7 +785,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	}
 
 	branch := payload.DefaultBranch
-	if input.Branch != nil {
+	if input.Branch != nil && *input.Branch != "" {
 		branch = *input.Branch
 	}
 
@@ -844,7 +851,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	if vp.AutoCreateWebhooks {
 		// Create the webhook.
 		payload, cErr := provider.CreateWebhook(ctx, &types.CreateWebhookInput{
-			Hostname:       vp.Hostname,
+			ProviderURL:    vp.URL,
 			AccessToken:    accessToken,
 			RepositoryPath: createdLink.RepositoryPath,
 			WebhookToken:   token,
@@ -960,7 +967,7 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 
 		// Delete the existing webhook.
 		if err = provider.DeleteWebhook(ctx, &types.DeleteWebhookInput{
-			Hostname:       vp.Hostname,
+			ProviderURL:    vp.URL,
 			AccessToken:    accessToken,
 			RepositoryPath: input.Link.RepositoryPath,
 			WebhookID:      input.Link.WebhookID,
@@ -1103,7 +1110,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 	}
 
 	var referenceName string
-	if input.ReferenceName != nil {
+	if input.ReferenceName != nil && *input.ReferenceName != "" {
 		// Use the provided reference name.
 		referenceName = *input.ReferenceName
 	} else {
@@ -1124,6 +1131,14 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		eventSourceRef = &referenceName
 	}
 
+	repoURL, err := provider.BuildRepositoryURL(&types.BuildRepositoryURLInput{
+		ProviderURL:    vp.URL,
+		RepositoryPath: link.RepositoryPath,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to build repository url: %w", err)
+	}
+
 	// Create the VCS event with 'pending' status.
 	createdEvent, err := s.dbClient.VCSEvents.CreateEvent(ctx, &models.VCSEvent{
 		CommitID:            eventCommitID,
@@ -1131,13 +1146,10 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		WorkspaceID:         input.Workspace.Metadata.ID,
 		Type:                models.ManualEventType,
 		Status:              models.VCSEventPending,
-		RepositoryURL: provider.BuildRepositoryURL(&types.BuildRepositoryURLInput{
-			Hostname:       vp.Hostname,
-			RepositoryPath: link.RepositoryPath,
-		}),
+		RepositoryURL:       repoURL,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create a vcs event: %v", err)
+		return fmt.Errorf("failed to create a vcs event: %w", err)
 	}
 
 	handleVCSRunCallback := func(ctx context.Context) {
@@ -1145,7 +1157,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		createdEvent.Status = models.VCSEventFinished
 
 		if err := s.handleVCSRun(auth.WithCaller(ctx, caller), &handleVCSRunInput{
-			hostname:      vp.Hostname,
+			providerURL:   vp.URL,
 			accessToken:   accessToken,
 			link:          link,
 			workspace:     input.Workspace,
@@ -1261,6 +1273,14 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		commitID = input.HeadCommitID
 	}
 
+	repoURL, err := provider.BuildRepositoryURL(&types.BuildRepositoryURLInput{
+		ProviderURL:    vcsCaller.Provider.URL,
+		RepositoryPath: vcsCaller.Link.RepositoryPath,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to build repository URL: %w", err)
+	}
+
 	// Create the VCS event with 'pending' status.
 	createdEvent, err := s.dbClient.VCSEvents.CreateEvent(ctx, &models.VCSEvent{
 		SourceReferenceName: &ref,
@@ -1268,10 +1288,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		WorkspaceID:         workspace.Metadata.ID,
 		Type:                eventType,
 		Status:              models.VCSEventPending,
-		RepositoryURL: provider.BuildRepositoryURL(&types.BuildRepositoryURLInput{
-			Hostname:       vcsCaller.Provider.Hostname,
-			RepositoryPath: vcsCaller.Link.RepositoryPath,
-		}),
+		RepositoryURL:       repoURL,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create a vcs event: %v", err)
@@ -1283,7 +1300,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		createdEvent.Status = models.VCSEventFinished
 
 		if err := s.handleEvent(auth.WithCaller(ctx, caller), &handleEventInput{
-			hostname:            vcsCaller.Provider.Hostname,
+			providerURL:         vcsCaller.Provider.URL,
 			accessToken:         accessToken,
 			provider:            provider,
 			processInput:        input,
@@ -1379,22 +1396,28 @@ func (s *service) getOAuthAuthorizationURL(ctx context.Context, vcsProvider *mod
 		return "", err
 	}
 
-	// Build authorization code URL for the provider which
-	// identity provider can use to complete OAuth flow.
-	authURL := provider.BuildOAuthAuthorizationURL(&types.BuildOAuthAuthorizationURLInput{
-		Hostname:           vcsProvider.Hostname,
+	authorizationURLInput := &types.BuildOAuthAuthorizationURLInput{
+		ProviderURL:        vcsProvider.URL,
 		OAuthClientID:      vcsProvider.OAuthClientID,
 		OAuthState:         *vcsProvider.OAuthState,
 		RedirectURL:        redirectURL,
 		UseReadWriteScopes: vcsProvider.AutoCreateWebhooks,
-	})
+	}
 
-	return authURL, nil
+	// Build authorization code URL for the provider which
+	// identity provider can use to complete OAuth flow.
+	return provider.BuildOAuthAuthorizationURL(authorizationURLInput)
 }
 
 func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) error {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		return err
+	}
+
+	// Make sure the state value if a valid UUID. Avoids
+	// a DB query for random calls to the endpoint.
+	if _, err = uuid.Parse(input.State); err != nil {
 		return err
 	}
 
@@ -1424,7 +1447,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 
 	// Create the access token with the provider.
 	payload, err := provider.CreateAccessToken(ctx, &types.CreateAccessTokenInput{
-		Hostname:          vp.Hostname,
+		ProviderURL:       vp.URL,
 		ClientID:          vp.OAuthClientID,
 		ClientSecret:      vp.OAuthClientSecret,
 		AuthorizationCode: input.AuthorizationCode,
@@ -1436,7 +1459,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 
 	// Test the access token incase the value wasn't retrieved for some reason.
 	if err = provider.TestConnection(ctx, &types.TestConnectionInput{
-		Hostname:    vp.Hostname,
+		ProviderURL: vp.URL,
 		AccessToken: payload.AccessToken,
 	}); err != nil {
 		return err
@@ -1502,7 +1525,7 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 
 	// Renew the access token.
 	payload, err := provider.CreateAccessToken(ctx, &types.CreateAccessTokenInput{
-		Hostname:     vp.Hostname,
+		ProviderURL:  vp.URL,
 		ClientID:     vp.OAuthClientID,
 		ClientSecret: vp.OAuthClientSecret,
 		RedirectURI:  redirectURI,
@@ -1542,7 +1565,7 @@ func (s *service) getVCSProvider(providerType models.VCSProviderType) (Provider,
 func (s *service) handleVCSRun(ctx context.Context, input *handleVCSRunInput) error {
 	// Download the repository archive and get the path to the local repo.
 	parentDirectory, repoDirectory, err := downloadRepositoryArchive(ctx, &downloadRepositoryArchiveInput{
-		hostname:            input.hostname,
+		providerURL:         input.providerURL,
 		accessToken:         input.accessToken,
 		provider:            input.provider,
 		repositoryPath:      input.link.RepositoryPath,
@@ -1637,7 +1660,7 @@ func (s *service) handleEvent(ctx context.Context, input *handleEventInput) erro
 	}
 
 	downloadInput := &downloadRepositoryArchiveInput{
-		hostname:            input.hostname,
+		providerURL:         input.providerURL,
 		accessToken:         input.accessToken,
 		provider:            input.provider,
 		repositoryPath:      input.link.RepositoryPath,
@@ -1777,7 +1800,7 @@ func (s *service) createUploadConfigurationVersion(ctx context.Context,
 func downloadRepositoryArchive(ctx context.Context, input *downloadRepositoryArchiveInput) (string, string, error) {
 	// Download the repository archive.
 	archiveResp, err := input.provider.GetArchive(ctx, &types.GetArchiveInput{
-		Hostname:       input.hostname,
+		ProviderURL:    input.providerURL,
 		AccessToken:    input.accessToken,
 		RepositoryPath: input.repositoryPath,
 		Ref:            input.referenceName,
@@ -1850,7 +1873,7 @@ func getAlteredFiles(ctx context.Context, input *handleEventInput) (map[string]s
 		// Since the 'before' commit is not empty, we can
 		// run a diff on 'before' and 'after' commits.
 		payload, err := input.provider.GetDiffs(ctx, &types.GetDiffsInput{
-			Hostname:       input.hostname,
+			ProviderURL:    input.providerURL,
 			AccessToken:    input.accessToken,
 			RepositoryPath: input.link.RepositoryPath,
 			BaseRef:        input.processInput.Before,
@@ -1872,7 +1895,7 @@ func getAlteredFiles(ctx context.Context, input *handleEventInput) (map[string]s
 		// No parent or 'before' hash i.e. first branch commit.
 		// Get the diff for the 'head' commit ID.
 		payload, err := input.provider.GetDiff(ctx, &types.GetDiffInput{
-			Hostname:       input.hostname,
+			ProviderURL:    input.providerURL,
 			AccessToken:    input.accessToken,
 			RepositoryPath: input.link.RepositoryPath,
 			Ref:            ref,
@@ -1891,6 +1914,9 @@ func getAlteredFiles(ctx context.Context, input *handleEventInput) (map[string]s
 // the glob patterns. Returns true on the earliest match.
 // Multiple patterns act as an OR condition.
 func globsMatch(repoDirectory string, alteredFiles map[string]struct{}, globs []string) bool {
+	// Must add a trailing slash, so globs without a leading slash work properly.
+	// FilepathGlob will properly clean the path before using it incase of double slashes.
+	repoDirectory += "/"
 	for _, glob := range globs {
 		// Only possible error returned is when pattern is malformed.
 		// Since this was validated when created, we can ignore it.
@@ -1899,7 +1925,7 @@ func globsMatch(repoDirectory string, alteredFiles map[string]struct{}, globs []
 		for _, match := range matches {
 			// Remove the directory name and a trailing '/' prefix as
 			// filepaths in alteredFiles won't have it.
-			if _, ok := alteredFiles[strings.TrimPrefix(match, repoDirectory+"/")]; ok {
+			if _, ok := alteredFiles[strings.TrimPrefix(match, repoDirectory)]; ok {
 				return ok
 			}
 		}
@@ -1929,7 +1955,7 @@ func refMatches(
 			return false
 		}
 
-		if link.TagRegex != nil {
+		if *link.TagRegex != "" {
 			// Regex has already been validated at the time of creation.
 			tagRegex, _ := regexp.Compile(*link.TagRegex)
 			return tagRegex.MatchString(ref)

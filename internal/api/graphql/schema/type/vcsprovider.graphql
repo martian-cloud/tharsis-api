@@ -54,7 +54,7 @@ type VCSProvider implements Node {
   name: String!
   description: String!
   group: Group!
-  hostname: String!
+  url: String!
   groupPath: String!
   resourcePath: String!
   type: VCSProviderType!
@@ -66,7 +66,7 @@ input CreateVCSProviderInput {
   name: String!
   description: String!
   groupPath: String!
-  hostname: String
+  url: String
   oAuthClientId: String!
   oAuthClientSecret: String!
   type: VCSProviderType!

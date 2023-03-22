@@ -1,19 +1,16 @@
 package types
 
-import "time"
+import (
+	"net/url"
+	"time"
+)
 
 // Request method and content types, headers, etc. mainly for convenience.
 const (
-	GETMethodType    = "GET"
-	POSTMethodType   = "POST"
-	DELETEMethodType = "DELETE"
-
 	JSONContentType = "application/json"
 	FormContentType = "application/x-www-form-urlencoded"
 
-	BearerAuthPrefix = "Bearer "
-
-	HTTPSScheme       = "https"
+	BearerAuthPrefix  = "Bearer "
 	V1WebhookEndpoint = "v1/vcs/events"
 )
 
@@ -27,7 +24,7 @@ type ToVCSEventTypeInput struct {
 // BuildOAuthAuthorizationURLInput is the input for building an
 // authorization code URL that can be used to complete OAuth flow.
 type BuildOAuthAuthorizationURLInput struct {
-	Hostname           string
+	ProviderURL        url.URL
 	OAuthClientID      string
 	OAuthState         string
 	RedirectURL        string
@@ -36,19 +33,19 @@ type BuildOAuthAuthorizationURLInput struct {
 
 // BuildRepositoryURLInput is the input for building a repository URL.
 type BuildRepositoryURLInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	RepositoryPath string
 }
 
 // TestConnectionInput is the input for testing a connection with a provider.
 type TestConnectionInput struct {
-	Hostname    string
+	ProviderURL url.URL
 	AccessToken string
 }
 
 // CreateAccessTokenInput is the input for creating an access token from a provider.
 type CreateAccessTokenInput struct {
-	Hostname          string
+	ProviderURL       url.URL
 	ClientID          string
 	ClientSecret      string
 	AuthorizationCode string
@@ -58,14 +55,14 @@ type CreateAccessTokenInput struct {
 
 // GetProjectInput is the input for retrieving a project.
 type GetProjectInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
 }
 
 // GetDiffInput is the input for retrieving a diff for a ref.
 type GetDiffInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
 	Ref            string // Branch or commit ID to diff.
@@ -73,7 +70,7 @@ type GetDiffInput struct {
 
 // GetDiffsInput is the input for comparing two Git references.
 type GetDiffsInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
 	BaseRef        string // What we're comparing from. (Parent branch, tag etc.)
@@ -82,7 +79,7 @@ type GetDiffsInput struct {
 
 // GetArchiveInput is the input for downloading a source archive.
 type GetArchiveInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
 	Ref            string
@@ -90,7 +87,7 @@ type GetArchiveInput struct {
 
 // CreateWebhookInput is the input for creating a webhook.
 type CreateWebhookInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
 	WebhookToken   []byte
@@ -98,7 +95,7 @@ type CreateWebhookInput struct {
 
 // DeleteWebhookInput is the input for deleting a webhook.
 type DeleteWebhookInput struct {
-	Hostname       string
+	ProviderURL    url.URL
 	AccessToken    string
 	RepositoryPath string
 	WebhookID      string

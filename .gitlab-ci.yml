@@ -30,7 +30,7 @@ workflow:
     - when: never
 
 variables:
-  GO_VERSION: "1.18.2"
+  GO_VERSION: "1.20"
   CGO_ENABLED: "0"
   GOPATH_RELATIVE_PATH: .go
   GOPATH: "$CI_PROJECT_DIR/$GOPATH_RELATIVE_PATH"
@@ -69,7 +69,7 @@ default:
 
 .on_tag_events:
   rules:
-    - if: '$CI_COMMIT_TAG'
+    - if: "$CI_COMMIT_TAG"
 
 .on_default_branch_and_merge_train_with_golang_changes:
   rules:
@@ -110,46 +110,46 @@ publish api docker:
     - !reference [.on_tag_events, rules]
   script:
     - |
-        # Build registry URIs.
-        registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
-        api_uri="$registry_uri"/api
+      # Build registry URIs.
+      registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+      api_uri="$registry_uri"/api
 
-        docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+      docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
-        echo "Building tharsis-api image"
-        docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
+      echo "Building tharsis-api image"
+      docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
 
-        if [ ! -z "$CI_COMMIT_TAG" ]; then
-          echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
+      if [ ! -z "$CI_COMMIT_TAG" ]; then
+        echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
 
-          # Version is based on semantic versioning
-          full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
-          major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
-          major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
+        # Version is based on semantic versioning
+        full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
+        major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
+        major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
 
-          # Version tag API images.
-          echo "Version tagging the api image"
-          docker image tag api:latest $api_uri:$full_version
-          docker image tag api:latest $api_uri:$major_version
-          docker image tag api:latest $api_uri:$major_minor_version
+        # Version tag API images.
+        echo "Version tagging the api image"
+        docker image tag api:latest $api_uri:$full_version
+        docker image tag api:latest $api_uri:$major_version
+        docker image tag api:latest $api_uri:$major_minor_version
 
-          echo "Pushing tharsis-api versioned image to registry"
-          docker image push $api_uri:$full_version
-          docker image push $api_uri:$major_version
-          docker image push $api_uri:$major_minor_version
+        echo "Pushing tharsis-api versioned image to registry"
+        docker image push $api_uri:$full_version
+        docker image push $api_uri:$major_version
+        docker image push $api_uri:$major_minor_version
 
-          latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
-          if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
-            then
-              echo "Build is latest, tagging and pushing image as latest"
-              docker image tag api:latest $api_uri:latest
-              docker image push $api_uri:latest
-          fi
-        else
-          echo "This is a normal commit so $IMAGE_TAG tag will be pushed to GitLab registry"
-          docker image tag api:latest $api_uri:$IMAGE_TAG
-          docker image push $api_uri:$IMAGE_TAG
+        latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
+        if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
+          then
+            echo "Build is latest, tagging and pushing image as latest"
+            docker image tag api:latest $api_uri:latest
+            docker image push $api_uri:latest
         fi
+      else
+        echo "This is a normal commit so $IMAGE_TAG tag will be pushed to GitLab registry"
+        docker image tag api:latest $api_uri:$IMAGE_TAG
+        docker image push $api_uri:$IMAGE_TAG
+      fi
   interruptible: false
 
 publish job-executor docker:
@@ -231,20 +231,20 @@ tests:
     - wget -O - https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
   script:
     - |
-        set -x
-        /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
-        go test \
-          -tags=integration \
-          --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
-          -covermode=atomic \
-          -coverpkg gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/... \
-          -v \
-          -coverprofile .coverage \
-          ./... 2>&1 | tee .test-results
+      set -x
+      /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
+      go test \
+        -tags=integration \
+        --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
+        -covermode=atomic \
+        -coverpkg gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/... \
+        -v \
+        -coverprofile .coverage \
+        ./... 2>&1 | tee .test-results
 
-        go tool cover -func .coverage | tail
-        go-junit-report -set-exit-code < .test-results > .xunit-results.xml
-        gocover-cobertura < .coverage > coverage.xml
+      go tool cover -func .coverage | tail
+      go-junit-report -set-exit-code < .test-results > .xunit-results.xml
+      gocover-cobertura < .coverage > coverage.xml
   artifacts:
     when: always
     reports:
@@ -266,34 +266,34 @@ lint:
   script:
     - go mod download
     - |
-        # Set similar rules as golint, subject to change
-        cat <<EOF > config.toml
-        ignoreGeneratedHeader = false
-        severity = "warning"
-        confidence = 0.8
-        errorCode = 0
-        warningCode = 0
+      # Set similar rules as golint, subject to change
+      cat <<EOF > config.toml
+      ignoreGeneratedHeader = false
+      severity = "warning"
+      confidence = 0.8
+      errorCode = 0
+      warningCode = 0
 
-        [rule.blank-imports]
-        [rule.context-as-argument]
-        [rule.context-keys-type]
-        [rule.dot-imports]
-        [rule.error-return]
-        [rule.error-strings]
-        [rule.error-naming]
-        [rule.exported]
-        [rule.if-return]
-        [rule.increment-decrement]
-        [rule.var-naming]
-        [rule.var-declaration]
-        # [rule.package-comments]
-        [rule.range]
-        [rule.receiver-naming]
-        [rule.time-naming]
-        [rule.unexported-return]
-        [rule.indent-error-flow]
-        [rule.errorf]
-        EOF
+      [rule.blank-imports]
+      [rule.context-as-argument]
+      [rule.context-keys-type]
+      [rule.dot-imports]
+      [rule.error-return]
+      [rule.error-strings]
+      [rule.error-naming]
+      [rule.exported]
+      [rule.if-return]
+      [rule.increment-decrement]
+      [rule.var-naming]
+      [rule.var-declaration]
+      # [rule.package-comments]
+      [rule.range]
+      [rule.receiver-naming]
+      [rule.time-naming]
+      [rule.unexported-return]
+      [rule.indent-error-flow]
+      [rule.errorf]
+      EOF
     - revive -config config.toml -set_exit_status $(go list ./... | grep -v /vendor/)
   cache:
     <<: *cache-template
@@ -320,7 +320,7 @@ container_scanning:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"'
       variables:
         CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${IMAGE_TAG}"
-    - if: '$CI_COMMIT_TAG'
+    - if: "$CI_COMMIT_TAG"
       variables:
         CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:latest"
 
@@ -365,18 +365,18 @@ license_scanning:
   script:
     - make build-api
     - |
-        cat <<EOF > lichen.yaml
-        # minimum confidence percentage used during license classification
-        threshold: .80
+      cat <<EOF > lichen.yaml
+      # minimum confidence percentage used during license classification
+      threshold: .80
 
-        override:
-          - path: "github.com/pjbgf/sha1cd"
-            version: "v0.2.3"
-            licenses: ["Apache-2.0"]
-        EOF
+      override:
+        - path: "github.com/pjbgf/sha1cd"
+          version: "v0.2.3"
+          licenses: ["Apache-2.0"]
+      EOF
     - lichen --config lichen.yaml -j lichen.json $CI_PROJECT_DIR/apiserver
     - >
-        jq '{"version": "2.1","licenses": [ . | .Modules[] | .Licenses[] | {"id": .Name,"name": .Name, "url": ("https://opensource.org/licenses/" + .Name) } ] | unique,"dependencies":[ . | .Modules[] | {"name": .Path, "version": .Version, "package_manager": "go","path": "go.sum","licenses": [ .Licenses[] | .Name]}]}' lichen.json > gl-license-scanning-report.json
+      jq '{"version": "2.1","licenses": [ . | .Modules[] | .Licenses[] | {"id": .Name,"name": .Name, "url": ("https://opensource.org/licenses/" + .Name) } ] | unique,"dependencies":[ . | .Modules[] | {"name": .Path, "version": .Version, "package_manager": "go","path": "go.sum","licenses": [ .Licenses[] | .Name]}]}' lichen.json > gl-license-scanning-report.json
   cache:
     <<: *cache-template
   artifacts:
@@ -408,14 +408,14 @@ dast_api:
     - build_aio_container_image
   before_script:
     - |
-        apk add curl jq
-        timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
-        THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
-          -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
-          --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
-          --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
-        export THARSIS_STATIC_TOKEN
-        echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
+      apk add curl jq
+      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
+      THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
+        -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
+        --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
+        --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
+      export THARSIS_STATIC_TOKEN
+      echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
   rules:
     - !reference [.on_default_branch_and_merge_train, rules]
 
@@ -440,13 +440,13 @@ apifuzzer_fuzz:
     - build_aio_container_image
   before_script:
     - |
-        apk add curl jq
-        timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
-        THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
-          -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
-          --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
-          --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
-        export THARSIS_STATIC_TOKEN
-        echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
+      apk add curl jq
+      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
+      THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
+        -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
+        --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
+        --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
+      export THARSIS_STATIC_TOKEN
+      echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
     - !reference [.on_default_branch_and_merge_train, rules]
