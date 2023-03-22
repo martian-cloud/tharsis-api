@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
@@ -86,7 +87,7 @@ var vcsProvidersFieldList = append(
 	"name",
 	"description",
 	"type",
-	"hostname",
+	"url",
 	"oauth_client_id",
 	"oauth_client_secret",
 	"oauth_state",
@@ -246,7 +247,7 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 			"name":                          provider.Name,
 			"description":                   nullableString(provider.Description),
 			"type":                          provider.Type,
-			"hostname":                      provider.Hostname,
+			"url":                           provider.URL.String(),
 			"oauth_client_id":               provider.OAuthClientID,
 			"oauth_client_secret":           provider.OAuthClientSecret,
 			"oauth_state":                   provider.OAuthState,
@@ -425,6 +426,7 @@ func buildVCSProviderResourcePath(groupPath string, name string) string {
 
 func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, error) {
 	var description sql.NullString
+	var providerURL string
 	vp := &models.VCSProvider{}
 
 	fields := []interface{}{
@@ -436,7 +438,7 @@ func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, e
 		&vp.Name,
 		&description,
 		&vp.Type,
-		&vp.Hostname,
+		&providerURL,
 		&vp.OAuthClientID,
 		&vp.OAuthClientSecret,
 		&vp.OAuthState,
@@ -465,6 +467,12 @@ func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, e
 	if withResourcePath {
 		vp.ResourcePath = buildVCSProviderResourcePath(path, vp.Name)
 	}
+
+	parsedURL, err := url.Parse(providerURL)
+	if err != nil {
+		return nil, err
+	}
+	vp.URL = *parsedURL
 
 	return vp, nil
 }

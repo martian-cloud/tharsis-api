@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -16,11 +17,11 @@ import (
 
 // Provider handles the logic for a specific type of vcs provider.
 type Provider interface {
-	DefaultAPIHostname() string
+	DefaultURL() url.URL
 	MergeRequestActionIsSupported(action string) bool
 	ToVCSEventType(input *types.ToVCSEventTypeInput) models.VCSEventType
-	BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) string
-	BuildRepositoryURL(input *types.BuildRepositoryURLInput) string
+	BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) (string, error)
+	BuildRepositoryURL(input *types.BuildRepositoryURLInput) (string, error)
 	TestConnection(ctx context.Context, input *types.TestConnectionInput) error
 	GetProject(ctx context.Context, input *types.GetProjectInput) (*types.GetProjectPayload, error)
 	GetDiff(ctx context.Context, input *types.GetDiffInput) (*types.GetDiffsPayload, error)

@@ -30,9 +30,6 @@ const (
 	// NOTE: GitHub does not seem to support read-only 'repo' scope.
 	// https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes
 	gitHubReadWriteOAuthScopes = "repo read:user"
-
-	// defaultAPIHostname is the default hostname for this provider type.
-	defaultAPIHostname = "api.github.com"
 )
 
 var (
@@ -48,6 +45,12 @@ var (
 	supportedGitHubPRActions = map[string]struct{}{
 		"opened":      {}, // When a PR is opened.
 		"synchronize": {}, // When a PR is updated.
+	}
+
+	// defaultURL is the default API URL for this provider type.
+	defaultURL = url.URL{
+		Scheme: "https",
+		Host:   "api.github.com",
 	}
 )
 
@@ -103,9 +106,9 @@ func New(
 	}, nil
 }
 
-// DefaultAPIHostname returns the default API hostname for this provider.
-func (p *Provider) DefaultAPIHostname() string {
-	return defaultAPIHostname
+// DefaultURL returns the default API URL for this provider.
+func (p *Provider) DefaultURL() url.URL {
+	return defaultURL
 }
 
 // MergeRequestActionIsSupported returns true if the merge request action is supported.
@@ -135,45 +138,36 @@ func (p *Provider) ToVCSEventType(input *types.ToVCSEventTypeInput) models.VCSEv
 
 // BuildOAuthAuthorizationURL build the authorization code URL which is
 // used to redirect the user to the VCS provider to complete OAuth flow.
-func (p *Provider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) string {
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   strings.TrimPrefix(input.Hostname, "api."), // Can't use GitHub's API hostname here.
-		Path:   "login/oauth/authorize",
-	}
-
-	queries := endpoint.Query()
+func (p *Provider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) (string, error) {
+	// Add queries.
+	queries := input.ProviderURL.Query()
 	queries.Add("client_id", input.OAuthClientID)
 	queries.Add("redirect_uri", input.RedirectURL)
 	queries.Add("state", input.OAuthState)
 	queries.Add("scope", gitHubReadWriteOAuthScopes)
-	endpoint.RawQuery = queries.Encode()
+	input.ProviderURL.RawQuery = queries.Encode()
 
-	return endpoint.String()
+	// Can't use GitHub's API here. Must remove ".api" prefix.
+	input.ProviderURL.Host = p.stripAPIPrefix(input.ProviderURL.Host)
+	return url.JoinPath(input.ProviderURL.String(), "login/oauth/authorize")
 }
 
 // BuildRepositoryURL returns the repository URL associated with the provider.
-func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) string {
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   strings.TrimPrefix(input.Hostname, "api."), // Can't use GitHub's API hostname here.
-		Path:   input.RepositoryPath,
-	}
-
-	return endpoint.String()
+func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) (string, error) {
+	input.ProviderURL.Host = p.stripAPIPrefix(input.ProviderURL.Host)
+	return url.JoinPath(input.ProviderURL.String(), input.RepositoryPath)
 }
 
 // TestConnection simply queries for the user metadata that's
 // associated with the access token to verify validity.
 // https://docs.github.com/en/rest/users/users#get-the-authenticated-user
 func (p *Provider) TestConnection(ctx context.Context, input *types.TestConnectionInput) error {
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   "user",
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), "user")
+	if err != nil {
+		return err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -189,11 +183,7 @@ func (p *Provider) TestConnection(ctx context.Context, input *types.TestConnecti
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"failed to connect to VCS provider at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return fmt.Errorf("failed to connect to VCS provider. Response status: %s", resp.Status)
 	}
 
 	return nil
@@ -208,13 +198,12 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 		input.RepositoryPath,
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -231,10 +220,7 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf(
-			"failed to query for project at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+			"failed to query for project. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -265,13 +251,12 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 		input.Ref,
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -287,11 +272,7 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to get diff at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to get diff. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -307,7 +288,7 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 	}
 
 	return &types.GetDiffsPayload{
-		AlteredFiles: createChangesMap(&diffResp),
+		AlteredFiles: p.createChangesMap(&diffResp),
 	}, nil
 }
 
@@ -321,13 +302,12 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 		input.BaseRef + "..." + input.HeadRef,
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -343,11 +323,7 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to get diffs at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to get diffs. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -363,7 +339,7 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 	}
 
 	return &types.GetDiffsPayload{
-		AlteredFiles: createChangesMap(&diffResp),
+		AlteredFiles: p.createChangesMap(&diffResp),
 	}, nil
 }
 
@@ -377,13 +353,12 @@ func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput)
 		input.Ref,
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -399,11 +374,7 @@ func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to get repository archive at hostname %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to get repository archive. Response status: %s", resp.Status)
 	}
 
 	return resp, nil
@@ -420,21 +391,23 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 		"access_token",
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   strings.TrimPrefix(input.Hostname, "api."), // Cannot use GitHub's API hostname here.
-		Path:   path,
-	}
-
 	// Add queries.
-	queries := endpoint.Query()
+	queries := input.ProviderURL.Query()
 	queries.Add("client_id", input.ClientID)
 	queries.Add("client_secret", input.ClientSecret)
 	queries.Add("code", input.AuthorizationCode)
 	queries.Add("redirect_uri", input.RedirectURI)
-	endpoint.RawQuery = queries.Encode()
+	input.ProviderURL.RawQuery = queries.Encode()
 
-	request, err := http.NewRequestWithContext(ctx, types.POSTMethodType, endpoint.String(), nil)
+	// Cannot use GitHub's API hostname here. Must trim "api." prefix here.
+	input.ProviderURL.Host = p.stripAPIPrefix(input.ProviderURL.Host)
+
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -449,11 +422,7 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to create access token at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to create access token. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -484,10 +453,9 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 		"hooks",
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
 	}
 
 	// Build Tharsis webhook endpoint.
@@ -520,7 +488,7 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 		return nil, fmt.Errorf("failed to marshal request body: %v", err)
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.POSTMethodType, endpoint.String(), bytes.NewBuffer(marshalledBody))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(marshalledBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -536,11 +504,7 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf(
-			"failed to create webhook at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to create webhook. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -571,13 +535,12 @@ func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhook
 		input.WebhookID,
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.DELETEMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -592,18 +555,25 @@ func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhook
 	}
 
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf(
-			"failed to delete webhook at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return fmt.Errorf("failed to delete webhook. Response status: %s", resp.Status)
 	}
 
 	return nil
 }
 
+// stripAPIPrefix removes the API prefix if using the provider's default URL.
+// This is necessary for any user-facing actions, such as, OAuth flow,
+// repository URL etc. i.e. actions that take place in the browser.
+func (p *Provider) stripAPIPrefix(host string) string {
+	if host == defaultURL.Host {
+		host = strings.TrimPrefix(host, "api.")
+	}
+
+	return host
+}
+
 // createChangesMap creates a unique map of files that have been altered.
-func createChangesMap(diffResp *getDiffsResponse) map[string]struct{} {
+func (p *Provider) createChangesMap(diffResp *getDiffsResponse) map[string]struct{} {
 	changesMap := map[string]struct{}{}
 	for _, file := range diffResp.Files {
 		if _, ok := changesMap[file.Filename]; !ok {

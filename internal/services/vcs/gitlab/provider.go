@@ -28,9 +28,6 @@ const (
 	// These base permissions are needed when webhooks aren't being used in order to validate
 	// the access token, download a repository tarball among other API interactions.
 	gitLabReadOnlyOAuthScopes = "read_user read_api"
-
-	// defaultAPIHostname is the default hostname for this provider type.
-	defaultAPIHostname = "gitlab.com"
 )
 
 var (
@@ -57,6 +54,12 @@ var (
 		"Push Hook":          models.BranchEventType,
 		"Tag Push Hook":      models.TagEventType,
 		"Merge Request Hook": models.MergeRequestEventType,
+	}
+
+	// defaultURL is the default API URL for this provider type.
+	defaultURL = url.URL{
+		Scheme: "https",
+		Host:   "gitlab.com",
 	}
 )
 
@@ -114,9 +117,9 @@ func New(
 	}, nil
 }
 
-// DefaultAPIHostname returns the default API hostname for this provider.
-func (p *Provider) DefaultAPIHostname() string {
-	return defaultAPIHostname
+// DefaultURL returns the default API URL for this provider.
+func (p *Provider) DefaultURL() url.URL {
+	return defaultURL
 }
 
 // MergeRequestActionIsSupported returns true if the merge request action is supported.
@@ -133,52 +136,39 @@ func (p *Provider) ToVCSEventType(input *types.ToVCSEventTypeInput) models.VCSEv
 
 // BuildOAuthAuthorizationURL build the authorization code URL which is
 // used to redirect the user to the VCS provider to complete OAuth flow.
-func (p *Provider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) string {
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   "oauth/authorize",
-	}
-
+func (p *Provider) BuildOAuthAuthorizationURL(input *types.BuildOAuthAuthorizationURLInput) (string, error) {
 	// Use appropriate scopes.
 	scopes := gitLabReadOnlyOAuthScopes
 	if input.UseReadWriteScopes {
 		scopes = gitLabReadWriteOAuthScopes
 	}
 
-	queries := endpoint.Query()
+	queries := input.ProviderURL.Query()
 	queries.Add("client_id", input.OAuthClientID)
 	queries.Add("redirect_uri", input.RedirectURL)
 	queries.Add("response_type", "code")
 	queries.Add("state", input.OAuthState)
 	queries.Add("scope", scopes)
-	endpoint.RawQuery = queries.Encode()
+	input.ProviderURL.RawQuery = queries.Encode()
 
-	return endpoint.String()
+	return url.JoinPath(input.ProviderURL.String(), "oauth/authorize")
 }
 
 // BuildRepositoryURL returns the repository URL associated with the provider.
-func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) string {
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   input.RepositoryPath,
-	}
-
-	return endpoint.String()
+func (p *Provider) BuildRepositoryURL(input *types.BuildRepositoryURLInput) (string, error) {
+	return url.JoinPath(input.ProviderURL.String(), input.RepositoryPath)
 }
 
 // TestConnection simply queries for the user metadata that's
 // associated with the access token to verify validity.
 // https://docs.gitlab.com/ee/api/users.html#for-normal-users-1
 func (p *Provider) TestConnection(ctx context.Context, input *types.TestConnectionInput) error {
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   strings.Join([]string{apiV4Endpoint, "user"}, "/"),
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), apiV4Endpoint, "user")
+	if err != nil {
+		return err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -194,11 +184,7 @@ func (p *Provider) TestConnection(ctx context.Context, input *types.TestConnecti
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"failed to connect to VCS provider at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return fmt.Errorf("failed to connect to VCS provider. Response status: %s", resp.Status)
 	}
 
 	return nil
@@ -214,26 +200,16 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 		url.PathEscape(input.RepositoryPath),
 	}, "/")
 
-	// Since part of the path is escaped, we must provide the
-	// unescaped version to 'Path' or URL will be double encoded.
-	path, err := url.PathUnescape(rawPath)
+	queries := input.ProviderURL.Query()
+	queries.Add("statistics", "true") // 'statistics' contains information about repo size.
+	input.ProviderURL.RawQuery = queries.Encode()
+
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create the URL with a 'statistics' query parameter.
-	endpoint := url.URL{
-		Scheme:  types.HTTPSScheme,
-		Host:    input.Hostname,
-		Path:    path,
-		RawPath: rawPath,
-	}
-
-	queries := endpoint.Query()
-	queries.Add("statistics", "true") // 'statistics' contains information about repo size.
-	endpoint.RawQuery = queries.Encode()
-
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -249,11 +225,7 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to query for project at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to query for project. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -288,21 +260,12 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 		"diff",
 	}, "/")
 
-	// Since part of the path is escaped, we must provide the
-	// unescaped version to 'Path' or URL will be double encoded.
-	path, err := url.PathUnescape(rawPath)
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
 	if err != nil {
 		return nil, err
 	}
 
-	endpoint := url.URL{
-		Scheme:  types.HTTPSScheme,
-		Host:    input.Hostname,
-		Path:    path,
-		RawPath: rawPath,
-	}
-
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -318,11 +281,7 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to get diff at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to get diff. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -354,27 +313,18 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 		"compare",
 	}, "/")
 
-	// Since part of the path is escaped, we must provide the
-	// unescaped version to 'Path' or URL will be double encoded.
-	path, err := url.PathUnescape(rawPath)
+	// Add queries.
+	queries := input.ProviderURL.Query()
+	queries.Add("from", input.BaseRef)
+	queries.Add("to", input.HeadRef)
+	input.ProviderURL.RawQuery = queries.Encode()
+
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
 	if err != nil {
 		return nil, err
 	}
 
-	endpoint := url.URL{
-		Scheme:  types.HTTPSScheme,
-		Host:    input.Hostname,
-		Path:    path,
-		RawPath: rawPath,
-	}
-
-	// Add queries.
-	queries := endpoint.Query()
-	queries.Add("from", input.BaseRef)
-	queries.Add("to", input.HeadRef)
-	endpoint.RawQuery = queries.Encode()
-
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -390,11 +340,7 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to get diffs at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to get diffs. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -426,26 +372,17 @@ func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput)
 		"archive.tar.gz", // Default is tar.gz, but incase it changes.
 	}, "/")
 
-	// Since part of the path is escaped, we must provide the
-	// unescaped version to 'Path' or URL will be double encoded.
-	path, err := url.PathUnescape(rawPath)
+	// Add queries.
+	queries := input.ProviderURL.Query()
+	queries.Add("sha", input.Ref)
+	input.ProviderURL.RawQuery = queries.Encode()
+
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
 	if err != nil {
 		return nil, err
 	}
 
-	endpoint := url.URL{
-		Scheme:  types.HTTPSScheme,
-		Host:    input.Hostname,
-		Path:    path,
-		RawPath: rawPath,
-	}
-
-	// Add queries.
-	queries := endpoint.Query()
-	queries.Add("sha", input.Ref)
-	endpoint.RawQuery = queries.Encode()
-
-	request, err := http.NewRequestWithContext(ctx, types.GETMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -460,11 +397,7 @@ func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to get repository archive at hostname %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to get repository archive. Response status: %s", resp.Status)
 	}
 
 	return resp, nil
@@ -480,14 +413,8 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 		"token",
 	}, "/")
 
-	endpoint := url.URL{
-		Scheme: types.HTTPSScheme,
-		Host:   input.Hostname,
-		Path:   path,
-	}
-
 	// Add queries.
-	queries := endpoint.Query()
+	queries := input.ProviderURL.Query()
 	queries.Add("client_id", input.ClientID)
 	queries.Add("client_secret", input.ClientSecret)
 	queries.Add("redirect_uri", input.RedirectURI)
@@ -500,9 +427,14 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 		queries.Add("code", input.AuthorizationCode)
 		queries.Add("grant_type", "authorization_code")
 	}
-	endpoint.RawQuery = queries.Encode()
+	input.ProviderURL.RawQuery = queries.Encode()
 
-	request, err := http.NewRequestWithContext(ctx, types.POSTMethodType, endpoint.String(), nil)
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), path)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -517,11 +449,7 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"failed to create access token at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to create access token. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -560,18 +488,9 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 		"hooks",
 	}, "/")
 
-	// Since part of the path is escaped, we must provide the
-	// unescaped version to 'Path' or URL will be double encoded.
-	path, err := url.PathUnescape(rawPath)
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
 	if err != nil {
 		return nil, err
-	}
-
-	endpoint := url.URL{
-		Scheme:  types.HTTPSScheme,
-		Host:    input.Hostname,
-		Path:    path,
-		RawPath: rawPath,
 	}
 
 	// Build Tharsis webhook endpoint.
@@ -591,7 +510,7 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	form.Add("url", parsedURL.String())
 	form.Add("token", string(input.WebhookToken))
 
-	request, err := http.NewRequestWithContext(ctx, types.POSTMethodType, endpoint.String(), strings.NewReader(form.Encode()))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -607,10 +526,7 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("failed to create webhook at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return nil, fmt.Errorf("failed to create webhook. Response status: %s", resp.Status)
 	}
 
 	defer func() {
@@ -642,21 +558,12 @@ func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhook
 		input.WebhookID,
 	}, "/")
 
-	// Since part of the path is escaped, we must provide the
-	// unescaped version to 'Path' or URL will be double encoded.
-	path, err := url.PathUnescape(rawPath)
+	endpoint, err := url.JoinPath(input.ProviderURL.String(), rawPath)
 	if err != nil {
 		return err
 	}
 
-	endpoint := url.URL{
-		Scheme:  types.HTTPSScheme,
-		Host:    input.Hostname,
-		Path:    path,
-		RawPath: rawPath,
-	}
-
-	request, err := http.NewRequestWithContext(ctx, types.DELETEMethodType, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to prepare HTTP request: %v", err)
 	}
@@ -671,10 +578,7 @@ func (p *Provider) DeleteWebhook(ctx context.Context, input *types.DeleteWebhook
 	}
 
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to delete webhook at hostname: %s. Response status: %s",
-			input.Hostname,
-			resp.Status,
-		)
+		return fmt.Errorf("failed to delete webhook. Response status: %s", resp.Status)
 	}
 
 	return nil

@@ -163,9 +163,9 @@ func (r *VCSProviderResolver) Group(ctx context.Context) (*GroupResolver, error)
 	return &GroupResolver{group: group}, nil
 }
 
-// Hostname resolver
-func (r *VCSProviderResolver) Hostname() string {
-	return r.vcsProvider.Hostname
+// URL resolver
+func (r *VCSProviderResolver) URL() string {
+	return r.vcsProvider.URL.String()
 }
 
 // Type resolver
@@ -235,7 +235,7 @@ type ResetVCSProviderOAuthTokenInput struct {
 // CreateVCSProviderInput is the input for creating a VCS provider.
 type CreateVCSProviderInput struct {
 	ClientMutationID   *string
-	Hostname           *string
+	URL                *string
 	Name               string
 	Description        string
 	GroupPath          string
@@ -317,7 +317,7 @@ func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInpu
 		Name:               input.Name,
 		Description:        input.Description,
 		GroupID:            group.Metadata.ID,
-		Hostname:           input.Hostname,
+		URL:                input.URL,
 		OAuthClientID:      input.OAuthClientID,
 		OAuthClientSecret:  input.OAuthClientSecret,
 		Type:               input.Type,

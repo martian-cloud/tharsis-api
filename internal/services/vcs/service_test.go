@@ -4,6 +4,7 @@ import (
 	context "context"
 	"io"
 	http "net/http"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -35,8 +36,8 @@ const (
 )
 
 var (
-	sampleProviderHostname = "some.gitlab.instance.com"
-	sampleTagRegex         = "\\d+.\\d+$"
+	sampleProviderURL = url.URL{Scheme: "http", Host: "example.com:8080", Path: "/some/instance"}
+	sampleTagRegex    = "\\d+.\\d+$"
 
 	groupPath = "a/resource"
 
@@ -284,7 +285,7 @@ func TestCreateVCSProvider(t *testing.T) {
 		expectedErrorCode     string
 	}{
 		{
-			name:   "positive: GitLab provider with hostname, manual; expect provider created with values",
+			name:   "positive: GitLab provider with URL, manual; expect provider created with values",
 			caller: &auth.SystemCaller{},
 			input: &CreateVCSProviderInput{
 				Name:               "a-sample-gitlab-provider",
@@ -293,11 +294,11 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				Type:               models.GitLabProviderType,
-				Hostname:           &sampleProviderHostname,
+				URL:                ptr.String(sampleProviderURL.String()),
 				AutoCreateWebhooks: false,
 			},
 			buildAuthCodeURLInput: &types.BuildOAuthAuthorizationURLInput{
-				Hostname:           sampleProviderHostname,
+				ProviderURL:        sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
 				OAuthState:         sampleOAuthState.String(),
 				RedirectURL:        oAuthCallBackEndpoint,
@@ -311,7 +312,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitLabProviderType,
-				Hostname:           sampleProviderHostname,
+				URL:                sampleProviderURL,
 				CreatedBy:          "system",
 				AutoCreateWebhooks: false,
 			},
@@ -333,13 +334,13 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitLabProviderType,
-				Hostname:           sampleProviderHostname,
+				URL:                sampleProviderURL,
 				CreatedBy:          "sample@sample-email",
 				AutoCreateWebhooks: false,
 			},
 		},
 		{
-			name:   "positive: GitHub provider, no hostname, manual; expect provider created with defaults",
+			name:   "positive: GitHub provider, no URL, manual; expect provider created with defaults",
 			caller: &auth.SystemCaller{},
 			input: &CreateVCSProviderInput{
 				Name:               "a-sample-github-provider",
@@ -357,7 +358,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
-				Hostname:           "api.github.com",
+				URL:                sampleProviderURL,
 				CreatedBy:          "system",
 				Type:               models.GitHubProviderType,
 				AutoCreateWebhooks: false,
@@ -369,7 +370,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				TargetID:      resourceUUID,
 			},
 			buildAuthCodeURLInput: &types.BuildOAuthAuthorizationURLInput{
-				Hostname:           "api.github.com",
+				ProviderURL:        sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
 				OAuthState:         sampleOAuthState.String(),
 				RedirectURL:        oAuthCallBackEndpoint,
@@ -387,7 +388,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
 				Type:               models.GitHubProviderType,
-				Hostname:           "api.github.com",
+				URL:                sampleProviderURL,
 				CreatedBy:          "system",
 				AutoCreateWebhooks: false,
 			},
@@ -404,14 +405,20 @@ func TestCreateVCSProvider(t *testing.T) {
 				Type:               "unsupported",
 				AutoCreateWebhooks: true,
 			},
-			// Must supply this or test will fail falsely.
-			expectedProvider:  &models.VCSProvider{},
+			expectedErrorCode: errors.EInvalid,
+		},
+		{
+			name:   "negative: not a valid URL; expect error EInvalid",
+			caller: &auth.SystemCaller{},
+			input: &CreateVCSProviderInput{
+				Type: models.GitHubProviderType,
+				URL:  ptr.String("not-valid"),
+			},
 			expectedErrorCode: errors.EInvalid,
 		},
 		{
 			name:              "negative: without caller; expect error EUnauthorized",
 			input:             &CreateVCSProviderInput{},
-			expectedProvider:  &models.VCSProvider{},
 			expectedErrorCode: errors.EUnauthorized,
 		},
 	}
@@ -430,16 +437,19 @@ func TestCreateVCSProvider(t *testing.T) {
 			mockTransactions.Test(t)
 			mockActivityEventService.Test(t)
 
-			mockProviders.On("DefaultAPIHostname").Return(test.expectedProvider.Hostname)
-			mockProviders.On("BuildOAuthAuthorizationURL", mock.Anything).Return("https://redirect-url")
-
-			mockVCSProviders.On("CreateProvider", mock.Anything, test.toCreate).Return(test.expectedProvider, nil)
+			mockProviders.On("DefaultURL").Return(sampleProviderURL)
+			mockProviders.On("BuildOAuthAuthorizationURL", mock.Anything).Return("https://redirect-url", nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-			mockActivityEventService.On("CreateActivityEvent", mock.Anything, test.activityInput).Return(nil, nil)
+			if test.expectedErrorCode == "" {
+				mockVCSProviders.On("CreateProvider", mock.Anything, test.toCreate).Return(test.expectedProvider, nil)
+
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+				mockActivityEventService.On("CreateActivityEvent", mock.Anything, test.activityInput).Return(nil, nil)
+			}
 
 			dbClient := &db.Client{
 				VCSProviders: &mockVCSProviders,
@@ -497,7 +507,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 					OAuthClientSecret:  "a-sample-client-secret",
 					OAuthState:         ptr.String("sample-state"),
 					Type:               models.GitHubProviderType,
-					Hostname:           "api.github.com",
+					URL:                sampleProviderURL,
 					CreatedBy:          "sample@sample-email",
 					AutoCreateWebhooks: true,
 				},
@@ -568,7 +578,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 			ID:      resourceUUID,
 			Version: 1,
 		},
-		Hostname:           "api.github.com",
+		URL:                sampleProviderURL,
 		OAuthClientID:      "a-sample-client-id",
 		OAuthClientSecret:  "a-sample-client-secret",
 		OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -585,7 +595,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 			ID:      resourceUUID,
 			Version: 1,
 		},
-		Hostname:           "api.github.com",
+		URL:                sampleProviderURL,
 		OAuthClientID:      "a-sample-client-id",
 		OAuthClientSecret:  "a-sample-client-secret",
 		OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -632,7 +642,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 				Force:    true,
 			},
 			deleteWebhookInput: &types.DeleteWebhookInput{
-				Hostname:       "api.github.com",
+				ProviderURL:    sampleProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				WebhookID:      "webhook-id",
@@ -714,7 +724,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 			mockActivityEventService.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
-				Hostname:     test.input.Provider.Hostname,
+				ProviderURL:  test.input.Provider.URL,
 				ClientID:     test.input.Provider.OAuthClientID,
 				ClientSecret: test.input.Provider.OAuthClientSecret,
 				RedirectURI:  vcsOAuthCallbackURL,
@@ -938,12 +948,12 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				WebhookDisabled: true, // Tharsis should still configure the webhook.
 			},
 			getProjectInput: &types.GetProjectInput{
-				Hostname:       "api.github.com",
+				ProviderURL:    sampleProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 			},
 			createWebhookInput: &types.CreateWebhookInput{
-				Hostname:       "api.github.com",
+				ProviderURL:    sampleProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				WebhookToken:   []byte("signed-token"),
@@ -952,7 +962,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "provider-id",
 				},
-				Hostname:           "api.github.com",
+				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -1022,7 +1032,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				// branch from the projectPayload.
 			},
 			getProjectInput: &types.GetProjectInput{
-				Hostname:       "api.github.com",
+				ProviderURL:    sampleProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 			},
@@ -1030,7 +1040,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "provider-id",
 				},
-				Hostname:           "api.github.com",
+				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -1172,7 +1182,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockWorkspaceVCSProviderLinks.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
-				Hostname:     test.existingProvider.Hostname,
+				ProviderURL:  test.existingProvider.URL,
 				ClientID:     test.existingProvider.OAuthClientID,
 				ClientSecret: test.existingProvider.OAuthClientSecret,
 				RedirectURI:  vcsOAuthCallbackURL,
@@ -1359,13 +1369,13 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 				Force: false,
 			},
 			deleteWebhookInput: &types.DeleteWebhookInput{
-				Hostname:       "api.github.com",
+				ProviderURL:    sampleProviderURL,
 				AccessToken:    "an-access-token",
 				RepositoryPath: "owner/repository",
 				WebhookID:      "webhook-id",
 			},
 			existingProvider: &models.VCSProvider{
-				Hostname:           "api.github.com",
+				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -1395,7 +1405,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 			mockWorkspaceVCSProviderLinks.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
-				Hostname:     test.existingProvider.Hostname,
+				ProviderURL:  test.existingProvider.URL,
 				ClientID:     test.existingProvider.OAuthClientID,
 				ClientSecret: test.existingProvider.OAuthClientSecret,
 				RedirectURI:  oAuthCallBackEndpoint,
@@ -1463,7 +1473,7 @@ func TestCreateVCSRun(t *testing.T) {
 	}
 
 	sampleVCSProvider := &models.VCSProvider{
-		Hostname:          sampleProviderHostname,
+		URL:               sampleProviderURL,
 		OAuthClientID:     "a-sample-client-id",
 		OAuthClientSecret: "a-sample-client-secret",
 		OAuthState:        ptr.String(sampleOAuthState.String()),
@@ -1554,14 +1564,14 @@ func TestCreateVCSRun(t *testing.T) {
 			}
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
-				Hostname:     sampleVCSProvider.Hostname,
+				ProviderURL:  sampleVCSProvider.URL,
 				ClientID:     sampleVCSProvider.OAuthClientID,
 				ClientSecret: sampleVCSProvider.OAuthClientSecret,
 				RedirectURI:  oAuthCallBackEndpoint,
 			}
 
 			buildRepositoryURLInput := &types.BuildRepositoryURLInput{
-				Hostname:       sampleVCSProvider.Hostname,
+				ProviderURL:    sampleVCSProvider.URL,
 				RepositoryPath: sampleLink.RepositoryPath,
 			}
 
@@ -1624,7 +1634,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 
 	sampleVCSProvider := &models.VCSProvider{
 		Type:              models.GitHubProviderType,
-		Hostname:          "api.github.com",
+		URL:               sampleProviderURL,
 		OAuthClientID:     "a-sample-client-id",
 		OAuthClientSecret: "a-sample-client-secret",
 		OAuthState:        ptr.String(sampleOAuthState.String()),
@@ -1868,7 +1878,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 			mockManager.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
-				Hostname:     sampleVCSProvider.Hostname,
+				ProviderURL:  sampleVCSProvider.URL,
 				ClientID:     sampleVCSProvider.OAuthClientID,
 				ClientSecret: sampleVCSProvider.OAuthClientSecret,
 				RedirectURI:  oAuthCallBackEndpoint,
@@ -1882,14 +1892,14 @@ func TestProcessWebhookEvent(t *testing.T) {
 			}
 
 			buildRepositoryURLInput := &types.BuildRepositoryURLInput{
-				Hostname:       sampleVCSProvider.Hostname,
+				ProviderURL:    sampleVCSProvider.URL,
 				RepositoryPath: "owner/repository",
 			}
 
 			mockProviders.On("ToVCSEventType", toVCSEventInput).Return(test.equivalentEventType)
 			mockProviders.On("MergeRequestActionIsSupported", test.input.Action).Return(test.input.Action == "opened")
 			mockProviders.On("CreateAccessToken", mock.Anything, createAccessTokenInput).Return(createAccessTokenPayload, nil)
-			mockProviders.On("BuildRepositoryURL", buildRepositoryURLInput).Return(sampleRepositoryURL)
+			mockProviders.On("BuildRepositoryURL", buildRepositoryURLInput).Return(sampleRepositoryURL, nil)
 
 			mockVCSProviders.On("UpdateProvider", mock.Anything, sampleVCSProvider).Return(&models.VCSProvider{}, nil)
 
@@ -1931,7 +1941,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 
 	sampleVCSProvider := &models.VCSProvider{
 		Type:              models.GitHubProviderType,
-		Hostname:          "api.github.com",
+		URL:               sampleProviderURL,
 		OAuthClientID:     "a-sample-client-id",
 		OAuthClientSecret: "a-sample-client-secret",
 		OAuthState:        ptr.String("sample-state"),
@@ -1953,7 +1963,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 			expectedResponse: &ResetVCSProviderOAuthTokenResponse{
 				VCSProvider: &models.VCSProvider{
 					Type:       models.GitHubProviderType,
-					Hostname:   "api.github.com",
+					URL:        sampleProviderURL,
 					OAuthState: ptr.String("a-new-state"),
 				},
 				OAuthAuthorizationURL: "expected-url",
@@ -2023,7 +2033,7 @@ func TestGetOAuthAuthorizationURL(t *testing.T) {
 			name:   "positive: vcs provider has a non-nil state value; expect no errors",
 			caller: &auth.SystemCaller{},
 			input: &models.VCSProvider{
-				Hostname:          sampleProviderHostname,
+				URL:               sampleProviderURL,
 				OAuthClientID:     "sample-client-id",
 				OAuthClientSecret: "sample-client-secret",
 				GroupID:           "group-id",
@@ -2050,7 +2060,7 @@ func TestGetOAuthAuthorizationURL(t *testing.T) {
 			mockProviders.Test(t)
 
 			buildAuthURLInput := &types.BuildOAuthAuthorizationURLInput{
-				Hostname:           test.input.Hostname,
+				ProviderURL:        test.input.URL,
 				OAuthClientID:      test.input.OAuthClientID,
 				OAuthState:         "a-state-value",
 				RedirectURL:        vcsOAuthCallbackURL,
@@ -2104,7 +2114,7 @@ func TestProcessOAuth(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Type:              models.GitLabProviderType,
-				Hostname:          "api.github.com",
+				URL:               sampleProviderURL,
 				OAuthClientID:     "a-sample-client-id",
 				OAuthClientSecret: "a-sample-client-secret",
 				OAuthState:        ptr.String("sample-state"),
@@ -2116,7 +2126,7 @@ func TestProcessOAuth(t *testing.T) {
 			},
 			toUpdateInput: &models.VCSProvider{
 				Type:                      models.GitLabProviderType,
-				Hostname:                  "api.github.com",
+				URL:                       sampleProviderURL,
 				OAuthClientID:             "a-sample-client-id",
 				OAuthClientSecret:         "a-sample-client-secret",
 				OAuthAccessToken:          &sampleOAuthAccessToken,
@@ -2133,7 +2143,7 @@ func TestProcessOAuth(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Type:              models.GitLabProviderType,
-				Hostname:          "api.github.com",
+				URL:               sampleProviderURL,
 				OAuthClientID:     "a-sample-client-id",
 				OAuthClientSecret: "a-sample-client-secret",
 				OAuthState:        ptr.String("sample-state"),
@@ -2144,7 +2154,7 @@ func TestProcessOAuth(t *testing.T) {
 			},
 			toUpdateInput: &models.VCSProvider{
 				Type:              models.GitLabProviderType,
-				Hostname:          "api.github.com",
+				URL:               sampleProviderURL,
 				OAuthClientID:     "a-sample-client-id",
 				OAuthClientSecret: "a-sample-client-secret",
 				OAuthAccessToken:  &sampleOAuthAccessToken,
@@ -2173,7 +2183,7 @@ func TestProcessOAuth(t *testing.T) {
 			mockVCSProviders.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
-				Hostname:          test.existingProvider.Hostname,
+				ProviderURL:       test.existingProvider.URL,
 				ClientID:          test.existingProvider.OAuthClientID,
 				ClientSecret:      test.existingProvider.OAuthClientSecret,
 				AuthorizationCode: test.input.AuthorizationCode,
@@ -2181,7 +2191,7 @@ func TestProcessOAuth(t *testing.T) {
 			}
 
 			testConnectionInput := &types.TestConnectionInput{
-				Hostname:    test.existingProvider.Hostname,
+				ProviderURL: test.existingProvider.URL,
 				AccessToken: test.createAccessTokenPayload.AccessToken,
 			}
 
@@ -2243,7 +2253,7 @@ func Test_handleEvent(t *testing.T) {
 		{
 			name: "positive: valid branch push event, mostly empty link and provider setup; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2272,7 +2282,7 @@ func Test_handleEvent(t *testing.T) {
 		{
 			name: "positive: valid branch push event, mostly empty link and provider setup; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2301,7 +2311,7 @@ func Test_handleEvent(t *testing.T) {
 		{
 			name: "positive: valid tag event, no tag regex defined on link; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2329,7 +2339,7 @@ func Test_handleEvent(t *testing.T) {
 		{
 			name: "positive: valid tag event, with tag regex defined on link; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2357,7 +2367,7 @@ func Test_handleEvent(t *testing.T) {
 		{
 			name: "positive: valid PR event, auto-speculative is false on link; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2389,7 +2399,7 @@ func Test_handleEvent(t *testing.T) {
 		{
 			name: "positive: valid PR event, auto-speculative is true on link; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2422,7 +2432,7 @@ func Test_handleEvent(t *testing.T) {
 			// Just to test the for-loop logic.
 			name: "negative: configuration version failed to upload; expect error",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2459,7 +2469,7 @@ func Test_handleEvent(t *testing.T) {
 			// Run should still be created regardless.
 			name: "negative: unable to get altered files; expect no errors",
 			input: &handleEventInput{
-				hostname:    "api.github.com",
+				providerURL: sampleProviderURL,
 				accessToken: "an-access-token",
 				link: &models.WorkspaceVCSProviderLink{
 					RepositoryPath:      "owner/repository",
@@ -2512,7 +2522,7 @@ func Test_handleEvent(t *testing.T) {
 			}
 
 			getDiffsInput := &types.GetDiffsInput{
-				Hostname:       test.input.hostname,
+				ProviderURL:    test.input.providerURL,
 				AccessToken:    test.input.accessToken,
 				RepositoryPath: test.input.link.RepositoryPath,
 				BaseRef:        test.input.processInput.Before,
@@ -2520,7 +2530,7 @@ func Test_handleEvent(t *testing.T) {
 			}
 
 			getDiffInput := &types.GetDiffInput{
-				Hostname:       test.input.hostname,
+				ProviderURL:    test.input.providerURL,
 				AccessToken:    test.input.accessToken,
 				RepositoryPath: test.input.link.RepositoryPath,
 				Ref:            test.input.processInput.After,
@@ -2531,7 +2541,7 @@ func Test_handleEvent(t *testing.T) {
 			}
 
 			getArchiveInput := &types.GetArchiveInput{
-				Hostname:       test.input.hostname,
+				ProviderURL:    test.input.providerURL,
 				AccessToken:    test.input.accessToken,
 				RepositoryPath: test.input.link.RepositoryPath,
 				Ref:            test.input.processInput.Ref,

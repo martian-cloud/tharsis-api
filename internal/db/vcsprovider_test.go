@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sort"
 	"testing"
 	"time"
@@ -16,9 +17,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
+// Miscellaneous values used throughout testing.
 var (
-	// Used as the state value.
 	warmupOAuthState = uuid.New()
+	gitHubURL        = url.URL{Scheme: "https", Host: "github.com"}
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -747,7 +749,7 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 			toCreate: &models.VCSProvider{
 				Name:              "positive-create-vcs-provider-nearly-empty",
 				GroupID:           warmupGroupID,
-				Hostname:          "github.com",
+				URL:               gitHubURL,
 				OAuthClientID:     "a-client-id",
 				OAuthClientSecret: "a-client-secret",
 				OAuthState:        ptr.String(warmupOAuthState.String()),
@@ -762,7 +764,7 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 				Name:              "positive-create-vcs-provider-nearly-empty",
 				GroupID:           warmupGroupID,
 				ResourcePath:      warmupGroup.FullPath + "/positive-create-vcs-provider-nearly-empty",
-				Hostname:          "github.com",
+				URL:               gitHubURL,
 				OAuthClientID:     "a-client-id",
 				OAuthClientSecret: "a-client-secret",
 				OAuthState:        ptr.String(warmupOAuthState.String()),
@@ -776,7 +778,7 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 				Name:               "positive-create-vcs-provider-full",
 				Description:        "positive create vcs provider",
 				GroupID:            warmupGroupID,
-				Hostname:           "github.com",
+				URL:                gitHubURL,
 				OAuthClientID:      "a-client-id",
 				OAuthClientSecret:  "a-client-secret",
 				OAuthState:         ptr.String(warmupOAuthState.String()),
@@ -794,7 +796,7 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 				Name:               "positive-create-vcs-provider-full",
 				Description:        "positive create vcs provider",
 				GroupID:            warmupGroupID,
-				Hostname:           "github.com",
+				URL:                gitHubURL,
 				OAuthClientID:      "a-client-id",
 				OAuthClientSecret:  "a-client-secret",
 				OAuthState:         ptr.String(warmupOAuthState.String()),
@@ -924,7 +926,7 @@ func TestVCSProviders_UpdateProvider(t *testing.T) {
 				Name:              "1-vcs-provider-0",
 				Description:       "updated description",
 				GroupID:           warmupGroup.Metadata.ID,
-				Hostname:          positiveVCSProvider.Hostname,
+				URL:               positiveVCSProvider.URL,
 				Type:              models.GitHubProviderType,
 				OAuthClientID:     "new-client-id",
 				OAuthClientSecret: "new-client-secret",
@@ -1071,7 +1073,7 @@ var standardWarmupVCSProviders = []models.VCSProvider{
 		Description:       "vcs provider 0 for testing vcs providers",
 		GroupID:           "top-level-group-0-for-vcs-providers",
 		CreatedBy:         "someone-vp0",
-		Hostname:          "github.com",
+		URL:               gitHubURL,
 		OAuthClientID:     "a-client-id",
 		OAuthClientSecret: "a-client-secret",
 		OAuthState:        ptr.String(uuid.New().String()),
@@ -1083,7 +1085,7 @@ var standardWarmupVCSProviders = []models.VCSProvider{
 		Description:       "vcs provider 1 for testing vcs providers",
 		GroupID:           "top-level-group-0-for-vcs-providers",
 		CreatedBy:         "someone-vp1",
-		Hostname:          "github.com",
+		URL:               gitHubURL,
 		OAuthClientID:     "a-client-id",
 		OAuthClientSecret: "a-client-secret",
 		OAuthState:        ptr.String(uuid.New().String()),
@@ -1095,7 +1097,7 @@ var standardWarmupVCSProviders = []models.VCSProvider{
 		Description:       "vcs provider 2 for testing vcs providers",
 		GroupID:           "top-level-group-0-for-vcs-providers",
 		CreatedBy:         "someone-vp2",
-		Hostname:          "github.com",
+		URL:               gitHubURL,
 		OAuthClientID:     "a-client-id",
 		OAuthClientSecret: "a-client-secret",
 		OAuthState:        ptr.String(uuid.New().String()),
@@ -1107,7 +1109,7 @@ var standardWarmupVCSProviders = []models.VCSProvider{
 		Description:       "vcs provider 3 for testing vcs providers",
 		GroupID:           "top-level-group-0-for-vcs-providers",
 		CreatedBy:         "someone-vp3",
-		Hostname:          "github.com",
+		URL:               gitHubURL,
 		OAuthClientID:     "a-client-id",
 		OAuthClientSecret: "a-client-secret",
 		OAuthState:        ptr.String(uuid.New().String()),
@@ -1119,7 +1121,7 @@ var standardWarmupVCSProviders = []models.VCSProvider{
 		Description:       "vcs provider 4 for testing vcs providers",
 		GroupID:           "top-level-group-0-for-vcs-providers",
 		CreatedBy:         "someone-vp4",
-		Hostname:          "github.com",
+		URL:               gitHubURL,
 		OAuthClientID:     "a-client-id",
 		OAuthClientSecret: "a-client-secret",
 		OAuthState:        ptr.String(uuid.New().String()),
@@ -1269,7 +1271,7 @@ func compareVCSProviders(t *testing.T, expected, actual *models.VCSProvider,
 	assert.Equal(t, expected.Description, actual.Description)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-	assert.Equal(t, expected.Hostname, actual.Hostname)
+	assert.Equal(t, expected.URL, actual.URL)
 	assert.Equal(t, expected.AutoCreateWebhooks, actual.AutoCreateWebhooks)
 	assert.Equal(t, expected.Type, actual.Type)
 	assert.Equal(t, expected.OAuthClientID, actual.OAuthClientID)

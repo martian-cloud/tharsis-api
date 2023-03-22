@@ -1,6 +1,7 @@
 package models
 
 import (
+	"net/url"
 	"strings"
 	"time"
 )
@@ -18,7 +19,7 @@ const (
 type VCSProvider struct {
 	OAuthAccessTokenExpiresAt *time.Time
 	CreatedBy                 string
-	Hostname                  string
+	URL                       url.URL
 	Name                      string
 	Description               string
 	ResourcePath              string
