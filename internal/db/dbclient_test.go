@@ -466,7 +466,7 @@ func createInitialJobs(ctx context.Context, testClient *testClient,
 
 		input.WorkspaceID = workspaceID
 		input.RunID = runID
-		input.RunnerID = runnerID
+		input.RunnerID = &runnerID
 		created, err := testClient.client.Jobs.CreateJob(ctx, &input)
 		if err != nil {
 			return nil, err

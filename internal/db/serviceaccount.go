@@ -23,6 +23,8 @@ type ServiceAccounts interface {
 	UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error)
 	GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*ServiceAccountsResult, error)
 	DeleteServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) error
+	AssignServiceAccountToRunner(ctx context.Context, serviceAccountID string, runnerID string) error
+	UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error
 }
 
 // ServiceAccountSortableField represents the fields that a service account can be sorted by
@@ -57,6 +59,7 @@ func (sf ServiceAccountSortableField) getSortDirection() SortDirection {
 // ServiceAccountFilter contains the supported fields for filtering ServiceAccount resources
 type ServiceAccountFilter struct {
 	Search            *string
+	RunnerID          *string
 	ServiceAccountIDs []string
 	NamespacePaths    []string
 }
@@ -119,6 +122,10 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.NamespacePaths))
 		}
 
+		if input.Filter.RunnerID != nil {
+			ex = ex.Append(goqu.I("service_account_runner_relation.runner_id").In(*input.Filter.RunnerID))
+		}
+
 		if input.Filter.Search != nil {
 			search := *input.Filter.Search
 
@@ -135,25 +142,25 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("service_accounts.name").Like(serviceAccountName+"%%"),
+								goqu.I("service_accounts.name").Like(serviceAccountName+"%"),
 							),
 							goqu.Or(
 								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("service_accounts.name").Like(serviceAccountName+"%%"),
+								goqu.I("service_accounts.name").Like(serviceAccountName+"%"),
 							),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%%"))
+					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or service account name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%%"),
-						goqu.I("service_accounts.name").Like(search+"%%"),
+						goqu.I("namespaces.path").Like(search+"%"),
+						goqu.I("service_accounts.name").Like(search+"%"),
 					),
 				)
 			}
@@ -163,8 +170,14 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 
 	query := dialect.From("service_accounts").
 		Select(s.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
-		Where(ex)
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")}))
+
+	if input.Filter != nil && input.Filter.RunnerID != nil {
+		// Add inner join for runner relation table
+		query = query.InnerJoin(goqu.T("service_account_runner_relation"), goqu.On(goqu.Ex{"service_accounts.id": goqu.I("service_account_runner_relation.service_account_id")}))
+	}
+
+	query = query.Where(ex)
 
 	sortDirection := AscSort
 
@@ -181,7 +194,6 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 		sortDirection,
 		serviceAccountFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -252,13 +264,11 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 			"oidc_trust_policies": trustPoliciesJSON,
 		}).
 		Returning(serviceAccountFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	createdServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -321,13 +331,11 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 				"oidc_trust_policies": trustPoliciesJSON,
 			},
 		).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).Returning(serviceAccountFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -359,7 +367,6 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 				"version": serviceAccount.Metadata.Version,
 			},
 		).Returning(serviceAccountFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -391,13 +398,11 @@ func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*m
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	serviceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -405,6 +410,51 @@ func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*m
 		return nil, err
 	}
 	return serviceAccount, nil
+}
+
+func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	sql, args, err := dialect.Insert("service_account_runner_relation").
+		Prepared(true).
+		Rows(goqu.Record{
+			"service_account_id": serviceAccountID,
+			"runner_id":          runnerID,
+		}).ToSQL()
+
+	if err != nil {
+		return err
+	}
+
+	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
+		if pgErr := asPgError(err); pgErr != nil {
+			if isUniqueViolation(pgErr) {
+				return errors.NewError(errors.EConflict, "service account already assigned to runner")
+			}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (s *serviceAccounts) UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	sql, args, err := dialect.Delete("service_account_runner_relation").
+		Prepared(true).
+		Where(
+			goqu.Ex{
+				"service_account_id": serviceAccountID,
+				"runner_id":          runnerID,
+			},
+		).ToSQL()
+
+	if err != nil {
+		return err
+	}
+
+	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *serviceAccounts) getSelectFields() []interface{} {

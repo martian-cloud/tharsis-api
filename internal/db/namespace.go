@@ -87,6 +87,35 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 	return createdNamespace, nil
 }
 
+// migrateNamespaces migrates all namespaces that either exactly match an old path or have the old path as a prefix.
+func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath string) error {
+	timestamp := currentTime()
+
+	sql, args, err := dialect.Update("namespaces").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":    goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at": timestamp,
+				"path":       goqu.L("REPLACE(?, ?, ?)", goqu.C("path"), oldPath, newPath),
+			},
+		).Where(goqu.Or(
+		goqu.I("path").Eq(oldPath),
+		goqu.I("path").Like(oldPath+"/%"),
+	)).Returning(namespaceFieldList...).ToSQL()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Exec(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func scanNamespace(row scanner) (*namespaceRow, error) {
 	var groupID sql.NullString
 	var workspaceID sql.NullString

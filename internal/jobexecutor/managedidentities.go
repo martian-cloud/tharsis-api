@@ -17,19 +17,19 @@ type managedIdentities struct {
 	client         Client
 	jobLogger      *jobLogger
 	factoryMap     map[types.ManagedIdentityType]authenticatorFactoryFunc
-	workspacePath  string
+	workspaceID    string
 	workspaceDir   string
 	authenticators []managedidentity.Authenticator
 }
 
 func newManagedIdentities(
-	workspacePath string,
+	workspaceID string,
 	workspaceDir string,
 	jobLogger *jobLogger,
 	client Client,
 ) *managedIdentities {
 	return &managedIdentities{
-		workspacePath:  workspacePath,
+		workspaceID:    workspaceID,
 		workspaceDir:   workspaceDir,
 		jobLogger:      jobLogger,
 		client:         client,
@@ -60,7 +60,7 @@ func (l *managedIdentities) close(ctx context.Context) error {
 func (l *managedIdentities) initialize(ctx context.Context) (map[string]string, error) {
 	allEnvVars := map[string]string{}
 
-	identities, err := l.client.GetAssignedManagedIdentities(ctx, l.workspacePath)
+	identities, err := l.client.GetAssignedManagedIdentities(ctx, l.workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assigned managed identities for workspace %v", err)
 	}

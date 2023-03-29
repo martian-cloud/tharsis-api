@@ -83,6 +83,28 @@ func (r *JobResolver) Type() string {
 	return string(r.job.Type)
 }
 
+// RunnerPath resolver
+func (r *JobResolver) RunnerPath() *string {
+	return r.job.RunnerPath
+}
+
+// Runner resolver
+func (r *JobResolver) Runner(ctx context.Context) (*RunnerResolver, error) {
+	if r.job.RunnerID == nil {
+		return nil, nil
+	}
+	runner, err := loadRunner(ctx, *r.job.RunnerID)
+	if err != nil {
+		// Check for not found since runner may have been deleted
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &RunnerResolver{runner: runner}, nil
+}
+
 // Run resolver
 func (r *JobResolver) Run(ctx context.Context) (*RunResolver, error) {
 	run, err := loadRun(ctx, r.job.RunID)
@@ -268,6 +290,20 @@ func (r RootResolver) jobCancellationEventSubscription(ctx context.Context, inpu
 
 /* Job Mutation Resolvers */
 
+// ClaimJobMutationPayload is the response payload for the claim job mutation
+type ClaimJobMutationPayload struct {
+	ClientMutationID *string
+	Token            *string
+	JobID            *string
+	Problems         []Problem
+}
+
+// ClaimJobInput is the input for claiming a job
+type ClaimJobInput struct {
+	ClientMutationID *string
+	RunnerPath       string
+}
+
 // SaveJobLogsPayload is the response payload for a save logs mutation
 type SaveJobLogsPayload struct {
 	ClientMutationID *string
@@ -282,6 +318,16 @@ type SaveJobLogsInput struct {
 	StartOffset      int32
 }
 
+func handleClaimJobMutationProblem(e error, clientMutationID *string) (*ClaimJobMutationPayload, error) {
+	problem, err := buildProblem(e)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := ClaimJobMutationPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
+	return &payload, nil
+}
+
 func handleSaveJobLogsMutationProblem(e error, clientMutationID *string) (*SaveJobLogsPayload, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -289,6 +335,23 @@ func handleSaveJobLogsMutationProblem(e error, clientMutationID *string) (*SaveJ
 	}
 
 	return &SaveJobLogsPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}, nil
+}
+
+func claimJobMutation(ctx context.Context, input *ClaimJobInput) (*ClaimJobMutationPayload, error) {
+	jobService := getJobService(ctx)
+
+	resp, err := jobService.ClaimJob(ctx, input.RunnerPath)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := ClaimJobMutationPayload{
+		ClientMutationID: input.ClientMutationID,
+		JobID:            ptr.String(gid.ToGlobalID(gid.JobType, resp.JobID)),
+		Token:            &resp.Token,
+		Problems:         []Problem{},
+	}
+	return &payload, nil
 }
 
 func saveJobLogsMutation(ctx context.Context, input *SaveJobLogsInput) (*SaveJobLogsPayload, error) {

@@ -752,7 +752,7 @@ func TestCreateJob(t *testing.T) {
 			toCreate: &models.Job{
 				WorkspaceID: warmupWorkspaceID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    standardWarmupRunnerIDForJobs,
+				RunnerID:    &standardWarmupRunnerIDForJobs,
 			},
 			expectCreated: &models.Job{
 				Metadata: models.ResourceMetadata{
@@ -761,7 +761,7 @@ func TestCreateJob(t *testing.T) {
 				},
 				WorkspaceID: warmupWorkspaceID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    standardWarmupRunnerIDForJobs,
+				RunnerID:    &standardWarmupRunnerIDForJobs,
 			},
 		},
 
@@ -772,7 +772,7 @@ func TestCreateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    warmupRuns[0].Metadata.ID,
-				RunnerID:                 standardWarmupRunnerIDForJobs,
+				RunnerID:                 &standardWarmupRunnerIDForJobs,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -792,7 +792,7 @@ func TestCreateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    warmupRuns[0].Metadata.ID,
-				RunnerID:                 standardWarmupRunnerIDForJobs,
+				RunnerID:                 &standardWarmupRunnerIDForJobs,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -813,7 +813,7 @@ func TestCreateJob(t *testing.T) {
 			toCreate: &models.Job{
 				WorkspaceID: nonExistentID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    standardWarmupRunnerIDForJobs,
+				RunnerID:    &standardWarmupRunnerIDForJobs,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"jobs\" violates foreign key constraint \"fk_workspace_id\" (SQLSTATE 23503)"),
 		},
@@ -823,7 +823,7 @@ func TestCreateJob(t *testing.T) {
 			toCreate: &models.Job{
 				WorkspaceID: invalidID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    standardWarmupRunnerIDForJobs,
+				RunnerID:    &standardWarmupRunnerIDForJobs,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -909,7 +909,7 @@ func TestUpdateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    newRunID,
-				RunnerID:                 newRunnerID,
+				RunnerID:                 &newRunnerID,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -931,7 +931,7 @@ func TestUpdateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    newRunID,
-				RunnerID:                 newRunnerID,
+				RunnerID:                 &newRunnerID,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -952,7 +952,7 @@ func TestUpdateJob(t *testing.T) {
 				},
 				WorkspaceID: warmupWorkspaceID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    standardWarmupRunnerIDForJobs,
+				RunnerID:    &standardWarmupRunnerIDForJobs,
 			},
 			expectMsg: resourceVersionMismatch,
 		},
@@ -964,7 +964,7 @@ func TestUpdateJob(t *testing.T) {
 					Version: positiveJob.Metadata.Version,
 				},
 				RunID:    warmupRuns[0].Metadata.ID,
-				RunnerID: standardWarmupRunnerIDForJobs,
+				RunnerID: &standardWarmupRunnerIDForJobs,
 			},
 			expectMsg: invalidUUIDMsg4,
 		},

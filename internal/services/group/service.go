@@ -3,6 +3,7 @@ package group
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -45,6 +46,8 @@ type Service interface {
 	CreateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
 	// UpdateGroup updates an existing group
 	UpdateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
+	// MigrateGroup migrates an existing group to a new parent (or to root)
+	MigrateGroup(ctx context.Context, groupID string, newParentID *string) (*models.Group, error)
 }
 
 type service struct {
@@ -401,4 +404,132 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 	}
 
 	return updatedGroup, nil
+}
+
+func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID *string) (*models.Group, error) {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the group to be moved.
+	group, err := s.dbClient.Groups.GetGroupByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, errors.NewError(
+			errors.ENotFound,
+			fmt.Sprintf("Group with id %s not found", groupID),
+		)
+	}
+
+	// Caller must be owner of the group being moved.
+	if err = caller.RequireAccessToNamespace(ctx, group.FullPath, models.OwnerRole); err != nil {
+		return nil, err
+	}
+
+	// If supplied, get the new parent group.
+	var newParentPath string
+	var newParent *models.Group
+	var nErr error
+	if newParentID != nil {
+		newParent, nErr = s.dbClient.Groups.GetGroupByID(ctx, *newParentID)
+		if nErr != nil {
+			return nil, nErr
+		}
+		if newParent == nil {
+			return nil, errors.NewError(
+				errors.ENotFound,
+				fmt.Sprintf("Group with id %s not found", *newParentID),
+			)
+		}
+
+		// In case a user gets confused or otherwise tries to do a no-op move, detect and bail out.
+		// Because nothing gets done, it's safe to do this before the authorization check on the new parent.
+		if group.ParentID == newParent.Metadata.ID {
+			// Return BadRequest.
+			return nil, errors.NewError(errors.EInvalid, "Group already has the specified parent.")
+		}
+
+		// Make sure the group to be moved and the new parent group aren't exactly the same group.
+		if newParent.FullPath == group.FullPath {
+			return nil, errors.NewError(errors.EInvalid, "Cannot move a group to be its own parent")
+		}
+
+		// Make sure the group to be moved and the new parent group aren't respective ancestor and descendant.
+		if strings.HasPrefix(newParent.FullPath, (group.FullPath + "/")) {
+			return nil, errors.NewError(errors.EInvalid, "Cannot move a group under one of its descendants")
+		}
+
+		// If there is a new parent, the caller must be at least deployer of the new parent.
+		if nErr = caller.RequireAccessToNamespace(ctx, newParent.FullPath, models.DeployerRole); nErr != nil {
+			return nil, nErr
+		}
+
+		newParentPath = newParent.FullPath
+	} else {
+
+		// Return BadRequest if the user tries to move a root group to root.
+		if group.ParentID == "" {
+			// Return BadRequest.
+			return nil, errors.NewError(errors.EInvalid, "Group is already a top-level group.")
+		}
+
+		// If moving to root, the caller must be admin, because only admins are allowed to create new root groups.
+		userCaller, ok := caller.(*auth.UserCaller)
+		if !ok {
+			return nil, errors.NewError(errors.EForbidden,
+				"Unsupported caller type, only users are allowed to move groups to top-level")
+		}
+		if !userCaller.User.Admin {
+			return nil, errors.NewError(errors.EForbidden, "Only system admins can move groups to top-level")
+		}
+		// Leave newParentPath empty for the log message.
+	}
+
+	// Because the group to be moved and the new parent group have been fetched from the DB,
+	// there's no need to validate them.
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer MigrateGroup: %v", txErr)
+		}
+	}()
+
+	s.logger.Infow("Requested a group migration.",
+		"caller", caller.GetSubject(),
+		"fullPath", group.FullPath, // This is the full path of the group prior to migration.
+		"groupID", group.Metadata.ID,
+		"newParentPath", newParentPath,
+	)
+
+	// Now that all checks have passed and the transaction is open, do the actual work of the migration.
+	migratedGroup, err := s.dbClient.Groups.MigrateGroup(txContext, group, newParent)
+	if err != nil {
+		return nil, err
+	}
+
+	// For now, generate an activity event on the group that was migrated--but without a custom payload.
+	// The old parent (if any) and the new parent (if any) might have (also) wanted an activity event.
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &migratedGroup.FullPath,
+			Action:        models.ActionMigrate,
+			TargetType:    models.TargetGroup,
+			TargetID:      migratedGroup.Metadata.ID,
+		}); err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, err
+	}
+
+	return migratedGroup, nil
 }

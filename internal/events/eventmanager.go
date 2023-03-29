@@ -19,6 +19,7 @@ const (
 	JobLogSubscription    SubscriptionType = "job_log_descriptors"
 	RunSubscription       SubscriptionType = "runs"
 	WorkspaceSubscription SubscriptionType = "workspaces"
+	RunnerSubscription    SubscriptionType = "runners"
 )
 
 // SubscriptionAction type represents the available actions that can be subscribed type
@@ -174,11 +175,11 @@ func (e *EventManager) notifyError(err error) {
 func (e *EventManager) match(event db.Event, subscriber *Subscriber) bool {
 	for _, subscription := range subscriber.subscriptions {
 		if subscription.Type != SubscriptionType(event.Table) {
-			return false
+			continue
 		}
 
 		if subscription.ID != "" && subscription.ID != event.ID {
-			return false
+			continue
 		}
 
 		if len(subscription.Actions) == 0 {

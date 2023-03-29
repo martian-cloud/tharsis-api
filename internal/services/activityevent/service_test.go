@@ -92,6 +92,7 @@ func TestGetActivityEvents(t *testing.T) {
 					"sa1",
 					"groupA/sa1",
 					&mockAuthorizer,
+					nil,
 				)
 			}
 
@@ -314,7 +315,7 @@ func TestCreateActivityEvent(t *testing.T) {
 				testCaller = auth.Caller(newUserCaller)
 			case test.callerServiceAccount != nil:
 				newServiceAccountCaller := auth.NewServiceAccountCaller(test.callerServiceAccount.Metadata.ID,
-					test.callerServiceAccount.ResourcePath, &mockAuthorizer)
+					test.callerServiceAccount.ResourcePath, &mockAuthorizer, nil)
 				testCaller = auth.Caller(newServiceAccountCaller)
 			}
 

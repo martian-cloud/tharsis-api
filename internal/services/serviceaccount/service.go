@@ -60,6 +60,8 @@ type GetServiceAccountsInput struct {
 	NamespacePath string
 	// IncludeInherited includes inherited services accounts in the result
 	IncludeInherited bool
+	// RunnerID will filter service accounts that are assigned to the specified runner
+	RunnerID *string
 }
 
 // Service implements all service account related functionality
@@ -130,7 +132,8 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 	}
 
 	filter := &db.ServiceAccountFilter{
-		Search: input.Search,
+		Search:   input.Search,
+		RunnerID: input.RunnerID,
 	}
 
 	if input.IncludeInherited {

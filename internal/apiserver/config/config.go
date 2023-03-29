@@ -17,6 +17,7 @@ import (
 const (
 	defaultServerPort                  = "8000"
 	envOidcProviderConfigPrefix        = "THARSIS_OAUTH_PROVIDERS_"
+	envRunnerConfigPrefix              = "THARSIS_INTERNAL_RUNNERS_"
 	defaultMaxGraphQLComplexity        = 0
 	defaultRateLimitStorePluginType    = "memory"
 	defaultModuleRegistryMaxUploadSize = 1024 * 1024 * 25 // 25 MiB
@@ -34,19 +35,24 @@ type IdpConfig struct {
 	LogoutURL     string `yaml:"logout_url"`
 }
 
+// RunnerConfig contains the config fields for a system runner
+type RunnerConfig struct {
+	JobDispatcherData map[string]string `yaml:"job_dispatcher_data"`
+	Name              string            `yaml:"name"`
+	JobDispatcherType string            `yaml:"job_dispatcher_type"`
+}
+
 // Config represents an application configuration.
 type Config struct {
 	// Plugin Data
 	ObjectStorePluginData    map[string]string `yaml:"object_store_plugin_data"`
 	RateLimitStorePluginData map[string]string `yaml:"rate_limit_store_plugin_data" env:"RATE_LIMIT_STORE_PLUGIN_DATA"`
-	JobDispatcherPluginData  map[string]string `yaml:"job_dispatcher_plugin_data"`
 	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data"`
 
 	// Plugin Typ
 	ObjectStorePluginType    string `yaml:"object_store_plugin_type" env:"OBJECT_STORE_PLUGIN_TYPE"`
 	RateLimitStorePluginType string `yaml:"rate_limit_store_plugin_type" env:"RATE_LIMIT_STORE_PLUGIN_TYPE"`
 	JWSProviderPluginType    string `yaml:"jws_provider_plugin_type" env:"JWS_PROVIDER_PLUGIN_TYPE"`
-	JobDispatcherPluginType  string `yaml:"job_dispatcher_plugin_type" env:"JOB_DISPATCHER_PLUGIN_TYPE"`
 
 	// The external facing URL for the Tharsis API
 	TharsisAPIURL string `yaml:"tharsis_api_url" env:"API_URL"`
@@ -76,6 +82,8 @@ type Config struct {
 	// The OIDC identity providers
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 
+	InternalRunners []RunnerConfig `yaml:"internal_runners"`
+
 	// Database Configuration
 	DBMaxConnections int `yaml:"db_max_connections" env:"DB_MAX_CONNECTIONS"`
 	DBPort           int `yaml:"db_port" env:"DB_PORT"`
@@ -104,7 +112,6 @@ func (c Config) Validate() error {
 		validation.Field(&c.ServerPort, is.Port),
 		validation.Field(&c.ObjectStorePluginType, validation.Required),
 		validation.Field(&c.JWSProviderPluginType, validation.Required),
-		validation.Field(&c.JobDispatcherPluginType, validation.Required),
 		validation.Field(&c.TharsisAPIURL, validation.Required),
 	)
 }
@@ -150,19 +157,24 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load OAUTH IDP config from environment is available
 	oauthProviders, err := loadOauthConfigFromEnvironment()
 	if err != nil {
-		return nil, fmt.Errorf("failed to oauth provider env variables: %w", err)
+		return nil, fmt.Errorf("failed to load oauth provider env variables: %w", err)
 	}
 
 	if len(oauthProviders) > 0 {
 		c.OauthProviders = oauthProviders
 	}
 
-	if c.JWSProviderPluginData == nil {
-		c.JWSProviderPluginData = make(map[string]string)
+	runners, err := loadRunnerConfigFromEnvironment()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load runner env variables %w", err)
 	}
 
-	if c.JobDispatcherPluginData == nil {
-		c.JobDispatcherPluginData = make(map[string]string)
+	if len(runners) > 0 {
+		c.InternalRunners = runners
+	}
+
+	if c.JWSProviderPluginData == nil {
+		c.JWSProviderPluginData = make(map[string]string)
 	}
 
 	if c.ObjectStorePluginData == nil {
@@ -175,11 +187,6 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load JWS Provider plugin data
 	for k, v := range loadPluginData("THARSIS_JWS_PROVIDER_PLUGIN_DATA_") {
 		c.JWSProviderPluginData[k] = v
-	}
-
-	// Load Job Dispatcher plugin data
-	for k, v := range loadPluginData("THARSIS_JOB_DISPATCHER_PLUGIN_DATA_") {
-		c.JobDispatcherPluginData[k] = v
 	}
 
 	// Load Object Store plugin data
@@ -263,4 +270,42 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 		}
 	}
 	return idpConfigs, nil
+}
+
+func loadRunnerConfigFromEnvironment() ([]RunnerConfig, error) {
+	var runnerConfigs []RunnerConfig
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+
+		key := pair[0]
+		val := pair[1]
+		if strings.HasPrefix(key, envRunnerConfigPrefix) && strings.HasSuffix(key, "_NAME") {
+			// Build runner config
+			index := key[len(envRunnerConfigPrefix) : len(key)-len("_NAME")]
+			name := val
+
+			dispatcherTypeKey := envRunnerConfigPrefix + index + "_JOB_DISPATCHER_TYPE"
+			dispatcherDataKey := envRunnerConfigPrefix + index + "_JOB_DISPATCHER_DATA_"
+
+			dispatcherType := os.Getenv(dispatcherTypeKey)
+
+			if dispatcherType == "" {
+				return nil, errors.New(dispatcherTypeKey + " environment variable is required")
+			}
+
+			jobDispatcherData := make(map[string]string)
+
+			// Load Job Dispatcher plugin data
+			for k, v := range loadPluginData(dispatcherDataKey) {
+				jobDispatcherData[k] = v
+			}
+
+			runnerConfigs = append(runnerConfigs, RunnerConfig{
+				Name:              name,
+				JobDispatcherType: dispatcherType,
+				JobDispatcherData: jobDispatcherData,
+			})
+		}
+	}
+	return runnerConfigs, nil
 }

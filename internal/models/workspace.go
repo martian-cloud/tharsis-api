@@ -34,3 +34,18 @@ func (w *Workspace) Validate() error {
 func (w *Workspace) GetGroupPath() string {
 	return w.FullPath[:strings.LastIndex(w.FullPath, "/")]
 }
+
+// ExpandPath returns the expanded path list for the workspace. The expanded path
+// list includes the full path for the workspace in addition to all parent paths
+func (w *Workspace) ExpandPath() []string {
+	pathParts := strings.Split(w.FullPath, "/")
+
+	paths := []string{}
+	for len(pathParts) > 0 {
+		paths = append(paths, strings.Join(pathParts, "/"))
+		// Remove last element
+		pathParts = pathParts[:len(pathParts)-1]
+	}
+
+	return paths
+}

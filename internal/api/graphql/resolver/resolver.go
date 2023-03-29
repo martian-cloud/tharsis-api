@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/scim"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
@@ -53,6 +54,7 @@ type State struct {
 	SCIMService                scim.Service
 	VCSService                 vcs.Service
 	ActivityService            activityevent.Service
+	RunnerService              runner.Service
 }
 
 // Attach is used to attach the resolver state to the context
@@ -145,6 +147,10 @@ func getVCSService(ctx context.Context) vcs.Service {
 
 func getActivityService(ctx context.Context) activityevent.Service {
 	return extract(ctx).ActivityService
+}
+
+func getRunnerService(ctx context.Context) runner.Service {
+	return extract(ctx).RunnerService
 }
 
 func getConfig(ctx context.Context) *config.Config {

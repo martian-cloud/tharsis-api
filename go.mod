@@ -60,7 +60,7 @@ require (
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20221003200235-27fb6b330f28
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20221003202249-22d91a3f6af2
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.21.1
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.26.0
 	go.uber.org/zap v1.24.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.26.2

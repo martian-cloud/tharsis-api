@@ -274,3 +274,9 @@ func (j *JobCaller) RequireUserDeleteAccess(ctx context.Context, userID string) 
 	// Job callers won't ever have access to user info.
 	return authorizationError(ctx, false)
 }
+
+// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
+func (j *JobCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	// Return authorization error because job callers don't have runner access
+	return authorizationError(ctx, false)
+}

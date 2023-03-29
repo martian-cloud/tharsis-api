@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
@@ -11,11 +12,12 @@ type ServiceAccountCaller struct {
 	authorizer         Authorizer
 	ServiceAccountPath string
 	ServiceAccountID   string
+	dbClient           *db.Client
 }
 
 // NewServiceAccountCaller returns a new ServiceAccountCaller
-func NewServiceAccountCaller(id string, path string, authorizer Authorizer) *ServiceAccountCaller {
-	return &ServiceAccountCaller{ServiceAccountID: id, ServiceAccountPath: path, authorizer: authorizer}
+func NewServiceAccountCaller(id string, path string, authorizer Authorizer, dbClient *db.Client) *ServiceAccountCaller {
+	return &ServiceAccountCaller{ServiceAccountID: id, ServiceAccountPath: path, authorizer: authorizer, dbClient: dbClient}
 }
 
 // GetSubject returns the subject identifier for this caller
@@ -136,4 +138,24 @@ func (s *ServiceAccountCaller) RequireUserUpdateAccess(ctx context.Context, user
 func (s *ServiceAccountCaller) RequireUserDeleteAccess(ctx context.Context, userID string) error {
 	// Return authorization error because services accounts don't need to modify users.
 	return authorizationError(ctx, false)
+}
+
+// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
+func (s *ServiceAccountCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	// Verify that service account is assigned to runner
+	resp, err := s.dbClient.ServiceAccounts.GetServiceAccounts(ctx, &db.GetServiceAccountsInput{
+		Filter: &db.ServiceAccountFilter{
+			RunnerID:          &runnerID,
+			ServiceAccountIDs: []string{s.ServiceAccountID},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(resp.ServiceAccounts) > 0 {
+		return nil
+	}
+
+	return authorizationError(ctx, true)
 }

@@ -18,29 +18,21 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
 const (
-
 	// forceCancelWait is how long a run must be soft-canceled before it is allowed to be forcefully canceled.
 	forceCancelWait = 30 * time.Minute
 )
-
-// ClaimJobResponse is returned when a runner claims a Job
-type ClaimJobResponse struct {
-	Job   *models.Job
-	Token string
-}
 
 // Variable represents a run variable
 type Variable struct {
@@ -130,7 +122,6 @@ type CancelRunInput struct {
 
 // Service encapsulates Terraform Enterprise Support
 type Service interface {
-	ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error)
 	GetRun(ctx context.Context, runID string) (*models.Run, error)
 	GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsResult, error)
 	GetRunsByIDs(ctx context.Context, idList []string) ([]models.Run, error)
@@ -156,24 +147,14 @@ type service struct {
 	dbClient        *db.Client
 	artifactStore   workspace.ArtifactStore
 	eventManager    *events.EventManager
-	idp             *auth.IdentityProvider
 	jobService      job.Service
 	cliService      cli.Service
-	runStateManager *runStateManager
+	runStateManager *state.RunStateManager
 	activityService activityevent.Service
 	moduleService   moduleregistry.Service
 	moduleResolver  ModuleResolver
 	ruleEnforcer    rules.RuleEnforcer
 }
-
-var (
-	planExecutionTime  = metric.NewHistogram("plan_execution_time", "Amount of time a plan took to execute.", 1, 2, 10)
-	applyExecutionTime = metric.NewHistogram("apply_execution_time", "Amount of time a plan took to apply.", 1, 2, 10)
-
-	planFinished  = metric.NewCounter("plan_completed_count", "Amount of times a plan is completed.")
-	applyFinished = metric.NewCounter("apply_completed_count", "Amount of times an apply is completed.")
-	runFinished   = metric.NewCounter("run_completed_count", "Amount of times a run is completed.")
-)
 
 // NewService creates an instance of Service
 func NewService(
@@ -181,25 +162,24 @@ func NewService(
 	dbClient *db.Client,
 	artifactStore workspace.ArtifactStore,
 	eventManager *events.EventManager,
-	idp *auth.IdentityProvider,
 	jobService job.Service,
 	cliService cli.Service,
 	activityService activityevent.Service,
 	moduleService moduleregistry.Service,
 	moduleResolver ModuleResolver,
+	runStateManager *state.RunStateManager,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
 		artifactStore,
 		eventManager,
-		idp,
 		jobService,
 		cliService,
 		activityService,
 		moduleService,
 		moduleResolver,
-		newRunStateManager(dbClient, logger),
+		runStateManager,
 		rules.NewRuleEnforcer(dbClient),
 	)
 }
@@ -209,13 +189,12 @@ func newService(
 	dbClient *db.Client,
 	artifactStore workspace.ArtifactStore,
 	eventManager *events.EventManager,
-	idp *auth.IdentityProvider,
 	jobService job.Service,
 	cliService cli.Service,
 	activityService activityevent.Service,
 	moduleService moduleregistry.Service,
 	moduleResolver ModuleResolver,
-	runStateManager *runStateManager,
+	runStateManager *state.RunStateManager,
 	ruleEnforcer rules.RuleEnforcer,
 ) Service {
 	return &service{
@@ -223,7 +202,6 @@ func newService(
 		dbClient,
 		artifactStore,
 		eventManager,
-		idp,
 		jobService,
 		cliService,
 		runStateManager,
@@ -232,126 +210,6 @@ func newService(
 		moduleResolver,
 		ruleEnforcer,
 	}
-}
-
-func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error) {
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Only allow system caller for now until runner registration is supported
-	if _, ok := caller.(*auth.SystemCaller); !ok {
-		return nil, errors.NewError(errors.EForbidden, fmt.Sprintf("Subject %s is not authorized to claim jobs", caller.GetSubject()))
-	}
-
-	for {
-		job, err := s.jobService.GetNextAvailableQueuedJob(ctx, runnerID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Attempt to claim job
-		job, err = s.claimJob(ctx, job, runnerID)
-		if err != nil {
-			return nil, err
-		}
-
-		if job != nil {
-			maxJobDuration := time.Duration(job.MaxJobDuration) * time.Minute
-			expiration := time.Now().Add(maxJobDuration + time.Hour)
-			token, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
-				// Expiration is job timeout plus 1 hour to give the job time to gracefully exit
-				Expiration: &expiration,
-				Subject:    fmt.Sprintf("job-%s", job.Metadata.ID),
-				Claims: map[string]string{
-					"job_id":       gid.ToGlobalID(gid.JobType, job.Metadata.ID),
-					"run_id":       gid.ToGlobalID(gid.RunType, job.RunID),
-					"workspace_id": gid.ToGlobalID(gid.WorkspaceType, job.WorkspaceID),
-					"type":         auth.JobTokenType,
-				},
-			})
-			if err != nil {
-				return nil, err
-			}
-
-			s.logger.Infow("Claimed a job.",
-				"caller", caller.GetSubject(),
-				"workspaceID", job.WorkspaceID,
-				"jobID", job.Metadata.ID,
-			)
-			return &ClaimJobResponse{Job: job, Token: string(token)}, nil
-		}
-	}
-}
-
-func (s *service) claimJob(ctx context.Context, job *models.Job, runnerID string) (*models.Job, error) {
-	// Start transaction
-	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for claimJob: %v", txErr)
-		}
-	}()
-
-	now := time.Now()
-	job.Timestamps.PendingTimestamp = &now
-	job.Status = models.JobPending
-	job.RunnerID = runnerID
-
-	job, err = s.runStateManager.updateJob(txContext, job)
-	if err != nil && err != db.ErrOptimisticLockError {
-		return nil, err
-	}
-
-	if err == db.ErrOptimisticLockError {
-		return nil, nil
-	}
-
-	// Get run associated with job
-	run, err := s.dbClient.Runs.GetRun(ctx, job.RunID)
-	if err != nil {
-		return nil, err
-	}
-
-	if run == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", job.RunID))
-	}
-
-	switch job.Type {
-	case models.JobPlanType:
-		plan, err := s.dbClient.Plans.GetPlan(ctx, run.PlanID)
-		if err != nil {
-			return nil, err
-		}
-
-		plan.Status = models.PlanPending
-		if _, err := s.runStateManager.updatePlan(txContext, plan); err != nil {
-			return nil, err
-		}
-	case models.JobApplyType:
-		apply, err := s.dbClient.Applies.GetApply(ctx, run.ApplyID)
-		if err != nil {
-			return nil, err
-		}
-
-		apply.Status = models.ApplyPending
-		if _, err := s.runStateManager.updateApply(txContext, apply); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.NewError(errors.EInternal, fmt.Sprintf("Invalid job type: %s", job.Type))
-	}
-
-	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		return nil, err
-	}
-
-	return job, nil
 }
 
 func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error) {
@@ -793,7 +651,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		}
 	}()
 
-	_, err = s.runStateManager.updateApply(txContext, apply)
+	_, err = s.runStateManager.UpdateApply(txContext, apply)
 	if err != nil {
 		return nil, errors.NewError(
 			errors.EInternal,
@@ -918,7 +776,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		}
 
 		apply.Status = models.ApplyCanceled
-		_, err = s.runStateManager.updateApply(ctx, apply)
+		_, err = s.runStateManager.UpdateApply(ctx, apply)
 		if err != nil {
 			return nil, errors.NewError(
 				errors.EInternal,
@@ -939,7 +797,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		}
 
 		plan.Status = models.PlanCanceled
-		_, err = s.runStateManager.updatePlan(ctx, plan)
+		_, err = s.runStateManager.UpdatePlan(ctx, plan)
 		if err != nil {
 			return nil, errors.NewError(
 				errors.EInternal,
@@ -1034,12 +892,12 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 	job.CancelRequested = true
 	job.CancelRequestedTimestamp = &now
 
-	_, err = s.runStateManager.updateJob(ctx, job)
+	_, err = s.runStateManager.UpdateJob(ctx, job)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.runStateManager.updateRun(ctx, run)
+	return s.runStateManager.UpdateRun(ctx, run)
 }
 
 func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.Run, error) {
@@ -1053,7 +911,7 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	run.ForceCanceled = true
 	run.ForceCanceledBy = &subject
 
-	updatedRun, err := s.runStateManager.updateRun(ctx, run)
+	updatedRun, err := s.runStateManager.UpdateRun(ctx, run)
 	if err != nil {
 		return nil, err
 	}
@@ -1092,7 +950,7 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 		}
 
 		plan.Status = models.PlanCanceled
-		_, err = s.runStateManager.updatePlan(ctx, plan)
+		_, err = s.runStateManager.UpdatePlan(ctx, plan)
 		if err != nil {
 			// This error does not need to be wrapped.
 			return nil, err
@@ -1108,7 +966,7 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 		}
 
 		apply.Status = models.ApplyCanceled
-		_, err = s.runStateManager.updateApply(ctx, apply)
+		_, err = s.runStateManager.UpdateApply(ctx, apply)
 		if err != nil {
 			// This error does not need to be wrapped.
 			return nil, err
@@ -1279,7 +1137,7 @@ func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Pl
 		return nil, err
 	}
 
-	return s.runStateManager.updatePlan(ctx, plan)
+	return s.runStateManager.UpdatePlan(ctx, plan)
 }
 
 func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error) {
@@ -1476,7 +1334,7 @@ func (s *service) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		return nil, err
 	}
 
-	return s.runStateManager.updateApply(ctx, apply)
+	return s.runStateManager.UpdateApply(ctx, apply)
 }
 
 func (s *service) GetLatestJobForPlan(ctx context.Context, planID string) (*models.Job, error) {

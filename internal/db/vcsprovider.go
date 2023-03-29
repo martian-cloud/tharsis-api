@@ -139,25 +139,25 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("vcs_providers.name").Like(vcsProviderName+"%%"),
+								goqu.I("vcs_providers.name").Like(vcsProviderName+"%"),
 							),
 							goqu.Or(
 								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("vcs_providers.name").Like(vcsProviderName+"%%"),
+								goqu.I("vcs_providers.name").Like(vcsProviderName+"%"),
 							),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%%"))
+					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or VCS provider name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%%"),
-						goqu.I("vcs_providers.name").Like(search+"%%"),
+						goqu.I("namespaces.path").Like(search+"%"),
+						goqu.I("vcs_providers.name").Like(search+"%"),
 					),
 				)
 			}
@@ -185,7 +185,6 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		sortDirection,
 		vcsProviderFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -323,13 +322,11 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 			},
 		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
 		Returning(vcsProvidersFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -361,7 +358,6 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 				"version": provider.Metadata.Version,
 			},
 		).Returning(vcsProvidersFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -393,7 +389,6 @@ func (vp *vcsProviders) getProvider(ctx context.Context, exp goqu.Ex) (*models.V
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +450,6 @@ func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, e
 	}
 
 	err := row.Scan(fields...)
-
 	if err != nil {
 		return nil, err
 	}

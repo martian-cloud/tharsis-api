@@ -105,6 +105,7 @@ type Client struct {
 	WorkspaceVCSProviderLinks   WorkspaceVCSProviderLinks
 	ActivityEvents              ActivityEvents
 	VCSEvents                   VCSEvents
+	Runners                     Runners
 }
 
 // NewClient creates a new Client
@@ -197,6 +198,7 @@ func NewClient(
 	dbClient.WorkspaceVCSProviderLinks = NewWorkspaceVCSProviderLinks(dbClient)
 	dbClient.ActivityEvents = NewActivityEvents(dbClient)
 	dbClient.VCSEvents = NewVCSEvents(dbClient)
+	dbClient.Runners = NewRunners(dbClient)
 
 	return dbClient, nil
 }

@@ -142,6 +142,13 @@ func (u *UserCaller) RequireJobWriteAccess(ctx context.Context, jobID string) er
 	return authorizationError(ctx, false)
 }
 
+// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
+func (u *UserCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	// Return authorization error because users don't have runner access
+	return authorizationError(ctx, false)
+}
+
+
 // RequireTeamCreateAccess will return an error if the specified access is not allowed to the indicated team.
 // For now, only admins are allowed to create a team.
 // Eventually, org admins and SCIM will be allowed to create and delete teams.

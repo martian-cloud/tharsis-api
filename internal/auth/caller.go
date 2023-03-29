@@ -143,6 +143,12 @@ func (s *SystemCaller) RequireUserDeleteAccess(ctx context.Context, userID strin
 	return nil
 }
 
+// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
+func (s *SystemCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	// Return nil because system caller is authorized to perform any action
+	return nil
+}
+
 // NamespaceAccessPolicy specifies the namespaces that a caller has access to
 type NamespaceAccessPolicy struct {
 	// RootNamespaceIDs restricts the caller to the specified root namespaces
@@ -173,6 +179,7 @@ type Caller interface {
 	RequireUserCreateAccess(ctx context.Context) error
 	RequireUserUpdateAccess(ctx context.Context, userID string) error
 	RequireUserDeleteAccess(ctx context.Context, userID string) error
+	RequireRunnerAccess(ctx context.Context, runnerID string) error
 }
 
 // WithCaller adds the caller to the context

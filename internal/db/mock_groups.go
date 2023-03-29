@@ -132,6 +132,32 @@ func (_m *MockGroups) GetGroups(ctx context.Context, input *GetGroupsInput) (*Gr
 	return r0, r1
 }
 
+// MigrateGroup provides a mock function with given fields: ctx, group, newParentGroup
+func (_m *MockGroups) MigrateGroup(ctx context.Context, group *models.Group, newParentGroup *models.Group) (*models.Group, error) {
+	ret := _m.Called(ctx, group, newParentGroup)
+
+	var r0 *models.Group
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Group, *models.Group) (*models.Group, error)); ok {
+		return rf(ctx, group, newParentGroup)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Group, *models.Group) *models.Group); ok {
+		r0 = rf(ctx, group, newParentGroup)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Group)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Group, *models.Group) error); ok {
+		r1 = rf(ctx, group, newParentGroup)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdateGroup provides a mock function with given fields: ctx, group
 func (_m *MockGroups) UpdateGroup(ctx context.Context, group *models.Group) (*models.Group, error) {
 	ret := _m.Called(ctx, group)

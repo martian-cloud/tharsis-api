@@ -193,6 +193,12 @@ func (r *NodeResolver) ToVCSEvent() (*VCSEventResolver, bool) {
 	return res, ok
 }
 
+// ToRunner resolver
+func (r *NodeResolver) ToRunner() (*RunnerResolver, bool) {
+	res, ok := r.result.(*RunnerResolver)
+	return res, ok
+}
+
 func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 	parsedGlobalID, err := gid.ParseGlobalID(globalID)
 	if err != nil {
@@ -386,6 +392,13 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &VCSEventResolver{vcsEvent: vcsEvent}
+	case gid.RunnerType:
+		runner, err := getRunnerService(ctx).GetRunnerByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &RunnerResolver{runner: runner}
 	default:
 		return nil, fmt.Errorf("node query doesn't support type %s", parsedGlobalID.Type)
 	}

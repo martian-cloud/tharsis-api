@@ -1,0 +1,83 @@
+enum RunnerSort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type RunnerConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [RunnerEdge]
+}
+
+type RunnerEdge {
+  cursor: String!
+  node: Runner
+}
+
+type AssignServiceAccountToRunnerPayload {
+  clientMutationId: String
+  runner: Runner
+  problems: [Problem!]!
+}
+
+type CreateRunnerPayload {
+  clientMutationId: String
+  runner: Runner
+  problems: [Problem!]!
+}
+
+type UpdateRunnerPayload {
+  clientMutationId: String
+  runner: Runner
+  problems: [Problem!]!
+}
+
+type DeleteRunnerPayload {
+  clientMutationId: String
+  runner: Runner
+  problems: [Problem!]!
+}
+
+type Runner implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  groupPath: String!
+  resourcePath: String!
+  name: String!
+  description: String!
+  group: Group!
+  createdBy: String!
+  type: String!
+  assignedServiceAccounts(
+    after: String
+    before: String
+    first: Int
+    last: Int
+  ): ServiceAccountConnection!
+}
+
+input AssignServiceAccountToRunnerInput {
+  clientMutationId: String
+  runnerPath: String!
+  serviceAccountPath: String!
+}
+
+input CreateRunnerInput {
+  clientMutationId: String
+  name: String!
+  description: String!
+  groupPath: String!
+}
+
+input UpdateRunnerInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+  description: String!
+}
+
+input DeleteRunnerInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}

@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	tharsis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -27,9 +29,99 @@ type groupInfo struct {
 // groupInfoSlice makes a slice of groupInfo sortable
 type groupInfoSlice []groupInfo
 
+type migrateGroupWarmupsInput struct {
+	groups             []models.Group
+	groupPath2ID       map[string]string
+	workspaces         []models.Workspace
+	serviceAccounts    []models.ServiceAccount
+	managedIdentities  []models.ManagedIdentity
+	gpgKeys            []models.GPGKey
+	terraformProviders []models.TerraformProvider
+	terraformModules   []models.TerraformModule
+	teams              []models.Team
+	membershipInputs   []CreateNamespaceMembershipInput
+	variables          []models.Variable
+	users              []models.User
+	activityEvents     []models.ActivityEvent
+	vcsProviders       []models.VCSProvider
+	runners            []models.Runner
+}
+
+type migrateGroupWarmupsOutput struct {
+	groupID2Path       map[string]string
+	workspaceID2Path   map[string]string // for use only as an output from creating resources
+	groups             []models.Group
+	workspaces         []models.Workspace
+	serviceAccounts    []models.ServiceAccount
+	managedIdentities  []models.ManagedIdentity
+	gpgKeys            []models.GPGKey
+	terraformProviders []models.TerraformProvider
+	terraformModules   []models.TerraformModule
+	teams              []models.Team
+	memberships        []models.NamespaceMembership
+	variables          []models.Variable
+	users              []models.User
+	activityEvents     []models.ActivityEvent
+	vcsProviders       []models.VCSProvider
+	runners            []models.Runner
+}
+
+type migrateGroupWarmupsOthers struct {
+	workspaces         []models.Workspace
+	serviceAccounts    []models.ServiceAccount
+	managedIdentities  []models.ManagedIdentity
+	gpgKeys            []models.GPGKey
+	terraformProviders []models.TerraformProvider
+	teams              []models.Team
+	memberships        []models.NamespaceMembership
+	variables          []models.Variable
+	users              []models.User
+	activityEvents     []models.ActivityEvent
+	vcsProviders       []models.VCSProvider
+	runners            []models.Runner
+}
+
+type associateManagedIdentityAssignment struct {
+	workspace           *models.Workspace
+	managedIdentity     *models.ManagedIdentity
+	filterBase          string
+	workspacePath       string
+	managedIdentityPath string
+}
+
+type associateServiceAccountNamespaceMembership struct {
+	namespaceMembership *models.NamespaceMembership
+	filterBase          string
+	serviceAccountPath  string
+	namespacePath       string
+}
+
+type associateServiceAccountRunnerAssignment struct {
+	filterBase         string
+	serviceAccountPath string
+	runnerPath         string
+	runner             *models.Runner
+	serviceAccount     *models.ServiceAccount
+}
+
+type associateWorkspaceVCSProviderLink struct {
+	workspaceVCSProviderLink *models.WorkspaceVCSProviderLink
+	filterBase               string
+	workspacePath            string
+	providerPath             string
+}
+
+// associations wraps the input to and results of creating an association.
+// It is used for testing MigrateGroup association handling.
+type associations struct {
+	managedIdentityAssignments         []associateManagedIdentityAssignment
+	serviceAccountNamespaceMemberships []associateServiceAccountNamespaceMembership
+	serviceAccountRunnerAssignments    []associateServiceAccountRunnerAssignment
+	workspaceVCSProviderLinks          []associateWorkspaceVCSProviderLink
+}
+
 // TestGetGroupByID tests GetGroupByID
 func TestGetGroupByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -73,7 +165,6 @@ func TestGetGroupByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			group, err := testClient.client.Groups.GetGroupByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -84,14 +175,12 @@ func TestGetGroupByID(t *testing.T) {
 			} else {
 				assert.Nil(t, group)
 			}
-
 		})
 	}
 }
 
 // TestGetGroupByFullPath tests GetGroupByFullPath
 func TestGetGroupByFullPath(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -150,7 +239,6 @@ func TestGetGroupByFullPath(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			group, err := testClient.client.Groups.GetGroupByFullPath(ctx, test.searchPath)
 
 			checkError(t, test.expectMsg, err)
@@ -161,14 +249,12 @@ func TestGetGroupByFullPath(t *testing.T) {
 			} else {
 				assert.Nil(t, group)
 			}
-
 		})
 	}
 }
 
 // TestDeleteGroup tests DeleteGroup
 func TestDeleteGroup(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -242,7 +328,6 @@ func TestDeleteGroup(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// Because deleting a group is destructive, this test must create/delete
 			// the warmup groups inside the loop.
 			// Creating the new client deletes the groups from the previous run.
@@ -307,14 +392,12 @@ func TestDeleteGroup(t *testing.T) {
 
 			// Must close manually, because later test cases will create their own test clients.
 			testClient.close(ctx)
-
 		})
 	}
 }
 
 // TestGetGroups tests GetGroups
 func TestGetGroups(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -355,7 +438,6 @@ func TestGetGroups(t *testing.T) {
 	}
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetGroups, so don't try it.
 
 		{
@@ -870,7 +952,6 @@ func TestGetGroups(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -948,7 +1029,6 @@ func TestGetGroups(t *testing.T) {
 
 // TestCreateGroup tests CreateGroup
 func TestCreateGroup(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1000,7 +1080,6 @@ func TestCreateGroup(t *testing.T) {
 	cumulativeClaimedCreated := []models.Group{}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			if test.isPositiveCase {
 
 				// Derive the name fields and parent ID fields from the full path.
@@ -1020,7 +1099,6 @@ func TestCreateGroup(t *testing.T) {
 				// Capture any new claimed to be created.
 				cumulativeClaimedCreated = append(cumulativeClaimedCreated, claimedCreated...)
 			} else {
-
 				// For a negative case, do each group one at a time.
 				for _, input := range test.toCreate {
 
@@ -1029,7 +1107,6 @@ func TestCreateGroup(t *testing.T) {
 						// Must find the parent's ID based on the full path.
 						parentPath := fullPath2ParentPath(input.FullPath)
 						if parentPath == "" {
-
 							// input must be top-level
 							input.ParentID = ""
 						} else {
@@ -1105,7 +1182,6 @@ func TestCreateGroup(t *testing.T) {
 
 // TestUpdateGroup tests UpdateGroup
 func TestUpdateGroup(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1204,7 +1280,6 @@ func TestUpdateGroup(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			var originalGroup *models.Group
 			switch {
 
@@ -1243,6 +1318,451 @@ func TestUpdateGroup(t *testing.T) {
 				require.NotNil(t, retrieved)
 
 				compareGroupsUpdate(t, *expectUpdatedDescription, *originalGroup, *retrieved)
+			}
+		})
+	}
+}
+
+// TestMigrateGroupBasics tests MigrateGroup's basic function of setting the parent ID and updating namespace paths.
+func TestMigrateGroupBasics(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	createdWarmupGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
+	require.Nil(t, err)
+
+	allResources, err := createMigrateResources(ctx, testClient, &migrateGroupWarmupsInput{
+		groups:             deriveGroupNames(createdWarmupGroups),
+		groupPath2ID:       groupPath2ID,
+		workspaces:         warmupWorkspacesForGroupMigration,
+		serviceAccounts:    warmupServiceAccountsForGroupMigration,
+		managedIdentities:  warmupManagedIdentitiesForGroupMigration,
+		gpgKeys:            warmupGPGKeysForGroupMigration,
+		terraformProviders: warmupTerraformProvidersForGroupMigration,
+		teams:              warmupTeamsForGroupMigration,
+		membershipInputs:   warmupMembershipInputsForGroupMigration,
+		variables:          warmupVariablesForGroupMigration,
+		users:              warmupUsersForGroupMigration,
+		activityEvents:     warmupActivityEventsForGroupMigration,
+		vcsProviders:       warmupVCSProvidersForGroupMigration,
+		runners:            warmupRunnersForGroupMigration,
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		newParent  *models.Group
+		expectMsg  *string
+		name       string
+		others     migrateGroupWarmupsOthers
+		group      models.Group
+		isPositive bool
+	}
+
+	/*
+				template test case:
+
+		{
+			name          string
+			group         models.Group
+			newParent     *models.Group
+			expectMsg     *string
+			isPositive    bool
+			others        migrateGroupWarmupsOthers
+		}
+	*/
+
+	testCases := []testCase{}
+
+	testCases = append(testCases,
+		testCase{
+			name:       "positive to root",
+			group:      allResources.groups[4], // move top-level-group-1/2nd-level-group-1b
+			newParent:  nil,                    // to root
+			isPositive: true,
+			others:     migrateGroupWarmupsOthers{}, // no other attached resources
+		},
+		testCase{
+			name:       "positive to non-root",
+			group:      allResources.groups[3],  // move top-level-group-1/2nd-level-group-1a
+			newParent:  &allResources.groups[1], // under top-level-group-2
+			isPositive: true,
+			others: migrateGroupWarmupsOthers{
+				workspaces:         allResources.workspaces,
+				serviceAccounts:    allResources.serviceAccounts,
+				managedIdentities:  allResources.managedIdentities,
+				gpgKeys:            allResources.gpgKeys,
+				terraformProviders: allResources.terraformProviders,
+				memberships:        allResources.memberships,
+				variables:          allResources.variables,
+				activityEvents:     allResources.activityEvents,
+				vcsProviders:       allResources.vcsProviders,
+				runners:            allResources.runners,
+			},
+		},
+
+		testCase{
+			name: "negative, group to move does not exist",
+			group: models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: nonExistentID,
+				},
+				FullPath: "the-group-that-does-not-exist",
+			},
+			newParent: &allResources.groups[1], // under top-level-group-2
+			expectMsg: resourceVersionMismatch,
+		},
+	)
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			oldGroup := test.group
+			oldPath := oldGroup.FullPath
+
+			var newPath string
+			if test.newParent != nil {
+				// Migrating to non-root.
+				newPath = test.newParent.FullPath + "/" + oldGroup.Name
+			} else {
+				// Migrating to root.
+				newPath = oldGroup.Name
+			}
+
+			newGroup, err := testClient.client.Groups.MigrateGroup(ctx, &oldGroup, test.newParent)
+
+			checkError(t, test.expectMsg, err)
+
+			if test.isPositive {
+
+				require.NotNil(t, newGroup)
+
+				// Claimed new group fields must match, except full path and parent ID.
+				assert.Equal(t, oldGroup.Name, newGroup.Name)
+				assert.Equal(t, oldGroup.Description, newGroup.Description)
+				assert.Equal(t, oldGroup.CreatedBy, newGroup.CreatedBy)
+
+				// Claimed new group full path and parent ID must be correct.
+				var fetchPath string
+				var newParentID string
+				if test.newParent == nil {
+					// move was to root
+					newParentID = ""
+					fetchPath = oldGroup.Name
+				} else {
+					// move was under another parent
+					newParentID = test.newParent.Metadata.ID
+					fetchPath = test.newParent.FullPath + "/" + oldGroup.Name
+				}
+				assert.Equal(t, newParentID, newGroup.ParentID)
+				assert.Equal(t, fetchPath, newGroup.FullPath)
+
+				// Group can be fetched from new path.
+				fetched, err := testClient.client.Groups.GetGroupByFullPath(ctx, fetchPath)
+				require.Nil(t, err)
+				require.NotNil(t, fetched)
+
+				// Fetched group fields match claimed new group.
+				compareGroupsMigrate(t, oldGroup.Description, *newGroup, *fetched)
+
+				// No group at old path.
+				oldFetchedGroup, err := testClient.client.Groups.GetGroupByFullPath(ctx, oldGroup.FullPath)
+				assert.Nil(t, err)
+				assert.Nil(t, oldFetchedGroup)
+
+				// Just in case something went badly awry, no workspace at old path.
+				oldFetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByFullPath(ctx, oldGroup.FullPath)
+				assert.Nil(t, err)
+				assert.Nil(t, oldFetchedWorkspace)
+
+				// All other relevant resources point to the new group path.
+				for _, oldOther := range test.others.workspaces {
+					newOther, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.FullPath, oldPath, newPath, 1), newOther.FullPath)
+				}
+				for _, oldOther := range test.others.serviceAccounts {
+					newOther, err := testClient.client.ServiceAccounts.GetServiceAccountByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+				}
+				for _, oldOther := range test.others.managedIdentities {
+					newOther, err := testClient.client.ManagedIdentities.GetManagedIdentityByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+				}
+				for _, oldOther := range test.others.gpgKeys {
+					newOther, err := testClient.client.GPGKeys.GetGPGKeyByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+				}
+				for _, oldOther := range test.others.terraformProviders {
+					newOther, err := testClient.client.TerraformProviders.GetProviderByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+				}
+				for _, oldOther := range test.others.memberships {
+					newOther, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.Namespace.Path, oldPath, newPath, 1), newOther.Namespace.Path)
+				}
+				for _, oldOther := range test.others.variables {
+					newOther, err := testClient.client.Variables.GetVariableByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.NamespacePath, oldPath, newPath, 1), newOther.NamespacePath)
+				}
+				for _, oldOther := range test.others.runners {
+					newOther, err := testClient.client.Runners.GetRunnerByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.GetGroupPath(), oldPath, newPath, 1), newOther.GetGroupPath())
+				}
+				for _, oldOther := range test.others.activityEvents {
+					result, err := testClient.client.ActivityEvents.GetActivityEvents(ctx, &GetActivityEventsInput{
+						Filter: &ActivityEventFilter{
+							ActivityEventIDs: []string{oldOther.Metadata.ID},
+						},
+					})
+					assert.Nil(t, err)
+					assert.NotNil(t, result)
+					newOther := result.ActivityEvents[0]
+					assert.Equal(t, strings.Replace(*oldOther.NamespacePath, oldPath, newPath, 1),
+						*newOther.NamespacePath)
+				}
+				for _, oldOther := range test.others.vcsProviders {
+					newOther, err := testClient.client.VCSProviders.GetProviderByID(ctx, oldOther.Metadata.ID)
+					assert.Nil(t, err)
+					assert.NotNil(t, newOther)
+					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1),
+						newOther.ResourcePath)
+				}
+			}
+		})
+	}
+}
+
+/*
+	This is the plan for testing MigrateGroup removal of associations and updating of RootGroupID:
+
+	Verify correct handling of the following:
+		Remove assigned managed identities to a workspace
+		Remove assigned service account namespace memberships
+		Remove service accounts assigned to runners
+		Remove workspace VCS provider links
+		Update RootGroupID of Terraform providers
+		Update RootGroupID of Terraform modules
+
+	For each case, create this group hierarchy:
+		A/B/C
+		A/D
+		E
+		A/B/X/Y
+
+	Workspaces:
+		.../X/WX
+		.../Y/WY
+
+	Managed identities in A and B; assign them to WX and WY.
+	Service accounts in A and B; make one of each a member of X, Y, WX, and WY.
+	VCS providers in A and B; link them to WX and WY, respectively (only one provider per workspace allowed).
+	A Terraform provider in each of X and Y.
+	A Terraform module in each of X and Y.
+
+	Case 1: Migrate X to A/B/C/X:
+		Verify no associations got removed.
+		Verify RootGroupID is still A.
+
+	Case 2: Migrate X to A/X:
+		Verify the associations from B got removed.
+		Verify RootGroupID is still A.
+
+	Case 3: Migrate X to A/D/X:
+		Verify the associations from B got removed.
+		Verify RootGroupID is still A.
+
+	Case 4: Migrate X to E/X:
+		Verify all associations got removed.
+		Verify RootGroupID is now E.
+
+	Case 5: Migrate X to top level:
+		Verify that all associations got removed.
+		Verify RootGroupID is now X.
+
+*/
+
+// TestMigrateGroupOther tests MigrateGroup's removal of assigned/inherited resources and updating of RootGroupID.
+func TestMigrateGroupOther(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// The test cases in this function are all positive, because the negative cases are in the ...Basics function.
+	type testCase struct {
+		name                   string
+		oldPath                string
+		newPath                string
+		expectRootGroupPath    string
+		expectKeepAssociations []string
+	}
+
+	/*
+		template test case:
+
+		{
+			name                   string
+			oldPath                string
+			newPath                string
+			expectKeepAssociations []string
+			expectRootGroupPath    string
+		}
+	*/
+
+	testCases := []testCase{
+		{
+			name:                   "migrate X to A/B/C/X",
+			oldPath:                "A/B/X",
+			newPath:                "A/B/C/X",
+			expectKeepAssociations: []string{"A", "B"}, // everything should remain
+			expectRootGroupPath:    "A",
+		},
+		{
+			name:                   "migrate X to A/X",
+			oldPath:                "A/B/X",
+			newPath:                "A/X",
+			expectKeepAssociations: []string{"A"}, // from B should get removed, from A should remain
+			expectRootGroupPath:    "A",
+		},
+		{
+			name:                   "migrate X to A/D/X",
+			oldPath:                "A/B/X",
+			newPath:                "A/D/X",
+			expectKeepAssociations: []string{"A"}, // from B should get removed, from A should remain
+			expectRootGroupPath:    "A",
+		},
+		{
+			name:                   "migrate X to E/X",
+			oldPath:                "A/B/X",
+			newPath:                "E/X",
+			expectKeepAssociations: []string{}, // everything should get removed
+			expectRootGroupPath:    "E",
+		},
+		{
+			name:                   "migrate X to top level",
+			oldPath:                "A/B/X",
+			newPath:                "X",
+			expectKeepAssociations: []string{}, // everything should get removed
+			expectRootGroupPath:    "X",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			createdWarmupGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, warmupGroupsForMigrateOther)
+			require.Nil(t, err)
+
+			mainResources, err := createMigrateResources(ctx, testClient, &migrateGroupWarmupsInput{
+				groups:             deriveGroupNames(createdWarmupGroups),
+				groupPath2ID:       groupPath2ID,
+				workspaces:         warmupWorkspacesForMigrateOther,
+				managedIdentities:  warmupManagedIdentitiesForMigrateOther,
+				serviceAccounts:    warmupServiceAccountsForMigrateOther,
+				vcsProviders:       warmupVCSProvidersForMigrateOther,
+				terraformProviders: warmupTerraformProvidersForMigrateOther,
+				terraformModules:   warmupTerraformModulesForMigrateOther,
+				runners:            warmupRunnersForGroupMigrationOther,
+			})
+			require.Nil(t, err)
+
+			allAssociations, err := createAssociations(ctx, testClient.client,
+				mainResources, &warmupAssociationsForMigrateOther)
+			require.Nil(t, err)
+
+			// Find the group object that will be migrated.
+			var oldGroup *models.Group
+			for _, grp := range mainResources.groups {
+				if grp.FullPath == test.oldPath {
+					oldGroup = &grp
+					break
+				}
+			}
+			require.NotNil(t, oldGroup)
+
+			// Filter the associations to get those that are expected after migration.
+			expectedAssociations := filterAssociations(allAssociations, test.expectKeepAssociations)
+
+			// Look up the expected root group ID from its name.
+			lookForPath := test.expectRootGroupPath
+			if test.expectRootGroupPath == test.newPath {
+				// The group being migrated is going to top level, so search for the group being migrated.
+				lookForPath = test.oldPath
+			}
+			var expectRootGroup *models.Group
+			for _, grp := range mainResources.groups {
+				if grp.FullPath == lookForPath {
+					expectRootGroup = &grp
+					break
+				}
+			}
+			require.NotNil(t, expectRootGroup)
+			expectRootGroupID := expectRootGroup.Metadata.ID
+
+			// Find the new parent (if any).
+			var newParentGroup *models.Group
+			if test.newPath != test.expectRootGroupPath {
+				// The group is being moved to a new parent (not to top level).
+				// Take off the last segment of test.newPath to get the new parent group's path.
+				dummyGroup := &models.Group{
+					ParentID: "dummy", // Simply so GetParentPath won't return empty string.
+					FullPath: test.newPath,
+				}
+				newParentGroup, err = testClient.client.Groups.GetGroupByFullPath(ctx, dummyGroup.GetParentPath())
+				assert.Nil(t, err)
+			}
+
+			// Do the migration.  An error is never expected, because this function does only positive cases.
+			_, err = testClient.client.Groups.MigrateGroup(ctx, oldGroup, newParentGroup)
+			assert.Nil(t, err)
+
+			// Check the associations.
+			actualAssociations, err := gatherActualAssociations(ctx, testClient.client, allAssociations)
+			assert.Nil(t, err)
+			assert.Equal(t, expectedAssociations, actualAssociations)
+
+			// Check the root group IDs.
+			for _, tp := range mainResources.terraformProviders {
+				// Must fetch the TF provider to verify it got updated.
+				found, err := testClient.client.TerraformProviders.GetProviderByID(ctx, tp.Metadata.ID)
+				assert.Nil(t, err)
+				assert.Equal(t, expectRootGroupID, found.RootGroupID)
+			}
+			for _, tm := range mainResources.terraformModules {
+				// Must fetch the TF module to verify it got updated.
+				found, err := testClient.client.TerraformModules.GetModuleByID(ctx, tm.Metadata.ID)
+				assert.Nil(t, err)
+				assert.Equal(t, expectRootGroupID, found.RootGroupID)
+			}
+
+			// Delete all resources so the next test case has a fresh start.
+
+			// Delete the groups in reverse order.
+			toDelete := mainResources.groups
+			for len(toDelete) > 0 {
+				g1 := toDelete[len(toDelete)-1]
+
+				// Must get the group to have its updated metadata version.
+				g2, err := testClient.client.Groups.GetGroupByID(ctx, g1.Metadata.ID)
+				require.Nil(t, err)
+
+				// Now, we can delete the group.
+				err = testClient.client.Groups.DeleteGroup(ctx, g2)
+				assert.Nil(t, err)
+				toDelete = toDelete[:len(toDelete)-1]
 			}
 		})
 	}
@@ -1364,7 +1884,7 @@ func namespaceIDsFromGroupInfos(groupInfos []groupInfo) []string {
 	return result
 }
 
-// removeMatching finds a group if a slice with a specified full path.
+// removeMatching finds a group in a slice with a specified full path.
 // It returns the found group, a shortened slice, and an error.
 func removeMatching(lookFor string, oldSlice []models.Group) (models.Group, []models.Group, error) {
 	found := models.Group{}
@@ -1403,7 +1923,6 @@ func updateDescription(input string) *string {
 
 // compareGroupsUpdate compares two groups for TestUpdateGroup
 func compareGroupsUpdate(t *testing.T, expectedDescription string, expected, actual models.Group) {
-
 	assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
 	assert.NotEqual(t, expected.Metadata.Version, actual.Metadata.Version)
@@ -1413,6 +1932,912 @@ func compareGroupsUpdate(t *testing.T, expectedDescription string, expected, act
 	assert.Equal(t, expectedDescription, actual.Description)
 	assert.Equal(t, expected.FullPath, actual.FullPath)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
+}
+
+// compareGroupsMigrate compares two groups for TestMigrateGroup
+func compareGroupsMigrate(t *testing.T, expectedDescription string, expected, actual models.Group) {
+	assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
+	assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
+	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
+
+	assert.Equal(t, expected.Name, actual.Name)
+	assert.Equal(t, expectedDescription, actual.Description)
+	assert.Equal(t, expected.FullPath, actual.FullPath)
+	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
+}
+
+// More resources to test MigrateGroup basic functionality.
+var warmupWorkspacesForGroupMigration = []models.Workspace{
+	{
+		FullPath:    "top-level-group-1/2nd-level-group-1a/workspace-20",
+		Description: "workspace to help test group migration",
+		CreatedBy:   "someone-w2",
+	},
+}
+
+var warmupServiceAccountsForGroupMigration = []models.ServiceAccount{
+	{
+		ResourcePath:      "sa-resource-path-0",
+		Name:              "1-service-account-0",
+		Description:       "service account 0",
+		GroupID:           "top-level-group-1/2nd-level-group-1a", // will be fixed later
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+}
+
+var warmupManagedIdentitiesForGroupMigration = []models.ManagedIdentity{
+	{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     "top-level-group-1/2nd-level-group-1a", // will be fixed later
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+		// Resource path is not used when creating the object, but it is returned.
+	},
+}
+
+var warmupGPGKeysForGroupMigration = []models.GPGKey{
+	{
+		GroupID:     "top-level-group-1/2nd-level-group-1a", // will be fixed later
+		CreatedBy:   "someone-k0",
+		ASCIIArmor:  "armor-0",
+		Fingerprint: "fingerprint-0",
+		GPGKeyID:    111222333444555,
+	},
+}
+
+var warmupTerraformProvidersForGroupMigration = []models.TerraformProvider{
+	{
+		Name:         "1-terraform-provider-0",
+		ResourcePath: "top-level-group-1/2nd-level-group-1a/1-terraform-provider-0",
+		RootGroupID:  "top-level-group-1",                    // will be fixed later
+		GroupID:      "top-level-group-1/2nd-level-group-1a", // will be fixed later
+		Private:      false,
+		CreatedBy:    "someone-sv0",
+	},
+}
+
+var warmupTeamsForGroupMigration = []models.Team{
+	{
+		Name:        "team-a",
+		Description: "team a for namespace membership tests",
+	},
+}
+
+var warmupMembershipInputsForGroupMigration = []CreateNamespaceMembershipInput{
+	{
+		NamespacePath: "top-level-group-1/2nd-level-group-1a",
+		TeamID:        ptr.String("team-a"), // will be fixed later
+		Role:          models.ViewerRole,
+	},
+}
+
+var warmupVariablesForGroupMigration = []models.Variable{
+	{
+		Category:      models.EnvironmentVariableCategory,
+		NamespacePath: "top-level-group-1/2nd-level-group-1a/workspace-20",
+		Hcl:           true,
+		Key:           "key-0",
+		Value:         ptr.String("value-0"),
+	},
+}
+
+var warmupUsersForGroupMigration = []models.User{
+	{
+		Username: "user-1",
+		Email:    "user-1@example.com",
+		Active:   true,
+	},
+}
+
+var warmupRunnersForGroupMigration = []models.Runner{
+	{
+		Type:    models.GroupRunnerType,
+		Name:    "group-runner-a",
+		GroupID: ptr.String("top-level-group-1/2nd-level-group-1a"),
+	},
+}
+
+var warmupActivityEventsForGroupMigration = []models.ActivityEvent{
+	{
+		UserID:           ptr.String("user-1"),
+		ServiceAccountID: nil,
+		NamespacePath:    ptr.String("top-level-group-1/2nd-level-group-1a/workspace-20"),
+		Action:           models.ActionCreate,
+		TargetType:       models.TargetVariable,
+		TargetID:         invalidID, // will be variable 0
+	},
+}
+
+var warmupVCSProvidersForGroupMigration = []models.VCSProvider{
+	{
+		Name:              "1-vcs-provider-0",
+		Description:       "vcs provider 0 for testing vcs providers",
+		GroupID:           "top-level-group-1/2nd-level-group-1a", // will be fixed later
+		CreatedBy:         "someone-vp0",
+		OAuthClientID:     "a-client-id",
+		OAuthClientSecret: "a-client-secret",
+		OAuthState:        ptr.String(uuid.New().String()),
+		Type:              models.GitHubProviderType,
+		// Resource path is not used when creating the object, but it is returned.
+	},
+}
+
+// More resources to test MigrateGroup association and root group ID handling.
+var warmupGroupsForMigrateOther = []models.Group{
+	{
+		Description: "warmup group A for testing MigrateGroup association and root group ID handling",
+		FullPath:    "A",
+		CreatedBy:   "someone-A",
+	},
+	{
+		Description: "warmup group B for testing MigrateGroup association and root group ID handling",
+		FullPath:    "A/B",
+		CreatedBy:   "someone-B",
+	},
+	{
+		Description: "warmup group C for testing MigrateGroup association and root group ID handling",
+		FullPath:    "A/B/C",
+		CreatedBy:   "someone-C",
+	},
+	{
+		Description: "warmup group D for testing MigrateGroup association and root group ID handling",
+		FullPath:    "A/D",
+		CreatedBy:   "someone-D",
+	},
+	{
+		Description: "warmup group E for testing MigrateGroup association and root group ID handling",
+		FullPath:    "E",
+		CreatedBy:   "someone-E",
+	},
+	{
+		Description: "warmup group X for testing MigrateGroup association and root group ID handling",
+		FullPath:    "A/B/X",
+		CreatedBy:   "someone-B",
+	},
+	{
+		Description: "warmup group Y for testing MigrateGroup association and root group ID handling",
+		FullPath:    "A/B/X/Y",
+		CreatedBy:   "someone-Y",
+	},
+}
+
+var warmupWorkspacesForMigrateOther = []models.Workspace{
+	{
+		FullPath:    "A/B/X/WX",
+		Description: "workspace to help test group migration other functionality",
+		CreatedBy:   "someone-WX",
+	},
+	{
+		FullPath:    "A/B/X/Y/WY",
+		Description: "workspace to help test group migration other functionality",
+		CreatedBy:   "someone-WY",
+	},
+}
+
+var warmupManagedIdentitiesForMigrateOther = []models.ManagedIdentity{
+	{
+		Name:        "MI-A1",
+		Description: "managed identity in group A 1",
+		GroupID:     "A", // will be fixed later
+		CreatedBy:   "someone-MI-A1",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-a1-data"),
+		// Resource path is not used when creating the object, but it is returned.
+	},
+	{
+		Name:        "MI-A2",
+		Description: "managed identity in group A 2",
+		GroupID:     "A", // will be fixed later
+		CreatedBy:   "someone-MI-A2",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-a2-data"),
+		// Resource path is not used when creating the object, but it is returned.
+	},
+	{
+		Name:        "MI-B1",
+		Description: "managed identity in group B 1",
+		GroupID:     "A/B", // will be fixed later
+		CreatedBy:   "someone-MI-B1",
+		Type:        models.ManagedIdentityAzureFederated,
+		Data:        []byte("managed-identity-b1-data"),
+		// Resource path is not used when creating the object, but it is returned.
+	},
+	{
+		Name:        "MI-B2",
+		Description: "managed identity in group B2",
+		GroupID:     "A/B", // will be fixed later
+		CreatedBy:   "someone-MI-B2",
+		Type:        models.ManagedIdentityAzureFederated,
+		Data:        []byte("managed-identity-b2-data"),
+		// Resource path is not used when creating the object, but it is returned.
+	},
+}
+
+var warmupRunnersForGroupMigrationOther = []models.Runner{
+	{
+		Type:    models.GroupRunnerType,
+		Name:    "group-runner-a",
+		GroupID: ptr.String("A/B/X"),
+	},
+	{
+		Type:    models.GroupRunnerType,
+		Name:    "group-runner-b",
+		GroupID: ptr.String("A/B/X"),
+	},
+}
+
+var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
+	{
+		ResourcePath:      "A/SA-A-X",
+		Name:              "SA-A-X",
+		Description:       "service account in A for X",
+		GroupID:           "A", // will be fixed later
+		CreatedBy:         "someone-SA-A-X",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/SA-A-Y",
+		Name:              "SA-A-Y",
+		Description:       "service account in A for Y",
+		GroupID:           "A", // will be fixed later
+		CreatedBy:         "someone-SA-A-Y",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/SA-A-WX",
+		Name:              "SA-A-WX",
+		Description:       "service account in A for WX",
+		GroupID:           "A", // will be fixed later
+		CreatedBy:         "someone-SA-A-WX",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/SA-A-WY",
+		Name:              "SA-A-WY",
+		Description:       "service account in A for WY",
+		GroupID:           "A", // will be fixed later
+		CreatedBy:         "someone-SA-A-WY",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/B/SA-B-X",
+		Name:              "SA-B-X",
+		Description:       "service account in B for X",
+		GroupID:           "A/B", // will be fixed later
+		CreatedBy:         "someone-SA-B-X",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/B/SA-B-Y",
+		Name:              "SA-B-Y",
+		Description:       "service account in B for Y",
+		GroupID:           "A/B", // will be fixed later
+		CreatedBy:         "someone-SA-B-Y",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/B/SA-B-WX",
+		Name:              "SA-B-WX",
+		Description:       "service account in B for WX",
+		GroupID:           "A/B", // will be fixed later
+		CreatedBy:         "someone-SA-B-WX",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+	{
+		ResourcePath:      "A/B/SA-B-WY",
+		Name:              "SA-B-WY",
+		Description:       "service account in B for WY",
+		GroupID:           "A/B", // will be fixed later
+		CreatedBy:         "someone-SA-B-WY",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+}
+
+var warmupVCSProvidersForMigrateOther = []models.VCSProvider{
+	{
+		Name:              "VP-A",
+		Description:       "vcs provider A for testing",
+		GroupID:           "A",
+		CreatedBy:         "someone-vp-A",
+		OAuthClientID:     "client-id-A",
+		OAuthClientSecret: "client-secret-A",
+		OAuthState:        ptr.String(uuid.New().String()),
+		Type:              models.GitHubProviderType,
+		// Resource path is not used when creating the object, but it is returned.
+	},
+	{
+		Name:              "VP-B",
+		Description:       "vcs provider B for testing",
+		GroupID:           "A/B",
+		CreatedBy:         "someone-vp-B",
+		OAuthClientID:     "client-id-B",
+		OAuthClientSecret: "client-secret-B",
+		OAuthState:        ptr.String(uuid.New().String()),
+		Type:              models.GitLabProviderType,
+		// Resource path is not used when creating the object, but it is returned.
+	},
+}
+
+var warmupTerraformProvidersForMigrateOther = []models.TerraformProvider{
+	{
+		Name:         "TP-X",
+		ResourcePath: "A/B/X/TP-X",
+		RootGroupID:  "A",
+		GroupID:      "A/B/X",
+		Private:      false,
+		CreatedBy:    "someone-TP-X",
+	},
+	{
+		Name:         "TP-Y",
+		ResourcePath: "A/B/X/Y/TP-Y",
+		RootGroupID:  "A",
+		GroupID:      "A/B/X/Y",
+		Private:      true,
+		CreatedBy:    "someone-TP-Y",
+	},
+}
+
+var warmupTerraformModulesForMigrateOther = []models.TerraformModule{
+	{
+		Name:         "TM-X",
+		System:       "aws",
+		ResourcePath: "A/B/X/TM-X",
+		RootGroupID:  "A",
+		GroupID:      "A/B/X",
+		Private:      false,
+		CreatedBy:    "someone-TM-X",
+	},
+	{
+		Name:         "TM-Y",
+		System:       "azure",
+		ResourcePath: "A/B/X/Y/TM-Y",
+		RootGroupID:  "A",
+		GroupID:      "A/B/X/Y",
+		Private:      true,
+		CreatedBy:    "someone-TM-Y",
+	},
+}
+
+var warmupAssociationsForMigrateOther = associations{
+	managedIdentityAssignments: []associateManagedIdentityAssignment{
+		{
+			filterBase:          "A",
+			managedIdentityPath: "A/MI-A1",
+			workspacePath:       "A/B/X/WX",
+		},
+		{
+			filterBase:          "A",
+			managedIdentityPath: "A/MI-A2",
+			workspacePath:       "A/B/X/Y/WY",
+		},
+		{
+			filterBase:          "B",
+			managedIdentityPath: "A/B/MI-B1",
+			workspacePath:       "A/B/X/WX",
+		},
+		{
+			filterBase:          "B",
+			managedIdentityPath: "A/B/MI-B2",
+			workspacePath:       "A/B/X/Y/WY",
+		},
+	},
+	serviceAccountRunnerAssignments: []associateServiceAccountRunnerAssignment{
+		{
+			filterBase:         "A",
+			serviceAccountPath: "A/SA-A-X",
+			runnerPath:         "A/B/X/group-runner-a",
+		},
+		{
+			filterBase:         "B",
+			serviceAccountPath: "A/B/SA-B-Y",
+			runnerPath:         "A/B/X/group-runner-b",
+		},
+	},
+	serviceAccountNamespaceMemberships: []associateServiceAccountNamespaceMembership{
+		{
+			filterBase:         "A",
+			serviceAccountPath: "A/SA-A-X",
+			namespacePath:      "A/B/X",
+		},
+		{
+			filterBase:         "A",
+			serviceAccountPath: "A/SA-A-Y",
+			namespacePath:      "A/B/X/Y",
+		},
+		{
+			filterBase:         "A",
+			serviceAccountPath: "A/SA-A-WX",
+			namespacePath:      "A/B/X/WX",
+		},
+		{
+			filterBase:         "A",
+			serviceAccountPath: "A/SA-A-WY",
+			namespacePath:      "A/B/X/Y/WY",
+		},
+		{
+			filterBase:         "B",
+			serviceAccountPath: "A/B/SA-B-X",
+			namespacePath:      "A/B/X",
+		},
+		{
+			filterBase:         "B",
+			serviceAccountPath: "A/B/SA-B-Y",
+			namespacePath:      "A/B/X/Y",
+		},
+		{
+			filterBase:         "B",
+			serviceAccountPath: "A/B/SA-B-WX",
+			namespacePath:      "A/B/X/WX",
+		},
+		{
+			filterBase:         "B",
+			serviceAccountPath: "A/B/SA-B-WY",
+			namespacePath:      "A/B/X/Y/WY",
+		},
+	},
+	workspaceVCSProviderLinks: []associateWorkspaceVCSProviderLink{
+		{
+			filterBase:    "A",
+			providerPath:  "A/VP-A",
+			workspacePath: "A/B/X/WX",
+		},
+		// Only one VCS provider allowed per workspace, so cannot do cross-product.
+		{
+			filterBase:    "B",
+			providerPath:  "A/B/VP-B",
+			workspacePath: "A/B/X/Y/WY",
+		},
+	},
+}
+
+// createMigrateResources creates other resources connected to the standard warmup groups for group migration testing.
+func createMigrateResources(ctx context.Context, testClient *testClient,
+	input *migrateGroupWarmupsInput,
+) (*migrateGroupWarmupsOutput, error) {
+	result := migrateGroupWarmupsOutput{}
+	var err error
+
+	// The groups are already created.
+	result.groups = input.groups
+
+	result.groupID2Path = map[string]string{}
+	for _, g := range result.groups {
+		result.groupID2Path[g.Metadata.ID] = g.FullPath
+	}
+
+	result.workspaces, err = createInitialWorkspaces(ctx, testClient, input.groupPath2ID, input.workspaces)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialWorkspaces: %s", err)
+	}
+
+	result.workspaceID2Path = map[string]string{}
+	for _, w := range result.workspaces {
+		result.workspaceID2Path[w.Metadata.ID] = w.FullPath
+	}
+
+	var serviceAccountName2ID map[string]string
+	result.serviceAccounts, serviceAccountName2ID, err = createInitialServiceAccounts(ctx, testClient,
+		input.groupPath2ID, input.serviceAccounts)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialServiceAccounts: %s", err)
+	}
+
+	result.managedIdentities, err = createInitialManagedIdentities(ctx, testClient,
+		input.groupPath2ID, input.managedIdentities)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialManagedIdentities: %s", err)
+	}
+
+	result.gpgKeys, err = createInitialGPGKeys(ctx, testClient, input.gpgKeys, input.groupPath2ID)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialManagedIdentities: %s", err)
+	}
+
+	result.terraformProviders, _, err = createInitialTerraformProviders(ctx, testClient,
+		input.terraformProviders, input.groupPath2ID)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialTerraformProviders: %s", err)
+	}
+
+	result.terraformModules, _, err = createInitialTerraformModules(ctx, testClient,
+		input.terraformModules, input.groupPath2ID)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialTerraformModules: %s", err)
+	}
+
+	var teamName2ID map[string]string
+	result.teams, teamName2ID, err = createInitialTeams(ctx, testClient, input.teams)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialTeams: %s", err)
+	}
+
+	// do only a service account namespace membership
+	result.memberships, err = createInitialNamespaceMemberships(ctx, testClient,
+		teamName2ID, map[string]string{}, input.groupPath2ID, serviceAccountName2ID,
+		input.membershipInputs)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialNamespaceMemberships: %s", err)
+	}
+
+	result.variables, err = createInitialVariables(ctx, testClient, input.variables)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialVariables: %s", err)
+	}
+
+	// Make a modified copy of the input events to set the target ID.
+	modifiedInputEvents := []models.ActivityEvent{}
+	for _, oldEvent := range input.activityEvents {
+		newEvent := oldEvent
+
+		var newID string
+		switch newEvent.TargetType {
+		case models.TargetVariable:
+			newID = result.variables[0].Metadata.ID
+		case models.TargetServiceAccount:
+			newID = result.serviceAccounts[0].Metadata.ID
+		}
+		newEvent.TargetID = newID
+
+		modifiedInputEvents = append(modifiedInputEvents, newEvent)
+	}
+
+	var username2ID map[string]string
+	result.users, username2ID, err = createInitialUsers(ctx, testClient, input.users)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialUsers: %s", err)
+	}
+
+	result.activityEvents, err = createInitialActivityEvents(ctx, testClient,
+		modifiedInputEvents, username2ID, serviceAccountName2ID)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialActivityEvents: %s", err)
+	}
+
+	result.vcsProviders, err = createInitialVCSProviders(ctx, testClient,
+		input.groupPath2ID, input.vcsProviders)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialVCSProviders: %s", err)
+	}
+
+	result.runners, _, err = createInitialRunners(ctx, testClient, input.runners, input.groupPath2ID)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialRunners: %s", err)
+	}
+
+	return &result, nil
+}
+
+// createAssociations creates the associations used in testing MigrateGroup association removal
+// and root group ID update.  The returned struct will have more fields filled in than the input.
+// With very small numbers of resources, it should be fast enough without maps.
+func createAssociations(ctx context.Context, dbClient *Client,
+	resources *migrateGroupWarmupsOutput, inputs *associations,
+) (*associations, error) {
+	result := associations{
+		managedIdentityAssignments:         []associateManagedIdentityAssignment{},
+		serviceAccountNamespaceMemberships: []associateServiceAccountNamespaceMembership{},
+		workspaceVCSProviderLinks:          []associateWorkspaceVCSProviderLink{},
+		serviceAccountRunnerAssignments:    []associateServiceAccountRunnerAssignment{},
+	}
+
+	// managed identity assignments
+	for _, input := range inputs.managedIdentityAssignments {
+
+		// Find the workspace resource.
+		var workspace *models.Workspace
+		for _, ws := range resources.workspaces {
+			if ws.FullPath == input.workspacePath {
+				workspace = &ws
+				break
+			}
+		}
+		if workspace == nil {
+			return nil, fmt.Errorf("failed to find workspace %s to associate with managed identity %s",
+				input.workspacePath, input.managedIdentityPath)
+		}
+
+		// Find the managed identity resource.
+		var managedIdentity *models.ManagedIdentity
+		for _, mi := range resources.managedIdentities {
+			if mi.ResourcePath == input.managedIdentityPath {
+				managedIdentity = &mi
+				break
+			}
+		}
+		if managedIdentity == nil {
+			return nil, fmt.Errorf("failed to find managed identity %s to associate with workspace %s",
+				input.managedIdentityPath, input.workspacePath)
+		}
+
+		// Create the assignment.
+		if err := dbClient.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
+			managedIdentity.Metadata.ID, workspace.Metadata.ID); err != nil {
+			return nil, fmt.Errorf("failed to associate managed identity %s with workspace %s: %v",
+				input.managedIdentityPath, input.workspacePath, err)
+		}
+
+		// Record the assignment for the result.
+		result.managedIdentityAssignments = append(result.managedIdentityAssignments,
+			associateManagedIdentityAssignment{
+				filterBase:          input.filterBase,
+				workspacePath:       input.workspacePath,
+				managedIdentityPath: input.managedIdentityPath,
+				workspace:           workspace,
+				managedIdentity:     managedIdentity,
+			})
+	}
+
+	// service account namespace memberships
+	for _, input := range inputs.serviceAccountNamespaceMemberships {
+
+		// Find the service account.
+		var serviceAccount *models.ServiceAccount
+		for _, sa := range resources.serviceAccounts {
+			if sa.ResourcePath == input.serviceAccountPath {
+				serviceAccount = &sa
+				break
+			}
+		}
+		if serviceAccount == nil {
+			return nil, fmt.Errorf("failed to find service account %s to associate with namespace %s",
+				input.serviceAccountPath, input.namespacePath)
+		}
+
+		// Find the namespace.  The group or workspace found here is not actually used except for consistency checking.
+		var grp *models.Group
+		for _, ns := range resources.groups {
+			if ns.FullPath == input.namespacePath {
+				grp = &ns
+				break
+			}
+		}
+		var ws *models.Workspace
+		for _, ns := range resources.workspaces {
+			if ns.FullPath == input.namespacePath {
+				ws = &ns
+				break
+			}
+		}
+		if (grp == nil) && (ws == nil) {
+			return nil, fmt.Errorf("failed to find namespace %s to associate with service account %s",
+				input.namespacePath, input.serviceAccountPath)
+		}
+
+		// Create the assignment.
+		createdNamespaceMembership, err := dbClient.NamespaceMemberships.CreateNamespaceMembership(ctx,
+			&CreateNamespaceMembershipInput{
+				NamespacePath:    input.namespacePath,
+				ServiceAccountID: &serviceAccount.Metadata.ID,
+			})
+		if err != nil {
+			return nil, fmt.Errorf("failed to associate service account %s with namespace %s: %v",
+				input.serviceAccountPath, input.namespacePath, err)
+		}
+
+		// Record the assignment for the result.
+		result.serviceAccountNamespaceMemberships = append(result.serviceAccountNamespaceMemberships,
+			associateServiceAccountNamespaceMembership{
+				filterBase:          input.filterBase,
+				serviceAccountPath:  input.serviceAccountPath,
+				namespacePath:       input.namespacePath,
+				namespaceMembership: createdNamespaceMembership,
+			})
+	}
+
+	for _, input := range inputs.serviceAccountRunnerAssignments {
+		// Find the service account.
+		var serviceAccount *models.ServiceAccount
+		for _, sa := range resources.serviceAccounts {
+			if sa.ResourcePath == input.serviceAccountPath {
+				serviceAccount = &sa
+				break
+			}
+		}
+		if serviceAccount == nil {
+			return nil, fmt.Errorf("failed to find service account %s to associate with runner %s",
+				input.serviceAccountPath, input.runnerPath)
+		}
+
+		// Find the namespace.  The group or workspace found here is not actually used except for consistency checking.
+		var runner *models.Runner
+		for _, r := range resources.runners {
+			if r.ResourcePath == input.runnerPath {
+				runner = &r
+				break
+			}
+		}
+
+		if runner == nil {
+			return nil, fmt.Errorf("failed to find runner %s to associate with service account %s",
+				input.runnerPath, input.serviceAccountPath)
+		}
+
+		// Create the assignment.
+		err := dbClient.ServiceAccounts.AssignServiceAccountToRunner(ctx,
+			serviceAccount.Metadata.ID, runner.Metadata.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign service account %s with runner %s: %v",
+				input.serviceAccountPath, input.runnerPath, err)
+		}
+
+		// Record the assignment for the result.
+		result.serviceAccountRunnerAssignments = append(result.serviceAccountRunnerAssignments,
+			associateServiceAccountRunnerAssignment{
+				filterBase:         input.filterBase,
+				serviceAccountPath: input.serviceAccountPath,
+				runnerPath:         input.runnerPath,
+				runner:             runner,
+				serviceAccount:     serviceAccount,
+			})
+	}
+
+	// workspace VCS provider links
+	for _, input := range inputs.workspaceVCSProviderLinks {
+
+		// Find the workspace.
+		var workspace *models.Workspace
+		for _, ws := range resources.workspaces {
+			if ws.FullPath == input.workspacePath {
+				workspace = &ws
+				break
+			}
+		}
+		if workspace == nil {
+			return nil, fmt.Errorf("failed to find workspace %s to associate with VCS provider %s",
+				input.workspacePath, input.providerPath)
+		}
+
+		// Find the VCS provider.
+		var provider *models.VCSProvider
+		for _, vp := range resources.vcsProviders {
+			if vp.ResourcePath == input.providerPath {
+				provider = &vp
+				break
+			}
+		}
+		if provider == nil {
+			return nil, fmt.Errorf("failed to find VCS provider %s to associate with workspace %s",
+				input.providerPath, input.workspacePath)
+		}
+
+		// Create the assignment.
+		createdLink, err := dbClient.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+			WorkspaceID: workspace.Metadata.ID,
+			ProviderID:  provider.Metadata.ID,
+			TokenNonce:  newResourceID(), // needs only to have valid UUID syntax
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to associate workspace %s with VCS provider %s: %v",
+				input.workspacePath, input.providerPath, err)
+		}
+
+		// Record the assignment for the result.
+		result.workspaceVCSProviderLinks = append(result.workspaceVCSProviderLinks,
+			associateWorkspaceVCSProviderLink{
+				filterBase:               input.filterBase,
+				workspacePath:            input.workspacePath,
+				providerPath:             input.providerPath,
+				workspaceVCSProviderLink: createdLink,
+			})
+	}
+
+	return &result, nil
+}
+
+// filterAssociations filters the associations to keep those specified.
+func filterAssociations(input *associations, toKeep []string) *associations {
+	keepMap := map[string]interface{}{}
+	for _, s := range toKeep {
+		keepMap[s] = interface{}(nil)
+	}
+
+	result := associations{
+		managedIdentityAssignments:         []associateManagedIdentityAssignment{},
+		serviceAccountNamespaceMemberships: []associateServiceAccountNamespaceMembership{},
+		workspaceVCSProviderLinks:          []associateWorkspaceVCSProviderLink{},
+		serviceAccountRunnerAssignments:    []associateServiceAccountRunnerAssignment{},
+	}
+
+	for _, mia := range input.managedIdentityAssignments {
+		if _, ok := keepMap[mia.filterBase]; ok {
+			result.managedIdentityAssignments = append(result.managedIdentityAssignments, mia)
+		}
+	}
+
+	for _, sanm := range input.serviceAccountNamespaceMemberships {
+		if _, ok := keepMap[sanm.filterBase]; ok {
+			result.serviceAccountNamespaceMemberships = append(result.serviceAccountNamespaceMemberships, sanm)
+		}
+	}
+
+	for _, wvpl := range input.workspaceVCSProviderLinks {
+		if _, ok := keepMap[wvpl.filterBase]; ok {
+			result.workspaceVCSProviderLinks = append(result.workspaceVCSProviderLinks, wvpl)
+		}
+	}
+
+	for _, r := range input.serviceAccountRunnerAssignments {
+		if _, ok := keepMap[r.filterBase]; ok {
+			result.serviceAccountRunnerAssignments = append(result.serviceAccountRunnerAssignments, r)
+		}
+	}
+
+	return &result
+}
+
+// gatherActualAssociations returns the associations that still exist.
+func gatherActualAssociations(ctx context.Context, dbClient *Client, inputs *associations) (*associations, error) {
+	result := associations{
+		managedIdentityAssignments:         []associateManagedIdentityAssignment{},
+		serviceAccountNamespaceMemberships: []associateServiceAccountNamespaceMembership{},
+		workspaceVCSProviderLinks:          []associateWorkspaceVCSProviderLink{},
+		serviceAccountRunnerAssignments:    []associateServiceAccountRunnerAssignment{},
+	}
+
+	for _, mia := range inputs.managedIdentityAssignments {
+		// This gets the managed identity assignments still tied to the workspace in question so we can check them.
+		candidates, err := dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, mia.workspace.Metadata.ID)
+		if err != nil {
+			if !tharsis.IsNotFoundError(err) {
+				return nil, err
+			}
+		} else {
+			for _, candidate := range candidates {
+				if candidate.Metadata.ID == mia.managedIdentity.Metadata.ID {
+					result.managedIdentityAssignments = append(result.managedIdentityAssignments, mia)
+				}
+			}
+		}
+	}
+
+	for _, sra := range inputs.serviceAccountRunnerAssignments {
+		sraCopy := sra
+		// This gets the service account assignments still tied to the runner in question so we can check them.
+		candidates, err := dbClient.ServiceAccounts.GetServiceAccounts(ctx, &GetServiceAccountsInput{
+			Filter: &ServiceAccountFilter{
+				RunnerID: &sraCopy.runner.Metadata.ID,
+			},
+		})
+		if err != nil {
+			if !tharsis.IsNotFoundError(err) {
+				return nil, err
+			}
+		} else {
+			for _, candidate := range candidates.ServiceAccounts {
+				if candidate.Metadata.ID == sra.serviceAccount.Metadata.ID {
+					result.serviceAccountRunnerAssignments = append(result.serviceAccountRunnerAssignments, sra)
+				}
+			}
+		}
+	}
+
+	for _, sanm := range inputs.serviceAccountNamespaceMemberships {
+		found, err := dbClient.NamespaceMemberships.GetNamespaceMembershipByID(ctx, sanm.namespaceMembership.Metadata.ID)
+		if err != nil {
+			if !tharsis.IsNotFoundError(err) {
+				return nil, err
+			}
+		} else if found != nil {
+			result.serviceAccountNamespaceMemberships = append(result.serviceAccountNamespaceMemberships, sanm)
+		}
+	}
+
+	for _, wvpl := range inputs.workspaceVCSProviderLinks {
+		found, err := dbClient.WorkspaceVCSProviderLinks.GetLinkByID(ctx, wvpl.workspaceVCSProviderLink.Metadata.ID)
+		if err != nil {
+			if !tharsis.IsNotFoundError(err) {
+				return nil, err
+			}
+		} else if found != nil {
+			result.workspaceVCSProviderLinks = append(result.workspaceVCSProviderLinks, wvpl)
+		}
+	}
+
+	return &result, nil
 }
 
 // The End.

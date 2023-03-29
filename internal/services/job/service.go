@@ -5,20 +5,30 @@ package job
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 )
 
 const (
-
 	// Number of concurrent jobs a given runner can execute.
 	runnerJobsLimit int = 100
 )
+
+// ClaimJobResponse is returned when a runner claims a Job
+type ClaimJobResponse struct {
+	JobID string
+	Token string
+}
 
 // LogEvent represents a run event
 type LogEvent struct {
@@ -42,15 +52,9 @@ type CancellationSubscriptionsOptions struct {
 	JobID string
 }
 
-// ClaimJobResponse is returned when a runner claims a Job
-type ClaimJobResponse struct {
-	Job   *models.Job
-	Token string
-}
-
 // Service implements all job related functionality
 type Service interface {
-	GetNextAvailableQueuedJob(ctx context.Context, runnerID string) (*models.Job, error)
+	ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error)
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
 	GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
@@ -62,20 +66,24 @@ type Service interface {
 }
 
 type service struct {
-	logger       logger.Logger
-	dbClient     *db.Client
-	eventManager *events.EventManager
-	logStore     LogStore
+	logger          logger.Logger
+	dbClient        *db.Client
+	idp             *auth.IdentityProvider
+	eventManager    *events.EventManager
+	runStateManager *state.RunStateManager
+	logStore        LogStore
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	idp *auth.IdentityProvider,
 	eventManager *events.EventManager,
+	runStateManager *state.RunStateManager,
 	logStore LogStore,
 ) Service {
-	return &service{logger, dbClient, eventManager, logStore}
+	return &service{logger, dbClient, idp, eventManager, runStateManager, logStore}
 }
 
 func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, options *LogEventSubscriptionOptions) (<-chan *LogEvent, error) {
@@ -379,97 +387,133 @@ func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, li
 	return s.logStore.GetLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, limit)
 }
 
-func (s *service) GetNextAvailableQueuedJob(ctx context.Context, runnerID string) (*models.Job, error) {
+func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Only allow system caller for now until runner registration is supported
-	if _, ok := caller.(*auth.SystemCaller); !ok {
-		return nil, errors.NewError(errors.EForbidden, fmt.Sprintf("Subject %s is not authorized to get queued jobs", caller.GetSubject()))
+	// Find runner by path
+	pathParts := strings.Split(runnerPath, "/")
+	getRunnerInput := db.GetRunnersInput{
+		Filter: &db.RunnerFilter{
+			RunnerName: ptr.String(pathParts[len(pathParts)-1]),
+		},
 	}
 
-	subscription := events.Subscription{
-		Type:    events.JobSubscription,
-		Actions: []events.SubscriptionAction{},
+	if len(pathParts) > 1 {
+		groupPath := strings.Join(pathParts[:len(pathParts)-1], "/")
+		group, ggErr := s.dbClient.Groups.GetGroupByFullPath(ctx, groupPath)
+		if ggErr != nil {
+			return nil, ggErr
+		}
+		if group == nil {
+			return nil, errors.NewError(errors.ENotFound, "runner not found")
+		}
+		getRunnerInput.Filter.GroupID = &group.Metadata.ID
 	}
-	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
-	defer s.eventManager.Unsubscribe(subscriber)
 
-	job, err := s.getNextAvailableJob(ctx, runnerID)
+	runnersResp, err := s.dbClient.Runners.GetRunners(ctx, &getRunnerInput)
 	if err != nil {
 		return nil, err
 	}
 
-	if job != nil {
-		return job, nil
+	if len(runnersResp.Runners) == 0 {
+		return nil, errors.NewError(errors.ENotFound, "runner not found")
 	}
+
+	runner := runnersResp.Runners[0]
+
+	if err = caller.RequireRunnerAccess(ctx, runner.Metadata.ID); err != nil {
+		return nil, err
+	}
+
+	for {
+		job, err := s.getNextAvailableQueuedJob(ctx, &runner)
+		if err != nil {
+			return nil, err
+		}
+
+		// Attempt to claim job
+		now := time.Now()
+		job.Timestamps.PendingTimestamp = &now
+		job.Status = models.JobPending
+		job.RunnerID = &runner.Metadata.ID
+		job.RunnerPath = &runner.ResourcePath
+
+		job, err = s.runStateManager.UpdateJob(ctx, job)
+		if err != nil {
+			if err == db.ErrOptimisticLockError {
+				continue
+			}
+			return nil, err
+		}
+
+		if job != nil {
+			maxJobDuration := time.Duration(job.MaxJobDuration) * time.Minute
+			expiration := time.Now().Add(maxJobDuration + time.Hour)
+			token, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
+				// Expiration is job timeout plus 1 hour to give the job time to gracefully exit
+				Expiration: &expiration,
+				Subject:    fmt.Sprintf("job-%s", job.Metadata.ID),
+				Claims: map[string]string{
+					"job_id":       gid.ToGlobalID(gid.JobType, job.Metadata.ID),
+					"run_id":       gid.ToGlobalID(gid.RunType, job.RunID),
+					"workspace_id": gid.ToGlobalID(gid.WorkspaceType, job.WorkspaceID),
+					"type":         auth.JobTokenType,
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			s.logger.Infow("Claimed a job.",
+				"caller", caller.GetSubject(),
+				"workspaceID", job.WorkspaceID,
+				"jobID", job.Metadata.ID,
+			)
+			return &ClaimJobResponse{JobID: job.Metadata.ID, Token: string(token)}, nil
+		}
+	}
+}
+
+func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.Runner) (*models.Job, error) {
+	jobSubscription := events.Subscription{
+		Type:    events.JobSubscription,
+		Actions: []events.SubscriptionAction{},
+	}
+	runnerSubscription := events.Subscription{
+		Type:    events.RunnerSubscription,
+		Actions: []events.SubscriptionAction{},
+	}
+
+	// Subscribe to job and run events
+	subscriber := s.eventManager.Subscribe([]events.Subscription{jobSubscription, runnerSubscription})
+	defer s.eventManager.Unsubscribe(subscriber)
 
 	// Wait for next available run
 	for {
+		job, err := s.getNextAvailableJob(ctx, runner)
+		if err != nil {
+			return nil, err
+		}
+
+		if job != nil {
+			return job, nil
+		}
+
 		event, err := subscriber.GetEvent(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		s.logger.Info("Received job notification from db")
-
-		if events.SubscriptionAction(event.Action) == events.DeleteAction {
-			nextJob, err := s.getNextAvailableJob(ctx, runnerID)
-			if err != nil {
-				return nil, err
-			}
-			if nextJob != nil {
-				return nextJob, nil
-			}
-		} else {
-			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to request job %v", err)
-			}
-
-			if job == nil {
-				s.logger.Errorf("Job not found for event with ID %s", event.ID)
-				continue
-			}
-
-			// Return the queued job if current job has finished.
-			if job.Status == models.JobQueued {
-				ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, job.WorkspaceID)
-				if err != nil {
-					return nil, err
-				}
-
-				if !ws.Locked {
-					below, err := s.isRunnerBelowJobsLimit(ctx, runnerID)
-					if err != nil {
-						return nil, err
-					}
-
-					if below {
-						return job, nil
-					}
-				}
-			}
-
-			// Find any queued jobs once current job has finished.
-			if job.Status == models.JobFinished {
-				nextJob, err := s.getNextAvailableJob(ctx, runnerID)
-				if err != nil {
-					return nil, err
-				}
-				if nextJob != nil {
-					return nextJob, nil
-				}
-			}
-		}
+		s.logger.Infof("Received %s:%s notification from db", event.Table, event.Action)
 	}
 }
 
 // isRunnerBelowJobsLimit determines if runner is full.
-func (s *service) isRunnerBelowJobsLimit(ctx context.Context, runnerID string) (bool, error) {
-	runnerJobsCount, err := s.dbClient.Jobs.GetJobCountForRunner(ctx, runnerID)
+func (s *service) isRunnerBelowJobsLimit(ctx context.Context, runner *models.Runner) (bool, error) {
+	runnerJobsCount, err := s.dbClient.Jobs.GetJobCountForRunner(ctx, runner.Metadata.ID)
 	if err != nil {
 		return false, err
 	}
@@ -478,7 +522,7 @@ func (s *service) isRunnerBelowJobsLimit(ctx context.Context, runnerID string) (
 
 // getNextAvailableJob returns a new job when workspace doesn't have an active job
 // and the runner is not full.
-func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*models.Job, error) {
+func (s *service) getNextAvailableJob(ctx context.Context, runner *models.Runner) (*models.Job, error) {
 	// Request next available Job
 	queuedStatus := models.JobQueued
 	sortBy := db.JobSortableFieldCreatedAtAsc
@@ -498,8 +542,61 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 			return nil, err
 		}
 
+		if ws == nil {
+			// This will only occur if the worspace is deleted after the job is queried
+			continue
+		}
+
 		if !ws.Locked {
-			below, err := s.isRunnerBelowJobsLimit(ctx, runnerID)
+			// Check if this runner has priority to claim this job
+			if runner.Type == models.SharedRunnerType {
+				// Verify that there are no group runners available for this workspace since
+				// group runners have higher precedence than shared runners
+				groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
+					Filter: &db.RunnerFilter{
+						NamespacePaths: ws.ExpandPath(),
+					},
+				})
+				if err != nil {
+					return nil, err
+				}
+				if len(groupRunners.Runners) != 0 {
+					continue
+				}
+			} else {
+				runnerGroupPath := runner.GetGroupPath()
+				if runnerGroupPath != ws.GetGroupPath() {
+					if !strings.HasPrefix(ws.GetGroupPath(), fmt.Sprintf("%s/", runnerGroupPath)) {
+						continue
+					}
+
+					// Verify there are no child runners with higher precedence
+					//runner.
+					groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
+						Filter: &db.RunnerFilter{
+							NamespacePaths: ws.ExpandPath(),
+						},
+					})
+					if err != nil {
+						return nil, err
+					}
+
+					runnerHasPrecedence := true
+					for _, r := range groupRunners.Runners {
+						if len(r.GetGroupPath()) > len(runnerGroupPath) {
+							// There is a runner lower in the hieararchy which as precedence
+							runnerHasPrecedence = false
+							break
+						}
+					}
+
+					if !runnerHasPrecedence {
+						continue
+					}
+				}
+			}
+
+			below, err := s.isRunnerBelowJobsLimit(ctx, runner)
 			if err != nil {
 				return nil, err
 			}

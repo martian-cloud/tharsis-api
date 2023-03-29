@@ -70,32 +70,6 @@ func (_m *MockService) CancelRun(ctx context.Context, options *CancelRunInput) (
 	return r0, r1
 }
 
-// ClaimJob provides a mock function with given fields: ctx, runnerID
-func (_m *MockService) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error) {
-	ret := _m.Called(ctx, runnerID)
-
-	var r0 *ClaimJobResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*ClaimJobResponse, error)); ok {
-		return rf(ctx, runnerID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *ClaimJobResponse); ok {
-		r0 = rf(ctx, runnerID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ClaimJobResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, runnerID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // CreateRun provides a mock function with given fields: ctx, options
 func (_m *MockService) CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error) {
 	ret := _m.Called(ctx, options)

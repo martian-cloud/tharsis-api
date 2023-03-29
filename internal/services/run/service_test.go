@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 )
 
@@ -221,7 +222,6 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				&mockActivityEvents,
 				mockModuleService,
 				mockModuleResolver,
@@ -409,7 +409,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, nil, &mockActivityEvents, nil, nil)
+			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, &mockActivityEvents, nil, nil, nil)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), test.runInput)
 			if test.expectErrorCode != "" {
@@ -530,11 +530,10 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				&mockActivityEvents,
 				mockModuleService,
 				mockModuleResolver,
-				newRunStateManager(dbClient.Client, logger),
+				state.NewRunStateManager(dbClient.Client, logger),
 				ruleEnforcer,
 			)
 

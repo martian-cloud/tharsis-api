@@ -14,6 +14,20 @@ type MockServiceAccounts struct {
 	mock.Mock
 }
 
+// AssignServiceAccountToRunner provides a mock function with given fields: ctx, serviceAccountID, runnerID
+func (_m *MockServiceAccounts) AssignServiceAccountToRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	ret := _m.Called(ctx, serviceAccountID, runnerID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, serviceAccountID, runnerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // CreateServiceAccount provides a mock function with given fields: ctx, serviceAccount
 func (_m *MockServiceAccounts) CreateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error) {
 	ret := _m.Called(ctx, serviceAccount)
@@ -130,6 +144,46 @@ func (_m *MockServiceAccounts) GetServiceAccounts(ctx context.Context, input *Ge
 	}
 
 	return r0, r1
+}
+
+// GetServiceAccountsAssignedToRunner provides a mock function with given fields: ctx, runnerID
+func (_m *MockServiceAccounts) GetServiceAccountsAssignedToRunner(ctx context.Context, runnerID string) ([]models.ServiceAccount, error) {
+	ret := _m.Called(ctx, runnerID)
+
+	var r0 []models.ServiceAccount
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]models.ServiceAccount, error)); ok {
+		return rf(ctx, runnerID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []models.ServiceAccount); ok {
+		r0 = rf(ctx, runnerID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.ServiceAccount)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, runnerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UnassignServiceAccountFromRunner provides a mock function with given fields: ctx, serviceAccountID, runnerID
+func (_m *MockServiceAccounts) UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	ret := _m.Called(ctx, serviceAccountID, runnerID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, serviceAccountID, runnerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateServiceAccount provides a mock function with given fields: ctx, serviceAccount

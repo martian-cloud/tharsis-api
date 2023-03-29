@@ -77,6 +77,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, us
 				serviceAccountID,
 				output.PrivateClaims["service_account_path"],
 				newNamespaceMembershipAuthorizer(a.dbClient, nil, &serviceAccountID, useCache),
+				a.dbClient,
 			), nil
 		case JobTokenType:
 			return &JobCaller{

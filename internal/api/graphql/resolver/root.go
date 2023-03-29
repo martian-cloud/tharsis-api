@@ -134,6 +134,17 @@ func (r RootResolver) DeleteGroup(ctx context.Context, args *struct{ Input *Dele
 	return response, nil
 }
 
+// MigrateGroup migrates an existing group
+func (r RootResolver) MigrateGroup(ctx context.Context,
+	args *struct{ Input *MigrateGroupInput }) (*GroupMutationPayloadResolver, error) {
+	response, err := migrateGroupMutation(ctx, args.Input)
+	if err != nil {
+		return handleGroupMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Run Queries and Mutations */
 
 // Run query returns a run by ID
@@ -441,6 +452,16 @@ func (r RootResolver) SaveJobLogs(ctx context.Context, args *struct{ Input *Save
 	response, err := saveJobLogsMutation(ctx, args.Input)
 	if err != nil {
 		return handleSaveJobLogsMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// ClaimJob attempts to claim the next available job, it'll block if no jobs are available to be claimed
+func (r RootResolver) ClaimJob(ctx context.Context, args *struct{ Input *ClaimJobInput }) (*ClaimJobMutationPayload, error) {
+	response, err := claimJobMutation(ctx, args.Input)
+	if err != nil {
+		return handleClaimJobMutationProblem(err, args.Input.ClientMutationID)
 	}
 
 	return response, nil
@@ -984,4 +1005,55 @@ func (r RootResolver) CreateVCSRun(ctx context.Context,
 // AuthSettings returns the configured auth settings
 func (r RootResolver) AuthSettings(ctx context.Context) *AuthSettingsResolver {
 	return authSettingsQuery(ctx)
+}
+
+/* Runner Queries and Mutations */
+
+// CreateRunner creates a new runner
+func (r RootResolver) CreateRunner(ctx context.Context, args *struct{ Input *CreateRunnerInput }) (*RunnerMutationPayloadResolver, error) {
+	response, err := createRunnerMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// UpdateRunner updates an existing runner
+func (r RootResolver) UpdateRunner(ctx context.Context, args *struct{ Input *UpdateRunnerInput }) (*RunnerMutationPayloadResolver, error) {
+	response, err := updateRunnerMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// DeleteRunner deletes a runner
+func (r RootResolver) DeleteRunner(ctx context.Context, args *struct{ Input *DeleteRunnerInput }) (*RunnerMutationPayloadResolver, error) {
+	response, err := deleteRunnerMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// AssignServiceAccountToRunner assigns a service account to a runner
+func (r RootResolver) AssignServiceAccountToRunner(ctx context.Context, args *struct {
+	Input *AssignServiceAccountToRunnerInput
+}) (*RunnerMutationPayloadResolver, error) {
+	response, err := assignServiceAccountToRunnerMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// UnassignServiceAccountFromRunner unassigns a service account from a runner
+func (r RootResolver) UnassignServiceAccountFromRunner(ctx context.Context, args *struct {
+	Input *AssignServiceAccountToRunnerInput
+}) (*RunnerMutationPayloadResolver, error) {
+	response, err := unassignServiceAccountFromRunnerMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
 }
