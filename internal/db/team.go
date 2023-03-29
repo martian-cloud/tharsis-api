@@ -109,7 +109,7 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 			ex["teams.id"] = input.Filter.TeamIDs
 		}
 		if input.Filter.TeamNamePrefix != nil && *input.Filter.TeamNamePrefix != "" {
-			ex["teams.name"] = goqu.Op{"like": *input.Filter.TeamNamePrefix + "%%"}
+			ex["teams.name"] = goqu.Op{"like": *input.Filter.TeamNamePrefix + "%"}
 		}
 		if input.Filter.UserID != nil {
 			ex["team_members.user_id"] = *input.Filter.UserID
@@ -146,7 +146,6 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 		sortDirection,
 		teamFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -227,13 +226,11 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 				"scim_external_id": nullableString(team.SCIMExternalID),
 			},
 		).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedTeam, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -245,7 +242,6 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 }
 
 func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
-
 	sql, args, err := dialect.Delete("teams").
 		Prepared(true).
 		Where(

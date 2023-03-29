@@ -118,7 +118,6 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 	}
 
 	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -143,7 +142,6 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 			"external_id": externalID,
 			"user_id":     userID,
 		}).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -170,7 +168,7 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 			ex["users.id"] = input.Filter.UserIDs
 		}
 		if input.Filter.UsernamePrefix != nil && *input.Filter.UsernamePrefix != "" {
-			ex["users.username"] = goqu.Op{"like": *input.Filter.UsernamePrefix + "%%"}
+			ex["users.username"] = goqu.Op{"like": *input.Filter.UsernamePrefix + "%"}
 		}
 		if input.Filter.SCIMExternalID {
 			ex["users.scim_external_id"] = goqu.Op{"isNot": nil}
@@ -199,7 +197,6 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		sortDirection,
 		userFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -249,13 +246,11 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 				"active":           user.Active,
 			},
 		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -288,13 +283,11 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 			"active":           user.Active,
 		}).
 		Returning(userFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	createdUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -316,7 +309,6 @@ func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
 				"version": user.Metadata.Version,
 			},
 		).Returning(userFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -344,7 +336,6 @@ func (u *users) getUser(ctx context.Context, exp goqu.Ex) (*models.User, error) 
 	}
 
 	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -381,7 +372,6 @@ func scanUser(row scanner) (*models.User, error) {
 	}
 
 	err := row.Scan(fields...)
-
 	if err != nil {
 		return nil, err
 	}

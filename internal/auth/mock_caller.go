@@ -180,6 +180,20 @@ func (_m *MockCaller) RequireRunWriteAccess(ctx context.Context, runID string) e
 	return r0
 }
 
+// RequireRunnerAccess provides a mock function with given fields: ctx, runnerID
+func (_m *MockCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	ret := _m.Called(ctx, runnerID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, runnerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RequireTeamCreateAccess provides a mock function with given fields: ctx
 func (_m *MockCaller) RequireTeamCreateAccess(ctx context.Context) error {
 	ret := _m.Called(ctx)

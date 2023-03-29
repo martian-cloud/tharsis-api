@@ -34,6 +34,12 @@ type DeleteGroupPayload {
   problems: [Problem!]!
 }
 
+type MigrateGroupPayload {
+  clientMutationId: String
+  group: Group
+  problems: [Problem!]!
+}
+
 type Group implements Node, Namespace {
   id: ID!
   metadata: ResourceMetadata!
@@ -87,6 +93,13 @@ type Group implements Node, Namespace {
     last: Int
     search: String
   ): TerraformProviderConnection!
+  runners(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    includeInherited: Boolean
+  ): RunnerConnection!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
   activityEvents(
@@ -135,4 +148,10 @@ input DeleteGroupInput {
   id: String
   force: Boolean
   metadata: ResourceMetadataInput
+}
+
+input MigrateGroupInput {
+  clientMutationId: String
+  groupPath: String!
+  newParentPath: String
 }

@@ -14,6 +14,32 @@ type MockService struct {
 	mock.Mock
 }
 
+// ClaimJob provides a mock function with given fields: ctx, runnerID
+func (_m *MockService) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error) {
+	ret := _m.Called(ctx, runnerID)
+
+	var r0 *ClaimJobResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*ClaimJobResponse, error)); ok {
+		return rf(ctx, runnerID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *ClaimJobResponse); ok {
+		r0 = rf(ctx, runnerID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ClaimJobResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, runnerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetJob provides a mock function with given fields: ctx, jobID
 func (_m *MockService) GetJob(ctx context.Context, jobID string) (*models.Job, error) {
 	ret := _m.Called(ctx, jobID)
@@ -137,32 +163,6 @@ func (_m *MockService) GetLogs(ctx context.Context, jobID string, startOffset in
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
 		r1 = rf(ctx, jobID, startOffset, limit)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetNextAvailableQueuedJob provides a mock function with given fields: ctx, runnerID
-func (_m *MockService) GetNextAvailableQueuedJob(ctx context.Context, runnerID string) (*models.Job, error) {
-	ret := _m.Called(ctx, runnerID)
-
-	var r0 *models.Job
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Job, error)); ok {
-		return rf(ctx, runnerID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Job); ok {
-		r0 = rf(ctx, runnerID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.Job)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, runnerID)
 	} else {
 		r1 = ret.Error(1)
 	}

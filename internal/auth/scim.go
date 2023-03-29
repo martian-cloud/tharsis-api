@@ -156,3 +156,9 @@ func (s *SCIMCaller) RequireUserDeleteAccess(ctx context.Context, userID string)
 
 	return authorizationError(ctx, false)
 }
+
+// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
+func (s *SCIMCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	// Return authorization error because SCIM callers don't have runner access
+	return authorizationError(ctx, false)
+}

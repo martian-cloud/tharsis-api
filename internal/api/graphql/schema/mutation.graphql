@@ -6,6 +6,7 @@ type Mutation {
   createGroup(input: CreateGroupInput!): CreateGroupPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
   deleteGroup(input: DeleteGroupInput!): DeleteGroupPayload!
+  migrateGroup(input: MigrateGroupInput!): MigrateGroupPayload!
   createManagedIdentity(
     input: CreateManagedIdentityInput!
   ): CreateManagedIdentityPayload!
@@ -157,4 +158,22 @@ type Mutation {
   resetVCSProviderOAuthToken(
     input: ResetVCSProviderOAuthTokenInput!
   ): ResetVCSProviderOAuthTokenPayload!
+  claimJob(
+    input: ClaimJobInput!
+  ): ClaimJobPayload!
+  createRunner(
+    input: CreateRunnerInput!
+  ): CreateRunnerPayload!
+  updateRunner(
+    input: UpdateRunnerInput!
+  ): UpdateRunnerPayload!
+  deleteRunner(
+    input: DeleteRunnerInput!
+  ): DeleteRunnerPayload!
+  assignServiceAccountToRunner(
+    input: AssignServiceAccountToRunnerInput!
+  ): AssignServiceAccountToRunnerPayload!
+  unassignServiceAccountFromRunner(
+    input: AssignServiceAccountToRunnerInput!
+  ): AssignServiceAccountToRunnerPayload!
 }

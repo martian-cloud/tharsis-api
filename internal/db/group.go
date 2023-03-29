@@ -30,6 +30,8 @@ type Groups interface {
 	CreateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
 	// UpdateGroup updates an existing group
 	UpdateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
+	// MigrateGroup re-parents an existing group
+	MigrateGroup(ctx context.Context, group, newParentGroup *models.Group) (*models.Group, error)
 }
 
 // GroupFilter contains the supported fields for filtering Group resources
@@ -151,7 +153,6 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		sortDirection,
 		groupFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -216,13 +217,11 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"created_by":  group.CreatedBy,
 		}).
 		Returning(groupFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	createdGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
@@ -275,13 +274,11 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 				"description": nullableString(group.Description),
 			},
 		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -299,6 +296,297 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 	return updatedGroup, nil
 }
 
+// MigrateGroup migrates a group.  If moving group to become a root group, newParentGroup must be set to nil.
+func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models.Group) (*models.Group, error) {
+	var newPath, newParentID string
+	if newParentGroup == nil {
+		// Moving to root group.
+		newPath = group.Name
+	} else {
+		newPath = newParentGroup.FullPath + "/" + group.Name
+		newParentID = newParentGroup.Metadata.ID
+	}
+
+	tx, err := g.dbClient.getConnection(ctx).Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Rollback is safe to call even if the tx is already closed, so if
+	// the tx commits successfully, this is a no-op
+	defer func() {
+		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
+			g.dbClient.logger.Errorf("failed to rollback tx for MigrateGroup: %v", txErr)
+		}
+	}()
+
+	timestamp := currentTime()
+
+	// Substitute the affected paths in the namespaces table first so that the FullPath field below will be set correctly.
+	if err = migrateNamespaces(ctx, tx, group.FullPath, newPath); err != nil {
+		return nil, fmt.Errorf("failed to migrate namespaces: %v", err)
+	}
+
+	// Update the parent_id field in the group being migrated.
+	sql, args, err := dialect.Update("groups").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":    goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at": timestamp,
+				"parent_id":  nullableString(newParentID),
+			},
+		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SQL to update the migrating group's parent ID: %v", err)
+	}
+
+	migratedGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), false)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrOptimisticLockError
+		}
+		return nil, fmt.Errorf("failed to execute query to update the migrating group's parent ID: %v", err)
+	}
+
+	namespace, err := getNamespaceByGroupID(ctx, tx, migratedGroup.Metadata.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new namespace of migrating group: %v", err)
+	}
+	if namespace == nil {
+		return nil, fmt.Errorf("failed to get new namespace of migrating group")
+	}
+
+	migratedGroup.FullPath = namespace.path
+
+	// Delete managed identity assignments to a workspace
+	// where the workspace is in the tree being migrated
+	// and the home group path of the managed identity is no longer a direct ancestor of the workspace.
+	sql, args, err = dialect.Delete("workspace_managed_identity_relation").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("workspace_managed_identity_relation.workspace_id").In(
+				dialect.From(goqu.T("workspaces")).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.workspace_id": goqu.I("workspaces.id")})).
+					Select("workspaces.id").
+					Where(
+						// Workspace is underneath the new path of the group being migrated.
+						// No equals check needed, because a workspace is never at the same path as a group.
+						goqu.I("namespaces.path").Like(newPath+"/%"),
+					)),
+			goqu.I("workspace_managed_identity_relation.managed_identity_id").In(
+				dialect.From(goqu.T("managed_identities")).
+					InnerJoin(goqu.T("groups"),
+						goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("groups.id")})).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.group_id": goqu.I("groups.id")})).
+					Select("managed_identities.id").
+					Where(
+						// Managed identity's home group path is no longer a direct ancestor of the workspace.
+						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SQL to delete managed identity assignments: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query to delete managed identity assignments: %v", err)
+	}
+
+	// Delete service accounts assigned to runners
+	// where the runner is in the tree being migrated
+	// and the group path of the service account is no longer a direct ancestor of the group.
+	sql, args, err = dialect.Delete("service_account_runner_relation").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("service_account_runner_relation.runner_id").
+				In(
+					dialect.From(goqu.T("runners")).
+						InnerJoin(goqu.T("namespaces"),
+							goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
+						Select("runners.id").
+						Where(
+							// Runner is underneath the new path of the group being migrated.
+							goqu.Or(
+								goqu.I("namespaces.path").Eq(newPath),
+								goqu.I("namespaces.path").Like(newPath+"/%"),
+							),
+						)),
+			goqu.I("service_account_runner_relation.service_account_id").In(
+				dialect.From(goqu.T("service_accounts")).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
+					Select("service_accounts.id").
+					Where(
+						// Service account's group path is no longer a direct ancestor of the runner's group.
+						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SQL to delete runner service account assignments: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query to delete runner service account assignments: %v", err)
+	}
+
+	// Delete namespace memberships of service accounts
+	// where the namespace (group or workspace) is in the tree being migrated
+	// and the home group path of the service account is no longer a direct ancestor of the namespace.
+	sql, args, err = dialect.Delete("namespace_memberships").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("namespace_memberships.namespace_id").In(
+				dialect.From(goqu.T("namespaces")).
+					Select("id").
+					Where(
+						// Namespace (group or workspace) is in the tree being migrated.
+						goqu.Or(
+							goqu.I("path").Eq(newPath),
+							goqu.I("path").Like(newPath+"/%"),
+						),
+					)),
+			goqu.I("namespace_memberships.service_account_id").In(
+				dialect.From(goqu.T("service_accounts")).
+					InnerJoin(goqu.T("groups"),
+						goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("groups.id")})).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.group_id": goqu.I("groups.id")})).
+					Select("service_accounts.id").
+					Where(
+						// Home group of the service account is no longer a direct ancestor of the namespace.
+						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SQL to delete service account namespace memberships: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query to delete service account namespace memberships: %v", err)
+	}
+
+	// Delete workspace VCS provider links to workspaces
+	// where the workspace is in the tree being migrated
+	// and the home group path of the VCS provider link is no longer a direct ancestor of the workspace.
+	sql, args, err = dialect.Delete("workspace_vcs_provider_links").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("workspace_vcs_provider_links.workspace_id").In(
+				dialect.From(goqu.T("workspaces")).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.workspace_id": goqu.I("workspaces.id")})).
+					Select("workspaces.id").
+					Where(
+						// Workspace is underneath the new path of the group being migrated.
+						// No equals check needed, because a workspace is never at the same path as a group.
+						goqu.I("namespaces.path").Like(newPath+"/%"),
+					)),
+			goqu.I("workspace_vcs_provider_links.provider_id").In(
+				dialect.From(goqu.T("vcs_providers")).
+					InnerJoin(goqu.T("groups"),
+						goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("groups.id")})).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.group_id": goqu.I("groups.id")})).
+					Select("vcs_providers.id").
+					Where(
+						// Home group of the provider is no longer a direct ancestor of the namespace.
+						goqu.I("namespaces.path").NotIn(migratedGroup.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SQL to delete workspace VCS provider links: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query to delete workspace VCS provider links: %v", err)
+	}
+
+	// Find the new root group ID.
+	newRootGroupRow, err := getNamespaceByPath(ctx, tx, migratedGroup.GetRootGroupPath())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new root group: %v", err)
+	}
+	if newRootGroupRow == nil {
+		return nil, fmt.Errorf("failed to get new root group")
+	}
+	newRootGroupID := newRootGroupRow.groupID
+
+	// For any affected Terraform providers, find all of them under the new path and update the root_group_id
+	// wherever it is not equal to the new root group ID.
+	sql, args, err = dialect.Update("terraform_providers").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":       goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":    timestamp,
+				"root_group_id": newRootGroupID,
+			},
+		).
+		Where(
+			goqu.And(
+				goqu.I("terraform_providers.group_id").In(
+					dialect.From(goqu.T("namespaces")).
+						Select("group_id").
+						Where(
+							// Namespace is a group and is in the tree being migrated.
+							goqu.And(
+								goqu.I("group_id").Neq(nil),
+								goqu.Or(
+									goqu.I("path").Eq(newPath),
+									goqu.I("path").Like(newPath+"/%"),
+								),
+							),
+						)),
+				goqu.I("terraform_providers.root_group_id").Neq(newRootGroupID),
+			)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare SQL to update the root group of Terraform providers: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query to update the root group of Terraform providers: %v", err)
+	}
+
+	// For any affected Terraform modules, find all of them under the new path and update the root_group_id
+	// wherever it is not equal to the new root group ID.
+	sql, args, err = dialect.Update("terraform_modules").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":       goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":    timestamp,
+				"root_group_id": newRootGroupID,
+			},
+		).
+		Where(
+			goqu.And(
+				goqu.I("terraform_modules.group_id").In(
+					dialect.From(goqu.T("namespaces")).
+						Select("group_id").
+						Where(
+							// Namespace is a group and is in the tree being migrated.
+							goqu.And(
+								goqu.I("group_id").Neq(nil),
+								goqu.Or(
+									goqu.I("path").Eq(newPath),
+									goqu.I("path").Like(newPath+"/%"),
+								),
+							),
+						)),
+				goqu.I("terraform_modules.root_group_id").Neq(newRootGroupID),
+			)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare SQL to update the root group of Terraform modules: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query to update the root group of Terraform modules: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit group migration transaction: %v", err)
+	}
+
+	return migratedGroup, nil
+}
+
 func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 	sql, args, err := dialect.Delete("groups").
 		Prepared(true).
@@ -308,7 +596,6 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 				"version": group.Metadata.Version,
 			},
 		).Returning(groupFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}

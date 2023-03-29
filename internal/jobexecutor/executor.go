@@ -125,7 +125,7 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 	}
 
 	// Get workspace
-	ws, err := j.client.GetWorkspace(ctx, job.WorkspacePath)
+	ws, err := j.client.GetWorkspace(ctx, job.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace %v", err)
 	}

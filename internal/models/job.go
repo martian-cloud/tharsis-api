@@ -38,7 +38,8 @@ type Job struct {
 	Type                     JobType
 	WorkspaceID              string
 	RunID                    string
-	RunnerID                 string
+	RunnerID                 *string
+	RunnerPath               *string
 	Metadata                 ResourceMetadata
 	MaxJobDuration           int32
 	CancelRequested          bool

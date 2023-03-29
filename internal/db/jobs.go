@@ -90,7 +90,7 @@ type jobs struct {
 var (
 	jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
 		"cancel_requested", "cancel_requested_at",
-		"runner_id", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration")
+		"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration")
 
 	jobLogDescriptorFieldList = append(metadataFieldList, "job_id", "size")
 )
@@ -226,7 +226,8 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 				"pending_at":          job.Timestamps.PendingTimestamp,
 				"running_at":          job.Timestamps.RunningTimestamp,
 				"finished_at":         job.Timestamps.FinishedTimestamp,
-				"runner_id":           nullableString(job.RunnerID),
+				"runner_id":           job.RunnerID,
+				"runner_path":         job.RunnerPath,
 			},
 		).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).Returning(jobFieldList...).ToSQL()
 
@@ -267,7 +268,8 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 			"running_at":          job.Timestamps.RunningTimestamp,
 			"finished_at":         job.Timestamps.FinishedTimestamp,
 			"max_job_duration":    job.MaxJobDuration,
-			"runner_id":           nullableString(job.RunnerID),
+			"runner_id":           job.RunnerID,
+			"runner_path":         job.RunnerPath,
 		}).
 		Returning(jobFieldList...).ToSQL()
 
@@ -439,7 +441,6 @@ func scanJob(row scanner) (*models.Job, error) {
 	var pendingAt sql.NullTime
 	var runningAt sql.NullTime
 	var finishedAt sql.NullTime
-	var runnerID sql.NullString
 
 	job := &models.Job{}
 
@@ -454,7 +455,8 @@ func scanJob(row scanner) (*models.Job, error) {
 		&job.RunID,
 		&job.CancelRequested,
 		&cancelRequestedAt,
-		&runnerID,
+		&job.RunnerID,
+		&job.RunnerPath,
 		&queuedAt,
 		&pendingAt,
 		&runningAt,
@@ -470,10 +472,6 @@ func scanJob(row scanner) (*models.Job, error) {
 
 	if cancelRequestedAt.Valid {
 		job.CancelRequestedTimestamp = &cancelRequestedAt.Time
-	}
-
-	if runnerID.Valid {
-		job.RunnerID = runnerID.String
 	}
 
 	if queuedAt.Valid {

@@ -1,4 +1,4 @@
-GO_VERSION = 1.18.2
+GO_VERSION = 1.20.2
 MODULE = $(shell go list -m)
 VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo "1.0.0")
 PACKAGES := $(shell go list ./... | grep -v /vendor/)
@@ -14,6 +14,10 @@ build-api:  ## build the binaries
 .PHONY: build-job-executor
 build-job-executor:  ## build the binaries
 	CGO_ENABLED=0 go build ${LDFLAGS} -a -o job $(MODULE)/cmd/job
+
+.PHONY: build-runner
+build-runner:  ## build the binaries
+	CGO_ENABLED=0 go build ${LDFLAGS} -a -o runner $(MODULE)/cmd/runner
 
 .PHONY: lint
 lint: ## run golint on all Go package
@@ -46,6 +50,10 @@ build-api-docker:
 .PHONY: build-job-docker
 build-job-docker:
 	docker build --build-arg goversion=$(GO_VERSION) --target job-executor -t tharsis/job-executor .
+
+.PHONY: build-runner-docker
+build-runner-docker:
+	docker build --build-arg goversion=$(GO_VERSION) --target runner -t tharsis/runner .
 
 .PHONY: run-api-docker
 run-api-docker:

@@ -15,6 +15,13 @@ type SaveJobLogsPayload {
   problems: [Problem!]!
 }
 
+type ClaimJobPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  jobId: String
+  token: String
+}
+
 type Job implements Node {
   id: ID!
   metadata: ResourceMetadata!
@@ -28,6 +35,8 @@ type Job implements Node {
   maxJobDuration: Int!
   logSize: Int!
   logs(startOffset: Int!, limit: Int!): String!
+  runner: Runner
+  runnerPath: String
 }
 
 type JobLogEvent {
@@ -46,6 +55,11 @@ input JobLogSubscriptionInput {
 
 input JobCancellationEventSubscriptionInput {
   jobId: String!
+}
+
+input ClaimJobInput {
+  clientMutationId: String
+  runnerPath: String!
 }
 
 input SaveJobLogsInput {

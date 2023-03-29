@@ -12,11 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jobdispatcher"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jobdispatcher/docker"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jobdispatcher/ecs"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jobdispatcher/kubernetes"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jobdispatcher/local"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider/awskms"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider/memory"
@@ -29,7 +24,6 @@ import (
 type Catalog struct {
 	ObjectStore    objectstore.ObjectStore
 	JWSProvider    jwsprovider.JWSProvider
-	JobDispatcher  jobdispatcher.JobDispatcher
 	RateLimitStore ratelimitstore.Store
 }
 
@@ -45,11 +39,6 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		return nil, err
 	}
 
-	jobDispatcher, err := newJobDispatcherPlugin(ctx, logger, cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	rateLimitStore, err := newRateLimitStore(ctx, logger, cfg)
 	if err != nil {
 		return nil, err
@@ -58,7 +47,6 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 	return &Catalog{
 		ObjectStore:    objectStore,
 		JWSProvider:    jwsProvider,
-		JobDispatcher:  jobDispatcher,
 		RateLimitStore: rateLimitStore,
 	}, nil
 }
@@ -148,31 +136,6 @@ func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Conf
 		err = errors.NewError(
 			errors.EInternal,
 			fmt.Sprintf("The specified JWS Provider plugin %s is not currently supported", cfg.JWSProviderPluginType),
-		)
-	}
-
-	return plugin, err
-}
-
-func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, cfg *config.Config) (jobdispatcher.JobDispatcher, error) {
-	var (
-		plugin jobdispatcher.JobDispatcher
-		err    error
-	)
-
-	switch cfg.JobDispatcherPluginType {
-	case "kubernetes":
-		plugin, err = kubernetes.New(ctx, cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
-	case "ecs":
-		plugin, err = ecs.New(ctx, cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
-	case "docker":
-		plugin, err = docker.New(cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
-	case "local":
-		plugin, err = local.New(cfg.JobDispatcherPluginData, cfg.ServiceDiscoveryHost, logger)
-	default:
-		err = errors.NewError(
-			errors.EInternal,
-			fmt.Sprintf("The specified Job Executor plugin %s is not currently supported", cfg.JobDispatcherPluginType),
 		)
 	}
 

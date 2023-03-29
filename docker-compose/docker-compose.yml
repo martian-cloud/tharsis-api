@@ -107,12 +107,13 @@ services:
       - THARSIS_JWS_PROVIDER_PLUGIN_TYPE=memory
       - THARSIS_API_URL=http://localhost:6560
       - THARSIS_SERVICE_ACCOUNT_ISSUER_URL=http://localhost:6560
-      - THARSIS_JOB_DISPATCHER_PLUGIN_TYPE=docker
-      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_API_URL=http://localhost:6560
-      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_HOST=unix:///var/run/docker.sock
-      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_EXTRA_HOSTS=localhost:host-gateway
-      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
-      - THARSIS_JOB_DISPATCHER_PLUGIN_DATA_LOCAL_IMAGE=false # Set to true if using local image.
+      - THARSIS_INTERNAL_RUNNERS_0_NAME=default-shared-runner
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_TYPE=docker
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_API_URL=http://localhost:6560
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_HOST=unix:///var/run/docker.sock
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_EXTRA_HOSTS=localhost:host-gateway
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
+      - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_LOCAL_IMAGE=false # Set to true if using local image.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Required for job-executor.
     networks:

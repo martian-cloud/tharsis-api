@@ -107,13 +107,11 @@ func (m *namespaceMemberships) GetNamespaceMembershipByID(ctx context.Context, i
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
 		Select(m.getSelectFields()...).
 		Where(goqu.Ex{"namespace_memberships.id": id}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	namespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -125,7 +123,8 @@ func (m *namespaceMemberships) GetNamespaceMembershipByID(ctx context.Context, i
 }
 
 func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
-	input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error) {
+	input *CreateNamespaceMembershipInput,
+) (*models.NamespaceMembership, error) {
 	namespace, err := getNamespaceByPath(ctx, m.dbClient.getConnection(ctx), input.NamespacePath)
 	if err != nil {
 		return nil, err
@@ -160,13 +159,11 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		Prepared(true).
 		Rows(record).
 		Returning(namespaceMembershipFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	createdNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -196,7 +193,8 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 }
 
 func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
-	namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error) {
+	namespaceMembership *models.NamespaceMembership,
+) (*models.NamespaceMembership, error) {
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("namespace_memberships").
@@ -207,13 +205,11 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 			"role":       namespaceMembership.Role,
 		}).
 		Where(goqu.Ex{"id": namespaceMembership.Metadata.ID, "version": namespaceMembership.Metadata.Version}).Returning(namespaceMembershipFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -240,7 +236,6 @@ func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, na
 				"version": namespaceMembership.Metadata.Version,
 			},
 		).Returning(namespaceMembershipFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -261,7 +256,8 @@ func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, na
 // In the case of a user ID, this method returns both direct membership and indirect membership via
 // a team member relationship.
 func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
-	input *GetNamespaceMembershipsInput) (*NamespaceMembershipResult, error) {
+	input *GetNamespaceMembershipsInput,
+) (*NamespaceMembershipResult, error) {
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -301,7 +297,7 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		if input.Filter.NamespacePathPrefix != nil {
 			ex = ex.Append(goqu.Or(
 				goqu.I("namespaces.path").Eq(*input.Filter.NamespacePathPrefix),
-				goqu.I("namespaces.path").Like(*input.Filter.NamespacePathPrefix+"/%%"),
+				goqu.I("namespaces.path").Like(*input.Filter.NamespacePathPrefix+"/%"),
 			))
 		}
 
@@ -333,7 +329,6 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		sortDirection,
 		namespaceMembershipFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}

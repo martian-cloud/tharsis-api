@@ -416,6 +416,12 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &VCSProviderResolver{vcsProvider: vcsProvider}}, nil
+	case models.TargetRunner:
+		runner, err := loadRunner(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &RunnerResolver{runner: runner}}, nil
 	default:
 		return nil, errors.NewError(errors.EInvalid, "valid TargetType must be specified")
 	}

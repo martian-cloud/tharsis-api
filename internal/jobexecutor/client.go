@@ -20,7 +20,7 @@ type Client interface {
 	GetJob(ctx context.Context, id string) (*types.Job, error)
 	GetWorkspace(ctx context.Context, id string) (*types.Workspace, error)
 	GetRunVariables(ctx context.Context, runID string) ([]types.RunVariable, error)
-	GetAssignedManagedIdentities(ctx context.Context, workspacePath string) ([]types.ManagedIdentity, error)
+	GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]types.ManagedIdentity, error)
 	GetConfigurationVersion(ctx context.Context, id string) (*types.ConfigurationVersion, error)
 	CreateStateVersion(ctx context.Context, runID string, body io.Reader) (*types.StateVersion, error)
 	CreateManagedIdentityCredentials(ctx context.Context, managedIdentityID string) ([]byte, error)
@@ -82,8 +82,8 @@ func (c *client) CreateManagedIdentityCredentials(ctx context.Context, managedId
 }
 
 // GetAssignedManagedIdentities returns a list of assigned managed identities for a workspace
-func (c *client) GetAssignedManagedIdentities(ctx context.Context, workspacePath string) ([]types.ManagedIdentity, error) {
-	identitiesOpts := &types.GetAssignedManagedIdentitiesInput{Path: workspacePath}
+func (c *client) GetAssignedManagedIdentities(ctx context.Context, workspaceID string) ([]types.ManagedIdentity, error) {
+	identitiesOpts := &types.GetAssignedManagedIdentitiesInput{ID: &workspaceID}
 
 	identities, err := c.tharsisClient.Workspaces.GetAssignedManagedIdentities(ctx, identitiesOpts)
 	if err != nil {
@@ -145,8 +145,8 @@ func (c *client) SaveJobLogs(ctx context.Context, jobID string, startOffset int,
 }
 
 // GetWorkspace returns a workspace by ID
-func (c *client) GetWorkspace(ctx context.Context, path string) (*types.Workspace, error) {
-	workspace, err := c.tharsisClient.Workspaces.GetWorkspace(ctx, &types.GetWorkspaceInput{Path: &path})
+func (c *client) GetWorkspace(ctx context.Context, id string) (*types.Workspace, error) {
+	workspace, err := c.tharsisClient.Workspaces.GetWorkspace(ctx, &types.GetWorkspaceInput{ID: &id})
 	if err != nil {
 		return nil, err
 	}

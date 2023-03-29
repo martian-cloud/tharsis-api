@@ -146,7 +146,8 @@ func NewManagedIdentities(dbClient *Client) ManagedIdentities {
 }
 
 func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
-	input *GetManagedIdentityAccessRulesInput) (*ManagedIdentityAccessRulesResult, error) {
+	input *GetManagedIdentityAccessRulesInput,
+) (*ManagedIdentityAccessRulesResult, error) {
 	conn := m.dbClient.getConnection(ctx)
 	ex := goqu.And()
 
@@ -249,7 +250,6 @@ func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ru
 		Prepared(true).
 		Select(managedIdentityRuleFieldList...).
 		Where(goqu.Ex{"id": ruleID}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -322,13 +322,11 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 			"module_attestation_policies": moduleAttestationPolicies,
 		}).
 		Returning(managedIdentityRuleFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	createdRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -347,7 +345,6 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": createdRule.Metadata.ID,
 				"user_id": userID,
 			}).ToSQL()
-
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +363,6 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id":            createdRule.Metadata.ID,
 				"service_account_id": serviceAccountID,
 			}).ToSQL()
-
 		if err != nil {
 			return nil, err
 		}
@@ -385,7 +381,6 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": createdRule.Metadata.ID,
 				"team_id": teamID,
 			}).ToSQL()
-
 		if err != nil {
 			return nil, err
 		}
@@ -440,13 +435,11 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"module_attestation_policies": moduleAttestationPolicies,
 			},
 		).Where(goqu.Ex{"id": rule.Metadata.ID, "version": rule.Metadata.Version}).Returning(managedIdentityRuleFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -467,7 +460,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": rule.Metadata.ID,
 			},
 		).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +476,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": rule.Metadata.ID,
 			},
 		).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +492,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": rule.Metadata.ID,
 			},
 		).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +509,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": rule.Metadata.ID,
 				"user_id": userID,
 			}).ToSQL()
-
 		if err != nil {
 			return nil, err
 		}
@@ -538,7 +527,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id":            rule.Metadata.ID,
 				"service_account_id": serviceAccountID,
 			}).ToSQL()
-
 		if err != nil {
 			return nil, err
 		}
@@ -557,7 +545,6 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"rule_id": rule.Metadata.ID,
 				"team_id": teamID,
 			}).ToSQL()
-
 		if err != nil {
 			return nil, err
 		}
@@ -587,7 +574,6 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 				"version": rule.Metadata.Version,
 			},
 		).Returning(managedIdentityRuleFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -611,7 +597,6 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"t1.group_id": goqu.I("namespaces.group_id")})).
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(goqu.Ex{"workspace_managed_identity_relation.workspace_id": workspaceID}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -644,7 +629,6 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 			"managed_identity_id": managedIdentityID,
 			"workspace_id":        workspaceID,
 		}).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -670,7 +654,6 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 				"workspace_id":        workspaceID,
 			},
 		).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -691,13 +674,11 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(goqu.Ex{"t1.id": id}).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true, true)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -718,13 +699,11 @@ func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path s
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(goqu.Ex{"t1.name": path[index+1:], "namespaces.path": path[:index]}).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	managedIdentity, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true, true)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -758,25 +737,25 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("t1.name").Like(managedIdentityName+"%%"),
+								goqu.I("t1.name").Like(managedIdentityName+"%"),
 							),
 							goqu.Or(
 								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("t1.name").Like(managedIdentityName+"%%"),
+								goqu.I("t1.name").Like(managedIdentityName+"%"),
 							),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%%"))
+					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or managed identity name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%%"),
-						goqu.I("t1.name").Like(search+"%%"),
+						goqu.I("namespaces.path").Like(search+"%"),
+						goqu.I("t1.name").Like(search+"%"),
 					),
 				)
 			}
@@ -815,7 +794,6 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 		sortDirection,
 		managedIdentityFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -883,7 +861,6 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 			"created_by":      managedIdentity.CreatedBy,
 			"alias_source_id": managedIdentity.AliasSourceID,
 		}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -956,13 +933,11 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 				"data":        managedIdentity.Data,
 			},
 		).Where(goqu.Ex{"id": managedIdentity.Metadata.ID, "version": managedIdentity.Metadata.Version}).Returning(managedIdentityFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql, args...), false, false)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -994,7 +969,6 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 				"version": managedIdentity.Metadata.Version,
 			},
 		).Returning(managedIdentityFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -1040,7 +1014,6 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedUserIDs(ctx conte
 		Prepared(true).
 		Select("user_id").
 		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -1072,7 +1045,6 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedServiceAccountIDs
 		Prepared(true).
 		Select("service_account_id").
 		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -1104,7 +1076,6 @@ func (m *managedIdentities) getManagedIdentityAccessRuleAllowedTeamIDs(ctx conte
 		Prepared(true).
 		Select("team_id").
 		Where(goqu.Ex{"rule_id": ruleID}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}

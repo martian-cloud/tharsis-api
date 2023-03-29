@@ -16,6 +16,7 @@ enum ActivityEventAction {
   CREATE
   DELETE
   LOCK
+  MIGRATE
   REMOVE
   SET_VARIABLES
   UNLOCK

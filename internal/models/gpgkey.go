@@ -11,9 +11,9 @@ type GPGKey struct {
 	GroupID      string
 	ASCIIArmor   string
 	Fingerprint  string
+	ResourcePath string
 	Metadata     ResourceMetadata
 	GPGKeyID     uint64
-	ResourcePath string
 }
 
 // GetHexGPGKeyID returns the GPG key ID in hex format

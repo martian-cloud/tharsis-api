@@ -59,7 +59,7 @@ func newTerraformWorkspace(
 	client Client,
 ) *terraformWorkspace {
 	managedIdentities := newManagedIdentities(
-		workspace.FullPath,
+		workspace.Metadata.ID,
 		workspaceDir,
 		jobLogger,
 		client,

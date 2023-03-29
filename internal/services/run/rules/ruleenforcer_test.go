@@ -626,6 +626,7 @@ func TestEnforceRules(t *testing.T) {
 					"sa1",
 					"groupA/sa1",
 					nil,
+					nil,
 				)
 			}
 

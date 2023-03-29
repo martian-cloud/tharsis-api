@@ -137,7 +137,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		}
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
-			ex = ex.Append(goqu.I("namespaces.path").Like("%%" + *input.Filter.Search + "%%"))
+			ex = ex.Append(goqu.I("namespaces.path").Like("%" + *input.Filter.Search + "%"))
 		}
 	}
 
@@ -161,7 +161,6 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		sortDirection,
 		workspaceFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -215,13 +214,11 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 				"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 			},
 		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrOptimisticLockError
@@ -276,13 +273,11 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 		}).
 		Returning(workspaceFieldList...).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
 	createdWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), false)
-
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
@@ -328,7 +323,6 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 				"version": workspace.Metadata.Version,
 			},
 		).Returning(workspaceFieldList...).ToSQL()
-
 	if err != nil {
 		return err
 	}
@@ -351,7 +345,6 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 		InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_managed_identity_relation.workspace_id")})).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
 		Where(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": managedIdentityID}).ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +383,6 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 	}
 
 	workspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -403,7 +395,6 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 
 // TODO: Remove this function and use namespaceMembershipExpressionBuilder after DB integration tests have been merged
 func namespaceMembershipFilterQuery(col string, id string) exp.Expression {
-
 	// The base column ID comparison, to be ORed with a sub-query based on team member relationships.
 	whereExOr := goqu.Or()
 	whereExOr = whereExOr.Append(goqu.I(col).Eq(id))
@@ -421,7 +412,7 @@ func namespaceMembershipFilterQuery(col string, id string) exp.Expression {
 	return goqu.Or(
 		goqu.I("namespaces.path").Like(goqu.Any(
 			dialect.From("namespace_memberships").
-				Select(goqu.L("path || '/%%'")).
+				Select(goqu.L("path || '/%'")).
 				InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
 				Where(whereExOr, goqu.I("namespaces.workspace_id").IsNull()),
 		)),
@@ -475,7 +466,6 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 	}
 
 	err := row.Scan(fields...)
-
 	if err != nil {
 		return nil, err
 	}

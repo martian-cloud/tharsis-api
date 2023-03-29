@@ -1,4 +1,4 @@
-package run
+package state
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
@@ -23,37 +24,49 @@ const (
 	jobEventType   eventType = "job"
 )
 
+var (
+	planExecutionTime  = metric.NewHistogram("plan_execution_time", "Amount of time a plan took to execute.", 1, 2, 10)
+	applyExecutionTime = metric.NewHistogram("apply_execution_time", "Amount of time a plan took to apply.", 1, 2, 10)
+
+	planFinished  = metric.NewCounter("plan_completed_count", "Amount of times a plan is completed.")
+	applyFinished = metric.NewCounter("apply_completed_count", "Amount of times an apply is completed.")
+	runFinished   = metric.NewCounter("run_completed_count", "Amount of times a run is completed.")
+)
+
 type eventHandlerFunc func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error
 
-// runStateManager is used to manage state changes for run resources
-type runStateManager struct {
+// RunStateManager is used to manage state changes for run resources
+type RunStateManager struct {
 	dbClient   *db.Client
 	logger     logger.Logger
 	handlerMap map[eventType][]eventHandlerFunc
 }
 
-func newRunStateManager(dbClient *db.Client, logger logger.Logger) *runStateManager {
-	manager := &runStateManager{
+// NewRunStateManager creates a new RunStateManager instance
+func NewRunStateManager(dbClient *db.Client, logger logger.Logger) *RunStateManager {
+	manager := &RunStateManager{
 		dbClient:   dbClient,
 		logger:     logger,
 		handlerMap: map[eventType][]eventHandlerFunc{},
 	}
 
 	registerRunHandlers(manager)
+	registerPlanHandlers(manager)
+	registerApplyHandlers(manager)
 	registerJobHandlers(manager)
 	registerWorkspaceHandlers(manager)
 
 	return manager
 }
 
-func (r *runStateManager) registerHandler(eventType eventType, handler eventHandlerFunc) {
+func (r *RunStateManager) registerHandler(eventType eventType, handler eventHandlerFunc) {
 	if _, ok := r.handlerMap[eventType]; !ok {
 		r.handlerMap[eventType] = []eventHandlerFunc{}
 	}
 	r.handlerMap[eventType] = append(r.handlerMap[eventType], handler)
 }
 
-func (r *runStateManager) fireEvent(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+func (r *RunStateManager) fireEvent(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
 	for _, h := range r.handlerMap[eventType] {
 		// Use retry handler here for optimistic lock errors since these are internal updates and
 		// we don't want to return until the handler completes successfully.
@@ -80,8 +93,8 @@ func (r *runStateManager) fireEvent(ctx context.Context, eventType eventType, ol
 	return nil
 }
 
-// updateJob handles the state transitions for updating a job resource
-func (r *runStateManager) updateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
+// UpdateJob handles the state transitions for updating a job resource
+func (r *RunStateManager) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -128,8 +141,8 @@ func (r *runStateManager) updateJob(ctx context.Context, job *models.Job) (*mode
 	return updatedJob, nil
 }
 
-// updateRun handles the state transitions for updating a run resource
-func (r *runStateManager) updateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
+// UpdateRun handles the state transitions for updating a run resource
+func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -184,8 +197,8 @@ func (r *runStateManager) updateRun(ctx context.Context, run *models.Run) (*mode
 	return updatedRun, nil
 }
 
-// updatePlan handles the state transitions for updating a plan resource
-func (r *runStateManager) updatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
+// UpdatePlan handles the state transitions for updating a plan resource
+func (r *RunStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -239,8 +252,8 @@ func (r *runStateManager) updatePlan(ctx context.Context, plan *models.Plan) (*m
 	return updatedPlan, nil
 }
 
-// updateApply handles the state transitions for updating an apply resource
-func (r *runStateManager) updateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
+// UpdateApply handles the state transitions for updating an apply resource
+func (r *RunStateManager) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -295,10 +308,10 @@ func (r *runStateManager) updateApply(ctx context.Context, apply *models.Apply) 
 }
 
 type runHandlers struct {
-	manager *runStateManager
+	manager *RunStateManager
 }
 
-func registerRunHandlers(manager *runStateManager) {
+func registerRunHandlers(manager *RunStateManager) {
 	handlers := &runHandlers{manager: manager}
 	manager.registerHandler(runEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
@@ -349,7 +362,7 @@ func (r *runHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *m
 		}
 
 		run.HasChanges = newPlan.HasChanges
-		if _, err := r.manager.updateRun(ctx, run); err != nil {
+		if _, err := r.manager.UpdateRun(ctx, run); err != nil {
 			return err
 		}
 	}
@@ -380,7 +393,87 @@ func (r *runHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 			applyFinished.Inc()
 		}
 
-		if _, err := r.manager.updateRun(ctx, run); err != nil {
+		if _, err := r.manager.UpdateRun(ctx, run); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+/* Plan Handlers */
+
+type planHandlers struct {
+	manager *RunStateManager
+}
+
+func registerPlanHandlers(manager *RunStateManager) {
+	handlers := &planHandlers{manager: manager}
+	manager.registerHandler(jobEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
+	})
+}
+
+func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
+	if newJob.Type == models.JobPlanType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
+		// Get run associated with job
+		run, err := p.manager.dbClient.Runs.GetRun(ctx, newJob.RunID)
+		if err != nil {
+			return err
+		}
+
+		if run == nil {
+			return errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", newJob.RunID))
+		}
+
+		plan, err := p.manager.dbClient.Plans.GetPlan(ctx, run.PlanID)
+		if err != nil {
+			return err
+		}
+
+		plan.Status = models.PlanPending
+
+		if _, err := p.manager.UpdatePlan(ctx, plan); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+/* Apply Handlers */
+
+type applyHandlers struct {
+	manager *RunStateManager
+}
+
+func registerApplyHandlers(manager *RunStateManager) {
+	handlers := &applyHandlers{manager: manager}
+	manager.registerHandler(jobEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
+	})
+}
+
+func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
+	if newJob.Type == models.JobApplyType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
+		// Get run associated with job
+		run, err := a.manager.dbClient.Runs.GetRun(ctx, newJob.RunID)
+		if err != nil {
+			return err
+		}
+
+		if run == nil {
+			return errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", newJob.RunID))
+		}
+
+		apply, err := a.manager.dbClient.Applies.GetApply(ctx, run.ApplyID)
+		if err != nil {
+			return err
+		}
+
+		apply.Status = models.ApplyPending
+
+		if _, err := a.manager.UpdateApply(ctx, apply); err != nil {
 			return err
 		}
 	}
@@ -391,10 +484,10 @@ func (r *runHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 /* Job Handlers */
 
 type jobHandlers struct {
-	manager *runStateManager
+	manager *RunStateManager
 }
 
-func registerJobHandlers(manager *runStateManager) {
+func registerJobHandlers(manager *RunStateManager) {
 	handlers := &jobHandlers{manager: manager}
 	manager.registerHandler(planEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
 		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
@@ -440,7 +533,7 @@ func (j *jobHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *m
 				planExecutionTime.Observe(float64(difference.Minutes()))
 			}
 
-			if _, err := j.manager.updateJob(ctx, job); err != nil {
+			if _, err := j.manager.UpdateJob(ctx, job); err != nil {
 				return err
 			}
 		}
@@ -485,7 +578,7 @@ func (j *jobHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 				applyExecutionTime.Observe(float64(difference.Minutes()))
 			}
 
-			if _, err := j.manager.updateJob(ctx, job); err != nil {
+			if _, err := j.manager.UpdateJob(ctx, job); err != nil {
 				return err
 			}
 		}
@@ -497,10 +590,10 @@ func (j *jobHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 /* Workspace Handlers */
 
 type workspaceHandlers struct {
-	manager *runStateManager
+	manager *RunStateManager
 }
 
-func registerWorkspaceHandlers(manager *runStateManager) {
+func registerWorkspaceHandlers(manager *RunStateManager) {
 	handlers := &workspaceHandlers{manager: manager}
 	manager.registerHandler(runEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))

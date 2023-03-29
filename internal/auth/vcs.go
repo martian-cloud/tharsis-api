@@ -162,3 +162,9 @@ func (v *VCSWorkspaceLinkCaller) RequireUserDeleteAccess(ctx context.Context, us
 	// Return an authorization error since VCS does not need any access to delete users.
 	return authorizationError(ctx, false)
 }
+
+// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
+func (v *VCSWorkspaceLinkCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+	// Return authorization error because vcs callers don't have runner access
+	return authorizationError(ctx, false)
+}

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -312,6 +313,29 @@ func (r *GroupResolver) ManagedIdentities(ctx context.Context, args *ManagedIden
 	return NewManagedIdentityConnectionResolver(ctx, &input)
 }
 
+// Runners resolver
+func (r *GroupResolver) Runners(ctx context.Context, args *RunnersConnectionQueryArgs) (*RunnerConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := runner.GetRunnersInput{
+		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		NamespacePath:     r.group.FullPath,
+	}
+
+	if args.Sort != nil {
+		sort := db.RunnerSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	if args.IncludeInherited != nil && *args.IncludeInherited {
+		input.IncludeInherited = true
+	}
+
+	return NewRunnerConnectionResolver(ctx, &input)
+}
+
 // CreatedBy resolver
 func (r *GroupResolver) CreatedBy() string {
 	return r.group.CreatedBy
@@ -446,6 +470,13 @@ type DeleteGroupInput struct {
 	ID               *string
 }
 
+// MigrateGroupInput contains the input for migrating a group
+type MigrateGroupInput struct {
+	ClientMutationID *string
+	NewParentPath    *string
+	GroupPath        string
+}
+
 func handleGroupMutationProblem(e error, clientMutationID *string) (*GroupMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -558,6 +589,33 @@ func deleteGroupMutation(ctx context.Context, input *DeleteGroupInput) (*GroupMu
 	}
 
 	payload := GroupMutationPayload{ClientMutationID: input.ClientMutationID, Group: groupToDelete, Problems: []Problem{}}
+	return &GroupMutationPayloadResolver{GroupMutationPayload: payload}, nil
+}
+
+func migrateGroupMutation(ctx context.Context, input *MigrateGroupInput) (*GroupMutationPayloadResolver, error) {
+	groupService := getGroupService(ctx)
+
+	group, err := groupService.GetGroupByFullPath(ctx, input.GroupPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// If supplied, get the new parent group.
+	var newParentID *string
+	if input.NewParentPath != nil {
+		newParent, iErr := groupService.GetGroupByFullPath(ctx, *input.NewParentPath)
+		if iErr != nil {
+			return nil, iErr
+		}
+		newParentID = &newParent.Metadata.ID
+	}
+
+	group, err = groupService.MigrateGroup(ctx, group.Metadata.ID, newParentID)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := GroupMutationPayload{ClientMutationID: input.ClientMutationID, Group: group, Problems: []Problem{}}
 	return &GroupMutationPayloadResolver{GroupMutationPayload: payload}, nil
 }
 
