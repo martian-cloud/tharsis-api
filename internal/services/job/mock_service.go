@@ -14,17 +14,17 @@ type MockService struct {
 	mock.Mock
 }
 
-// ClaimJob provides a mock function with given fields: ctx, runnerID
-func (_m *MockService) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error) {
-	ret := _m.Called(ctx, runnerID)
+// ClaimJob provides a mock function with given fields: ctx, runnerPath
+func (_m *MockService) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error) {
+	ret := _m.Called(ctx, runnerPath)
 
 	var r0 *ClaimJobResponse
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*ClaimJobResponse, error)); ok {
-		return rf(ctx, runnerID)
+		return rf(ctx, runnerPath)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *ClaimJobResponse); ok {
-		r0 = rf(ctx, runnerID)
+		r0 = rf(ctx, runnerPath)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*ClaimJobResponse)
@@ -32,7 +32,7 @@ func (_m *MockService) ClaimJob(ctx context.Context, runnerID string) (*ClaimJob
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, runnerID)
+		r1 = rf(ctx, runnerPath)
 	} else {
 		r1 = ret.Error(1)
 	}
