@@ -520,7 +520,7 @@ func TestUpdateRunner(t *testing.T) {
 					CreationTimestamp:    positiveRunner.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				Type:        models.GroupRunnerType,
+				Type:         models.GroupRunnerType,
 				Name:         positiveRunner.Name,
 				Description:  "Updated description",
 				ResourcePath: positiveRunner.ResourcePath,
