@@ -1,3 +1,4 @@
+// Package workspace package
 package workspace
 
 //go:generate mockery --name ArtifactStore --inpackage --case underscore

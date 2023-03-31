@@ -30,7 +30,6 @@ type gpgKeyInfoIDSlice []gpgKeyInfo
 type gpgKeyInfoUpdateTimeSlice []gpgKeyInfo
 
 func TestGetGPGKeyByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -39,11 +38,7 @@ func TestGetGPGKeyByID(t *testing.T) {
 	_, warmupGPGKeys, err := createWarmupGPGKeys(ctx, testClient,
 		standardWarmupGroupsForGPGKeys, standardWarmupGPGKeys)
 	createdHigh := currentTime()
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg    *string
@@ -87,7 +82,6 @@ func TestGetGPGKeyByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualGPGKey, err := testClient.client.GPGKeys.GetGPGKeyByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -108,18 +102,13 @@ func TestGetGPGKeyByID(t *testing.T) {
 }
 
 func TestGetGPGKeys(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	warmupGroups, warmupGPGKeys, err := createWarmupGPGKeys(ctx, testClient,
 		standardWarmupGroupsForGPGKeys, standardWarmupGPGKeys)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allGPGKeyInfos := gpgKeyInfoFromGPGKeys(warmupGPGKeys)
 
 	// Sort by GPG key IDs.
@@ -179,7 +168,6 @@ func TestGetGPGKeys(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetGPGKeys, so don't try it.
 
 		{
@@ -504,7 +492,6 @@ func TestGetGPGKeys(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -581,18 +568,13 @@ func TestGetGPGKeys(t *testing.T) {
 }
 
 func TestCreateGPGKey(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	warmupGroups, _, err := createWarmupGPGKeys(ctx, testClient,
 		standardWarmupGroupsForGPGKeys, []models.GPGKey{})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.GPGKey
@@ -664,7 +646,6 @@ func TestCreateGPGKey(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.GPGKeys.CreateGPGKey(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -691,18 +672,13 @@ func TestCreateGPGKey(t *testing.T) {
 }
 
 func TestDeleteGPGKey(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	_, warmupGPGKeys, err := createWarmupGPGKeys(ctx, testClient,
 		standardWarmupGroupsForGPGKeys, standardWarmupGPGKeys)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg *string
@@ -713,7 +689,6 @@ func TestDeleteGPGKey(t *testing.T) {
 	// Looks up by ID and version.
 	positiveGPGKey := warmupGPGKeys[0]
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.GPGKey{
@@ -749,7 +724,6 @@ func TestDeleteGPGKey(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.GPGKeys.DeleteGPGKey(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -818,8 +792,8 @@ func createWarmupGPGKeys(ctx context.Context, testClient *testClient,
 	newGPGKeys []models.GPGKey) (
 	[]models.Group,
 	[]models.GPGKey,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group
 	// in order to provide the necessary IDs for the GPG key.
 
@@ -890,8 +864,8 @@ func gpgKeyIDsFromGPGKeyInfos(gpgKeyInfos []gpgKeyInfo) []string {
 // compareGPGKeys compares two GPG key objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareGPGKeys(t *testing.T, expected, actual *models.GPGKey,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.GroupID, actual.GroupID)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
 	assert.Equal(t, expected.ASCIIArmor, actual.ASCIIArmor)
@@ -912,5 +886,3 @@ func compareGPGKeys(t *testing.T, expected, actual *models.GPGKey,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

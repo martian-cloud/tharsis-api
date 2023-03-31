@@ -1,3 +1,4 @@
+// Package eks package
 package eks
 
 //go:generate mockery --name eksClient --inpackage --case underscore

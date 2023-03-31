@@ -1,3 +1,4 @@
+// Package vcs package
 package vcs
 
 //go:generate mockery --name Provider --inpackage --case underscore
@@ -42,7 +43,6 @@ func NewVCSProviderMap(
 	map[models.VCSProviderType]Provider,
 	error,
 ) {
-
 	gitLabHandler, err := gitlab.New(ctx, logger, client, tharsisURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize %s vcs provider handler %v", models.GitLabProviderType, err)

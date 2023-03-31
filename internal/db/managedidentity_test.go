@@ -49,7 +49,6 @@ type warmupManagedIdentities struct {
 }
 
 func TestGetManagedIdentityByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -67,17 +66,10 @@ func TestGetManagedIdentityByID(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 	assert.NotNil(t, createdAlias)
 
 	createdHigh := currentTime()
@@ -116,9 +108,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualManagedIdentity, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentityByID(ctx, test.searchID)
+			actualManagedIdentity, err := testClient.client.ManagedIdentities.GetManagedIdentityByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -133,13 +123,11 @@ func TestGetManagedIdentityByID(t *testing.T) {
 			} else {
 				assert.Nil(t, actualManagedIdentity)
 			}
-
 		})
 	}
 }
 
 func TestGetManagedIdentityByPath(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -157,17 +145,10 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 	assert.NotNil(t, createdAlias)
 
 	createdHigh := currentTime()
@@ -201,9 +182,7 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualManagedIdentity, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentityByPath(ctx, test.searchID)
+			actualManagedIdentity, err := testClient.client.ManagedIdentities.GetManagedIdentityByPath(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -218,13 +197,11 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 			} else {
 				assert.Nil(t, actualManagedIdentity)
 			}
-
 		})
 	}
 }
 
 func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -242,17 +219,10 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 	assert.NotNil(t, createdAlias)
 
 	createdHigh := currentTime()
@@ -289,7 +259,6 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// If specified, add the managed identities to the workspace.
 			if test.addToWorkspace {
 				for _, identity := range test.expectManagedIdentities {
@@ -299,8 +268,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 				}
 			}
 
-			actualManagedIdentities, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, test.workspaceID)
+			actualManagedIdentities, err := testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, test.workspaceID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -315,7 +283,6 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 							updateLow:  &createdLow,
 							updateHigh: &createdHigh,
 						})
-
 				}
 			} else {
 				assert.Nil(t, actualManagedIdentities)
@@ -325,7 +292,6 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 }
 
 func TestAddManagedIdentityToWorkspace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -343,11 +309,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -409,7 +371,6 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// If specified, add the managed identity to the workspace.
 			if test.addToWorkspace {
 
@@ -430,8 +391,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 				}
 			}
 
-			actualManagedIdentities, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, test.workspaceID)
+			actualManagedIdentities, err := testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, test.workspaceID)
 
 			checkError(t, test.expectVerifyFail, err)
 
@@ -447,7 +407,6 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 							updateLow:  &createdLow,
 							updateHigh: &createdHigh,
 						})
-
 				}
 			} else {
 				assert.Nil(t, actualManagedIdentities)
@@ -457,7 +416,6 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 }
 
 func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -474,11 +432,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		overrideManagedIdentityID *string
@@ -522,7 +476,6 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// If specified add the managed identity to the workspace.
 			if test.addToWorkspace {
 				err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
@@ -545,7 +498,6 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 }
 
 func TestCreateManagedIdentity(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -560,11 +512,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			[]models.ManagedIdentity{},
 			[]models.ManagedIdentityAccessRule{},
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupGroup := warmupItems.groups[0]
 	warmupGroupID := warmupGroup.Metadata.ID
 
@@ -580,10 +528,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 		CreatedBy:   "creator-of-managed-identities",
 		Data:        []byte("some-data-for-the-source-managed-identity"),
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 	assert.NotNil(t, aliasSourceIdentity)
 
 	type testCase struct {
@@ -595,7 +540,6 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.ManagedIdentity{
@@ -703,7 +647,6 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, test.toCreate)
 			checkError(t, test.expectMsg, err)
 
@@ -731,7 +674,6 @@ func TestCreateManagedIdentity(t *testing.T) {
 }
 
 func TestUpdateManagedIdentity(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -749,11 +691,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupGroup := warmupItems.groups[0]
 
@@ -819,9 +757,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualManagedIdentity, err :=
-				testClient.client.ManagedIdentities.UpdateManagedIdentity(ctx, test.toUpdate)
+			actualManagedIdentity, err := testClient.client.ManagedIdentities.UpdateManagedIdentity(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
 
@@ -842,7 +778,6 @@ func TestUpdateManagedIdentity(t *testing.T) {
 }
 
 func TestGetManagedIdentities(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -859,17 +794,10 @@ func TestGetManagedIdentities(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 	assert.NotNil(t, createdAlias)
 
 	// Append the slice to the created alias.
@@ -929,7 +857,6 @@ func TestGetManagedIdentities(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetManagedIdentities, so don't try it.
 
 		{
@@ -1278,7 +1205,6 @@ func TestGetManagedIdentities(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -1355,7 +1281,6 @@ func TestGetManagedIdentities(t *testing.T) {
 }
 
 func TestDeleteManagedIdentity(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1372,11 +1297,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.ManagedIdentity
@@ -1385,7 +1306,6 @@ func TestDeleteManagedIdentity(t *testing.T) {
 	}
 
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.ManagedIdentity{
@@ -1421,17 +1341,14 @@ func TestDeleteManagedIdentity(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.ManagedIdentities.DeleteManagedIdentity(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
-
 		})
 	}
 }
 
 func TestGetManagedIdentityAccessRules(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1449,17 +1366,10 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 	assert.NotNil(t, createdAlias)
 
 	createdHigh := currentTime()
@@ -1501,13 +1411,11 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualResult, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentityAccessRules(ctx, &GetManagedIdentityAccessRulesInput{
-					Filter: &ManagedIdentityAccessRuleFilter{
-						ManagedIdentityID: &test.searchID,
-					},
-				})
+			actualResult, err := testClient.client.ManagedIdentities.GetManagedIdentityAccessRules(ctx, &GetManagedIdentityAccessRulesInput{
+				Filter: &ManagedIdentityAccessRuleFilter{
+					ManagedIdentityID: &test.searchID,
+				},
+			})
 
 			checkError(t, test.expectMsg, err)
 
@@ -1528,13 +1436,11 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 			} else {
 				assert.Nil(t, actualResult)
 			}
-
 		})
 	}
 }
 
 func TestGetManagedIdentityAccessRule(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1552,11 +1458,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -1588,9 +1490,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualManagedIdentityAccessRule, err :=
-				testClient.client.ManagedIdentities.GetManagedIdentityAccessRule(ctx, test.searchID)
+			actualManagedIdentityAccessRule, err := testClient.client.ManagedIdentities.GetManagedIdentityAccessRule(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -1612,7 +1512,6 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 }
 
 func TestCreateManagedIdentityAccessRule(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1629,11 +1528,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.ManagedIdentityAccessRule
@@ -1645,7 +1540,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	now := currentTime()
 	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.ManagedIdentityAccessRule{
@@ -1701,7 +1595,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -1730,7 +1623,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 }
 
 func TestUpdateManagedIdentityAccessRule(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1748,11 +1640,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -1817,9 +1705,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualManagedIdentity, err :=
-				testClient.client.ManagedIdentities.UpdateManagedIdentityAccessRule(ctx, test.toUpdate)
+			actualManagedIdentity, err := testClient.client.ManagedIdentities.UpdateManagedIdentityAccessRule(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
 
@@ -1841,7 +1727,6 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 }
 
 func TestDeleteManagedIdentityAccessRule(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1858,11 +1743,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			standardWarmupManagedIdentities,
 			standardWarmupManagedIdentityAccessRules,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.ManagedIdentityAccessRule
@@ -1905,11 +1786,9 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.ManagedIdentities.DeleteManagedIdentityAccessRule(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
-
 		})
 	}
 }
@@ -2053,8 +1932,8 @@ var standardWarmupManagedIdentityAccessRules = []models.ManagedIdentityAccessRul
 // createWarmupManagedIdentities creates some warmup managed identities for a test
 // The warmup managed identities to create can be standard or otherwise.
 func createWarmupManagedIdentities(ctx context.Context, testClient *testClient,
-	input warmupManagedIdentities) (*warmupManagedIdentities, error) {
-
+	input warmupManagedIdentities,
+) (*warmupManagedIdentities, error) {
 	// It is necessary to create at least one group and workspace
 	// in order to provide the necessary IDs for the managed identities.
 
@@ -2208,8 +2087,8 @@ func createWarmupManagedIdentityAlias(ctx context.Context, testClient *testClien
 // compareManagedIdentities compares two managed identity objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareManagedIdentities(t *testing.T, expected, actual *models.ManagedIdentity,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Type, actual.Type)
 	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Name, actual.Name)
@@ -2237,8 +2116,8 @@ func compareManagedIdentities(t *testing.T, expected, actual *models.ManagedIden
 // including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareManagedIdentityAccessRules(t *testing.T, expected, actual *models.ManagedIdentityAccessRule,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.RunStage, actual.RunStage)
 	assert.Equal(t, expected.ManagedIdentityID, actual.ManagedIdentityID)
 	assert.Equal(t, expected.AllowedUserIDs, actual.AllowedUserIDs)
@@ -2259,5 +2138,3 @@ func compareManagedIdentityAccessRules(t *testing.T, expected, actual *models.Ma
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

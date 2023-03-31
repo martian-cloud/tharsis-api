@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -2501,7 +2502,6 @@ func Test_handleEvent(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			mockProvider := MockProvider{}
 			mockRunService := run.MockService{}
 			mockWorkspaceService := workspace.MockService{}
@@ -2552,11 +2552,7 @@ func Test_handleEvent(t *testing.T) {
 			}
 
 			tarFile, err := createRepositoryArchive()
-			assert.Nil(t, err)
-			if err != nil {
-				// No point in continuing if tarFile failed to create.
-				return
-			}
+			require.Nil(t, err)
 			defer tarFile.Close()
 			defer os.Remove(tarFile.Name())
 

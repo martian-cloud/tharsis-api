@@ -39,18 +39,13 @@ type workspaceInfoPathSlice []workspaceInfo
 type workspaceInfoTimeSlice []workspaceInfo
 
 func TestGetWorkspaceByFullPath(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	_, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg       *string
@@ -89,7 +84,6 @@ func TestGetWorkspaceByFullPath(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			workspace, err := testClient.client.Workspaces.GetWorkspaceByFullPath(ctx, test.searchPath)
 
 			checkError(t, test.expectMsg, err)
@@ -107,7 +101,6 @@ func TestGetWorkspaceByFullPath(t *testing.T) {
 }
 
 func TestGetWorkspaceByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -116,11 +109,7 @@ func TestGetWorkspaceByID(t *testing.T) {
 	// low-level stuff, create the warmup workspace(s) by name and then find the relevant ID.
 	_, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg       *string
@@ -153,7 +142,6 @@ func TestGetWorkspaceByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			workspace, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -171,25 +159,16 @@ func TestGetWorkspaceByID(t *testing.T) {
 }
 
 func TestGetWorkspaces(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupGroups, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	allGroupInfos, err := groupInfoFromGroups(ctx, testClient.client.getConnection(ctx), createdWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allGroupIDs := groupIDsFromGroupInfos(allGroupInfos)
 	allWorkspaceInfos := workspaceInfoFromWorkspaces(createdWarmupWorkspaces)
 
@@ -242,11 +221,7 @@ func TestGetWorkspaces(t *testing.T) {
 		},
 	} {
 		newTeam, err := testClient.client.Teams.CreateTeam(ctx, &toCreateTeam)
-		assert.Nil(t, err)
-		if err != nil {
-			// No point in continuing if teams weren't created as designed.
-			return
-		}
+		require.Nil(t, err)
 		teamIDs = append(teamIDs, &newTeam.Metadata.ID)
 	}
 
@@ -275,11 +250,7 @@ func TestGetWorkspaces(t *testing.T) {
 		},
 	} {
 		newUser, err := testClient.client.Users.CreateUser(ctx, &toCreateUser)
-		assert.Nil(t, err)
-		if err != nil {
-			// No point in continuing if users weren't created as designed.
-			return
-		}
+		require.Nil(t, err)
 		userMemberIDs = append(userMemberIDs, &newUser.Metadata.ID)
 	}
 
@@ -312,11 +283,7 @@ func TestGetWorkspaces(t *testing.T) {
 		},
 	} {
 		_, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &toCreateTeamMember)
-		assert.Nil(t, err)
-		if err != nil {
-			// No point in continuing if team member relationships weren't created as designed.
-			return
-		}
+		require.Nil(t, err)
 	}
 
 	// Some service accounts for namespace memberships.
@@ -336,11 +303,7 @@ func TestGetWorkspaces(t *testing.T) {
 		},
 	} {
 		newServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &toCreateServiceAccount)
-		assert.Nil(t, err)
-		if err != nil {
-			// No point in continuing if service accounts weren't created.
-			return
-		}
+		require.Nil(t, err)
 		serviceAccountMemberIDs = append(serviceAccountMemberIDs, &newServiceAccount.Metadata.ID)
 	}
 
@@ -356,11 +319,7 @@ func TestGetWorkspaces(t *testing.T) {
 					NamespacePath: allPaths[ix2],
 					UserID:        userMemberID,
 				})
-			assert.Nil(t, err)
-			if err != nil {
-				// No point in continuing if namespace memberships weren't created.
-				return
-			}
+			require.Nil(t, err)
 		}
 	}
 
@@ -374,11 +333,7 @@ func TestGetWorkspaces(t *testing.T) {
 					NamespacePath:    allPaths[ix2],
 					ServiceAccountID: serviceAccountMemberID,
 				})
-			assert.Nil(t, err)
-			if err != nil {
-				// No point in continuing if namespace memberships weren't created.
-				return
-			}
+			require.Nil(t, err)
 		}
 	}
 
@@ -426,11 +381,7 @@ func TestGetWorkspaces(t *testing.T) {
 		},
 	} {
 		_, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &nsm)
-		assert.Nil(t, err)
-		if err != nil {
-			// No point in continuing if namespace memberships weren't created.
-			return
-		}
+		require.Nil(t, err)
 	}
 
 	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
@@ -450,7 +401,6 @@ func TestGetWorkspaces(t *testing.T) {
 	}
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetWorkspaces, so don't try it.
 
 		{
@@ -1134,7 +1084,6 @@ func TestGetWorkspaces(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -1211,18 +1160,13 @@ func TestGetWorkspaces(t *testing.T) {
 }
 
 func TestUpdateWorkspace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	_, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toUpdate      *models.Workspace
@@ -1237,11 +1181,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		newDescription := fmt.Sprintf("updated description: %s", positiveWorkspace.Description)
 
 		newJobID, newStateVersionID, err := createJobStateVersion(ctx, testClient.client, positiveWorkspace.Metadata.ID)
-		assert.Nil(t, err)
-		if err != nil {
-			// No point continuing.
-			return
-		}
+		require.Nil(t, err)
 
 		newDirtyState := true
 		newMaxJobDuration := ptr.Int32(int32(400 + (100 * ix)))
@@ -1312,7 +1252,6 @@ func TestUpdateWorkspace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualUpdated, err := testClient.client.Workspaces.UpdateWorkspace(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -1341,7 +1280,6 @@ func TestUpdateWorkspace(t *testing.T) {
 }
 
 func TestCreateWorkspace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1349,11 +1287,7 @@ func TestCreateWorkspace(t *testing.T) {
 	// Create only one warmup group and _NOT_ any warmup workspaces.
 	createdWarmupGroups, _, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces[:1], []models.Workspace{})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup group wasn't created.
-		return
-	}
+	require.Nil(t, err)
 
 	require.Equal(t, 1, len(createdWarmupGroups))
 
@@ -1371,7 +1305,6 @@ func TestCreateWorkspace(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive empty",
 			toCreate: &models.Workspace{
@@ -1464,7 +1397,6 @@ func TestCreateWorkspace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Workspaces.CreateWorkspace(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -1493,18 +1425,13 @@ func TestCreateWorkspace(t *testing.T) {
 }
 
 func TestDeleteWorkspace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	_, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.Workspace
@@ -1550,7 +1477,6 @@ func TestDeleteWorkspace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.Workspaces.DeleteWorkspace(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -1559,25 +1485,16 @@ func TestDeleteWorkspace(t *testing.T) {
 }
 
 func TestGetWorkspacesForManagedIdentity(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupGroups, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
 		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	allGroupInfos, err := groupInfoFromGroups(ctx, testClient.client.getConnection(ctx), createdWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allGroupIDs := groupIDsFromGroupInfos(allGroupInfos)
 
 	// Some managed identities and their connections to workspaces.
@@ -1595,11 +1512,7 @@ func TestGetWorkspacesForManagedIdentity(t *testing.T) {
 			Data:        []byte(fmt.Sprintf("managed identity %d data", ix)),
 			CreatedBy:   fmt.Sprintf("someone %d", ix),
 		})
-		assert.Nil(t, err)
-		if err != nil {
-			// No point in continuing if users weren't created as designed.
-			return
-		}
+		require.Nil(t, err)
 		thisManagedIdentityID := newManagedIdentity.Metadata.ID
 		managedIdentityIDs = append(managedIdentityIDs, thisManagedIdentityID)
 		managedIdentityID2WorkspacePaths[thisManagedIdentityID] = []string{}
@@ -1669,7 +1582,6 @@ func TestGetWorkspacesForManagedIdentity(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			workspacesResult, err := testClient.client.Workspaces.GetWorkspacesForManagedIdentity(ctx, test.managedIdentityID)
 
 			checkError(t, test.expectMsg, err)
@@ -1761,8 +1673,8 @@ var standardWarmupWorkspaces = []models.Workspace{
 // NOTE: Due to the need to supply the parent ID for non-top-level groups,
 // the groups must be created in a top-down manner.
 func createWarmupWorkspaces(ctx context.Context, testClient *testClient,
-	newGroups []models.Group, newWorkspaces []models.Workspace) ([]models.Group, []models.Workspace, error) {
-
+	newGroups []models.Group, newWorkspaces []models.Workspace,
+) ([]models.Group, []models.Workspace, error) {
 	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, newGroups)
 	if err != nil {
 		return nil, nil, err
@@ -1840,7 +1752,6 @@ func workspaceIDsFromWorkspaceInfos(workspaceInfos []workspaceInfo) []string {
 // createJobStateVersion creates the records necessary to avoid violating
 // foreign key constraints when updating and creating workspaces.
 func createJobStateVersion(ctx context.Context, client *Client, workspaceID string) (string, string, error) {
-
 	newPlan, err := client.Plans.CreatePlan(ctx, &models.Plan{
 		WorkspaceID: workspaceID,
 	})
@@ -1897,5 +1808,3 @@ func compareWorkspaces(t *testing.T, expected, actual *models.Workspace, checkID
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
 	assert.Equal(t, expected.PreventDestroyPlan, actual.PreventDestroyPlan)
 }
-
-// The End.

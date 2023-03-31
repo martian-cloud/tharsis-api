@@ -18,7 +18,6 @@ import (
 type teamNameSlice []models.Team
 
 func TestCreateTeams(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -43,7 +42,6 @@ func TestCreateTeams(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive: create a simple team object",
 			input: &models.Team{
@@ -78,7 +76,6 @@ func TestCreateTeams(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error)
 			actualCreated, err := testClient.client.Teams.CreateTeam(ctx, test.input)
 
@@ -102,24 +99,17 @@ func TestCreateTeams(t *testing.T) {
 				// the negative and defective cases
 				assert.Nil(t, actualCreated)
 			}
-
 		})
-
 	}
 }
 
 func TestGetTeamBySCIMExternalID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupTeams, _, err := createInitialTeams(ctx, testClient, standardWarmupTeams)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg  *string
@@ -152,7 +142,6 @@ func TestGetTeamBySCIMExternalID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			team, err := testClient.client.Teams.GetTeamBySCIMExternalID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -170,17 +159,12 @@ func TestGetTeamBySCIMExternalID(t *testing.T) {
 }
 
 func TestGetTeams(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupTeams, _, err := createInitialTeams(ctx, testClient, standardWarmupTeams)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		name        string
@@ -215,7 +199,6 @@ func TestGetTeams(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// TODO: Add checks for pagination, cursors, etc.
 
 			gotResult, err := testClient.client.Teams.GetTeams(ctx, test.input)
@@ -244,24 +227,17 @@ func TestGetTeams(t *testing.T) {
 			}
 
 			// TODO: Add code for pagination, cursors, etc.
-
 		})
-
 	}
 }
 
 func TestUpdateTeams(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupTeams, _, err := createInitialTeams(ctx, testClient, standardWarmupTeams)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		input         *models.Team
@@ -325,7 +301,6 @@ func TestUpdateTeams(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualUpdated, err := testClient.client.Teams.UpdateTeam(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -349,22 +324,16 @@ func TestUpdateTeams(t *testing.T) {
 				assert.Nil(t, actualUpdated)
 			}
 		})
-
 	}
 }
 
 func TestDeleteTeams(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupTeams, _, err := createInitialTeams(ctx, testClient, standardWarmupTeams)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	warmupNames := []string{}
 	for _, warmupTeam := range createdWarmupTeams {
@@ -422,7 +391,6 @@ func TestDeleteTeams(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// Now, try to delete the teams in sequence.
 			for _, teamToDelete := range test.input {
 
@@ -436,10 +404,7 @@ func TestDeleteTeams(t *testing.T) {
 					PaginationOptions: nil,
 					Filter:            nil,
 				})
-				assert.Nil(t, err)
-				if err != nil {
-					return
-				}
+				require.Nil(t, err)
 
 				actualNames := []string{}
 				for _, gotTeam := range gotResult.Teams {
@@ -454,7 +419,6 @@ func TestDeleteTeams(t *testing.T) {
 				assert.Equal(t, test.expectTeamNames, actualNames)
 			}
 		})
-
 	}
 }
 
@@ -489,8 +453,8 @@ var standardWarmupTeams = []models.Team{
 // createWarmupTeams creates some objects for a test
 // The objects to create can be standard or otherwise.
 func createWarmupTeams(ctx context.Context, testClient *testClient,
-	input []models.Team) ([]models.Team, error) {
-
+	input []models.Team,
+) ([]models.Team, error) {
 	resultTeams, _, err := createInitialTeams(ctx, testClient, input)
 	if err != nil {
 		return nil, err
@@ -514,8 +478,8 @@ func (tns teamNameSlice) Less(i, j int) bool {
 // compareTeams compares two team objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareTeams(t *testing.T, expected, actual *models.Team,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Description, actual.Description)
 
@@ -540,5 +504,3 @@ func copyStringSlice(input []string) []string {
 	result = append(result, input...)
 	return result
 }
-
-// The End.

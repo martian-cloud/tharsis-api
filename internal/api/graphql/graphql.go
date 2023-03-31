@@ -42,7 +42,7 @@ type contextGenerator struct {
 	disableCache  bool
 }
 
-func (c *contextGenerator) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
+func (c *contextGenerator) BuildContext(ctx context.Context, _ *http.Request) (context.Context, error) {
 	// Build context for subscriptions
 	ctx = c.resolverState.Attach(ctx)
 

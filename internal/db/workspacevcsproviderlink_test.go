@@ -24,7 +24,6 @@ type warmupWorkspaceVCSProviderLinks struct {
 }
 
 func TestGetLinksByProviderID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -39,11 +38,7 @@ func TestGetLinksByProviderID(t *testing.T) {
 			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
 			standardWarmupWorkspaceVCSProviderLinks,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -74,7 +69,6 @@ func TestGetLinksByProviderID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualLinks, err := testClient.client.WorkspaceVCSProviderLinks.GetLinksByProviderID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -95,7 +89,6 @@ func TestGetLinksByProviderID(t *testing.T) {
 }
 
 func TestGetLinkByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -110,11 +103,7 @@ func TestGetLinkByID(t *testing.T) {
 			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
 			standardWarmupWorkspaceVCSProviderLinks,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -146,7 +135,6 @@ func TestGetLinkByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -167,7 +155,6 @@ func TestGetLinkByID(t *testing.T) {
 }
 
 func TestGetLinkByWorkspaceID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -182,11 +169,7 @@ func TestGetLinkByWorkspaceID(t *testing.T) {
 			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
 			standardWarmupWorkspaceVCSProviderLinks,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -218,7 +201,6 @@ func TestGetLinkByWorkspaceID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByWorkspaceID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -239,7 +221,6 @@ func TestGetLinkByWorkspaceID(t *testing.T) {
 }
 
 func TestCreateLink(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -253,11 +234,7 @@ func TestCreateLink(t *testing.T) {
 			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
 			[]models.WorkspaceVCSProviderLink{},
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	moduleDirectory := "this/is/where/configuration/is"
 	tagRegex := "\\d+.\\d+$"
@@ -388,7 +365,6 @@ func TestCreateLink(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, test.toCreate)
 
 			if test.expectErrorMsg != "" {
@@ -421,7 +397,6 @@ func TestCreateLink(t *testing.T) {
 }
 
 func TestUpdateLink(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -436,11 +411,7 @@ func TestUpdateLink(t *testing.T) {
 			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
 			standardWarmupWorkspaceVCSProviderLinks,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupWorkspace := warmupItems.workspaces[0]
 	warmupProvider := warmupItems.providers[0]
@@ -509,9 +480,7 @@ func TestUpdateLink(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualLink, err :=
-				testClient.client.WorkspaceVCSProviderLinks.UpdateLink(ctx, test.toUpdate)
+			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.UpdateLink(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
 
@@ -532,7 +501,6 @@ func TestUpdateLink(t *testing.T) {
 }
 
 func TestDeleteLink(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -546,11 +514,7 @@ func TestDeleteLink(t *testing.T) {
 			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
 			standardWarmupWorkspaceVCSProviderLinks,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.WorkspaceVCSProviderLink
@@ -559,7 +523,6 @@ func TestDeleteLink(t *testing.T) {
 	}
 
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.WorkspaceVCSProviderLink{
@@ -593,11 +556,9 @@ func TestDeleteLink(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.WorkspaceVCSProviderLinks.DeleteLink(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
-
 		})
 	}
 }
@@ -679,8 +640,8 @@ var standardWarmupWorkspaceVCSProviderLinks = []models.WorkspaceVCSProviderLink{
 
 // createWarmupWorkspaceVCSProviderLinks creates workspace vcs provider links for testing.
 func createWarmupWorkspaceVCSProviderLinks(ctx context.Context, testClient *testClient,
-	input warmupWorkspaceVCSProviderLinks) (*warmupWorkspaceVCSProviderLinks, error) {
-
+	input warmupWorkspaceVCSProviderLinks,
+) (*warmupWorkspaceVCSProviderLinks, error) {
 	// It is necessary to create at least one group and workspace
 	// in order to provide the necessary IDs for the workspace vcs provider links.
 
@@ -732,8 +693,8 @@ func createInitialWorkspaceVCSProviderLinks(
 	vcsProviderMap map[string]string,
 	toCreate []models.WorkspaceVCSProviderLink,
 ) (
-	[]models.WorkspaceVCSProviderLink, error) {
-
+	[]models.WorkspaceVCSProviderLink, error,
+) {
 	result := []models.WorkspaceVCSProviderLink{}
 
 	for _, input := range toCreate {
@@ -766,8 +727,8 @@ func createInitialWorkspaceVCSProviderLinks(
 // including bounds for creation and updated times. If times is nil, it compares
 // the exact metadata timestamps.
 func compareWorkspaceVCSProviderLinks(t *testing.T, expected, actual *models.WorkspaceVCSProviderLink,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
 	assert.Equal(t, expected.AutoSpeculativePlan, actual.AutoSpeculativePlan)
 	assert.Equal(t, expected.Branch, actual.Branch)

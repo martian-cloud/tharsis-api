@@ -1,3 +1,4 @@
+// Package tharsisfederated package
 package tharsisfederated
 
 import (
@@ -27,9 +28,9 @@ func (a *Authenticator) Close(context.Context) error {
 }
 
 // Authenticate configures the environment with the identity information used by the Tharsis terraform provider
-func (a *Authenticator) Authenticate(ctx context.Context,
-	managedIdentity *types.ManagedIdentity, creds []byte) (map[string]string, error) {
-
+func (a *Authenticator) Authenticate(_ context.Context,
+	managedIdentity *types.ManagedIdentity, creds []byte,
+) (map[string]string, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(string(managedIdentity.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed identity payload %v", err)

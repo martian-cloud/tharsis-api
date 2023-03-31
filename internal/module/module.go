@@ -1,3 +1,4 @@
+// Package module package
 package module
 
 import (

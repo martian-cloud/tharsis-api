@@ -1,3 +1,4 @@
+// Package jwsprovider package
 package jwsprovider
 
 //go:generate mockery --name JWSProvider --inpackage --case underscore

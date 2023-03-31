@@ -1,3 +1,4 @@
+// Package awskms package
 package awskms
 
 //go:generate mockery --name client --inpackage --case underscore
@@ -32,7 +33,7 @@ type signer struct {
 	keyID  string
 }
 
-func (s *signer) Sign(payload []byte, key interface{}) ([]byte, error) {
+func (s *signer) Sign(payload []byte, _ interface{}) ([]byte, error) {
 	h := crypto.SHA256.New()
 	if _, err := h.Write(payload); err != nil {
 		return nil, fmt.Errorf("failed to create hash for token payload %v", err)
@@ -127,12 +128,12 @@ func (j *JWSProvider) Sign(ctx context.Context, payload []byte) ([]byte, error) 
 }
 
 // GetKeySet returns the JWK key set in JSON format
-func (j *JWSProvider) GetKeySet(ctx context.Context) ([]byte, error) {
+func (j *JWSProvider) GetKeySet(_ context.Context) ([]byte, error) {
 	return j.keySet, nil
 }
 
 // Verify will return an error if the JWT does not have a valid signature
-func (j *JWSProvider) Verify(ctx context.Context, token []byte) error {
+func (j *JWSProvider) Verify(_ context.Context, token []byte) error {
 	if _, err := jws.Verify(token, jwa.RS256, j.pubKey); err != nil {
 		return err
 	}

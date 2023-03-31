@@ -97,11 +97,11 @@ type associateServiceAccountNamespaceMembership struct {
 }
 
 type associateServiceAccountRunnerAssignment struct {
+	runner             *models.Runner
+	serviceAccount     *models.ServiceAccount
 	filterBase         string
 	serviceAccountPath string
 	runnerPath         string
-	runner             *models.Runner
-	serviceAccount     *models.ServiceAccount
 }
 
 type associateWorkspaceVCSProviderLink struct {
@@ -129,11 +129,7 @@ func TestGetGroupByID(t *testing.T) {
 	// Because we cannot create a group with a specific ID without going into the really
 	// low-level stuff, create the warmup group(s) by name and then find the relevant ID.
 	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg   *string
@@ -186,11 +182,7 @@ func TestGetGroupByFullPath(t *testing.T) {
 	defer testClient.close(ctx)
 
 	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg   *string
@@ -261,11 +253,7 @@ func TestDeleteGroup(t *testing.T) {
 
 	// Create initial warmup groups in order to get their paths in sorted order, etc.
 	initialWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	// Build slices of group paths, one ascending (but only top-level) and one descending.
 	ascendingTopPaths := sort.StringSlice{}
@@ -335,11 +323,7 @@ func TestDeleteGroup(t *testing.T) {
 			// Must close manually, because later test cases will create their own test clients.
 
 			createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-			assert.Nil(t, err)
-			if err != nil {
-				// No point continuing if warmup groups weren't all created.
-				return
-			}
+			require.Nil(t, err)
 
 			groupsToDelete := []*models.Group{}
 			switch {
@@ -403,18 +387,10 @@ func TestGetGroups(t *testing.T) {
 	defer testClient.close(ctx)
 
 	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	allGroupInfos, err := groupInfoFromGroups(ctx, testClient.client.getConnection(ctx), createdWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	allPaths := pathsFromGroupInfo(allGroupInfos)
 	reversePaths := reverseStringSlice(allPaths)
@@ -1090,11 +1066,7 @@ func TestCreateGroup(t *testing.T) {
 
 				// For a positive case, just use the utility function.
 				claimedCreated, _, err := createInitialGroups(ctx, testClient, test.toCreate)
-				assert.Nil(t, err)
-				if err != nil {
-					// No point if warmup groups weren't all created.
-					return
-				}
+				require.Nil(t, err)
 
 				// Capture any new claimed to be created.
 				cumulativeClaimedCreated = append(cumulativeClaimedCreated, claimedCreated...)
@@ -1113,11 +1085,7 @@ func TestCreateGroup(t *testing.T) {
 
 							// input must be not top-level, so look up the parent's ID.
 							parent, err := testClient.client.Groups.GetGroupByFullPath(ctx, parentPath)
-							assert.Nil(t, err)
-							if err != nil {
-								// No point continuing if things are falling apart.
-								return
-							}
+							require.Nil(t, err)
 
 							input.ParentID = parent.Metadata.ID
 						}
@@ -1139,11 +1107,7 @@ func TestCreateGroup(t *testing.T) {
 				PaginationOptions: nil,
 				Filter:            nil,
 			})
-			assert.Nil(t, err)
-			if err != nil {
-				// No point if we couldn't retrieve the groups.
-				return
-			}
+			require.Nil(t, err)
 			retrievedGroups := gotResult.Groups
 
 			// Compare lengths.
@@ -1187,11 +1151,7 @@ func TestUpdateGroup(t *testing.T) {
 	defer testClient.close(ctx)
 
 	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	// In a given test case, use exactly one of findFullPath and findGroup.
 	type testCase struct {
@@ -2839,5 +2799,3 @@ func gatherActualAssociations(ctx context.Context, dbClient *Client, inputs *ass
 
 	return &result, nil
 }
-
-// The End.

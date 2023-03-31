@@ -361,6 +361,7 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 	the Mozilla Public License, v. 2.0.
 */
 
+// Package getmodules package
 package getmodules
 
 import (
@@ -381,7 +382,7 @@ import (
 // produce a hint error message if desired.
 type fileDetector struct{}
 
-func (d *fileDetector) Detect(src, pwd string) (string, bool, error) {
+func (d *fileDetector) Detect(src, _ string) (string, bool, error) {
 	if len(src) == 0 {
 		return "", false, nil
 	}

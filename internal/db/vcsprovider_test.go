@@ -63,11 +63,7 @@ func TestVCSProviders_GetProviderByID(t *testing.T) {
 			standardWarmupGroupsForVCSProviders,
 			standardWarmupVCSProviders,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -99,9 +95,7 @@ func TestVCSProviders_GetProviderByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualVCSProvider, err :=
-				testClient.client.VCSProviders.GetProviderByID(ctx, test.searchID)
+			actualVCSProvider, err := testClient.client.VCSProviders.GetProviderByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -116,7 +110,6 @@ func TestVCSProviders_GetProviderByID(t *testing.T) {
 			} else {
 				assert.Nil(t, actualVCSProvider)
 			}
-
 		})
 	}
 }
@@ -132,11 +125,7 @@ func TestGetProviderByOAuthState(t *testing.T) {
 			standardWarmupGroupsForVCSProviders,
 			standardWarmupVCSProviders,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -168,9 +157,7 @@ func TestGetProviderByOAuthState(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualVCSProvider, err :=
-				testClient.client.VCSProviders.GetProviderByOAuthState(ctx, test.searchID)
+			actualVCSProvider, err := testClient.client.VCSProviders.GetProviderByOAuthState(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -185,7 +172,6 @@ func TestGetProviderByOAuthState(t *testing.T) {
 			} else {
 				assert.Nil(t, actualVCSProvider)
 			}
-
 		})
 	}
 }
@@ -200,11 +186,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			standardWarmupGroupsForVCSProviders,
 			standardWarmupVCSProviders,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	allVCSProviderInfos := vcsProviderInfoFromVCSProviders(warmupItems.providers)
 
@@ -261,7 +243,6 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetVCSProvidersInput, so don't try it.
 
 		{
@@ -639,7 +620,6 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -725,11 +705,7 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 			standardWarmupGroupsForVCSProviders,
 			[]models.VCSProvider{},
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	warmupGroup := warmupItems.groups[0]
 	warmupGroupID := warmupGroup.Metadata.ID
@@ -743,7 +719,6 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.VCSProvider{
@@ -843,7 +818,6 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.VCSProviders.CreateProvider(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -882,11 +856,7 @@ func TestVCSProviders_UpdateProvider(t *testing.T) {
 			standardWarmupGroupsForVCSProviders,
 			standardWarmupVCSProviders,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 	warmupGroup := warmupItems.groups[0]
@@ -963,9 +933,7 @@ func TestVCSProviders_UpdateProvider(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualVCSProvider, err :=
-				testClient.client.VCSProviders.UpdateProvider(ctx, test.toUpdate)
+			actualVCSProvider, err := testClient.client.VCSProviders.UpdateProvider(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
 
@@ -995,11 +963,7 @@ func TestVCSProviders_DeleteProvider(t *testing.T) {
 			standardWarmupGroupsForVCSProviders,
 			standardWarmupVCSProviders,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.VCSProvider
@@ -1008,7 +972,6 @@ func TestVCSProviders_DeleteProvider(t *testing.T) {
 	}
 
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.VCSProvider{
@@ -1044,11 +1007,9 @@ func TestVCSProviders_DeleteProvider(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.VCSProviders.DeleteProvider(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
-
 		})
 	}
 }
@@ -1132,8 +1093,8 @@ var standardWarmupVCSProviders = []models.VCSProvider{
 
 // createWarmupVCSProviders creates vcs providers for testing.
 func createWarmupVCSProviders(ctx context.Context, testClient *testClient,
-	input warmupVCSProviders) (*warmupVCSProviders, error) {
-
+	input warmupVCSProviders,
+) (*warmupVCSProviders, error) {
 	resultGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
 	if err != nil {
 		return nil, err
@@ -1154,7 +1115,8 @@ func createWarmupVCSProviders(ctx context.Context, testClient *testClient,
 // createInitialVCSProviders creates some warmup vcs providers for a test.
 func createInitialVCSProviders(ctx context.Context, testClient *testClient,
 	groupMap map[string]string, toCreate []models.VCSProvider) (
-	[]models.VCSProvider, error) {
+	[]models.VCSProvider, error,
+) {
 	result := []models.VCSProvider{}
 
 	for _, input := range toCreate {
@@ -1263,8 +1225,8 @@ func vcsProviderIDsFromVCSProviderInfos(vcsProviderInfos []vcsProviderInfo) []st
 // compareVCSProviders compares two vcs provider objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareVCSProviders(t *testing.T, expected, actual *models.VCSProvider,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Type, actual.Type)
 	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Name, actual.Name)

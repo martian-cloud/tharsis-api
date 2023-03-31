@@ -1,3 +1,4 @@
+// Package namespacemembership package
 package namespacemembership
 
 //go:generate mockery --name Service --inpackage --case underscore
@@ -124,7 +125,8 @@ func (s *service) GetNamespaceMembershipsForNamespace(ctx context.Context, names
 }
 
 func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
-	input *GetNamespaceMembershipsForSubjectInput) (*db.NamespaceMembershipResult, error) {
+	input *GetNamespaceMembershipsForSubjectInput,
+) (*db.NamespaceMembershipResult, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -211,7 +213,8 @@ func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string
 }
 
 func (s *service) CreateNamespaceMembership(ctx context.Context,
-	input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error) {
+	input *CreateNamespaceMembershipInput,
+) (*models.NamespaceMembership, error) {
 	if err := s.requireOwnerAccessToNamespace(ctx, input.NamespacePath); err != nil {
 		return nil, err
 	}
@@ -309,7 +312,8 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 }
 
 func (s *service) UpdateNamespaceMembership(ctx context.Context,
-	namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error) {
+	namespaceMembership *models.NamespaceMembership,
+) (*models.NamespaceMembership, error) {
 	if err := s.requireOwnerAccessToNamespace(ctx, namespaceMembership.Namespace.Path); err != nil {
 		return nil, err
 	}

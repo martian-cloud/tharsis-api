@@ -1,3 +1,4 @@
+// Package gpgkey package
 package gpgkey
 
 import (

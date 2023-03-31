@@ -1,3 +1,4 @@
+// Package kubernetes package
 package kubernetes
 
 //go:generate mockery --name client --inpackage --case underscore
@@ -87,7 +88,7 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		return nil, fmt.Errorf("kubernetes job dispatcher doesn't support auth_type '%s'", pluginData["auth_type"])
 	}
 
-	var namespace = "default"
+	namespace := "default"
 	if ns, ok := pluginData["namespace"]; ok {
 		namespace = ns
 	}

@@ -1,3 +1,4 @@
+// Package github package
 package github
 
 import (
@@ -94,7 +95,7 @@ type Provider struct {
 
 // New creates a new Provider instance.
 func New(
-	ctx context.Context,
+	_ context.Context,
 	logger logger.Logger,
 	client *http.Client,
 	tharsisURL string,

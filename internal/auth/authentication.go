@@ -1,3 +1,4 @@
+// Package auth package
 package auth
 
 import (

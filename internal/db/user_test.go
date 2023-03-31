@@ -49,17 +49,12 @@ type getExternalIDInput struct {
 // Because no other functions interact with external IDs, testing for
 // GetUserByExternalID and LinkUserWithExternalID are combined.
 func TestGetUserByLinkUserWithExternalID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		linkInput     *linkExternalIDInput
@@ -149,7 +144,6 @@ func TestGetUserByLinkUserWithExternalID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			if test.linkInput != nil {
 
 				err := testClient.client.Users.LinkUserWithExternalID(ctx,
@@ -178,17 +172,12 @@ func TestGetUserByLinkUserWithExternalID(t *testing.T) {
 }
 
 func TestGetUserByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg  *string
@@ -234,7 +223,6 @@ func TestGetUserByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotUser, err := testClient.client.Users.GetUserByID(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -250,17 +238,12 @@ func TestGetUserByID(t *testing.T) {
 }
 
 func TestGetUserByEmail(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg  *string
@@ -301,7 +284,6 @@ func TestGetUserByEmail(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotUser, err := testClient.client.Users.GetUserByEmail(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -317,17 +299,12 @@ func TestGetUserByEmail(t *testing.T) {
 }
 
 func TestGetUserByUsername(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg  *string
@@ -368,7 +345,6 @@ func TestGetUserByUsername(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotUser, err := testClient.client.Users.GetUserByUsername(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -384,17 +360,12 @@ func TestGetUserByUsername(t *testing.T) {
 }
 
 func TestGetUsers(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	warmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allUserInfos := userInfoFromUsers(warmupUsers)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -447,7 +418,6 @@ func TestGetUsers(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetUsers, so don't try it.
 
 		{
@@ -657,7 +627,8 @@ func TestGetUsers(t *testing.T) {
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
 				Filter: &UserFilter{
 					UserIDs: []string{
-						allUserIDsByName[0], allUserIDsByName[1], allUserIDsByName[3]},
+						allUserIDsByName[0], allUserIDsByName[1], allUserIDsByName[3],
+					},
 				},
 			},
 			expectUserIDs: []string{
@@ -779,7 +750,6 @@ func TestGetUsers(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -856,17 +826,12 @@ func TestGetUsers(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		input         *models.User
@@ -947,7 +912,6 @@ func TestUpdateUser(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualUpdated, err := testClient.client.Users.UpdateUser(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -970,12 +934,10 @@ func TestUpdateUser(t *testing.T) {
 				assert.Nil(t, actualUpdated)
 			}
 		})
-
 	}
 }
 
 func TestCreateUser(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1044,7 +1006,6 @@ func TestCreateUser(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			claimedAdded, err := testClient.client.Users.CreateUser(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -1086,11 +1047,7 @@ func TestDeleteUser(t *testing.T) {
 	defer testClient.close(ctx)
 
 	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.User
@@ -1134,7 +1091,6 @@ func TestDeleteUser(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.Users.DeleteUser(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -1255,8 +1211,8 @@ func activeUsersFromUserInfos(userInfos []userInfo) []string {
 // compareUsers compares two user objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareUsers(t *testing.T, expected, actual *models.User,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Username, actual.Username)
 	assert.Equal(t, expected.Email, actual.Email)
 	assert.Equal(t, expected.Admin, actual.Admin)
@@ -1275,5 +1231,3 @@ func compareUsers(t *testing.T, expected, actual *models.User,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

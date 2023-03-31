@@ -1,3 +1,4 @@
+// Package serviceaccount package
 package serviceaccount
 
 import (
@@ -535,8 +536,8 @@ func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDCon
 
 // verifyOneTrustPolicy verifies a token vs. one trust policy.
 func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, trustPolicy models.OIDCTrustPolicy,
-	serviceAccount *models.ServiceAccount) error {
-
+	_ *models.ServiceAccount,
+) error {
 	// Get issuer JWK response
 	keySet, err := s.getKeySetFunc(ctx, trustPolicy.Issuer, s.openIDConfigFetcher)
 	if err != nil {

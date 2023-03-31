@@ -61,7 +61,6 @@ type namespaceMembershipInfoPathSlice []namespaceMembershipInfo
 type namespaceMembershipInfoTimeSlice []namespaceMembershipInfo
 
 func TestGetNamespaceMemberships(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -76,11 +75,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 		namespaceMemberships: standardWarmupNamespaceMemberships,
 	})
 
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
 		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
@@ -165,7 +160,6 @@ func TestGetNamespaceMemberships(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetNamespaceMemberships, so don't try it.
 
 		{
@@ -1153,7 +1147,6 @@ func TestGetNamespaceMemberships(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -1230,7 +1223,6 @@ func TestGetNamespaceMemberships(t *testing.T) {
 }
 
 func TestGetNamespaceMembershipByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1244,11 +1236,7 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces and so forth weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg                 *string
@@ -1280,7 +1268,6 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			namespaceMembership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -1298,7 +1285,6 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 }
 
 func TestCreateNamespaceMembership(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1312,11 +1298,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces and so forth weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		input         *CreateNamespaceMembershipInput
@@ -1500,7 +1482,6 @@ func TestCreateNamespaceMembership(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// CreateNamespaceMembership(ctx context.Context, input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error)
 			actualCreated, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, test.input)
 
@@ -1529,7 +1510,6 @@ func TestCreateNamespaceMembership(t *testing.T) {
 }
 
 func TestUpdateNamespaceMembership(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1543,11 +1523,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces and so forth weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
 		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
@@ -1620,7 +1596,6 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// UpdateNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error)
 			actualUpdated, err := testClient.client.NamespaceMemberships.UpdateNamespaceMembership(ctx, test.searchFor)
 
@@ -1649,7 +1624,6 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 }
 
 func TestDeleteNamespaceMembership(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1663,11 +1637,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup groups and workspaces and so forth weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
 		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
@@ -1714,12 +1684,10 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error
 			err := testClient.client.NamespaceMemberships.DeleteNamespaceMembership(ctx, test.searchFor)
 
 			checkError(t, test.expectMsg, err)
-
 		})
 	}
 }
@@ -1881,7 +1849,6 @@ var standardWarmupWorkspacesForNamespaceMemberships = []models.Workspace{
 // Standard warmup namespace memberships for tests in this module:
 // In this variable, the ID field is the user, service account, and team _NAME_, NOT the ID.
 var standardWarmupNamespaceMemberships = []CreateNamespaceMembershipInput{
-
 	// Teams are given group memberships straight across: team X to group X; abc.
 	{
 		NamespacePath: "group-a",
@@ -1991,8 +1958,8 @@ var standardWarmupNamespaceMemberships = []CreateNamespaceMembershipInput{
 // NOTE: Due to the need to supply the parent ID for non-top-level groups,
 // any groups must be created in a top-down manner.
 func createWarmupNamespaceMemberships(ctx context.Context, testClient *testClient,
-	input namespaceMembershipWarmupsInput) (*namespaceMembershipWarmupsOutput, error) {
-
+	input namespaceMembershipWarmupsInput,
+) (*namespaceMembershipWarmupsOutput, error) {
 	resultTeams, teamName2ID, err := createInitialTeams(ctx, testClient, input.teams)
 	if err != nil {
 		return nil, err
@@ -2087,7 +2054,8 @@ func (nss namespaceMembershipInfoTimeSlice) Less(i, j int) bool {
 // namespaceMembershipInfoFromNamespaceMemberships returns a slice of namespaceMembershipInfo,
 // not necessarily sorted in any order.
 func namespaceMembershipInfoFromNamespaceMemberships(holderIDs2Name holderIDs2Name,
-	namespaceMemberships []models.NamespaceMembership) []namespaceMembershipInfo {
+	namespaceMemberships []models.NamespaceMembership,
+) []namespaceMembershipInfo {
 	result := []namespaceMembershipInfo{}
 
 	for _, namespaceMembership := range namespaceMemberships {
@@ -2124,7 +2092,8 @@ namespace membership trails within the same namespace path.
 If sortedDescending is true, the trails within a given namespace path are sorted in descending order.
 */
 func trailsFromNamespaceMembershipInfo(namespaceMembershipInfos []namespaceMembershipInfo,
-	sortedDescending bool) []string {
+	sortedDescending bool,
+) []string {
 	result := []string{}
 
 	sameNamespace := []string{}
@@ -2174,7 +2143,8 @@ func namespaceMembershipIDsFromNamespaceMembershipInfos(namespaceMembershipInfos
 
 // Compare two namespace membership objects, including bounds for creation and updated times.
 func compareNamespaceMemberships(t *testing.T, expected, actual *models.NamespaceMembership,
-	checkID bool, times timeBounds) {
+	checkID bool, times timeBounds,
+) {
 	if checkID {
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
@@ -2245,7 +2215,6 @@ func findServiceAccountIDFromName(serviceAccounts []models.ServiceAccount, nm st
 		}
 	}
 	return ""
-
 }
 
 // findTeamIDFromName returns the matching team ID for the specified name.
@@ -2293,5 +2262,3 @@ func rotateRole(input models.Role) models.Role {
 	// Keep the compiler happy, even if it cannot happen.
 	return models.ViewerRole
 }
-
-// The End.

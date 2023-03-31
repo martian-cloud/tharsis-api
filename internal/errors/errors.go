@@ -1,3 +1,4 @@
+// Package errors package
 package errors
 
 import (

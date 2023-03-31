@@ -1,3 +1,4 @@
+// Package gid package
 package gid
 
 import (

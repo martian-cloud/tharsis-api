@@ -1,3 +1,4 @@
+// Package graphql package
 package graphql
 
 import (

@@ -22,7 +22,7 @@ func (j *JobCaller) GetSubject() string {
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (j *JobCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
+func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
 	return &NamespaceAccessPolicy{
 		AllowAll: false,
 		// RootNamespaceIDs is empty to indicate the caller doesn't have access to any root namespaces
@@ -46,7 +46,7 @@ func (j *JobCaller) RequireAccessToNamespace(ctx context.Context, namespacePath 
 }
 
 // RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group
-func (j *JobCaller) RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error {
+func (j *JobCaller) RequireAccessToGroup(ctx context.Context, _ string, _ models.Role) error {
 	// Return authorization error since job callers don't have access to groups
 	return authorizationError(ctx, false)
 }
@@ -117,7 +117,7 @@ func (j *JobCaller) RequireAccessToWorkspace(ctx context.Context, workspaceID st
 }
 
 // RequireViewerAccessToGroups will return an error if the caller doesn't have viewer access to all the specified groups
-func (j *JobCaller) RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error {
+func (j *JobCaller) RequireViewerAccessToGroups(ctx context.Context, _ []models.Group) error {
 	// Return authorization error since job callers don't have access to groups
 	return authorizationError(ctx, false)
 }
@@ -246,13 +246,13 @@ func (j *JobCaller) RequireTeamCreateAccess(ctx context.Context) error {
 }
 
 // RequireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
-func (j *JobCaller) RequireTeamUpdateAccess(ctx context.Context, teamID string) error {
+func (j *JobCaller) RequireTeamUpdateAccess(ctx context.Context, _ string) error {
 	// Job callers won't ever have access to team info.
 	return authorizationError(ctx, false)
 }
 
 // RequireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-func (j *JobCaller) RequireTeamDeleteAccess(ctx context.Context, teamID string) error {
+func (j *JobCaller) RequireTeamDeleteAccess(ctx context.Context, _ string) error {
 	// Job callers won't ever have access to team info.
 	return authorizationError(ctx, false)
 }
@@ -264,19 +264,19 @@ func (j *JobCaller) RequireUserCreateAccess(ctx context.Context) error {
 }
 
 // RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (j *JobCaller) RequireUserUpdateAccess(ctx context.Context, userID string) error {
+func (j *JobCaller) RequireUserUpdateAccess(ctx context.Context, _ string) error {
 	// Job callers won't ever have access to user info.
 	return authorizationError(ctx, false)
 }
 
 // RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (j *JobCaller) RequireUserDeleteAccess(ctx context.Context, userID string) error {
+func (j *JobCaller) RequireUserDeleteAccess(ctx context.Context, _ string) error {
 	// Job callers won't ever have access to user info.
 	return authorizationError(ctx, false)
 }
 
 // RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (j *JobCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+func (j *JobCaller) RequireRunnerAccess(ctx context.Context, _ string) error {
 	// Return authorization error because job callers don't have runner access
 	return authorizationError(ctx, false)
 }

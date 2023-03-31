@@ -51,7 +51,7 @@ func (p *PlanHandler) OnSuccess(ctx context.Context) error {
 }
 
 // OnError is called if the job returns an error while executing
-func (p *PlanHandler) OnError(ctx context.Context, e error) error {
+func (p *PlanHandler) OnError(ctx context.Context, _ error) error {
 	// Cleanup workspace
 	if err := p.terraformWorkspace.close(ctx); err != nil {
 		return err
@@ -166,7 +166,7 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (p *PlanHandler) createVarsFile(ctx context.Context) (string, error) {
+func (p *PlanHandler) createVarsFile(_ context.Context) (string, error) {
 	// First write HCL variables
 	fileContents := ""
 	for _, v := range p.terraformWorkspace.variables {

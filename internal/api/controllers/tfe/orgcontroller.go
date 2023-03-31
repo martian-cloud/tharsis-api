@@ -59,7 +59,7 @@ func (c *orgController) RegisterRoutes(router chi.Router) {
 	router.Get("/organizations/{organization}/runs/queue", c.GetRunQueue)
 }
 
-func (c *orgController) GetEntitlements(w http.ResponseWriter, r *http.Request) {
+func (c *orgController) GetEntitlements(w http.ResponseWriter, _ *http.Request) {
 	c.respWriter.RespondWithJSONAPI(w, &EntitlementSettings, http.StatusOK)
 }
 

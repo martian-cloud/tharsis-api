@@ -1,3 +1,4 @@
+// Package semver package
 package semver
 
 import "github.com/hashicorp/go-version"

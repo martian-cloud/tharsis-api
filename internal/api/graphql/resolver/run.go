@@ -47,7 +47,7 @@ func (r *RunEdgeResolver) Cursor() (string, error) {
 }
 
 // Node returns a run node
-func (r *RunEdgeResolver) Node(ctx context.Context) (*RunResolver, error) {
+func (r *RunEdgeResolver) Node(_ context.Context) (*RunResolver, error) {
 	run, ok := r.edge.Node.(models.Run)
 	if !ok {
 		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")

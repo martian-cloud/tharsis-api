@@ -213,7 +213,7 @@ type TeamMutationPayloadResolver struct {
 }
 
 // Team field resolver
-func (r *TeamMutationPayloadResolver) Team(ctx context.Context) *TeamResolver {
+func (r *TeamMutationPayloadResolver) Team(_ context.Context) *TeamResolver {
 	if r.TeamMutationPayload.Team == nil {
 		return nil
 	}

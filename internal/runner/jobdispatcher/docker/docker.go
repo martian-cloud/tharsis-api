@@ -1,3 +1,4 @@
+// Package docker package
 package docker
 
 //go:generate mockery --name client --inpackage --case underscore
@@ -62,7 +63,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		}
 	}
 
-	var extraHosts = []string{}
+	extraHosts := []string{}
 	if _, ok := pluginData["extra_hosts"]; ok {
 		extraHosts = append(extraHosts, strings.Split(pluginData["extra_hosts"], ",")...)
 	}

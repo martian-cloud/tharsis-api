@@ -1,3 +1,4 @@
+// Package models package
 package models
 
 // ActivityEventAction represents the type of action.

@@ -33,7 +33,6 @@ type runInfoCreateSlice []runInfo
 type runInfoUpdateSlice []runInfo
 
 func TestGetRun(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -43,11 +42,7 @@ func TestGetRun(t *testing.T) {
 	createdLow := currentTime()
 	_, _, createdWarmupRuns, _, _, err := createWarmupRuns(ctx, testClient, standardWarmupGroupsForRuns,
 		standardWarmupWorkspacesForRuns, standardWarmupRuns, nil, nil, false)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup runs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -79,7 +74,6 @@ func TestGetRun(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			run, err := testClient.client.Runs.GetRun(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -95,13 +89,11 @@ func TestGetRun(t *testing.T) {
 			} else {
 				assert.Nil(t, run)
 			}
-
 		})
 	}
 }
 
 func TestGetRunByPlanID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -112,11 +104,7 @@ func TestGetRunByPlanID(t *testing.T) {
 	_, _, createdWarmupRuns, createdWarmupPlans, _, err := createWarmupRuns(ctx, testClient,
 		standardWarmupGroupsForRuns, standardWarmupWorkspacesForRuns, standardWarmupRuns,
 		standardWarmupPlansForRuns, standardWarmupAppliesForRuns, true)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup runs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -147,7 +135,6 @@ func TestGetRunByPlanID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualRun, err := testClient.client.Runs.GetRunByPlanID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -163,13 +150,11 @@ func TestGetRunByPlanID(t *testing.T) {
 			} else {
 				assert.Nil(t, actualRun)
 			}
-
 		})
 	}
 }
 
 func TestGetRunByApplyID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -180,11 +165,7 @@ func TestGetRunByApplyID(t *testing.T) {
 	_, _, createdWarmupRuns, _, createdWarmupApplies, err := createWarmupRuns(ctx, testClient,
 		standardWarmupGroupsForRuns, standardWarmupWorkspacesForRuns, standardWarmupRuns,
 		standardWarmupPlansForRuns, standardWarmupAppliesForRuns, true)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup runs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -215,7 +196,6 @@ func TestGetRunByApplyID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualRun, err := testClient.client.Runs.GetRunByApplyID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -231,13 +211,11 @@ func TestGetRunByApplyID(t *testing.T) {
 			} else {
 				assert.Nil(t, actualRun)
 			}
-
 		})
 	}
 }
 
 func TestCreateRun(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -245,11 +223,7 @@ func TestCreateRun(t *testing.T) {
 	_, warmupWorkspaces, _, warmupPlans, warmupApplies, err := createWarmupRuns(ctx, testClient,
 		standardWarmupGroupsForRuns, standardWarmupWorkspacesForRuns, nil,
 		standardWarmupPlansForRuns, standardWarmupAppliesForRuns, false)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup runs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
 	type testCase struct {
@@ -261,7 +235,6 @@ func TestCreateRun(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.Run{
@@ -340,7 +313,6 @@ func TestCreateRun(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Runs.CreateRun(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -369,7 +341,6 @@ func TestCreateRun(t *testing.T) {
 }
 
 func TestUpdateRun(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -380,11 +351,7 @@ func TestUpdateRun(t *testing.T) {
 	_, warmupWorkspaces, warmupRuns, warmupPlans, warmupApplies, err := createWarmupRuns(ctx, testClient,
 		standardWarmupGroupsForRuns, standardWarmupWorkspacesForRuns, standardWarmupRuns,
 		standardWarmupPlansForRuns, standardWarmupAppliesForRuns, false)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup runs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
@@ -462,7 +429,6 @@ func TestUpdateRun(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			run, err := testClient.client.Runs.UpdateRun(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -479,13 +445,11 @@ func TestUpdateRun(t *testing.T) {
 			} else {
 				assert.Nil(t, run)
 			}
-
 		})
 	}
 }
 
 func TestGetRuns(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -493,11 +457,7 @@ func TestGetRuns(t *testing.T) {
 	warmupGroups, warmupWorkspaces, warmupRuns, warmupPlans, warmupApplies, err := createWarmupRuns(ctx, testClient,
 		standardWarmupGroupsForRuns, standardWarmupWorkspacesForRuns, standardWarmupRuns,
 		standardWarmupPlansForRuns, standardWarmupAppliesForRuns, true)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup runs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 	warmupGroupID := warmupGroups[0].Metadata.ID
 	allRunInfos := runInfoFromRuns(warmupRuns)
@@ -551,7 +511,6 @@ func TestGetRuns(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetRuns, so don't try it.
 
 		{
@@ -979,7 +938,6 @@ func TestGetRuns(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -1138,8 +1096,8 @@ func createWarmupRuns(ctx context.Context, testClient *testClient,
 	[]models.Run,
 	[]models.Plan,
 	[]models.Apply,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group, workspace, plan, and apply
 	// in order to provide the necessary IDs for the runs.
 
@@ -1259,8 +1217,8 @@ func runIDsFromRunInfos(runInfos []runInfo) []string {
 // compareRuns compares two run objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareRuns(t *testing.T, expected, actual *models.Run,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Status, actual.Status)
 	assert.Equal(t, expected.IsDestroy, actual.IsDestroy)
 	assert.Equal(t, expected.HasChanges, actual.HasChanges)
@@ -1291,5 +1249,3 @@ func compareRuns(t *testing.T, expected, actual *models.Run,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

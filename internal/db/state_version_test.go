@@ -30,7 +30,6 @@ type stateVersionInfoIDSlice []stateVersionInfo
 type stateVersionInfoUpdateSlice []stateVersionInfo
 
 func TestGetStateVersions(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -38,11 +37,7 @@ func TestGetStateVersions(t *testing.T) {
 	warmupWorkspaces, _, warmupStateVersions, err := createWarmupStateVersions(ctx, testClient,
 		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
 		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allStateVersionInfos := stateVersionInfoFromStateVersions(warmupStateVersions)
 
 	// Sort by state version IDs.
@@ -100,7 +95,6 @@ func TestGetStateVersions(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetStateVersions, so don't try it.
 
 		{
@@ -355,7 +349,8 @@ func TestGetStateVersions(t *testing.T) {
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
 				Filter: &StateVersionFilter{
 					StateVersionIDs: []string{
-						allStateVersionIDsByTime[0], allStateVersionIDsByTime[1], allStateVersionIDsByTime[3]},
+						allStateVersionIDsByTime[0], allStateVersionIDsByTime[1], allStateVersionIDsByTime[3],
+					},
 				},
 			},
 			expectStateVersionIDs: []string{
@@ -402,7 +397,6 @@ func TestGetStateVersions(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -479,7 +473,6 @@ func TestGetStateVersions(t *testing.T) {
 }
 
 func TestGetStateVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -488,11 +481,7 @@ func TestGetStateVersion(t *testing.T) {
 	_, _, warmupStateVersions, err := createWarmupStateVersions(ctx, testClient,
 		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
 		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -535,7 +524,6 @@ func TestGetStateVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualStateVersion, err := testClient.client.StateVersions.GetStateVersion(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -556,7 +544,6 @@ func TestGetStateVersion(t *testing.T) {
 }
 
 func TestGetStateVersionByRunID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -565,11 +552,7 @@ func TestGetStateVersionByRunID(t *testing.T) {
 	_, _, warmupStateVersions, err := createWarmupStateVersions(ctx, testClient,
 		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
 		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -612,7 +595,6 @@ func TestGetStateVersionByRunID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualStateVersion, err := testClient.client.StateVersions.GetStateVersionByRunID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -633,7 +615,6 @@ func TestGetStateVersionByRunID(t *testing.T) {
 }
 
 func TestCreateStateVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -641,11 +622,7 @@ func TestCreateStateVersion(t *testing.T) {
 	warmupWorkspaces, warmupRuns, _, err := createWarmupStateVersions(ctx, testClient,
 		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
 		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.StateVersion
@@ -656,7 +633,6 @@ func TestCreateStateVersion(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toCreate: &models.StateVersion{
@@ -720,7 +696,6 @@ func TestCreateStateVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.StateVersions.CreateStateVersion(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -847,8 +822,8 @@ func createWarmupStateVersions(ctx context.Context, testClient *testClient,
 	[]models.Workspace,
 	[]models.Run,
 	[]models.StateVersion,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group, workspace, and run
 	// in order to provide the necessary IDs for the state versions.
 
@@ -943,8 +918,8 @@ func stateVersionIDsFromStateVersionInfos(stateVersionInfos []stateVersionInfo) 
 // compareStateVersions compares two state version objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareStateVersions(t *testing.T, expected, actual *models.StateVersion,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
 	assert.Equal(t, expected.RunID, actual.RunID)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
@@ -963,5 +938,3 @@ func compareStateVersions(t *testing.T, expected, actual *models.StateVersion,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

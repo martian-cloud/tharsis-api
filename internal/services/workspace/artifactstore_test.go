@@ -31,7 +31,7 @@ type fakeWriterAt struct {
 	w io.Writer
 }
 
-func (fw fakeWriterAt) WriteAt(p []byte, offset int64) (n int, err error) {
+func (fw fakeWriterAt) WriteAt(p []byte, _ int64) (n int, err error) {
 	// Ignore offset
 	return fw.w.Write(p)
 }

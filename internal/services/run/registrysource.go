@@ -1,3 +1,4 @@
+// Package run package
 package run
 
 //go:generate mockery --name ModuleResolver --inpackage --case underscore
@@ -157,7 +158,7 @@ func (m *moduleResolver) ResolveModuleVersion(ctx context.Context, moduleSource 
 
 // getVersions returns a slice of the versions available on the server
 // for example, https://gitlab.com/api/v4/packages/terraform/modules/v1/mygroup/module-001/aws/versions
-func (m *moduleResolver) getVersions(ctx context.Context, registryURL *url.URL, token string, sourceModule *ModuleRegistrySource) (map[string]bool, error) {
+func (m *moduleResolver) getVersions(_ context.Context, registryURL *url.URL, token string, sourceModule *ModuleRegistrySource) (map[string]bool, error) {
 	namespace := sourceModule.Namespace
 	moduleName := sourceModule.Name
 	targetSystem := sourceModule.TargetSystem

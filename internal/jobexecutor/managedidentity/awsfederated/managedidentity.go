@@ -1,3 +1,4 @@
+// Package awsfederated package
 package awsfederated
 
 import (
@@ -36,7 +37,7 @@ func (a *Authenticator) Close(context.Context) error {
 }
 
 // Authenticate configures the environment with the identity information used by the AWS terraform provider
-func (a *Authenticator) Authenticate(ctx context.Context, managedIdentity *types.ManagedIdentity, creds []byte) (map[string]string, error) {
+func (a *Authenticator) Authenticate(_ context.Context, managedIdentity *types.ManagedIdentity, creds []byte) (map[string]string, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(string(managedIdentity.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed identity payload %v", err)
@@ -48,7 +49,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, managedIdentity *types
 	}
 
 	filePath := filepath.Join(a.dir, fmt.Sprintf("%s-token", managedIdentity.Metadata.ID))
-	if err := os.WriteFile(filePath, creds, 0600); err != nil {
+	if err := os.WriteFile(filePath, creds, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write managed identity token to disk %v", err)
 	}
 

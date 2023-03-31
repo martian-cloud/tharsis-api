@@ -1,3 +1,4 @@
+// Package scim package
 package scim
 
 import (

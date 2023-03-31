@@ -31,7 +31,6 @@ type pathChecksType struct {
 }
 
 func TestGetNamespaceByGroupID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -39,11 +38,7 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 	createdWarmupOutput, err := createWarmupNamespaces(ctx, testClient, &namespaceWarmupsInput{
 		groups: standardWarmupGroupsForNamespaces,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg       *string
@@ -92,7 +87,6 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotNamespace, err := getNamespaceByGroupID(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -103,13 +97,11 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 			} else {
 				assert.Nil(t, gotNamespace)
 			}
-
 		})
 	}
 }
 
 func TestGetNamespaceByWorkspaceID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -118,11 +110,7 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 		groups:     standardWarmupGroupsForNamespaces,
 		workspaces: standardWarmupWorkspacesForNamespaces,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	// Creating the groups above is necessary in order to create the workspaces.
 	// However, to make sure the groups are not inadvertently used in the test
@@ -176,7 +164,6 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotNamespace, err := getNamespaceByWorkspaceID(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -187,13 +174,11 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 			} else {
 				assert.Nil(t, gotNamespace)
 			}
-
 		})
 	}
 }
 
 func TestGetNamespaceByPath(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -202,11 +187,7 @@ func TestGetNamespaceByPath(t *testing.T) {
 		groups:     standardWarmupGroupsForNamespaces,
 		workspaces: standardWarmupWorkspacesForNamespaces,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg       *string
@@ -271,7 +252,6 @@ func TestGetNamespaceByPath(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotNamespace, err := getNamespaceByPath(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -282,13 +262,11 @@ func TestGetNamespaceByPath(t *testing.T) {
 			} else {
 				assert.Nil(t, gotNamespace)
 			}
-
 		})
 	}
 }
 
 func TestCreateNamespace(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -297,11 +275,7 @@ func TestCreateNamespace(t *testing.T) {
 		groups:     standardWarmupGroupsForNamespaces,
 		workspaces: standardWarmupWorkspacesForNamespaces,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		input           *namespaceRow
@@ -385,7 +359,6 @@ func TestCreateNamespace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotNamespace, err := createNamespace(ctx, testClient.client.getConnection(ctx), test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -396,7 +369,6 @@ func TestCreateNamespace(t *testing.T) {
 			} else {
 				assert.Nil(t, gotNamespace)
 			}
-
 		})
 	}
 }
@@ -412,11 +384,7 @@ func TestMigrateNamespace(t *testing.T) {
 		groups:     append(standardWarmupGroupsForNamespaces, warmupGroupsForNamespaceMigration...),
 		workspaces: append(standardWarmupWorkspacesForNamespaces, warmupWorkspacesForNamespaceMigration...),
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg  *string
@@ -527,7 +495,6 @@ func TestMigrateNamespace(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := migrateNamespaces(ctx, testClient.client.getConnection(ctx), test.oldPath, test.newPath)
 
 			checkError(t, test.expectMsg, err)
@@ -677,8 +644,8 @@ var warmupWorkspacesForNamespaceMigration = []models.Workspace{
 // NOTE: Due to the need to supply the parent ID for non-top-level groups,
 // the groups must be created in a top-down manner.
 func createWarmupNamespaces(ctx context.Context, testClient *testClient,
-	input *namespaceWarmupsInput) (*namespaceWarmupsOutput, error) {
-
+	input *namespaceWarmupsInput,
+) (*namespaceWarmupsOutput, error) {
 	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
 	if err != nil {
 		return nil, err
@@ -741,5 +708,3 @@ func compareNamespaceRows(t *testing.T, expected, actual *namespaceRow) {
 	assert.Equal(t, expected.workspaceID, actual.workspaceID)
 	assert.Equal(t, expected.version, actual.version)
 }
-
-// The End.

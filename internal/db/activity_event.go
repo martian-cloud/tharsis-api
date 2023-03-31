@@ -1,3 +1,4 @@
+// Package db package
 package db
 
 //go:generate mockery --name ActivityEvents --inpackage --case underscore
@@ -125,8 +126,8 @@ func NewActivityEvents(dbClient *Client) ActivityEvents {
 }
 
 func (m *activityEvents) GetActivityEvents(ctx context.Context,
-	input *GetActivityEventsInput) (*ActivityEventsResult, error) {
-
+	input *GetActivityEventsInput,
+) (*ActivityEventsResult, error) {
 	ex := goqu.And()
 	if input.Filter != nil {
 		if input.Filter.ActivityEventIDs != nil {
@@ -199,7 +200,6 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		sortDirection,
 		activityEventFieldResolver,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,6 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 }
 
 func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.ActivityEvent) (*models.ActivityEvent, error) {
-
 	var namespaceID *string
 	if input.NamespacePath != nil {
 

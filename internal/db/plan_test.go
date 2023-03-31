@@ -29,7 +29,6 @@ type planInfoIDSlice []planInfo
 type planInfoUpdateSlice []planInfo
 
 func TestGetPlan(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -39,11 +38,7 @@ func TestGetPlan(t *testing.T) {
 	createdLow := currentTime()
 	_, createdWarmupPlans, err := createWarmupPlans(ctx, testClient, standardWarmupGroupsForPlans,
 		standardWarmupWorkspacesForPlans, standardWarmupPlans)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup plans weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -75,7 +70,6 @@ func TestGetPlan(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			plan, err := testClient.client.Plans.GetPlan(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -91,24 +85,18 @@ func TestGetPlan(t *testing.T) {
 			} else {
 				assert.Nil(t, plan)
 			}
-
 		})
 	}
 }
 
 func TestGetPlans(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	_, warmupPlans, err := createWarmupPlans(ctx, testClient,
 		standardWarmupGroupsForPlans, standardWarmupWorkspacesForPlans, standardWarmupPlans)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup Plans weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allPlanInfos := planInfoFromPlans(warmupPlans)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -155,7 +143,6 @@ func TestGetPlans(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetPlans, so don't try it.
 
 		{
@@ -387,7 +374,6 @@ func TestGetPlans(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -464,18 +450,13 @@ func TestGetPlans(t *testing.T) {
 }
 
 func TestCreatePlan(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	warmupWorkspaces, _, err := createWarmupPlans(ctx, testClient,
 		standardWarmupGroupsForPlans, standardWarmupWorkspacesForPlans, standardWarmupPlans)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup plans weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
 	type testCase struct {
@@ -487,7 +468,6 @@ func TestCreatePlan(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.Plan{
@@ -548,7 +528,6 @@ func TestCreatePlan(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Plans.CreatePlan(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -577,7 +556,6 @@ func TestCreatePlan(t *testing.T) {
 }
 
 func TestUpdatePlan(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -587,11 +565,7 @@ func TestUpdatePlan(t *testing.T) {
 	createdLow := currentTime()
 	warmupWorkspaces, warmupPlans, err := createWarmupPlans(ctx, testClient,
 		standardWarmupGroupsForPlans, standardWarmupWorkspacesForPlans, standardWarmupPlans)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup plans weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
@@ -659,7 +633,6 @@ func TestUpdatePlan(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			plan, err := testClient.client.Plans.UpdatePlan(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -676,7 +649,6 @@ func TestUpdatePlan(t *testing.T) {
 			} else {
 				assert.Nil(t, plan)
 			}
-
 		})
 	}
 }
@@ -736,8 +708,8 @@ func createWarmupPlans(ctx context.Context, testClient *testClient,
 	newPlans []models.Plan) (
 	[]models.Workspace,
 	[]models.Plan,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group and workspace in order to provide the necessary IDs for the plans.
 
 	_, parentPath2ID, err := createInitialGroups(ctx, testClient, newGroups)
@@ -813,8 +785,8 @@ func planIDsFromPlanInfos(planInfos []planInfo) []string {
 // comparePlans compares two plan objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func comparePlans(t *testing.T, expected, actual *models.Plan,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
 	assert.Equal(t, expected.Status, actual.Status)
 	assert.Equal(t, expected.HasChanges, actual.HasChanges)
@@ -836,5 +808,3 @@ func comparePlans(t *testing.T, expected, actual *models.Plan,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

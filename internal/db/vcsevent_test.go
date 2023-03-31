@@ -46,7 +46,6 @@ type warmupVCSEvents struct {
 }
 
 func TestGetEventByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -60,11 +59,7 @@ func TestGetEventByID(t *testing.T) {
 			standardWarmupWorkspacesForVCSEvents,
 			standardWarmupVCSEvents,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -96,7 +91,6 @@ func TestGetEventByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualEvent, err := testClient.client.VCSEvents.GetEventByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -117,7 +111,6 @@ func TestGetEventByID(t *testing.T) {
 }
 
 func TestGetEvents(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -130,11 +123,7 @@ func TestGetEvents(t *testing.T) {
 			standardWarmupWorkspacesForVCSEvents,
 			standardWarmupVCSEvents,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	allVCSEventInfos := vcsEventInfoFromVCSEvents(warmupItems.events)
 
@@ -187,7 +176,6 @@ func TestGetEvents(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetVCSEventsInput, so don't try it.
 
 		{
@@ -470,7 +458,6 @@ func TestGetEvents(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -547,7 +534,6 @@ func TestGetEvents(t *testing.T) {
 }
 
 func TestCreateEvent(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -558,11 +544,7 @@ func TestCreateEvent(t *testing.T) {
 			standardWarmupWorkspacesForVCSEvents,
 			[]models.VCSEvent{},
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	warmupWorkspace := warmupItems.workspaces[0]
 	warmupWorkspaceID := warmupWorkspace.Metadata.ID
@@ -576,7 +558,6 @@ func TestCreateEvent(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.VCSEvent{
@@ -644,7 +625,6 @@ func TestCreateEvent(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.VCSEvents.CreateEvent(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -673,7 +653,6 @@ func TestCreateEvent(t *testing.T) {
 }
 
 func TestUpdateEvent(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -685,11 +664,7 @@ func TestUpdateEvent(t *testing.T) {
 			standardWarmupWorkspacesForVCSEvents,
 			standardWarmupVCSEvents,
 		})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 	warmupWorkspace := warmupItems.workspaces[0]
@@ -754,7 +729,6 @@ func TestUpdateEvent(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualVCSEvent, err := testClient.client.VCSEvents.UpdateEvent(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -838,7 +812,6 @@ var standardWarmupVCSEvents = []models.VCSEvent{
 
 // createWarmupVCSEvents creates vcs events for testing.
 func createWarmupVCSEvents(ctx context.Context, testClient *testClient, input warmupVCSEvents) (*warmupVCSEvents, error) {
-
 	// It is necessary to create at least one group and workspace
 	// in order to provide the necessary IDs for the vcs events.
 
@@ -876,8 +849,8 @@ func createInitialVCSEvents(
 	workspaceMap map[string]string,
 	toCreate []models.VCSEvent,
 ) (
-	[]models.VCSEvent, error) {
-
+	[]models.VCSEvent, error,
+) {
 	result := []models.VCSEvent{}
 
 	for _, input := range toCreate {
@@ -974,8 +947,8 @@ func vcsEventIDsFromVCSEventInfos(vcsEventInfos []vcsEventInfo) []string {
 // including bounds for creation and updated times. If times is nil, it compares
 // the exact metadata timestamps.
 func compareVCSEvents(t *testing.T, expected, actual *models.VCSEvent,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
 	assert.Equal(t, expected.CommitID, actual.CommitID)
 	assert.Equal(t, expected.ErrorMessage, actual.ErrorMessage)

@@ -14,17 +14,12 @@ import (
 )
 
 func TestGetTokenByNonce(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupToken, err := createInitialSCIMToken(ctx, testClient, standardWarmupSCIMToken)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup token was not created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg       *string
@@ -52,7 +47,6 @@ func TestGetTokenByNonce(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			token, err := testClient.client.SCIMTokens.GetTokenByNonce(ctx, test.searchNonce)
 
 			checkError(t, test.expectMsg, err)
@@ -70,17 +64,12 @@ func TestGetTokenByNonce(t *testing.T) {
 }
 
 func TestGetTokens(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupToken, err := createInitialSCIMToken(ctx, testClient, standardWarmupSCIMToken)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup token was not created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		name          string
@@ -96,7 +85,6 @@ func TestGetTokens(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			tokens, err := testClient.client.SCIMTokens.GetTokens(ctx)
 
 			assert.Nil(t, err)
@@ -107,7 +95,6 @@ func TestGetTokens(t *testing.T) {
 }
 
 func TestCreateToken(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -158,7 +145,6 @@ func TestCreateToken(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.SCIMTokens.CreateToken(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -187,17 +173,12 @@ func TestCreateToken(t *testing.T) {
 }
 
 func TestDeleteToken(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	createdWarmupToken, err := createInitialSCIMToken(ctx, testClient, standardWarmupSCIMToken)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup token was not created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.SCIMToken
@@ -237,7 +218,6 @@ func TestDeleteToken(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.SCIMTokens.DeleteToken(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -254,8 +234,8 @@ var standardWarmupSCIMToken = &models.SCIMToken{
 
 // createInitialSCIMToken creates a warmup SCIM token for a test.
 func createInitialSCIMToken(ctx context.Context, testClient *testClient,
-	toCreate *models.SCIMToken) (*models.SCIMToken, error) {
-
+	toCreate *models.SCIMToken,
+) (*models.SCIMToken, error) {
 	// At most one token will exist.
 	created, err := testClient.client.SCIMTokens.CreateToken(ctx, toCreate)
 	if err != nil {

@@ -27,7 +27,6 @@ type applyInfoIDSlice []applyInfo
 type applyInfoUpdateSlice []applyInfo
 
 func TestGetApply(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -37,11 +36,7 @@ func TestGetApply(t *testing.T) {
 	createdLow := currentTime()
 	_, createdWarmupApplies, err := createWarmupApplies(ctx, testClient, standardWarmupGroupsForApplies,
 		standardWarmupWorkspacesForApplies, standardWarmupApplies)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup applies weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -73,7 +68,6 @@ func TestGetApply(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			apply, err := testClient.client.Applies.GetApply(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -89,24 +83,18 @@ func TestGetApply(t *testing.T) {
 			} else {
 				assert.Nil(t, apply)
 			}
-
 		})
 	}
 }
 
 func TestGetApplies(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	_, warmupApplies, err := createWarmupApplies(ctx, testClient,
 		standardWarmupGroupsForApplies, standardWarmupWorkspacesForApplies, standardWarmupApplies)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup applies weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allApplyInfos := applyInfoFromApplies(warmupApplies)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -153,7 +141,6 @@ func TestGetApplies(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetApplies, so don't try it.
 
 		{
@@ -385,7 +372,6 @@ func TestGetApplies(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -462,18 +448,13 @@ func TestGetApplies(t *testing.T) {
 }
 
 func TestCreateApply(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	warmupWorkspaces, _, err := createWarmupApplies(ctx, testClient,
 		standardWarmupGroupsForApplies, standardWarmupWorkspacesForApplies, standardWarmupApplies)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup applies weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
 	type testCase struct {
@@ -485,7 +466,6 @@ func TestCreateApply(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.Apply{
@@ -542,7 +522,6 @@ func TestCreateApply(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Applies.CreateApply(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -571,7 +550,6 @@ func TestCreateApply(t *testing.T) {
 }
 
 func TestUpdateApply(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -581,11 +559,7 @@ func TestUpdateApply(t *testing.T) {
 	createdLow := currentTime()
 	warmupWorkspaces, warmupApplies, err := createWarmupApplies(ctx, testClient,
 		standardWarmupGroupsForApplies, standardWarmupWorkspacesForApplies, standardWarmupApplies)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup applies weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
@@ -649,7 +623,6 @@ func TestUpdateApply(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			apply, err := testClient.client.Applies.UpdateApply(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -666,7 +639,6 @@ func TestUpdateApply(t *testing.T) {
 			} else {
 				assert.Nil(t, apply)
 			}
-
 		})
 	}
 }
@@ -721,8 +693,8 @@ func createWarmupApplies(ctx context.Context, testClient *testClient,
 	newApplies []models.Apply) (
 	[]models.Workspace,
 	[]models.Apply,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group and workspace in order to provide the necessary IDs for the applies.
 
 	_, parentPath2ID, err := createInitialGroups(ctx, testClient, newGroups)
@@ -798,8 +770,8 @@ func applyIDsFromApplyInfos(applyInfos []applyInfo) []string {
 // compareApplies compares two apply objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareApplies(t *testing.T, expected, actual *models.Apply,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
 	assert.Equal(t, expected.Status, actual.Status)
 	assert.Equal(t, expected.TriggeredBy, actual.TriggeredBy)
@@ -819,5 +791,3 @@ func compareApplies(t *testing.T, expected, actual *models.Apply,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.
