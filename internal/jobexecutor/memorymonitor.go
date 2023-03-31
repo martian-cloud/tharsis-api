@@ -43,7 +43,6 @@ type memoryMonitor struct {
 
 // NewMemoryMonitor creates an instance of the memory monitor.
 func NewMemoryMonitor(jobLogger *jobLogger, memoryLimit uint64) (MemoryMonitor, error) {
-
 	// error out if the limit is zero.
 	if memoryLimit == 0 {
 		return nil, fmt.Errorf("memory limit must not be zero")
@@ -56,7 +55,7 @@ func NewMemoryMonitor(jobLogger *jobLogger, memoryLimit uint64) (MemoryMonitor, 
 	}, nil
 }
 
-func (mm *memoryMonitor) Start(ctx context.Context) {
+func (mm *memoryMonitor) Start(_ context.Context) {
 	if checkProc() {
 		go func() {
 			mm.monitorProcesses()
@@ -82,7 +81,6 @@ func checkProc() bool {
 // Because there might be multiple descendant processes and they might evolve over time,
 // the main loop must look for new processes each pass.
 func (mm *memoryMonitor) monitorProcesses() {
-
 	// Initialize variables used in the loop.  Start with this process.
 	// Eligible parents include this process and eventually all its descendants.
 	eligibleParents := map[int]struct{}{
@@ -220,7 +218,6 @@ func (mm *memoryMonitor) logError(e error) {
 }
 
 func getMemoryUseForPID(pid int) (uint64, error) {
-
 	proc, err := procfs.NewProc(pid)
 	if err != nil {
 		return uint64(0), err

@@ -1,3 +1,4 @@
+// Package metric package
 package metric
 
 import (

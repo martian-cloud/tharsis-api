@@ -27,7 +27,6 @@ type warmupStateVersionOutputs struct {
 }
 
 func TestCreateStateVersionOutput(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -39,11 +38,7 @@ func TestCreateStateVersionOutput(t *testing.T) {
 		stateVersions:       standardWarmupStateVersionsForStateVersionOutputs,
 		stateVersionOutputs: []models.StateVersionOutput{},
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.StateVersionOutput
@@ -54,7 +49,6 @@ func TestCreateStateVersionOutput(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		// Duplicates are not prohibited by the DB, so don't do a duplicate test case.
 		{
 			name: "positive, full",
@@ -101,7 +95,6 @@ func TestCreateStateVersionOutput(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.StateVersionOutputs.CreateStateVersionOutput(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -130,7 +123,6 @@ func TestCreateStateVersionOutput(t *testing.T) {
 }
 
 func TestGetStateVersionOutputs(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -144,11 +136,7 @@ func TestGetStateVersionOutputs(t *testing.T) {
 		stateVersionOutputs: standardWarmupStateVersionOutputs,
 	})
 	createdHigh := currentTime()
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg                 *string
@@ -180,7 +168,6 @@ func TestGetStateVersionOutputs(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualOutputs, err := testClient.client.StateVersionOutputs.GetStateVersionOutputs(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -205,7 +192,6 @@ func TestGetStateVersionOutputs(t *testing.T) {
 }
 
 func TestGetStateVersionOutputByName(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -219,11 +205,7 @@ func TestGetStateVersionOutputByName(t *testing.T) {
 		stateVersionOutputs: standardWarmupStateVersionOutputs,
 	})
 	createdHigh := currentTime()
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg                *string
@@ -265,7 +247,6 @@ func TestGetStateVersionOutputByName(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualOutput, err := testClient.client.StateVersionOutputs.GetStateVersionOutputByName(ctx,
 				test.searchID, test.searchName)
 
@@ -386,8 +367,8 @@ var standardWarmupStateVersionOutputs = []models.StateVersionOutput{
 // createWarmupStateVersionOutputs creates some warmup state version outputs for a test
 // The warmup state version outputs to create can be standard or otherwise.
 func createWarmupStateVersionOutputs(ctx context.Context, testClient *testClient,
-	input warmupStateVersionOutputs) (*warmupStateVersionOutputs, error) {
-
+	input warmupStateVersionOutputs,
+) (*warmupStateVersionOutputs, error) {
 	// It is necessary to create at least one group, workspace, run, and state version
 	// in order to provide the necessary IDs for the state version outputs.
 
@@ -443,8 +424,8 @@ func createWarmupStateVersionOutputs(ctx context.Context, testClient *testClient
 // including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareStateVersionOutputs(t *testing.T, expected, actual *models.StateVersionOutput,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Value, actual.Value)
 	assert.Equal(t, expected.Type, actual.Type)
@@ -465,5 +446,3 @@ func compareStateVersionOutputs(t *testing.T, expected, actual *models.StateVers
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

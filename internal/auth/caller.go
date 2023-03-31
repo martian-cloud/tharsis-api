@@ -14,9 +14,7 @@ import (
 // Uses the context key pattern
 type contextKey string
 
-var (
-	contextKeyCaller = contextKey("caller")
-)
+var contextKeyCaller = contextKey("caller")
 
 func (c contextKey) String() string {
 	return "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth " + string(c)
@@ -31,120 +29,120 @@ func (s *SystemCaller) GetSubject() string {
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
-func (s *SystemCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
+func (s *SystemCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
 	return &NamespaceAccessPolicy{AllowAll: true}, nil
 }
 
 // RequireAccessToNamespace will return an error if the caller doesn't have the specified access level
-func (s *SystemCaller) RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error {
+func (s *SystemCaller) RequireAccessToNamespace(_ context.Context, _ string, _ models.Role) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireViewerAccessToGroups will return an error if the caller doesn't have viewer access to all the specified groups
-func (s *SystemCaller) RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error {
+func (s *SystemCaller) RequireViewerAccessToGroups(_ context.Context, _ []models.Group) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireViewerAccessToWorkspaces will return an error if the caller doesn't have viewer access on the specified workspace
-func (s *SystemCaller) RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error {
+func (s *SystemCaller) RequireViewerAccessToWorkspaces(_ context.Context, _ []models.Workspace) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireViewerAccessToNamespaces will return an error if the caller doesn't have viewer access to the specified list of namespaces
-func (s *SystemCaller) RequireViewerAccessToNamespaces(ctx context.Context, namespaces []string) error {
+func (s *SystemCaller) RequireViewerAccessToNamespaces(_ context.Context, _ []string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group
-func (s *SystemCaller) RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error {
+func (s *SystemCaller) RequireAccessToGroup(_ context.Context, _ string, _ models.Role) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace
-func (s *SystemCaller) RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error {
+func (s *SystemCaller) RequireAccessToWorkspace(_ context.Context, _ string, _ models.Role) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (s *SystemCaller) RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
+func (s *SystemCaller) RequireAccessToInheritedGroupResource(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (s *SystemCaller) RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error {
+func (s *SystemCaller) RequireAccessToInheritedNamespaceResource(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state
-func (s *SystemCaller) RequireRunWriteAccess(ctx context.Context, runID string) error {
+func (s *SystemCaller) RequireRunWriteAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (s *SystemCaller) RequirePlanWriteAccess(ctx context.Context, planID string) error {
+func (s *SystemCaller) RequirePlanWriteAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (s *SystemCaller) RequireApplyWriteAccess(ctx context.Context, applyID string) error {
+func (s *SystemCaller) RequireApplyWriteAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job
-func (s *SystemCaller) RequireJobWriteAccess(ctx context.Context, jobID string) error {
+func (s *SystemCaller) RequireJobWriteAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireTeamCreateAccess will return an error if the caller does not have permission for the specified access on the specified team.
-func (s *SystemCaller) RequireTeamCreateAccess(ctx context.Context) error {
+func (s *SystemCaller) RequireTeamCreateAccess(_ context.Context) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireTeamUpdateAccess will return an error if the caller does not have permission for the specified access on the specified team.
-func (s *SystemCaller) RequireTeamUpdateAccess(ctx context.Context, teamID string) error {
+func (s *SystemCaller) RequireTeamUpdateAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireTeamDeleteAccess will return an error if the caller does not have permission for the specified access on the specified team.
-func (s *SystemCaller) RequireTeamDeleteAccess(ctx context.Context, teamID string) error {
+func (s *SystemCaller) RequireTeamDeleteAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireUserCreateAccess will return an error if the specified caller is not allowed to create users.
-func (s *SystemCaller) RequireUserCreateAccess(ctx context.Context) error {
+func (s *SystemCaller) RequireUserCreateAccess(_ context.Context) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (s *SystemCaller) RequireUserUpdateAccess(ctx context.Context, userID string) error {
+func (s *SystemCaller) RequireUserUpdateAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (s *SystemCaller) RequireUserDeleteAccess(ctx context.Context, userID string) error {
+func (s *SystemCaller) RequireUserDeleteAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (s *SystemCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+func (s *SystemCaller) RequireRunnerAccess(_ context.Context, _ string) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }

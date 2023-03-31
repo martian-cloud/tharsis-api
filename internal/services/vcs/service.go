@@ -44,7 +44,7 @@ const (
 
 	// options for creating a temporary TarFile
 	tarFlagWrite = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
-	tarMode      = 0600
+	tarMode      = 0o600
 )
 
 var (
@@ -1484,7 +1484,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 	return nil
 }
 
-func (s *service) getOAuthCallBackURL(ctx context.Context) (string, error) {
+func (s *service) getOAuthCallBackURL(_ context.Context) (string, error) {
 	tharsisURL, err := url.Parse(s.tharsisURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse Tharsis URL: %v", err)
@@ -1736,8 +1736,8 @@ func (s *service) handleEvent(ctx context.Context, input *handleEventInput) erro
 // and waits for the upload to finish. Returns the configuration version ID and
 // any errors encountered.
 func (s *service) createUploadConfigurationVersion(ctx context.Context,
-	input *createUploadConfigurationVersionInput) (string, error) {
-
+	input *createUploadConfigurationVersionInput,
+) (string, error) {
 	// Create the configuration version.
 	cv, err := s.workspaceService.CreateConfigurationVersion(ctx, &workspace.CreateConfigurationVersionInput{
 		VCSEventID:  &input.vcsEvent.Metadata.ID,
@@ -1838,7 +1838,7 @@ func downloadRepositoryArchive(ctx context.Context, input *downloadRepositoryArc
 	}
 
 	// Decompress the tar file.
-	err = tgz.Decompress(tmpDownloadDir, destinationFile.Name(), true, 0000)
+	err = tgz.Decompress(tmpDownloadDir, destinationFile.Name(), true, 0o000)
 	if err != nil {
 		return tmpDownloadDir, "", err
 	}
@@ -1866,7 +1866,6 @@ func downloadRepositoryArchive(ctx context.Context, input *downloadRepositoryArc
 // simply retrieves the files from the most-recent commit ID.
 // For merge requests, it uses the head commit ID.
 func getAlteredFiles(ctx context.Context, input *handleEventInput) (map[string]struct{}, error) {
-
 	var alteredFiles map[string]struct{}
 
 	if !plumbing.NewHash(input.processInput.Before).IsZero() {

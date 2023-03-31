@@ -1,3 +1,4 @@
+// Package ecs package
 package ecs
 
 //go:generate mockery --name client --inpackage --case underscore

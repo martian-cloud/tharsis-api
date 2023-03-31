@@ -1,3 +1,4 @@
+// Package plugin package
 package plugin
 
 import (

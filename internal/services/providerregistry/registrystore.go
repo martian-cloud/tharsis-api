@@ -1,3 +1,4 @@
+// Package providerregistry package
 package providerregistry
 
 //go:generate mockery --name RegistryStore --inpackage --case underscore

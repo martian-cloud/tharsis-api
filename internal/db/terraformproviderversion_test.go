@@ -44,7 +44,6 @@ type warmupTerraformProviderVersions struct {
 }
 
 func TestGetProviderVersionByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -55,11 +54,7 @@ func TestGetProviderVersionByID(t *testing.T) {
 		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
 		terraformProviderVersions: standardWarmupTerraformProviderVersions,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -107,7 +102,6 @@ func TestGetProviderVersionByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProviderVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -128,7 +122,6 @@ func TestGetProviderVersionByID(t *testing.T) {
 }
 
 func TestGetProviderVersions(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -138,11 +131,7 @@ func TestGetProviderVersions(t *testing.T) {
 		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
 		terraformProviderVersions: standardWarmupTerraformProviderVersions,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allTerraformProviderVersionInfos := terraformProviderVersionInfoFromTerraformProviderVersions(warmupItems.terraformProviderVersions)
 
 	// Sort by Terraform provider version IDs.
@@ -200,7 +189,6 @@ func TestGetProviderVersions(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetProviderVersions, so don't try it.
 
 		{
@@ -611,7 +599,6 @@ func TestGetProviderVersions(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -688,7 +675,6 @@ func TestGetProviderVersions(t *testing.T) {
 }
 
 func TestCreateProviderVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -697,11 +683,7 @@ func TestCreateProviderVersion(t *testing.T) {
 		groups:             standardWarmupGroupsForTerraformProviderVersions,
 		terraformProviders: standardWarmupTerraformProvidersForTerraformProviderVersions,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.TerraformProviderVersion
@@ -771,7 +753,6 @@ func TestCreateProviderVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -798,7 +779,6 @@ func TestCreateProviderVersion(t *testing.T) {
 }
 
 func TestUpdateProviderVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -808,11 +788,7 @@ func TestUpdateProviderVersion(t *testing.T) {
 		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
 		terraformProviderVersions: standardWarmupTerraformProviderVersions,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg     *string
@@ -827,7 +803,6 @@ func TestUpdateProviderVersion(t *testing.T) {
 	otherTerraformProviderVersion := warmupItems.terraformProviderVersions[1]
 	now := time.Now()
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toUpdate: &models.TerraformProviderVersion{
@@ -897,7 +872,6 @@ func TestUpdateProviderVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProviderVersion, err := testClient.client.TerraformProviderVersions.UpdateProviderVersion(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -923,7 +897,6 @@ func TestUpdateProviderVersion(t *testing.T) {
 }
 
 func TestDeleteProviderVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -933,11 +906,7 @@ func TestDeleteProviderVersion(t *testing.T) {
 		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
 		terraformProviderVersions: standardWarmupTerraformProviderVersions,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg *string
@@ -948,7 +917,6 @@ func TestDeleteProviderVersion(t *testing.T) {
 	// Looks up by ID and version.
 	positiveTerraformProviderVersion := warmupItems.terraformProviderVersions[0]
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.TerraformProviderVersion{
@@ -984,7 +952,6 @@ func TestDeleteProviderVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.TerraformProviderVersions.DeleteProviderVersion(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -1086,8 +1053,8 @@ var standardWarmupTerraformProviderVersions = []models.TerraformProviderVersion{
 // createWarmupTerraformProviderVersions creates some warmup terraform provider versions for a test
 // The warmup terraform provider versions to create can be standard or otherwise.
 func createWarmupTerraformProviderVersions(ctx context.Context, testClient *testClient,
-	input warmupTerraformProviderVersions) (*warmupTerraformProviderVersions, error) {
-
+	input warmupTerraformProviderVersions,
+) (*warmupTerraformProviderVersions, error) {
 	// It is necessary to create at least one group in order to
 	// provide the necessary IDs for the terraform provider versions.
 
@@ -1169,8 +1136,8 @@ func terraformProviderVersionIDsFromTerraformProviderVersionInfos(terraformProvi
 // compareTerraformProviderVersions compares two terraform provider version objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareTerraformProviderVersions(t *testing.T, expected, actual *models.TerraformProviderVersion,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.ProviderID, actual.ProviderID)
 	assert.Equal(t, expected.GPGASCIIArmor, actual.GPGASCIIArmor)
 	assert.Equal(t, expected.GPGKeyID, actual.GPGKeyID)
@@ -1193,5 +1160,3 @@ func compareTerraformProviderVersions(t *testing.T, expected, actual *models.Ter
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

@@ -1,3 +1,4 @@
+// Package rules package
 package rules
 
 //go:generate mockery --name RuleEnforcer --inpackage --case underscore

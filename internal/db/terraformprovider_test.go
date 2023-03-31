@@ -47,7 +47,6 @@ type warmupTerraformProviders struct {
 }
 
 func TestGetProviderByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -57,11 +56,7 @@ func TestGetProviderByID(t *testing.T) {
 		groups:             standardWarmupGroupsForTerraformProviders,
 		terraformProviders: standardWarmupTerraformProviders,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -107,7 +102,6 @@ func TestGetProviderByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProvider, err := testClient.client.TerraformProviders.GetProviderByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -128,7 +122,6 @@ func TestGetProviderByID(t *testing.T) {
 }
 
 func TestGetProviderByPath(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -138,11 +131,7 @@ func TestGetProviderByPath(t *testing.T) {
 		groups:             standardWarmupGroupsForTerraformProviders,
 		terraformProviders: standardWarmupTerraformProviders,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -185,7 +174,6 @@ func TestGetProviderByPath(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProvider, err := testClient.client.TerraformProviders.GetProviderByPath(ctx, test.searchPath)
 
 			checkError(t, test.expectMsg, err)
@@ -206,7 +194,6 @@ func TestGetProviderByPath(t *testing.T) {
 }
 
 func TestGetProviders(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -221,11 +208,7 @@ func TestGetProviders(t *testing.T) {
 		namespaceMembershipsIn: standardWarmupNamespaceMembershipsForTerraformProviders,
 		terraformProviders:     standardWarmupTerraformProviders,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allTerraformProviderInfos := terraformProviderInfoFromTerraformProviders(warmupItems.terraformProviders)
 
 	// Sort by Terraform provider IDs.
@@ -288,7 +271,6 @@ func TestGetProviders(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetProviders, so don't try it.
 
 		{
@@ -793,7 +775,8 @@ func TestGetProviders(t *testing.T) {
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
 				Filter: &TerraformProviderFilter{
 					TerraformProviderIDs: []string{
-						allTerraformProviderIDsByTime[0], allTerraformProviderIDsByTime[1], allTerraformProviderIDsByTime[3]},
+						allTerraformProviderIDsByTime[0], allTerraformProviderIDsByTime[1], allTerraformProviderIDsByTime[3],
+					},
 				},
 			},
 			expectTerraformProviderIDs: []string{
@@ -840,7 +823,6 @@ func TestGetProviders(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -917,7 +899,6 @@ func TestGetProviders(t *testing.T) {
 }
 
 func TestCreateProvider(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -925,11 +906,7 @@ func TestCreateProvider(t *testing.T) {
 	warmupItems, err := createWarmupTerraformProviders(ctx, testClient, warmupTerraformProviders{
 		groups: standardWarmupGroupsForTerraformProviders,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.TerraformProvider
@@ -1022,7 +999,6 @@ func TestCreateProvider(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.TerraformProviders.CreateProvider(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -1049,7 +1025,6 @@ func TestCreateProvider(t *testing.T) {
 }
 
 func TestUpdateProvider(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1058,11 +1033,7 @@ func TestUpdateProvider(t *testing.T) {
 		groups:             standardWarmupGroupsForTerraformProviders,
 		terraformProviders: standardWarmupTerraformProviders,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg     *string
@@ -1079,7 +1050,6 @@ func TestUpdateProvider(t *testing.T) {
 	otherTerraformProvider := warmupItems.terraformProviders[1]
 	now := time.Now()
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toUpdate: &models.TerraformProvider{
@@ -1145,7 +1115,6 @@ func TestUpdateProvider(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProvider, err := testClient.client.TerraformProviders.UpdateProvider(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -1171,7 +1140,6 @@ func TestUpdateProvider(t *testing.T) {
 }
 
 func TestDeleteProvider(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1180,11 +1148,7 @@ func TestDeleteProvider(t *testing.T) {
 		groups:             standardWarmupGroupsForTerraformProviders,
 		terraformProviders: standardWarmupTerraformProviders,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg *string
@@ -1195,7 +1159,6 @@ func TestDeleteProvider(t *testing.T) {
 	// Looks up by ID and version.
 	positiveTerraformProvider := warmupItems.terraformProviders[0]
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.TerraformProvider{
@@ -1231,7 +1194,6 @@ func TestDeleteProvider(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.TerraformProviders.DeleteProvider(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -1390,7 +1352,6 @@ var standardWarmupServiceAccountsForTerraformProviders = []models.ServiceAccount
 // Standard warmup namespace memberships for tests in this module:
 // In this variable, the ID field is the user, service account, and team _NAME_, NOT the ID.
 var standardWarmupNamespaceMembershipsForTerraformProviders = []CreateNamespaceMembershipInput{
-
 	// Team access to group:
 	{
 		NamespacePath: "top-level-group-3-for-terraform-providers",
@@ -1483,8 +1444,8 @@ var standardWarmupTerraformProviders = []models.TerraformProvider{
 // createWarmupTerraformProviders creates some warmup terraform providers for a test
 // The warmup terraform providers to create can be standard or otherwise.
 func createWarmupTerraformProviders(ctx context.Context, testClient *testClient,
-	input warmupTerraformProviders) (*warmupTerraformProviders, error) {
-
+	input warmupTerraformProviders,
+) (*warmupTerraformProviders, error) {
 	// It is necessary to create several groups in order to provide the necessary IDs for the terraform providers.
 
 	// If doing get operations based on user ID or service account ID, it is necessary to create a bunch of other things.
@@ -1611,8 +1572,8 @@ func terraformProviderIDsFromTerraformProviderInfos(terraformProviderInfos []ter
 // compareTerraformProviders compares two terraform provider objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareTerraformProviders(t *testing.T, expected, actual *models.TerraformProvider,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.RootGroupID, actual.RootGroupID)
@@ -1634,5 +1595,3 @@ func compareTerraformProviders(t *testing.T, expected, actual *models.TerraformP
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

@@ -135,7 +135,6 @@ func NewClient(
 	logger.Infof("Connecting to DB (host=%s, maxConnections=%d)", dbHost, cfg.MaxConns)
 
 	pool, err := pgxpool.ConnectConfig(ctx, cfg)
-
 	if err != nil {
 		logger.Errorf("Unable to connect to DB: %v\n", err)
 		return nil, err
@@ -204,7 +203,7 @@ func NewClient(
 }
 
 // Close will close the database connections
-func (db *Client) Close(ctx context.Context) {
+func (db *Client) Close(_ context.Context) {
 	db.conn.Close()
 }
 

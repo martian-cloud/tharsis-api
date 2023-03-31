@@ -1,3 +1,4 @@
+// Package asynctask package
 package asynctask
 
 //go:generate mockery --name Manager --inpackage --case underscore

@@ -1,3 +1,4 @@
+// Package team package
 package team
 
 import (
@@ -114,7 +115,6 @@ func (s *service) GetTeamByName(ctx context.Context, name string) (*models.Team,
 }
 
 func (s *service) GetTeamsByIDs(ctx context.Context, idList []string) ([]models.Team, error) {
-
 	resp, err := s.dbClient.Teams.GetTeams(ctx, &db.GetTeamsInput{Filter: &db.TeamFilter{TeamIDs: idList}})
 	if err != nil {
 		return nil, err
@@ -122,7 +122,6 @@ func (s *service) GetTeamsByIDs(ctx context.Context, idList []string) ([]models.
 	teams := resp.Teams
 
 	return teams, nil
-
 }
 
 func (s *service) GetTeams(ctx context.Context, input *GetTeamsInput) (*db.TeamsResult, error) {
@@ -139,7 +138,6 @@ func (s *service) GetTeams(ctx context.Context, input *GetTeamsInput) (*db.Teams
 	}
 
 	return s.dbClient.Teams.GetTeams(ctx, &dbInput)
-
 }
 
 func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {

@@ -49,7 +49,7 @@ func (a *ApplyHandler) OnSuccess(ctx context.Context) error {
 }
 
 // OnError is called if the job returns an error while executing
-func (a *ApplyHandler) OnError(ctx context.Context, e error) error {
+func (a *ApplyHandler) OnError(ctx context.Context, _ error) error {
 	// Cleanup workspace
 	if err := a.terraformWorkspace.close(ctx); err != nil {
 		return err

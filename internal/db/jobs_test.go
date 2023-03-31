@@ -34,7 +34,6 @@ type jobInfoCreateSlice []jobInfo
 type jobInfoUpdateSlice []jobInfo
 
 func TestGetJobByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -46,11 +45,7 @@ func TestGetJobByID(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -82,7 +77,6 @@ func TestGetJobByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			job, err := testClient.client.Jobs.GetJobByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -98,13 +92,11 @@ func TestGetJobByID(t *testing.T) {
 			} else {
 				assert.Nil(t, job)
 			}
-
 		})
 	}
 }
 
 func TestGetJobs(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -113,11 +105,7 @@ func TestGetJobs(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allJobInfos := jobInfoFromJobs(warmupJobs)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -178,7 +166,6 @@ func TestGetJobs(t *testing.T) {
 	JobStatusFinished := models.JobFinished
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetJobs, so don't try it.
 
 		{
@@ -639,7 +626,6 @@ func TestGetJobs(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -716,7 +702,6 @@ func TestGetJobs(t *testing.T) {
 }
 
 func TestCreateJob(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -725,11 +710,7 @@ func TestCreateJob(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
 	type testCase struct {
@@ -746,7 +727,6 @@ func TestCreateJob(t *testing.T) {
 	nowMinusD := now.Add(-7 * time.Minute)
 	nowMinusE := now.Add(-3 * time.Minute)
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.Job{
@@ -831,7 +811,6 @@ func TestCreateJob(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Jobs.CreateJob(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -860,7 +839,6 @@ func TestCreateJob(t *testing.T) {
 }
 
 func TestUpdateJob(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -872,11 +850,7 @@ func TestUpdateJob(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
@@ -972,7 +946,6 @@ func TestUpdateJob(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			job, err := testClient.client.Jobs.UpdateJob(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -989,13 +962,11 @@ func TestUpdateJob(t *testing.T) {
 			} else {
 				assert.Nil(t, job)
 			}
-
 		})
 	}
 }
 
 func TestGetLatestJobByType(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1007,11 +978,7 @@ func TestGetLatestJobByType(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -1063,7 +1030,6 @@ func TestGetLatestJobByType(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			job, err := testClient.client.Jobs.GetLatestJobByType(ctx, test.searchRunID, test.searchJobType)
 
 			checkError(t, test.expectMsg, err)
@@ -1079,13 +1045,11 @@ func TestGetLatestJobByType(t *testing.T) {
 			} else {
 				assert.Nil(t, job)
 			}
-
 		})
 	}
 }
 
 func TestGetJobLogDescriptor(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1097,11 +1061,7 @@ func TestGetJobLogDescriptor(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	// Create job log descriptors
 	createdWarmupJobLogDescriptors, err := createWarmupJobLogDescriptors(ctx, testClient,
 		createdWarmupJobs, standardWarmupJobLogDescriptorsForJobs)
@@ -1138,7 +1098,6 @@ func TestGetJobLogDescriptor(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			job, err := testClient.client.Jobs.GetJobLogDescriptor(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -1154,13 +1113,11 @@ func TestGetJobLogDescriptor(t *testing.T) {
 			} else {
 				assert.Nil(t, job)
 			}
-
 		})
 	}
 }
 
 func TestGetJobLogDescriptorByJobID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1172,11 +1129,7 @@ func TestGetJobLogDescriptorByJobID(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	// Create job log descriptors
 	createdWarmupJobLogDescriptors, err := createWarmupJobLogDescriptors(ctx, testClient,
 		createdWarmupJobs, standardWarmupJobLogDescriptorsForJobs)
@@ -1213,7 +1166,6 @@ func TestGetJobLogDescriptorByJobID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			job, err := testClient.client.Jobs.GetJobLogDescriptorByJobID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -1229,13 +1181,11 @@ func TestGetJobLogDescriptorByJobID(t *testing.T) {
 			} else {
 				assert.Nil(t, job)
 			}
-
 		})
 	}
 }
 
 func TestCreateJobLogDescriptor(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1244,11 +1194,7 @@ func TestCreateJobLogDescriptor(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupJobID := warmupJobs[0].Metadata.ID
 
 	type testCase struct {
@@ -1260,7 +1206,6 @@ func TestCreateJobLogDescriptor(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toCreate: &models.JobLogDescriptor{
@@ -1301,7 +1246,6 @@ func TestCreateJobLogDescriptor(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Jobs.CreateJobLogDescriptor(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -1330,7 +1274,6 @@ func TestCreateJobLogDescriptor(t *testing.T) {
 }
 
 func TestUpdateJobLogDescriptor(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1342,11 +1285,7 @@ func TestUpdateJobLogDescriptor(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	// Create job log descriptors
 	createdWarmupJobLogDescriptors, err := createWarmupJobLogDescriptors(ctx, testClient,
 		warmupJobs, standardWarmupJobLogDescriptorsForJobs)
@@ -1414,7 +1353,6 @@ func TestUpdateJobLogDescriptor(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			descriptor, err := testClient.client.Jobs.UpdateJobLogDescriptor(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -1436,7 +1374,6 @@ func TestUpdateJobLogDescriptor(t *testing.T) {
 }
 
 func TestGetJobCountForRunner(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1447,11 +1384,7 @@ func TestGetJobCountForRunner(t *testing.T) {
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
 		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
 		standardWarmupJobs)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup jobs weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg   *string
@@ -1481,7 +1414,6 @@ func TestGetJobCountForRunner(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCount, err := testClient.client.Jobs.GetJobCountForRunner(ctx, test.runnerID)
 
 			checkError(t, test.expectMsg, err)
@@ -1621,8 +1553,8 @@ func createWarmupJobs(ctx context.Context, testClient *testClient,
 	[]models.Workspace,
 	[]models.Run,
 	[]models.Job,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group, workspace, and run
 	// in order to provide the necessary IDs for the jobs.
 
@@ -1654,7 +1586,8 @@ func createWarmupJobs(ctx context.Context, testClient *testClient,
 // createWarmupJobLogDescriptors creates some warmup job log descriptors for a test
 // The warmup jobs to create can be standard or otherwise.
 func createWarmupJobLogDescriptors(ctx context.Context, testClient *testClient,
-	linkToJobs []models.Job, newDescriptors []models.JobLogDescriptor) ([]models.JobLogDescriptor, error) {
+	linkToJobs []models.Job, newDescriptors []models.JobLogDescriptor,
+) ([]models.JobLogDescriptor, error) {
 	result := []models.JobLogDescriptor{}
 
 	for ix, d := range newDescriptors {
@@ -1740,8 +1673,8 @@ func jobIDsFromJobInfos(jobInfos []jobInfo) []string {
 // compareJobs compares two job objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareJobs(t *testing.T, expected, actual *models.Job,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Status, actual.Status)
 	assert.Equal(t, expected.Type, actual.Type)
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
@@ -1774,8 +1707,8 @@ func compareJobs(t *testing.T, expected, actual *models.Job,
 // including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareJobLogDescriptors(t *testing.T, expected, actual *models.JobLogDescriptor,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.JobID, actual.JobID)
 	assert.Equal(t, expected.Size, actual.Size)
 
@@ -1793,5 +1726,3 @@ func compareJobLogDescriptors(t *testing.T, expected, actual *models.JobLogDescr
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

@@ -11,9 +11,7 @@ type health struct {
 	Ok bool `json:"ok"`
 } //@name Health
 
-var (
-	healthy = health{Ok: true}
-)
+var healthy = health{Ok: true}
 
 type healthController struct {
 	respWriter response.Writer
@@ -37,6 +35,6 @@ func (c *healthController) RegisterRoutes(router chi.Router) {
 // @Produce  json
 // @Success 200 {object} Health
 // @Router /health [get]
-func (c *healthController) GetHealth(w http.ResponseWriter, r *http.Request) {
+func (c *healthController) GetHealth(w http.ResponseWriter, _ *http.Request) {
 	c.respWriter.RespondWithJSON(w, healthy, 200)
 }

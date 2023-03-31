@@ -1,3 +1,4 @@
+// Package aws package
 package aws
 
 import (
@@ -105,7 +106,6 @@ func (s *ObjectStore) UploadObject(ctx context.Context, key string, body io.Read
 		Key:    aws.String(key),
 		Body:   body,
 	})
-
 	if err != nil {
 		s.logger.Errorf("Failed to upload file to location %v", err)
 		return err
@@ -126,7 +126,6 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 	}
 
 	_, err := s.downloader.Download(ctx, w, &s3Options)
-
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
@@ -157,7 +156,6 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 	}
 
 	result, err := s.client.GetObject(ctx, &s3Options)
-
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {

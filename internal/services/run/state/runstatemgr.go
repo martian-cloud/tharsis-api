@@ -1,3 +1,4 @@
+// Package state package
 package state
 
 import (
@@ -324,7 +325,7 @@ func registerRunHandlers(manager *RunStateManager) {
 	})
 }
 
-func (r *runHandlers) handleRunStateChangeEvent(ctx context.Context, oldRun *models.Run, newRun *models.Run) error {
+func (r *runHandlers) handleRunStateChangeEvent(_ context.Context, oldRun *models.Run, newRun *models.Run) error {
 	if oldRun.Status != newRun.Status {
 		switch newRun.Status {
 		case models.RunPlannedAndFinished, models.RunApplied, models.RunCanceled, models.RunErrored:

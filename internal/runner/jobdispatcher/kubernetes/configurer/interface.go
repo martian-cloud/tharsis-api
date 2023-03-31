@@ -1,3 +1,4 @@
+// Package configurer package
 package configurer
 
 //go:generate mockery --name Configurer --inpackage --case underscore

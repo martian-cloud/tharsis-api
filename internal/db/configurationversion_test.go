@@ -30,7 +30,6 @@ type configurationVersionInfoIDSlice []configurationVersionInfo
 type configurationVersionInfoUpdateSlice []configurationVersionInfo
 
 func TestGetConfigurationVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -42,11 +41,7 @@ func TestGetConfigurationVersion(t *testing.T) {
 		standardWarmupGroupsForConfigurationVersions,
 		standardWarmupWorkspacesForConfigurationVersions,
 		standardWarmupConfigurationVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup configuration versions weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -79,7 +74,6 @@ func TestGetConfigurationVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			configurationVersion, err := testClient.client.ConfigurationVersions.GetConfigurationVersion(ctx,
 				test.searchID)
 
@@ -96,13 +90,11 @@ func TestGetConfigurationVersion(t *testing.T) {
 			} else {
 				assert.Nil(t, configurationVersion)
 			}
-
 		})
 	}
 }
 
 func TestGetConfigurationVersions(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -111,11 +103,7 @@ func TestGetConfigurationVersions(t *testing.T) {
 		standardWarmupGroupsForConfigurationVersions,
 		standardWarmupWorkspacesForConfigurationVersions,
 		standardWarmupConfigurationVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup configuration versions weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allConfigurationVersionInfos := configurationVersionInfoFromConfigurationVersions(warmupConfigurationVersions)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -162,7 +150,6 @@ func TestGetConfigurationVersions(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input causes a nil pointer dereference in GetConfigurationVersions, so don't try it.
 
 		{
@@ -403,7 +390,6 @@ func TestGetConfigurationVersions(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -481,7 +467,6 @@ func TestGetConfigurationVersions(t *testing.T) {
 }
 
 func TestCreateConfigurationVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -490,11 +475,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 		standardWarmupGroupsForConfigurationVersions,
 		standardWarmupWorkspacesForConfigurationVersions,
 		standardWarmupConfigurationVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup configuration versions weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
 	type testCase struct {
@@ -506,7 +487,6 @@ func TestCreateConfigurationVersion(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.ConfigurationVersion{
@@ -563,7 +543,6 @@ func TestCreateConfigurationVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.ConfigurationVersions.CreateConfigurationVersion(ctx, *test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -592,7 +571,6 @@ func TestCreateConfigurationVersion(t *testing.T) {
 }
 
 func TestUpdateConfigurationVersion(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -604,11 +582,7 @@ func TestUpdateConfigurationVersion(t *testing.T) {
 		standardWarmupGroupsForConfigurationVersions,
 		standardWarmupWorkspacesForConfigurationVersions,
 		standardWarmupConfigurationVersions)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup configuration versions weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := currentTime()
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
 
@@ -672,7 +646,6 @@ func TestUpdateConfigurationVersion(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			configurationVersion, err := testClient.client.ConfigurationVersions.UpdateConfigurationVersion(ctx,
 				*test.toUpdate)
 
@@ -690,7 +663,6 @@ func TestUpdateConfigurationVersion(t *testing.T) {
 			} else {
 				assert.Nil(t, configurationVersion)
 			}
-
 		})
 	}
 }
@@ -745,8 +717,8 @@ func createWarmupConfigurationVersions(ctx context.Context, testClient *testClie
 	newConfigurationVersions []models.ConfigurationVersion) (
 	[]models.Workspace,
 	[]models.ConfigurationVersion,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group and workspace in order to provide the necessary IDs
 	// for the configuration versions.
 
@@ -801,7 +773,8 @@ func (wis configurationVersionInfoUpdateSlice) Less(i, j int) bool {
 // configurationVersionInfoFromConfigurationVersions returns a slice of configurationVersionInfo,
 // not necessarily sorted in any order.
 func configurationVersionInfoFromConfigurationVersions(
-	configurationVersions []models.ConfigurationVersion) []configurationVersionInfo {
+	configurationVersions []models.ConfigurationVersion,
+) []configurationVersionInfo {
 	result := []configurationVersionInfo{}
 
 	for _, configurationVersion := range configurationVersions {
@@ -816,7 +789,8 @@ func configurationVersionInfoFromConfigurationVersions(
 
 // configurationVersionIDsFromConfigurationVersionInfos preserves order
 func configurationVersionIDsFromConfigurationVersionInfos(
-	configurationVersionInfos []configurationVersionInfo) []string {
+	configurationVersionInfos []configurationVersionInfo,
+) []string {
 	result := []string{}
 	for _, configurationVersionInfo := range configurationVersionInfos {
 		result = append(result, configurationVersionInfo.configurationVersionID)
@@ -828,8 +802,8 @@ func configurationVersionIDsFromConfigurationVersionInfos(
 // including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareConfigurationVersions(t *testing.T, expected, actual *models.ConfigurationVersion,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Status, actual.Status)
 	assert.Equal(t, expected.Speculative, actual.Speculative)
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
@@ -849,5 +823,3 @@ func compareConfigurationVersions(t *testing.T, expected, actual *models.Configu
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

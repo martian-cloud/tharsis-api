@@ -1,3 +1,4 @@
+// Package types package
 package types
 
 import (

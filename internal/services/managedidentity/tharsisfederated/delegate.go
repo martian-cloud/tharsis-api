@@ -1,3 +1,4 @@
+// Package tharsisfederated package
 package tharsisfederated
 
 import (
@@ -32,7 +33,7 @@ type Delegate struct {
 }
 
 // New creates a new Delegate instance
-func New(ctx context.Context, jwsProvider jwsprovider.JWSProvider, issuerURL string) (*Delegate, error) {
+func New(_ context.Context, jwsProvider jwsprovider.JWSProvider, issuerURL string) (*Delegate, error) {
 	return &Delegate{
 		jwsProvider: jwsProvider,
 		issuerURL:   issuerURL,
@@ -82,7 +83,7 @@ func (d *Delegate) CreateCredentials(ctx context.Context, identity *models.Manag
 }
 
 // SetManagedIdentityData updates the managed identity custom data payload
-func (d *Delegate) SetManagedIdentityData(ctx context.Context, managedIdentity *models.ManagedIdentity, input []byte) error {
+func (d *Delegate) SetManagedIdentityData(_ context.Context, managedIdentity *models.ManagedIdentity, input []byte) error {
 	decodedData, err := base64.StdEncoding.DecodeString(string(input))
 	if err != nil {
 		return errors.NewError(errors.EInvalid, "Failed to decode managed identity data", errors.WithErrorErr(err))

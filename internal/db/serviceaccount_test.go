@@ -39,7 +39,6 @@ type serviceAccountInfoUpdateSlice []serviceAccountInfo
 type serviceAccountInfoNameSlice []serviceAccountInfo
 
 func TestGetServiceAccountByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -48,11 +47,7 @@ func TestGetServiceAccountByID(t *testing.T) {
 	_, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
 		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
 		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -98,7 +93,6 @@ func TestGetServiceAccountByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualServiceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -119,7 +113,6 @@ func TestGetServiceAccountByID(t *testing.T) {
 }
 
 func TestGetServiceAccountByPath(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -128,11 +121,7 @@ func TestGetServiceAccountByPath(t *testing.T) {
 	warmupGroups, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
 		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
 		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -172,7 +161,6 @@ func TestGetServiceAccountByPath(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualServiceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByPath(ctx, test.searchPath)
 
 			checkError(t, test.expectMsg, err)
@@ -193,18 +181,13 @@ func TestGetServiceAccountByPath(t *testing.T) {
 }
 
 func TestCreateServiceAccount(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
 	warmupGroups, _, err := createWarmupServiceAccounts(ctx, testClient,
 		standardWarmupGroupsForServiceAccounts, []models.ServiceAccount{}, []models.OIDCTrustPolicy{})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	warmupGroup := warmupGroups[0]
 	warmupGroupID := warmupGroup.Metadata.ID
 
@@ -217,7 +200,6 @@ func TestCreateServiceAccount(t *testing.T) {
 
 	now := currentTime()
 	testCases := []testCase{
-
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.ServiceAccount{
@@ -293,7 +275,6 @@ func TestCreateServiceAccount(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -322,7 +303,6 @@ func TestCreateServiceAccount(t *testing.T) {
 }
 
 func TestUpdateServiceAccount(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -331,11 +311,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 	warmupGroups, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
 		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
 		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -410,9 +386,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			actualServiceAccount, err :=
-				testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, test.toUpdate)
+			actualServiceAccount, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
 
@@ -433,7 +407,6 @@ func TestUpdateServiceAccount(t *testing.T) {
 }
 
 func TestGetServiceAccounts(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -441,11 +414,7 @@ func TestGetServiceAccounts(t *testing.T) {
 	_, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
 		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
 		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allServiceAccountInfos := serviceAccountInfoFromServiceAccounts(warmupServiceAccounts)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
@@ -501,7 +470,6 @@ func TestGetServiceAccounts(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetServiceAccounts, so don't try it.
 
 		{
@@ -808,7 +776,8 @@ func TestGetServiceAccounts(t *testing.T) {
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
 				Filter: &ServiceAccountFilter{
 					ServiceAccountIDs: []string{
-						allServiceAccountIDsByName[0], allServiceAccountIDsByName[1], allServiceAccountIDsByName[3]},
+						allServiceAccountIDsByName[0], allServiceAccountIDsByName[1], allServiceAccountIDsByName[3],
+					},
 				},
 			},
 			expectServiceAccountIDs: []string{
@@ -885,7 +854,6 @@ func TestGetServiceAccounts(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -962,7 +930,6 @@ func TestGetServiceAccounts(t *testing.T) {
 }
 
 func TestDeleteServiceAccount(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -970,11 +937,7 @@ func TestDeleteServiceAccount(t *testing.T) {
 	_, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
 		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
 		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toDelete  *models.ServiceAccount
@@ -983,7 +946,6 @@ func TestDeleteServiceAccount(t *testing.T) {
 	}
 
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.ServiceAccount{
@@ -1019,11 +981,9 @@ func TestDeleteServiceAccount(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.ServiceAccounts.DeleteServiceAccount(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
-
 		})
 	}
 }
@@ -1105,8 +1065,8 @@ func createWarmupServiceAccounts(ctx context.Context, testClient *testClient,
 	newGroups []models.Group,
 	newServiceAccounts []models.ServiceAccount,
 	newTrustPolicies []models.OIDCTrustPolicy) (
-	[]models.Group, []models.ServiceAccount, error) {
-
+	[]models.Group, []models.ServiceAccount, error,
+) {
 	// It is necessary to create at least one group
 	// in order to provide the necessary IDs for the service accounts.
 
@@ -1215,8 +1175,8 @@ func serviceAccountIDsFromServiceAccountInfos(serviceAccountInfos []serviceAccou
 // compareServiceAccounts compares two service account objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareServiceAccounts(t *testing.T, expected, actual *models.ServiceAccount,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Description, actual.Description)
@@ -1248,5 +1208,3 @@ func compareOIDCTrustPolicies(t *testing.T, expected, actual []models.OIDCTrustP
 		assert.Equal(t, expected[ix].BoundClaims, actual[ix].BoundClaims)
 	}
 }
-
-// The End.

@@ -1,3 +1,4 @@
+// Package memory package
 package memory
 
 import (
@@ -70,7 +71,7 @@ func New(pluginData map[string]string) (*InMemoryJWSProvider, error) {
 }
 
 // Sign signs a JWT payload
-func (im *InMemoryJWSProvider) Sign(ctx context.Context, token []byte) ([]byte, error) {
+func (im *InMemoryJWSProvider) Sign(_ context.Context, token []byte) ([]byte, error) {
 	key, err := jwk.New(im.privKey)
 	if err != nil {
 		return nil, err
@@ -94,12 +95,12 @@ func (im *InMemoryJWSProvider) Sign(ctx context.Context, token []byte) ([]byte, 
 }
 
 // GetKeySet returns the JWK key set in JSON format
-func (im *InMemoryJWSProvider) GetKeySet(ctx context.Context) ([]byte, error) {
+func (im *InMemoryJWSProvider) GetKeySet(_ context.Context) ([]byte, error) {
 	return im.keySet, nil
 }
 
 // Verify will return an error if the JWT does not have a valid signature
-func (im *InMemoryJWSProvider) Verify(ctx context.Context, token []byte) error {
+func (im *InMemoryJWSProvider) Verify(_ context.Context, token []byte) error {
 	if _, err := jws.Verify(token, jwa.RS256, im.pubKey); err != nil {
 		return err
 	}

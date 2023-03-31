@@ -52,7 +52,6 @@ type activityEventInfoNamespacePathSlice []activityEventInfo
 type activityEventInfoActionSlice []activityEventInfo
 
 func TestGetActivityEvents(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -65,11 +64,8 @@ func TestGetActivityEvents(t *testing.T) {
 		variables:       standardWarmupVariablesForActivityEvents,
 		activityEvents:  buildStandardWarmupActivityEvents(t),
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
+
 	allActivityEventInfos := activityEventInfoFromActivityEvents(*warmupItems)
 
 	// Sort by activity event IDs.
@@ -137,7 +133,6 @@ func TestGetActivityEvents(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetActivityEvents, so don't try it.
 
 		{
@@ -733,7 +728,6 @@ func TestGetActivityEvents(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -810,7 +804,6 @@ func TestGetActivityEvents(t *testing.T) {
 }
 
 func TestCreateActivityEvent(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -823,11 +816,7 @@ func TestCreateActivityEvent(t *testing.T) {
 		variables:       standardWarmupVariablesForActivityEvents,
 		activityEvents:  []models.ActivityEvent{},
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.ActivityEvent
@@ -931,7 +920,6 @@ func TestCreateActivityEvent(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.ActivityEvents.CreateActivityEvent(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -1085,8 +1073,8 @@ func buildStandardWarmupActivityEvents(t *testing.T) []models.ActivityEvent {
 // createWarmupActivityEvents creates some warmup activity events for a test
 // The warmup activity events to create can be standard or otherwise.
 func createWarmupActivityEvents(ctx context.Context, testClient *testClient,
-	input activityEventWarmups) (*activityEventWarmups, error) {
-
+	input activityEventWarmups,
+) (*activityEventWarmups, error) {
 	// It is necessary to create at least one group, workspace, and run
 	// in order to provide the necessary IDs for the activity events.
 
@@ -1258,8 +1246,8 @@ func activityEventIDsFromActivityEventInfos(activityEventInfos []activityEventIn
 // compareActivityEvents compares two activity event objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareActivityEvents(t *testing.T, expected, actual *models.ActivityEvent,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	if checkID {
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
@@ -1286,7 +1274,6 @@ func compareActivityEvents(t *testing.T, expected, actual *models.ActivityEvent,
 
 // compareStringPointers compares two string pointers.
 func compareStringPointers(t *testing.T, expected, actual *string) {
-
 	assert.Equal(t, (expected == nil), (actual == nil))
 
 	if (expected != nil) && (actual != nil) {
@@ -1300,5 +1287,3 @@ func buildPayload(t *testing.T, input interface{}) []byte {
 	require.Nil(t, err)
 	return result
 }
-
-// The End.

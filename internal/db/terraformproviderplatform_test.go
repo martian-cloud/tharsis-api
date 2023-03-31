@@ -45,7 +45,6 @@ type warmupTerraformProviderPlatforms struct {
 }
 
 func TestGetProviderPlatformByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -57,11 +56,7 @@ func TestGetProviderPlatformByID(t *testing.T) {
 		terraformProviderVersions:  standardWarmupTerraformProviderVersionsForTerraformProviderPlatforms,
 		terraformProviderPlatforms: standardWarmupTerraformProviderPlatforms,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	createdHigh := time.Now()
 
 	type testCase struct {
@@ -109,7 +104,6 @@ func TestGetProviderPlatformByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProviderPlatform, err := testClient.client.TerraformProviderPlatforms.GetProviderPlatformByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -130,7 +124,6 @@ func TestGetProviderPlatformByID(t *testing.T) {
 }
 
 func TestGetProviderPlatforms(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -141,11 +134,7 @@ func TestGetProviderPlatforms(t *testing.T) {
 		terraformProviderVersions:  standardWarmupTerraformProviderVersionsForTerraformProviderPlatforms,
 		terraformProviderPlatforms: standardWarmupTerraformProviderPlatforms,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allTerraformProviderPlatformInfos := terraformProviderPlatformInfoFromTerraformProviderPlatforms(
 		warmupItems.terraformProviderPlatforms)
 
@@ -204,7 +193,6 @@ func TestGetProviderPlatforms(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetProviderPlatforms, so don't try it.
 
 		{
@@ -584,7 +572,6 @@ func TestGetProviderPlatforms(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -661,7 +648,6 @@ func TestGetProviderPlatforms(t *testing.T) {
 }
 
 func TestCreateProviderPlatform(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -671,11 +657,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderPlatforms,
 		terraformProviderVersions: standardWarmupTerraformProviderVersionsForTerraformProviderPlatforms,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.TerraformProviderPlatform
@@ -753,7 +735,6 @@ func TestCreateProviderPlatform(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.TerraformProviderPlatforms.CreateProviderPlatform(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -780,7 +761,6 @@ func TestCreateProviderPlatform(t *testing.T) {
 }
 
 func TestUpdateProviderPlatform(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -791,11 +771,7 @@ func TestUpdateProviderPlatform(t *testing.T) {
 		terraformProviderVersions:  standardWarmupTerraformProviderVersionsForTerraformProviderPlatforms,
 		terraformProviderPlatforms: standardWarmupTerraformProviderPlatforms,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg     *string
@@ -809,7 +785,6 @@ func TestUpdateProviderPlatform(t *testing.T) {
 	positiveTerraformProviderPlatform := warmupItems.terraformProviderPlatforms[0]
 	now := time.Now()
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toUpdate: &models.TerraformProviderPlatform{
@@ -864,7 +839,6 @@ func TestUpdateProviderPlatform(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualTerraformProviderPlatform, err := testClient.client.TerraformProviderPlatforms.UpdateProviderPlatform(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -890,7 +864,6 @@ func TestUpdateProviderPlatform(t *testing.T) {
 }
 
 func TestDeleteProviderPlatform(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -901,11 +874,7 @@ func TestDeleteProviderPlatform(t *testing.T) {
 		terraformProviderVersions:  standardWarmupTerraformProviderVersionsForTerraformProviderPlatforms,
 		terraformProviderPlatforms: standardWarmupTerraformProviderPlatforms,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg *string
@@ -916,7 +885,6 @@ func TestDeleteProviderPlatform(t *testing.T) {
 	// Looks up by ID and version.
 	positiveTerraformProviderPlatform := warmupItems.terraformProviderPlatforms[0]
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.TerraformProviderPlatform{
@@ -952,7 +920,6 @@ func TestDeleteProviderPlatform(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.TerraformProviderPlatforms.DeleteProviderPlatform(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -1085,8 +1052,8 @@ var standardWarmupTerraformProviderPlatforms = []models.TerraformProviderPlatfor
 // createWarmupTerraformProviderPlatforms creates some warmup terraform provider platforms for a test
 // The warmup terraform provider platforms to create can be standard or otherwise.
 func createWarmupTerraformProviderPlatforms(ctx context.Context, testClient *testClient,
-	input warmupTerraformProviderPlatforms) (*warmupTerraformProviderPlatforms, error) {
-
+	input warmupTerraformProviderPlatforms,
+) (*warmupTerraformProviderPlatforms, error) {
 	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
 	if err != nil {
 		return nil, err
@@ -1172,8 +1139,8 @@ func terraformProviderPlatformIDsFromTerraformProviderPlatformInfos(terraformPro
 // compareTerraformProviderPlatforms compares two terraform provider platform objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareTerraformProviderPlatforms(t *testing.T, expected, actual *models.TerraformProviderPlatform,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.ProviderVersionID, actual.ProviderVersionID)
 	assert.Equal(t, expected.OperatingSystem, actual.OperatingSystem)
 	assert.Equal(t, expected.Architecture, actual.Architecture)
@@ -1196,5 +1163,3 @@ func compareTerraformProviderPlatforms(t *testing.T, expected, actual *models.Te
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

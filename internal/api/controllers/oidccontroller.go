@@ -39,7 +39,7 @@ func (c *oidcController) RegisterRoutes(router chi.Router) {
 	router.Get("/oauth/discovery/keys", c.GetKeys)
 }
 
-func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, r *http.Request) {
+func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, _ *http.Request) {
 	oidcConfig := &openIDConfig{
 		Issuer:                           c.tharsisAPIURL,
 		JwksURI:                          fmt.Sprintf("%s/oauth/discovery/keys", c.tharsisAPIURL),

@@ -1,3 +1,4 @@
+// Package moduleregistry package
 package moduleregistry
 
 import (

@@ -1,3 +1,4 @@
+// Package activityevent package
 package activityevent
 
 //go:generate mockery --name Service --inpackage --case underscore
@@ -55,7 +56,8 @@ func NewService(dbClient *db.Client, logger logger.Logger) Service {
 }
 
 func (s *service) GetActivityEvents(ctx context.Context,
-	input *GetActivityEventsInput) (*db.ActivityEventsResult, error) {
+	input *GetActivityEventsInput,
+) (*db.ActivityEventsResult, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err

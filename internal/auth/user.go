@@ -119,31 +119,31 @@ func (u *UserCaller) RequireViewerAccessToNamespaces(ctx context.Context, namesp
 }
 
 // RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state
-func (u *UserCaller) RequireRunWriteAccess(ctx context.Context, runID string) error {
+func (u *UserCaller) RequireRunWriteAccess(ctx context.Context, _ string) error {
 	// Return authorization error because users don't have run write access
 	return authorizationError(ctx, false)
 }
 
 // RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (u *UserCaller) RequirePlanWriteAccess(ctx context.Context, planID string) error {
+func (u *UserCaller) RequirePlanWriteAccess(ctx context.Context, _ string) error {
 	// Return authorization error because users don't have plan write access
 	return authorizationError(ctx, false)
 }
 
 // RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (u *UserCaller) RequireApplyWriteAccess(ctx context.Context, applyID string) error {
+func (u *UserCaller) RequireApplyWriteAccess(ctx context.Context, _ string) error {
 	// Return authorization error because users don't have apply write access
 	return authorizationError(ctx, false)
 }
 
 // RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job
-func (u *UserCaller) RequireJobWriteAccess(ctx context.Context, jobID string) error {
+func (u *UserCaller) RequireJobWriteAccess(ctx context.Context, _ string) error {
 	// Return authorization error because users accounts don't have job write access
 	return authorizationError(ctx, false)
 }
 
 // RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (u *UserCaller) RequireRunnerAccess(ctx context.Context, runnerID string) error {
+func (u *UserCaller) RequireRunnerAccess(ctx context.Context, _ string) error {
 	// Return authorization error because users don't have runner access
 	return authorizationError(ctx, false)
 }
@@ -183,7 +183,7 @@ func (u *UserCaller) RequireTeamUpdateAccess(ctx context.Context, teamID string)
 // RequireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
 // For now, only admins are allowed to delete a team.
 // Eventually, org admins and SCIM will be allowed to create and delete teams.
-func (u *UserCaller) RequireTeamDeleteAccess(ctx context.Context, teamID string) error {
+func (u *UserCaller) RequireTeamDeleteAccess(ctx context.Context, _ string) error {
 	if u.User.Admin {
 		return nil
 	}
@@ -202,7 +202,7 @@ func (u *UserCaller) RequireUserCreateAccess(ctx context.Context) error {
 }
 
 // RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (u *UserCaller) RequireUserUpdateAccess(ctx context.Context, userID string) error {
+func (u *UserCaller) RequireUserUpdateAccess(ctx context.Context, _ string) error {
 	if u.User.Admin {
 		return nil
 	}
@@ -212,7 +212,7 @@ func (u *UserCaller) RequireUserUpdateAccess(ctx context.Context, userID string)
 }
 
 // RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (u *UserCaller) RequireUserDeleteAccess(ctx context.Context, userID string) error {
+func (u *UserCaller) RequireUserDeleteAccess(ctx context.Context, _ string) error {
 	if u.User.Admin {
 		return nil
 	}

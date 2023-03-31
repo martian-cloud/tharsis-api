@@ -319,36 +319,7 @@ lint:
     - go install github.com/mgechev/revive@latest
   script:
     - go mod download
-    - |
-      # Set similar rules as golint, subject to change
-      cat <<EOF > config.toml
-      ignoreGeneratedHeader = false
-      severity = "warning"
-      confidence = 0.8
-      errorCode = 0
-      warningCode = 0
-
-      [rule.blank-imports]
-      [rule.context-as-argument]
-      [rule.context-keys-type]
-      [rule.dot-imports]
-      [rule.error-return]
-      [rule.error-strings]
-      [rule.error-naming]
-      [rule.exported]
-      [rule.if-return]
-      [rule.increment-decrement]
-      [rule.var-naming]
-      [rule.var-declaration]
-      # [rule.package-comments]
-      [rule.range]
-      [rule.receiver-naming]
-      [rule.time-naming]
-      [rule.unexported-return]
-      [rule.indent-error-flow]
-      [rule.errorf]
-      EOF
-    - revive -config config.toml -set_exit_status $(go list ./... | grep -v /vendor/)
+    - revive -set_exit_status ./...
   cache:
     <<: *cache-template
 

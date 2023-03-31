@@ -1,3 +1,4 @@
+// Package user package
 package user
 
 import (

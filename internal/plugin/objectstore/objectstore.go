@@ -1,3 +1,4 @@
+// Package objectstore package
 package objectstore
 
 //go:generate mockery --name ObjectStore --inpackage --case underscore

@@ -38,7 +38,6 @@ type variableInfoCreateTimeSlice []variableInfo
 type variableInfoNamespacePathSlice []variableInfo
 
 func TestGetVariables(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -46,11 +45,7 @@ func TestGetVariables(t *testing.T) {
 	warmupVariables, err := createWarmupVariables(ctx, testClient,
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		standardWarmupVariables)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 	allVariableInfos := variableInfoFromVariables(warmupVariables)
 
 	// Sort by variable IDs.
@@ -119,7 +114,6 @@ func TestGetVariables(t *testing.T) {
 	*/
 
 	testCases := []testCase{
-
 		// nil input likely causes a nil pointer dereference in GetVariables, so don't try it.
 
 		{
@@ -462,7 +456,6 @@ func TestGetVariables(t *testing.T) {
 	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// For some pagination tests, a previous case's cursor value gets piped into the next case.
 			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
 
@@ -553,7 +546,6 @@ func TestGetVariables(t *testing.T) {
 }
 
 func TestGetVariableByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -563,11 +555,7 @@ func TestGetVariableByID(t *testing.T) {
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		standardWarmupVariables)
 	createdHigh := currentTime()
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg      *string
@@ -611,7 +599,6 @@ func TestGetVariableByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualVariable, err := testClient.client.Variables.GetVariableByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
@@ -632,7 +619,6 @@ func TestGetVariableByID(t *testing.T) {
 }
 
 func TestCreateVariable(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -640,11 +626,7 @@ func TestCreateVariable(t *testing.T) {
 	_, err := createWarmupVariables(ctx, testClient,
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		[]models.Variable{})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		toCreate      *models.Variable
@@ -708,7 +690,6 @@ func TestCreateVariable(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualCreated, err := testClient.client.Variables.CreateVariable(ctx, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
@@ -735,7 +716,6 @@ func TestCreateVariable(t *testing.T) {
 }
 
 func TestCreateVariables(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -743,11 +723,7 @@ func TestCreateVariables(t *testing.T) {
 	_, err := createWarmupVariables(ctx, testClient,
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		[]models.Variable{})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	// CreateVariables does not return any objects, only an error, so don't expect any returned objects.
 	type testCase struct {
@@ -832,19 +808,16 @@ func TestCreateVariables(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.Variables.CreateVariables(ctx, test.namespacePath, test.toCreate)
 
 			checkError(t, test.expectMsg, err)
 
 			// There are no returned objects to verify.
-
 		})
 	}
 }
 
 func TestUpdateVariable(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -852,11 +825,7 @@ func TestUpdateVariable(t *testing.T) {
 	warmupVariables, err := createWarmupVariables(ctx, testClient,
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		standardWarmupVariables)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg     *string
@@ -871,7 +840,6 @@ func TestUpdateVariable(t *testing.T) {
 	positiveVariable := warmupVariables[0]
 	now := time.Now()
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toUpdate: &models.Variable{
@@ -940,7 +908,6 @@ func TestUpdateVariable(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualVariable, err := testClient.client.Variables.UpdateVariable(ctx, test.toUpdate)
 
 			checkError(t, test.expectMsg, err)
@@ -966,7 +933,6 @@ func TestUpdateVariable(t *testing.T) {
 }
 
 func TestDeleteVariable(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -974,11 +940,7 @@ func TestDeleteVariable(t *testing.T) {
 	warmupVariables, err := createWarmupVariables(ctx, testClient,
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		standardWarmupVariables)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg *string
@@ -989,7 +951,6 @@ func TestDeleteVariable(t *testing.T) {
 	// Looks up by ID and version.
 	positiveVariable := warmupVariables[0]
 	testCases := []testCase{
-
 		{
 			name: "positive",
 			toDelete: &models.Variable{
@@ -1030,7 +991,6 @@ func TestDeleteVariable(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.Variables.DeleteVariable(ctx, test.toDelete)
 
 			checkError(t, test.expectMsg, err)
@@ -1039,7 +999,6 @@ func TestDeleteVariable(t *testing.T) {
 }
 
 func TestDeleteVariables(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1047,11 +1006,7 @@ func TestDeleteVariables(t *testing.T) {
 	warmupVariables, err := createWarmupVariables(ctx, testClient,
 		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
 		standardWarmupVariables)
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg     *string
@@ -1063,7 +1018,6 @@ func TestDeleteVariables(t *testing.T) {
 	// Looks up by ID and version.
 	positiveVariable := warmupVariables[0]
 	testCases := []testCase{
-
 		{
 			name:          "positive",
 			namespacePath: positiveVariable.NamespacePath,
@@ -1088,7 +1042,6 @@ func TestDeleteVariables(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.Variables.DeleteVariables(ctx, test.namespacePath, test.category)
 
 			checkError(t, test.expectMsg, err)
@@ -1179,8 +1132,8 @@ func createWarmupVariables(ctx context.Context, testClient *testClient,
 	newWorkspaces []models.Workspace,
 	newVariables []models.Variable) (
 	[]models.Variable,
-	error) {
-
+	error,
+) {
 	// It is necessary to create at least one group, workspace, and run
 	// in order to provide the necessary IDs for the variables.
 
@@ -1282,8 +1235,8 @@ func variableIDsFromVariableInfos(variableInfos []variableInfo) []string {
 // compareVariables compares two variable objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareVariables(t *testing.T, expected, actual *models.Variable,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.Category, actual.Category)
 	assert.Equal(t, expected.NamespacePath, actual.NamespacePath)
 	assert.Equal(t, expected.Hcl, actual.Hcl)
@@ -1304,5 +1257,3 @@ func compareVariables(t *testing.T, expected, actual *models.Variable,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

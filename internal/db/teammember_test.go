@@ -35,7 +35,6 @@ type teamMemberNameSlice struct {
 }
 
 func TestGetTeamMemberByID(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -45,11 +44,7 @@ func TestGetTeamMemberByID(t *testing.T) {
 		users:       standardWarmupUsersForTeamMembers,
 		teamMembers: standardWarmupTeamMembers,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg        *string
@@ -95,7 +90,6 @@ func TestGetTeamMemberByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotTeamMember, err := testClient.client.TeamMembers.GetTeamMemberByID(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -106,13 +100,11 @@ func TestGetTeamMemberByID(t *testing.T) {
 			} else {
 				assert.Nil(t, gotTeamMember)
 			}
-
 		})
 	}
 }
 
 func TestGetTeamMember(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -122,11 +114,7 @@ func TestGetTeamMember(t *testing.T) {
 		users:       standardWarmupUsersForTeamMembers,
 		teamMembers: standardWarmupTeamMembers,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		expectMsg        *string
@@ -189,7 +177,6 @@ func TestGetTeamMember(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			gotTeamMember, err := testClient.client.TeamMembers.GetTeamMember(ctx, test.userID, test.teamID)
 
 			checkError(t, test.expectMsg, err)
@@ -200,13 +187,11 @@ func TestGetTeamMember(t *testing.T) {
 			} else {
 				assert.Nil(t, gotTeamMember)
 			}
-
 		})
 	}
 }
 
 func TestGetTeamMembers(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -216,10 +201,7 @@ func TestGetTeamMembers(t *testing.T) {
 		users:       standardWarmupUsersForTeamMembers,
 		teamMembers: standardWarmupTeamMembers,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		name              string
@@ -254,7 +236,6 @@ func TestGetTeamMembers(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			// TODO: Add checks for pagination, cursors, etc.
 
 			gotResult, err := testClient.client.TeamMembers.GetTeamMembers(ctx, test.input)
@@ -287,14 +268,11 @@ func TestGetTeamMembers(t *testing.T) {
 			}
 
 			// TODO: Add code for pagination, cursors, etc.
-
 		})
-
 	}
 }
 
 func TestAddUserToTeam(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -305,11 +283,7 @@ func TestAddUserToTeam(t *testing.T) {
 		users:       standardWarmupUsersForTeamMembers,
 		teamMembers: []models.TeamMember{},
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	usernames2IDs := reverseMap(createdWarmupOutput.userIDs2Name)
 	teamNames2IDs := reverseMap(createdWarmupOutput.teamIDs2Name)
@@ -412,7 +386,6 @@ func TestAddUserToTeam(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			claimedAdded, err := testClient.client.TeamMembers.AddUserToTeam(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -449,7 +422,6 @@ func TestAddUserToTeam(t *testing.T) {
 }
 
 func TestUpdateTeamMember(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -459,11 +431,7 @@ func TestUpdateTeamMember(t *testing.T) {
 		users:       standardWarmupUsersForTeamMembers,
 		teamMembers: standardWarmupTeamMembers,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	type testCase struct {
 		input         *models.TeamMember
@@ -544,7 +512,6 @@ func TestUpdateTeamMember(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			actualUpdated, err := testClient.client.TeamMembers.UpdateTeamMember(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -568,12 +535,10 @@ func TestUpdateTeamMember(t *testing.T) {
 				assert.Nil(t, actualUpdated)
 			}
 		})
-
 	}
 }
 
 func TestRemoveUserFromTeam(t *testing.T) {
-
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -583,11 +548,7 @@ func TestRemoveUserFromTeam(t *testing.T) {
 		users:       standardWarmupUsersForTeamMembers,
 		teamMembers: standardWarmupTeamMembers,
 	})
-	assert.Nil(t, err)
-	if err != nil {
-		// No point if warmup objects weren't all created.
-		return
-	}
+	require.Nil(t, err)
 
 	warmupNames := []string{}
 	for _, warmupTeamMember := range createdWarmupOutput.teamMembers {
@@ -616,7 +577,6 @@ func TestRemoveUserFromTeam(t *testing.T) {
 	// positive case per warmup group.  Alternatively, the warmup team members could be
 	// created fresh for each test case.
 	testCases := []testCase{
-
 		{
 			name: "negative: team member ID does not exist",
 			input: &models.TeamMember{
@@ -659,7 +619,6 @@ func TestRemoveUserFromTeam(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			err := testClient.client.TeamMembers.RemoveUserFromTeam(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
@@ -670,10 +629,7 @@ func TestRemoveUserFromTeam(t *testing.T) {
 				PaginationOptions: nil,
 				Filter:            nil,
 			})
-			assert.Nil(t, err)
-			if err != nil {
-				return
-			}
+			require.Nil(t, err)
 
 			actualNames := []string{}
 			for _, gotTeam := range gotResult.TeamMembers {
@@ -758,8 +714,8 @@ var standardWarmupTeamMembers = []models.TeamMember{
 // createWarmupTeamMembers creates some objects for a test
 // The objects to create can be standard or otherwise.
 func createWarmupTeamMembers(ctx context.Context, testClient *testClient,
-	input teamMemberWarmupsInput) (*teamMemberWarmupsOutput, error) {
-
+	input teamMemberWarmupsInput,
+) (*teamMemberWarmupsOutput, error) {
 	resultTeams, teamName2ID, err := createInitialTeams(ctx, testClient, input.teams)
 	if err != nil {
 		return nil, err
@@ -804,8 +760,8 @@ func (tmns teamMemberNameSlice) Less(i, j int) bool {
 // compareTeamMembers compares two team member objects, including bounds for creation and updated times.
 // If times is nil, it compares the exact metadata timestamps.
 func compareTeamMembers(t *testing.T, expected, actual *models.TeamMember,
-	checkID bool, times *timeBounds) {
-
+	checkID bool, times *timeBounds,
+) {
 	assert.Equal(t, expected.UserID, actual.UserID)
 	assert.Equal(t, expected.TeamID, actual.TeamID)
 	assert.Equal(t, expected.IsMaintainer, actual.IsMaintainer)
@@ -824,5 +780,3 @@ func compareTeamMembers(t *testing.T, expected, actual *models.TeamMember,
 		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }
-
-// The End.

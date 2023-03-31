@@ -1,3 +1,4 @@
+// Package variable package
 package variable
 
 import (
@@ -413,8 +414,8 @@ func (s *service) DeleteVariable(ctx context.Context, variable *models.Variable)
 
 // getTargetTypeID returns the target type and the target ID, whether the target is a group or a workspace.
 func (s *service) getTargetTypeID(ctx context.Context,
-	namespacePath string) (models.ActivityEventTargetType, string, error) {
-
+	namespacePath string,
+) (models.ActivityEventTargetType, string, error) {
 	var targetType models.ActivityEventTargetType
 	targetID := ""
 	group, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, namespacePath)
