@@ -1356,42 +1356,42 @@ var standardWarmupNamespaceMembershipsForTerraformProviders = []CreateNamespaceM
 	{
 		NamespacePath: "top-level-group-3-for-terraform-providers",
 		TeamID:        ptr.String("team-a"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-a",
 	},
 
 	// User access to group:
 	{
 		NamespacePath: "top-level-group-4-for-terraform-providers",
 		UserID:        ptr.String("user-0"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-b",
 	},
 
 	// Service accounts access to group:
 	{
 		NamespacePath:    "top-level-group-4-for-terraform-providers/nested-group-5-for-terraform-providers",
 		ServiceAccountID: ptr.String("service-account-0"),
-		Role:             models.ViewerRole,
+		RoleID:           "role-c",
 	},
 
 	// Team access to workspace:
 	{
 		NamespacePath: "top-level-group-0-for-terraform-providers/workspace-0-in-group-0",
 		TeamID:        ptr.String("team-b"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-a",
 	},
 
 	// User access to workspace:
 	{
 		NamespacePath: "top-level-group-1-for-terraform-providers/workspace-1-in-group-1",
 		UserID:        ptr.String("user-1"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-b",
 	},
 
 	// Service account access to workspace:
 	{
 		NamespacePath:    "top-level-group-2-for-terraform-providers/workspace-2-in-group-2",
 		ServiceAccountID: ptr.String("service-account-1"),
-		Role:             models.OwnerRole,
+		RoleID:           "role-c",
 	},
 }
 
@@ -1441,6 +1441,25 @@ var standardWarmupTerraformProviders = []models.TerraformProvider{
 	},
 }
 
+// Standard warmup roles for tests in this module:
+var standardWarmupRolesForTerraformProviders = []models.Role{
+	{
+		Name:        "role-a",
+		Description: "role a for namespace membership tests",
+		CreatedBy:   "someone-a",
+	},
+	{
+		Name:        "role-b",
+		Description: "role b for namespace membership tests",
+		CreatedBy:   "someone-b",
+	},
+	{
+		Name:        "role-c",
+		Description: "role c for namespace membership tests",
+		CreatedBy:   "someone-c",
+	},
+}
+
 // createWarmupTerraformProviders creates some warmup terraform providers for a test
 // The warmup terraform providers to create can be standard or otherwise.
 func createWarmupTerraformProviders(ctx context.Context, testClient *testClient,
@@ -1481,8 +1500,13 @@ func createWarmupTerraformProviders(ctx context.Context, testClient *testClient,
 		return nil, err
 	}
 
+	_, roleName2ID, err := createInitialRoles(ctx, testClient, standardWarmupRolesForTerraformProviders)
+	if err != nil {
+		return nil, err
+	}
+
 	resultNamespaceMemberships, err := createInitialNamespaceMemberships(ctx, testClient,
-		teamName2ID, username2ID, parentPath2ID, serviceAccountName2ID, input.namespaceMembershipsIn)
+		teamName2ID, username2ID, parentPath2ID, serviceAccountName2ID, roleName2ID, input.namespaceMembershipsIn)
 	if err != nil {
 		return nil, err
 	}

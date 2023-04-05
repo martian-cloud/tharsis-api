@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
@@ -167,7 +168,8 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, options.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(options.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -227,9 +229,17 @@ func (s *service) GetWorkspacesByIDs(ctx context.Context, idList []string) ([]mo
 		return nil, err
 	}
 
-	// Verify user has access to all returned groups
-	if err := caller.RequireViewerAccessToWorkspaces(ctx, resp.Workspaces); err != nil {
-		return nil, err
+	wsPaths := []string{}
+	for _, ws := range resp.Workspaces {
+		wsPaths = append(wsPaths, ws.FullPath)
+	}
+
+	// Verify caller has access to all returned workspaces.
+	if len(wsPaths) > 0 {
+		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePaths(wsPaths))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return resp.Workspaces, nil
@@ -250,7 +260,8 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 	}
 
 	if input.Group != nil {
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(input.Group.FullPath))
+		if err != nil {
 			return nil, err
 		}
 		dbInput.Filter.GroupID = &input.Group.Metadata.ID
@@ -291,7 +302,8 @@ func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*mod
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, path, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(path))
+	if err != nil {
 		return nil, err
 	}
 
@@ -321,7 +333,8 @@ func (s *service) GetWorkspaceByID(ctx context.Context, id string) (*models.Work
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -334,7 +347,8 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		return err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	if err != nil {
 		return err
 	}
 
@@ -417,8 +431,9 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	if cErr := caller.RequireAccessToGroup(ctx, workspace.GroupID, models.DeployerRole); cErr != nil {
-		return nil, cErr
+	err = caller.RequirePermission(ctx, permissions.CreateWorkspacePermission, auth.WithGroupID(workspace.GroupID))
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate model
@@ -499,8 +514,9 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	if cErr := caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); cErr != nil {
-		return nil, cErr
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate model.
@@ -568,7 +584,8 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -625,7 +642,8 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -696,7 +714,8 @@ func (s *service) GetCurrentStateVersion(ctx context.Context, workspaceID string
 		return nil, nil
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, workspace.FullPath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithNamespacePath(workspace.FullPath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -709,7 +728,8 @@ func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *mo
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, stateVersion.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -765,7 +785,8 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, stateVersion.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -829,16 +850,9 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
-	// RequireRunWriteAccess is used when state version is created by a run
-	// whereas RequireAccessToWorkspace is used otherwise.
-	if stateVersion.RunID != nil {
-		if err = caller.RequireRunWriteAccess(ctx, *stateVersion.RunID); err != nil {
-			return nil, err
-		}
-	} else {
-		if err = caller.RequireAccessToWorkspace(ctx, stateVersion.WorkspaceID, models.DeployerRole); err != nil {
-			return nil, err
-		}
+	err = caller.RequirePermission(ctx, permissions.CreateStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	if err != nil {
+		return nil, err
 	}
 
 	// We need to decode the base64 encoded string
@@ -964,7 +978,8 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("State version with ID %s not found", stateVersionID))
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, sv.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -977,7 +992,8 @@ func (s *service) GetStateVersions(ctx context.Context, input *GetStateVersionsI
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, input.Workspace.Metadata.ID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1029,8 +1045,9 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 		)
 	}
 
-	for _, cv := range result.StateVersions {
-		if err := caller.RequireAccessToWorkspace(ctx, cv.WorkspaceID, models.ViewerRole); err != nil {
+	for _, sv := range result.StateVersions {
+		err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -1063,7 +1080,8 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, options.WorkspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateConfigurationVersionPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1109,7 +1127,8 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 		)
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, cv.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1136,7 +1155,8 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 	}
 
 	for _, cv := range result.ConfigurationVersions {
-		if err := caller.RequireAccessToWorkspace(ctx, cv.WorkspaceID, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -1156,7 +1176,8 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		return err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, cv.WorkspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
+	if err != nil {
 		return err
 	}
 
@@ -1203,7 +1224,8 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 		)
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, sv.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 

@@ -5,11 +5,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	mock "github.com/stretchr/testify/mock"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
+
+func TestSCIMCaller_GetSubject(t *testing.T) {
+	caller := SCIMCaller{}
+	assert.Equal(t, "scim", caller.GetSubject())
+}
 
 func TestSCIMCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	expectedAccessPolicy := &NamespaceAccessPolicy{
@@ -23,186 +29,111 @@ func TestSCIMCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	assert.Equal(t, expectedAccessPolicy, accessPolicy)
 }
 
-func TestSCIMCaller_RequireAccessToNamespace(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireAccessToNamespace(WithCaller(context.Background(), &caller), "1", models.DeployerRole)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
+func TestSCIMCaller_RequirePermissions(t *testing.T) {
+	invalid := "invalid"
+	teamID := "team-1"
+	userID := "user-1"
 
-func TestSCIMCaller_RequireViewerAccessToGroups(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireViewerAccessToGroups(WithCaller(context.Background(), &caller), []models.Group{})
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireViewerAccessToWorkspaces(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireViewerAccessToWorkspaces(WithCaller(context.Background(), &caller), []models.Workspace{})
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireViewerAccessToNamespaces(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireViewerAccessToNamespaces(WithCaller(context.Background(), &caller), []string{})
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireAccessToGroup(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireAccessToGroup(WithCaller(context.Background(), &caller), "1", models.DeployerRole)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireAccessToWorkspace(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireAccessToWorkspace(WithCaller(context.Background(), &caller), "1", models.DeployerRole)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireAccessToInheritedGroupResource(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireAccessToInheritedGroupResource(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireAccessToInheritedNamespaceResource(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireAccessToInheritedNamespaceResource(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireRunWriteAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireRunWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequirePlanWriteAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequirePlanWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireApplyWriteAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireApplyWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireJobWriteAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	err := caller.RequireJobWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestSCIMCaller_RequireTeamCreateAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	assert.Nil(t, caller.RequireTeamCreateAccess(WithCaller(context.Background(), &caller)))
-}
-
-func TestSCIMCaller_RequireTeamUpdateAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	assert.Nil(t, caller.RequireTeamUpdateAccess(WithCaller(context.Background(), &caller), "1"))
-}
-
-func TestSCIMCaller_RequireTeamDeleteAccess(t *testing.T) {
 	caller := SCIMCaller{}
 	ctx := WithCaller(context.Background(), &caller)
 
-	tests := []struct {
-		expect error
-		team   *models.Team
-		name   string
+	testCases := []struct {
+		expect      error
+		team        *models.Team
+		user        *models.User
+		name        string
+		perms       []permissions.Permission
+		constraints []func(*constraints)
 	}{
 		{
-			name: "positive: team with SCIMExternalID. Grant access.",
-			team: &models.Team{
-				Name:           "positive-test-team",
-				Description:    "positive team description",
-				SCIMExternalID: "positive-scim-id",
+			name: "viewing, creating, updating a team or a user; grant access",
+			perms: []permissions.Permission{
+				permissions.CreateTeamPermission,
+				permissions.UpdateTeamPermission,
+				permissions.CreateUserPermission,
+				permissions.UpdateUserPermission,
 			},
-			// expect errors to be nil
 		},
 		{
-			name: "negative: team without SCIMExternalID. Deny access.",
-			team: &models.Team{
-				Name:        "negative-test-team",
-				Description: "negative team description",
-			},
+			name:        "deleting a team created by SCIM",
+			team:        &models.Team{SCIMExternalID: "scim-team-1"},
+			perms:       []permissions.Permission{permissions.DeleteTeamPermission},
+			constraints: []func(*constraints){WithTeamID(teamID)},
+		},
+		{
+			name:        "access denied because deleting a team not created by SCIM",
+			team:        &models.Team{},
+			perms:       []permissions.Permission{permissions.DeleteTeamPermission},
+			constraints: []func(*constraints){WithTeamID(teamID)},
+			expect:      authorizationError(ctx, false),
+		},
+		{
+			name:        "access denied because deleting a team that doesn't exist",
+			perms:       []permissions.Permission{permissions.DeleteTeamPermission},
+			constraints: []func(*constraints){WithTeamID(invalid)},
+			expect:      authorizationError(ctx, false),
+		},
+		{
+			name:        "deleting a user created by SCIM",
+			user:        &models.User{SCIMExternalID: "scim-user-1"},
+			perms:       []permissions.Permission{permissions.DeleteUserPermission},
+			constraints: []func(*constraints){WithUserID(userID)},
+		},
+		{
+			name:        "access denied because deleting a user not created by SCIM",
+			user:        &models.User{},
+			perms:       []permissions.Permission{permissions.DeleteUserPermission},
+			constraints: []func(*constraints){WithUserID(userID)},
+			expect:      authorizationError(ctx, false),
+		},
+		{
+			name:        "access denied because deleting a user that doesn't exist",
+			perms:       []permissions.Permission{permissions.DeleteUserPermission},
+			constraints: []func(*constraints){WithUserID(invalid)},
+			expect:      authorizationError(ctx, false),
+		},
+		{
+			name:   "access denied because required constraints not provided",
+			perms:  []permissions.Permission{permissions.DeleteTeamPermission, permissions.DeleteUserPermission},
+			expect: errMissingConstraints,
+		},
+		{
+			name:   "access denied because no permissions specified",
+			expect: errMissingConstraints,
+		},
+		{
+			name:   "access denied because permission is never available to caller",
+			perms:  []permissions.Permission{permissions.CreateGroupPermission},
 			expect: authorizationError(ctx, false),
 		},
 	}
 
-	for _, test := range tests {
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			mockTeams := db.NewMockTeams(t)
+			mockUsers := db.NewMockUsers(t)
 
-			mockTeam := db.MockTeams{}
-			mockTeam.On("GetTeamByID", mock.Anything, mock.Anything).Return(test.team, nil)
-			caller.dbClient = &db.Client{Teams: &mockTeam}
+			constraints := getConstraints(test.constraints...)
 
-			err := caller.RequireTeamDeleteAccess(ctx, "a-fake-team-ID")
-			if test.expect == nil {
-				// Positive case.
-				assert.Nil(t, err)
-			} else {
-				// Negative case.
-				assert.EqualError(t, err, test.expect.Error())
+			if constraints.teamID != nil {
+				mockTeams.On("GetTeamByID", mock.Anything, mock.Anything).Return(test.team, nil)
+			}
+
+			if constraints.userID != nil {
+				mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(test.user, nil)
+			}
+
+			caller.dbClient = &db.Client{Teams: mockTeams, Users: mockUsers}
+
+			for _, perm := range test.perms {
+				assert.Equal(t, test.expect, caller.RequirePermission(ctx, perm, test.constraints...))
 			}
 		})
 	}
 }
 
-func TestSCIMCaller_RequireUserCreateAccess(t *testing.T) {
+func TestSCIMCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := SCIMCaller{}
-	assert.Nil(t, caller.RequireUserCreateAccess(WithCaller(context.Background(), &caller)))
-}
-
-func TestSCIMCaller_RequireUserUpdateAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	assert.Nil(t, caller.RequireUserUpdateAccess(WithCaller(context.Background(), &caller), "1"))
-}
-
-func TestSCIMCaller_RequireUserDeleteAccess(t *testing.T) {
-	caller := SCIMCaller{}
-	ctx := WithCaller(context.Background(), &caller)
-
-	tests := []struct {
-		expect error
-		user   *models.User
-		name   string
-	}{
-		{
-			name: "positive: user with SCIMExternalID. Grant access.",
-			user: &models.User{
-				Username:       "positive-test-user",
-				SCIMExternalID: "positive-scim-id",
-			},
-			// expect errors to be nil
-		},
-		{
-			name: "negative: user without SCIMExternalID. Deny access.",
-			user: &models.User{
-				Username: "negative-test-user",
-			},
-			expect: authorizationError(ctx, false),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-
-			mockUsers := db.MockUsers{}
-			mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(test.user, nil)
-			caller.dbClient = &db.Client{Users: &mockUsers}
-
-			err := caller.RequireUserDeleteAccess(ctx, "a-fake-user-ID")
-			if test.expect == nil {
-				// Positive case.
-				assert.Nil(t, err)
-			} else {
-				// Negative case.
-				assert.EqualError(t, err, test.expect.Error())
-			}
-		})
-	}
+	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), permissions.RunnerResourceType, nil)
+	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }

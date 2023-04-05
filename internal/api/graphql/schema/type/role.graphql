@@ -1,0 +1,66 @@
+enum RoleSort {
+  NAME_ASC
+  NAME_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type RoleConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [RoleEdge]
+}
+
+type RoleEdge {
+  cursor: String!
+  node: Role
+}
+
+type CreateRolePayload {
+  clientMutationId: String
+  role: Role
+  problems: [Problem!]!
+}
+
+type UpdateRolePayload {
+  clientMutationId: String
+  role: Role
+  problems: [Problem!]!
+}
+
+type DeleteRolePayload {
+  clientMutationId: String
+  role: Role
+  problems: [Problem!]!
+}
+
+type Role implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  name: String!
+  description: String!
+  permissions: [String!]!
+}
+
+input CreateRoleInput {
+  clientMutationId: String
+  name: String!
+  description: String!
+  permissions: [String!]!
+}
+
+input UpdateRoleInput {
+  clientMutationId: String
+  id: ID!
+  description: String
+  permissions: [String!]!
+  metadata: ResourceMetadataInput
+}
+
+input DeleteRoleInput {
+  clientMutationId: String
+  id: ID!
+  force: Boolean
+  metadata: ResourceMetadataInput
+}

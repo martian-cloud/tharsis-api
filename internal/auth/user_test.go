@@ -2,195 +2,188 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	mock "github.com/stretchr/testify/mock"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
-func TestUserCaller_RequireRunWriteAccess(t *testing.T) {
-	caller := UserCaller{}
-	err := caller.RequireRunWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+func TestUserCaller_GetSubject(t *testing.T) {
+	caller := UserCaller{User: &models.User{Email: "user@email"}}
+	assert.Equal(t, "user@email", caller.GetSubject())
 }
 
-func TestUserCaller_RequirePlanWriteAccess(t *testing.T) {
-	caller := UserCaller{}
-	err := caller.RequirePlanWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestUserCaller_RequireApplyWriteAccess(t *testing.T) {
-	caller := UserCaller{}
-	err := caller.RequireApplyWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestUserCaller_RequireJobWriteAccess(t *testing.T) {
-	caller := UserCaller{}
-	err := caller.RequireJobWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestUserCaller_RequireTeamCreateAccess(t *testing.T) {
-
-	// Non-admin case:
-	caller := UserCaller{User: &models.User{}}
-	err := caller.RequireTeamCreateAccess(WithCaller(context.Background(), &caller))
-	assert.NotNil(t, err)
-
-	// Admin case:
-	caller.User.Admin = true
-	err = caller.RequireTeamCreateAccess(WithCaller(context.Background(), &caller))
-	assert.Nil(t, err)
-}
-
-func TestUserCaller_RequireTeamUpdateAccess(t *testing.T) {
-
-	// Preliminary setup:
+func TestUserCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	caller := UserCaller{User: &models.User{}}
 	ctx := WithCaller(context.Background(), &caller)
 
-	// Test cases:
-	tests := []struct {
-		getError     error
-		expect       error
-		name         string
-		isAdmin      bool
-		isMember     bool
-		isMaintainer bool
+	// Admin case.
+	caller.User.Admin = true
+	policy, err := caller.GetNamespaceAccessPolicy(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: true}, policy)
+
+	// Non-admin case.
+	caller.User.Admin = false
+	membershipNamespaceID := "nm-1"
+
+	mockAuthorizer := NewMockAuthorizer(t)
+	mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{{ID: membershipNamespaceID}}, nil)
+	caller.authorizer = mockAuthorizer
+
+	policy, err = caller.GetNamespaceAccessPolicy(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: []string{membershipNamespaceID}}, policy)
+}
+
+func TestUserCaller_RequirePermissions(t *testing.T) {
+	teamID := "team1"
+	caller := UserCaller{User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Email: "user@email"}}
+	ctx := WithCaller(context.Background(), &caller)
+
+	testCases := []struct {
+		name           string
+		expect         error
+		teamMember     *models.TeamMember
+		perm           permissions.Permission
+		constraints    []func(*constraints)
+		isAdmin        bool
+		withAuthorizer bool
 	}{
 		{
-			name:    "admin",
+			name:           "access is granted by the authorizer",
+			perm:           permissions.ViewGroupPermission,
+			constraints:    []func(*constraints){WithNamespacePath("namespace")},
+			withAuthorizer: true,
+		},
+		{
+			name:           "access denied by the authorizer because a permission is not satisfied",
+			perm:           permissions.DeleteGroupPermission,
+			constraints:    []func(*constraints){WithNamespacePath("namespace")},
+			expect:         authorizationError(ctx, false),
+			withAuthorizer: true,
+		},
+		{
+			name:    "permissions are only granted since user is admin",
+			perm:    permissions.CreateTeamPermission,
 			isAdmin: true,
 		},
 		{
-			name:     "not admin, get error",
-			getError: fmt.Errorf("GetTeamMember mock error"),
-			isMember: true,
-			expect:   fmt.Errorf("GetTeamMember mock error"),
+			name:        "access forbidden because user must be an admin",
+			perm:        permissions.CreateTeamPermission,
+			constraints: []func(*constraints){WithGroupID("team-1")},
+			expect:      authorizationError(ctx, false),
 		},
 		{
-			name:     "not admin, member, not maintainer",
-			isMember: true,
-			expect:   authorizationError(ctx, true),
+			name:        "team update allowed since user is an admin",
+			perm:        permissions.UpdateTeamPermission,
+			constraints: []func(*constraints){WithTeamID(teamID)},
+			isAdmin:     true,
 		},
 		{
-			name:         "not admin, member, is maintainer",
-			isMember:     true,
-			isMaintainer: true,
+			name:        "access denied because user is not an admin or a team maintainer",
+			teamMember:  &models.TeamMember{IsMaintainer: false},
+			perm:        permissions.UpdateTeamPermission,
+			constraints: []func(*constraints){WithTeamID(teamID)},
+			expect:      authorizationError(ctx, true),
 		},
 		{
-			name:   "not admin, not member",
-			expect: authorizationError(ctx, true),
+			name:        "access denied because team member not found",
+			perm:        permissions.UpdateTeamPermission,
+			constraints: []func(*constraints){WithTeamID(teamID)},
+			expect:      authorizationError(ctx, true),
+		},
+		{
+			name:        "access denied because user is not a maintainer",
+			teamMember:  &models.TeamMember{IsMaintainer: false},
+			perm:        permissions.UpdateTeamPermission,
+			constraints: []func(*constraints){WithTeamID(teamID)},
+			expect:      authorizationError(ctx, true),
+		},
+		{
+			name:           "access denied because required constraints are not specified",
+			perm:           permissions.ViewWorkspacePermission,
+			expect:         errMissingConstraints,
+			withAuthorizer: true,
 		},
 	}
 
-	// Run the tests:
-	for _, test := range tests {
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			_ = t
+			mockAuthorizer := NewMockAuthorizer(t)
+			mockTeamMembers := db.NewMockTeamMembers(t)
 
-			// Mock out the u.dbClient.TeamMembers.GetTeamMember method.
-			mockResult0 := func(ctx context.Context, userID, teamID string) *models.TeamMember {
-				_ = ctx
-				_ = userID
-				_ = teamID
-
-				if test.getError != nil {
-					// Return an error trying to get team members.
-					return nil
-				}
-
-				if !test.isMember {
-					// Return that the caller is not a member.
-					return nil
-				}
-
-				// Return that the caller is a member and maybe a maintainer.
-				return &models.TeamMember{IsMaintainer: test.isMaintainer}
+			if test.perm == permissions.UpdateTeamPermission && !test.isAdmin {
+				mockTeamMembers.On("GetTeamMember", mock.Anything, caller.User.Metadata.ID, teamID).Return(test.teamMember, nil)
 			}
-			mockResult1 := func(ctx context.Context, userID, teamID string) error {
-				_ = ctx
-				_ = userID
-				_ = teamID
 
-				if test.getError != nil {
-					// Return an error trying to get team members.
-					return test.getError
-				}
-
-				if !test.isMember {
-					// Return that the caller is not a member.
-					return nil
-				}
-
-				// Return that the caller is a member and maybe a maintainer.
-				return nil
+			if test.withAuthorizer {
+				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{test.perm}, mock.Anything).Return(requireAccessAuthorizerFunc)
 			}
-			mockTeamMembers := db.MockTeamMembers{}
-			mockTeamMembers.On("GetTeamMember", mock.Anything, mock.Anything, mock.Anything).Return(mockResult0, mockResult1)
-			caller.dbClient = &db.Client{TeamMembers: &mockTeamMembers}
 
-			// Run the test:
 			caller.User.Admin = test.isAdmin
-			gotErr := caller.RequireTeamUpdateAccess(ctx, "a-fake-team-ID")
-			assert.Equal(t, test.expect, gotErr)
+			caller.authorizer = mockAuthorizer
+			caller.dbClient = &db.Client{TeamMembers: mockTeamMembers}
+
+			assert.Equal(t, test.expect, caller.RequirePermission(ctx, test.perm, test.constraints...))
 		})
 	}
 }
 
-func TestUserCaller_RequireTeamDeleteAccess(t *testing.T) {
+func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
+	caller := UserCaller{User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Email: "user@email"}}
+	ctx := WithCaller(context.Background(), &caller)
 
-	// Non-admin case:
-	caller := UserCaller{User: &models.User{}}
-	err := caller.RequireTeamDeleteAccess(WithCaller(context.Background(), &caller), "a-fake-team-id")
-	assert.NotNil(t, err)
+	testCases := []struct {
+		name           string
+		expect         error
+		resourceType   permissions.ResourceType
+		constraints    []func(*constraints)
+		isAdmin        bool
+		withAuthorizer bool
+	}{
+		{
+			name:           "multiple permissions granted by the authorizer",
+			resourceType:   permissions.ManagedIdentityResourceType,
+			constraints:    []func(*constraints){WithGroupID("group1")},
+			withAuthorizer: true,
+		},
+		{
+			name:           "access denied by the authorizer because a permission is not satisfied",
+			resourceType:   permissions.ApplyResourceType, // Just using an invalid resource here to deny access.
+			constraints:    []func(*constraints){WithWorkspaceID("ws2")},
+			expect:         authorizationError(ctx, false),
+			withAuthorizer: true,
+		},
+		{
+			name:         "permissions granted since user is admin",
+			resourceType: permissions.GPGKeyResourceType,
+			isAdmin:      true,
+		},
+		{
+			name:           "access denied because required constraints are not specified",
+			resourceType:   permissions.TerraformModuleResourceType,
+			expect:         errMissingConstraints,
+			withAuthorizer: true,
+		},
+	}
 
-	// Admin case:
-	caller.User.Admin = true
-	err = caller.RequireTeamDeleteAccess(WithCaller(context.Background(), &caller), "a-fake-team-id")
-	assert.Nil(t, err)
-}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockAuthorizer := NewMockAuthorizer(t)
 
-func TestUserCaller_RequireUserCreateAccess(t *testing.T) {
-	// Non-admin case:
-	caller := UserCaller{User: &models.User{}}
-	err := caller.RequireUserCreateAccess(WithCaller(context.Background(), &caller))
-	assert.NotNil(t, err)
+			if test.withAuthorizer {
+				mockAuthorizer.On("RequireAccessToInheritableResource", mock.Anything, []permissions.ResourceType{test.resourceType}, mock.Anything).Return(requireInheritedAccessAuthorizerFunc)
+			}
 
-	// Admin case:
-	caller.User.Admin = true
-	err = caller.RequireUserCreateAccess(WithCaller(context.Background(), &caller))
-	assert.Nil(t, err)
-}
-
-func TestUserCaller_RequireUserUpdateAccess(t *testing.T) {
-	// Non-admin case:
-	caller := UserCaller{User: &models.User{}}
-	err := caller.RequireUserUpdateAccess(WithCaller(context.Background(), &caller), "1")
-	assert.NotNil(t, err)
-
-	// Admin case:
-	caller.User.Admin = true
-	err = caller.RequireUserUpdateAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Nil(t, err)
-}
-
-func TestUserCaller_RequireUserDeleteAccess(t *testing.T) {
-	// Non-admin case:
-	caller := UserCaller{User: &models.User{}}
-	err := caller.RequireUserDeleteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.NotNil(t, err)
-
-	// Admin case:
-	caller.User.Admin = true
-	err = caller.RequireUserDeleteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Nil(t, err)
+			caller.authorizer = mockAuthorizer
+			caller.User.Admin = test.isAdmin
+			assert.Equal(t, test.expect, caller.RequireAccessToInheritableResource(ctx, test.resourceType, test.constraints...))
+		})
+	}
 }
 
 // The End.

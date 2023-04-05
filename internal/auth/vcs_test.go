@@ -5,11 +5,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
+
+func TestVCSWorkspaceLinkCaller_GetSubject(t *testing.T) {
+	caller := VCSWorkspaceLinkCaller{Provider: &models.VCSProvider{
+		ResourcePath: "rs1",
+	}}
+	assert.Equal(t, "rs1", caller.GetSubject())
+}
 
 func TestVCSWorkspaceLinkCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	expectedAccessPolicy := &NamespaceAccessPolicy{
@@ -23,167 +29,72 @@ func TestVCSWorkspaceLinkCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	assert.Equal(t, expectedAccessPolicy, accessPolicy)
 }
 
-func TestVCSWorkspaceLinkCaller_RequireAccessToNamespace(t *testing.T) {
+func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
+	invalid := "invalid"
+
+	ws := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "ws-1",
+		},
+	}
+
 	caller := VCSWorkspaceLinkCaller{
 		Link: &models.WorkspaceVCSProviderLink{
-			WorkspaceID: "workspace-id",
+			WorkspaceID: ws.Metadata.ID,
 		},
 	}
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		expect    error
-		workspace *models.Workspace
-		name      string
+		expect      error
+		name        string
+		workspace   *models.Workspace
+		perm        permissions.Permission
+		constraints []func(*constraints)
 	}{
 		{
-			name: "positive: requested workspace is the one workspace vcs provider link belongs to; grant access",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "workspace-id",
-				},
-			},
+			name:        "link belongs to requested workspace",
+			perm:        permissions.ViewWorkspacePermission,
+			constraints: []func(*constraints){WithWorkspaceID(ws.Metadata.ID)},
 		},
 		{
-			name:   "negative: requested workspace doesn't exist; deny access",
-			expect: authorizationError(ctx, false),
+			name:        "access denied because link doesn't belong to requested workspace",
+			perm:        permissions.ViewWorkspacePermission,
+			constraints: []func(*constraints){WithWorkspaceID(invalid)},
+			expect:      authorizationError(ctx, false),
 		},
 		{
-			name: "negative: requested workspace ID doesn't match the link's workspace ID, deny access",
-			workspace: &models.Workspace{
-				Metadata: models.ResourceMetadata{
-					ID: "another-workspace-id",
-				},
-			},
+			name:        "link is creating a run in its own workspace",
+			perm:        permissions.CreateRunPermission,
+			constraints: []func(*constraints){WithWorkspaceID(ws.Metadata.ID)},
+		},
+		{
+			name:        "access denied because link is creating a run outside its own workspace",
+			perm:        permissions.CreateRunPermission,
+			constraints: []func(*constraints){WithWorkspaceID(invalid)},
+			expect:      authorizationError(ctx, false),
+		},
+		{
+			name:   "access denied because required constraint not provided",
+			perm:   permissions.CreateRunPermission,
+			expect: errMissingConstraints,
+		},
+		{
+			name:   "access denied because permission is never available to caller",
+			perm:   permissions.CreateGroupPermission,
 			expect: authorizationError(ctx, false),
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			mockWorkspaces := db.MockWorkspaces{}
-			mockWorkspaces.On("GetWorkspaceByFullPath", mock.Anything, mock.Anything).Return(test.workspace, nil)
-			caller.dbClient = &db.Client{Workspaces: &mockWorkspaces}
-
-			err := caller.RequireAccessToNamespace(ctx, "workspace-id", models.DeployerRole)
-			if test.expect == nil {
-				// Positive case.
-				assert.Nil(t, err)
-			} else {
-				// Negative case.
-				assert.EqualError(t, err, test.expect.Error())
-			}
+			assert.Equal(t, test.expect, caller.RequirePermission(ctx, test.perm, test.constraints...))
 		})
 	}
 }
 
-func TestVCSWorkspaceLinkCaller_RequireViewerAccessToGroups(t *testing.T) {
+func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireViewerAccessToGroups(WithCaller(context.Background(), &caller), []models.Group{})
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireViewerAccessToWorkspaces(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireViewerAccessToWorkspaces(WithCaller(context.Background(), &caller), []models.Workspace{})
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireViewerAccessToNamespaces(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireViewerAccessToNamespaces(WithCaller(context.Background(), &caller), []string{})
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireAccessToGroup(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireAccessToGroup(WithCaller(context.Background(), &caller), "1", models.DeployerRole)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireAccessToWorkspace(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{
-		Link: &models.WorkspaceVCSProviderLink{
-			WorkspaceID: "workspace-id",
-		},
-	}
-	// Allow access.
-	err := caller.RequireAccessToWorkspace(WithCaller(context.Background(), &caller), "workspace-id", models.DeployerRole)
-	assert.Nil(t, err)
-	// Deny access.
-	err = caller.RequireAccessToWorkspace(WithCaller(context.Background(), &caller), "another-workspace-id", models.DeployerRole)
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireAccessToInheritedGroupResource(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireAccessToInheritedGroupResource(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireAccessToInheritedNamespaceResource(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireAccessToInheritedNamespaceResource(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireRunWriteAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireRunWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequirePlanWriteAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequirePlanWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireApplyWriteAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireApplyWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireJobWriteAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireJobWriteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireTeamCreateAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireTeamCreateAccess(WithCaller(context.Background(), &caller))
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireTeamUpdateAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireTeamUpdateAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireTeamDeleteAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireTeamDeleteAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireUserCreateAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireUserCreateAccess(WithCaller(context.Background(), &caller))
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireUserUpdateAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireUserUpdateAccess(WithCaller(context.Background(), &caller), "1")
-	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
-}
-
-func TestVCSWorkspaceLinkCaller_RequireUserDeleteAccess(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
-	err := caller.RequireUserDeleteAccess(WithCaller(context.Background(), &caller), "1")
+	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), permissions.ApplyResourceType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }

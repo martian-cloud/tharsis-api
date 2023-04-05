@@ -9,6 +9,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -80,7 +81,8 @@ func (s *service) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*db.G
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewGPGKeyPermission, auth.WithNamespacePath(input.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -129,8 +131,14 @@ func (s *service) GetGPGKeysByIDs(ctx context.Context, idList []string) ([]model
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, k := range result.GPGKeys {
-		if err := caller.RequireAccessToInheritedGroupResource(ctx, k.GroupID); err != nil {
+		namespacePaths = append(namespacePaths, k.GetGroupPath())
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.GPGKeyResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -144,7 +152,8 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, gpgKey.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteGPGKeyPermission, auth.WithGroupID(gpgKey.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -212,7 +221,8 @@ func (s *service) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey,
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("gpg key with ID %s not found", id))
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, gpgKey.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.GPGKeyResourceType, auth.WithGroupID(gpgKey.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -225,7 +235,8 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateGPGKeyPermission, auth.WithGroupID(input.GroupID))
+	if err != nil {
 		return nil, err
 	}
 

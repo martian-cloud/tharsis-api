@@ -214,8 +214,13 @@ func (r *NamespaceMembershipResolver) Namespace(ctx context.Context) (*Namespace
 }
 
 // Role resolver
-func (r *NamespaceMembershipResolver) Role() string {
-	return string(r.namespaceMembership.Role)
+func (r *NamespaceMembershipResolver) Role(ctx context.Context) (*RoleResolver, error) {
+	role, err := loadRole(ctx, r.namespaceMembership.RoleID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RoleResolver{role: role}, nil
 }
 
 // Metadata resolver
@@ -296,44 +301,43 @@ func handleNamespaceMembershipMutationProblem(e error,
 func createNamespaceMembershipMutation(ctx context.Context,
 	input *CreateNamespaceMembershipInput,
 ) (*NamespaceMembershipMutationPayloadResolver, error) {
-	// Verify role is valid
-	role := models.Role(input.Role)
-	if !role.IsValid() {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Role %s is not a valid role", input.Role))
+	role, err := getRoleService(ctx).GetRoleByName(ctx, input.Role)
+	if err != nil {
+		return nil, err
 	}
 
 	createOptions := namespacemembership.CreateNamespaceMembershipInput{
 		NamespacePath: input.NamespacePath,
-		Role:          role,
+		RoleID:        role.Metadata.ID,
 	}
 
 	if input.Username != nil {
-		user, err := getUserService(ctx).GetUserByUsername(ctx, *input.Username)
-		if err != nil {
-			return nil, err
+		user, uErr := getUserService(ctx).GetUserByUsername(ctx, *input.Username)
+		if uErr != nil {
+			return nil, uErr
 		}
 		createOptions.User = user
 	}
 
 	if input.ServiceAccountID != nil {
-		serviceAccount, err := getSAService(ctx).GetServiceAccountByID(ctx, gid.FromGlobalID(*input.ServiceAccountID))
-		if err != nil {
-			return nil, err
+		serviceAccount, sErr := getSAService(ctx).GetServiceAccountByID(ctx, gid.FromGlobalID(*input.ServiceAccountID))
+		if sErr != nil {
+			return nil, sErr
 		}
 		createOptions.ServiceAccount = serviceAccount
 	}
 
 	if input.TeamName != nil {
-		team, err := getTeamService(ctx).GetTeamByName(ctx, *input.TeamName)
-		if err != nil {
-			return nil, err
+		team, tErr := getTeamService(ctx).GetTeamByName(ctx, *input.TeamName)
+		if tErr != nil {
+			return nil, tErr
 		}
 		createOptions.Team = team
 	}
 
-	namespaceMembership, err := getNamespaceMembershipService(ctx).CreateNamespaceMembership(ctx, &createOptions)
-	if err != nil {
-		return nil, err
+	namespaceMembership, nErr := getNamespaceMembershipService(ctx).CreateNamespaceMembership(ctx, &createOptions)
+	if nErr != nil {
+		return nil, nErr
 	}
 
 	payload := NamespaceMembershipMutationPayload{
@@ -364,13 +368,12 @@ func updateNamespaceMembershipMutation(ctx context.Context,
 		namespaceMembership.Metadata.Version = v
 	}
 
-	// Verify role is valid
-	role := models.Role(input.Role)
-	if !role.IsValid() {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Role %s is not a valid role", input.Role))
+	role, err := getRoleService(ctx).GetRoleByName(ctx, input.Role)
+	if err != nil {
+		return nil, err
 	}
 
-	namespaceMembership.Role = role
+	namespaceMembership.RoleID = role.Metadata.ID
 
 	namespaceMembership, err = service.UpdateNamespaceMembership(ctx, namespaceMembership)
 	if err != nil {

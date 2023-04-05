@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -79,16 +80,9 @@ func (s *service) GetTeamByID(ctx context.Context, id string) (*models.Team, err
 		return nil, err
 	}
 
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, id)
+	team, err := s.getTeamByID(ctx, id)
 	if err != nil {
 		return nil, err
-	}
-
-	if team == nil {
-		return nil, errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("Team with id %s not found", id),
-		)
 	}
 
 	return team, nil
@@ -147,7 +141,7 @@ func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Te
 	}
 
 	// Team has not yet been created, so it cannot have an ID.
-	if err = caller.RequireTeamCreateAccess(ctx); err != nil {
+	if err = caller.RequirePermission(ctx, permissions.CreateTeamPermission); err != nil {
 		return nil, err
 	}
 
@@ -199,8 +193,9 @@ func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Te
 		return nil, err
 	}
 
-	if rErr := caller.RequireTeamUpdateAccess(ctx, team.Metadata.ID); rErr != nil {
-		return nil, rErr
+	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate model
@@ -251,12 +246,12 @@ func (s *service) DeleteTeam(ctx context.Context, team *models.Team) error {
 		return err
 	}
 
-	if err = caller.RequireTeamDeleteAccess(ctx, team.Metadata.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteTeamPermission, auth.WithTeamID(team.Metadata.ID))
+	if err != nil {
 		return err
 	}
 
-	err = s.dbClient.Teams.DeleteTeam(ctx, team)
-	if err != nil {
+	if err = s.dbClient.Teams.DeleteTeam(ctx, team); err != nil {
 		return err
 	}
 
@@ -328,20 +323,12 @@ func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (
 		return nil, err
 	}
 
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, input.TeamID)
+	team, err := s.getTeamByID(ctx, input.TeamID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Returned team pointer will never be nil if error is nil.
-	if team == nil {
-		return nil, errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("Team with id %s not found", input.TeamID),
-		)
-	}
-
-	err = caller.RequireTeamUpdateAccess(ctx, team.Metadata.ID)
+	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -395,20 +382,12 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember
 		return nil, err
 	}
 
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, input.TeamID)
+	team, err := s.getTeamByID(ctx, input.TeamID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Returned team pointer will never be nil if error is nil.
-	if team == nil {
-		return nil, errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("Team with id %s not found", input.TeamID),
-		)
-	}
-
-	err = caller.RequireTeamUpdateAccess(ctx, team.Metadata.ID)
+	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -462,20 +441,12 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMemb
 		return err
 	}
 
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, input.TeamID)
+	team, err := s.getTeamByID(ctx, input.TeamID)
 	if err != nil {
 		return err
 	}
 
-	// Returned team pointer will never be nil if error is nil.
-	if team == nil {
-		return errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("Team with id %s not found", input.TeamID),
-		)
-	}
-
-	err = caller.RequireTeamUpdateAccess(ctx, team.Metadata.ID)
+	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
 		return err
 	}
@@ -516,6 +487,23 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMemb
 	}
 
 	return s.dbClient.Transactions.CommitTx(txContext)
+}
+
+func (s *service) getTeamByID(ctx context.Context, id string) (*models.Team, error) {
+	team, err := s.dbClient.Teams.GetTeamByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Returned team pointer will never be nil if error is nil.
+	if team == nil {
+		return nil, errors.NewError(
+			errors.ENotFound,
+			fmt.Sprintf("Team with id %s not found", id),
+		)
+	}
+
+	return team, nil
 }
 
 // The End.

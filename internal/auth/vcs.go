@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
@@ -37,51 +38,29 @@ func (v *VCSWorkspaceLinkCaller) GetNamespaceAccessPolicy(_ context.Context) (*N
 	}, nil
 }
 
-// RequireAccessToNamespace will return an error if the caller doesn't have the specified access level.
-func (v *VCSWorkspaceLinkCaller) RequireAccessToNamespace(ctx context.Context, namespacePath string, _ models.Role) error {
-	// VCSWorkspaceLinkCaller will only require access to workspaces.
-	ws, err := v.dbClient.Workspaces.GetWorkspaceByFullPath(ctx, namespacePath)
-	if err != nil {
-		return err
+// RequirePermission will return an error if the caller doesn't have the specified permissions.
+func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	handlerFunc, ok := v.getPermissionHandler(perm)
+	if !ok {
+		return authorizationError(ctx, false)
 	}
 
-	if ws != nil && v.Link.WorkspaceID == ws.Metadata.ID {
-		// Allow since workspace being accessed is one
-		// the link belongs to.
-		return nil
+	return handlerFunc(ctx, &perm, getConstraints(checks...))
+}
+
+// RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
+func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
+	// Return an authorization error since VCS does not need any access to inherited resources.
+	return authorizationError(ctx, false)
+}
+
+// requireAccessToWorkspace will return an error if the caller doesn't have permission to view the specified workspace.
+func (v *VCSWorkspaceLinkCaller) requireAccessToWorkspace(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.workspaceID == nil {
+		return errMissingConstraints
 	}
 
-	// Deny access to all other namespaces.
-	return authorizationError(ctx, false)
-}
-
-// RequireViewerAccessToGroups will return an error if the caller doesn't have the required access level on the specified group.
-func (v *VCSWorkspaceLinkCaller) RequireViewerAccessToGroups(ctx context.Context, _ []models.Group) error {
-	// Return an authorization error since VCS does not need any access to groups.
-	return authorizationError(ctx, false)
-}
-
-// RequireViewerAccessToWorkspaces will return an error if the caller doesn't have viewer access on the specified workspace.
-func (v *VCSWorkspaceLinkCaller) RequireViewerAccessToWorkspaces(ctx context.Context, _ []models.Workspace) error {
-	// Return an authorization error since VCS does not need any access to workspaces.
-	return authorizationError(ctx, false)
-}
-
-// RequireViewerAccessToNamespaces will return an error if the caller doesn't have viewer access to the specified list of namespaces.
-func (v *VCSWorkspaceLinkCaller) RequireViewerAccessToNamespaces(ctx context.Context, _ []string) error {
-	// Return an authorization error since VCS does not need any access to namespaces.
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group.
-func (v *VCSWorkspaceLinkCaller) RequireAccessToGroup(ctx context.Context, _ string, _ models.Role) error {
-	// Return an authorization error since VCS does not need any access to groups.
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace.
-func (v *VCSWorkspaceLinkCaller) RequireAccessToWorkspace(ctx context.Context, workspaceID string, _ models.Role) error {
-	if v.Link.WorkspaceID == workspaceID {
+	if v.Link.WorkspaceID == *checks.workspaceID {
 		// Allow since workspace on the link is
 		// the one being accessed.
 		return nil
@@ -91,80 +70,17 @@ func (v *VCSWorkspaceLinkCaller) RequireAccessToWorkspace(ctx context.Context, w
 	return authorizationError(ctx, false)
 }
 
-// RequireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy.
-func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritedGroupResource(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to inherited group resources.
-	return authorizationError(ctx, false)
-}
+// getPermissionHandler returns a permissionTypeHandler for a given permission.
+func (v *VCSWorkspaceLinkCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[permissions.Permission]permissionTypeHandler{
+		permissions.ViewWorkspacePermission:              v.requireAccessToWorkspace,
+		permissions.ViewRunPermission:                    v.requireAccessToWorkspace,
+		permissions.CreateRunPermission:                  v.requireAccessToWorkspace, // Should only create runs for linked workspace.
+		permissions.ViewConfigurationVersionPermission:   v.requireAccessToWorkspace,
+		permissions.CreateConfigurationVersionPermission: v.requireAccessToWorkspace,
+		permissions.UpdateConfigurationVersionPermission: v.requireAccessToWorkspace,
+	}
 
-// RequireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy.
-func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritedNamespaceResource(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to namespace resources.
-	return authorizationError(ctx, false)
-}
-
-// RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state.
-func (v *VCSWorkspaceLinkCaller) RequireRunWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to runs.
-	return authorizationError(ctx, false)
-}
-
-// RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state.
-func (v *VCSWorkspaceLinkCaller) RequirePlanWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to plans.
-	return authorizationError(ctx, false)
-}
-
-// RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state.
-func (v *VCSWorkspaceLinkCaller) RequireApplyWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to plans.
-	return authorizationError(ctx, false)
-}
-
-// RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job.
-func (v *VCSWorkspaceLinkCaller) RequireJobWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to jobs.
-	return authorizationError(ctx, false)
-}
-
-// RequireTeamCreateAccess will return an error if the specified access is not allowed to the indicated team.
-func (v *VCSWorkspaceLinkCaller) RequireTeamCreateAccess(ctx context.Context) error {
-	// Return an authorization error since VCS does not need any access to create new teams.
-	return authorizationError(ctx, false)
-}
-
-// RequireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
-func (v *VCSWorkspaceLinkCaller) RequireTeamUpdateAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to update teams.
-	return authorizationError(ctx, false)
-}
-
-// RequireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-func (v *VCSWorkspaceLinkCaller) RequireTeamDeleteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to delete teams.
-	return authorizationError(ctx, false)
-}
-
-// RequireUserCreateAccess will return an error if the specified caller is not allowed to create users.
-func (v *VCSWorkspaceLinkCaller) RequireUserCreateAccess(ctx context.Context) error {
-	// Return an authorization error since VCS does not need any access to create new users.
-	return authorizationError(ctx, false)
-}
-
-// RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (v *VCSWorkspaceLinkCaller) RequireUserUpdateAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to update users.
-	return authorizationError(ctx, false)
-}
-
-// RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (v *VCSWorkspaceLinkCaller) RequireUserDeleteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since VCS does not need any access to delete users.
-	return authorizationError(ctx, false)
-}
-
-// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (v *VCSWorkspaceLinkCaller) RequireRunnerAccess(ctx context.Context, _ string) error {
-	// Return authorization error because vcs callers don't have runner access
-	return authorizationError(ctx, false)
+	handlerFunc, ok := handlerMap[perm]
+	return handlerFunc, ok
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -205,7 +206,8 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: resourceUUID,
 		},
-		Name: "expected-name",
+		Name:         "expected-name",
+		ResourcePath: "some-group/expected-name",
 	}
 
 	// a sample DB result object.
@@ -899,13 +901,6 @@ func TestGetVCSProviderLinkByID(t *testing.T) {
 }
 
 func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
-	sampleCaller := &auth.UserCaller{
-		User: &models.User{
-			Email: "some@some-email",
-			Admin: true,
-		},
-	}
-
 	sampleOAuthState, err := uuid.NewRandom()
 	assert.Nil(t, err)
 
@@ -925,7 +920,6 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 	}
 
 	testCases := []struct {
-		caller             auth.Caller
 		input              *CreateWorkspaceVCSProviderLinkInput
 		getProjectInput    *types.GetProjectInput
 		createWebhookInput *types.CreateWebhookInput
@@ -937,8 +931,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 		expectedErrorCode  string
 	}{
 		{
-			name:   "positive: AutoCreateWebhooks is true; expect Tharsis configures webhook, no url in response",
-			caller: sampleCaller,
+			name: "positive: AutoCreateWebhooks is true; expect Tharsis configures webhook, no url in response",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:       sampleWorkspace,
 				ProviderID:      "provider-id",
@@ -1021,8 +1014,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 		},
 		{
-			name:   "positive: valid link, no branch, AutoCreateWebhooks is false; expect webhook url in response",
-			caller: sampleCaller,
+			name: "positive: valid link, no branch, AutoCreateWebhooks is false; expect webhook url in response",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:       sampleWorkspace,
 				ProviderID:      "provider-id",
@@ -1080,8 +1072,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 		},
 		{
-			name:   "negative: vcs provider is not in the same group hierarchy; expect error EInvalid",
-			caller: sampleCaller,
+			name: "negative: vcs provider is not in the same group hierarchy; expect error EInvalid",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:  sampleWorkspace,
 				ProviderID: "provider-id",
@@ -1095,8 +1086,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			expectedErrorCode: errors.EInvalid,
 		},
 		{
-			name:   "negative: OAuth flow hasn't been completed; expect error EInvalid",
-			caller: sampleCaller,
+			name: "negative: OAuth flow hasn't been completed; expect error EInvalid",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:  sampleWorkspace,
 				ProviderID: "provider-id",
@@ -1109,8 +1099,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			expectedErrorCode: errors.EInvalid,
 		},
 		{
-			name:   "negative: no such provider; expect error EInvalid",
-			caller: sampleCaller,
+			name: "negative: no such provider; expect error EInvalid",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:      sampleWorkspace,
 				ProviderID:     "provider-id",
@@ -1124,8 +1113,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			expectedErrorCode: errors.EInvalid,
 		},
 		{
-			name:   "negative: invalid repository path; expect error EInvalid",
-			caller: sampleCaller,
+			name: "negative: invalid repository path; expect error EInvalid",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:      sampleWorkspace,
 				ProviderID:     "provider-id",
@@ -1139,8 +1127,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			expectedErrorCode: errors.EInvalid,
 		},
 		{
-			name:   "negative: invalid glob pattern; expect error EInvalid",
-			caller: sampleCaller,
+			name: "negative: invalid glob pattern; expect error EInvalid",
 			input: &CreateWorkspaceVCSProviderLinkInput{
 				Workspace:      sampleWorkspace,
 				ProviderID:     "provider-id",
@@ -1154,33 +1141,27 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			expectedErrorCode: errors.EInvalid,
 		},
-		{
-			name:  "negative: without caller; expect error EUnauthorized",
-			input: &CreateWorkspaceVCSProviderLinkInput{},
-			existingProvider: &models.VCSProvider{
-				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
-				},
-			},
-			expectedErrorCode: errors.EUnauthorized,
-		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := auth.WithCaller(context.Background(), test.caller)
-
+			mockCaller := auth.MockCaller{}
 			mockProviders := MockProvider{}
 			mockTransactions := db.MockTransactions{}
 			mockVCSProviders := db.MockVCSProviders{}
 			mockJWSProvider := jwsprovider.MockJWSProvider{}
 			mockWorkspaceVCSProviderLinks := db.MockWorkspaceVCSProviderLinks{}
 
+			mockCaller.Test(t)
 			mockProviders.Test(t)
 			mockTransactions.Test(t)
 			mockVCSProviders.Test(t)
 			mockJWSProvider.Test(t)
 			mockWorkspaceVCSProviderLinks.Test(t)
+
+			mockCaller.On("GetSubject").Return("testsubject")
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).Return(nil)
+			ctx := auth.WithCaller(context.Background(), &mockCaller)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
 				ProviderURL:  test.existingProvider.URL,

@@ -15,6 +15,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
@@ -222,7 +223,8 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		return nil, errors.NewError(errors.EInvalid, "WorkspaceID option is required")
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, *options.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -291,7 +293,8 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, options.WorkspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -305,7 +308,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		)
 	}
 
-	// Filter out the non-environmental variables.
+	// Filter out the environment variables.
 	runEnvVars := []Variable{}
 	for _, variable := range runVariables {
 		if variable.Category == models.EnvironmentVariableCategory {
@@ -572,7 +575,8 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -710,7 +714,10 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.DeployerRole); err != nil {
+	// Since UpdateRunPermission means run write access, we must use CreateRunPermission
+	// instead i.e. if caller can create a run, they must be able to cancel it as well.
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -988,7 +995,8 @@ func (s *service) GetRun(ctx context.Context, runID string) (*models.Run, error)
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1004,12 +1012,14 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 	filter := &db.RunFilter{}
 
 	if input.Workspace != nil {
-		if err = caller.RequireAccessToNamespace(ctx, input.Workspace.FullPath, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithNamespacePath(input.Workspace.FullPath))
+		if err != nil {
 			return nil, err
 		}
 		filter.WorkspaceID = &input.Workspace.Metadata.ID
 	} else if input.Group != nil {
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithNamespacePath(input.Group.FullPath))
+		if err != nil {
 			return nil, err
 		}
 		filter.GroupID = &input.Group.Metadata.ID
@@ -1059,7 +1069,8 @@ func (s *service) GetRunsByIDs(ctx context.Context, idList []string) ([]models.R
 	}
 
 	for _, run := range result.Runs {
-		if err := caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -1087,7 +1098,8 @@ func (s *service) GetPlansByIDs(ctx context.Context, idList []string) ([]models.
 	}
 
 	for _, plan := range result.Plans {
-		if err := caller.RequireAccessToWorkspace(ctx, plan.WorkspaceID, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(plan.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -1120,7 +1132,8 @@ func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, err
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1133,7 +1146,8 @@ func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Pl
 		return nil, err
 	}
 
-	if err := caller.RequirePlanWriteAccess(ctx, plan.Metadata.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(plan.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1151,7 +1165,8 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1186,13 +1201,11 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", runID))
 	}
 
-	// Only include variable values if the caller has run write access or deployer access on the workspace
+	// Only include variable values if the caller has UpdateRunPermission or ViewVariableValuePermission on workspace.
 	includeValues := false
-	if err = caller.RequireRunWriteAccess(ctx, runID); err == nil {
+	if err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithWorkspaceID(run.WorkspaceID)); err == nil {
 		includeValues = true
-	} else if err = caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.DeployerRole); err == nil {
-		includeValues = true
-	} else if err = caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	} else if err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
 		return nil, err
 	}
 
@@ -1244,7 +1257,8 @@ func (s *service) UploadPlan(ctx context.Context, planID string, reader io.Reade
 		return err
 	}
 
-	if err = caller.RequirePlanWriteAccess(ctx, planID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(planID))
+	if err != nil {
 		return err
 	}
 
@@ -1284,7 +1298,8 @@ func (s *service) GetAppliesByIDs(ctx context.Context, idList []string) ([]model
 	}
 
 	for _, apply := range result.Applies {
-		if err := caller.RequireAccessToWorkspace(ctx, apply.WorkspaceID, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(apply.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -1317,7 +1332,12 @@ func (s *service) GetApply(ctx context.Context, applyID string) (*models.Apply, 
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	if run == nil {
+		return nil, fmt.Errorf("failed to get run associated with apply id %s", applyID)
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1330,7 +1350,8 @@ func (s *service) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		return nil, err
 	}
 
-	if err := caller.RequireApplyWriteAccess(ctx, apply.Metadata.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateApplyPermission, auth.WithApplyID(apply.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1348,11 +1369,17 @@ func (s *service) GetLatestJobForPlan(ctx context.Context, planID string) (*mode
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	job, err := s.getLatestJobByRunAndType(ctx, run.Metadata.ID, models.JobPlanType)
+	if err != nil {
 		return nil, err
 	}
 
-	return s.getLatestJobByRunAndType(ctx, run.Metadata.ID, models.JobPlanType)
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithJobID(job.Metadata.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func (s *service) GetLatestJobForApply(ctx context.Context, applyID string) (*models.Job, error) {
@@ -1366,11 +1393,21 @@ func (s *service) GetLatestJobForApply(ctx context.Context, applyID string) (*mo
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
+	if run == nil {
+		return nil, fmt.Errorf("failed to get run associated with apply id %s", applyID)
+	}
+
+	job, err := s.getLatestJobByRunAndType(ctx, run.Metadata.ID, models.JobApplyType)
+	if err != nil {
 		return nil, err
 	}
 
-	return s.getLatestJobByRunAndType(ctx, run.Metadata.ID, models.JobApplyType)
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithJobID(job.Metadata.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func (s *service) buildRunVariables(ctx context.Context, workspaceID string, runVariables []Variable) ([]Variable, error) {
@@ -1378,6 +1415,10 @@ func (s *service) buildRunVariables(ctx context.Context, workspaceID string, run
 	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
+	}
+
+	if ws == nil {
+		return nil, fmt.Errorf("workspace with id %s not found", workspaceID)
 	}
 
 	pathParts := strings.Split(ws.FullPath, "/")

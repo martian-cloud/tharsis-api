@@ -46,6 +46,7 @@ const (
 	TargetVariable                  ActivityEventTargetType = "VARIABLE"
 	TargetVCSProvider               ActivityEventTargetType = "VCS_PROVIDER"
 	TargetWorkspace                 ActivityEventTargetType = "WORKSPACE"
+	TargetRole                      ActivityEventTargetType = "ROLE"
 )
 
 // ActivityEventCreateNamespaceMembershipPayload helps with custom
@@ -96,6 +97,11 @@ type ActivityEventRemoveTeamMemberPayload struct {
 type ActivityEventUpdateTeamMemberPayload struct {
 	UserID     *string `json:"userId"`
 	Maintainer bool    `json:"maintainer"`
+}
+
+// ActivityEventMigrateGroupPayload is the custom payload for migrating a group.
+type ActivityEventMigrateGroupPayload struct {
+	PreviousGroupPath string `json:"previousGroupPath"`
 }
 
 // ActivityEvent resource

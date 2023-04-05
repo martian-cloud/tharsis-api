@@ -193,6 +193,12 @@ func (r *NodeResolver) ToVCSEvent() (*VCSEventResolver, bool) {
 	return res, ok
 }
 
+// ToRole resolver
+func (r *NodeResolver) ToRole() (*RoleResolver, bool) {
+	res, ok := r.result.(*RoleResolver)
+	return res, ok
+}
+
 // ToRunner resolver
 func (r *NodeResolver) ToRunner() (*RunnerResolver, bool) {
 	res, ok := r.result.(*RunnerResolver)
@@ -392,6 +398,13 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &VCSEventResolver{vcsEvent: vcsEvent}
+	case gid.RoleType:
+		gotRole, err := getRoleService(ctx).GetRoleByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &RoleResolver{role: gotRole}
 	case gid.RunnerType:
 		runner, err := getRunnerService(ctx).GetRunnerByID(ctx, parsedGlobalID.ID)
 		if err != nil {

@@ -44,6 +44,7 @@ type migrateGroupWarmupsInput struct {
 	users              []models.User
 	activityEvents     []models.ActivityEvent
 	vcsProviders       []models.VCSProvider
+	roles              []models.Role
 	runners            []models.Runner
 }
 
@@ -63,6 +64,7 @@ type migrateGroupWarmupsOutput struct {
 	users              []models.User
 	activityEvents     []models.ActivityEvent
 	vcsProviders       []models.VCSProvider
+	roles              []models.Role
 	runners            []models.Runner
 }
 
@@ -94,6 +96,7 @@ type associateServiceAccountNamespaceMembership struct {
 	filterBase          string
 	serviceAccountPath  string
 	namespacePath       string
+	roleName            string
 }
 
 type associateServiceAccountRunnerAssignment struct {
@@ -1306,6 +1309,7 @@ func TestMigrateGroupBasics(t *testing.T) {
 		users:              warmupUsersForGroupMigration,
 		activityEvents:     warmupActivityEventsForGroupMigration,
 		vcsProviders:       warmupVCSProvidersForGroupMigration,
+		roles:              warmupRolesForGroupMigration,
 		runners:            warmupRunnersForGroupMigration,
 	})
 	require.Nil(t, err)
@@ -1635,6 +1639,7 @@ func TestMigrateGroupOther(t *testing.T) {
 				vcsProviders:       warmupVCSProvidersForMigrateOther,
 				terraformProviders: warmupTerraformProvidersForMigrateOther,
 				terraformModules:   warmupTerraformModulesForMigrateOther,
+				roles:              warmupRolesForMigrateOther,
 				runners:            warmupRunnersForGroupMigrationOther,
 			})
 			require.Nil(t, err)
@@ -1709,6 +1714,11 @@ func TestMigrateGroupOther(t *testing.T) {
 			}
 
 			// Delete all resources so the next test case has a fresh start.
+			for _, r := range mainResources.roles {
+				rCopy := r
+				err := testClient.client.Roles.DeleteRole(ctx, &rCopy)
+				assert.Nil(t, err)
+			}
 
 			// Delete the groups in reverse order.
 			toDelete := mainResources.groups
@@ -1967,11 +1977,19 @@ var warmupTeamsForGroupMigration = []models.Team{
 	},
 }
 
+var warmupRolesForGroupMigration = []models.Role{
+	{
+		Name:        "role-1",
+		Description: "role 1 for testing group migration",
+		CreatedBy:   "creator-of-roles",
+	},
+}
+
 var warmupMembershipInputsForGroupMigration = []CreateNamespaceMembershipInput{
 	{
 		NamespacePath: "top-level-group-1/2nd-level-group-1a",
 		TeamID:        ptr.String("team-a"), // will be fixed later
-		Role:          models.ViewerRole,
+		RoleID:        "role-1",
 	},
 }
 
@@ -2262,6 +2280,41 @@ var warmupTerraformModulesForMigrateOther = []models.TerraformModule{
 	},
 }
 
+var warmupRolesForMigrateOther = []models.Role{
+	{
+		Name:      "role-1",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-2",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-3",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-4",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-5",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-6",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-7",
+		CreatedBy: "role-creator",
+	},
+	{
+		Name:      "role-8",
+		CreatedBy: "role-creator",
+	},
+}
+
 var warmupAssociationsForMigrateOther = associations{
 	managedIdentityAssignments: []associateManagedIdentityAssignment{
 		{
@@ -2302,41 +2355,49 @@ var warmupAssociationsForMigrateOther = associations{
 			filterBase:         "A",
 			serviceAccountPath: "A/SA-A-X",
 			namespacePath:      "A/B/X",
+			roleName:           "role-1",
 		},
 		{
 			filterBase:         "A",
 			serviceAccountPath: "A/SA-A-Y",
 			namespacePath:      "A/B/X/Y",
+			roleName:           "role-2",
 		},
 		{
 			filterBase:         "A",
 			serviceAccountPath: "A/SA-A-WX",
 			namespacePath:      "A/B/X/WX",
+			roleName:           "role-3",
 		},
 		{
 			filterBase:         "A",
 			serviceAccountPath: "A/SA-A-WY",
 			namespacePath:      "A/B/X/Y/WY",
+			roleName:           "role-4",
 		},
 		{
 			filterBase:         "B",
 			serviceAccountPath: "A/B/SA-B-X",
 			namespacePath:      "A/B/X",
+			roleName:           "role-5",
 		},
 		{
 			filterBase:         "B",
 			serviceAccountPath: "A/B/SA-B-Y",
 			namespacePath:      "A/B/X/Y",
+			roleName:           "role-6",
 		},
 		{
 			filterBase:         "B",
 			serviceAccountPath: "A/B/SA-B-WX",
 			namespacePath:      "A/B/X/WX",
+			roleName:           "role-7",
 		},
 		{
 			filterBase:         "B",
 			serviceAccountPath: "A/B/SA-B-WY",
 			namespacePath:      "A/B/X/Y/WY",
+			roleName:           "role-8",
 		},
 	},
 	workspaceVCSProviderLinks: []associateWorkspaceVCSProviderLink{
@@ -2371,7 +2432,7 @@ func createMigrateResources(ctx context.Context, testClient *testClient,
 
 	result.workspaces, err = createInitialWorkspaces(ctx, testClient, input.groupPath2ID, input.workspaces)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialWorkspaces: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialWorkspaces: %w", err)
 	}
 
 	result.workspaceID2Path = map[string]string{}
@@ -2383,49 +2444,55 @@ func createMigrateResources(ctx context.Context, testClient *testClient,
 	result.serviceAccounts, serviceAccountName2ID, err = createInitialServiceAccounts(ctx, testClient,
 		input.groupPath2ID, input.serviceAccounts)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialServiceAccounts: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialServiceAccounts: %w", err)
 	}
 
 	result.managedIdentities, err = createInitialManagedIdentities(ctx, testClient,
 		input.groupPath2ID, input.managedIdentities)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialManagedIdentities: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialManagedIdentities: %w", err)
 	}
 
 	result.gpgKeys, err = createInitialGPGKeys(ctx, testClient, input.gpgKeys, input.groupPath2ID)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialManagedIdentities: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialManagedIdentities: %w", err)
 	}
 
 	result.terraformProviders, _, err = createInitialTerraformProviders(ctx, testClient,
 		input.terraformProviders, input.groupPath2ID)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialTerraformProviders: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialTerraformProviders: %w", err)
 	}
 
 	result.terraformModules, _, err = createInitialTerraformModules(ctx, testClient,
 		input.terraformModules, input.groupPath2ID)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialTerraformModules: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialTerraformModules: %w", err)
 	}
 
 	var teamName2ID map[string]string
 	result.teams, teamName2ID, err = createInitialTeams(ctx, testClient, input.teams)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialTeams: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialTeams: %w", err)
+	}
+
+	var roleName2ID map[string]string
+	result.roles, roleName2ID, err = createInitialRoles(ctx, testClient, input.roles)
+	if err != nil {
+		return nil, fmt.Errorf("error reported by createInitialRoles: %w", err)
 	}
 
 	// do only a service account namespace membership
 	result.memberships, err = createInitialNamespaceMemberships(ctx, testClient,
-		teamName2ID, map[string]string{}, input.groupPath2ID, serviceAccountName2ID,
+		teamName2ID, map[string]string{}, input.groupPath2ID, serviceAccountName2ID, roleName2ID,
 		input.membershipInputs)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialNamespaceMemberships: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialNamespaceMemberships: %w", err)
 	}
 
 	result.variables, err = createInitialVariables(ctx, testClient, input.variables)
 	if err != nil {
-		return nil, fmt.Errorf("error reported by createInitialVariables: %s", err)
+		return nil, fmt.Errorf("error reported by createInitialVariables: %w", err)
 	}
 
 	// Make a modified copy of the input events to set the target ID.
@@ -2567,11 +2634,20 @@ func createAssociations(ctx context.Context, dbClient *Client,
 				input.namespacePath, input.serviceAccountPath)
 		}
 
+		var role *models.Role
+		for _, r := range resources.roles {
+			if r.Name == input.roleName {
+				role = &r
+				break
+			}
+		}
+
 		// Create the assignment.
 		createdNamespaceMembership, err := dbClient.NamespaceMemberships.CreateNamespaceMembership(ctx,
 			&CreateNamespaceMembershipInput{
 				NamespacePath:    input.namespacePath,
 				ServiceAccountID: &serviceAccount.Metadata.ID,
+				RoleID:           role.Metadata.ID,
 			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to associate service account %s with namespace %s: %v",

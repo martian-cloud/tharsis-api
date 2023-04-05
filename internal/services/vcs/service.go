@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-slug"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -334,7 +335,8 @@ func (s *service) GetVCSProviderByID(ctx context.Context, id string) (*models.VC
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("VCS provider with ID %s not found", id))
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -347,7 +349,8 @@ func (s *service) GetVCSProviders(ctx context.Context, input *GetVCSProvidersInp
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithNamespacePath(input.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -399,8 +402,14 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, vp := range result.VCSProviders {
-		if err := caller.RequireAccessToInheritedGroupResource(ctx, vp.GroupID); err != nil {
+		namespacePaths = append(namespacePaths, vp.GetGroupPath())
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.VCSProviderResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -414,8 +423,8 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		return nil, err
 	}
 
-	// Require deployer role to configure a VCS provider.
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateVCSProviderPermission, auth.WithGroupID(input.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -522,8 +531,8 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 		return nil, err
 	}
 
-	// Require deployer role to configure a VCS provider.
-	if err = caller.RequireAccessToGroup(ctx, input.Provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -579,8 +588,8 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 		return err
 	}
 
-	// Require deployer role to configure a VCS provider.
-	if err = caller.RequireAccessToGroup(ctx, input.Provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -672,7 +681,8 @@ func (s *service) GetWorkspaceVCSProviderLinkByWorkspaceID(ctx context.Context, 
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, workspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -708,7 +718,8 @@ func (s *service) GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("workspace vcs provider link with ID %s not found", id))
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, link.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -721,7 +732,8 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, input.Workspace.Metadata.ID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -910,7 +922,8 @@ func (s *service) UpdateWorkspaceVCSProviderLink(ctx context.Context, input *Upd
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, input.Link.WorkspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -933,7 +946,8 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 		return err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, input.Link.WorkspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
+	if err != nil {
 		return err
 	}
 
@@ -1001,7 +1015,8 @@ func (s *service) GetVCSEventByID(ctx context.Context, id string) (*models.VCSEv
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("VCS event with id %s not found", id))
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, event.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1014,7 +1029,8 @@ func (s *service) GetVCSEvents(ctx context.Context, input *GetVCSEventsInput) (*
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, input.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(input.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1045,7 +1061,8 @@ func (s *service) GetVCSEventsByIDs(ctx context.Context, idList []string) ([]mod
 	}
 
 	for _, ve := range result.VCSEvents {
-		if err := caller.RequireAccessToWorkspace(ctx, ve.WorkspaceID, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(ve.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -1059,8 +1076,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		return err
 	}
 
-	// Require deployer role since a run will be created.
-	err = caller.RequireAccessToWorkspace(ctx, input.Workspace.Metadata.ID, models.DeployerRole)
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
 		return err
 	}
@@ -1208,7 +1224,8 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 		return errors.NewError(errors.EInvalid, "Invalid caller; only version control systems can invoke webhook")
 	}
 
-	err = caller.RequireAccessToWorkspace(ctx, vcsCaller.Link.WorkspaceID, models.DeployerRole)
+	// Require permission for creating plan runs.
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(vcsCaller.Link.WorkspaceID))
 	if err != nil {
 		return err
 	}
@@ -1346,7 +1363,8 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.VCSProvider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateVCSProviderPermission, auth.WithGroupID(input.VCSProvider.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1431,7 +1449,9 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 		return errors.NewError(errors.ENotFound, "VCS provider not found")
 	}
 
-	if err = caller.RequireAccessToInheritedGroupResource(ctx, vp.GroupID); err != nil {
+	// Require UpdateVCSProviderPermission since we're updating the provider's values.
+	err = caller.RequirePermission(ctx, permissions.UpdateVCSProviderPermission, auth.WithGroupID(vp.GroupID))
+	if err != nil {
 		return err
 	}
 

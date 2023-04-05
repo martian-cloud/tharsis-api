@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
 // SCIMCaller represents a SCIM subject.
@@ -31,93 +31,29 @@ func (s *SCIMCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcce
 	}, nil
 }
 
-// RequireAccessToNamespace will return an error if the caller doesn't have the specified access level.
-func (s *SCIMCaller) RequireAccessToNamespace(ctx context.Context, _ string, _ models.Role) error {
-	// Return an authorization error since SCIM does not need access to namespaces.
+// RequirePermission will return an error if the caller doesn't have the specified permissions.
+func (s *SCIMCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	handlerFunc, ok := s.getPermissionHandler(perm)
+	if !ok {
+		return authorizationError(ctx, false)
+	}
+
+	return handlerFunc(ctx, &perm, getConstraints(checks...))
+}
+
+// RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type.
+func (s *SCIMCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
+	// Return an authorization error since SCIM does not need any access to inherited resources.
 	return authorizationError(ctx, false)
 }
 
-// RequireViewerAccessToGroups will return an error if the caller doesn't have the required access level on the specified group.
-func (s *SCIMCaller) RequireViewerAccessToGroups(ctx context.Context, _ []models.Group) error {
-	// Return an authorization error since SCIM does not need any access to groups.
-	return authorizationError(ctx, false)
-}
+// requireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
+func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.teamID == nil {
+		return errMissingConstraints
+	}
 
-// RequireViewerAccessToWorkspaces will return an error if the caller doesn't have viewer access on the specified workspace.
-func (s *SCIMCaller) RequireViewerAccessToWorkspaces(ctx context.Context, _ []models.Workspace) error {
-	// Return an authorization error since SCIM does not need any access to workspaces.
-	return authorizationError(ctx, false)
-}
-
-// RequireViewerAccessToNamespaces will return an error if the caller doesn't have viewer access to the specified list of namespaces.
-func (s *SCIMCaller) RequireViewerAccessToNamespaces(ctx context.Context, _ []string) error {
-	// Return an authorization error since SCIM does not need any access to namespaces.
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group.
-func (s *SCIMCaller) RequireAccessToGroup(ctx context.Context, _ string, _ models.Role) error {
-	// Return an authorization error since SCIM does not need any access to groups.
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace.
-func (s *SCIMCaller) RequireAccessToWorkspace(ctx context.Context, _ string, _ models.Role) error {
-	// Return an authorization error since SCIM does not need any access to workspaces.
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy.
-func (s *SCIMCaller) RequireAccessToInheritedGroupResource(ctx context.Context, _ string) error {
-	// Return an authorization error since SCIM does not need any access to group resources.
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy.
-func (s *SCIMCaller) RequireAccessToInheritedNamespaceResource(ctx context.Context, _ string) error {
-	// Return an authorization error since SCIM does not need any access to namespace resources.
-	return authorizationError(ctx, false)
-}
-
-// RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state.
-func (s *SCIMCaller) RequireRunWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since SCIM does not need any access to runs.
-	return authorizationError(ctx, false)
-}
-
-// RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state.
-func (s *SCIMCaller) RequirePlanWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since SCIM does not need any access to plans.
-	return authorizationError(ctx, false)
-}
-
-// RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state.
-func (s *SCIMCaller) RequireApplyWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since SCIM does not need any access to plans.
-	return authorizationError(ctx, false)
-}
-
-// RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job.
-func (s *SCIMCaller) RequireJobWriteAccess(ctx context.Context, _ string) error {
-	// Return an authorization error since SCIM does not need any access to jobs.
-	return authorizationError(ctx, false)
-}
-
-// RequireTeamCreateAccess will return an error if the specified access is not allowed to the indicated team.
-func (s *SCIMCaller) RequireTeamCreateAccess(_ context.Context) error {
-	// SCIM is allowed to create new teams.
-	return nil
-}
-
-// RequireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
-func (s *SCIMCaller) RequireTeamUpdateAccess(_ context.Context, _ string) error {
-	// SCIM is allowed to update teams.
-	return nil
-}
-
-// RequireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-func (s *SCIMCaller) RequireTeamDeleteAccess(ctx context.Context, teamID string) error {
-	team, err := s.dbClient.Teams.GetTeamByID(ctx, teamID)
+	team, err := s.dbClient.Teams.GetTeamByID(ctx, *checks.teamID)
 	if err != nil {
 		return err
 	}
@@ -130,21 +66,13 @@ func (s *SCIMCaller) RequireTeamDeleteAccess(ctx context.Context, teamID string)
 	return authorizationError(ctx, false)
 }
 
-// RequireUserCreateAccess will return an error if the specified caller is not allowed to create users.
-func (s *SCIMCaller) RequireUserCreateAccess(_ context.Context) error {
-	// SCIM caller is allowed to create new users.
-	return nil
-}
+// requireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
+func (s *SCIMCaller) requireUserDeleteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.userID == nil {
+		return errMissingConstraints
+	}
 
-// RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (s *SCIMCaller) RequireUserUpdateAccess(_ context.Context, _ string) error {
-	// SCIM caller is allowed to update users.
-	return nil
-}
-
-// RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (s *SCIMCaller) RequireUserDeleteAccess(ctx context.Context, userID string) error {
-	user, err := s.dbClient.Users.GetUserByID(ctx, userID)
+	user, err := s.dbClient.Users.GetUserByID(ctx, *checks.userID)
 	if err != nil {
 		return err
 	}
@@ -157,8 +85,17 @@ func (s *SCIMCaller) RequireUserDeleteAccess(ctx context.Context, userID string)
 	return authorizationError(ctx, false)
 }
 
-// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (s *SCIMCaller) RequireRunnerAccess(ctx context.Context, _ string) error {
-	// Return authorization error because SCIM callers don't have runner access
-	return authorizationError(ctx, false)
+// getPermissionHandler returns a permissionTypeHandler for a given permission.
+func (s *SCIMCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[permissions.Permission]permissionTypeHandler{
+		permissions.DeleteTeamPermission: s.requireTeamDeleteAccess,
+		permissions.DeleteUserPermission: s.requireUserDeleteAccess,
+		permissions.CreateTeamPermission: noopPermissionHandler,
+		permissions.UpdateTeamPermission: noopPermissionHandler,
+		permissions.CreateUserPermission: noopPermissionHandler,
+		permissions.UpdateUserPermission: noopPermissionHandler,
+	}
+
+	handlerFunc, ok := handlerMap[perm]
+	return handlerFunc, ok
 }

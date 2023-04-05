@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -28,7 +29,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "create user namespace membership with owner role in top level namespace",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				User:          &models.User{Metadata: models.ResourceMetadata{ID: "user1"}},
 			},
 			expectNamespaceMembership: &models.NamespaceMembership{
@@ -36,7 +37,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 					Path:    "ns1",
 					GroupID: ptr.String("group1"),
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			hasOwnerRole: true,
@@ -45,7 +46,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "create service account namespace membership with owner role in nested namespace",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1/ns11/ns111",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
 					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
 					ResourcePath: "ns1/ns11/serviceAccount",
@@ -56,7 +57,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 					Path:    "ns1/ns11/ns111",
 					GroupID: ptr.String("group1"),
 				},
-				Role:             models.OwnerRole,
+				RoleID:           models.OwnerRoleID.String(),
 				ServiceAccountID: ptr.String("serviceAccount1"),
 			},
 			hasOwnerRole: true,
@@ -65,7 +66,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "create service account namespace membership with owner role in top-level namespace",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
 					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
 					ResourcePath: "ns1/serviceAccount",
@@ -76,7 +77,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 					Path:    "ns1",
 					GroupID: ptr.String("group1"),
 				},
-				Role:             models.OwnerRole,
+				RoleID:           models.OwnerRoleID.String(),
 				ServiceAccountID: ptr.String("serviceAccount1"),
 			},
 			hasOwnerRole: true,
@@ -85,7 +86,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "no owner role",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				User:          &models.User{Metadata: models.ResourceMetadata{ID: "user1"}},
 			},
 			hasOwnerRole:    false,
@@ -95,7 +96,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "missing user and service account",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 			},
 			hasOwnerRole:    true,
 			expectErrorCode: errors.EInvalid,
@@ -104,7 +105,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "user and service account can't both be defined",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath:  "ns1",
-				Role:           models.OwnerRole,
+				RoleID:         models.OwnerRoleID.String(),
 				User:           &models.User{Metadata: models.ResourceMetadata{ID: "user1"}},
 				ServiceAccount: &models.ServiceAccount{Metadata: models.ResourceMetadata{ID: "serviceAccount1"}},
 			},
@@ -115,7 +116,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "should not be able to create service account namespace membership in a namespace it doesn't exist in",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
 					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
 					ResourcePath: "ns2/serviceAccount",
@@ -128,7 +129,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			name: "should not be able to create service account namespace membership in a nested namespace it doesn't exist in",
 			input: CreateNamespaceMembershipInput{
 				NamespacePath: "ns1",
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
 					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
 					ResourcePath: "ns1/ns11/serviceAccount",
@@ -150,13 +151,11 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			retFunc := func(_ context.Context, _ string, _ models.Role) error {
-				if test.hasOwnerRole {
-					return nil
-				}
-				return errors.NewError(errors.EForbidden, "Forbidden")
+			var authError error
+			if !test.hasOwnerRole {
+				authError = errors.NewError(errors.EForbidden, "not authorized")
 			}
-			mockCaller.On("RequireAccessToNamespace", mock.Anything, test.input.NamespacePath, models.OwnerRole).Return(retFunc)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateNamespaceMembershipPermission, mock.Anything).Return(authError)
 
 			var userID, serviceAccountID *string
 			if test.input.User != nil {
@@ -167,7 +166,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 
 			mockNamespaceMemberships.On("CreateNamespaceMembership", mock.Anything, &db.CreateNamespaceMembershipInput{
 				NamespacePath:    test.input.NamespacePath,
-				Role:             test.input.Role,
+				RoleID:           test.input.RoleID,
 				UserID:           userID,
 				ServiceAccountID: serviceAccountID,
 			}).Return(test.expectNamespaceMembership, nil)
@@ -182,15 +181,21 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			mockServiceAccounts := db.MockServiceAccounts{}
 			mockServiceAccounts.Test(t)
 
+			mockRoles := db.MockRoles{}
+			mockRoles.Test(t)
+
 			dbClient := db.Client{
 				NamespaceMemberships: &mockNamespaceMemberships,
 				Transactions:         &mockTransactions,
 				Users:                &mockUsers,
 				ServiceAccounts:      &mockServiceAccounts,
+				Roles:                &mockRoles,
 			}
 
 			mockActivityEvents := activityevent.MockService{}
 			mockActivityEvents.Test(t)
+
+			mockRoles.On("GetRoleByID", mock.Anything, test.input.RoleID).Return(&models.Role{Name: "role-1"}, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -241,7 +246,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1",
 				},
-				Role:   models.DeployerRole,
+				RoleID: models.DeployerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			current: &models.NamespaceMembership{
@@ -249,12 +254,12 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1",
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			namespaceMemberships: []models.NamespaceMembership{
-				{Metadata: models.ResourceMetadata{ID: "1"}, Role: models.OwnerRole},
-				{Metadata: models.ResourceMetadata{ID: "2"}, Role: models.OwnerRole},
+				{Metadata: models.ResourceMetadata{ID: "1"}, RoleID: models.OwnerRoleID.String()},
+				{Metadata: models.ResourceMetadata{ID: "2"}, RoleID: models.OwnerRoleID.String()},
 			},
 			hasOwnerRole: true,
 		},
@@ -265,7 +270,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1/ns11",
 				},
-				Role:   models.DeployerRole,
+				RoleID: models.DeployerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			current: &models.NamespaceMembership{
@@ -273,7 +278,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1/ns11",
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			hasOwnerRole: true,
@@ -285,7 +290,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1",
 				},
-				Role:   models.DeployerRole,
+				RoleID: models.DeployerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			current: &models.NamespaceMembership{
@@ -293,11 +298,11 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1",
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			namespaceMemberships: []models.NamespaceMembership{
-				{Metadata: models.ResourceMetadata{ID: "1"}, Role: models.OwnerRole},
+				{Metadata: models.ResourceMetadata{ID: "1"}, RoleID: models.OwnerRoleID.String()},
 			},
 			hasOwnerRole:    true,
 			expectErrorCode: errors.EInvalid,
@@ -309,7 +314,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1",
 				},
-				Role:   models.DeployerRole,
+				RoleID: models.DeployerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			hasOwnerRole:    true,
@@ -322,7 +327,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				Namespace: models.MembershipNamespace{
 					Path: "ns1",
 				},
-				Role:   models.DeployerRole,
+				RoleID: models.DeployerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			hasOwnerRole:    false,
@@ -341,13 +346,15 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			retFunc := func(_ context.Context, _ string, _ models.Role) error {
-				if test.hasOwnerRole {
-					return nil
-				}
-				return errors.NewError(errors.EForbidden, "Forbidden")
+			mockRoles := db.MockRoles{}
+			mockRoles.Test(t)
+
+			var authError error
+			if !test.hasOwnerRole {
+				authError = errors.NewError(errors.EForbidden, "not authorized")
 			}
-			mockCaller.On("RequireAccessToNamespace", mock.Anything, test.input.Namespace.Path, models.OwnerRole).Return(retFunc)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateNamespaceMembershipPermission, mock.Anything).Return(authError)
 
 			mockNamespaceMemberships.On("GetNamespaceMembershipByID", mock.Anything, test.input.Metadata.ID).Return(test.current, nil)
 
@@ -363,6 +370,18 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 			mockNamespaceMemberships.On("UpdateNamespaceMembership", mock.Anything, test.input).Return(test.input, nil)
 
+			mockRoles.On("GetRoleByID", mock.Anything, test.input.RoleID).Return(&models.Role{
+				Metadata: models.ResourceMetadata{ID: test.input.RoleID},
+				Name:     "role-1",
+			}, nil)
+
+			if test.current != nil {
+				mockRoles.On("GetRoleByID", mock.Anything, test.current.RoleID).Return(&models.Role{
+					Metadata: models.ResourceMetadata{ID: test.current.RoleID},
+					Name:     "role-2",
+				}, nil)
+			}
+
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 			// The mocks are enabled by the above function.
@@ -370,6 +389,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			dbClient := db.Client{
 				NamespaceMemberships: &mockNamespaceMemberships,
 				Transactions:         &mockTransactions,
+				Roles:                &mockRoles,
 			}
 
 			mockActivityEvents := activityevent.MockService{}
@@ -414,12 +434,12 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					Path:    "ns1",
 					GroupID: ptr.String("group1"),
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			namespaceMemberships: []models.NamespaceMembership{
-				{Metadata: models.ResourceMetadata{ID: "1"}, Role: models.OwnerRole},
-				{Metadata: models.ResourceMetadata{ID: "2"}, Role: models.OwnerRole},
+				{Metadata: models.ResourceMetadata{ID: "1"}, RoleID: models.OwnerRoleID.String()},
+				{Metadata: models.ResourceMetadata{ID: "2"}, RoleID: models.OwnerRoleID.String()},
 			},
 			hasOwnerRole: true,
 		},
@@ -431,7 +451,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					Path:    "ns1/ns11",
 					GroupID: ptr.String("group1"),
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			hasOwnerRole: true,
@@ -444,11 +464,11 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					Path:        "ns1",
 					WorkspaceID: ptr.String("ws1"),
 				},
-				Role:   models.OwnerRole,
+				RoleID: models.OwnerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			namespaceMemberships: []models.NamespaceMembership{
-				{Metadata: models.ResourceMetadata{ID: "1"}, Role: models.OwnerRole},
+				{Metadata: models.ResourceMetadata{ID: "1"}, RoleID: models.OwnerRoleID.String()},
 			},
 			hasOwnerRole:    true,
 			expectErrorCode: errors.EInvalid,
@@ -461,7 +481,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					Path:        "ns1",
 					WorkspaceID: ptr.String("ws1"),
 				},
-				Role:   models.DeployerRole,
+				RoleID: models.DeployerRoleID.String(),
 				UserID: ptr.String("user1"),
 			},
 			hasOwnerRole:    false,
@@ -480,13 +500,12 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			retFunc := func(_ context.Context, _ string, _ models.Role) error {
-				if test.hasOwnerRole {
-					return nil
-				}
-				return errors.NewError(errors.EForbidden, "Forbidden")
+			var authError error
+			if !test.hasOwnerRole {
+				authError = errors.NewError(errors.EForbidden, "not authorized")
 			}
-			mockCaller.On("RequireAccessToNamespace", mock.Anything, test.input.Namespace.Path, models.OwnerRole).Return(retFunc)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteNamespaceMembershipPermission, mock.Anything).Return(authError)
 
 			getNamespaceMembershipsInput := &db.GetNamespaceMembershipsInput{
 				Filter: &db.NamespaceMembershipFilter{

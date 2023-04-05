@@ -11,6 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jwt"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -27,7 +28,11 @@ type UserCaller struct {
 
 // NewUserCaller returns a new UserCaller
 func NewUserCaller(user *models.User, authorizer Authorizer, dbClient *db.Client) *UserCaller {
-	return &UserCaller{User: user, authorizer: authorizer, dbClient: dbClient}
+	return &UserCaller{
+		User:       user,
+		authorizer: authorizer,
+		dbClient:   dbClient,
+	}
 }
 
 // GetSubject returns the subject identifier for this caller
@@ -54,119 +59,43 @@ func (u *UserCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAc
 	return &NamespaceAccessPolicy{AllowAll: false, RootNamespaceIDs: ids}, nil
 }
 
-// RequireAccessToNamespace will return an error if the caller doesn't have the specified access level
-func (u *UserCaller) RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error {
-	if u.User.Admin {
+// RequirePermission will return an error if the caller doesn't have the specified permissions
+func (u *UserCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	if perm.IsAssignable() && u.User.Admin {
+		// User is an admin, so assignable permission can be granted.
 		return nil
 	}
-	return u.authorizer.RequireAccessToNamespace(ctx, namespacePath, accessLevel)
+
+	if handlerFunc, ok := u.getPermissionHandler(perm); ok {
+		return handlerFunc(ctx, &perm, getConstraints(checks...))
+	}
+
+	// Lastly, check the authorizer.
+	return u.authorizer.RequireAccess(ctx, []permissions.Permission{perm}, checks...)
 }
 
-// RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group
-func (u *UserCaller) RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error {
-	if u.User.Admin {
+// RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
+func (u *UserCaller) RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error {
+	perm := permissions.Permission{Action: permissions.ViewAction, ResourceType: resourceType}
+	if perm.IsAssignable() && u.User.Admin {
+		// User is an admin, so assignable permission can be granted.
 		return nil
 	}
-	return u.authorizer.RequireAccessToGroup(ctx, groupID, accessLevel)
+
+	return u.authorizer.RequireAccessToInheritableResource(ctx, []permissions.ResourceType{resourceType}, checks...)
 }
 
-// RequireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (u *UserCaller) RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
-	if u.User.Admin {
-		return nil
+// requireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
+func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.teamID == nil {
+		return errMissingConstraints
 	}
-	return u.authorizer.RequireAccessToInheritedGroupResource(ctx, groupID)
-}
 
-// RequireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (u *UserCaller) RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error {
-	if u.User.Admin {
-		return nil
-	}
-	return u.authorizer.RequireAccessToInheritedNamespaceResource(ctx, namespace)
-}
-
-// RequireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace
-func (u *UserCaller) RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error {
-	if u.User.Admin {
-		return nil
-	}
-	return u.authorizer.RequireAccessToWorkspace(ctx, workspaceID, accessLevel)
-}
-
-// RequireViewerAccessToGroups will return an error if the caller doesn't have viewer access to all the specified groups
-func (u *UserCaller) RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error {
-	if u.User.Admin {
-		return nil
-	}
-	return u.authorizer.RequireViewerAccessToGroups(ctx, groups)
-}
-
-// RequireViewerAccessToWorkspaces will return an error if the caller doesn't have viewer access on the specified workspace
-func (u *UserCaller) RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error {
-	if u.User.Admin {
-		return nil
-	}
-	return u.authorizer.RequireViewerAccessToWorkspaces(ctx, workspaces)
-}
-
-// RequireViewerAccessToNamespaces will return an error if the caller doesn't have viewer access to the specified list of namespaces
-func (u *UserCaller) RequireViewerAccessToNamespaces(ctx context.Context, namespaces []string) error {
-	if u.User.Admin {
-		return nil
-	}
-	return u.authorizer.RequireViewerAccessToNamespaces(ctx, namespaces)
-}
-
-// RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state
-func (u *UserCaller) RequireRunWriteAccess(ctx context.Context, _ string) error {
-	// Return authorization error because users don't have run write access
-	return authorizationError(ctx, false)
-}
-
-// RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (u *UserCaller) RequirePlanWriteAccess(ctx context.Context, _ string) error {
-	// Return authorization error because users don't have plan write access
-	return authorizationError(ctx, false)
-}
-
-// RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (u *UserCaller) RequireApplyWriteAccess(ctx context.Context, _ string) error {
-	// Return authorization error because users don't have apply write access
-	return authorizationError(ctx, false)
-}
-
-// RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job
-func (u *UserCaller) RequireJobWriteAccess(ctx context.Context, _ string) error {
-	// Return authorization error because users accounts don't have job write access
-	return authorizationError(ctx, false)
-}
-
-// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (u *UserCaller) RequireRunnerAccess(ctx context.Context, _ string) error {
-	// Return authorization error because users don't have runner access
-	return authorizationError(ctx, false)
-}
-
-// RequireTeamCreateAccess will return an error if the specified access is not allowed to the indicated team.
-// For now, only admins are allowed to create a team.
-// Eventually, org admins and SCIM will be allowed to create and delete teams.
-func (u *UserCaller) RequireTeamCreateAccess(ctx context.Context) error {
 	if u.User.Admin {
 		return nil
 	}
 
-	// All users have viewer access to teams.
-	return authorizationError(ctx, true)
-}
-
-// RequireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
-func (u *UserCaller) RequireTeamUpdateAccess(ctx context.Context, teamID string) error {
-	if u.User.Admin {
-		return nil
-	}
-
-	teamMember, err := u.dbClient.TeamMembers.GetTeamMember(ctx, u.User.Metadata.ID, teamID)
+	teamMember, err := u.dbClient.TeamMembers.GetTeamMember(ctx, u.User.Metadata.ID, *checks.teamID)
 	if err != nil {
 		return err
 	}
@@ -176,14 +105,11 @@ func (u *UserCaller) RequireTeamUpdateAccess(ctx context.Context, teamID string)
 		return nil
 	}
 
-	// All others are denied.  Viewer access is available to everyone.
+	// All others are denied. Viewer access is available to everyone.
 	return authorizationError(ctx, true)
 }
 
-// RequireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-// For now, only admins are allowed to delete a team.
-// Eventually, org admins and SCIM will be allowed to create and delete teams.
-func (u *UserCaller) RequireTeamDeleteAccess(ctx context.Context, _ string) error {
+func (u *UserCaller) requireAdmin(ctx context.Context, _ *permissions.Permission, _ *constraints) error {
 	if u.User.Admin {
 		return nil
 	}
@@ -191,33 +117,20 @@ func (u *UserCaller) RequireTeamDeleteAccess(ctx context.Context, _ string) erro
 	return authorizationError(ctx, false)
 }
 
-// RequireUserCreateAccess will return an error if the specified caller is not allowed to create users.
-func (u *UserCaller) RequireUserCreateAccess(ctx context.Context) error {
-	if u.User.Admin {
-		return nil
+// getPermissionHandler returns a permissionTypeHandler for a given permission.
+func (u *UserCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[permissions.Permission]permissionTypeHandler{
+		permissions.CreateTeamPermission: u.requireAdmin,
+		permissions.UpdateTeamPermission: u.requireAdmin,
+		permissions.DeleteTeamPermission: u.requireAdmin,
+		permissions.CreateUserPermission: u.requireAdmin,
+		permissions.UpdateUserPermission: u.requireAdmin,
+		permissions.DeleteUserPermission: u.requireAdmin,
+		permissions.UpdateTeamPermission: u.requireTeamUpdateAccess,
 	}
 
-	// All others are denied.  Viewer access is available to everyone.
-	return authorizationError(ctx, true)
-}
-
-// RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (u *UserCaller) RequireUserUpdateAccess(ctx context.Context, _ string) error {
-	if u.User.Admin {
-		return nil
-	}
-
-	// All others are denied.  Viewer access is available to everyone.
-	return authorizationError(ctx, true)
-}
-
-// RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (u *UserCaller) RequireUserDeleteAccess(ctx context.Context, _ string) error {
-	if u.User.Admin {
-		return nil
-	}
-
-	return authorizationError(ctx, false)
+	handler, ok := handlerMap[perm]
+	return handler, ok
 }
 
 // GetTeams does lazy initialization of the list of teams for this user caller.

@@ -25,7 +25,7 @@ type JWTClaim struct {
 	Value string
 }
 
-// OIDCTrustPolicy specified the trust policies for a service account
+// OIDCTrustPolicy specifies the trust policies for a service account
 type OIDCTrustPolicy struct {
 	Issuer      string
 	BoundClaims []JWTClaim
@@ -251,10 +251,6 @@ func serviceAccountQuery(ctx context.Context, args *ServiceAccountQueryArgs) (*S
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if serviceAccount == nil {
-		return nil, nil
 	}
 
 	return &ServiceAccountResolver{serviceAccount: serviceAccount}, nil

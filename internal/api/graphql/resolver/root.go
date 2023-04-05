@@ -1000,6 +1000,53 @@ func (r RootResolver) CreateVCSRun(ctx context.Context,
 	return response, nil
 }
 
+/* Role queries and mutations */
+
+// AvailableRolePermissions returns a list of available role permissions.
+func (r RootResolver) AvailableRolePermissions(ctx context.Context) ([]string, error) {
+	return availableRolePermissionsQuery(ctx)
+}
+
+// Role query returns a role by name
+func (r RootResolver) Role(ctx context.Context, args *RoleQueryArgs) (*RoleResolver, error) {
+	return roleQuery(ctx, args)
+}
+
+// Roles query returns a roles connection
+func (r RootResolver) Roles(ctx context.Context, args *RolesConnectionQueryArgs) (*RoleConnectionResolver, error) {
+	return rolesQuery(ctx, args)
+}
+
+// CreateRole creates a role
+func (r RootResolver) CreateRole(ctx context.Context, args *struct{ Input *CreateRoleInput }) (*RoleMutationPayloadResolver, error) {
+	response, err := createRoleMutation(ctx, args.Input)
+	if err != nil {
+		return handleRoleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateRole updates a role
+func (r RootResolver) UpdateRole(ctx context.Context, args *struct{ Input *UpdateRoleInput }) (*RoleMutationPayloadResolver, error) {
+	response, err := updateRoleMutation(ctx, args.Input)
+	if err != nil {
+		return handleRoleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteRole updates a role
+func (r RootResolver) DeleteRole(ctx context.Context, args *struct{ Input *DeleteRoleInput }) (*RoleMutationPayloadResolver, error) {
+	response, err := deleteRoleMutation(ctx, args.Input)
+	if err != nil {
+		return handleRoleMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Auth Settings Query */
 
 // AuthSettings returns the configured auth settings

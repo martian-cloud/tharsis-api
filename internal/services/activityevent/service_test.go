@@ -188,20 +188,6 @@ func TestCreateActivityEvent(t *testing.T) {
 	fakeErrorInvalidUsername := fmt.Errorf("fake error: invalid username")
 	fakeErrorInvalidServiceAccountName := fmt.Errorf("fake error: invalid service account name")
 	fakeErrorInvalidNamespace := fmt.Errorf("fake error: invalid namespace path")
-	fakeErrorNoPermission := fmt.Errorf("fake error: user has no permission in namespace")
-
-	// Start mocking out the necessary functions.
-	mockAuthorizer := auth.MockAuthorizer{}
-	mockAuthorizer.Test(t)
-
-	mockAuthorizer.On("RequireAccessToNamespace", mock.Anything, "namespace-path-u-1", models.DeployerRole).
-		Return(nil)
-	mockAuthorizer.On("RequireAccessToNamespace", mock.Anything, "namespace-path-sa-1", models.DeployerRole).
-		Return(nil)
-	mockAuthorizer.On("RequireAccessToNamespace", mock.Anything, "invalid", models.DeployerRole).
-		Return(nil)
-	mockAuthorizer.On("RequireAccessToNamespace", mock.Anything, "namespace-path-2", models.DeployerRole).
-		Return(fakeErrorNoPermission)
 
 	type testCase struct {
 		expectError          error
@@ -311,11 +297,11 @@ func TestCreateActivityEvent(t *testing.T) {
 			var testCaller auth.Caller
 			switch {
 			case test.callerUser != nil:
-				newUserCaller := auth.NewUserCaller(test.callerUser, &mockAuthorizer, dbClient.Client)
+				newUserCaller := auth.NewUserCaller(test.callerUser, nil, dbClient.Client)
 				testCaller = auth.Caller(newUserCaller)
 			case test.callerServiceAccount != nil:
 				newServiceAccountCaller := auth.NewServiceAccountCaller(test.callerServiceAccount.Metadata.ID,
-					test.callerServiceAccount.ResourcePath, &mockAuthorizer, nil)
+					test.callerServiceAccount.ResourcePath, nil, nil)
 				testCaller = auth.Caller(newServiceAccountCaller)
 			}
 

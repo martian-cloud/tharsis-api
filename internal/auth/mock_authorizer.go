@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	permissions "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
@@ -40,13 +41,20 @@ func (_m *MockAuthorizer) GetRootNamespaces(ctx context.Context) ([]models.Membe
 	return r0, r1
 }
 
-// RequireAccessToGroup provides a mock function with given fields: ctx, groupID, accessLevel
-func (_m *MockAuthorizer) RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error {
-	ret := _m.Called(ctx, groupID, accessLevel)
+// RequireAccess provides a mock function with given fields: ctx, perms, checks
+func (_m *MockAuthorizer) RequireAccess(ctx context.Context, perms []permissions.Permission, checks ...func(*constraints)) error {
+	_va := make([]interface{}, len(checks))
+	for _i := range checks {
+		_va[_i] = checks[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, perms)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, models.Role) error); ok {
-		r0 = rf(ctx, groupID, accessLevel)
+	if rf, ok := ret.Get(0).(func(context.Context, []permissions.Permission, ...func(*constraints)) error); ok {
+		r0 = rf(ctx, perms, checks...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -54,97 +62,20 @@ func (_m *MockAuthorizer) RequireAccessToGroup(ctx context.Context, groupID stri
 	return r0
 }
 
-// RequireAccessToInheritedGroupResource provides a mock function with given fields: ctx, groupID
-func (_m *MockAuthorizer) RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
-	ret := _m.Called(ctx, groupID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, groupID)
-	} else {
-		r0 = ret.Error(0)
+// RequireAccessToInheritableResource provides a mock function with given fields: ctx, resourceTypes, checks
+func (_m *MockAuthorizer) RequireAccessToInheritableResource(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error {
+	_va := make([]interface{}, len(checks))
+	for _i := range checks {
+		_va[_i] = checks[_i]
 	}
-
-	return r0
-}
-
-// RequireAccessToInheritedNamespaceResource provides a mock function with given fields: ctx, namespace
-func (_m *MockAuthorizer) RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error {
-	ret := _m.Called(ctx, namespace)
+	var _ca []interface{}
+	_ca = append(_ca, ctx, resourceTypes)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, namespace)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RequireAccessToNamespace provides a mock function with given fields: ctx, namespacePath, accessLevel
-func (_m *MockAuthorizer) RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error {
-	ret := _m.Called(ctx, namespacePath, accessLevel)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, models.Role) error); ok {
-		r0 = rf(ctx, namespacePath, accessLevel)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RequireAccessToWorkspace provides a mock function with given fields: ctx, workspaceID, accessLevel
-func (_m *MockAuthorizer) RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error {
-	ret := _m.Called(ctx, workspaceID, accessLevel)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, models.Role) error); ok {
-		r0 = rf(ctx, workspaceID, accessLevel)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RequireViewerAccessToGroups provides a mock function with given fields: ctx, groups
-func (_m *MockAuthorizer) RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error {
-	ret := _m.Called(ctx, groups)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []models.Group) error); ok {
-		r0 = rf(ctx, groups)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RequireViewerAccessToNamespaces provides a mock function with given fields: ctx, requiredNamespaces
-func (_m *MockAuthorizer) RequireViewerAccessToNamespaces(ctx context.Context, requiredNamespaces []string) error {
-	ret := _m.Called(ctx, requiredNamespaces)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string) error); ok {
-		r0 = rf(ctx, requiredNamespaces)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RequireViewerAccessToWorkspaces provides a mock function with given fields: ctx, workspaces
-func (_m *MockAuthorizer) RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error {
-	ret := _m.Called(ctx, workspaces)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []models.Workspace) error); ok {
-		r0 = rf(ctx, workspaces)
+	if rf, ok := ret.Get(0).(func(context.Context, []permissions.ResourceType, ...func(*constraints)) error); ok {
+		r0 = rf(ctx, resourceTypes, checks...)
 	} else {
 		r0 = ret.Error(0)
 	}

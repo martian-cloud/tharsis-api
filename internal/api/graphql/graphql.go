@@ -96,6 +96,7 @@ func NewGraphQL(
 	resolver.RegisterNamespaceVariableLoader(loaderCollection)
 	resolver.RegisterVCSProviderLoader(loaderCollection)
 	resolver.RegisterVCSEventLoader(loaderCollection)
+	resolver.RegisterRoleLoader(loaderCollection)
 	resolver.RegisterRunnerLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers())

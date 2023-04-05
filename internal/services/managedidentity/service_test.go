@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -103,7 +104,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 
-			mockCaller.On("RequireAccessToNamespace", mock.Anything, test.input.NamespacePath, models.ViewerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, test.dbInput).Return(test.expectResult, nil).Maybe()
 
@@ -195,7 +196,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			expectErrorCode: errors.EInvalid,
 		},
 		{
-			name:      "negative: subject does not have deployer role in group",
+			name:      "negative: subject does not have permissions in group",
 			authError: errors.NewError(errors.EForbidden, "Forbidden"),
 			input: &DeleteManagedIdentityInput{
 				ManagedIdentity: sampleManagedIdentity,
@@ -215,18 +216,23 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("DeleteManagedIdentity", mock.Anything, test.input.ManagedIdentity).Return(nil).Maybe()
+			if !test.input.ManagedIdentity.IsAlias() {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError)
+			}
+
+			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			mockWorkspaces.On("GetWorkspacesForManagedIdentity", mock.Anything, sampleManagedIdentity.Metadata.ID).Return(test.managedIdentityWorkspaces, nil).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("DeleteManagedIdentity", mock.Anything, test.input.ManagedIdentity).Return(nil)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, test.input.ManagedIdentity.GroupID, models.DeployerRole).Return(test.authError).Maybe()
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -293,9 +299,11 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspaceID).Return(test.expectResult, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspaceID).Return(test.expectResult, nil)
+			}
 
-			mockCaller.On("RequireAccessToWorkspace", mock.Anything, test.workspaceID, models.ViewerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -389,7 +397,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			expectErrorCode:   errors.EInvalid,
 		},
 		{
-			name:              "negative: subject does not have deployer access to workspace",
+			name:              "negative: subject does not have permissions for workspace",
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
 			authError:         errors.NewError(errors.EForbidden, "Forbidden"),
@@ -408,20 +416,29 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
+
+			if test.identitiesInWorkspace != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
+
+				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspaceID).Return(test.identitiesInWorkspace, nil)
+			}
+
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.managedIdentityID).Return(test.existingManagedIdentity, nil).Maybe()
-			mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspaceID).Return(test.identitiesInWorkspace, nil).Maybe()
-			mockManagedIdentities.On("AddManagedIdentityToWorkspace", mock.Anything, test.managedIdentityID, test.workspaceID).Return(nil).Maybe()
 
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspaceID).Return(test.existingWorkspace, nil).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockCaller.On("GetSubject").Return("mockSubject")
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockManagedIdentities.On("AddManagedIdentityToWorkspace", mock.Anything, test.managedIdentityID, test.workspaceID).Return(nil)
 
-			mockCaller.On("RequireAccessToWorkspace", mock.Anything, test.workspaceID, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -490,7 +507,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			expectErrorCode:   errors.ENotFound,
 		},
 		{
-			name:              "negative: subject does not have deployer access to workspace",
+			name:              "negative: subject does not have permissions for workspace",
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
 			authError:         errors.NewError(errors.EForbidden, "Forbidden"),
@@ -509,19 +526,25 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.managedIdentityID).Return(test.existingManagedIdentity, nil).Maybe()
-			mockManagedIdentities.On("RemoveManagedIdentityFromWorkspace", mock.Anything, test.managedIdentityID, test.workspaceID).Return(nil).Maybe()
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
 
-			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspaceID).Return(sampleWorkspace, nil).Maybe()
+			if test.authError == nil {
+				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.managedIdentityID).Return(test.existingManagedIdentity, nil)
+			}
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("RemoveManagedIdentityFromWorkspace", mock.Anything, test.managedIdentityID, test.workspaceID).Return(nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspaceID).Return(sampleWorkspace, nil)
 
-			mockCaller.On("RequireAccessToWorkspace", mock.Anything, test.workspaceID, mock.Anything).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+				mockCaller.On("GetSubject").Return("mockSubject")
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -594,7 +617,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.searchID).Return(test.expectManagedIdentity, nil)
 
-			mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, sampleManagedIdentity.GroupID).Return(test.authError).Maybe()
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -667,7 +690,7 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentityByPath", mock.Anything, test.searchPath).Return(test.expectManagedIdentity, nil).Maybe()
 
-			mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, sampleManagedIdentity.GroupID).Return(test.authError).Maybe()
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -866,23 +889,29 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("CreateManagedIdentity", mock.Anything, test.createInput).Return(test.expectCreatedAlias, nil).Maybe()
-			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, mock.Anything).Return(test.existingManagedIdentity, nil).Maybe()
+			if test.authError == nil {
+				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, mock.Anything).Return(test.existingManagedIdentity, nil)
+			}
 
 			mockGroups.On("GetGroupByID", mock.Anything, mock.Anything).Return(test.existingGroup, nil).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockCaller.On("GetSubject").Return("mockSubject")
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockManagedIdentities.On("CreateManagedIdentity", mock.Anything, test.createInput).Return(test.expectCreatedAlias, nil)
 
-			if test.existingGroup != nil {
-				mockCaller.On("RequireAccessToGroup", mock.Anything, test.existingGroup.Metadata.ID, models.OwnerRole).Return(test.authError)
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, test.input.Group.Metadata.ID, models.OwnerRole).Return(test.authError)
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			if test.existingGroup != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
+			}
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1007,22 +1036,28 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, sampleSourceIdentity.Metadata.ID).Return(test.sourceIdentity, nil).Maybe()
-			mockManagedIdentities.On("DeleteManagedIdentity", mock.Anything, test.input.ManagedIdentity).Return(nil).Maybe()
 
-			mockWorkspaces.On("GetWorkspacesForManagedIdentity", mock.Anything, sampleManagedIdentityAlias.Metadata.ID).Return(test.managedIdentityWorkspaces, nil).Maybe()
+			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockManagedIdentities.On("DeleteManagedIdentity", mock.Anything, test.input.ManagedIdentity).Return(nil)
 
-			if test.sourceIdentity != nil {
-				mockCaller.On("RequireAccessToGroup", mock.Anything, test.sourceIdentity.GroupID, models.OwnerRole).Return(test.authError).Maybe()
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, test.input.ManagedIdentity.GroupID, models.OwnerRole).Return(test.authError).Maybe()
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			if !test.input.Force {
+				mockWorkspaces.On("GetWorkspacesForManagedIdentity", mock.Anything, sampleManagedIdentityAlias.Metadata.ID).Return(test.managedIdentityWorkspaces, nil).Maybe()
+			}
+
+			if test.sourceIdentity != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError).Maybe()
+			}
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1203,7 +1238,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			expectErrorCode: errors.EInvalid,
 		},
 		{
-			name: "negative: subject does not have owner role for group",
+			name: "negative: subject does not have perms for group",
 			input: &CreateManagedIdentityInput{
 				Type:    models.ManagedIdentityAWSFederated,
 				Name:    "a-managed-identity",
@@ -1240,7 +1275,8 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 			mockDelegate.On("SetManagedIdentityData", mock.Anything, sampleManagedIdentity, sampleManagedIdentity.Data).Return(nil).Maybe()
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, test.input.GroupID, models.OwnerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
+
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			dbClient := &db.Client{
@@ -1279,7 +1315,8 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "some-managed-identity-id",
 		},
-		GroupID: "some-group-id",
+		GroupID:      "some-group-id",
+		ResourcePath: "some-group/some-identity",
 	}
 
 	inputList := []string{
@@ -1334,7 +1371,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, test.dbInput).Return(test.expectResult, nil)
 
-			mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, sampleManagedIdentity.GroupID).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1463,22 +1500,25 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			mockDelegate := NewMockDelegate(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ID).Return(test.existingManagedIdentity, nil)
-			mockManagedIdentities.On("UpdateManagedIdentity", mock.Anything, test.existingManagedIdentity).Return(test.expectManagedIdentity, nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("UpdateManagedIdentity", mock.Anything, test.existingManagedIdentity).Return(test.expectManagedIdentity, nil)
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockCaller.On("GetSubject").Return("mockSubject")
 
-			mockDelegate.On("SetManagedIdentityData", mock.Anything, test.existingManagedIdentity, test.input.Data).Return(nil).Maybe()
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-			if test.existingManagedIdentity != nil {
-				mockCaller.On("RequireAccessToGroup", mock.Anything, test.existingManagedIdentity.GroupID, models.OwnerRole).Return(test.authError).Maybe()
+				mockDelegate.On("SetManagedIdentityData", mock.Anything, test.existingManagedIdentity, test.input.Data).Return(nil)
 			}
 
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ID).Return(test.existingManagedIdentity, nil)
+
+			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1587,7 +1627,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, test.dbInput).Return(test.dbResult, nil).Maybe()
 
-			mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, test.input.GroupID).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1630,7 +1670,8 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "some-managed-identity-id",
 				},
-				GroupID: "some-group-id",
+				GroupID:      "some-group-id",
+				ResourcePath: "some-group/some-identity",
 			},
 		},
 	}
@@ -1699,7 +1740,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 			mockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, test.ruleDBInput).Return(test.dbResult, nil)
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, test.identityDBInput).Return(sampleIdentitiesResult, nil)
 
-			mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, mock.Anything).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1781,7 +1822,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 			mockManagedIdentities.On("GetManagedIdentityAccessRule", mock.Anything, test.searchID).Return(test.expectAccessRule, nil)
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, sampleManagedIdentity.Metadata.ID).Return(sampleManagedIdentity, nil).Maybe()
 
-			mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, mock.Anything).Return(test.authError).Maybe()
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1910,22 +1951,23 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("CreateManagedIdentityAccessRule", mock.Anything, test.input).Return(test.expectAccessRule, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
+			}
+
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ManagedIdentityID).Return(test.existingManagedIdentity, nil)
-			mockManagedIdentities.On("CreateManagedIdentityAccessRule", mock.Anything, test.input).Return(test.expectAccessRule, nil).Maybe()
 
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(test.existingServiceAccount, nil).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
-
-			if test.existingManagedIdentity != nil {
-				mockCaller.On("RequireAccessToGroup", mock.Anything, test.existingManagedIdentity.GroupID, models.OwnerRole).Return(test.authError).Maybe()
+			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
-
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -2052,22 +2094,23 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("UpdateManagedIdentityAccessRule", mock.Anything, test.input).Return(test.expectAccessRule, nil)
+
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			}
+
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ManagedIdentityID).Return(test.existingManagedIdentity, nil)
-			mockManagedIdentities.On("UpdateManagedIdentityAccessRule", mock.Anything, test.input).Return(test.expectAccessRule, nil).Maybe()
 
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(test.existingServiceAccount, nil).Maybe()
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
-
-			if test.existingManagedIdentity != nil {
-				mockCaller.On("RequireAccessToGroup", mock.Anything, test.existingManagedIdentity.GroupID, models.OwnerRole).Return(test.authError).Maybe()
+			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
-
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -2174,20 +2217,21 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ManagedIdentityID).Return(test.existingManagedIdentity, nil)
-			mockManagedIdentities.On("DeleteManagedIdentityAccessRule", mock.Anything, test.input).Return(nil).Maybe()
+			if test.expectErrorCode == "" {
+				mockManagedIdentities.On("DeleteManagedIdentityAccessRule", mock.Anything, test.input).Return(nil)
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil).Maybe()
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
-
-			if test.existingManagedIdentity != nil {
-				mockCaller.On("RequireAccessToGroup", mock.Anything, test.existingManagedIdentity.GroupID, models.OwnerRole).Return(test.authError).Maybe()
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
 
-			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ManagedIdentityID).Return(test.existingManagedIdentity, nil)
+
+			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -2279,11 +2323,15 @@ func TestCreateCredentials(t *testing.T) {
 			mockJobService := job.NewMockService(t)
 			mockDelegate := NewMockDelegate(t)
 
-			mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, sampleJob.WorkspaceID).Return(test.existingManagedIdentities, nil).Maybe()
+			if test.existingManagedIdentities != nil {
+				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, sampleJob.WorkspaceID).Return(test.existingManagedIdentities, nil)
 
-			mockJobService.On("GetJob", mock.Anything, mock.Anything).Return(sampleJob, nil).Maybe()
+				mockJobService.On("GetJob", mock.Anything, mock.Anything).Return(sampleJob, nil)
+			}
 
-			mockDelegate.On("CreateCredentials", mock.Anything, test.input, sampleJob).Return([]byte("some-credentials"), nil).Maybe()
+			if test.expectCredentials != nil {
+				mockDelegate.On("CreateCredentials", mock.Anything, test.input, sampleJob).Return([]byte("some-credentials"), nil)
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -84,9 +85,17 @@ func (s *service) GetGroupsByIDs(ctx context.Context, idList []string) ([]models
 		return nil, err
 	}
 
+	paths := []string{}
+	for _, g := range resp.Groups {
+		paths = append(paths, g.FullPath)
+	}
+
 	// Verify user has access to all returned groups
-	if err := caller.RequireViewerAccessToGroups(ctx, resp.Groups); err != nil {
-		return nil, err
+	if len(paths) > 0 {
+		err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePaths(paths))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return resp.Groups, nil
@@ -105,7 +114,8 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 	}
 
 	if input.ParentGroup != nil {
-		if err := caller.RequireAccessToNamespace(ctx, input.ParentGroup.FullPath, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(input.ParentGroup.FullPath))
+		if err != nil {
 			return nil, err
 		}
 		dbInput.Filter.ParentID = &input.ParentGroup.Metadata.ID
@@ -144,7 +154,8 @@ func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, e
 		)
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, group.FullPath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -169,7 +180,8 @@ func (s *service) GetGroupByFullPath(ctx context.Context, path string) (*models.
 		)
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, group.FullPath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -182,16 +194,9 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 		return err
 	}
 
-	if input.Group.ParentID == "" {
-		// Require owner role to delete top level groups
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.OwnerRole); err != nil {
-			return err
-		}
-	} else {
-		// Require deployer role to delete nested groups
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.DeployerRole); err != nil {
-			return err
-		}
+	err = caller.RequirePermission(ctx, permissions.DeleteGroupPermission, auth.WithGroupID(input.Group.Metadata.ID))
+	if err != nil {
+		return err
 	}
 
 	s.logger.Infow("Requested deletion of a group.",
@@ -278,7 +283,8 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 	}
 
 	if input.ParentID != "" {
-		if err = caller.RequireAccessToGroup(ctx, input.ParentID, models.DeployerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.CreateGroupPermission, auth.WithGroupID(input.ParentID))
+		if err != nil {
 			return nil, err
 		}
 	} else {
@@ -330,7 +336,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		// Create namespace membership for caller with owner access level
 		namespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
 			NamespacePath: group.FullPath,
-			Role:          models.OwnerRole,
+			RoleID:        models.OwnerRoleID.String(),
 			User:          caller.(*auth.UserCaller).User,
 		}
 
@@ -359,7 +365,8 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, group.FullPath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateGroupPermission, auth.WithGroupID(group.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -425,8 +432,9 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		)
 	}
 
-	// Caller must be owner of the group being moved.
-	if err = caller.RequireAccessToNamespace(ctx, group.FullPath, models.OwnerRole); err != nil {
+	// Caller must have UpdateGroupPermission in the group being moved.
+	err = caller.RequirePermission(ctx, permissions.DeleteGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -463,9 +471,10 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 			return nil, errors.NewError(errors.EInvalid, "Cannot move a group under one of its descendants")
 		}
 
-		// If there is a new parent, the caller must be at least deployer of the new parent.
-		if nErr = caller.RequireAccessToNamespace(ctx, newParent.FullPath, models.DeployerRole); nErr != nil {
-			return nil, nErr
+		// If there is a new parent, the caller must have CreateGroupPermission in the new parent.
+		err = caller.RequirePermission(ctx, permissions.CreateGroupPermission, auth.WithNamespacePath(newParent.FullPath))
+		if err != nil {
+			return nil, err
 		}
 
 		newParentPath = newParent.FullPath
@@ -524,6 +533,9 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 			Action:        models.ActionMigrate,
 			TargetType:    models.TargetGroup,
 			TargetID:      migratedGroup.Metadata.ID,
+			Payload: &models.ActivityEventMigrateGroupPayload{
+				PreviousGroupPath: group.FullPath,
+			},
 		}); err != nil {
 		return nil, err
 	}

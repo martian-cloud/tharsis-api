@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -66,7 +67,7 @@ func TestGetRunnerByID(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectRunner != nil && test.expectRunner.GroupID != nil {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.RunnerResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockRunners := db.NewMockRunners(t)
@@ -149,7 +150,7 @@ func TestGetRunnerByPath(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectRunner != nil && test.expectRunner.GroupID != nil {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.RunnerResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockRunners := db.NewMockRunners(t)
@@ -201,19 +202,21 @@ func TestGetRunnersByIDs(t *testing.T) {
 		{
 			name: "get group runner",
 			expectRunner: &models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerID},
-				GroupID:  &groupID,
-				Name:     "test-runner",
-				Type:     models.GroupRunnerType,
+				Metadata:     models.ResourceMetadata{ID: runnerID},
+				GroupID:      &groupID,
+				Name:         "test-runner",
+				ResourcePath: "some-group/test-runner",
+				Type:         models.GroupRunnerType,
 			},
 		},
 		{
 			name: "subject does not have access to group runner",
 			expectRunner: &models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerID},
-				GroupID:  &groupID,
-				Name:     "test-runner",
-				Type:     models.GroupRunnerType,
+				Metadata:     models.ResourceMetadata{ID: runnerID},
+				GroupID:      &groupID,
+				Name:         "test-runner",
+				ResourcePath: "some-group/test-runner",
+				Type:         models.GroupRunnerType,
 			},
 			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
@@ -230,7 +233,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectRunner != nil && test.expectRunner.GroupID != nil {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.RunnerResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockRunners := db.NewMockRunners(t)
@@ -322,7 +325,7 @@ func TestGetRunners(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequireAccessToNamespace", mock.Anything, test.input.NamespacePath, models.ViewerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunnerPermission, mock.Anything).Return(test.authError)
 
 			mockRunners := db.NewMockRunners(t)
 
@@ -414,7 +417,8 @@ func TestCreateRunner(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.OwnerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunnerPermission, mock.Anything).Return(test.authError)
+
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -500,7 +504,8 @@ func TestUpdateRunner(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.OwnerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateRunnerPermission, mock.Anything).Return(test.authError)
+
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -584,7 +589,8 @@ func TestDeleteRunner(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.OwnerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteRunnerPermission, mock.Anything).Return(test.authError)
+
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)

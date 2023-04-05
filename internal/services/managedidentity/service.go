@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -125,8 +126,9 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 		return nil, err
 	}
 
+	perm := permissions.ViewManagedIdentityPermission
 	if input.NamespacePath != "" {
-		if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
+		if err = caller.RequirePermission(ctx, perm, auth.WithNamespacePath(input.NamespacePath)); err != nil {
 			return nil, err
 		}
 	} else if input.AliasSourceID != nil {
@@ -135,7 +137,7 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 			return nil, gErr
 		}
 
-		if err = caller.RequireAccessToGroup(ctx, sourceIdentity.GroupID, models.ViewerRole); err != nil {
+		if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(sourceIdentity.GroupID)); err != nil {
 			return nil, err
 		}
 	} else {
@@ -187,8 +189,9 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 		return errors.NewError(errors.EInvalid, "Only a source managed identity can be deleted, not an alias")
 	}
 
-	if rErr := caller.RequireAccessToGroup(ctx, input.ManagedIdentity.GroupID, models.DeployerRole); rErr != nil {
-		return rErr
+	err = caller.RequirePermission(ctx, permissions.DeleteManagedIdentityPermission, auth.WithGroupID(input.ManagedIdentity.GroupID))
+	if err != nil {
+		return err
 	}
 
 	s.logger.Infow("Requested to delete a managed identity.",
@@ -254,7 +257,8 @@ func (s *service) GetManagedIdentitiesForWorkspace(ctx context.Context, workspac
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, workspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewManagedIdentityPermission, auth.WithWorkspaceID(workspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -272,7 +276,8 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, workspaceID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	if err != nil {
 		return err
 	}
 
@@ -353,8 +358,9 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 		return err
 	}
 
-	if rErr := caller.RequireAccessToWorkspace(ctx, workspaceID, models.DeployerRole); rErr != nil {
-		return rErr
+	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	if err != nil {
+		return err
 	}
 
 	// Get managed identity that will be removed
@@ -419,7 +425,8 @@ func (s *service) GetManagedIdentityByID(ctx context.Context, id string) (*model
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, identity.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(identity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -446,7 +453,8 @@ func (s *service) GetManagedIdentityByPath(ctx context.Context, path string) (*m
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Managed identity with path %s not found", path))
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, identity.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(identity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -459,8 +467,9 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		return nil, err
 	}
 
-	// Require owner role for target group (group being shared to).
-	if err = caller.RequireAccessToGroup(ctx, input.Group.Metadata.ID, models.OwnerRole); err != nil {
+	// Require permissions for target group (group being shared to).
+	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission, auth.WithGroupID(input.Group.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -484,8 +493,9 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		return nil, errors.NewError(errors.EInternal, fmt.Sprintf("Group associated with managed identity ID %s not found", aliasSourceIdentity.Metadata.ID))
 	}
 
-	// Require owner role for source group (group source managed identity belongs to).
-	if err = caller.RequireAccessToGroup(ctx, sourceGroup.Metadata.ID, models.OwnerRole); err != nil {
+	// Require permissions for source group (group source managed identity belongs to).
+	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission, auth.WithGroupID(input.Group.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -557,17 +567,19 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 		return errors.NewError(errors.EInvalid, "Only an alias may be deleted, not a source managed identity")
 	}
 
-	// First check whether they're an owner for alias' group.
-	if err = caller.RequireAccessToGroup(ctx, input.ManagedIdentity.GroupID, models.OwnerRole); err != nil {
+	// First check whether they have permissions for alias' group.
+	perm := permissions.DeleteManagedIdentityPermission
+	if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(input.ManagedIdentity.GroupID)); err != nil {
 		aliasSource, gErr := s.getManagedIdentityByID(ctx, *input.ManagedIdentity.AliasSourceID)
 		if gErr != nil {
 			return gErr
 		}
 
-		// Now check if they're an owner of group of the source managed identity.
-		if err = caller.RequireAccessToGroup(ctx, aliasSource.GroupID, models.OwnerRole); err != nil {
+		// Now check if they have permissions in group of the source managed identity.
+		if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(aliasSource.GroupID)); err != nil {
 			return err
 		}
+
 	}
 
 	s.logger.Infow("Requested to delete a managed identity alias.",
@@ -633,7 +645,8 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.OwnerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission, auth.WithGroupID(input.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -751,8 +764,14 @@ func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) (
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, identity := range results.ManagedIdentities {
-		if err := caller.RequireAccessToInheritedGroupResource(ctx, identity.GroupID); err != nil {
+		namespacePaths = append(namespacePaths, identity.GetGroupPath())
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -776,7 +795,8 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 		return nil, errors.NewError(errors.EInvalid, "Only a source managed identity can be updated, not an alias")
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -844,7 +864,8 @@ func (s *service) GetManagedIdentityAccessRules(ctx context.Context, managedIden
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToInheritedGroupResource(ctx, managedIdentity.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -917,7 +938,8 @@ func (s *service) GetManagedIdentityAccessRule(ctx context.Context, ruleID strin
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, managedIdentity.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -944,7 +966,8 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, errors.NewError(errors.EInvalid, "Access rules can be created only for source managed identities, not for aliases")
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1009,7 +1032,8 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, errors.NewError(errors.EInvalid, "Access rules can be updated only for source managed identities, not for aliases")
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -1069,8 +1093,9 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 		return errors.NewError(errors.EInvalid, "Access rules can be deleted only for source managed identities, not for aliases")
 	}
 
-	if rErr := caller.RequireAccessToGroup(ctx, managedIdentity.GroupID, models.OwnerRole); rErr != nil {
-		return rErr
+	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
+		return err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -157,7 +158,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequireAccessToWorkspace", mock.Anything, ws.Metadata.ID, models.DeployerRole).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -246,9 +247,6 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 	configurationVersionID := "cv1"
 	var duration int32 = 720
 
-	mockAuthorizer := auth.MockAuthorizer{}
-	mockAuthorizer.Test(t)
-
 	// Test cases
 	type testCase struct {
 		name            string
@@ -284,7 +282,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 		},
 
 		{
-			name: "destroy plan is allowed, because PreventDestroyPlan is falsee",
+			name: "destroy plan is allowed, because PreventDestroyPlan is false",
 			workspace: &models.Workspace{
 				Metadata: models.ResourceMetadata{
 					ID: "test-workspace-metadata-id-2",
@@ -337,17 +335,10 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
-			testCaller := auth.NewUserCaller(
-				&models.User{
-					Metadata: models.ResourceMetadata{
-						ID: "123",
-					},
-					Admin:    false,
-					Username: "user1",
-				},
-				&mockAuthorizer,
-				dbClient.Client, // was nil
-			)
+			mockCaller := auth.NewMockCaller(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
 			run := models.Run{
 				Metadata: models.ResourceMetadata{
@@ -364,9 +355,6 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			mockAuthorizer.On("RequireAccessToWorkspace",
-				mock.Anything, test.workspace.Metadata.ID, models.DeployerRole).Return(nil)
 
 			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace",
 				mock.Anything, test.workspace.Metadata.ID).Return([]models.ManagedIdentity{}, nil)
@@ -411,7 +399,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, &mockActivityEvents, nil, nil, nil)
 
-			_, err := service.CreateRun(auth.WithCaller(ctx, testCaller), test.runInput)
+			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
@@ -484,7 +472,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequireAccessToWorkspace", mock.Anything, ws.Metadata.ID, models.DeployerRole).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
 			ctx, cancel := context.WithCancel(auth.WithCaller(context.Background(), mockCaller))

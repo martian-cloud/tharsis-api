@@ -40,6 +40,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
@@ -172,6 +173,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
 		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL), runStateManager)
 		runnerService              = runner.NewService(logger, dbClient, activityService)
+		roleService                = role.NewService(logger, dbClient, activityService)
 	)
 
 	vcsService, err := vcs.NewService(
@@ -280,6 +282,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 		SCIMService:                scimService,
 		VCSService:                 vcsService,
 		ActivityService:            activityService,
+		RoleService:                roleService,
 		RunnerService:              runnerService,
 	}
 

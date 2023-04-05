@@ -255,6 +255,12 @@ func (r *ActivityEventPayloadResolver) ToActivityEventUpdateTeamMemberPayload() 
 	return res, ok
 }
 
+// ToActivityEventMigrateGroupPayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventMigrateGroupPayload() (*ActivityEventMigrateGroupPayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventMigrateGroupPayloadResolver)
+	return res, ok
+}
+
 // ActivityEventResolver resolves an activity event resource
 type ActivityEventResolver struct {
 	activityEvent *models.ActivityEvent
@@ -417,6 +423,12 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &VCSProviderResolver{vcsProvider: vcsProvider}}, nil
+	case models.TargetRole:
+		role, err := loadRole(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &RoleResolver{role: role}}, nil
 	case models.TargetRunner:
 		runner, err := loadRunner(ctx, r.activityEvent.TargetID)
 		if err != nil {
@@ -495,6 +507,13 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 				return nil, err
 			}
 			return &ActivityEventPayloadResolver{result: &ActivityEventUpdateTeamMemberPayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionMigrate) &&
+			(r.activityEvent.TargetType == models.TargetGroup):
+			var payload models.ActivityEventMigrateGroupPayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventMigrateGroupPayloadResolver{payload: &payload}}, nil
 		default:
 			return nil, fmt.Errorf("payload supplied without a supported target type and action")
 
@@ -561,6 +580,17 @@ func (r *ActivityEventDeleteChildResourcePayloadResolver) ID() string {
 // Type resolver
 func (r *ActivityEventDeleteChildResourcePayloadResolver) Type() string {
 	return r.activityEventDeleteChildResourcePayload.Type
+}
+
+// ActivityEventMigrateGroupPayloadResolver resolves an activity event
+// migrate group payload resource
+type ActivityEventMigrateGroupPayloadResolver struct {
+	payload *models.ActivityEventMigrateGroupPayload
+}
+
+// PreviousGroupPath resolver
+func (r *ActivityEventMigrateGroupPayloadResolver) PreviousGroupPath() string {
+	return r.payload.PreviousGroupPath
 }
 
 func activityEventsQuery(ctx context.Context, args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {

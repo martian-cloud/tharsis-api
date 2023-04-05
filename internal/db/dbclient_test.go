@@ -337,7 +337,7 @@ func createInitialWorkspaces(ctx context.Context, testClient *testClient, groupP
 
 // createInitialNamespaceMemberships creates some warmup namespace memberships for a test.
 func createInitialNamespaceMemberships(ctx context.Context, testClient *testClient,
-	teamMap, userMap, groupMap, serviceAccountMap map[string]string,
+	teamMap, userMap, groupMap, serviceAccountMap, rolesMap map[string]string,
 	toCreate []CreateNamespaceMembershipInput) ([]models.NamespaceMembership, error) {
 	result := []models.NamespaceMembership{}
 
@@ -345,7 +345,7 @@ func createInitialNamespaceMemberships(ctx context.Context, testClient *testClie
 
 		translated := CreateNamespaceMembershipInput{
 			NamespacePath: input.NamespacePath,
-			Role:          input.Role,
+			RoleID:        rolesMap[input.RoleID],
 		}
 		if input.UserID != nil {
 			translated.UserID = ptr.String(userMap[*input.UserID])
