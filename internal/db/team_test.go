@@ -268,7 +268,7 @@ func TestUpdateTeams(t *testing.T) {
 					ID:      preUpdate.Metadata.ID,
 					Version: preUpdate.Metadata.Version,
 				},
-				Name:        "updated-name-" + preUpdate.Name,
+				Name:        preUpdate.Name,
 				Description: "updated-description: " + preUpdate.Description,
 			},
 			expectUpdated: &models.Team{
@@ -278,7 +278,7 @@ func TestUpdateTeams(t *testing.T) {
 					CreationTimestamp:    preUpdate.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				Name:        "updated-name-" + preUpdate.Name,
+				Name:        preUpdate.Name,
 				Description: "updated-description: " + preUpdate.Description,
 			},
 		})

@@ -6,7 +6,7 @@ type NamespaceMembership implements Node {
   resourcePath: String!
   member: Member
   namespace: Namespace
-  role: String!
+  role: Role!
 }
 
 enum NamespaceMembershipSort {

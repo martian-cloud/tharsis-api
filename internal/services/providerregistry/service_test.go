@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -130,7 +131,7 @@ func TestCreateProviderVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.MockTransactions{}
@@ -344,7 +345,7 @@ func TestDeleteProviderVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.MockTransactions{}

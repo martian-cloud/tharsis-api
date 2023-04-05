@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/scim"
@@ -54,6 +55,7 @@ type State struct {
 	SCIMService                scim.Service
 	VCSService                 vcs.Service
 	ActivityService            activityevent.Service
+	RoleService                role.Service
 	RunnerService              runner.Service
 }
 
@@ -155,4 +157,8 @@ func getRunnerService(ctx context.Context) runner.Service {
 
 func getConfig(ctx context.Context) *config.Config {
 	return extract(ctx).Config
+}
+
+func getRoleService(ctx context.Context) role.Service {
+	return extract(ctx).RoleService
 }

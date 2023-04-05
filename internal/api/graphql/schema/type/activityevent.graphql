@@ -47,6 +47,8 @@ enum ActivityEventTargetType {
   VARIABLE
   VCS_PROVIDER
   WORKSPACE
+  ROLE
+  RUNNER
 }
 
 type ActivityEventConnection {
@@ -80,6 +82,10 @@ type ActivityEventDeleteChildResourcePayload {
   type: String!
 }
 
+type ActivityEventMigrateGroupPayload {
+  previousGroupPath: String!
+}
+
 type ActivityEventAddTeamMemberPayload {
   user: User
   maintainer: Boolean!
@@ -102,6 +108,7 @@ union ActivityEventPayload =
   | ActivityEventAddTeamMemberPayload
   | ActivityEventRemoveTeamMemberPayload
   | ActivityEventUpdateTeamMemberPayload
+  | ActivityEventMigrateGroupPayload
 
 type ActivityEvent implements Node {
   id: ID!

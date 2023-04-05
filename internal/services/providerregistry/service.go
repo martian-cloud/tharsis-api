@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-version"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -145,7 +146,8 @@ func (s *service) GetProviderByID(ctx context.Context, id string) (*models.Terra
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -169,7 +171,8 @@ func (s *service) GetProviderByPath(ctx context.Context, path string) (*models.T
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -210,7 +213,8 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 	provider := providerResult.Providers[0]
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -233,7 +237,8 @@ func (s *service) GetProviders(ctx context.Context, input *GetProvidersInput) (*
 	}
 
 	if input.Group != nil {
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewTerraformProviderPermission, auth.WithNamespacePath(input.Group.FullPath))
+		if err != nil {
 			return nil, err
 		}
 		dbInput.Filter.GroupID = &input.Group.Metadata.ID
@@ -269,7 +274,8 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -318,13 +324,18 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateTerraformProviderPermission, auth.WithGroupID(input.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
 		return nil, err
+	}
+
+	if group == nil {
+		return nil, fmt.Errorf("group with id %s not found", input.GroupID)
 	}
 
 	var rootGroupID string
@@ -334,6 +345,10 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		rootGroup, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
 		if gErr != nil {
 			return nil, gErr
+		}
+
+		if rootGroup == nil {
+			return nil, fmt.Errorf("group with path %s not found", group.GetRootGroupPath())
 		}
 		rootGroupID = rootGroup.Metadata.ID
 	}
@@ -390,7 +405,8 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -445,11 +461,17 @@ func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, provider := range response.Providers {
 		if provider.Private {
-			if err := caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
-				return nil, err
-			}
+			namespacePaths = append(namespacePaths, provider.GetGroupPath())
+		}
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -468,7 +490,8 @@ func (s *service) GetProviderVersionReadme(ctx context.Context, providerVersion 
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return "", err
 		}
 	}
@@ -504,7 +527,8 @@ func (s *service) GetProviderVersionByID(ctx context.Context, id string) (*model
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -524,7 +548,8 @@ func (s *service) GetProviderVersions(ctx context.Context, input *GetProviderVer
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -585,7 +610,8 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -687,7 +713,8 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -796,7 +823,8 @@ func (s *service) GetProviderPlatformByID(ctx context.Context, id string) (*mode
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -834,7 +862,8 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -873,7 +902,8 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -904,7 +934,8 @@ func (s *service) DeleteProviderPlatform(ctx context.Context, providerPlatform *
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -932,7 +963,8 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -980,7 +1012,8 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -1028,7 +1061,8 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -1076,7 +1110,8 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, provider.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -1117,6 +1152,10 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, provider.GroupID)
 	if err != nil {
 		return err
+	}
+
+	if group == nil {
+		return fmt.Errorf("group with id %s not found", provider.GroupID)
 	}
 
 	// Find key by GPG key id
@@ -1167,7 +1206,8 @@ func (s *service) GetProviderPlatformDownloadURLs(ctx context.Context, providerP
 	}
 
 	if provider.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, provider.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}

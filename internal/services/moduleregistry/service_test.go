@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -72,7 +73,7 @@ func TestGetModuleByID(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -156,7 +157,7 @@ func TestGetModuleByPath(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -267,7 +268,7 @@ func TestGetModuleByAddress(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockGroups := db.NewMockGroups(t)
@@ -333,28 +334,31 @@ func TestGetModulesByIDs(t *testing.T) {
 		{
 			name: "get private module by ID",
 			expectModule: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{ID: moduleID},
-				GroupID:  groupID,
-				Name:     "test-module",
-				Private:  true,
+				Metadata:     models.ResourceMetadata{ID: moduleID},
+				GroupID:      groupID,
+				Name:         "test-module",
+				ResourcePath: "some-group/test-module",
+				Private:      true,
 			},
 		},
 		{
 			name: "get public module by ID",
 			expectModule: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{ID: moduleID},
-				GroupID:  groupID,
-				Name:     "test-module",
-				Private:  false,
+				Metadata:     models.ResourceMetadata{ID: moduleID},
+				GroupID:      groupID,
+				Name:         "test-module",
+				ResourcePath: "some-group/test-module",
+				Private:      false,
 			},
 		},
 		{
 			name: "subject does not have access to private module",
 			expectModule: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{ID: moduleID},
-				GroupID:  groupID,
-				Name:     "test-module",
-				Private:  true,
+				Metadata:     models.ResourceMetadata{ID: moduleID},
+				GroupID:      groupID,
+				Name:         "test-module",
+				ResourcePath: "some-group/test-module",
+				Private:      true,
 			},
 			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
@@ -371,7 +375,7 @@ func TestGetModulesByIDs(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -524,7 +528,7 @@ func TestGetModules(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.input.Group != nil {
-				mockCaller.On("RequireAccessToNamespace", mock.Anything, test.input.Group.FullPath, models.ViewerRole).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewTerraformModulePermission, mock.Anything).Return(test.authError)
 			}
 
 			if test.namespaceAccessPolicy != nil {
@@ -663,7 +667,7 @@ func TestCreateModule(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -761,7 +765,7 @@ func TestUpdateModule(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -845,7 +849,7 @@ func TestDeleteModule(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -957,7 +961,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -1068,7 +1072,7 @@ func TestGetModuleVersions(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -1141,10 +1145,11 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 		{
 			name: "get module version by ID for private module",
 			expectModule: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{ID: moduleID},
-				GroupID:  groupID,
-				Name:     "test-module",
-				Private:  true,
+				Metadata:     models.ResourceMetadata{ID: moduleID},
+				GroupID:      groupID,
+				Name:         "test-module",
+				ResourcePath: "some-group/test-module",
+				Private:      true,
 			},
 			expectModuleVersion: &models.TerraformModuleVersion{
 				Metadata:        models.ResourceMetadata{ID: moduleVersionID},
@@ -1155,10 +1160,11 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 		{
 			name: "get module version by ID for public module",
 			expectModule: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{ID: moduleID},
-				GroupID:  groupID,
-				Name:     "test-module",
-				Private:  false,
+				Metadata:     models.ResourceMetadata{ID: moduleID},
+				GroupID:      groupID,
+				Name:         "test-module",
+				ResourcePath: "some-group/test-module",
+				Private:      false,
 			},
 			expectModuleVersion: &models.TerraformModuleVersion{
 				Metadata:        models.ResourceMetadata{ID: moduleVersionID},
@@ -1169,10 +1175,11 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 		{
 			name: "subject does not have access to private module",
 			expectModule: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{ID: moduleID},
-				GroupID:  groupID,
-				Name:     "test-module",
-				Private:  true,
+				Metadata:     models.ResourceMetadata{ID: moduleID},
+				GroupID:      groupID,
+				Name:         "test-module",
+				ResourcePath: "some-group/test-module",
+				Private:      true,
 			},
 			expectModuleVersion: &models.TerraformModuleVersion{
 				Metadata:        models.ResourceMetadata{ID: moduleVersionID},
@@ -1194,7 +1201,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -1387,7 +1394,7 @@ func TestCreateModuleVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.MockTransactions{}
@@ -1627,7 +1634,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.MockTransactions{}
@@ -1773,7 +1780,7 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.module != nil && test.module.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockRegistryStore := NewMockRegistryStore(t)
@@ -1897,8 +1904,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
-			//mockCaller.On("GetSubject").Return("mockSubject")
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockModules := db.NewMockTerraformModules(t)
@@ -2073,7 +2079,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.module != nil && test.module.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockRegistryStore := NewMockRegistryStore(t)
@@ -2185,7 +2191,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -2296,7 +2302,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -2404,7 +2410,7 @@ func TestGetModuleAttestations(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if test.expectModule != nil && test.expectModule.Private {
-				mockCaller.On("RequireAccessToInheritedGroupResource", mock.Anything, groupID).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.authError)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)
@@ -2499,7 +2505,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockModules := db.MockTerraformModules{}
@@ -2582,7 +2588,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequireAccessToGroup", mock.Anything, groupID, models.DeployerRole).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformModulePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockModules := db.MockTerraformModules{}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -255,7 +256,7 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 		return nil, err
 	}
 
-	if err = caller.RequireUserCreateAccess(ctx); err != nil {
+	if err = caller.RequirePermission(ctx, permissions.CreateUserPermission); err != nil {
 		return nil, err
 	}
 
@@ -304,7 +305,8 @@ func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput
 		return nil, err
 	}
 
-	if err = caller.RequireUserUpdateAccess(ctx, input.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateUserPermission, auth.WithUserID(input.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -327,7 +329,8 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 		return err
 	}
 
-	if err = caller.RequireUserDeleteAccess(ctx, input.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteUserPermission, auth.WithUserID(input.ID))
+	if err != nil {
 		return err
 	}
 
@@ -394,7 +397,7 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 		return nil, err
 	}
 
-	if err = caller.RequireTeamCreateAccess(ctx); err != nil {
+	if err = caller.RequirePermission(ctx, permissions.CreateTeamPermission); err != nil {
 		return nil, err
 	}
 
@@ -437,7 +440,8 @@ func (s *service) UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInpu
 		return nil, err
 	}
 
-	if err = caller.RequireTeamUpdateAccess(ctx, input.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(input.ID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -455,7 +459,7 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 		return err
 	}
 
-	err = caller.RequireTeamDeleteAccess(ctx, input.ID)
+	err = caller.RequirePermission(ctx, permissions.DeleteTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
 		return err
 	}

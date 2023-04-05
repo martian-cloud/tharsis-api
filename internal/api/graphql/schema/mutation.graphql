@@ -158,18 +158,13 @@ type Mutation {
   resetVCSProviderOAuthToken(
     input: ResetVCSProviderOAuthTokenInput!
   ): ResetVCSProviderOAuthTokenPayload!
-  claimJob(
-    input: ClaimJobInput!
-  ): ClaimJobPayload!
-  createRunner(
-    input: CreateRunnerInput!
-  ): CreateRunnerPayload!
-  updateRunner(
-    input: UpdateRunnerInput!
-  ): UpdateRunnerPayload!
-  deleteRunner(
-    input: DeleteRunnerInput!
-  ): DeleteRunnerPayload!
+  createRole(input: CreateRoleInput!): CreateRolePayload!
+  updateRole(input: UpdateRoleInput!): UpdateRolePayload!
+  deleteRole(input: DeleteRoleInput!): DeleteRolePayload!
+  claimJob(input: ClaimJobInput!): ClaimJobPayload!
+  createRunner(input: CreateRunnerInput!): CreateRunnerPayload!
+  updateRunner(input: UpdateRunnerInput!): UpdateRunnerPayload!
+  deleteRunner(input: DeleteRunnerInput!): DeleteRunnerPayload!
   assignServiceAccountToRunner(
     input: AssignServiceAccountToRunnerInput!
   ): AssignServiceAccountToRunnerPayload!

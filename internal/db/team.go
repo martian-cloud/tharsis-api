@@ -221,7 +221,6 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 			goqu.Record{
 				"version":          goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at":       timestamp,
-				"name":             team.Name,
 				"description":      team.Description,
 				"scim_external_id": nullableString(team.SCIMExternalID),
 			},
@@ -327,7 +326,12 @@ func teamFieldResolver(key string, model interface{}) (string, error) {
 
 	val, ok := metadataFieldResolver(key, &team.Metadata)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
+		switch key {
+		case "name":
+			val = team.Name
+		default:
+			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
+		}
 	}
 
 	return val, nil

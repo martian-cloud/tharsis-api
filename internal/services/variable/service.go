@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -70,11 +71,11 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 		return nil, err
 	}
 
-	// Only include variable values if the caller has the deployer role on the namespace
-	hasDeployerRole := false
-	if err = caller.RequireAccessToNamespace(ctx, namespacePath, models.DeployerRole); err == nil {
-		hasDeployerRole = true
-	} else if err = caller.RequireAccessToNamespace(ctx, namespacePath, models.ViewerRole); err != nil {
+	// Only include variable values if the caller has ViewVariableValuePermission on workspace.
+	hasViewVariableValuePerm := false
+	if err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath)); err == nil {
+		hasViewVariableValuePerm = true
+	} else if err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 		return nil, err
 	}
 
@@ -103,19 +104,18 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 
 	variables := []models.Variable{}
 
-	seen := map[string]bool{}
+	seen := map[string]struct{}{}
 	for _, v := range result.Variables {
 		varCopy := v
-		// Clear values if caller does not have deployer role on namespace
-		if !hasDeployerRole {
+		// Clear values if caller can't view values for namespace.
+		if !hasViewVariableValuePerm {
 			varCopy.Value = nil
 		}
 
 		keyAndCategory := fmt.Sprintf("%s::%s", varCopy.Key, varCopy.Category)
 		if _, ok := seen[keyAndCategory]; !ok {
 			variables = append(variables, varCopy)
-
-			seen[keyAndCategory] = true
+			seen[keyAndCategory] = struct{}{}
 		}
 	}
 
@@ -146,7 +146,8 @@ func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Varia
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Variable with id %s not found", id))
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, variable.NamespacePath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -169,8 +170,14 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, variable := range resp.Variables {
-		if err := caller.RequireAccessToNamespace(ctx, variable.NamespacePath, models.DeployerRole); err != nil {
+		namespacePaths = append(namespacePaths, variable.NamespacePath)
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -184,7 +191,8 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 		return err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
+	if err != nil {
 		return err
 	}
 
@@ -249,7 +257,8 @@ func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -306,7 +315,8 @@ func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable)
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, variable.NamespacePath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -362,7 +372,8 @@ func (s *service) DeleteVariable(ctx context.Context, variable *models.Variable)
 		return err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, variable.NamespacePath, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
+	if err != nil {
 		return err
 	}
 

@@ -174,6 +174,10 @@ func teamQuery(ctx context.Context, args *TeamQueryArgs) (*TeamResolver, error) 
 
 	team, err := teamService.GetTeamByName(ctx, args.Name)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 
@@ -213,7 +217,7 @@ type TeamMutationPayloadResolver struct {
 }
 
 // Team field resolver
-func (r *TeamMutationPayloadResolver) Team(_ context.Context) *TeamResolver {
+func (r *TeamMutationPayloadResolver) Team() *TeamResolver {
 	if r.TeamMutationPayload.Team == nil {
 		return nil
 	}

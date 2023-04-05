@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -16,14 +17,8 @@ import (
 // Authorizer is used to authorize access to namespaces
 type Authorizer interface {
 	GetRootNamespaces(ctx context.Context) ([]models.MembershipNamespace, error)
-	RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error
-	RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error
-	RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error
-	RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error
-	RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error
-	RequireViewerAccessToNamespaces(ctx context.Context, requiredNamespaces []string) error
-	RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error
-	RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error
+	RequireAccess(ctx context.Context, perms []permissions.Permission, checks ...func(*constraints)) error
+	RequireAccessToInheritableResource(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error
 }
 
 const (
@@ -53,7 +48,8 @@ type authorizer struct {
 	dbClient                 *db.Client
 	userID                   *string
 	serviceAccountID         *string
-	namespaceMembershipCache map[string]models.Role
+	rolePermissionCache      map[string][]permissions.Permission
+	namespaceMembershipCache map[string]map[string]struct{}
 	useCache                 bool
 }
 
@@ -63,7 +59,8 @@ func newNamespaceMembershipAuthorizer(dbClient *db.Client, userID *string, servi
 		userID:                   userID,
 		serviceAccountID:         serviceAccountID,
 		useCache:                 useCache,
-		namespaceMembershipCache: map[string]models.Role{},
+		rolePermissionCache:      map[string][]permissions.Permission{},
+		namespaceMembershipCache: map[string]map[string]struct{}{},
 	}
 }
 
@@ -108,9 +105,63 @@ func (a *authorizer) GetRootNamespaces(ctx context.Context) ([]models.Membership
 	return rootNamespaces, nil
 }
 
-func (a *authorizer) RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error {
+func (a *authorizer) RequireAccess(ctx context.Context, perms []permissions.Permission, checks ...func(*constraints)) error {
+	c := getConstraints(checks...)
+
+	if (len(perms) == 0) || !a.hasConstraints(c, true) {
+		return errMissingConstraints
+	}
+
+	for _, perm := range perms {
+		permCopy := perm
+		if c.groupID != nil {
+			if err := a.requireAccessToGroup(ctx, *c.groupID, &permCopy); err != nil {
+				return err
+			}
+		}
+		if c.workspaceID != nil {
+			if err := a.requireAccessToWorkspace(ctx, *c.workspaceID, &permCopy); err != nil {
+				return err
+			}
+		}
+		if len(c.namespacePaths) > 0 {
+			if err := a.requireAccessToNamespaces(ctx, c.namespacePaths, &permCopy); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (a *authorizer) RequireAccessToInheritableResource(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error {
+	c := getConstraints(checks...)
+
+	// Must specify at least one resource type and constraint.
+	if (len(resourceTypes) == 0) || !a.hasConstraints(c, false) {
+		return errMissingConstraints
+	}
+
+	for _, rt := range resourceTypes {
+		perm := &permissions.Permission{Action: permissions.ViewAction, ResourceType: rt}
+		if c.groupID != nil {
+			if err := a.requireAccessToInheritedGroupResource(ctx, *c.groupID, perm); err != nil {
+				return err
+			}
+		}
+		if len(c.namespacePaths) > 0 {
+			if err := a.requireAccessToInheritedNamespaceResources(ctx, c.namespacePaths, perm); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, perm *permissions.Permission) error {
 	// Check cache
-	if a.checkCache(&cacheKey{groupID: &groupID}, accessLevel) {
+	if a.checkCache(&cacheKey{groupID: &groupID}, perm) {
 		return nil
 	}
 
@@ -123,12 +174,12 @@ func (a *authorizer) RequireAccessToGroup(ctx context.Context, groupID string, a
 		return authorizationError(ctx, false)
 	}
 
-	return a.RequireAccessToNamespace(ctx, group.FullPath, accessLevel)
+	return a.requireAccessToNamespace(ctx, group.FullPath, perm)
 }
 
-func (a *authorizer) RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error {
+func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID string, perm *permissions.Permission) error {
 	// Check cache
-	if a.checkCache(&cacheKey{workspaceID: &workspaceID}, accessLevel) {
+	if a.checkCache(&cacheKey{workspaceID: &workspaceID}, perm) {
 		return nil
 	}
 
@@ -141,12 +192,12 @@ func (a *authorizer) RequireAccessToWorkspace(ctx context.Context, workspaceID s
 		return authorizationError(ctx, false)
 	}
 
-	return a.RequireAccessToNamespace(ctx, ws.FullPath, accessLevel)
+	return a.requireAccessToNamespace(ctx, ws.FullPath, perm)
 }
 
-func (a *authorizer) RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error {
+func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath string, perm *permissions.Permission) error {
 	// Check cache
-	if a.checkCache(&cacheKey{path: &namespacePath}, accessLevel) {
+	if a.checkCache(&cacheKey{path: &namespacePath}, perm) {
 		return nil
 	}
 
@@ -163,37 +214,35 @@ func (a *authorizer) RequireAccessToNamespace(ctx context.Context, namespacePath
 		return err
 	}
 
-	for _, m := range resp.NamespaceMemberships {
-		if m.Role.GTE(accessLevel) {
-			// Grant access
-			return nil
+	filteredMemberships := []models.NamespaceMembership{}
+	seen := map[string]struct{}{}
+	for _, nm := range resp.NamespaceMemberships {
+		var id string
+		switch {
+		case nm.UserID != nil:
+			id = *a.userID
+		case nm.TeamID != nil:
+			id = *nm.TeamID
+		case nm.ServiceAccountID != nil:
+			id = *nm.ServiceAccountID
 		}
+
+		if _, ok := seen[id]; ok {
+			// Skip any parent memberships for same user, team or service account
+			// since the lowest membership in the hierarchy should take precedence.
+			continue
+		}
+
+		seen[id] = struct{}{}
+		filteredMemberships = append(filteredMemberships, nm)
 	}
 
-	return authorizationError(ctx, len(resp.NamespaceMemberships) > 0)
+	return a.requirePermission(ctx, filteredMemberships, perm)
 }
 
-func (a *authorizer) RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error {
-	namespaces := []string{}
-	for _, group := range groups {
-		namespaces = append(namespaces, group.FullPath)
-	}
-
-	return a.RequireViewerAccessToNamespaces(ctx, namespaces)
-}
-
-func (a *authorizer) RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error {
-	namespaces := []string{}
-	for _, ws := range workspaces {
-		namespaces = append(namespaces, ws.FullPath)
-	}
-
-	return a.RequireViewerAccessToNamespaces(ctx, namespaces)
-}
-
-func (a *authorizer) RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
+func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, groupID string, perm *permissions.Permission) error {
 	// Check cache
-	if a.checkCache(&cacheKey{groupID: &groupID}, models.ViewerRole) {
+	if a.checkCache(&cacheKey{groupID: &groupID}, perm) {
 		return nil
 	}
 
@@ -206,20 +255,18 @@ func (a *authorizer) RequireAccessToInheritedGroupResource(ctx context.Context, 
 		return authorizationError(ctx, false)
 	}
 
-	return a.RequireAccessToInheritedNamespaceResource(ctx, group.FullPath)
+	return a.requireAccessToInheritedNamespaceResource(ctx, group.FullPath, perm)
 }
 
-func (a *authorizer) RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error {
+func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Context, namespace string, perm *permissions.Permission) error {
 	// Check cache
-	if a.checkCache(&cacheKey{path: &namespace}, models.ViewerRole) {
+	if a.checkCache(&cacheKey{path: &namespace}, perm) {
 		return nil
 	}
 
 	namespaceParts := strings.Split(namespace, "/")
-
 	resp, err := a.getNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
 		Filter: &db.NamespaceMembershipFilter{
-			// Filter by namespace prefix
 			NamespacePathPrefix: &namespaceParts[0],
 		},
 	})
@@ -231,48 +278,28 @@ func (a *authorizer) RequireAccessToInheritedNamespaceResource(ctx context.Conte
 		return authorizationError(ctx, false)
 	}
 
-	return nil
+	// Build a map of namespaces in descending order.
+	expandedPaths := map[string]struct{}{}
+	for i := len(namespaceParts); i > 0; i-- {
+		expandedPaths[strings.Join(namespaceParts[0:i], "/")] = struct{}{}
+	}
+
+	memberships := []models.NamespaceMembership{}
+	for _, nm := range resp.NamespaceMemberships {
+		_, ok := expandedPaths[nm.Namespace.Path]
+		if ok || strings.HasPrefix(nm.Namespace.Path, namespace+"/") {
+			// Only add parent or child namespaces of requested namespace.
+			memberships = append(memberships, nm)
+		}
+	}
+
+	return a.requirePermission(ctx, memberships, perm)
 }
 
-func (a *authorizer) RequireViewerAccessToNamespaces(ctx context.Context, requiredNamespaces []string) error {
-	if a.useCache {
-		cacheMiss := false
-		for _, ns := range requiredNamespaces {
-			path := ns
-			if !a.checkCache(&cacheKey{path: &path}, models.ViewerRole) {
-				cacheMiss = true
-				break
-			}
-		}
-		if !cacheMiss {
-			// grant access because all required access levels were in the cache
-			return nil
-		}
-	}
-
-	rootNamespaces, err := a.GetRootNamespaces(ctx)
-	if err != nil {
-		return err
-	}
-
-	rootNamespaceMap := map[string]bool{}
-	for _, ns := range rootNamespaces {
-		rootNamespaceMap[ns.Path] = true
-	}
-
+func (a *authorizer) requireAccessToInheritedNamespaceResources(ctx context.Context, requiredNamespaces []string, perm *permissions.Permission) error {
 	for _, ns := range requiredNamespaces {
-		paths := expandNamespaceDescOrder(ns)
-		found := false
-		// If any path of the namespace path is found in the map then the user has viewer access
-		for _, path := range paths {
-			if _, ok := rootNamespaceMap[path]; ok {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return authorizationError(ctx, false)
+		if err := a.requireAccessToInheritedNamespaceResource(ctx, ns, perm); err != nil {
+			return err
 		}
 	}
 
@@ -280,7 +307,22 @@ func (a *authorizer) RequireViewerAccessToNamespaces(ctx context.Context, requir
 	return nil
 }
 
-func (a *authorizer) checkCache(key *cacheKey, accessLevel models.Role) bool {
+func (a *authorizer) requireAccessToNamespaces(ctx context.Context, requiredNamespaces []string, perm *permissions.Permission) error {
+	for _, ns := range requiredNamespaces {
+		if err := a.requireAccessToNamespace(ctx, ns, perm); err != nil {
+			return err
+		}
+	}
+
+	// Grant access
+	return nil
+}
+
+// checkCache returns true if the permission is found. It only looks for an exact
+// match meaning a permission with View Action will not be automatically granted
+// if a subject has a permission with Create, Update, Delete or Manage actions
+// for that ResourceType.
+func (a *authorizer) checkCache(key *cacheKey, perm *permissions.Permission) bool {
 	if !a.useCache {
 		return false
 	}
@@ -293,21 +335,20 @@ func (a *authorizer) checkCache(key *cacheKey, accessLevel models.Role) bool {
 
 		for _, path := range namespacePaths {
 			p := path
-			level, ok := a.namespaceMembershipCache[cacheKey{path: &p}.getPathKey()]
-			if ok {
-				// Check first role found
-				return level.GTE(accessLevel)
+			if cachedPerms, ok := a.namespaceMembershipCache[cacheKey{path: &p}.getPathKey()]; ok {
+				_, ok := cachedPerms[perm.String()]
+				return ok
 			}
 		}
 	} else if key.workspaceID != nil {
-		level, ok := a.namespaceMembershipCache[key.getWorkspaceIDKey()]
-		if ok && level.GTE(accessLevel) {
-			return true
+		if cachedPerms, ok := a.namespaceMembershipCache[key.getWorkspaceIDKey()]; ok {
+			_, ok := cachedPerms[perm.String()]
+			return ok
 		}
 	} else if key.groupID != nil {
-		level, ok := a.namespaceMembershipCache[key.getGroupIDKey()]
-		if ok && level.GTE(accessLevel) {
-			return true
+		if cachedPerms, ok := a.namespaceMembershipCache[key.getGroupIDKey()]; ok {
+			_, ok := cachedPerms[perm.String()]
+			return ok
 		}
 	}
 
@@ -328,28 +369,113 @@ func (a *authorizer) getNamespaceMemberships(ctx context.Context,
 		return nil, err
 	}
 
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	for _, membership := range resp.NamespaceMemberships {
-		a.addMembershipToCache(cacheKey{path: &membership.Namespace.Path}.getPathKey(), membership.Role)
-		if membership.Namespace.WorkspaceID != nil {
-			a.addMembershipToCache(cacheKey{workspaceID: membership.Namespace.WorkspaceID}.getWorkspaceIDKey(), membership.Role)
-		}
-		if membership.Namespace.GroupID != nil {
-			a.addMembershipToCache(cacheKey{groupID: membership.Namespace.GroupID}.getGroupIDKey(), membership.Role)
-		}
-	}
-
 	return resp, nil
 }
 
-func (a *authorizer) addMembershipToCache(key string, role models.Role) {
-	curRole, ok := a.namespaceMembershipCache[key]
-	// Only add role to cache if it's GTE to the existing role that is cached
-	if !ok || !curRole.GTE(role) {
-		a.namespaceMembershipCache[key] = role
+// addToCache adds specified perms to role and namespaceMembership caches.
+func (a *authorizer) addToCache(membership *models.NamespaceMembership, perms []permissions.Permission) {
+	if !a.useCache {
+		// Cache isn't being used.
+		return
 	}
+
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	// Add role perms to cache.
+	if _, ok := a.rolePermissionCache[membership.RoleID]; !ok {
+		a.rolePermissionCache[membership.RoleID] = perms
+	}
+
+	// Add to membership cache.
+	a.addMembershipToCache(cacheKey{path: &membership.Namespace.Path}.getPathKey(), perms)
+	if membership.Namespace.WorkspaceID != nil {
+		a.addMembershipToCache(cacheKey{workspaceID: membership.Namespace.WorkspaceID}.getWorkspaceIDKey(), perms)
+	}
+	if membership.Namespace.GroupID != nil {
+		a.addMembershipToCache(cacheKey{groupID: membership.Namespace.GroupID}.getGroupIDKey(), perms)
+	}
+}
+
+func (a *authorizer) addMembershipToCache(key string, perms []permissions.Permission) {
+	if _, ok := a.namespaceMembershipCache[key]; !ok {
+		permsMap := make(map[string]struct{}, len(perms))
+		for _, p := range perms {
+			permsMap[p.String()] = struct{}{}
+		}
+		a.namespaceMembershipCache[key] = permsMap
+	}
+}
+
+func (a *authorizer) getPermissionsFromMembership(ctx context.Context, membership *models.NamespaceMembership) ([]permissions.Permission, error) {
+	if a.useCache {
+		a.lock.RLock()
+		if perms, ok := a.rolePermissionCache[membership.RoleID]; ok {
+			a.lock.RUnlock()
+			return perms, nil
+		}
+		a.lock.RUnlock()
+	}
+
+	// Check if this a default role, in which case we can use the permissions from the map.
+	if perms, ok := models.DefaultRoleID(membership.RoleID).Permissions(); ok {
+		a.addToCache(membership, perms)
+		return perms, nil
+	}
+
+	// Get the role by ID.
+	role, err := a.dbClient.Roles.GetRoleByID(ctx, membership.RoleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if role == nil {
+		return nil, authorizationError(ctx, false)
+	}
+
+	perms := role.GetPermissions()
+
+	// Add to membership and role cache.
+	a.addToCache(membership, perms)
+
+	return perms, nil
+}
+
+// requirePermission returns an error if the target permission can't be found within namespace memberships.
+func (a *authorizer) requirePermission(
+	ctx context.Context,
+	memberships []models.NamespaceMembership,
+	target *permissions.Permission,
+) error {
+	hasViewerAccess := false
+	for _, membership := range memberships {
+		membershipCopy := membership
+		perms, err := a.getPermissionsFromMembership(ctx, &membershipCopy)
+		if err != nil {
+			return err
+		}
+
+		for _, p := range perms {
+			if p.GTE(target) {
+				return nil
+			}
+
+			// Determine if caller has at least viewer access for resource
+			// if an authorizationError is to be returned.
+			if p.ResourceType == target.ResourceType && p.Action.HasViewerAccess() {
+				hasViewerAccess = true
+			}
+		}
+	}
+
+	return authorizationError(ctx, hasViewerAccess)
+}
+
+// hasConstraints returns true if at least one of the required constraints are specified.
+func (*authorizer) hasConstraints(checks *constraints, checkWorkspace bool) bool {
+	return checks.groupID != nil ||
+		len(checks.namespacePaths) > 0 ||
+		(checkWorkspace && checks.workspaceID != nil)
 }
 
 func authorizationError(ctx context.Context, hasViewerAccessLevel bool) error {

@@ -1095,6 +1095,18 @@ var standardWarmupServiceAccountsForTerraformModules = []models.ServiceAccount{
 	},
 }
 
+// standardWarmupRolesForTerraformModules for tests in this module.
+var standardWarmupRolesForTerraformModules = []models.Role{
+	{
+		Name:        "role-a",
+		Description: "Warmup role-a for terraform modules",
+	},
+	{
+		Name:        "role-b",
+		Description: "Warmup role-b for terraform modules",
+	},
+}
+
 // Standard warmup namespace memberships for tests in this module:
 // In this variable, the ID field is the user, service account, and team _NAME_, NOT the ID.
 var standardWarmupNamespaceMembershipsForTerraformModules = []CreateNamespaceMembershipInput{
@@ -1103,42 +1115,42 @@ var standardWarmupNamespaceMembershipsForTerraformModules = []CreateNamespaceMem
 	{
 		NamespacePath: "top-level-group-3-for-terraform-modules",
 		TeamID:        ptr.String("team-a"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-a",
 	},
 
 	// User access to group:
 	{
 		NamespacePath: "top-level-group-4-for-terraform-modules",
 		UserID:        ptr.String("user-0"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-b",
 	},
 
 	// Service accounts access to group:
 	{
 		NamespacePath:    "top-level-group-4-for-terraform-modules/nested-group-5-for-terraform-modules",
 		ServiceAccountID: ptr.String("service-account-0"),
-		Role:             models.ViewerRole,
+		RoleID:           "role-a",
 	},
 
 	// Team access to workspace:
 	{
 		NamespacePath: "top-level-group-0-for-terraform-modules/workspace-0-in-group-0",
 		TeamID:        ptr.String("team-b"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-a",
 	},
 
 	// User access to workspace:
 	{
 		NamespacePath: "top-level-group-1-for-terraform-modules/workspace-1-in-group-1",
 		UserID:        ptr.String("user-1"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-b",
 	},
 
 	// Service account access to workspace:
 	{
 		NamespacePath:    "top-level-group-2-for-terraform-modules/workspace-2-in-group-2",
 		ServiceAccountID: ptr.String("service-account-1"),
-		Role:             models.OwnerRole,
+		RoleID:           "role-a",
 	},
 }
 
@@ -1233,8 +1245,13 @@ func createWarmupTerraformModules(ctx context.Context, testClient *testClient,
 		return nil, err
 	}
 
+	_, roleName2ID, err := createInitialRoles(ctx, testClient, standardWarmupRolesForTerraformModules)
+	if err != nil {
+		return nil, err
+	}
+
 	resultNamespaceMemberships, err := createInitialNamespaceMemberships(ctx, testClient,
-		teamName2ID, username2ID, parentPath2ID, serviceAccountName2ID, input.namespaceMembershipsIn)
+		teamName2ID, username2ID, parentPath2ID, serviceAccountName2ID, roleName2ID, input.namespaceMembershipsIn)
 	if err != nil {
 		return nil, err
 	}

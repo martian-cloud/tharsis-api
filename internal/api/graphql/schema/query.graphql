@@ -57,14 +57,14 @@ type Query {
     sort: TerraformModuleSort
   ): TerraformModuleConnection!
   terraformModule(
-    registryNamespace: String!,
-    moduleName: String!,
+    registryNamespace: String!
+    moduleName: String!
     system: String!
   ): TerraformModule
   terraformModuleVersion(
-    registryNamespace: String!,
-    moduleName: String!,
-    system: String!,
+    registryNamespace: String!
+    moduleName: String!
+    system: String!
     version: String
   ): TerraformModuleVersion
   run(id: String!): Run
@@ -115,5 +115,15 @@ type Query {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  role(name: String!): Role
+  roles(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: RoleSort
+  ): RoleConnection!
+  availableRolePermissions: [String!]!
   authSettings: AuthSettings
 }

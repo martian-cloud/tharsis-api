@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -21,8 +22,8 @@ type CreateNamespaceMembershipInput struct {
 	User           *models.User
 	ServiceAccount *models.ServiceAccount
 	Team           *models.Team
+	RoleID         string
 	NamespacePath  string
-	Role           models.Role
 }
 
 // GetNamespaceMembershipsForSubjectInput is the input for querying a list of namespace memberships
@@ -73,7 +74,8 @@ func (s *service) GetNamespaceMembershipsForNamespace(ctx context.Context, names
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, namespacePath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithNamespacePath(namespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -141,8 +143,9 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 				fmt.Sprintf("User %s is not authorized to query namespace memberships for %s", userCaller.User.Username, *input.UserID))
 		}
 	case input.ServiceAccount != nil:
-		// Verify caller has access to the group this service account is in
-		if err := caller.RequireAccessToGroup(ctx, input.ServiceAccount.GroupID, models.ViewerRole); err != nil {
+		// Verify caller has access to the group this service account is in.
+		err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithGroupID(input.ServiceAccount.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	default:
@@ -179,7 +182,8 @@ func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*m
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("namespace membership with id %s not found", id))
 	}
 
-	if err := caller.RequireAccessToNamespace(ctx, namespaceMembership.Namespace.Path, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithNamespacePath(namespaceMembership.Namespace.Path))
+	if err != nil {
 		return nil, err
 	}
 
@@ -203,8 +207,14 @@ func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, namespaceMembership := range resp.NamespaceMemberships {
-		if err := caller.RequireAccessToInheritedNamespaceResource(ctx, namespaceMembership.Namespace.Path); err != nil {
+		namespacePaths = append(namespacePaths, namespaceMembership.Namespace.Path)
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.NamespaceMembershipResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -215,7 +225,9 @@ func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string
 func (s *service) CreateNamespaceMembership(ctx context.Context,
 	input *CreateNamespaceMembershipInput,
 ) (*models.NamespaceMembership, error) {
-	if err := s.requireOwnerAccessToNamespace(ctx, input.NamespacePath); err != nil {
+
+	err := s.requirePermissionForNamespace(ctx, input.NamespacePath, permissions.CreateNamespaceMembershipPermission)
+	if err != nil {
 		return nil, err
 	}
 
@@ -277,11 +289,17 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 	namespaceMembership, err := s.dbClient.NamespaceMemberships.CreateNamespaceMembership(txContext,
 		&db.CreateNamespaceMembershipInput{
 			NamespacePath:    input.NamespacePath,
-			Role:             input.Role,
+			RoleID:           input.RoleID,
 			UserID:           userID,
 			ServiceAccountID: serviceAccountID,
 			TeamID:           teamID,
 		})
+	if err != nil {
+		return nil, err
+	}
+
+	// Find the role name.
+	role, err := s.getRoleByID(ctx, input.RoleID)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +316,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 				UserID:           namespaceMembership.UserID,
 				ServiceAccountID: namespaceMembership.ServiceAccountID,
 				TeamID:           namespaceMembership.TeamID,
-				Role:             string(namespaceMembership.Role),
+				Role:             string(role.Name),
 			},
 		}); err != nil {
 		return nil, err
@@ -314,24 +332,43 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	namespaceMembership *models.NamespaceMembership,
 ) (*models.NamespaceMembership, error) {
-	if err := s.requireOwnerAccessToNamespace(ctx, namespaceMembership.Namespace.Path); err != nil {
-		return nil, err
-	}
 
-	// Get current state of namespace membership
-	currentNamespaceMembership, err := s.dbClient.NamespaceMemberships.GetNamespaceMembershipByID(ctx, namespaceMembership.Metadata.ID)
+	err := s.requirePermissionForNamespace(ctx, namespaceMembership.Namespace.Path, permissions.UpdateNamespaceMembershipPermission)
 	if err != nil {
 		return nil, err
 	}
 
-	if currentNamespaceMembership == nil {
+	// Get current state of namespace membership
+	currentMembership, err := s.dbClient.NamespaceMemberships.GetNamespaceMembershipByID(ctx, namespaceMembership.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if currentMembership == nil {
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("namespace membership with ID %s not found", namespaceMembership.Metadata.ID))
+	}
+
+	if currentMembership.RoleID == namespaceMembership.RoleID {
+		// Noop if role being changed to is the same as current role.
+		return currentMembership, nil
+	}
+
+	// Find the previous role to find its name.
+	prevRole, err := s.getRoleByID(ctx, currentMembership.RoleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find the new role for find its name.
+	newRole, err := s.getRoleByID(ctx, namespaceMembership.RoleID)
+	if err != nil {
+		return nil, err
 	}
 
 	// If this namespace membership is an owner and this is a top-level group, verify it's not the only owner
 	// to prevent the group from becoming orphaned
-	if currentNamespaceMembership.Role == models.OwnerRole && namespaceMembership.Role != models.OwnerRole && currentNamespaceMembership.Namespace.IsTopLevel() {
-		if err = s.verifyNotOnlyOwner(ctx, currentNamespaceMembership); err != nil {
+	if prevRole.Metadata.ID == models.OwnerRoleID.String() && newRole.Metadata.ID != models.OwnerRoleID.String() && currentMembership.Namespace.IsTopLevel() {
+		if err = s.verifyNotOnlyOwner(ctx, currentMembership); err != nil {
 			return nil, err
 		}
 	}
@@ -359,8 +396,8 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 			TargetType:    models.TargetNamespaceMembership,
 			TargetID:      updatedNamespaceMembership.Metadata.ID,
 			Payload: &models.ActivityEventUpdateNamespaceMembershipPayload{
-				PrevRole: string(currentNamespaceMembership.Role),
-				NewRole:  string(updatedNamespaceMembership.Role),
+				PrevRole: string(prevRole.Name),
+				NewRole:  string(newRole.Name),
 			},
 		}); err != nil {
 		return nil, err
@@ -374,14 +411,15 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 }
 
 func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error {
-	if err := s.requireOwnerAccessToNamespace(ctx, namespaceMembership.Namespace.Path); err != nil {
+	err := s.requirePermissionForNamespace(ctx, namespaceMembership.Namespace.Path, permissions.DeleteNamespaceMembershipPermission)
+	if err != nil {
 		return err
 	}
 
 	// If this namespace membership is an owner and this is a top-level group, verify it's not the only owner
 	// to prevent the group from becoming orphaned
-	if namespaceMembership.Role == models.OwnerRole && namespaceMembership.Namespace.IsTopLevel() {
-		if err := s.verifyNotOnlyOwner(ctx, namespaceMembership); err != nil {
+	if namespaceMembership.RoleID == models.OwnerRoleID.String() && namespaceMembership.Namespace.IsTopLevel() {
+		if err = s.verifyNotOnlyOwner(ctx, namespaceMembership); err != nil {
 			return err
 		}
 	}
@@ -434,7 +472,7 @@ func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *m
 
 	otherOwnerFound := false
 	for _, m := range resp.NamespaceMemberships {
-		if m.Role == models.OwnerRole && m.Metadata.ID != namespaceMembership.Metadata.ID {
+		if m.RoleID == models.OwnerRoleID.String() && m.Metadata.ID != namespaceMembership.Metadata.ID {
 			otherOwnerFound = true
 			break
 		}
@@ -447,33 +485,26 @@ func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *m
 	return nil
 }
 
-func (s *service) requireOwnerAccessToNamespace(ctx context.Context, namespacePath string) error {
+func (s *service) requirePermissionForNamespace(ctx context.Context, namespacePath string, perm permissions.Permission) error {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return err
 	}
 
-	parts := strings.Split(namespacePath, "/")
-	namespacePaths := []string{}
+	return caller.RequirePermission(ctx, perm, auth.WithNamespacePath(namespacePath))
+}
 
-	// Namespaces are added in descending order
-	for i := len(parts); i > 0; i-- {
-		namespacePaths = append(namespacePaths, strings.Join(parts[0:i], "/"))
+func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, error) {
+	role, err := s.dbClient.Roles.GetRoleByID(ctx, id)
+	if err != nil {
+		return nil, err
 	}
 
-	for i, path := range namespacePaths {
-		err := caller.RequireAccessToNamespace(ctx, path, models.OwnerRole)
-		if err != nil {
-			// Only return error if all namespaces have been checked
-			if i == (len(namespacePaths) - 1) {
-				return err
-			}
-		} else {
-			// Break because caller has owner access
-			break
-		}
+	if role == nil {
+		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Role with id %s not found", id))
 	}
-	return nil
+
+	return role, nil
 }
 
 func getTargetTypeID(namespaceMembership *models.NamespaceMembership) (models.ActivityEventTargetType, string) {

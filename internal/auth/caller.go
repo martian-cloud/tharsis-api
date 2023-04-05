@@ -4,12 +4,16 @@ package auth
 
 import (
 	"context"
+	goerror "errors"
 	"net/http"
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
+
+// errMissingConstraints is the error returned when required constraints or permissions are missing.
+var errMissingConstraints = goerror.New("missing required permissions or constraints")
 
 // Uses the context key pattern
 type contextKey string
@@ -18,6 +22,116 @@ var contextKeyCaller = contextKey("caller")
 
 func (c contextKey) String() string {
 	return "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth " + string(c)
+}
+
+// permissionTypeHandler allows delegating checks based on the permission type.
+type permissionTypeHandler func(ctx context.Context, perm *permissions.Permission, checks *constraints) error
+
+// noopPermissionHandler handles any use-cases where the permission is automatically granted for a caller.
+func noopPermissionHandler(_ context.Context, _ *permissions.Permission, _ *constraints) error {
+	return nil
+}
+
+// constraints defines permission constraints that should be checked
+// when a subject is being authorized to modify or view a Tharsis resource.
+type constraints struct {
+	workspaceID    *string
+	groupID        *string
+	planID         *string
+	applyID        *string
+	jobID          *string
+	runID          *string
+	teamID         *string
+	userID         *string
+	runnerID       *string
+	namespacePaths []string // Group, workspace, namespace paths, etc.
+}
+
+// getConstraints returns a constraints struct.
+func getConstraints(checks ...func(*constraints)) *constraints {
+	constraint := &constraints{}
+	for _, c := range checks {
+		c(constraint)
+	}
+
+	return constraint
+}
+
+// WithWorkspaceID sets the WorkspaceID on constraints struct.
+func WithWorkspaceID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.workspaceID = &id
+	}
+}
+
+// WithNamespacePath sets the Namespace on constraints struct.
+func WithNamespacePath(namespacePath string) func(*constraints) {
+	return func(c *constraints) {
+		c.namespacePaths = append(c.namespacePaths, namespacePath)
+	}
+}
+
+// WithNamespacePaths sets the NamespacePaths on constraints struct.
+func WithNamespacePaths(namespacePaths []string) func(*constraints) {
+	return func(c *constraints) {
+		c.namespacePaths = namespacePaths
+	}
+}
+
+// WithPlanID sets the PlanID on constraints struct.
+func WithPlanID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.planID = &id
+	}
+}
+
+// WithApplyID sets the ApplyID on constraints struct.
+func WithApplyID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.applyID = &id
+	}
+}
+
+// WithJobID sets the JobID on constraints struct.
+func WithJobID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.jobID = &id
+	}
+}
+
+// WithRunID sets the RunID on constraints struct.
+func WithRunID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.runID = &id
+	}
+}
+
+// WithGroupID sets the GroupID on constraints struct.
+func WithGroupID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.groupID = &id
+	}
+}
+
+// WithUserID sets the UserID on constraints struct.
+func WithUserID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.userID = &id
+	}
+}
+
+// WithTeamID sets the TeamID on Constraints struct.
+func WithTeamID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.teamID = &id
+	}
+}
+
+// WithRunnerID sets the RunnerID on constraints struct.
+func WithRunnerID(id string) func(*constraints) {
+	return func(c *constraints) {
+		c.runnerID = &id
+	}
 }
 
 // SystemCaller is the caller subject for internal system calls
@@ -33,116 +147,14 @@ func (s *SystemCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAc
 	return &NamespaceAccessPolicy{AllowAll: true}, nil
 }
 
-// RequireAccessToNamespace will return an error if the caller doesn't have the specified access level
-func (s *SystemCaller) RequireAccessToNamespace(_ context.Context, _ string, _ models.Role) error {
+// RequirePermission will return an error if the caller doesn't have the specified permissions
+func (s *SystemCaller) RequirePermission(_ context.Context, _ permissions.Permission, _ ...func(*constraints)) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
-// RequireViewerAccessToGroups will return an error if the caller doesn't have viewer access to all the specified groups
-func (s *SystemCaller) RequireViewerAccessToGroups(_ context.Context, _ []models.Group) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireViewerAccessToWorkspaces will return an error if the caller doesn't have viewer access on the specified workspace
-func (s *SystemCaller) RequireViewerAccessToWorkspaces(_ context.Context, _ []models.Workspace) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireViewerAccessToNamespaces will return an error if the caller doesn't have viewer access to the specified list of namespaces
-func (s *SystemCaller) RequireViewerAccessToNamespaces(_ context.Context, _ []string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group
-func (s *SystemCaller) RequireAccessToGroup(_ context.Context, _ string, _ models.Role) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace
-func (s *SystemCaller) RequireAccessToWorkspace(_ context.Context, _ string, _ models.Role) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (s *SystemCaller) RequireAccessToInheritedGroupResource(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (s *SystemCaller) RequireAccessToInheritedNamespaceResource(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state
-func (s *SystemCaller) RequireRunWriteAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (s *SystemCaller) RequirePlanWriteAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (s *SystemCaller) RequireApplyWriteAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job
-func (s *SystemCaller) RequireJobWriteAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireTeamCreateAccess will return an error if the caller does not have permission for the specified access on the specified team.
-func (s *SystemCaller) RequireTeamCreateAccess(_ context.Context) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireTeamUpdateAccess will return an error if the caller does not have permission for the specified access on the specified team.
-func (s *SystemCaller) RequireTeamUpdateAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireTeamDeleteAccess will return an error if the caller does not have permission for the specified access on the specified team.
-func (s *SystemCaller) RequireTeamDeleteAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireUserCreateAccess will return an error if the specified caller is not allowed to create users.
-func (s *SystemCaller) RequireUserCreateAccess(_ context.Context) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (s *SystemCaller) RequireUserUpdateAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (s *SystemCaller) RequireUserDeleteAccess(_ context.Context, _ string) error {
-	// Return nil because system caller is authorized to perform any action
-	return nil
-}
-
-// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (s *SystemCaller) RequireRunnerAccess(_ context.Context, _ string) error {
+// RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
+func (s *SystemCaller) RequireAccessToInheritableResource(_ context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
@@ -159,25 +171,8 @@ type NamespaceAccessPolicy struct {
 type Caller interface {
 	GetSubject() string
 	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
-	RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error
-	RequireViewerAccessToGroups(ctx context.Context, groups []models.Group) error
-	RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error
-	RequireViewerAccessToNamespaces(ctx context.Context, namespaces []string) error
-	RequireAccessToGroup(ctx context.Context, groupID string, accessLevel models.Role) error
-	RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error
-	RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error
-	RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error
-	RequireRunWriteAccess(ctx context.Context, runID string) error
-	RequirePlanWriteAccess(ctx context.Context, planID string) error
-	RequireApplyWriteAccess(ctx context.Context, applyID string) error
-	RequireJobWriteAccess(ctx context.Context, jobID string) error
-	RequireTeamCreateAccess(ctx context.Context) error
-	RequireTeamUpdateAccess(ctx context.Context, teamID string) error
-	RequireTeamDeleteAccess(ctx context.Context, teamID string) error
-	RequireUserCreateAccess(ctx context.Context) error
-	RequireUserUpdateAccess(ctx context.Context, userID string) error
-	RequireUserDeleteAccess(ctx context.Context, userID string) error
-	RequireRunnerAccess(ctx context.Context, runnerID string) error
+	RequirePermission(ctx context.Context, perms permissions.Permission, checks ...func(*constraints)) error
+	RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error
 }
 
 // WithCaller adds the caller to the context

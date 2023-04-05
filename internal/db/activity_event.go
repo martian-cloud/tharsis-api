@@ -117,6 +117,7 @@ var activityEventFieldList = append(metadataFieldList,
 	"workspace_target_id",
 	"payload",
 	"vcs_provider_target_id",
+	"role_target_id",
 	"runner_target_id",
 )
 
@@ -268,6 +269,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		variableTargetID                 *string
 		workspaceTargetID                *string
 		vcsProviderTargetID              *string
+		roleTargetID                     *string
 		runnerTargetID                   *string
 	)
 
@@ -304,6 +306,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		workspaceTargetID = &input.TargetID
 	case models.TargetVCSProvider:
 		vcsProviderTargetID = &input.TargetID
+	case models.TargetRole:
+		roleTargetID = &input.TargetID
 	case models.TargetRunner:
 		runnerTargetID = &input.TargetID
 	default:
@@ -344,6 +348,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"workspace_target_id":                  workspaceTargetID,
 		"payload":                              payload,
 		"vcs_provider_target_id":               vcsProviderTargetID,
+		"role_target_id":                       roleTargetID,
 		"runner_target_id":                     runnerTargetID,
 	}
 
@@ -398,6 +403,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 					return nil, errors.NewError(errors.ENotFound, "workspace does not exist")
 				case "fk_activity_events_vcs_providers_target_id":
 					return nil, errors.NewError(errors.ENotFound, "vcs provider does not exist")
+				case "fk_activity_events_role_target_id":
+					return nil, errors.NewError(errors.ENotFound, "role does not exist")
 				case "fk_activity_events_runner_target_id":
 					return nil, errors.NewError(errors.ENotFound, "runner does not exist")
 				}
@@ -447,6 +454,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		variableTargetID                 *string
 		workspaceTargetID                *string
 		vcsProviderTargetID              *string
+		roleTargetID                     *string
 		runnerTargetID                   *string
 	)
 
@@ -476,6 +484,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&workspaceTargetID,
 		&activityEvent.Payload,
 		&vcsProviderTargetID,
+		&roleTargetID,
 		&runnerTargetID,
 	}
 
@@ -522,6 +531,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *workspaceTargetID
 	case models.TargetVCSProvider:
 		activityEvent.TargetID = *vcsProviderTargetID
+	case models.TargetRole:
+		activityEvent.TargetID = *roleTargetID
 	case models.TargetRunner:
 		activityEvent.TargetID = *runnerTargetID
 	default:

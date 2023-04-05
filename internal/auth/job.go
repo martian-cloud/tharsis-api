@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
@@ -30,29 +31,31 @@ func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcces
 	}, nil
 }
 
-// RequireAccessToNamespace will return an error if the caller doesn't have the specified access level
-func (j *JobCaller) RequireAccessToNamespace(ctx context.Context, namespacePath string, accessLevel models.Role) error {
-	if accessLevel != models.ViewerRole {
+// RequirePermission will return an error if the caller doesn't have the specified permissions
+func (j *JobCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	handlerFunc, ok := j.getPermissionHandler(perm)
+	if !ok {
 		return authorizationError(ctx, false)
 	}
 
-	workspace, err := j.dbClient.Workspaces.GetWorkspaceByFullPath(ctx, namespacePath)
-	// If the namespace isn't a workspace or the workspace doesn't exist return an error
-	if err != nil || workspace == nil {
-		return authorizationError(ctx, false)
+	return handlerFunc(ctx, &perm, getConstraints(checks...))
+}
+
+// RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
+func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, checks ...func(*constraints)) error {
+	c := getConstraints(checks...)
+	if c.groupID != nil {
+		return j.requireAccessToInheritedGroupResource(ctx, *c.groupID)
+	}
+	if len(c.namespacePaths) > 0 {
+		return j.requireAccessToInheritedNamespaceResource(ctx, c.namespacePaths)
 	}
 
-	return j.requireRootNamespaceAccess(ctx, []string{workspace.FullPath})
+	return errMissingConstraints
 }
 
-// RequireAccessToGroup will return an error if the caller doesn't have the required access level on the specified group
-func (j *JobCaller) RequireAccessToGroup(ctx context.Context, _ string, _ models.Role) error {
-	// Return authorization error since job callers don't have access to groups
-	return authorizationError(ctx, false)
-}
-
-// RequireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (j *JobCaller) RequireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
+// requireAccessToInheritedGroupResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
+func (j *JobCaller) requireAccessToInheritedGroupResource(ctx context.Context, groupID string) error {
 	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
 	if err != nil {
 		return err
@@ -79,8 +82,8 @@ func (j *JobCaller) RequireAccessToInheritedGroupResource(ctx context.Context, g
 	return nil
 }
 
-// RequireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
-func (j *JobCaller) RequireAccessToInheritedNamespaceResource(ctx context.Context, namespace string) error {
+// requireAccessToInheritedNamespaceResource will return an error if the caller doesn't have viewer access on any namespace within the namespace hierarchy
+func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Context, namespacePaths []string) error {
 	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
 	if err != nil {
 		return err
@@ -90,19 +93,30 @@ func (j *JobCaller) RequireAccessToInheritedNamespaceResource(ctx context.Contex
 		return authorizationError(ctx, false)
 	}
 
-	if !strings.HasPrefix(workspace.FullPath, namespace+"/") {
-		return authorizationError(ctx, false)
+	for _, ns := range namespacePaths {
+		if !strings.HasPrefix(workspace.FullPath, ns+"/") {
+			return authorizationError(ctx, false)
+		}
 	}
 
 	return nil
 }
 
-// RequireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace
-func (j *JobCaller) RequireAccessToWorkspace(ctx context.Context, workspaceID string, accessLevel models.Role) error {
-	if accessLevel != models.ViewerRole {
-		return authorizationError(ctx, false)
+// requireAccessToWorkspaces delegates the appropriate workspace check based on the Constraints.
+func (j *JobCaller) requireAccessToWorkspaces(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.workspaceID != nil {
+		return j.requireAccessToWorkspace(ctx, *checks.workspaceID)
 	}
 
+	if len(checks.namespacePaths) > 0 {
+		return j.requireRootNamespaceAccess(ctx, checks.namespacePaths)
+	}
+
+	return errMissingConstraints
+}
+
+// requireAccessToWorkspace will return an error if the caller doesn't have the required access level on the specified workspace
+func (j *JobCaller) requireAccessToWorkspace(ctx context.Context, workspaceID string) error {
 	if j.WorkspaceID == workspaceID {
 		return nil
 	}
@@ -116,56 +130,37 @@ func (j *JobCaller) RequireAccessToWorkspace(ctx context.Context, workspaceID st
 	return j.requireRootNamespaceAccess(ctx, []string{workspace.FullPath})
 }
 
-// RequireViewerAccessToGroups will return an error if the caller doesn't have viewer access to all the specified groups
-func (j *JobCaller) RequireViewerAccessToGroups(ctx context.Context, _ []models.Group) error {
-	// Return authorization error since job callers don't have access to groups
-	return authorizationError(ctx, false)
-}
-
-// RequireViewerAccessToNamespaces will return an error if the caller doesn't have viewer access to the specified list of namespaces
-func (j *JobCaller) RequireViewerAccessToNamespaces(ctx context.Context, namespaces []string) error {
-	// Verify that all namespaces are workspaces
-	for _, path := range namespaces {
-		workspace, err := j.dbClient.Workspaces.GetWorkspaceByFullPath(ctx, path)
-		// If the namespace isn't a workspace or the workspace doesn't exist return an error
-		if err != nil || workspace == nil {
-			return authorizationError(ctx, false)
-		}
+// requireRunAccess will return an error if the caller doesn't have permission to the run
+func (j *JobCaller) requireRunAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.runID == nil && checks.workspaceID == nil {
+		return errMissingConstraints
 	}
 
-	return j.requireRootNamespaceAccess(ctx, namespaces)
-}
-
-// RequireViewerAccessToWorkspaces will return an error if the caller doesn't have viewer access on the specified workspace
-func (j *JobCaller) RequireViewerAccessToWorkspaces(ctx context.Context, workspaces []models.Workspace) error {
-	if len(workspaces) == 1 && workspaces[0].Metadata.ID == j.WorkspaceID {
+	if checks.runID != nil && j.RunID == *checks.runID {
+		// Job belongs to run.
 		return nil
 	}
 
-	namespacePaths := []string{}
-	for _, ws := range workspaces {
-		namespacePaths = append(namespacePaths, ws.FullPath)
+	if checks.workspaceID != nil && j.WorkspaceID == *checks.workspaceID {
+		// Job belongs to workspace.
+		return nil
 	}
 
-	return j.requireRootNamespaceAccess(ctx, namespacePaths)
+	return authorizationError(ctx, false)
 }
 
-// RequireRunWriteAccess will return an error if the caller doesn't have permission to update run state
-func (j *JobCaller) RequireRunWriteAccess(ctx context.Context, runID string) error {
-	if j.RunID != runID {
-		return authorizationError(ctx, false)
+// requirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
+func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.planID == nil {
+		return errMissingConstraints
 	}
-	return nil
-}
 
-// RequirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (j *JobCaller) RequirePlanWriteAccess(ctx context.Context, planID string) error {
 	run, err := j.dbClient.Runs.GetRun(ctx, j.RunID)
 	if err != nil {
 		return err
 	}
 
-	if run == nil || run.PlanID != planID {
+	if run == nil || run.PlanID != *checks.planID {
 		return authorizationError(ctx, false)
 	}
 
@@ -182,14 +177,18 @@ func (j *JobCaller) RequirePlanWriteAccess(ctx context.Context, planID string) e
 	return nil
 }
 
-// RequireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (j *JobCaller) RequireApplyWriteAccess(ctx context.Context, applyID string) error {
+// requireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
+func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.applyID == nil {
+		return errMissingConstraints
+	}
+
 	run, err := j.dbClient.Runs.GetRun(ctx, j.RunID)
 	if err != nil {
 		return err
 	}
 
-	if run == nil || run.ApplyID != applyID {
+	if run == nil || run.ApplyID != *checks.applyID {
 		return authorizationError(ctx, false)
 	}
 
@@ -206,12 +205,17 @@ func (j *JobCaller) RequireApplyWriteAccess(ctx context.Context, applyID string)
 	return nil
 }
 
-// RequireJobWriteAccess will return an error if the caller doesn't have permission to update the state of the specified job
-func (j *JobCaller) RequireJobWriteAccess(ctx context.Context, jobID string) error {
-	if j.JobID != jobID {
-		return authorizationError(ctx, false)
+// requireJobAccess will return an error if the caller doesn't have permission to the specified job
+func (j *JobCaller) requireJobAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.jobID == nil {
+		return errMissingConstraints
 	}
-	return nil
+
+	if j.JobID == *checks.jobID {
+		return nil
+	}
+
+	return authorizationError(ctx, false)
 }
 
 func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePaths []string) error {
@@ -239,44 +243,23 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 	return nil
 }
 
-// RequireTeamCreateAccess will return an error if the specified access is not allowed to the indicated team.
-func (j *JobCaller) RequireTeamCreateAccess(ctx context.Context) error {
-	// Job callers won't ever have access to team info.
-	return authorizationError(ctx, false)
-}
+// getPermissionHandler returns a permissionTypeHandler for a given permission.
+func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[permissions.Permission]permissionTypeHandler{
+		permissions.ViewWorkspacePermission:            j.requireAccessToWorkspaces,
+		permissions.ViewConfigurationVersionPermission: j.requireAccessToWorkspaces,
+		permissions.ViewStateVersionPermission:         j.requireAccessToWorkspaces,
+		permissions.CreateStateVersionPermission:       j.requireAccessToWorkspaces,
+		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspaces,
+		permissions.ViewVariablePermission:             j.requireAccessToWorkspaces,
+		permissions.ViewVariableValuePermission:        j.requireAccessToWorkspaces,
+		permissions.ViewRunPermission:                  j.requireRunAccess, // View is automatically granted if action != View.
+		permissions.ViewJobPermission:                  j.requireJobAccess, // View is automatically granted if action != View.
+		permissions.UpdateJobPermission:                j.requireJobAccess,
+		permissions.UpdatePlanPermission:               j.requirePlanWriteAccess,
+		permissions.UpdateApplyPermission:              j.requireApplyWriteAccess,
+	}
 
-// RequireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
-func (j *JobCaller) RequireTeamUpdateAccess(ctx context.Context, _ string) error {
-	// Job callers won't ever have access to team info.
-	return authorizationError(ctx, false)
-}
-
-// RequireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-func (j *JobCaller) RequireTeamDeleteAccess(ctx context.Context, _ string) error {
-	// Job callers won't ever have access to team info.
-	return authorizationError(ctx, false)
-}
-
-// RequireUserCreateAccess will return an error if the specified caller is not allowed to create users.
-func (j *JobCaller) RequireUserCreateAccess(ctx context.Context) error {
-	// Job callers won't ever have access to user info.
-	return authorizationError(ctx, false)
-}
-
-// RequireUserUpdateAccess will return an error if the specified caller is not allowed to update a user.
-func (j *JobCaller) RequireUserUpdateAccess(ctx context.Context, _ string) error {
-	// Job callers won't ever have access to user info.
-	return authorizationError(ctx, false)
-}
-
-// RequireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (j *JobCaller) RequireUserDeleteAccess(ctx context.Context, _ string) error {
-	// Job callers won't ever have access to user info.
-	return authorizationError(ctx, false)
-}
-
-// RequireRunnerAccess will return an error if the caller is not allowed to claim a job as the specified runner
-func (j *JobCaller) RequireRunnerAccess(ctx context.Context, _ string) error {
-	// Return authorization error because job callers don't have runner access
-	return authorizationError(ctx, false)
+	handlerFunc, ok := handlerMap[perm]
+	return handlerFunc, ok
 }

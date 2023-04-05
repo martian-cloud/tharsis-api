@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
@@ -92,7 +93,8 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, job.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -176,7 +178,8 @@ func (s *service) GetJobLogDescriptor(ctx context.Context, job *models.Job) (*mo
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToWorkspace(ctx, job.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -210,7 +213,8 @@ func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error)
 		)
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, job.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -230,7 +234,8 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 
 	// Verify user has access to all returned jobs
 	for _, job := range resp.Jobs {
-		if err := caller.RequireAccessToWorkspace(ctx, job.WorkspaceID, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -241,10 +246,6 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	if err = caller.RequireAccessToWorkspace(ctx, run.WorkspaceID, models.ViewerRole); err != nil {
 		return nil, err
 	}
 
@@ -263,6 +264,11 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 		return nil, nil
 	}
 
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobsResult.Jobs[0].Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		return nil, err
+	}
+
 	return &jobsResult.Jobs[0], nil
 }
 
@@ -279,7 +285,8 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, job.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -349,11 +356,12 @@ func (s *service) SaveLogs(ctx context.Context, jobID string, startOffset int, b
 		return err
 	}
 
-	if err = caller.RequireJobWriteAccess(ctx, jobID); err != nil {
+	job, err := s.GetJob(ctx, jobID)
+	if err != nil {
 		return err
 	}
 
-	job, err := s.GetJob(ctx, jobID)
+	err = caller.RequirePermission(ctx, permissions.UpdateJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		return err
 	}
@@ -371,17 +379,18 @@ func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, li
 		return nil, err
 	}
 
+	if limit < 0 || startOffset < 0 {
+		return nil, errors.NewError(errors.EInvalid, "limit and offset cannot be negative")
+	}
+
 	job, err := s.GetJob(ctx, jobID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := caller.RequireAccessToWorkspace(ctx, job.WorkspaceID, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
 		return nil, err
-	}
-
-	if limit < 0 || startOffset < 0 {
-		return nil, errors.NewError(errors.EInvalid, "limit and offset cannot be negative")
 	}
 
 	return s.logStore.GetLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, limit)
@@ -424,7 +433,8 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 
 	runner := runnersResp.Runners[0]
 
-	if err = caller.RequireRunnerAccess(ctx, runner.Metadata.ID); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ClaimJobPermission, auth.WithRunnerID(runner.Metadata.ID))
+	if err != nil {
 		return nil, err
 	}
 

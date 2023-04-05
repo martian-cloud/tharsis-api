@@ -220,8 +220,8 @@ func TestGetWorkspaces(t *testing.T) {
 			Description: "team for workspace-5 for testing the workspace DB layer",
 		},
 	} {
-		newTeam, err := testClient.client.Teams.CreateTeam(ctx, &toCreateTeam)
-		require.Nil(t, err)
+		newTeam, cErr := testClient.client.Teams.CreateTeam(ctx, &toCreateTeam)
+		require.Nil(t, cErr)
 		teamIDs = append(teamIDs, &newTeam.Metadata.ID)
 	}
 
@@ -249,8 +249,8 @@ func TestGetWorkspaces(t *testing.T) {
 			Email:    "user-member-4@example.com",
 		},
 	} {
-		newUser, err := testClient.client.Users.CreateUser(ctx, &toCreateUser)
-		require.Nil(t, err)
+		newUser, cErr := testClient.client.Users.CreateUser(ctx, &toCreateUser)
+		require.Nil(t, cErr)
 		userMemberIDs = append(userMemberIDs, &newUser.Metadata.ID)
 	}
 
@@ -282,7 +282,7 @@ func TestGetWorkspaces(t *testing.T) {
 			TeamID: *teamIDs[5],
 		},
 	} {
-		_, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &toCreateTeamMember)
+		_, err = testClient.client.TeamMembers.AddUserToTeam(ctx, &toCreateTeamMember)
 		require.Nil(t, err)
 	}
 
@@ -302,9 +302,16 @@ func TestGetWorkspaces(t *testing.T) {
 			GroupID: createdWarmupGroups[2].Metadata.ID,
 		},
 	} {
-		newServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &toCreateServiceAccount)
-		require.Nil(t, err)
+		newServiceAccount, sErr := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &toCreateServiceAccount)
+		require.Nil(t, sErr)
 		serviceAccountMemberIDs = append(serviceAccountMemberIDs, &newServiceAccount.Metadata.ID)
+	}
+
+	role, rErr := testClient.client.Roles.CreateRole(ctx, &models.Role{Name: "owner"})
+	assert.Nil(t, rErr)
+	if rErr != nil {
+		// No point in continuing if role wasn't created.
+		return
 	}
 
 	// Add namespace memberships.
@@ -314,10 +321,11 @@ func TestGetWorkspaces(t *testing.T) {
 	// user member 2 to nothing
 	for ix, userMemberID := range userMemberIDs[0:2] {
 		for ix2 := ix + 1; ix2 <= ix+3; ix2++ {
-			_, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx,
+			_, err = testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx,
 				&CreateNamespaceMembershipInput{
 					NamespacePath: allPaths[ix2],
 					UserID:        userMemberID,
+					RoleID:        role.Metadata.ID,
 				})
 			require.Nil(t, err)
 		}
@@ -328,10 +336,11 @@ func TestGetWorkspaces(t *testing.T) {
 	// service account member 2 to nothing
 	for ix, serviceAccountMemberID := range serviceAccountMemberIDs[0:2] {
 		for ix2 := 2 * ix; ix2 <= (2*ix)+1; ix2++ {
-			_, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx,
+			_, err = testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx,
 				&CreateNamespaceMembershipInput{
 					NamespacePath:    allPaths[ix2],
 					ServiceAccountID: serviceAccountMemberID,
+					RoleID:           role.Metadata.ID,
 				})
 			require.Nil(t, err)
 		}
@@ -342,42 +351,42 @@ func TestGetWorkspaces(t *testing.T) {
 		{
 			NamespacePath: "top-level-group-0-for-workspaces",
 			TeamID:        teamIDs[0], // g0
-			Role:          models.ViewerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-1-for-workspaces",
 			TeamID:        teamIDs[1], // g1
-			Role:          models.DeployerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-2-for-workspaces",
 			TeamID:        teamIDs[2], // g2
-			Role:          models.OwnerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-0-for-workspaces/workspace-1",
 			TeamID:        teamIDs[3], // w1
-			Role:          models.OwnerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-1-for-workspaces/workspace-5",
 			TeamID:        teamIDs[4], // w5
-			Role:          models.DeployerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-2-for-workspaces/workspace-3",
 			TeamID:        teamIDs[5], // w3
-			Role:          models.ViewerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-0-for-workspaces/workspace-4",
 			TeamID:        teamIDs[6], // w4
-			Role:          models.OwnerRole,
+			RoleID:        role.Metadata.ID,
 		},
 		{
 			NamespacePath: "top-level-group-1-for-workspaces/workspace-2",
 			TeamID:        teamIDs[7], // w2
-			Role:          models.DeployerRole,
+			RoleID:        role.Metadata.ID,
 		},
 	} {
 		_, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &nsm)

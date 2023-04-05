@@ -31,6 +31,7 @@ type namespaceMembershipWarmupsInput struct {
 	serviceAccounts      []models.ServiceAccount
 	workspaces           []models.Workspace
 	namespaceMemberships []CreateNamespaceMembershipInput
+	roles                []models.Role
 }
 
 type namespaceMembershipWarmupsOutput struct {
@@ -42,6 +43,7 @@ type namespaceMembershipWarmupsOutput struct {
 	workspaces           []models.Workspace
 	namespaceMemberships []models.NamespaceMembership
 	users                []models.User
+	roles                []models.Role
 }
 
 // namespaceMembershipInfo aids convenience in accessing the information TestGetNamespaceMemberships
@@ -73,6 +75,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
+		roles:                standardWarmupRolesForNamespaceMemberships,
 	})
 
 	require.Nil(t, err)
@@ -1235,6 +1238,7 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
+		roles:                standardWarmupRolesForNamespaceMemberships,
 	})
 	require.Nil(t, err)
 
@@ -1297,6 +1301,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
+		roles:                standardWarmupRolesForNamespaceMemberships,
 	})
 	require.Nil(t, err)
 
@@ -1316,14 +1321,14 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-99",
 				UserID:        &createdWarmupOutput.users[0].Metadata.ID,
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectCreated: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
 				},
-				Role: models.ViewerRole,
+				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 				Namespace: models.MembershipNamespace{
 					Path:        "group-99",
 					GroupID:     &createdWarmupOutput.groups[3].Metadata.ID,
@@ -1338,14 +1343,14 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath:    "group-a/workspace-99",
 				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
-				Role:             models.DeployerRole,
+				RoleID:           createdWarmupOutput.roles[1].Metadata.ID,
 			},
 			expectCreated: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
 				},
-				Role: models.DeployerRole,
+				RoleID: createdWarmupOutput.roles[1].Metadata.ID,
 				Namespace: models.MembershipNamespace{
 					Path:        "group-a/workspace-99",
 					GroupID:     ptr.String(""),
@@ -1360,14 +1365,14 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-99",
 				TeamID:        &createdWarmupOutput.teamMembers[0].TeamID,
-				Role:          models.OwnerRole,
+				RoleID:        createdWarmupOutput.roles[2].Metadata.ID,
 			},
 			expectCreated: &models.NamespaceMembership{
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
 				},
-				Role: models.OwnerRole,
+				RoleID: createdWarmupOutput.roles[2].Metadata.ID,
 				Namespace: models.MembershipNamespace{
 					Path:        "group-99",
 					GroupID:     &createdWarmupOutput.groups[3].Metadata.ID,
@@ -1384,7 +1389,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-99",
 				UserID:        &createdWarmupOutput.users[0].Metadata.ID,
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("member already exists"),
 		},
@@ -1394,7 +1399,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath:    "group-a/workspace-99",
 				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
-				Role:             models.DeployerRole,
+				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("member already exists"),
 		},
@@ -1404,7 +1409,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-99",
 				TeamID:        &createdWarmupOutput.teamMembers[0].TeamID,
-				Role:          models.OwnerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("member already exists"),
 		},
@@ -1414,7 +1419,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-bogus",
 				UserID:        &createdWarmupOutput.users[1].Metadata.ID,
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("Namespace not found"),
 		},
@@ -1424,7 +1429,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-a",
 				UserID:        ptr.String(nonExistentID),
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("user does not exist"),
 		},
@@ -1434,7 +1439,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath:    "group-a",
 				ServiceAccountID: ptr.String(nonExistentID),
-				Role:             models.ViewerRole,
+				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("service account does not exist"),
 		},
@@ -1444,7 +1449,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-a",
 				TeamID:        ptr.String(nonExistentID),
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("team does not exist"),
 		},
@@ -1454,7 +1459,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-a",
 				UserID:        ptr.String(invalidID),
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -1464,7 +1469,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath:    "group-a",
 				ServiceAccountID: ptr.String(invalidID),
-				Role:             models.ViewerRole,
+				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -1474,7 +1479,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			input: &CreateNamespaceMembershipInput{
 				NamespacePath: "group-a",
 				TeamID:        ptr.String(invalidID),
-				Role:          models.ViewerRole,
+				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -1522,6 +1527,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
+		roles:                standardWarmupRolesForNamespaceMemberships,
 	})
 	require.Nil(t, err)
 	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
@@ -1549,7 +1555,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 					ID:      preUpdate.Metadata.ID,
 					Version: preUpdate.Metadata.Version,
 				},
-				Role:      rotateRole(preUpdate.Role),
+				RoleID:    rotateRole(preUpdate.RoleID, createdWarmupOutput.roles),
 				Namespace: preUpdate.Namespace,
 			},
 			expectUpdated: &models.NamespaceMembership{
@@ -1559,7 +1565,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 					CreationTimestamp:    preUpdate.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				Role: rotateRole(preUpdate.Role),
+				RoleID: rotateRole(preUpdate.RoleID, createdWarmupOutput.roles),
 				Namespace: models.MembershipNamespace{
 					ID:          preUpdate.Namespace.ID,
 					Path:        preUpdate.Namespace.Path,
@@ -1580,6 +1586,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				ID:      nonExistentID,
 				Version: 1,
 			},
+			RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 		},
 		expectMsg: resourceVersionMismatch,
 	},
@@ -1590,6 +1597,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 					ID:      invalidID,
 					Version: 1,
 				},
+				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		})
@@ -1636,6 +1644,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 		serviceAccounts:      standardWarmupServiceAccountsForNamespaceMemberships,
 		workspaces:           standardWarmupWorkspacesForNamespaceMemberships,
 		namespaceMemberships: standardWarmupNamespaceMemberships,
+		roles:                standardWarmupRolesForNamespaceMemberships,
 	})
 	require.Nil(t, err)
 	allNamespaceMembershipInfos := namespaceMembershipInfoFromNamespaceMemberships(
@@ -1853,102 +1862,121 @@ var standardWarmupNamespaceMemberships = []CreateNamespaceMembershipInput{
 	{
 		NamespacePath: "group-a",
 		TeamID:        ptr.String("team-a"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-a",
 	},
 	{
 		NamespacePath: "group-a/group-b",
 		TeamID:        ptr.String("team-b"),
-		Role:          models.DeployerRole,
+		RoleID:        "role-b",
 	},
 	{
 		NamespacePath: "group-a/group-b/group-c",
 		TeamID:        ptr.String("team-c"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-c",
 	},
 
 	// Users are given group memberships rotated by one slot; bca.
 	{
 		NamespacePath: "group-a/group-b",
 		UserID:        ptr.String("user-0"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-b",
 	},
 	{
 		NamespacePath: "group-a/group-b/group-c",
 		UserID:        ptr.String("user-1"),
-		Role:          models.DeployerRole,
+		RoleID:        "role-c",
 	},
 	{
 		NamespacePath: "group-a",
 		UserID:        ptr.String("user-2"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-a",
 	},
 
 	// Service accounts are given group memberships rotated by two slots (or back by one); cab.
 	{
 		NamespacePath:    "group-a/group-b/group-c",
 		ServiceAccountID: ptr.String("sa-0"),
-		Role:             models.ViewerRole,
+		RoleID:           "role-c",
 	},
 	{
 		NamespacePath:    "group-a",
 		ServiceAccountID: ptr.String("sa-1"),
-		Role:             models.DeployerRole,
+		RoleID:           "role-a",
 	},
 	{
 		NamespacePath:    "group-a/group-b",
 		ServiceAccountID: ptr.String("sa-2"),
-		Role:             models.OwnerRole,
+		RoleID:           "role-b",
 	},
 
 	// Teams are given workspace memberships rotated by one slot; bca.
 	{
 		NamespacePath: "group-a/group-b/workspace-b2",
 		TeamID:        ptr.String("team-a"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-b",
 	},
 	{
 		NamespacePath: "group-a/group-b/group-c/workspace-c3",
 		TeamID:        ptr.String("team-b"),
-		Role:          models.DeployerRole,
+		RoleID:        "role-c",
 	},
 	{
 		NamespacePath: "group-a/workspace-a1",
 		TeamID:        ptr.String("team-c"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-a",
 	},
 
 	// Users are given workspace memberships rotated by two slots (or back by one); cab.
 	{
 		NamespacePath: "group-a/group-b/group-c/workspace-c3",
 		UserID:        ptr.String("user-0"),
-		Role:          models.OwnerRole,
+		RoleID:        "role-c",
 	},
 	{
 		NamespacePath: "group-a/workspace-a1",
 		UserID:        ptr.String("user-1"),
-		Role:          models.DeployerRole,
+		RoleID:        "role-a",
 	},
 	{
 		NamespacePath: "group-a/group-b/workspace-b2",
 		UserID:        ptr.String("user-2"),
-		Role:          models.ViewerRole,
+		RoleID:        "role-b",
 	},
 
 	// Service accounts are given workspace memberships straight across; abc.
 	{
 		NamespacePath:    "group-a/workspace-a1",
 		ServiceAccountID: ptr.String("sa-0"),
-		Role:             models.OwnerRole,
+		RoleID:           "role-a",
 	},
 	{
 		NamespacePath:    "group-a/group-b/workspace-b2",
 		ServiceAccountID: ptr.String("sa-1"),
-		Role:             models.DeployerRole,
+		RoleID:           "role-b",
 	},
 	{
 		NamespacePath:    "group-a/group-b/group-c/workspace-c3",
 		ServiceAccountID: ptr.String("sa-2"),
-		Role:             models.ViewerRole,
+		RoleID:           "role-c",
+	},
+}
+
+// Standard warmup roles for tests in this module:
+var standardWarmupRolesForNamespaceMemberships = []models.Role{
+	{
+		Name:        "role-a",
+		Description: "role a for namespace membership tests",
+		CreatedBy:   "someone-a",
+	},
+	{
+		Name:        "role-b",
+		Description: "role b for namespace membership tests",
+		CreatedBy:   "someone-b",
+	},
+	{
+		Name:        "role-c",
+		Description: "role c for namespace membership tests",
+		CreatedBy:   "someone-c",
 	},
 }
 
@@ -1991,8 +2019,13 @@ func createWarmupNamespaceMemberships(ctx context.Context, testClient *testClien
 		return nil, err
 	}
 
+	resultRoles, roleName2ID, err := createInitialRoles(ctx, testClient, input.roles)
+	if err != nil {
+		return nil, err
+	}
+
 	resultNamespaceMemberships, err := createInitialNamespaceMemberships(ctx, testClient,
-		teamName2ID, username2ID, groupPath2ID, serviceAccountName2ID, input.namespaceMemberships)
+		teamName2ID, username2ID, groupPath2ID, serviceAccountName2ID, roleName2ID, input.namespaceMemberships)
 	if err != nil {
 		return nil, err
 	}
@@ -2005,6 +2038,7 @@ func createWarmupNamespaceMemberships(ctx context.Context, testClient *testClien
 		serviceAccounts:      resultServiceAccounts,
 		workspaces:           resultWorkspaces,
 		namespaceMemberships: resultNamespaceMemberships,
+		roles:                resultRoles,
 		holderIDs2Name: holderIDs2Name{
 			userIDs2Name:           reverseMap(username2ID),
 			serviceAccountIDs2Name: reverseMap(serviceAccountName2ID),
@@ -2074,7 +2108,7 @@ func namespaceMembershipInfoFromNamespaceMemberships(holderIDs2Name holderIDs2Na
 			namespacePath:         namespaceMembership.Namespace.Path,
 			namespaceMembershipID: namespaceMembership.Metadata.ID,
 			holder:                holder,
-			role:                  string(namespaceMembership.Role),
+			role:                  namespaceMembership.RoleID,
 			updateTime:            *namespaceMembership.Metadata.LastUpdatedTimestamp,
 		})
 	}
@@ -2154,7 +2188,7 @@ func compareNamespaceMemberships(t *testing.T, expected, actual *models.Namespac
 	compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
 	compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
 
-	assert.Equal(t, expected.Role, actual.Role)
+	assert.Equal(t, expected.RoleID, actual.RoleID)
 
 	assert.Equal(t, expected.Namespace.ID, actual.Namespace.ID)
 	assert.Equal(t, expected.Namespace.Path, actual.Namespace.Path)
@@ -2249,16 +2283,16 @@ func findWorkspaceIDFromName(workspaces []models.Workspace, nm string) string {
 
 // rotateRole returns a different role from what was passed in.
 // If other modules need this function, move it to dbclient_test.
-func rotateRole(input models.Role) models.Role {
+func rotateRole(input string, roles []models.Role) string {
 	switch {
-	case input == models.ViewerRole:
-		return models.DeployerRole
-	case input == models.DeployerRole:
-		return models.OwnerRole
-	case input == models.OwnerRole:
-		return models.ViewerRole
+	case input == roles[0].Metadata.ID:
+		return roles[1].Metadata.ID
+	case input == roles[1].Metadata.ID:
+		return roles[2].Metadata.ID
+	case input == roles[2].Metadata.ID:
+		return roles[0].Metadata.ID
 	}
 
 	// Keep the compiler happy, even if it cannot happen.
-	return models.ViewerRole
+	return roles[0].Metadata.ID
 }

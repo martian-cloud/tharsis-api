@@ -17,11 +17,11 @@ import (
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
 type CreateNamespaceMembershipInput struct {
-	NamespacePath    string
 	UserID           *string
 	ServiceAccountID *string
 	TeamID           *string
-	Role             models.Role
+	NamespacePath    string
+	RoleID           string
 }
 
 // NamespaceMemberships encapsulates the logic to access namespace memberships from the database
@@ -70,6 +70,7 @@ type NamespaceMembershipFilter struct {
 	GroupID                *string
 	WorkspaceID            *string
 	NamespacePathPrefix    *string
+	RoleID                 *string
 	NamespacePaths         []string
 	NamespaceMembershipIDs []string
 }
@@ -94,7 +95,7 @@ type namespaceMemberships struct {
 	dbClient *Client
 }
 
-var namespaceMembershipFieldList = append(metadataFieldList, "role", "user_id", "service_account_id", "team_id")
+var namespaceMembershipFieldList = append(metadataFieldList, "role_id", "user_id", "service_account_id", "team_id")
 
 // NewNamespaceMemberships returns an instance of the NamespaceMemberships interface
 func NewNamespaceMemberships(dbClient *Client) NamespaceMemberships {
@@ -142,7 +143,7 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		"created_at":   timestamp,
 		"updated_at":   timestamp,
 		"namespace_id": namespace.id,
-		"role":         input.Role,
+		"role_id":      input.RoleID,
 	}
 
 	// Should be that exactly one of these takes effect.
@@ -179,6 +180,8 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 					return nil, errors.NewError(errors.ENotFound, "team does not exist")
 				case "fk_namespace_memberships_namespace_id":
 					return nil, errors.NewError(errors.ENotFound, "namespace does not exist")
+				case "fk_namespace_memberships_role_id":
+					return nil, errors.NewError(errors.ENotFound, "role does not exist")
 				}
 			}
 		}
@@ -202,7 +205,7 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		Set(goqu.Record{
 			"version":    goqu.L("? + ?", goqu.C("version"), 1),
 			"updated_at": timestamp,
-			"role":       namespaceMembership.Role,
+			"role_id":    namespaceMembership.RoleID,
 		}).
 		Where(goqu.Ex{"id": namespaceMembership.Metadata.ID, "version": namespaceMembership.Metadata.Version}).Returning(namespaceMembershipFieldList...).ToSQL()
 	if err != nil {
@@ -217,6 +220,12 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				return nil, errors.NewError(errors.EConflict, "member already exists")
+			}
+			if isForeignKeyViolation(pgErr) {
+				switch pgErr.ConstraintName {
+				case "fk_namespace_memberships_role_id":
+					return nil, errors.NewError(errors.ENotFound, "role does not exist")
+				}
 			}
 		}
 		return nil, err
@@ -274,6 +283,9 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 						Select("team_id").
 						Where(goqu.I("team_members.user_id").Eq(*input.Filter.UserID))),
 			))
+		}
+		if input.Filter.RoleID != nil {
+			ex = ex.Append(goqu.I("namespace_memberships.role_id").Eq(*input.Filter.RoleID))
 		}
 		if input.Filter.ServiceAccountID != nil {
 			ex = ex.Append(goqu.I("namespace_memberships.service_account_id").Eq(*input.Filter.ServiceAccountID))
@@ -391,7 +403,7 @@ func scanNamespaceMembership(row scanner, withNamespacePath bool) (*models.Names
 		&namespaceMembership.Metadata.CreationTimestamp,
 		&namespaceMembership.Metadata.LastUpdatedTimestamp,
 		&namespaceMembership.Metadata.Version,
-		&namespaceMembership.Role,
+		&namespaceMembership.RoleID,
 		&userID,
 		&serviceAccountID,
 		&teamID,

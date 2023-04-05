@@ -362,10 +362,6 @@ func managedIdentityQuery(ctx context.Context, args *ManagedIdentityQueryArgs) (
 		return nil, err
 	}
 
-	if managedIdentity == nil {
-		return nil, nil
-	}
-
 	return &ManagedIdentityResolver{managedIdentity: managedIdentity}, nil
 }
 

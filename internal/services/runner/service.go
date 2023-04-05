@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -71,7 +72,8 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewRunnerPermission, auth.WithNamespacePath(input.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -120,15 +122,16 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 		return nil, err
 	}
 
-	groupIDs := []string{}
+	namespacePaths := []string{}
 	for _, r := range result.Runners {
 		if r.GroupID != nil {
-			groupIDs = append(groupIDs, *r.GroupID)
+			namespacePaths = append(namespacePaths, r.GetGroupPath())
 		}
 	}
 
-	for _, groupID := range groupIDs {
-		if err := caller.RequireAccessToInheritedGroupResource(ctx, groupID); err != nil {
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -143,8 +146,9 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 	}
 
 	if runner.GroupID != nil {
-		if rErr := caller.RequireAccessToGroup(ctx, *runner.GroupID, models.OwnerRole); rErr != nil {
-			return rErr
+		err = caller.RequirePermission(ctx, permissions.DeleteRunnerPermission, auth.WithGroupID(*runner.GroupID))
+		if err != nil {
+			return err
 		}
 	} else {
 		// Verify caller is a user.
@@ -225,7 +229,8 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 	}
 
 	if runner.GroupID != nil {
-		if err := caller.RequireAccessToInheritedGroupResource(ctx, *runner.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*runner.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -250,7 +255,8 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 	}
 
 	if runner.GroupID != nil {
-		if err := caller.RequireAccessToInheritedGroupResource(ctx, *runner.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*runner.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -265,7 +271,8 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	}
 
 	if input.GroupID != "" {
-		if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.OwnerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.CreateRunnerPermission, auth.WithGroupID(input.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	} else {
@@ -334,8 +341,9 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 	}
 
 	if runner.GroupID != nil {
-		if rErr := caller.RequireAccessToGroup(ctx, *runner.GroupID, models.OwnerRole); rErr != nil {
-			return nil, rErr
+		err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		// Verify caller is a user.
@@ -424,8 +432,9 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 		return errors.NewError(errors.EInvalid, "service account cannot be assigned to shared runner")
 	}
 
-	if rErr := caller.RequireAccessToGroup(ctx, *runner.GroupID, models.OwnerRole); rErr != nil {
-		return rErr
+	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
+	if err != nil {
+		return err
 	}
 
 	sa, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, serviceAccountID)
@@ -468,8 +477,9 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 		return errors.NewError(errors.EInvalid, "service account cannot be unassigned to shared runner")
 	}
 
-	if rErr := caller.RequireAccessToGroup(ctx, *runner.GroupID, models.OwnerRole); rErr != nil {
-		return rErr
+	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
+	if err != nil {
+		return err
 	}
 
 	return s.dbClient.ServiceAccounts.UnassignServiceAccountFromRunner(ctx, serviceAccountID, runnerID)

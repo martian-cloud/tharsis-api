@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -51,40 +52,36 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			mockNamespaceMemberships := namespacemembership.MockService{}
-			mockNamespaceMemberships.Test(t)
-
-			mockGroups := db.MockGroups{}
-			mockGroups.Test(t)
-
-			mockTransactions := db.MockTransactions{}
-			mockTransactions.Test(t)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
+			mockNamespaceMemberships := namespacemembership.NewMockService(t)
+			mockGroups := db.NewMockGroups(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockActivityEvents := activityevent.NewMockService(t)
 
 			createNamespaceMembershipInput := &namespacemembership.CreateNamespaceMembershipInput{
 				NamespacePath: test.input.FullPath,
-				Role:          models.OwnerRole,
+				RoleID:        models.OwnerRoleID.String(),
 				User:          test.caller.User,
 			}
-			mockNamespaceMemberships.On("CreateNamespaceMembership", mock.Anything, createNamespaceMembershipInput).Return(nil, nil)
 
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+			if test.expectErrorCode == "" {
+				mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+				mockNamespaceMemberships.On("CreateNamespaceMembership", mock.Anything, createNamespaceMembershipInput).Return(nil, nil)
 
-			dbClient := db.Client{
-				Groups:       &mockGroups,
-				Transactions: &mockTransactions,
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			}
+
+			dbClient := &db.Client{
+				Groups:       mockGroups,
+				Transactions: mockTransactions,
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, &mockNamespaceMemberships, &mockActivityEvents)
+			service := NewService(logger, dbClient, mockNamespaceMemberships, mockActivityEvents)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, test.caller), &test.input)
 			if test.expectErrorCode != "" {
@@ -103,10 +100,10 @@ func TestCreateTopLevelGroup(t *testing.T) {
 func TestCreateNestedGroup(t *testing.T) {
 	// Test cases
 	tests := []struct {
+		authError       error
 		name            string
 		expectErrorCode string
 		input           models.Group
-		isAuthorized    bool
 	}{
 		{
 			name: "create group",
@@ -115,7 +112,6 @@ func TestCreateNestedGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "group1"},
 				ParentID: "group0",
 			},
-			isAuthorized: true,
 		},
 		{
 			name: "caller is not authorized to create group",
@@ -124,7 +120,7 @@ func TestCreateNestedGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "group1"},
 				ParentID: "group0",
 			},
-			isAuthorized:    false,
+			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -134,44 +130,35 @@ func TestCreateNestedGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			mockCaller := auth.MockCaller{}
-			mockCaller.On("GetSubject").Return("testsubject")
-			mockCaller.Test(t)
+			mockCaller := auth.NewMockCaller(t)
 
-			retFunc := func(_ context.Context, _ string, _ models.Role) error {
-				if test.isAuthorized {
-					return nil
-				}
-				return errors.NewError(errors.EForbidden, "Forbidden")
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateGroupPermission, mock.Anything).Return(test.authError)
+
+			mockGroups := db.NewMockGroups(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockActivityEvents := activityevent.NewMockService(t)
+
+			if test.authError == nil {
+				mockCaller.On("GetSubject").Return("testsubject")
+
+				mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
+
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			}
-			mockCaller.On("RequireAccessToGroup", mock.Anything, test.input.ParentID, models.DeployerRole).Return(retFunc)
-
-			mockGroups := db.MockGroups{}
-			mockGroups.Test(t)
-
-			mockTransactions := db.MockTransactions{}
-			mockTransactions.Test(t)
-
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
-
-			mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
-
-			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			dbClient := db.Client{
-				Groups:       &mockGroups,
-				Transactions: &mockTransactions,
+				Groups:       mockGroups,
+				Transactions: mockTransactions,
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, nil, &mockActivityEvents)
+			service := NewService(logger, &dbClient, nil, mockActivityEvents)
 
-			group, err := service.CreateGroup(auth.WithCaller(ctx, &mockCaller), &test.input)
+			group, err := service.CreateGroup(auth.WithCaller(ctx, mockCaller), &test.input)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
@@ -308,14 +295,13 @@ func TestMigrateGroup(t *testing.T) {
 			mockAuthorizer := auth.MockAuthorizer{}
 			mockAuthorizer.Test(t)
 
-			mockAuthorizer.On("RequireAccessToNamespace",
-				mock.Anything, testGroupOldPath, models.OwnerRole).Return(groupAccessError)
+			perms := []permissions.Permission{permissions.DeleteGroupPermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(groupAccessError)
 
-			mockAuthorizer.On("RequireAccessToNamespace",
-				mock.Anything, testGroupOldPath, models.DeployerRole).Return(nil)
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(nil)
 
-			mockAuthorizer.On("RequireAccessToNamespace",
-				mock.Anything, newParentPath, models.DeployerRole).Return(parentAccessError)
+			perms = []permissions.Permission{permissions.CreateGroupPermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
 
 			mockGroups := db.MockGroups{}
 			mockGroups.Test(t)

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -385,6 +386,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 		name              string
 		input             *DeleteSCIMResourceInput
 		existingUser      *models.User
+		authError         error
 		expectedErrorCode string
 	}{
 		{
@@ -411,6 +413,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 				},
 				// None of the other fields matter here.
 			},
+			authError:         errors.NewError(errors.ENotFound, "Resource not found"),
 			expectedErrorCode: errors.ENotFound,
 		},
 	}
@@ -423,16 +426,8 @@ func TestDeleteSCIMUser(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			callerFunc := func(_ context.Context, _ string) error {
-				if test.existingUser.SCIMExternalID != "" {
-					return nil
-				}
-
-				return errors.NewError(errors.ENotFound, "Resource Not found")
-			}
-
 			// Caller function mocks.
-			mockCaller.On("RequireUserDeleteAccess", mock.Anything, test.input.ID).Return(callerFunc)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteUserPermission, mock.Anything).Return(test.authError)
 
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 
@@ -839,6 +834,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 		name              string
 		input             *DeleteSCIMResourceInput
 		existingSCIMGroup *models.Team
+		authError         error
 		expectedErrorCode string
 	}{
 		{
@@ -864,6 +860,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 					ID: resourceUUID,
 				},
 			},
+			authError:         errors.NewError(errors.ENotFound, "Resource not found"),
 			expectedErrorCode: errors.ENotFound,
 		},
 	}
@@ -876,16 +873,8 @@ func TestDeleteSCIMGroup(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			callerFunc := func(_ context.Context, _ string) error {
-				if test.existingSCIMGroup.SCIMExternalID != "" {
-					return nil
-				}
-
-				return errors.NewError(errors.ENotFound, "Resource not found")
-			}
-
 			// Caller function mocks.
-			mockCaller.On("RequireTeamDeleteAccess", mock.Anything, test.input.ID).Return(callerFunc)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteTeamPermission, mock.Anything).Return(test.authError)
 
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 

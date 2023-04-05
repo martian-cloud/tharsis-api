@@ -21,6 +21,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
@@ -197,7 +198,8 @@ func (s *service) GetModuleByID(ctx context.Context, id string) (*models.Terrafo
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -221,7 +223,8 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -263,7 +266,8 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	module := moduleResult.Modules[0]
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -286,7 +290,8 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 	}
 
 	if input.Group != nil {
-		if err = caller.RequireAccessToNamespace(ctx, input.Group.FullPath, models.ViewerRole); err != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewTerraformModulePermission, auth.WithNamespacePath(input.Group.FullPath))
+		if err != nil {
 			return nil, err
 		}
 		dbInput.Filter.GroupID = &input.Group.Metadata.ID
@@ -322,7 +327,8 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -376,7 +382,8 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -485,7 +492,8 @@ func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *mode
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -525,7 +533,8 @@ func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*mod
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -545,7 +554,8 @@ func (s *service) GetModuleAttestations(ctx context.Context, input *GetModuleAtt
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -573,7 +583,8 @@ func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *mode
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -598,13 +609,18 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateTerraformModulePermission, auth.WithGroupID(input.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
 		return nil, err
+	}
+
+	if group == nil {
+		return nil, fmt.Errorf("group with id %s not found", input.GroupID)
 	}
 
 	var rootGroupID string
@@ -614,6 +630,10 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		rootGroup, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
 		if gErr != nil {
 			return nil, gErr
+		}
+
+		if rootGroup == nil {
+			return nil, fmt.Errorf("group with path %s not found", group.GetRootGroupPath())
 		}
 		rootGroupID = rootGroup.Metadata.ID
 	}
@@ -671,7 +691,8 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.DeleteTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -726,11 +747,17 @@ func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.T
 		return nil, err
 	}
 
+	namespacePaths := []string{}
 	for _, module := range response.Modules {
 		if module.Private {
-			if err := caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
-				return nil, err
-			}
+			namespacePaths = append(namespacePaths, module.GetGroupPath())
+		}
+	}
+
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -749,7 +776,8 @@ func (s *service) GetModuleConfigurationDetails(ctx context.Context, moduleVersi
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -785,7 +813,8 @@ func (s *service) GetModuleVersionByID(ctx context.Context, id string) (*models.
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -805,7 +834,8 @@ func (s *service) GetModuleVersions(ctx context.Context, input *GetModuleVersion
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -867,7 +897,8 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -970,7 +1001,8 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -1067,7 +1099,8 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 		return err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, module.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	if err != nil {
 		return err
 	}
 
@@ -1147,7 +1180,8 @@ func (s *service) GetModuleVersionPackageDownloadURL(ctx context.Context, module
 	}
 
 	if module.Private {
-		if err = caller.RequireAccessToInheritedGroupResource(ctx, module.GroupID); err != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		if err != nil {
 			return "", err
 		}
 	}

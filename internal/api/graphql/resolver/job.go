@@ -206,10 +206,6 @@ func jobQuery(ctx context.Context, args *JobQueryArgs) (*JobResolver, error) {
 		return nil, err
 	}
 
-	if job == nil {
-		return nil, nil
-	}
-
 	return &JobResolver{job: job}, nil
 }
 

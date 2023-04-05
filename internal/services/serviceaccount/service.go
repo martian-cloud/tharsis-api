@@ -12,6 +12,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -57,12 +58,12 @@ type GetServiceAccountsInput struct {
 	PaginationOptions *db.PaginationOptions
 	// Search returns only the service accounts with a name or resource path that starts with the value of search
 	Search *string
+	// RunnerID will filter service accounts that are assigned to the specified runner
+	RunnerID *string
 	// NamespacePath is the namespace to return service accounts for
 	NamespacePath string
 	// IncludeInherited includes inherited services accounts in the result
 	IncludeInherited bool
-	// RunnerID will filter service accounts that are assigned to the specified runner
-	RunnerID *string
 }
 
 // Service implements all service account related functionality
@@ -128,7 +129,8 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToNamespace(ctx, input.NamespacePath, models.ViewerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.ViewServiceAccountPermission, auth.WithNamespacePath(input.NamespacePath))
+	if err != nil {
 		return nil, err
 	}
 
@@ -162,6 +164,7 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -180,14 +183,14 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 		return nil, err
 	}
 
-	namespaces := []string{}
+	namespacePaths := []string{}
 	for _, sa := range result.ServiceAccounts {
-		parts := strings.Split(sa.ResourcePath, "/")
-		namespaces = append(namespaces, strings.Join(parts[:len(parts)-1], "/"))
+		namespacePaths = append(namespacePaths, sa.GetGroupPath())
 	}
 
-	for _, ns := range namespaces {
-		if err := caller.RequireAccessToInheritedNamespaceResource(ctx, ns); err != nil {
+	if len(namespacePaths) > 0 {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithNamespacePaths(namespacePaths))
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -201,8 +204,9 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 		return err
 	}
 
-	if rErr := caller.RequireAccessToGroup(ctx, serviceAccount.GroupID, models.DeployerRole); rErr != nil {
-		return rErr
+	err = caller.RequirePermission(ctx, permissions.DeleteServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
+	if err != nil {
+		return err
 	}
 
 	s.logger.Infow("Requested deletion of a service account.",
@@ -263,7 +267,8 @@ func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*mo
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("service account with path %s not found", path))
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, serviceAccount.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -286,7 +291,8 @@ func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models
 		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("service account with ID %s not found", id))
 	}
 
-	if err := caller.RequireAccessToInheritedGroupResource(ctx, serviceAccount.GroupID); err != nil {
+	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -299,7 +305,8 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, input.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.CreateServiceAccountPermission, auth.WithGroupID(input.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
@@ -358,7 +365,8 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 		return nil, err
 	}
 
-	if err = caller.RequireAccessToGroup(ctx, serviceAccount.GroupID, models.DeployerRole); err != nil {
+	err = caller.RequirePermission(ctx, permissions.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
+	if err != nil {
 		return nil, err
 	}
 
