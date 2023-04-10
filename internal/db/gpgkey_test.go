@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -120,7 +121,7 @@ func TestGetGPGKeys(t *testing.T) {
 	allGPGKeyIDsByUpdateTime := gpgKeyIDsFromGPGKeyInfos(allGPGKeyInfos)
 	reverseGPGKeyIDsByUpdateTime := reverseStringSlice(allGPGKeyIDsByUpdateTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -128,7 +129,7 @@ func TestGetGPGKeys(t *testing.T) {
 		input                       *GetGPGKeysInput
 		expectMsg                   *string
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectGPGKeyIDs             []string
 		getBeforeCursorFromPrevious bool
 		sortedDescending            bool
@@ -154,7 +155,7 @@ func TestGetGPGKeys(t *testing.T) {
 			getAfterCursorFromPrevious:  false,
 			expectMsg:                   nil,
 			expectGPGKeyIDs:             []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				Cursor:          nil,
 				TotalCount:      0,
 				HasNextPage:     false,
@@ -178,7 +179,7 @@ func TestGetGPGKeys(t *testing.T) {
 				Filter:            nil,
 			},
 			expectGPGKeyIDs:      allGPGKeyIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -187,13 +188,13 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectGPGKeyIDs:      allGPGKeyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -204,7 +205,7 @@ func TestGetGPGKeys(t *testing.T) {
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
 			},
 			expectGPGKeyIDs:      allGPGKeyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -216,7 +217,7 @@ func TestGetGPGKeys(t *testing.T) {
 			},
 			sortedDescending:     true,
 			expectGPGKeyIDs:      reverseGPGKeyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -225,12 +226,12 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectGPGKeyIDs:      allGPGKeyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allGPGKeyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -239,12 +240,12 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectGPGKeyIDs: allGPGKeyIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allGPGKeyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -258,13 +259,13 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectGPGKeyIDs:            allGPGKeyIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allGPGKeyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -278,13 +279,13 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectGPGKeyIDs:            allGPGKeyIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allGPGKeyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -299,13 +300,13 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			sortedDescending: true,
 			expectGPGKeyIDs:  reverseGPGKeyIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allGPGKeyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -329,27 +330,27 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetGPGKeysInput{
 				Sort:              ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectGPGKeyIDs:             []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:       ptr.String("only first or last can be defined, not both"),
 			expectGPGKeyIDs: allGPGKeyIDs[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allGPGKeyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -363,7 +364,7 @@ func TestGetGPGKeys(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetGPGKeysInput{
 				Sort: ptrGPGKeySortableField(GPGKeySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &GPGKeyFilter{
@@ -375,7 +376,7 @@ func TestGetGPGKeys(t *testing.T) {
 				},
 			},
 			expectGPGKeyIDs: []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount: 0,
 				Cursor:     dummyCursorFunc,
 			},
@@ -392,7 +393,7 @@ func TestGetGPGKeys(t *testing.T) {
 				},
 			},
 			expectGPGKeyIDs:      []string{allGPGKeyIDsByUpdateTime[0]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -406,7 +407,7 @@ func TestGetGPGKeys(t *testing.T) {
 				},
 			},
 			expectGPGKeyIDs:      []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -422,7 +423,7 @@ func TestGetGPGKeys(t *testing.T) {
 			expectGPGKeyIDs: []string{
 				allGPGKeyIDsByUpdateTime[0], allGPGKeyIDsByUpdateTime[2], allGPGKeyIDsByUpdateTime[4],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -437,7 +438,7 @@ func TestGetGPGKeys(t *testing.T) {
 			},
 			//			expectMsg:            ptr.String("Failed to scan query count result"),
 			expectGPGKeyIDs:      []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -450,9 +451,9 @@ func TestGetGPGKeys(t *testing.T) {
 					KeyIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            ptr.String("Failed to scan query count result: ERROR: invalid input syntax for type uuid: \"not-a-valid-uuid\" (SQLSTATE 22P02)"),
+			expectMsg:            invalidUUIDMsg2,
 			expectGPGKeyIDs:      []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -466,7 +467,7 @@ func TestGetGPGKeys(t *testing.T) {
 				},
 			},
 			expectGPGKeyIDs:      allGPGKeyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: 5, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 5, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -480,7 +481,7 @@ func TestGetGPGKeys(t *testing.T) {
 				},
 			},
 			expectGPGKeyIDs:      []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

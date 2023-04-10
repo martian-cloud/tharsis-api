@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // ActivityEvents encapsulates the logic to access activity events from the database
@@ -33,24 +34,24 @@ const (
 	ActivityEventSortableFieldActionDesc        ActivityEventSortableField = "ACTION_DESC"
 )
 
-func (sf ActivityEventSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf ActivityEventSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case ActivityEventSortableFieldCreatedAtAsc, ActivityEventSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "activity_events", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "activity_events", Col: "created_at"}
 	case ActivityEventSortableFieldNamespacePathAsc, ActivityEventSortableFieldNamespacePathDesc:
-		return &fieldDescriptor{key: "namespace_path", table: "namespaces", col: "path"}
+		return &pagination.FieldDescriptor{Key: "namespace_path", Table: "namespaces", Col: "path"}
 	case ActivityEventSortableFieldActionAsc, ActivityEventSortableFieldActionDesc:
-		return &fieldDescriptor{key: "action", table: "activity_events", col: "action"}
+		return &pagination.FieldDescriptor{Key: "action", Table: "activity_events", Col: "action"}
 	default:
 		return nil
 	}
 }
 
-func (sf ActivityEventSortableField) getSortDirection() SortDirection {
+func (sf ActivityEventSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // ActivityEventNamespaceMembershipRequirement specifies the namespace requirements for returning
@@ -79,14 +80,14 @@ type GetActivityEventsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *ActivityEventSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter contains the supported fields for filtering ActivityEvent resources
 	Filter *ActivityEventFilter
 }
 
 // ActivityEventsResult contains the response data and page information
 type ActivityEventsResult struct {
-	PageInfo       *PageInfo
+	PageInfo       *pagination.PageInfo
 	ActivityEvents []models.ActivityEvent
 }
 
@@ -179,9 +180,9 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		}
 	}
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
@@ -194,18 +195,17 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		Select(m.getSelectFields(true)...).
 		Where(ex)
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "activity_events", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "activity_events", Col: "id"},
 		sortBy,
 		sortDirection,
-		activityEventFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, m.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -223,12 +223,12 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := ActivityEventsResult{
-		PageInfo:       rows.getPageInfo(),
+		PageInfo:       rows.GetPageInfo(),
 		ActivityEvents: results,
 	}
 
@@ -542,32 +542,3 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 
 	return activityEvent, nil
 }
-
-func activityEventFieldResolver(key string, model interface{}) (string, error) {
-	activityEvent, ok := model.(*models.ActivityEvent)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected activity event type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &activityEvent.Metadata)
-	if !ok {
-		switch key {
-		case "user_id":
-			val = stringPtrToString(activityEvent.UserID)
-		case "service_account_id":
-			val = stringPtrToString(activityEvent.ServiceAccountID)
-		case "namespace_path":
-			val = stringPtrToString(activityEvent.NamespacePath)
-		case "action":
-			val = string(activityEvent.Action)
-		case "target_type":
-			val = string(activityEvent.TargetType)
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
-}
-
-// The End.

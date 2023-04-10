@@ -34,18 +34,23 @@ type VCSProvider struct {
 	AutoCreateWebhooks        bool
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (v *VCSProvider) ResolveMetadata(key string) (string, error) {
+	return v.Metadata.resolveFieldValue(key)
+}
+
 // Validate returns an error if the model is not valid
-func (vp *VCSProvider) Validate() error {
+func (v *VCSProvider) Validate() error {
 	// Verify name satisfies constraints
-	if err := verifyValidName(vp.Name); err != nil {
+	if err := verifyValidName(v.Name); err != nil {
 		return err
 	}
 
 	// Verify description satisfies constraints
-	return verifyValidDescription(vp.Description)
+	return verifyValidDescription(v.Description)
 }
 
 // GetGroupPath returns the group path
-func (vp *VCSProvider) GetGroupPath() string {
-	return vp.ResourcePath[:strings.LastIndex(vp.ResourcePath, "/")]
+func (v *VCSProvider) GetGroupPath() string {
+	return v.ResourcePath[:strings.LastIndex(v.ResourcePath, "/")]
 }

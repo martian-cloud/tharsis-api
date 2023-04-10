@@ -14,6 +14,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Workspaces encapsulates the logic to access workspaces from the database
@@ -38,22 +39,22 @@ const (
 	WorkspaceSortableFieldUpdatedAtDesc WorkspaceSortableField = "UPDATED_AT_DESC"
 )
 
-func (gs WorkspaceSortableField) getFieldDescriptor() *fieldDescriptor {
+func (gs WorkspaceSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch gs {
 	case WorkspaceSortableFieldFullPathAsc, WorkspaceSortableFieldFullPathDesc:
-		return &fieldDescriptor{key: "full_path", table: "namespaces", col: "path"}
+		return &pagination.FieldDescriptor{Key: "full_path", Table: "namespaces", Col: "path"}
 	case WorkspaceSortableFieldUpdatedAtAsc, WorkspaceSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "workspaces", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "workspaces", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (gs WorkspaceSortableField) getSortDirection() SortDirection {
+func (gs WorkspaceSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(gs), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // WorkspaceFilter contains the supported fields for filtering Workspace resources
@@ -70,14 +71,14 @@ type GetWorkspacesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *WorkspaceSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *WorkspaceFilter
 }
 
 // WorkspacesResult contains the response data and page information
 type WorkspacesResult struct {
-	PageInfo   *PageInfo
+	PageInfo   *pagination.PageInfo
 	Workspaces []models.Workspace
 }
 
@@ -146,26 +147,25 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "workspaces", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "workspaces", Col: "id"},
 		sortBy,
 		sortDirection,
-		workspaceFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, w.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, w.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -183,12 +183,12 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := WorkspacesResult{
-		PageInfo:   rows.getPageInfo(),
+		PageInfo:   rows.GetPageInfo(),
 		Workspaces: results,
 	}
 
@@ -483,23 +483,4 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 	}
 
 	return ws, nil
-}
-
-func workspaceFieldResolver(key string, model interface{}) (string, error) {
-	ws, ok := model.(*models.Workspace)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected workspace type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &ws.Metadata)
-	if !ok {
-		switch key {
-		case "full_path":
-			val = ws.FullPath
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }

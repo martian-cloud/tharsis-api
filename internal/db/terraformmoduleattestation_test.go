@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // terraformModuleAttestationInfo aids convenience in accessing the information
@@ -107,7 +108,7 @@ func TestGetModuleAttestationsWithPagination(t *testing.T) {
 	// Query for first page
 	middleIndex := len(warmupItems.terraformModuleAttestations) / 2
 	page1, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(int32(middleIndex)),
 		},
 	})
@@ -122,7 +123,7 @@ func TestGetModuleAttestationsWithPagination(t *testing.T) {
 
 	remaining := len(warmupItems.terraformModuleAttestations) - middleIndex
 	page2, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(int32(remaining)),
 			After: cursor,
 		},
@@ -180,7 +181,7 @@ func TestGetModuleAttestations(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetModuleAttestationsInput{
 				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
@@ -208,7 +209,7 @@ func TestGetModuleAttestations(t *testing.T) {
 			name: "pagination, first one and last two, expect error",
 			input: &GetModuleAttestationsInput{
 				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},

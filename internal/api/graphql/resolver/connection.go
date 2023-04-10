@@ -3,8 +3,8 @@ package resolver
 import (
 	"fmt"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const maxQueryLimit = 100
@@ -74,7 +74,7 @@ func (r *PageInfoResolver) HasPreviousPage() bool {
 
 // Edge type
 type Edge struct {
-	CursorFunc db.CursorFunc
+	CursorFunc pagination.CursorFunc
 	Node       interface{}
 }
 

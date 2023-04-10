@@ -10,12 +10,12 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // RegistryModuleVersion represents a module version
@@ -146,7 +146,7 @@ func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWri
 	// Get module version by module ID and version
 	statusFilter := models.TerraformModuleVersionStatusUploaded
 	versionsResponse, err := c.moduleRegistryService.GetModuleVersions(r.Context(), &moduleregistry.GetModuleVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		ModuleID:        module.Metadata.ID,

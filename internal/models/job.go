@@ -45,6 +45,11 @@ type Job struct {
 	CancelRequested          bool
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (j *Job) ResolveMetadata(key string) (string, error) {
+	return j.Metadata.resolveFieldValue(key)
+}
+
 // JobLogDescriptor contains metadata for job logs
 type JobLogDescriptor struct {
 	JobID    string

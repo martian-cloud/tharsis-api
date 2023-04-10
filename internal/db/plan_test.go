@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -108,7 +109,7 @@ func TestGetPlans(t *testing.T) {
 	allPlanIDsByUpdateTime := planIDsFromPlanInfos(allPlanInfos)
 	reversePlanIDsByUpdateTime := reverseStringSlice(allPlanIDsByUpdateTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -116,7 +117,7 @@ func TestGetPlans(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetPlansInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectPlanIDs               []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -134,7 +135,7 @@ func TestGetPlans(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectPlanIDs               []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -153,7 +154,7 @@ func TestGetPlans(t *testing.T) {
 				Filter:            nil,
 			},
 			expectPlanIDs:        allPlanIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -162,13 +163,13 @@ func TestGetPlans(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectPlanIDs:        allPlanIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -179,7 +180,7 @@ func TestGetPlans(t *testing.T) {
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtDesc),
 			},
 			expectPlanIDs:        reversePlanIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -188,12 +189,12 @@ func TestGetPlans(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectPlanIDs:        allPlanIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPlanIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -202,12 +203,12 @@ func TestGetPlans(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectPlanIDs: allPlanIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPlanIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -221,13 +222,13 @@ func TestGetPlans(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectPlanIDs:              allPlanIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPlanIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -241,13 +242,13 @@ func TestGetPlans(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectPlanIDs:              allPlanIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPlanIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -262,12 +263,12 @@ func TestGetPlans(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectPlanIDs: reversePlanIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPlanIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -291,26 +292,26 @@ func TestGetPlans(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetPlansInput{
 				Sort:              ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectPlanIDs:               []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetPlansInput{
 				Sort: ptrPlanSortableField(PlanSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPlanIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -332,7 +333,7 @@ func TestGetPlans(t *testing.T) {
 				},
 			},
 			expectPlanIDs:        []string{allPlanIDsByUpdateTime[0], allPlanIDsByUpdateTime[2], allPlanIDsByUpdateTime[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -346,7 +347,7 @@ func TestGetPlans(t *testing.T) {
 				},
 			},
 			expectPlanIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -360,7 +361,7 @@ func TestGetPlans(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

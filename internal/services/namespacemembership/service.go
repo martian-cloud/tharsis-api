@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
@@ -31,7 +32,7 @@ type GetNamespaceMembershipsForSubjectInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.NamespaceMembershipSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// UserID filters the namespace memberships by user ID
 	UserID *string
 	// ServiceAccount filters the namespace memberships by this service account

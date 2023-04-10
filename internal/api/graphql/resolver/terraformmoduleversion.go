@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -216,7 +217,7 @@ func (r *TerraformModuleVersionResolver) ConfigurationDetails(ctx context.Contex
 func (r *TerraformModuleVersionResolver) Attestations(ctx context.Context, args *TerraformModuleAttestationConnectionQueryArgs) (*TerraformModuleAttestationConnectionResolver, error) {
 	digest := r.moduleVersion.GetSHASumHex()
 	input := &moduleregistry.GetModuleAttestationsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -251,7 +252,7 @@ func terraformModuleVersionQuery(ctx context.Context, args *TerraformModuleVersi
 	}
 
 	input := moduleregistry.GetModuleVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		ModuleID:        module.Metadata.ID,

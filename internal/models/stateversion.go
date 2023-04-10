@@ -7,3 +7,8 @@ type StateVersion struct {
 	CreatedBy   string
 	Metadata    ResourceMetadata
 }
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (s *StateVersion) ResolveMetadata(key string) (string, error) {
+	return s.Metadata.resolveFieldValue(key)
+}

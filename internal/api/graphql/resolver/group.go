@@ -18,6 +18,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -180,7 +181,7 @@ func (r *GroupResolver) DescendentGroups(ctx context.Context, args ConnectionQue
 	}
 
 	input := group.GetGroupsInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		ParentGroup:       r.group,
 	}
 
@@ -199,7 +200,7 @@ func (r *GroupResolver) Workspaces(ctx context.Context, args *ConnectionQueryArg
 	}
 
 	input := workspace.GetWorkspacesInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Group:             r.group,
 	}
 
@@ -237,7 +238,7 @@ func (r *GroupResolver) Variables(ctx context.Context) ([]*NamespaceVariableReso
 // GPGKeys resolver
 func (r *GroupResolver) GPGKeys(ctx context.Context, args *GPGKeysConnectionQueryArgs) (*GPGKeyConnectionResolver, error) {
 	input := &gpgkey.GetGPGKeysInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -256,7 +257,7 @@ func (r *GroupResolver) GPGKeys(ctx context.Context, args *GPGKeysConnectionQuer
 // TerraformProviders resolver
 func (r *GroupResolver) TerraformProviders(ctx context.Context, args *TerraformProviderConnectionQueryArgs) (*TerraformProviderConnectionResolver, error) {
 	input := &providerregistry.GetProvidersInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -272,7 +273,7 @@ func (r *GroupResolver) TerraformProviders(ctx context.Context, args *TerraformP
 // ServiceAccounts resolver
 func (r *GroupResolver) ServiceAccounts(ctx context.Context, args *ServiceAccountsConnectionQueryArgs) (*ServiceAccountConnectionResolver, error) {
 	input := &serviceaccount.GetServiceAccountsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -296,7 +297,7 @@ func (r *GroupResolver) ManagedIdentities(ctx context.Context, args *ManagedIden
 	}
 
 	input := managedidentity.GetManagedIdentitiesInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 		NamespacePath:     r.group.FullPath,
 	}
@@ -320,7 +321,7 @@ func (r *GroupResolver) Runners(ctx context.Context, args *RunnersConnectionQuer
 	}
 
 	input := runner.GetRunnersInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		NamespacePath:     r.group.FullPath,
 	}
 
@@ -366,7 +367,7 @@ func (r *GroupResolver) VCSProviders(ctx context.Context,
 	}
 
 	input := vcs.GetVCSProvidersInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 		NamespacePath:     r.group.FullPath,
 	}
@@ -403,7 +404,7 @@ func groupsQuery(ctx context.Context, args *GroupConnectionQueryArgs) (*GroupCon
 	}
 
 	input := group.GetGroupsInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 	}
 
 	if args.ParentPath != nil {

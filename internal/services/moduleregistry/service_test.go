@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetModuleByID(t *testing.T) {
@@ -287,7 +288,7 @@ func TestGetModuleByAddress(t *testing.T) {
 
 			if test.rootGroup != nil {
 				mockModules.On("GetModules", mock.Anything, &db.GetModulesInput{
-					PaginationOptions: &db.PaginationOptions{First: ptr.Int32(1)},
+					PaginationOptions: &pagination.Options{First: ptr.Int32(1)},
 					Filter: &db.TerraformModuleFilter{
 						RootGroupID: &groupID,
 						Name:        &moduleName,
@@ -1435,7 +1436,7 @@ func TestCreateModuleVersion(t *testing.T) {
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 				mockModuleVersions.On("GetModuleVersions", mock.Anything, &db.GetModuleVersionsInput{
-					PaginationOptions: &db.PaginationOptions{
+					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
 					},
 					Filter: &db.TerraformModuleVersionFilter{

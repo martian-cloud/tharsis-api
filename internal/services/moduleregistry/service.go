@@ -28,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // CreateModuleInput is the input for creating a terraform module
@@ -58,7 +59,7 @@ type GetModulesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.TerraformModuleSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Group filters modules be the specified group
 	Group *models.Group
 	// Search filters module list by modules with a name that contains the search query
@@ -68,7 +69,7 @@ type GetModulesInput struct {
 // GetModuleVersionsInput is the input for getting a list of module versions
 type GetModuleVersionsInput struct {
 	Sort              *db.TerraformModuleVersionSortableField
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	Status            *models.TerraformModuleVersionStatus
 	SemanticVersion   *string
 	Latest            *bool
@@ -78,7 +79,7 @@ type GetModuleVersionsInput struct {
 // GetModuleAttestationsInput is the input for getting a list of module attestations
 type GetModuleAttestationsInput struct {
 	Sort              *db.TerraformModuleAttestationSortableField
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	Digest            *string
 	ModuleID          string
 }
@@ -248,7 +249,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	}
 
 	moduleResult, err := s.dbClient.TerraformModules.GetModules(ctx, &db.GetModulesInput{
-		PaginationOptions: &db.PaginationOptions{First: ptr.Int32(1)},
+		PaginationOptions: &pagination.Options{First: ptr.Int32(1)},
 		Filter: &db.TerraformModuleFilter{
 			RootGroupID: &rootGroup.Metadata.ID,
 			Name:        &name,
@@ -910,7 +911,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 
 	// Check if this version is greater than the previous latest
 	versionsResp, err := s.dbClient.TerraformModuleVersions.GetModuleVersions(ctx, &db.GetModuleVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		Filter: &db.TerraformModuleVersionFilter{

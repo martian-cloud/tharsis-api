@@ -22,6 +22,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -82,7 +83,7 @@ type GetWorkspacesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.WorkspaceSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Group filters the workspaces by the specified group
 	Group *models.Group
 	// Search is used to search for a workspace by name or namespace path
@@ -94,7 +95,7 @@ type GetStateVersionsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.StateVersionSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Workspace filters state versions by the specified workspace
 	Workspace *models.Workspace
 }

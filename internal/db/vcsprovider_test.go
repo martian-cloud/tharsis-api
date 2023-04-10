@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Miscellaneous values used throughout testing.
@@ -208,7 +209,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 	sort.Sort(vcsProviderInfoNameSlice(allVCSProviderInfos))
 	allVCSProviderIDsByName := vcsProviderIDsFromVCSProviderInfos(allVCSProviderInfos)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -216,7 +217,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetVCSProvidersInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectVCSProviderIDs        []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -234,7 +235,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectVCSProviderIDs    	[]string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -253,7 +254,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				Filter:            nil,
 			},
 			expectVCSProviderIDs: allVCSProviderIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -262,13 +263,13 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "populated pagination, sort in ascending order of creation time, nil filter",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -279,7 +280,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldCreatedAtDesc),
 			},
 			expectVCSProviderIDs: reverseVCSProviderIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -288,13 +289,13 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -305,7 +306,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtDesc),
 			},
 			expectVCSProviderIDs: reverseVCSProviderIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -314,12 +315,12 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -328,12 +329,12 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -347,13 +348,13 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectVCSProviderIDs:       allVCSProviderIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -367,13 +368,13 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectVCSProviderIDs:       allVCSProviderIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -388,12 +389,12 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectVCSProviderIDs: reverseVCSProviderIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -417,26 +418,26 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetVCSProvidersInput{
 				Sort:              ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectVCSProviderIDs:        []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -451,7 +452,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 			name: "fully-populated types, everything allowed through filters",
 			input: &GetVCSProvidersInput{
 				Sort: ptrVCSProviderSortableField(VCSProviderSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &VCSProviderFilter{
@@ -461,7 +462,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByCreateTime,
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -480,7 +481,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByName,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -494,7 +495,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByName[0:2],
-			expectPageInfo:       PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -508,7 +509,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByName[2:4],
-			expectPageInfo:       PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -522,7 +523,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByName[4:],
-			expectPageInfo:       PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -536,7 +537,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -550,7 +551,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(5), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(5), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -564,7 +565,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -578,7 +579,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -592,7 +593,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: allVCSProviderIDsByName,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -606,7 +607,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 				},
 			},
 			expectVCSProviderIDs: []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

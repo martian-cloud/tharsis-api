@@ -9,12 +9,12 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // RegistryProviderPlatform represents a platform for a provider version
@@ -223,7 +223,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 
 	// Get provider version by provider ID and version
 	versionsResponse, err := c.providerRegistryService.GetProviderVersions(r.Context(), &providerregistry.GetProviderVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		ProviderID:               provider.Metadata.ID,
@@ -244,7 +244,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 	providerVersion := versionsResponse.ProviderVersions[0]
 
 	platformsResponse, err := c.providerRegistryService.GetProviderPlatforms(r.Context(), &providerregistry.GetProviderPlatformsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		ProviderVersionID: &providerVersion.Metadata.ID,

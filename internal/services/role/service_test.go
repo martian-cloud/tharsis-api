@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetAvailablePermissions(t *testing.T) {
@@ -231,7 +232,7 @@ func TestGetRoles(t *testing.T) {
 			caller: &auth.SystemCaller{},
 			input: &GetRolesInput{
 				Sort: &sort,
-				PaginationOptions: &db.PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 				RoleNamePrefix: ptr.String("role"),

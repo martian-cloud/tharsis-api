@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -49,7 +50,7 @@ func TestGetStateVersions(t *testing.T) {
 	allStateVersionIDsByTime := stateVersionIDsFromStateVersionInfos(allStateVersionInfos)
 	reverseStateVersionIDsByTime := reverseStringSlice(allStateVersionIDsByTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -57,7 +58,7 @@ func TestGetStateVersions(t *testing.T) {
 		input                       *GetStateVersionsInput
 		expectMsg                   *string
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStateVersionIDs       []string
 		getBeforeCursorFromPrevious bool
 		sortedDescending            bool
@@ -81,7 +82,7 @@ func TestGetStateVersions(t *testing.T) {
 			getAfterCursorFromPrevious:  false,
 			expectMsg:                   nil,
 			expectStateVersionIDs:       []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				Cursor:          nil,
 				TotalCount:      0,
 				HasNextPage:     false,
@@ -105,7 +106,7 @@ func TestGetStateVersions(t *testing.T) {
 				Filter:            nil,
 			},
 			expectStateVersionIDs: allStateVersionIDs,
-			expectPageInfo:        PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -114,13 +115,13 @@ func TestGetStateVersions(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectStateVersionIDs: allStateVersionIDsByTime,
-			expectPageInfo:        PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -131,7 +132,7 @@ func TestGetStateVersions(t *testing.T) {
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
 			},
 			expectStateVersionIDs: allStateVersionIDsByTime,
-			expectPageInfo:        PageInfo{TotalCount: int32(len(allStateVersionIDsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -143,7 +144,7 @@ func TestGetStateVersions(t *testing.T) {
 			},
 			sortedDescending:      true,
 			expectStateVersionIDs: reverseStateVersionIDsByTime,
-			expectPageInfo:        PageInfo{TotalCount: int32(len(allStateVersionIDsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -152,12 +153,12 @@ func TestGetStateVersions(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectStateVersionIDs: allStateVersionIDsByTime,
-			expectPageInfo:        PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -166,12 +167,12 @@ func TestGetStateVersions(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectStateVersionIDs: allStateVersionIDsByTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allStateVersionIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -185,13 +186,13 @@ func TestGetStateVersions(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectStateVersionIDs:      allStateVersionIDsByTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allStateVersionIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -205,13 +206,13 @@ func TestGetStateVersions(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectStateVersionIDs:      allStateVersionIDsByTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allStateVersionIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -226,13 +227,13 @@ func TestGetStateVersions(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			sortedDescending:      true,
 			expectStateVersionIDs: reverseStateVersionIDsByTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allStateVersionIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -256,27 +257,27 @@ func TestGetStateVersions(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetStateVersionsInput{
 				Sort:              ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectStateVersionIDs:       []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:             ptr.String("only first or last can be defined, not both"),
 			expectStateVersionIDs: allStateVersionIDs[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allStateVersionIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -290,7 +291,7 @@ func TestGetStateVersions(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetStateVersionsInput{
 				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &StateVersionFilter{
@@ -301,7 +302,7 @@ func TestGetStateVersions(t *testing.T) {
 			},
 			expectMsg:             emptyUUIDMsg2,
 			expectStateVersionIDs: []string{},
-			expectPageInfo:        PageInfo{},
+			expectPageInfo:        pagination.PageInfo{},
 		},
 
 		{
@@ -313,7 +314,7 @@ func TestGetStateVersions(t *testing.T) {
 				},
 			},
 			expectStateVersionIDs: allStateVersionIDsByTime[:3],
-			expectPageInfo:        PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -327,7 +328,7 @@ func TestGetStateVersions(t *testing.T) {
 				},
 			},
 			expectStateVersionIDs: []string{},
-			expectPageInfo:        PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -340,7 +341,7 @@ func TestGetStateVersions(t *testing.T) {
 			},
 			expectMsg:             invalidUUIDMsg2,
 			expectStateVersionIDs: []string{},
-			expectPageInfo:        PageInfo{},
+			expectPageInfo:        pagination.PageInfo{},
 		},
 
 		{
@@ -356,7 +357,7 @@ func TestGetStateVersions(t *testing.T) {
 			expectStateVersionIDs: []string{
 				allStateVersionIDsByTime[0], allStateVersionIDsByTime[1], allStateVersionIDsByTime[3],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -370,7 +371,7 @@ func TestGetStateVersions(t *testing.T) {
 				},
 			},
 			expectStateVersionIDs: []string{},
-			expectPageInfo:        PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},
@@ -385,7 +386,7 @@ func TestGetStateVersions(t *testing.T) {
 			},
 			expectMsg:             invalidUUIDMsg2,
 			expectStateVersionIDs: []string{},
-			expectPageInfo:        PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:        pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
 			expectHasEndCursor:    true,
 		},

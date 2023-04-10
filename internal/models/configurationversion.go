@@ -19,3 +19,8 @@ type ConfigurationVersion struct {
 	Metadata    ResourceMetadata
 	Speculative bool
 }
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (c *ConfigurationVersion) ResolveMetadata(key string) (string, error) {
+	return c.Metadata.resolveFieldValue(key)
+}

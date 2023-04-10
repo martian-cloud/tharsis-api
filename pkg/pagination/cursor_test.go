@@ -1,4 +1,4 @@
-package db
+package pagination
 
 import (
 	"testing"
@@ -29,7 +29,7 @@ func TestEncode(t *testing.T) {
 		{
 			name:          "build cursor with error",
 			encodedCursor: "dGVzdA==",
-			expectErrMsg:  "Invalid cursor: invalid character 'e' in literal true (expecting 'r')",
+			expectErrMsg:  ErrInvalidCursor.Error(),
 		},
 	}
 

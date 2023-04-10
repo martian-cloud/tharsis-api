@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // ManagedIdentities encapsulates the logic to access managed identities from the database
@@ -44,39 +45,39 @@ const (
 	ManagedIdentitySortableFieldUpdatedAtDesc ManagedIdentitySortableField = "UPDATED_AT_DESC"
 )
 
-func (sf ManagedIdentitySortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf ManagedIdentitySortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case ManagedIdentitySortableFieldCreatedAtAsc, ManagedIdentitySortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "t1", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "t1", Col: "created_at"}
 	case ManagedIdentitySortableFieldUpdatedAtAsc, ManagedIdentitySortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "t1", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "t1", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf ManagedIdentitySortableField) getSortDirection() SortDirection {
+func (sf ManagedIdentitySortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // ManagedIdentityAccessRuleSortableField represents the fields that a managed identity access rule can be sorted by
 type ManagedIdentityAccessRuleSortableField string
 
-func (sf ManagedIdentityAccessRuleSortableField) getRuleFieldDescriptor() *fieldDescriptor {
+func (sf ManagedIdentityAccessRuleSortableField) getRuleFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	default:
 		return nil
 	}
 }
 
-func (sf ManagedIdentityAccessRuleSortableField) getRuleSortDirection() SortDirection {
+func (sf ManagedIdentityAccessRuleSortableField) getRuleSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // ManagedIdentityFilter contains the supported fields for filtering ManagedIdentity resources
@@ -98,7 +99,7 @@ type GetManagedIdentitiesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *ManagedIdentitySortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *ManagedIdentityFilter
 }
@@ -108,20 +109,20 @@ type GetManagedIdentityAccessRulesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *ManagedIdentityAccessRuleSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *ManagedIdentityAccessRuleFilter
 }
 
 // ManagedIdentitiesResult contains the response data and page information
 type ManagedIdentitiesResult struct {
-	PageInfo          *PageInfo
+	PageInfo          *pagination.PageInfo
 	ManagedIdentities []models.ManagedIdentity
 }
 
 // ManagedIdentityAccessRulesResult contains the response data and page information
 type ManagedIdentityAccessRulesResult struct {
-	PageInfo                   *PageInfo
+	PageInfo                   *pagination.PageInfo
 	ManagedIdentityAccessRules []models.ManagedIdentityAccessRule
 }
 
@@ -177,26 +178,25 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 		Select(managedIdentityRuleFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getRuleSortDirection()
 		sortBy = input.Sort.getRuleFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "managed_identity_rules", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "managed_identity_rules", Col: "id"},
 		sortBy,
 		sortDirection,
-		managedIdentityAccessRuleFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, conn, query)
+	rows, err := qBuilder.Execute(ctx, conn, query)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 	}
 
 	result := ManagedIdentityAccessRulesResult{
-		PageInfo:                   rows.getPageInfo(),
+		PageInfo:                   rows.GetPageInfo(),
 		ManagedIdentityAccessRules: rules,
 	}
 
@@ -779,26 +779,25 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "t1", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "t1", Col: "id"},
 		sortBy,
 		sortDirection,
-		managedIdentityFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, m.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -816,12 +815,12 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := ManagedIdentitiesResult{
-		PageInfo:          rows.getPageInfo(),
+		PageInfo:          rows.GetPageInfo(),
 		ManagedIdentities: results,
 	}
 
@@ -1180,32 +1179,4 @@ func scanManagedIdentityRule(row scanner) (*models.ManagedIdentityAccessRule, er
 	}
 
 	return rule, nil
-}
-
-func managedIdentityFieldResolver(key string, model interface{}) (string, error) {
-	managedIdentity, ok := model.(*models.ManagedIdentity)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected ManagedIdentity type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &managedIdentity.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
-}
-
-func managedIdentityAccessRuleFieldResolver(key string, model interface{}) (string, error) {
-	rule, ok := model.(*models.ManagedIdentityAccessRule)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected ManagedIdentityAccessRule type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &rule.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

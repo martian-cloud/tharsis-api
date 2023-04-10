@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // runnerInfo aids convenience in accessing the information
@@ -159,7 +160,7 @@ func TestGetRunnersWithPagination(t *testing.T) {
 	// Query for first page
 	middleIndex := len(warmupItems.runners) / 2
 	page1, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(int32(middleIndex)),
 		},
 	})
@@ -174,7 +175,7 @@ func TestGetRunnersWithPagination(t *testing.T) {
 
 	remaining := len(warmupItems.runners) - middleIndex
 	page2, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(int32(remaining)),
 			After: cursor,
 		},
@@ -231,7 +232,7 @@ func TestGetRunners(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetRunnersInput{
 				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
@@ -259,7 +260,7 @@ func TestGetRunners(t *testing.T) {
 			name: "pagination, first one and last two, expect error",
 			input: &GetRunnersInput{
 				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},

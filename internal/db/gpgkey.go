@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // GPGKeys encapsulates the logic to access gpg keys from the database
@@ -30,20 +31,20 @@ const (
 	GPGKeySortableFieldUpdatedAtDesc GPGKeySortableField = "UPDATED_AT_DESC"
 )
 
-func (ts GPGKeySortableField) getFieldDescriptor() *fieldDescriptor {
+func (ts GPGKeySortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch ts {
 	case GPGKeySortableFieldUpdatedAtAsc, GPGKeySortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "gpg_keys", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "gpg_keys", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (ts GPGKeySortableField) getSortDirection() SortDirection {
+func (ts GPGKeySortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(ts), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // GPGKeyFilter contains the supported fields for filtering GPGKey resources
@@ -58,14 +59,14 @@ type GetGPGKeysInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *GPGKeySortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *GPGKeyFilter
 }
 
 // GPGKeysResult contains the response data and page information
 type GPGKeysResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	GPGKeys  []models.GPGKey
 }
 
@@ -106,27 +107,26 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "gpg_keys", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "gpg_keys", Col: "id"},
 		sortBy,
 		sortDirection,
-		gpgKeyFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, t.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -144,12 +144,12 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := GPGKeysResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		GPGKeys:  results,
 	}
 
@@ -311,18 +311,4 @@ func scanGPGKey(row scanner, withResourcePath bool) (*models.GPGKey, error) {
 	}
 
 	return gpgKey, nil
-}
-
-func gpgKeyFieldResolver(key string, model interface{}) (string, error) {
-	gpgKey, ok := model.(*models.GPGKey)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected GPG Key type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &gpgKey.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

@@ -38,3 +38,8 @@ type VCSEvent struct {
 	Status              VCSEventStatus
 	Metadata            ResourceMetadata
 }
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (v *VCSEvent) ResolveMetadata(key string) (string, error) {
+	return v.Metadata.resolveFieldValue(key)
+}

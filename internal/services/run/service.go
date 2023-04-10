@@ -28,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -61,7 +62,7 @@ type GetRunsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.RunSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Workspace filters the runs by the specified workspace
 	Workspace *models.Workspace
 	// Group filters the runs by the specified group
@@ -344,7 +345,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			if moduleRegistrySource.ModuleID != nil {
 				var versionsResponse *db.ModuleVersionsResult
 				versionsResponse, err = s.moduleService.GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
-					PaginationOptions: &db.PaginationOptions{
+					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
 					},
 					ModuleID:        *moduleRegistrySource.ModuleID,

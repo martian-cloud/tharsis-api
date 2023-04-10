@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -192,7 +193,7 @@ func (r *TerraformProviderResolver) Group(ctx context.Context) (*GroupResolver, 
 // Versions resolver
 func (r *TerraformProviderResolver) Versions(ctx context.Context, args *TerraformProviderVersionsConnectionQueryArgs) (*TerraformProviderVersionConnectionResolver, error) {
 	input := &providerregistry.GetProviderVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -212,7 +213,7 @@ func (r *TerraformProviderResolver) Versions(ctx context.Context, args *Terrafor
 // LatestVersion resolver
 func (r *TerraformProviderResolver) LatestVersion(ctx context.Context) (*TerraformProviderVersionResolver, error) {
 	versionsResp, err := getProviderRegistryService(ctx).GetProviderVersions(ctx, &providerregistry.GetProviderVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		ProviderID: r.provider.Metadata.ID,
@@ -235,7 +236,7 @@ func terraformProvidersQuery(ctx context.Context, args *TerraformProviderConnect
 	}
 
 	input := providerregistry.GetProvidersInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 	}
 

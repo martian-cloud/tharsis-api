@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
@@ -44,22 +45,22 @@ const (
 	NamespaceMembershipSortableFieldNamespacePathDesc NamespaceMembershipSortableField = "NAMESPACE_PATH_DESC"
 )
 
-func (sf NamespaceMembershipSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf NamespaceMembershipSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case NamespaceMembershipSortableFieldUpdatedAtAsc, NamespaceMembershipSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "namespace_memberships", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "namespace_memberships", Col: "updated_at"}
 	case NamespaceMembershipSortableFieldNamespacePathAsc, NamespaceMembershipSortableFieldNamespacePathDesc:
-		return &fieldDescriptor{key: "namespace_path", table: "namespaces", col: "path"}
+		return &pagination.FieldDescriptor{Key: "namespace_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
 }
 
-func (sf NamespaceMembershipSortableField) getSortDirection() SortDirection {
+func (sf NamespaceMembershipSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // NamespaceMembershipFilter contains the supported fields for filtering NamespaceMembership resources
@@ -80,14 +81,14 @@ type GetNamespaceMembershipsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *NamespaceMembershipSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *NamespaceMembershipFilter
 }
 
 // NamespaceMembershipResult contains the response data and page information
 type NamespaceMembershipResult struct {
-	PageInfo             *PageInfo
+	PageInfo             *pagination.PageInfo
 	NamespaceMemberships []models.NamespaceMembership
 }
 
@@ -326,26 +327,25 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "namespace_memberships", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "namespace_memberships", Col: "id"},
 		sortBy,
 		sortDirection,
-		namespaceMembershipFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, m.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -363,12 +363,12 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := NamespaceMembershipResult{
-		PageInfo:             rows.getPageInfo(),
+		PageInfo:             rows.GetPageInfo(),
 		NamespaceMemberships: results,
 	}
 
@@ -447,25 +447,6 @@ func scanNamespaceMembership(row scanner, withNamespacePath bool) (*models.Names
 	}
 
 	return namespaceMembership, nil
-}
-
-func namespaceMembershipFieldResolver(key string, model interface{}) (string, error) {
-	namespaceMembership, ok := model.(*models.NamespaceMembership)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected namespace membership type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &namespaceMembership.Metadata)
-	if !ok {
-		switch key {
-		case "namespace_path":
-			val = namespaceMembership.Namespace.Path
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }
 
 type namespaceMembershipExpressionBuilder struct {

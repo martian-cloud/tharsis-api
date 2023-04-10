@@ -1,38 +1,81 @@
-package db
+// Package pagination provides functionalities
+// related to cursor-based pagination.
+package pagination
+
+//go:generate mockery --name Connection --inpackage --case underscore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 )
 
-// CursorFunc creates an opaque cursor string
-type CursorFunc func(item interface{}) (*string, error)
+// Constants used for sorting
+const (
+	gt   = "GT"
+	lt   = "LT"
+	asc  = "ASC"
+	desc = "DESC"
+)
 
-// PaginationOptions contain the cursor based pagination options
-type PaginationOptions struct {
+// SortDirection indicates the direction for sorting results
+type SortDirection string
+
+// SortDirection constants
+const (
+	AscSort  SortDirection = "ASC"
+	DescSort SortDirection = "DESC"
+)
+
+// Connection is used to represent a DB connection
+type Connection interface {
+	Query(ctx context.Context, sql string, optionsAndArgs ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, optionsAndArgs ...any) pgx.Row
+}
+
+// CursorPaginatable implements functions needed to resolve fields for cursor pagination
+type CursorPaginatable interface {
+	ResolveMetadata(key string) (string, error)
+}
+
+// CursorFunc creates an opaque cursor string
+type CursorFunc func(cp CursorPaginatable) (*string, error)
+
+// Options contain the cursor based pagination options
+type Options struct {
 	Before *string
 	After  *string
 	First  *int32
 	Last   *int32
 }
 
-// Validate returns an error if the options are not valid.
-func (po *PaginationOptions) Validate() error {
+// Validate returns an error if the options are not valid
+func (o *Options) validate() error {
 	// This is also checked in the service layer before getting here.
-	if (po.Before != nil) && (po.After != nil) {
-		return errors.NewError(errors.EInvalid, "only before or after can be defined, not both")
+	if (o.Before != nil) && (o.After != nil) {
+		return errors.New("only before or after can be defined, not both")
 	}
-	if (po.First != nil) && (po.Last != nil) {
-		return errors.NewError(errors.EInvalid, "only first or last can be defined, not both")
+	if (o.First != nil) && (o.Last != nil) {
+		return errors.New("only first or last can be defined, not both")
 	}
 
 	return nil
+}
+
+// FieldDescriptor defines a field descriptor
+type FieldDescriptor struct {
+	Key   string
+	Table string
+	Col   string
+}
+
+func (f *FieldDescriptor) getFullColName() string {
+	return fmt.Sprintf("%s.%s", f.Table, f.Col)
 }
 
 // PageInfo contains the page information
@@ -43,32 +86,14 @@ type PageInfo struct {
 	HasPreviousPage bool
 }
 
-// paginatedRows contains the paginated query results
-type paginatedRows interface {
+// PaginatedRows contains the paginated query results
+type PaginatedRows interface {
 	pgx.Rows
-	getPageInfo() *PageInfo
-	finalize(resultsPtr interface{}) error
+	GetPageInfo() *PageInfo
+	Finalize(resultsPtr any) error
 }
 
-const (
-	gt   = "GT"
-	lt   = "LT"
-	asc  = "ASC"
-	desc = "DESC"
-)
-
-type fieldResolverFunc func(key string, model interface{}) (string, error)
-
-type fieldDescriptor struct {
-	key   string
-	table string
-	col   string
-}
-
-func (f *fieldDescriptor) getFullColName() string {
-	return fmt.Sprintf("%s.%s", f.table, f.col)
-}
-
+// cursorPaginatedRows represents DB rows with pagination
 type cursorPaginatedRows struct {
 	pgx.Rows
 	limit      *int32
@@ -81,6 +106,7 @@ type cursorPaginatedRows struct {
 	count      int32
 }
 
+// Next returns true if there are more rows.
 func (c *cursorPaginatedRows) Next() bool {
 	next := c.Rows.Next()
 
@@ -91,15 +117,16 @@ func (c *cursorPaginatedRows) Next() bool {
 	return next
 }
 
-func (c *cursorPaginatedRows) finalize(resultsPtr interface{}) error {
+// Finalize finalizes the result set
+func (c *cursorPaginatedRows) Finalize(resultsPtr any) error {
 	ptr := reflect.ValueOf(resultsPtr)
 	if ptr.Kind() != reflect.Ptr {
-		return errors.NewError(errors.EInternal, fmt.Sprintf("expected pointer type, got %T", resultsPtr))
+		return fmt.Errorf("expected pointer type, got %T", resultsPtr)
 	}
 
 	array := ptr.Elem()
 	if array.Kind() != reflect.Array && array.Kind() != reflect.Slice {
-		return errors.NewError(errors.EInternal, fmt.Sprintf("expected slice type, got %T", resultsPtr))
+		return fmt.Errorf("expected slice type, got %T", resultsPtr)
 	}
 
 	if c.limit != nil && c.count > *c.limit {
@@ -115,7 +142,8 @@ func (c *cursorPaginatedRows) finalize(resultsPtr interface{}) error {
 	return nil
 }
 
-func (c *cursorPaginatedRows) getPageInfo() *PageInfo {
+// GetPageInfo returns the PageInfo
+func (c *cursorPaginatedRows) GetPageInfo() *PageInfo {
 	pageInfo := PageInfo{TotalCount: c.totalCount}
 
 	// Handle all possible permutations
@@ -151,29 +179,29 @@ func (c *cursorPaginatedRows) getPageInfo() *PageInfo {
 	return &pageInfo
 }
 
-type paginatedQueryBuilder struct {
-	options       *PaginationOptions
-	primaryKey    *fieldDescriptor
-	sortBy        *fieldDescriptor
+// PaginatedQueryBuilder represents a paginated DB query
+type PaginatedQueryBuilder struct {
+	options       *Options
+	primaryKey    *FieldDescriptor
+	sortBy        *FieldDescriptor
 	limit         *int32
-	fieldResolver fieldResolverFunc
 	cur           *cursor
 	sortDirection SortDirection
 }
 
-func newPaginatedQueryBuilder(
-	options *PaginationOptions,
-	primaryKey *fieldDescriptor,
-	sortBy *fieldDescriptor,
+// NewPaginatedQueryBuilder returns a PaginatedQueryBuilder
+func NewPaginatedQueryBuilder(
+	options *Options,
+	primaryKey *FieldDescriptor,
+	sortBy *FieldDescriptor,
 	sortDirection SortDirection,
-	fieldResolver fieldResolverFunc,
-) (*paginatedQueryBuilder, error) {
+) (*PaginatedQueryBuilder, error) {
 	if options == nil {
-		options = &PaginationOptions{}
+		options = &Options{}
 	}
 
-	if err := options.Validate(); err != nil {
-		return nil, errors.NewError(errors.EInvalid, err.Error())
+	if err := options.validate(); err != nil {
+		return nil, err
 	}
 
 	var limit *int32
@@ -195,33 +223,29 @@ func newPaginatedQueryBuilder(
 	}
 
 	if err != nil {
-		return nil, errors.NewError(
-			errors.EInvalid,
-			"Failed to decode cursor",
-			errors.WithErrorErr(err),
-		)
+		return nil, err
 	}
 
-	// Verify sortby matches cursor
+	// Verify sortBy matches cursor
 	if cur != nil &&
 		((cur.secondary != nil && sortBy == nil) ||
 			(cur.secondary == nil && sortBy != nil) ||
-			(cur.secondary != nil && sortBy != nil && sortBy.key != cur.secondary.name)) {
-		return nil, errors.NewError(errors.EInvalid, "Sort by argument does not match cursor")
+			(cur.secondary != nil && sortBy != nil && sortBy.Key != cur.secondary.name)) {
+		return nil, ErrInvalidSortBy
 	}
 
-	return &paginatedQueryBuilder{
+	return &PaginatedQueryBuilder{
 		options:       options,
 		primaryKey:    primaryKey,
 		sortBy:        sortBy,
 		sortDirection: sortDirection,
 		limit:         limit,
-		fieldResolver: fieldResolver,
 		cur:           cur,
 	}, nil
 }
 
-func (p *paginatedQueryBuilder) execute(ctx context.Context, conn connection, query *goqu.SelectDataset) (paginatedRows, error) {
+// Execute executes the paginated query using the DB Connection
+func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, query *goqu.SelectDataset) (PaginatedRows, error) {
 	// Copy original query which will be used to get the total count
 	originalQuery := *query
 
@@ -257,7 +281,7 @@ func (p *paginatedQueryBuilder) execute(ctx context.Context, conn connection, qu
 
 	var count int32
 	if err = row.Scan(&count); err != nil {
-		return nil, errors.NewError(errors.EInternal, "Failed to scan query count result", errors.WithErrorErr(err))
+		return nil, fmt.Errorf("failed to scan query count result: %w", err)
 	}
 
 	rows, err := conn.Query(ctx, sql, args...)
@@ -273,21 +297,21 @@ func (p *paginatedQueryBuilder) execute(ctx context.Context, conn connection, qu
 		last:       p.options.Last,
 		before:     p.options.Before,
 		after:      p.options.After,
-		cursorFunc: func(item interface{}) (*string, error) {
-			pKeyVal, err := p.fieldResolver(p.primaryKey.key, item)
+		cursorFunc: func(cp CursorPaginatable) (*string, error) {
+			pKeyVal, err := cp.ResolveMetadata(p.primaryKey.Key)
 			if err != nil {
 				return nil, err
 			}
 
-			cur := cursor{primary: &cursorField{name: p.primaryKey.key, value: pKeyVal}}
+			cur := cursor{primary: &cursorField{name: p.primaryKey.Key, value: pKeyVal}}
 
 			if p.sortBy != nil {
-				sKeyVal, frErr := p.fieldResolver(p.sortBy.key, item)
+				sKeyVal, frErr := cp.ResolveMetadata(p.sortBy.Key)
 				if frErr != nil {
 					return nil, frErr
 				}
 
-				cur.secondary = &cursorField{name: p.sortBy.key, value: sKeyVal}
+				cur.secondary = &cursorField{name: p.sortBy.Key, value: sKeyVal}
 			}
 
 			encodedCursor, err := cur.encode()
@@ -300,21 +324,19 @@ func (p *paginatedQueryBuilder) execute(ctx context.Context, conn connection, qu
 	}, nil
 }
 
-func (p *paginatedQueryBuilder) buildWhereCondition() goqu.Expression {
+func (p *PaginatedQueryBuilder) buildWhereCondition() goqu.Expression {
 	var op string
 
 	afterOp := gt
 	beforeOp := lt
-
 	if p.sortDirection == DescSort {
 		afterOp = lt
 		beforeOp = gt
 	}
 
+	op = beforeOp
 	if p.options.After != nil {
 		op = afterOp
-	} else {
-		op = beforeOp
 	}
 
 	if p.cur != nil {
@@ -335,54 +357,42 @@ func (p *paginatedQueryBuilder) buildWhereCondition() goqu.Expression {
 	return nil
 }
 
-func (p *paginatedQueryBuilder) buildOrderBy() []exp.OrderedExpression {
+func (p *PaginatedQueryBuilder) buildOrderBy() []exp.OrderedExpression {
 	expressions := []exp.OrderedExpression{}
 
 	forward := asc
 	backward := desc
-
 	if p.sortDirection == DescSort {
 		forward = desc
 		backward = asc
 	}
 
 	direction := forward
-
 	if (p.options.Before == nil && p.options.Last != nil) || (p.options.Before != nil && p.options.First != nil) {
 		direction = backward
 	}
 
-	idCol := p.primaryKey.getFullColName()
 	if p.sortBy != nil {
-		expressions = append(
-			expressions,
-			p.buildOrderByExpression(goqu.I(p.sortBy.getFullColName()), direction),
-		)
+		expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.sortBy.getFullColName()), direction))
 	}
-	expressions = append(expressions, p.buildOrderByExpression(goqu.I(idCol), direction))
+	expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.primaryKey.getFullColName()), direction))
 
 	return expressions
 }
 
-func (p *paginatedQueryBuilder) buildOuterReverseOrderBy() []exp.OrderedExpression {
+func (p *PaginatedQueryBuilder) buildOuterReverseOrderBy() []exp.OrderedExpression {
 	expressions := []exp.OrderedExpression{}
 
-	direction := asc
-
-	idCol := p.primaryKey.col
 	if p.sortBy != nil {
-		expressions = append(
-			expressions,
-			p.buildOrderByExpression(goqu.I(p.sortBy.col), direction),
-		)
+		expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.sortBy.Col), asc))
 	}
-	expressions = append(expressions, p.buildOrderByExpression(goqu.I(idCol), direction))
+	expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.primaryKey.Col), asc))
 
 	return expressions
 }
 
-func (p *paginatedQueryBuilder) buildOrderByExpression(ex exp.IdentifierExpression, dir string) exp.OrderedExpression {
-	if dir == desc {
+func (p *PaginatedQueryBuilder) buildOrderByExpression(ex exp.IdentifierExpression, direction string) exp.OrderedExpression {
+	if direction == desc {
 		return ex.Desc()
 	}
 	return ex.Asc()

@@ -4,13 +4,12 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // ConfigurationVersionSortableField represents the fields that a list of configuration versions can be sorted by
@@ -22,20 +21,20 @@ const (
 	ConfigurationVersionSortableFieldUpdatedAtDesc ConfigurationVersionSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf ConfigurationVersionSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf ConfigurationVersionSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case ConfigurationVersionSortableFieldUpdatedAtAsc, ConfigurationVersionSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "configuration_versions", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "configuration_versions", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf ConfigurationVersionSortableField) getSortDirection() SortDirection {
+func (sf ConfigurationVersionSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // ConfigurationVersionFilter contains the supported fields for filtering ConfigurationVersion resources
@@ -48,14 +47,14 @@ type GetConfigurationVersionsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *ConfigurationVersionSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *ConfigurationVersionFilter
 }
 
 // ConfigurationVersionsResult contains the response data and page information
 type ConfigurationVersionsResult struct {
-	PageInfo              *PageInfo
+	PageInfo              *pagination.PageInfo
 	ConfigurationVersions []models.ConfigurationVersion
 }
 
@@ -101,27 +100,26 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 		Select(configurationVersionFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "configuration_versions", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "configuration_versions", Col: "id"},
 		sortBy,
 		sortDirection,
-		configurationVersionFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, c.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, c.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +137,12 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := ConfigurationVersionsResult{
-		PageInfo:              rows.getPageInfo(),
+		PageInfo:              rows.GetPageInfo(),
 		ConfigurationVersions: results,
 	}
 
@@ -251,18 +249,4 @@ func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error)
 	}
 
 	return configurationVersion, nil
-}
-
-func configurationVersionFieldResolver(key string, model interface{}) (string, error) {
-	configurationVersion, ok := model.(*models.ConfigurationVersion)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected configurationVersion type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &configurationVersion.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

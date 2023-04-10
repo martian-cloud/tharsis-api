@@ -4,13 +4,12 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Plans encapsulates the logic to access plans from the database
@@ -34,20 +33,20 @@ const (
 	PlanSortableFieldUpdatedAtDesc PlanSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf PlanSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf PlanSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case PlanSortableFieldUpdatedAtAsc, PlanSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "plans", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "plans", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf PlanSortableField) getSortDirection() SortDirection {
+func (sf PlanSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // PlanFilter contains the supported fields for filtering Plan resources
@@ -60,14 +59,14 @@ type GetPlansInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *PlanSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *PlanFilter
 }
 
 // PlansResult contains the response data and page information
 type PlansResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Plans    []models.Plan
 }
 
@@ -120,27 +119,26 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 		Select(planFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "plans", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "plans", Col: "id"},
 		sortBy,
 		sortDirection,
-		planFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, p.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, p.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -158,12 +156,12 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := PlansResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Plans:    results,
 	}
 
@@ -257,18 +255,4 @@ func scanPlan(row scanner) (*models.Plan, error) {
 	}
 
 	return plan, nil
-}
-
-func planFieldResolver(key string, model interface{}) (string, error) {
-	plan, ok := model.(*models.Plan)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected plan type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &plan.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

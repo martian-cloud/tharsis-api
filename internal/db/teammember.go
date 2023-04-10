@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // TeamMembers encapsulates the logic to access team members from the database
@@ -40,7 +41,7 @@ const (
 	UsernameDesc TeamMemberSortableField = "USERNAME_DESC"
 )
 
-func (tms TeamMemberSortableField) getFieldDescriptor() *fieldDescriptor {
+func (tms TeamMemberSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch tms {
 	// Placeholder for any future sorting field assignments.
 	default:
@@ -48,11 +49,11 @@ func (tms TeamMemberSortableField) getFieldDescriptor() *fieldDescriptor {
 	}
 }
 
-func (tms TeamMemberSortableField) getSortDirection() SortDirection {
+func (tms TeamMemberSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(tms), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // GetTeamMembersInput is the input for listing team members
@@ -60,14 +61,14 @@ type GetTeamMembersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *TeamMemberSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *TeamMemberFilter
 }
 
 // TeamMembersResult contains the response data and page information
 type TeamMembersResult struct {
-	PageInfo    *PageInfo
+	PageInfo    *pagination.PageInfo
 	TeamMembers []models.TeamMember
 }
 
@@ -113,26 +114,25 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 		Select(teamMemberFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "team_members", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "team_members", Col: "id"},
 		sortBy,
 		sortDirection,
-		teamMemberFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, tm.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, tm.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +150,12 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := TeamMembersResult{
-		PageInfo:    rows.getPageInfo(),
+		PageInfo:    rows.GetPageInfo(),
 		TeamMembers: results,
 	}
 
@@ -311,19 +311,3 @@ func scanTeamMember(row scanner) (*models.TeamMember, error) {
 
 	return teamMember, nil
 }
-
-func teamMemberFieldResolver(key string, model interface{}) (string, error) {
-	teamMember, ok := model.(*models.TeamMember)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected team member type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &teamMember.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
-}
-
-// The End.

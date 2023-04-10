@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Variables encapsulates the logic to access variables from the database
@@ -37,24 +38,24 @@ const (
 	VariableSortableFieldNamespacePathDesc VariableSortableField = "NAMESPACE_PATH_DESC"
 )
 
-func (sf VariableSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf VariableSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case VariableSortableFieldKeyAsc, VariableSortableFieldKeyDesc:
-		return &fieldDescriptor{key: "key", table: "namespace_variables", col: "key"}
+		return &pagination.FieldDescriptor{Key: "key", Table: "namespace_variables", Col: "key"}
 	case VariableSortableFieldCreatedAtAsc, VariableSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "namespace_variables", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "namespace_variables", Col: "created_at"}
 	case VariableSortableFieldNamespacePathAsc, VariableSortableFieldNamespacePathDesc:
-		return &fieldDescriptor{key: "namespace_path", table: "namespaces", col: "path"}
+		return &pagination.FieldDescriptor{Key: "namespace_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
 }
 
-func (sf VariableSortableField) getSortDirection() SortDirection {
+func (sf VariableSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // VariableFilter contains the supported fields for filtering Variable resources
@@ -68,14 +69,14 @@ type GetVariablesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *VariableSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *VariableFilter
 }
 
 // VariableResult contains the response data and page information
 type VariableResult struct {
-	PageInfo  *PageInfo
+	PageInfo  *pagination.PageInfo
 	Variables []models.Variable
 }
 
@@ -332,27 +333,26 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "namespace_variables", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "namespace_variables", Col: "id"},
 		sortBy,
 		sortDirection,
-		variableFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, m.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -370,12 +370,12 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := VariableResult{
-		PageInfo:  rows.getPageInfo(),
+		PageInfo:  rows.GetPageInfo(),
 		Variables: results,
 	}
 
@@ -423,25 +423,4 @@ func scanVariable(row scanner, withNamespacePath bool) (*models.Variable, error)
 	}
 
 	return variable, nil
-}
-
-func variableFieldResolver(key string, model interface{}) (string, error) {
-	variable, ok := model.(*models.Variable)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected variable type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &variable.Metadata)
-	if !ok {
-		switch key {
-		case "namespace_path":
-			val = variable.NamespacePath
-		case "key":
-			val = variable.Key
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }

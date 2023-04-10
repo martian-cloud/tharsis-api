@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -393,10 +394,10 @@ func TestGetWorkspaces(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectMsg                   *string
@@ -420,7 +421,7 @@ func TestGetWorkspaces(t *testing.T) {
 				Filter:            nil,
 			},
 			expectWorkspacePaths: allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -429,13 +430,13 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectWorkspacePaths: allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -446,7 +447,7 @@ func TestGetWorkspaces(t *testing.T) {
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
 			},
 			expectWorkspacePaths: allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -457,7 +458,7 @@ func TestGetWorkspaces(t *testing.T) {
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathDesc),
 			},
 			expectWorkspacePaths: reversePaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -468,7 +469,7 @@ func TestGetWorkspaces(t *testing.T) {
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldUpdatedAtAsc),
 			},
 			expectWorkspacePaths: allPathsByTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPathsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPathsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -479,7 +480,7 @@ func TestGetWorkspaces(t *testing.T) {
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldUpdatedAtDesc),
 			},
 			expectWorkspacePaths: reversePathsByTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPathsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPathsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -488,12 +489,12 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectWorkspacePaths: allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -502,12 +503,12 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectWorkspacePaths: allPaths[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -521,13 +522,13 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectWorkspacePaths:       allPaths[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -541,13 +542,13 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectWorkspacePaths:       allPaths[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -562,12 +563,12 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectWorkspacePaths: reversePaths[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -591,27 +592,27 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetWorkspacesInput{
 				Sort:              ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectWorkspacePaths:        []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:            ptr.String("only first or last can be defined, not both"),
 			expectWorkspacePaths: allPaths[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -625,7 +626,7 @@ func TestGetWorkspaces(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetWorkspacesInput{
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &WorkspaceFilter{
@@ -638,7 +639,7 @@ func TestGetWorkspaces(t *testing.T) {
 			},
 			expectMsg:            emptyUUIDMsg2,
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{},
+			expectPageInfo:       pagination.PageInfo{},
 		},
 
 		{
@@ -650,7 +651,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths,
-			expectPageInfo:       PageInfo{TotalCount: 5, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 5, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -664,7 +665,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[0], allPaths[2], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -678,7 +679,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -692,7 +693,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -706,7 +707,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[0], allPaths[1]},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -720,7 +721,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -733,7 +734,7 @@ func TestGetWorkspaces(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{},
+			expectPageInfo:       pagination.PageInfo{},
 		},
 
 		{
@@ -745,7 +746,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths[1:4],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -759,7 +760,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths[2:5],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -773,7 +774,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -785,7 +786,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -798,7 +799,7 @@ func TestGetWorkspaces(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{},
+			expectPageInfo:       pagination.PageInfo{},
 		},
 
 		/*
@@ -849,7 +850,7 @@ func TestGetWorkspaces(t *testing.T) {
 				"top-level-group-1-for-workspaces/workspace-5",
 				"top-level-group-2-for-workspaces/workspace-3",
 			},
-			expectPageInfo:       PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -868,7 +869,7 @@ func TestGetWorkspaces(t *testing.T) {
 				"top-level-group-1-for-workspaces/workspace-5",
 				"top-level-group-2-for-workspaces/workspace-3",
 			},
-			expectPageInfo:       PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -882,7 +883,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths[0:2],
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -896,7 +897,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths[2:4],
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -910,7 +911,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -922,7 +923,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -935,7 +936,7 @@ func TestGetWorkspaces(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{},
+			expectPageInfo:       pagination.PageInfo{},
 		},
 
 		{
@@ -947,7 +948,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -961,7 +962,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[0], allPaths[2], allPaths[3]},
-			expectPageInfo:       PageInfo{TotalCount: int32(3), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(3), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -975,7 +976,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[2], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -989,7 +990,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths[3:4],
-			expectPageInfo:       PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1003,7 +1004,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1021,7 +1022,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[2]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1036,7 +1037,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: allPaths[2:4],
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1051,7 +1052,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[1]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1066,7 +1067,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[1]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1081,7 +1082,7 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			},
 			expectWorkspacePaths: []string{allPaths[1]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

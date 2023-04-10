@@ -32,6 +32,11 @@ type TerraformModuleVersion struct {
 	Latest                 bool
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (t *TerraformModuleVersion) ResolveMetadata(key string) (string, error) {
+	return t.Metadata.resolveFieldValue(key)
+}
+
 // GetSHASumHex returns the SHA checksum as a HEX string
 func (t *TerraformModuleVersion) GetSHASumHex() string {
 	return hex.EncodeToString(t.SHASum)

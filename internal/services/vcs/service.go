@@ -29,6 +29,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -67,7 +68,7 @@ type GetVCSProvidersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.VCSProviderSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Search returns only the VCS providers with a name or resource path that starts with the value of search
 	Search *string
 	// NamespacePath is the namespace to return VCS providers for
@@ -79,7 +80,7 @@ type GetVCSProvidersInput struct {
 // GetVCSEventsInput is the input for retrieving VCSEvents.
 type GetVCSEventsInput struct {
 	Sort              *db.VCSEventSortableField
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	WorkspaceID       string
 }
 

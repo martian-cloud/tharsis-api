@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	tharsis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
 )
 
@@ -400,10 +401,10 @@ func TestGetGroups(t *testing.T) {
 	allGroupIDs := groupIDsFromGroupInfos(allGroupInfos)
 	allNamespaceIDs := namespaceIDsFromGroupInfos(allGroupInfos)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectMsg                   *string
@@ -427,7 +428,7 @@ func TestGetGroups(t *testing.T) {
 				Filter:            nil,
 			},
 			expectGroupPaths:     allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -436,13 +437,13 @@ func TestGetGroups(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectGroupPaths:     allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -453,7 +454,7 @@ func TestGetGroups(t *testing.T) {
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
 			},
 			expectGroupPaths:     allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -464,7 +465,7 @@ func TestGetGroups(t *testing.T) {
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathDesc),
 			},
 			expectGroupPaths:     reversePaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -473,12 +474,12 @@ func TestGetGroups(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectGroupPaths:     allPaths,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allPaths)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -487,12 +488,12 @@ func TestGetGroups(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectGroupPaths: allPaths[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -506,13 +507,13 @@ func TestGetGroups(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectGroupPaths:           allPaths[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -526,13 +527,13 @@ func TestGetGroups(t *testing.T) {
 			name: "pagination: final two",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectGroupPaths:           allPaths[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -547,12 +548,12 @@ func TestGetGroups(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectGroupPaths: reversePaths[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -574,12 +575,12 @@ func TestGetGroups(t *testing.T) {
 				name: "pagination: first four to set up for next test",
 				input: &GetGroupsInput{
 					Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-					PaginationOptions: &PaginationOptions{
+					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(4),
 					},
 				},
 				expectGroupPaths: allPaths[:4],
-				expectPageInfo: PageInfo{
+				expectPageInfo: pagination.PageInfo{
 					TotalCount:      int32(len(allPaths)),
 					Cursor:          dummyCursorFunc,
 					HasNextPage:     true,
@@ -592,13 +593,13 @@ func TestGetGroups(t *testing.T) {
 				name: "pagination, before and last",
 				input: &GetGroupsInput{
 					Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-					PaginationOptions: &PaginationOptions{
+					PaginationOptions: &pagination.Options{
 						Last: ptr.Int32(2),
 					},
 				},
 				getBeforeCursorFromPrevious: true,
 				expectGroupPaths:            allPaths[1:3],
-				expectPageInfo: PageInfo{
+				expectPageInfo: pagination.PageInfo{
 					TotalCount:      int32(len(allPaths)),
 					Cursor:          dummyCursorFunc,
 					HasNextPage:     true,
@@ -612,27 +613,27 @@ func TestGetGroups(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetGroupsInput{
 				Sort:              ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectGroupPaths:            []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:        ptr.String("only first or last can be defined, not both"),
 			expectGroupPaths: allPaths[5:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allPaths)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -646,7 +647,7 @@ func TestGetGroups(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetGroupsInput{
 				Sort: ptrGroupSortableField(GroupSortableFieldFullPathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &GroupFilter{
@@ -657,7 +658,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths: []string{},
-			expectPageInfo:   PageInfo{},
+			expectPageInfo:   pagination.PageInfo{},
 		},
 
 		{
@@ -669,7 +670,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{"top-level-group-1", "top-level-group-2", "top-level-group-3"},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -683,7 +684,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     allPaths,
-			expectPageInfo:       PageInfo{TotalCount: 6, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 6, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -697,7 +698,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[0], allPaths[2], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -711,7 +712,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -726,7 +727,7 @@ func TestGetGroups(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectGroupPaths:     []string{allPaths[0], allPaths[2], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -740,7 +741,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[1], allPaths[2]},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -754,7 +755,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[3]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -768,7 +769,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -782,7 +783,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -796,7 +797,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: nil},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: nil},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -810,7 +811,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[0], allPaths[2], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -824,7 +825,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -839,7 +840,7 @@ func TestGetGroups(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectGroupPaths:     []string{allPaths[0], allPaths[2], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -856,7 +857,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -874,7 +875,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[0], allPaths[4]},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -889,7 +890,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[2]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -904,7 +905,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     allPaths[2:4],
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -919,7 +920,7 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 			expectGroupPaths:     []string{allPaths[3]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

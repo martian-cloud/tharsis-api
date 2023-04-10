@@ -14,6 +14,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Groups encapsulates the logic to access groups from the database
@@ -51,20 +52,20 @@ const (
 	GroupSortableFieldFullPathDesc GroupSortableField = "FULL_PATH_DESC"
 )
 
-func (gs GroupSortableField) getFieldDescriptor() *fieldDescriptor {
+func (gs GroupSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch gs {
 	case GroupSortableFieldFullPathAsc, GroupSortableFieldFullPathDesc:
-		return &fieldDescriptor{key: "full_path", table: "namespaces", col: "path"}
+		return &pagination.FieldDescriptor{Key: "full_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
 }
 
-func (gs GroupSortableField) getSortDirection() SortDirection {
+func (gs GroupSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(gs), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // GetGroupsInput is the input for listing groups
@@ -72,14 +73,14 @@ type GetGroupsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *GroupSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *GroupFilter
 }
 
 // GroupsResult contains the response data and page information
 type GroupsResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Groups   []models.Group
 }
 
@@ -124,7 +125,7 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		if input.Filter.NamespaceIDs != nil {
 			if len(input.Filter.NamespaceIDs) == 0 {
 				return &GroupsResult{
-					PageInfo: &PageInfo{},
+					PageInfo: &pagination.PageInfo{},
 					Groups:   []models.Group{},
 				}, nil
 			}
@@ -138,26 +139,25 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "groups", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "groups", Col: "id"},
 		sortBy,
 		sortDirection,
-		groupFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, g.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, g.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -175,12 +175,12 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := GroupsResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Groups:   results,
 	}
 
@@ -686,23 +686,4 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 	}
 
 	return group, nil
-}
-
-func groupFieldResolver(key string, model interface{}) (string, error) {
-	group, ok := model.(*models.Group)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected group type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &group.Metadata)
-	if !ok {
-		switch key {
-		case "full_path":
-			val = group.FullPath
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }

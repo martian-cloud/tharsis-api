@@ -27,6 +27,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	types "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -125,7 +126,7 @@ func TestGetVCSProviders(t *testing.T) {
 
 	// a sample DB result object.
 	sampleResult := &db.VCSProvidersResult{
-		PageInfo: &db.PageInfo{
+		PageInfo: &pagination.PageInfo{
 			TotalCount:      1,
 			HasNextPage:     false,
 			HasPreviousPage: false,
@@ -212,7 +213,7 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 
 	// a sample DB result object.
 	sampleResult := &db.VCSProvidersResult{
-		PageInfo: &db.PageInfo{
+		PageInfo: &pagination.PageInfo{
 			TotalCount:      1,
 			HasNextPage:     false,
 			HasPreviousPage: false,

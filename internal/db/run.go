@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Runs encapsulates the logic to access runs from the database
@@ -36,22 +37,22 @@ const (
 	RunSortableFieldUpdatedAtDesc RunSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf RunSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf RunSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case RunSortableFieldCreatedAtAsc, RunSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "runs", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "runs", Col: "created_at"}
 	case RunSortableFieldUpdatedAtAsc, RunSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "runs", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "runs", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf RunSortableField) getSortDirection() SortDirection {
+func (sf RunSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // RunFilter contains the supported fields for filtering Run resources
@@ -68,14 +69,14 @@ type GetRunsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *RunSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *RunFilter
 }
 
 // RunsResult contains the response data and page information
 type RunsResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Runs     []models.Run
 }
 
@@ -136,7 +137,7 @@ func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, 
 	sort := RunSortableFieldUpdatedAtDesc
 	result, err := r.GetRuns(ctx, &GetRunsInput{
 		Sort: &sort,
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		Filter: &RunFilter{
@@ -165,7 +166,7 @@ func (r *runs) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run
 	sort := RunSortableFieldUpdatedAtDesc
 	result, err := r.GetRuns(ctx, &GetRunsInput{
 		Sort: &sort,
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		Filter: &RunFilter{
@@ -221,27 +222,26 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		InnerJoin(goqu.T("workspaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("workspaces.id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "runs", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "runs", Col: "id"},
 		sortBy,
 		sortDirection,
-		runFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, r.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -259,12 +259,12 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := RunsResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Runs:     results,
 	}
 
@@ -420,18 +420,4 @@ func scanRun(row scanner) (*models.Run, error) {
 	}
 
 	return run, nil
-}
-
-func runFieldResolver(key string, model interface{}) (string, error) {
-	run, ok := model.(*models.Run)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected run type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &run.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

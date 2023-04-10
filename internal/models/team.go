@@ -8,6 +8,21 @@ type Team struct {
 	Metadata       ResourceMetadata
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (t *Team) ResolveMetadata(key string) (string, error) {
+	val, err := t.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "name":
+			val = t.Name
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
+}
+
 // Validate returns an error if the model is not valid
 func (t *Team) Validate() error {
 	// Verify description satisfies constraints

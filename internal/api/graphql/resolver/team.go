@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 /* Team Query Resolvers */
@@ -157,7 +158,7 @@ func (r *TeamResolver) Members(ctx context.Context, args *ConnectionQueryArgs) (
 	}
 
 	input := team.GetTeamMembersInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		TeamID:            &r.team.Metadata.ID,
 	}
 
@@ -190,7 +191,7 @@ func teamsQuery(ctx context.Context, args *TeamConnectionQueryArgs) (*TeamConnec
 	}
 
 	input := team.GetTeamsInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		TeamNamePrefix:    args.Search,
 	}
 

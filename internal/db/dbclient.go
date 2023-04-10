@@ -1,7 +1,6 @@
 package db
 
 //go:generate mockery --srcpkg github.com/jackc/pgx/v4 --name Rows
-//go:generate mockery --name connection --exported --inpackage --case underscore
 
 import (
 	"context"
@@ -20,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const initialResourceVersion int = 1
@@ -54,22 +53,13 @@ var (
 	dialect           = goqu.Dialect("postgres")
 )
 
-// Connection is used to represent a DB connection
+// connection is used to represent a DB connection
 type connection interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, optionsAndArgs ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, optionsAndArgs ...any) pgx.Row
 }
-
-// SortDirection indicates the direction for sorting results
-type SortDirection string
-
-// SortDirection constants
-const (
-	AscSort  SortDirection = "ASC"
-	DescSort SortDirection = "DESC"
-)
 
 // Client acts as a facade for the database
 type Client struct {
@@ -255,24 +245,6 @@ func nullableString(val string) sql.NullString {
 	}
 }
 
-// metadataFieldResolver is used for resolving model field values for cursor based pagination
-func metadataFieldResolver(key string, metadata *models.ResourceMetadata) (string, bool) {
-	var resp string
-
-	switch key {
-	case "id":
-		resp = metadata.ID
-	case "updated_at":
-		resp = metadata.LastUpdatedTimestamp.Format(time.RFC3339Nano)
-	case "created_at":
-		resp = metadata.CreationTimestamp.Format(time.RFC3339Nano)
-	default:
-		return "", false
-	}
-
-	return resp, true
-}
-
 // Produce a rounded version of current time suitable for storing in the DB.
 // Because time.Now().UTC() returns nanosecond precision but the DB stores only
 // microseconds, it is necessary to round the time to the nearest microsecond
@@ -281,10 +253,12 @@ func currentTime() time.Time {
 	return time.Now().UTC().Round(time.Microsecond)
 }
 
-// stringPtrToString returns empty string for nil pointer.
-func stringPtrToString(p *string) string {
-	if p == nil {
-		return ""
+// handlePaginationError translates an invalid error from the
+// pagination package to a Tharsis equivalent.
+func handlePaginationError(err error) error {
+	if errors.Is(err, pagination.ErrInvalidCursor) || errors.Is(err, pagination.ErrInvalidSortBy) {
+		return te.NewError(te.EInvalid, err.Error())
 	}
-	return *p
+
+	return err
 }

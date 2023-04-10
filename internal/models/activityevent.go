@@ -116,4 +116,35 @@ type ActivityEvent struct {
 	Metadata         ResourceMetadata
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (a *ActivityEvent) ResolveMetadata(key string) (string, error) {
+	val, err := a.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "user_id":
+			val = a.stringPtrToString(a.UserID)
+		case "service_account_id":
+			val = a.stringPtrToString(a.ServiceAccountID)
+		case "namespace_path":
+			val = a.stringPtrToString(a.NamespacePath)
+		case "action":
+			val = string(a.Action)
+		case "target_type":
+			val = string(a.TargetType)
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
+}
+
+// stringPtrToString returns empty string for nil pointer.
+func (*ActivityEvent) stringPtrToString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 // The End.
