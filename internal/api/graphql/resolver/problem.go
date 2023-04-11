@@ -1,6 +1,6 @@
 package resolver
 
-import "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+import "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 // ProblemType represents the type of problem
 type ProblemType string

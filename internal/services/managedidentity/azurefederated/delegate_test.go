@@ -51,7 +51,7 @@ func TestValidateManagedIdentityData(t *testing.T) {
 		{
 			name:      "Empty data payload",
 			inputData: []byte(""),
-			expectErr: "Invalid managed identity data: unexpected end of JSON input",
+			expectErr: "invalid managed identity data: unexpected end of JSON input",
 		},
 	}
 

@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/aws/smithy-go/ptr"
@@ -9,11 +8,11 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -237,7 +236,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 	}
 
 	if len(versionsResponse.ProviderVersions) == 0 {
-		c.respWriter.RespondWithError(w, errors.NewError(errors.ENotFound, fmt.Sprintf("provider version %s not found", version)))
+		c.respWriter.RespondWithError(w, errors.New(errors.ENotFound, "provider version %s not found", version))
 		return
 	}
 
@@ -258,7 +257,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 	}
 
 	if len(platformsResponse.ProviderPlatforms) == 0 {
-		c.respWriter.RespondWithError(w, errors.NewError(errors.ENotFound, fmt.Sprintf("provider platform %s_%s not found", os, arch)))
+		c.respWriter.RespondWithError(w, errors.New(errors.ENotFound, "provider platform %s_%s not found", os, arch))
 		return
 	}
 

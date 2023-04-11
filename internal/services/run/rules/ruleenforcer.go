@@ -20,8 +20,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/dsse"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // RuleEnforcer is used to enforce managed identity access rules
@@ -120,14 +120,13 @@ func (r *ruleEnforcer) enforceRules(ctx context.Context, managedIdentity *models
 		// rule was not satisfied
 		if i == (len(rules) - 1) {
 			// this is the last rule
-			return terrors.NewError(
+			return terrors.New(
 				terrors.EForbidden,
-				fmt.Sprintf(
-					"managed identity rule for %s not satisfied for run stage %s and managed identity %s: %s",
-					rule.Type,
-					rule.RunStage,
-					managedIdentity.ResourcePath,
-					strings.Join(diagnostics, ": ")),
+				"managed identity rule for %s not satisfied for run stage %s and managed identity %s: %s",
+				rule.Type,
+				rule.RunStage,
+				managedIdentity.ResourcePath,
+				strings.Join(diagnostics, ": "),
 			)
 		}
 	}
@@ -308,13 +307,13 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 			}
 
 			if !foundSubject {
-				diagnostics = append(diagnostics, fmt.Sprintf("subject with digest %s not found in module attestation", moduleDigest))
+				diagnostics = append(diagnostics, "subject with digest %s not found in module attestation", moduleDigest)
 				continue
 			}
 
 			// Verify predicate type if it's defined in the policy
 			if policy.PredicateType != nil && statement.PredicateType != *policy.PredicateType {
-				diagnostics = append(diagnostics, fmt.Sprintf("invalid predicate type, expected=%s actual=%s", *policy.PredicateType, statement.PredicateType))
+				diagnostics = append(diagnostics, "invalid predicate type, expected=%s actual=%s", *policy.PredicateType, statement.PredicateType)
 				continue
 			}
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -130,7 +130,7 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, ve.dbClient.getConnection(ctx), query)
@@ -192,7 +192,7 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_workspace_id":
-					return nil, errors.NewError(errors.ENotFound, "workspace does not exist")
+					return nil, errors.New(errors.ENotFound, "workspace does not exist")
 				}
 			}
 		}

@@ -20,10 +20,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/resolver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/schema"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // fieldOverrides is initialized map passed into GetQueryComplexity
@@ -214,7 +214,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, subject)
 			if qcErr != nil {
 				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
-				err := errors.NewError(
+				err := errors.New(
 					errors.EInvalid,
 					"invalid graphql query: "+strings.TrimPrefix(qcErr.Error(), "graphql: syntax error: "),
 				)
@@ -229,7 +229,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				res.Errors = expandResolverErrors(res.Errors)
 			} else {
 				rateLimitExceededCount.Inc()
-				err := errors.NewError(
+				err := errors.New(
 					errors.ETooManyRequests,
 					"max query complexity exceeded",
 				)

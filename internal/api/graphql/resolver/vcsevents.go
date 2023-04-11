@@ -6,10 +6,10 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // VCSEventConnectionQueryArgs are used to query a vcsEvent connection
@@ -27,7 +27,7 @@ type VCSEventEdgeResolver struct {
 func (r *VCSEventEdgeResolver) Cursor() (string, error) {
 	vcsEvent, ok := r.edge.Node.(models.VCSEvent)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&vcsEvent)
 	return *cursor, err
@@ -37,7 +37,7 @@ func (r *VCSEventEdgeResolver) Cursor() (string, error) {
 func (r *VCSEventEdgeResolver) Node() (*VCSEventResolver, error) {
 	vcsEvent, ok := r.edge.Node.(models.VCSEvent)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &VCSEventResolver{vcsEvent: &vcsEvent}, nil
@@ -188,7 +188,7 @@ func loadVCSEvent(ctx context.Context, id string) (*models.VCSEvent, error) {
 
 	ve, ok := data.(models.VCSEvent)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &ve, nil

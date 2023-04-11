@@ -9,10 +9,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -155,7 +155,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 		// Verify caller is a user.
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok {
-			return errors.NewError(
+			return errors.New(
 				errors.EForbidden,
 				"Unsupported caller type, only users are allowed to delete shared runners",
 			)
@@ -163,7 +163,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 		// Only admins are allowed to delete shared runners.
 		if !userCaller.User.Admin {
-			return errors.NewError(
+			return errors.New(
 				errors.EForbidden,
 				"Only system admins can delete shared runners",
 			)
@@ -226,7 +226,7 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 	}
 
 	if runner == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("runner with ID %s not found", id))
+		return nil, errors.New(errors.ENotFound, "runner with ID %s not found", id)
 	}
 
 	if runner.GroupID != nil {
@@ -252,7 +252,7 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 	}
 
 	if runner == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("runner with path %s not found", path))
+		return nil, errors.New(errors.ENotFound, "runner with path %s not found", path)
 	}
 
 	if runner.GroupID != nil {
@@ -277,7 +277,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 			return nil, err
 		}
 	} else {
-		return nil, errors.NewError(errors.EInvalid, "shared runners can only be created via the API config")
+		return nil, errors.New(errors.EInvalid, "shared runners can only be created via the API config")
 	}
 
 	runnerToCreate := models.Runner{
@@ -350,7 +350,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 		// Verify caller is a user.
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok {
-			return nil, errors.NewError(
+			return nil, errors.New(
 				errors.EForbidden,
 				"Unsupported caller type, only users are allowed to update shared runners",
 			)
@@ -358,7 +358,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 		// Only admins are allowed to update shared runners.
 		if !userCaller.User.Admin {
-			return nil, errors.NewError(
+			return nil, errors.New(
 				errors.EForbidden,
 				"Only system admins can update shared runners",
 			)
@@ -425,12 +425,12 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 	}
 
 	if runner == nil {
-		return errors.NewError(errors.ENotFound, "runner not found")
+		return errors.New(errors.ENotFound, "runner not found")
 	}
 
 	// Service accounts can only be assigned to group runners
 	if runner.Type == models.SharedRunnerType {
-		return errors.NewError(errors.EInvalid, "service account cannot be assigned to shared runner")
+		return errors.New(errors.EInvalid, "service account cannot be assigned to shared runner")
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
@@ -444,7 +444,7 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 	}
 
 	if sa == nil {
-		return errors.NewError(errors.ENotFound, "service account not found")
+		return errors.New(errors.ENotFound, "service account not found")
 	}
 
 	saGroupPath := sa.GetGroupPath()
@@ -452,7 +452,7 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 
 	// Verify that the service account is in the same group as the runner or in a parent group
 	if saGroupPath != runnerGroupPath && !strings.HasPrefix(runnerGroupPath, fmt.Sprintf("%s/", saGroupPath)) {
-		return errors.NewError(errors.EInvalid, fmt.Sprintf("service account %s cannot be assigned to runner %s", sa.ResourcePath, runner.ResourcePath))
+		return errors.New(errors.EInvalid, "service account %s cannot be assigned to runner %s", sa.ResourcePath, runner.ResourcePath)
 	}
 
 	return s.dbClient.ServiceAccounts.AssignServiceAccountToRunner(ctx, serviceAccountID, runnerID)
@@ -470,12 +470,12 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 	}
 
 	if runner == nil {
-		return errors.NewError(errors.ENotFound, "runner not found")
+		return errors.New(errors.ENotFound, "runner not found")
 	}
 
 	// Service accounts can only be assigned to group runners
 	if runner.Type == models.SharedRunnerType {
-		return errors.NewError(errors.EInvalid, "service account cannot be unassigned to shared runner")
+		return errors.New(errors.EInvalid, "service account cannot be unassigned to shared runner")
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))

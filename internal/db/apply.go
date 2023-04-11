@@ -132,7 +132,7 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, a.dbClient.getConnection(ctx), query)

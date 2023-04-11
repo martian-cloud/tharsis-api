@@ -11,10 +11,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -219,7 +219,7 @@ func (s *service) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey,
 	}
 
 	if gpgKey == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("gpg key with ID %s not found", id))
+		return nil, errors.New(errors.ENotFound, "gpg key with ID %s not found", id)
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, permissions.GPGKeyResourceType, auth.WithGroupID(gpgKey.GroupID))
@@ -244,11 +244,11 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	// Read key to get GPG key ID and fingerprint
 	entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(input.ASCIIArmor))
 	if err != nil {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("failed to read ascii key armor: %v", err))
+		return nil, errors.Wrap(err, errors.EInvalid, "failed to read ascii key armor")
 	}
 
 	if len(entityList) != 1 {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid number of public keys found, expected 1 but found %d", len(entityList)))
+		return nil, errors.New(errors.EInvalid, "invalid number of public keys found, expected 1 but found %d", len(entityList))
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)

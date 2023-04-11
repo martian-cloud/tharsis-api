@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"sync"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Events provides the ability to listen for async events from the database
@@ -48,11 +48,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 
 		conn, err := e.dbClient.conn.Acquire(ctx)
 		if err != nil {
-			fatalErrors <- errors.NewError(
-				errors.EInternal,
-				"Failed to acquire db connection from pool",
-				errors.WithErrorErr(err),
-			)
+			fatalErrors <- errors.Wrap(err, errors.EInternal, "failed to acquire db connection from pool")
 			wg.Done()
 			return
 		}
@@ -60,11 +56,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 
 		_, err = conn.Exec(ctx, "listen events")
 		if err != nil {
-			fatalErrors <- errors.NewError(
-				errors.EInternal,
-				"Error when listening on events channel",
-				errors.WithErrorErr(err),
-			)
+			fatalErrors <- errors.Wrap(err, errors.EInternal, "error when listening on events channel")
 			wg.Done()
 			return
 		}
@@ -81,11 +73,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 			}
 
 			if err != nil {
-				fatalErrors <- errors.NewError(
-					errors.EInternal,
-					"Error waiting for db notification",
-					errors.WithErrorErr(err),
-				)
+				fatalErrors <- errors.Wrap(err, errors.EInternal, "error waiting for db notification")
 				return
 			}
 

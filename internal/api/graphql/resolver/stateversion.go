@@ -8,10 +8,10 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 /* State Version Query Resolvers */
@@ -30,7 +30,7 @@ type StateVersionEdgeResolver struct {
 func (r *StateVersionEdgeResolver) Cursor() (string, error) {
 	stateVersion, ok := r.edge.Node.(models.StateVersion)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&stateVersion)
 	return *cursor, err
@@ -40,7 +40,7 @@ func (r *StateVersionEdgeResolver) Cursor() (string, error) {
 func (r *StateVersionEdgeResolver) Node() (*StateVersionResolver, error) {
 	stateVersion, ok := r.edge.Node.(models.StateVersion)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &StateVersionResolver{stateVersion: &stateVersion}, nil
@@ -333,7 +333,7 @@ func loadStateVersion(ctx context.Context, id string) (*models.StateVersion, err
 
 	sv, ok := data.(models.StateVersion)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &sv, nil

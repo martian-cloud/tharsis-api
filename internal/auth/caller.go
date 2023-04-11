@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // errMissingConstraints is the error returned when required constraints or permissions are missing.
@@ -184,7 +184,7 @@ func WithCaller(ctx context.Context, caller Caller) context.Context {
 func AuthorizeCaller(ctx context.Context) (Caller, error) {
 	caller, ok := ctx.Value(contextKeyCaller).(Caller)
 	if !ok {
-		return nil, errors.NewError(errors.EUnauthorized, "Authentication is required")
+		return nil, errors.New(errors.EUnauthorized, "Authentication is required")
 	}
 
 	return caller, nil
@@ -207,7 +207,7 @@ func HandleCaller(
 	case *ServiceAccountCaller:
 		return serviceAccountHandler(ctx, c)
 	default:
-		return errors.NewError(errors.EForbidden, "Invalid caller type")
+		return errors.New(errors.EForbidden, "Invalid caller type")
 	}
 }
 

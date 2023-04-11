@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	gotfe "github.com/hashicorp/go-tfe"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // TharsisWorkspaceToWorkspace converts a tharsis workspace to a TFE workspace
@@ -140,12 +140,12 @@ func TharsisErrorToTfeError(err error) error {
 	var tfeError error
 
 	switch err {
-	case workspace.WorkspaceLockedError:
-		tfeError = errors.NewError(errors.EConflict, gotfe.ErrWorkspaceLocked.Error())
-	case workspace.WorkspaceUnlockedError:
-		tfeError = errors.NewError(errors.EConflict, gotfe.ErrWorkspaceNotLocked.Error())
-	case workspace.WorkspaceLockedByRunError:
-		tfeError = errors.NewError(errors.EConflict, gotfe.ErrWorkspaceLockedByRun.Error())
+	case workspace.ErrWorkspaceLocked:
+		tfeError = errors.New(errors.EConflict, gotfe.ErrWorkspaceLocked.Error())
+	case workspace.ErrWorkspaceUnlocked:
+		tfeError = errors.New(errors.EConflict, gotfe.ErrWorkspaceNotLocked.Error())
+	case workspace.ErrWorkspaceLockedByRun:
+		tfeError = errors.New(errors.EConflict, gotfe.ErrWorkspaceLockedByRun.Error())
 	default:
 		tfeError = err
 	}

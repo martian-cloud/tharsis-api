@@ -11,8 +11,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -133,7 +133,7 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 	}
 
 	if namespace == nil {
-		return nil, errors.NewError(errors.ENotFound, "Namespace not found")
+		return nil, errors.New(errors.ENotFound, "Namespace not found")
 	}
 
 	timestamp := currentTime()
@@ -169,20 +169,20 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, "member already exists")
+				return nil, errors.New(errors.EConflict, "member already exists")
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_memberships_user_id":
-					return nil, errors.NewError(errors.ENotFound, "user does not exist")
+					return nil, errors.New(errors.ENotFound, "user does not exist")
 				case "fk_namespace_memberships_service_account_id":
-					return nil, errors.NewError(errors.ENotFound, "service account does not exist")
+					return nil, errors.New(errors.ENotFound, "service account does not exist")
 				case "fk_namespace_memberships_team_id":
-					return nil, errors.NewError(errors.ENotFound, "team does not exist")
+					return nil, errors.New(errors.ENotFound, "team does not exist")
 				case "fk_namespace_memberships_namespace_id":
-					return nil, errors.NewError(errors.ENotFound, "namespace does not exist")
+					return nil, errors.New(errors.ENotFound, "namespace does not exist")
 				case "fk_namespace_memberships_role_id":
-					return nil, errors.NewError(errors.ENotFound, "role does not exist")
+					return nil, errors.New(errors.ENotFound, "role does not exist")
 				}
 			}
 		}
@@ -220,12 +220,12 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, "member already exists")
+				return nil, errors.New(errors.EConflict, "member already exists")
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_memberships_role_id":
-					return nil, errors.NewError(errors.ENotFound, "role does not exist")
+					return nil, errors.New(errors.ENotFound, "role does not exist")
 				}
 			}
 		}
@@ -342,7 +342,7 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)

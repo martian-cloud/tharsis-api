@@ -13,9 +13,9 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // UserCaller represents a user subject
@@ -324,7 +324,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 
 	// If user is not active (disabled via SCIM), return EUnauthorized.
 	if !userModel.Active {
-		return nil, terrors.NewError(
+		return nil, terrors.New(
 			terrors.EUnauthorized,
 			"User has been disabled",
 		)
@@ -340,11 +340,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 func (u *UserAuth) getUserWithExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error) {
 	user, err := u.dbClient.Users.GetUserByExternalID(ctx, issuer, externalID)
 	if err != nil {
-		return nil, terrors.NewError(
-			terrors.EInternal,
-			"Failed to get user by external identity",
-			terrors.WithErrorErr(err),
-		)
+		return nil, terrors.Wrap(err, terrors.EInternal, "failed to get user by external identity")
 	}
 	return user, nil
 }
@@ -367,11 +363,10 @@ func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity) (
 			err = u.dbClient.Users.LinkUserWithExternalID(ctx, identity.Issuer, identity.ID, user.Metadata.ID)
 			// Ignore conflict errors since another instance may have already linked the external identity
 			if err != nil && terrors.ErrorCode(err) != terrors.EConflict {
-				return nil, terrors.NewError(
+				return nil, terrors.Wrap(
+					err,
 					terrors.EInternal,
-					"Failed to link user with external identity",
-					terrors.WithErrorErr(err),
-				)
+					"failed to link user with external identity")
 			}
 		} else {
 			// User not found with email so we need to create a new user with a number added to their username

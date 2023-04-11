@@ -13,8 +13,8 @@ import (
 	"github.com/hashicorp/hc-install/releases"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const (
@@ -56,7 +56,7 @@ func (v TerraformCLIVersions) Supported(wantVersion string) error {
 		}
 	}
 
-	return errors.NewError(errors.EInvalid, "Unsupported Terraform version")
+	return errors.New(errors.EInvalid, "Unsupported Terraform version")
 }
 
 // Service encapsulates the logic for interacting with the CLI service.
@@ -112,7 +112,7 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 
 	// If the length here is zero, then the retrieval failed.
 	if len(versionSources) == 0 {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"failed to get a list of Terraform CLI versions",
 		)

@@ -8,10 +8,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -100,10 +100,7 @@ func (s *service) GetTeamByName(ctx context.Context, name string) (*models.Team,
 	}
 
 	if team == nil {
-		return nil, errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("Team with name %s not found", name),
-		)
+		return nil, errors.New(errors.ENotFound, "Team with name %s not found", name)
 	}
 
 	return team, nil
@@ -293,9 +290,9 @@ func (s *service) GetTeamMember(ctx context.Context, username, teamName string) 
 	}
 
 	if teamMember == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("Team member with username %s and team name %s not found", username, teamName),
+			"Team member with username %s and team name %s not found", username, teamName,
 		)
 	}
 
@@ -498,9 +495,9 @@ func (s *service) getTeamByID(ctx context.Context, id string) (*models.Team, err
 
 	// Returned team pointer will never be nil if error is nil.
 	if team == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("Team with id %s not found", id),
+			"Team with id %s not found", id,
 		)
 	}
 

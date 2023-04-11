@@ -3,7 +3,6 @@ package graphql
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -13,8 +12,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/resolver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func newSubscriptionHandler(
@@ -58,16 +57,16 @@ var graphqlSubscriptionCount = metric.NewCounter("graphql_subscription_count", "
 func (g *graphqlSubscriptions) Subscribe(ctx context.Context, document string, operationName string, variableValues map[string]interface{}) (payloads <-chan interface{}, err error) {
 	msg, ok := ctx.Value("Header").(json.RawMessage)
 	if !ok {
-		return nil, errors.NewError(errors.EUnauthorized, "Missing Authorization header")
+		return nil, errors.New(errors.EUnauthorized, "Missing Authorization header")
 	}
 	var params connectionParams
 	if err = json.Unmarshal(msg, &params); err != nil {
-		return nil, errors.NewError(errors.EInvalid, "Failed to decode connection params")
+		return nil, errors.New(errors.EInvalid, "Failed to decode connection params")
 	}
 
 	caller, err := g.authenticator.Authenticate(ctx, params.findToken(), false)
 	if err != nil {
-		return nil, errors.NewError(errors.EUnauthorized, fmt.Sprintf("Unauthorized: %v", err))
+		return nil, errors.Wrap(err, errors.EUnauthorized, "unauthorized")
 	}
 
 	graphqlSubscriptionCount.Inc()

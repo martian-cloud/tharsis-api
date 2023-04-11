@@ -2,7 +2,7 @@ package pagination
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/doug-martin/goqu/v9"
@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db/mocks"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 type testModel struct {
@@ -24,7 +25,7 @@ func (t testModel) ResolveMetadata(key string) (string, error) {
 	case "name":
 		return t.name, nil
 	default:
-		return "", errors.New("invalid key")
+		return "", fmt.Errorf("invalid key requested: %s", key)
 	}
 }
 
@@ -39,7 +40,7 @@ func TestExecute(t *testing.T) {
 		sortDirection       SortDirection
 		expectSQL           string
 		expectCountSQL      string
-		expectErr           error
+		expectErrCode       string
 		expectArguments     []interface{}
 		resultCount         int
 		expectedResultCount int
@@ -49,7 +50,7 @@ func TestExecute(t *testing.T) {
 		{
 			name:              "invalid cursor",
 			paginationOptions: Options{After: buildTestCursor("1", "test1")},
-			expectErr:         ErrInvalidSortBy,
+			expectErrCode:     errors.EInvalid,
 		},
 		{
 			name:                "no pagination or sort by",
@@ -170,7 +171,7 @@ func TestExecute(t *testing.T) {
 				test.sortDirection,
 			)
 			if err != nil {
-				assert.Equal(t, test.expectErr, err)
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
 				return
 			}
 
@@ -178,7 +179,7 @@ func TestExecute(t *testing.T) {
 
 			rows, err := qBuilder.Execute(ctx, &mockDBConn, query)
 			if err != nil {
-				assert.Equal(t, test.expectErr, err)
+				assert.Equal(t, test.expectErrCode, err)
 				return
 			}
 
@@ -189,7 +190,7 @@ func TestExecute(t *testing.T) {
 			}
 
 			if err = rows.Finalize(&results); err != nil {
-				assert.Equal(t, test.expectErr, err)
+				assert.Equal(t, test.expectErrCode, err)
 			}
 
 			pageInfo := rows.GetPageInfo()
@@ -200,13 +201,13 @@ func TestExecute(t *testing.T) {
 
 			c, err := pageInfo.Cursor(testModel{id: "1", name: "m1"})
 			if err != nil {
-				assert.Equal(t, test.expectErr, err)
+				assert.Equal(t, test.expectErrCode, err)
 				return
 			}
 
 			cursor, err := newCursor(*c)
 			if err != nil {
-				assert.Equal(t, test.expectErr, err)
+				assert.Equal(t, test.expectErrCode, err)
 				return
 			}
 

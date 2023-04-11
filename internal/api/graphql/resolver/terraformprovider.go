@@ -7,10 +7,10 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/aws/smithy-go/ptr"
@@ -41,7 +41,7 @@ type TerraformProviderEdgeResolver struct {
 func (r *TerraformProviderEdgeResolver) Cursor() (string, error) {
 	provider, ok := r.edge.Node.(models.TerraformProvider)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&provider)
 	return *cursor, err
@@ -51,7 +51,7 @@ func (r *TerraformProviderEdgeResolver) Cursor() (string, error) {
 func (r *TerraformProviderEdgeResolver) Node() (*TerraformProviderResolver, error) {
 	provider, ok := r.edge.Node.(models.TerraformProvider)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &TerraformProviderResolver{provider: &provider}, nil
@@ -419,7 +419,7 @@ func loadTerraformProvider(ctx context.Context, id string) (*models.TerraformPro
 
 	ws, ok := data.(models.TerraformProvider)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &ws, nil

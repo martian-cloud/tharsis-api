@@ -29,7 +29,7 @@ func TestEncode(t *testing.T) {
 		{
 			name:          "build cursor with error",
 			encodedCursor: "dGVzdA==",
-			expectErrMsg:  ErrInvalidCursor.Error(),
+			expectErrMsg:  "invalid cursor: invalid character 'e' in literal true (expecting 'r')",
 		},
 	}
 

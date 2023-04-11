@@ -23,11 +23,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -220,7 +220,7 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 	}
 
 	if module == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("module with path %s not found", path))
+		return nil, errors.New(errors.ENotFound, "module with path %s not found", path)
 	}
 
 	if module.Private {
@@ -245,7 +245,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	}
 
 	if rootGroup == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("namespace %s not found", namespace))
+		return nil, errors.New(errors.ENotFound, "namespace %s not found", namespace)
 	}
 
 	moduleResult, err := s.dbClient.TerraformModules.GetModules(ctx, &db.GetModulesInput{
@@ -261,7 +261,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	}
 
 	if len(moduleResult.Modules) == 0 {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("module with name %s and system %s not found in namespace %s", name, system, namespace))
+		return nil, errors.New(errors.ENotFound, "module with name %s and system %s not found in namespace %s", name, system, namespace)
 	}
 
 	module := moduleResult.Modules[0]
@@ -398,32 +398,32 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 
 	// Verify the module attestation data is below the size limit
 	if size > MaxModuleAttestationSize {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("module attestation of size %d exceeds max size limit of %d bytes", size, MaxModuleAttestationSize))
+		return nil, errors.New(errors.EInvalid, "module attestation of size %d exceeds max size limit of %d bytes", size, MaxModuleAttestationSize)
 	}
 
 	decodedSig, err := base64.StdEncoding.DecodeString(input.AttestationData)
 	if err != nil {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("failed to decode attestation data: %v", err))
+		return nil, errors.Wrap(err, errors.EInvalid, "failed to decode attestation data")
 	}
 
 	// Decode DSSE Envelope
 	env := dsseEnvelope{}
 	if err = json.Unmarshal(decodedSig, &env); err != nil {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("attestation data is not in dsse format: %v", err))
+		return nil, errors.Wrap(err, errors.EInvalid, "attestation data is not in dsse format")
 	}
 
 	if env.PayloadType != IntotoPayloadType {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid payloadType %s on envelope; expected %s", env.PayloadType, IntotoPayloadType))
+		return nil, errors.New(errors.EInvalid, "invalid payloadType %s on envelope; expected %s", env.PayloadType, IntotoPayloadType)
 	}
 
 	// Get the expected digest from the attestation
 	decodedPredicate, err := base64.StdEncoding.DecodeString(env.Payload)
 	if err != nil {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("decoding dsse envelope payload: %v", err))
+		return nil, errors.Wrap(err, errors.EInvalid, "decoding dsse envelope payload")
 	}
 	var statement in_toto.Statement
 	if err = json.Unmarshal(decodedPredicate, &statement); err != nil {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("decoding predicate: %v", err))
+		return nil, errors.Wrap(err, errors.EInvalid, "decoding predicate")
 	}
 
 	foundSupportedType := false
@@ -435,19 +435,19 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	}
 
 	if !foundSupportedType {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("in-toto statement type %s not supported; exected one of %s", statement.Type, strings.Join(SupportedIntotoStatementTypes, ", ")))
+		return nil, errors.New(errors.EInvalid, "in-toto statement type %s not supported; expected one of %s", statement.Type, strings.Join(SupportedIntotoStatementTypes, ", "))
 	}
 
 	// Compare the actual and expected
 	if statement.Subject == nil || len(statement.Subject) == 0 {
-		return nil, errors.NewError(errors.EInvalid, "in-toto statement is missing subject")
+		return nil, errors.New(errors.EInvalid, "in-toto statement is missing subject")
 	}
 
 	digests := []string{}
 	for _, subject := range statement.Subject {
 		digest, ok := subject.Digest["sha256"]
 		if !ok {
-			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("subject %s is missing sha256 digest", subject.Name))
+			return nil, errors.New(errors.EInvalid, "subject %s is missing sha256 digest", subject.Name)
 		}
 		digests = append(digests, digest)
 	}
@@ -525,7 +525,7 @@ func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*mod
 	}
 
 	if moduleAttestation == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("module with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "module with id %s not found", id)
 	}
 
 	module, err := s.getModuleByID(ctx, moduleAttestation.ModuleID)
@@ -906,7 +906,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 	// Verify semantic version is valid
 	semVersion, err := version.NewSemver(input.SemanticVersion)
 	if err != nil {
-		return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("invalid semantic version: %v", err))
+		return nil, errors.Wrap(err, errors.EInvalid, "invalid semantic version")
 	}
 
 	// Check if this version is greater than the previous latest
@@ -1106,11 +1106,11 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 	}
 
 	if moduleVersion.Status == models.TerraformModuleVersionStatusUploadInProgress {
-		return errors.NewError(errors.EConflict, "module package upload is already in progress")
+		return errors.New(errors.EConflict, "module package upload is already in progress")
 	}
 
 	if moduleVersion.Status == models.TerraformModuleVersionStatusUploaded || moduleVersion.Status == models.TerraformModuleVersionStatusErrored {
-		return errors.NewError(errors.EConflict, "module package already uploaded")
+		return errors.New(errors.EConflict, "module package already uploaded")
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -1202,7 +1202,7 @@ func (s *service) getModuleByID(ctx context.Context, id string) (*models.Terrafo
 	}
 
 	if module == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("module with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "module with id %s not found", id)
 	}
 
 	return module, nil
@@ -1215,7 +1215,7 @@ func (s *service) getModuleVersionByID(ctx context.Context, id string) (*models.
 	}
 
 	if version == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("module version with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "module version with id %s not found", id)
 	}
 
 	return version, nil

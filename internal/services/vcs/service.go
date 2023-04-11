@@ -21,7 +21,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -29,6 +28,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -333,7 +333,7 @@ func (s *service) GetVCSProviderByID(ctx context.Context, id string) (*models.VC
 	}
 
 	if provider == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("VCS provider with ID %s not found", id))
+		return nil, errors.New(errors.ENotFound, "VCS provider with ID %s not found", id)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
@@ -442,7 +442,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 	} else {
 		parsedURL, uErr := url.Parse(*input.URL)
 		if uErr != nil || (parsedURL.Scheme == "") || (parsedURL.Host == "") {
-			return nil, errors.NewError(errors.EInvalid, "Invalid provider URL")
+			return nil, errors.New(errors.EInvalid, "Invalid provider URL")
 		}
 
 		// Remove any trailing backslash.
@@ -601,10 +601,10 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 	}
 
 	if !input.Force && len(links) > 0 {
-		return errors.NewError(
+		return errors.New(
 			errors.EConflict,
-			fmt.Sprintf("This VCS provider can't be deleted because it's currently linked to %d workspaces. "+
-				"Setting force to true will automatically remove all associated links for this provider.", len(links)),
+			"This VCS provider can't be deleted because it's currently linked to %d workspaces. "+
+				"Setting force to true will automatically remove all associated links for this provider.", len(links),
 		)
 	}
 
@@ -693,12 +693,7 @@ func (s *service) GetWorkspaceVCSProviderLinkByWorkspaceID(ctx context.Context, 
 	}
 
 	if link == nil {
-		return nil, errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("workspace vcs provider link for workspace ID %s not found",
-				workspaceID,
-			),
-		)
+		return nil, errors.New(errors.ENotFound, "workspace vcs provider link for workspace ID %s not found", workspaceID)
 	}
 
 	return link, nil
@@ -716,7 +711,7 @@ func (s *service) GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string
 	}
 
 	if link == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("workspace vcs provider link with ID %s not found", id))
+		return nil, errors.New(errors.ENotFound, "workspace vcs provider link with ID %s not found", id)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
@@ -745,10 +740,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	}
 
 	if vp == nil {
-		return nil, errors.NewError(
-			errors.EInvalid,
-			fmt.Sprintf("vcs provider with id %s not found", input.ProviderID),
-		)
+		return nil, errors.New(errors.EInvalid, "vcs provider with id %s not found", input.ProviderID)
 	}
 
 	// Get the group path.
@@ -756,19 +748,13 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	// Verify that the vcs provider's group is in the same hierarchy as the workspace.
 	if !strings.HasPrefix(input.Workspace.FullPath, groupPath) {
-		return nil, errors.NewError(errors.EInvalid,
-			fmt.Sprintf(
-				"VCS provider %s is not available to workspace %s",
-				vp.ResourcePath,
-				input.Workspace.FullPath,
-			),
-		)
+		return nil, errors.New(errors.EInvalid, "VCS provider %s is not available to workspace %s", vp.ResourcePath, input.Workspace.FullPath)
 	}
 
 	// Make sure the token is there, otherwise user forgot to complete
 	// the OAuth flow for the VCS provider.
 	if vp.OAuthAccessToken == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInvalid,
 			"OAuth flow must be completed before linking a workspace to a VCS provider. "+
 				"Either use the original authorization URL when VCS provider was created "+
@@ -959,10 +945,7 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 	}
 
 	if vp == nil {
-		return errors.NewError(
-			errors.EInternal,
-			fmt.Sprintf("vcs provider with id %s not found", input.Link.ProviderID),
-		)
+		return errors.New(errors.EInternal, "vcs provider with id %s not found", input.Link.ProviderID)
 	}
 
 	// If the provider was automatically configured, delete the webhook
@@ -1013,7 +996,7 @@ func (s *service) GetVCSEventByID(ctx context.Context, id string) (*models.VCSEv
 	}
 
 	if event == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("VCS event with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "vcs event with id %s not found", id)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
@@ -1089,13 +1072,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 	}
 
 	if link == nil {
-		return errors.NewError(
-			errors.EInvalid,
-			fmt.Sprintf(
-				"Workspace %s is not linked to a VCS provider",
-				input.Workspace.FullPath,
-			),
-		)
+		return errors.New(errors.EInvalid, "Workspace %s is not linked to a VCS provider", input.Workspace.FullPath)
 	}
 
 	// Get the provider associated with the link.
@@ -1106,13 +1083,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 
 	// Shouldn't happen.
 	if vp == nil {
-		return errors.NewError(
-			errors.EInternal,
-			fmt.Sprintf(
-				"VCS provider associated with link ID %s not found",
-				link.Metadata.ID,
-			),
-		)
+		return errors.New(errors.EInternal, "VCS provider associated with link ID %s not found", link.Metadata.ID)
 	}
 
 	// Get the appropriate provider from the map, so we can download from it.
@@ -1222,7 +1193,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 
 	vcsCaller, ok := caller.(*auth.VCSWorkspaceLinkCaller)
 	if !ok {
-		return errors.NewError(errors.EInvalid, "Invalid caller; only version control systems can invoke webhook")
+		return errors.New(errors.EInvalid, "Invalid caller; only version control systems can invoke webhook")
 	}
 
 	// Require permission for creating plan runs.
@@ -1402,7 +1373,7 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 func (s *service) getOAuthAuthorizationURL(ctx context.Context, vcsProvider *models.VCSProvider) (string, error) {
 	// Check if a valid state value is available.
 	if vcsProvider.OAuthState == nil {
-		return "", errors.NewError(errors.EInternal, "oauth state is not set")
+		return "", errors.New(errors.EInternal, "oauth state is not set")
 	}
 
 	redirectURL, err := s.getOAuthCallBackURL(ctx)
@@ -1447,7 +1418,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 	}
 
 	if vp == nil {
-		return errors.NewError(errors.ENotFound, "VCS provider not found")
+		return errors.New(errors.ENotFound, "VCS provider not found")
 	}
 
 	// Require UpdateVCSProviderPermission since we're updating the provider's values.
@@ -1523,7 +1494,7 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 	if vp.OAuthAccessToken == nil {
 		// OAuthAccessToken could be nil if OAuth token has been reset, but
 		// OAuth flow hasn't been completed yet.
-		return "", errors.NewError(
+		return "", errors.New(
 			errors.EInternal,
 			"No available access token, please complete OAuth flow first",
 		)
@@ -1574,10 +1545,7 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 func (s *service) getVCSProvider(providerType models.VCSProviderType) (Provider, error) {
 	provider, ok := s.vcsProviderMap[providerType]
 	if !ok {
-		return nil, errors.NewError(
-			errors.EInvalid,
-			fmt.Sprintf("VCS provider with type %s is not supported", providerType),
-		)
+		return nil, errors.New(errors.EInvalid, "VCS provider with type %s is not supported", providerType)
 	}
 
 	return provider, nil

@@ -12,12 +12,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const (
@@ -199,18 +199,15 @@ func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error)
 
 	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get job",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if job == nil {
-		return nil, errors.NewError(
-			errors.ENotFound,
-			fmt.Sprintf("Job with ID %s not found", jobID),
-		)
+		return nil, errors.New(errors.ENotFound, "Job with ID %s not found", jobID)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
@@ -367,7 +364,7 @@ func (s *service) SaveLogs(ctx context.Context, jobID string, startOffset int, b
 	}
 
 	if err := s.logStore.SaveLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, buffer); err != nil {
-		return errors.NewError(errors.EInvalid, "Failed to save logs", errors.WithErrorErr(err))
+		return errors.Wrap(err, errors.EInvalid, "Failed to save logs")
 	}
 
 	return nil
@@ -380,7 +377,7 @@ func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, li
 	}
 
 	if limit < 0 || startOffset < 0 {
-		return nil, errors.NewError(errors.EInvalid, "limit and offset cannot be negative")
+		return nil, errors.New(errors.EInvalid, "limit and offset cannot be negative")
 	}
 
 	job, err := s.GetJob(ctx, jobID)
@@ -417,7 +414,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 			return nil, ggErr
 		}
 		if group == nil {
-			return nil, errors.NewError(errors.ENotFound, "runner not found")
+			return nil, errors.New(errors.ENotFound, "runner not found")
 		}
 		getRunnerInput.Filter.GroupID = &group.Metadata.ID
 	}
@@ -428,7 +425,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 	}
 
 	if len(runnersResp.Runners) == 0 {
-		return nil, errors.NewError(errors.ENotFound, "runner not found")
+		return nil, errors.New(errors.ENotFound, "runner not found")
 	}
 
 	runner := runnersResp.Runners[0]

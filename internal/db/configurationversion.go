@@ -116,7 +116,7 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, c.dbClient.getConnection(ctx), query)

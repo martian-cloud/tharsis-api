@@ -115,7 +115,7 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)

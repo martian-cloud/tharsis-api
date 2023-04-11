@@ -10,9 +10,9 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -78,7 +78,7 @@ func (s *service) GetActivityEvents(ctx context.Context,
 		case *auth.ServiceAccountCaller:
 			membershipRequirement = &db.ActivityEventNamespaceMembershipRequirement{ServiceAccountID: &c.ServiceAccountID}
 		default:
-			return nil, errors.NewError(errors.EUnauthorized, "invalid caller type")
+			return nil, errors.New(errors.EUnauthorized, "invalid caller type")
 		}
 	}
 

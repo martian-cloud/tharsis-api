@@ -11,8 +11,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -195,7 +195,7 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)
@@ -272,13 +272,13 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(
+				return nil, errors.New(
 					errors.EConflict,
-					fmt.Sprintf("Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID),
+					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID,
 				)
 			}
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
-				return nil, errors.NewError(errors.EConflict, "invalid group: the specified group does not exist")
+				return nil, errors.New(errors.EConflict, "invalid group: the specified group does not exist")
 			}
 		}
 		return nil, err
@@ -378,9 +378,9 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
-				return errors.NewError(
+				return errors.New(
 					errors.EConflict,
-					fmt.Sprintf("Service account %s is assigned as a member of a group/workspace", serviceAccount.Name),
+					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name,
 				)
 			}
 		}
@@ -427,7 +427,7 @@ func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serv
 	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return errors.NewError(errors.EConflict, "service account already assigned to runner")
+				return errors.New(errors.EConflict, "service account already assigned to runner")
 			}
 		}
 		return err

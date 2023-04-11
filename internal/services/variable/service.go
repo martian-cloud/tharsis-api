@@ -10,10 +10,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -144,7 +144,7 @@ func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Varia
 	}
 
 	if variable == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Variable with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "variable with id %s not found", id)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
@@ -216,15 +216,15 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 
 	for _, v := range input.Variables {
 		if input.Category != v.Category {
-			return errors.NewError(errors.EInternal, "variable category does not match input")
+			return errors.New(errors.EInternal, "variable category does not match input")
 		}
 
 		if input.NamespacePath != v.NamespacePath {
-			return errors.NewError(errors.EInternal, "variable namespace path does not match input")
+			return errors.New(errors.EInternal, "variable namespace path does not match input")
 		}
 
 		if input.Category == models.EnvironmentVariableCategory && v.Hcl {
-			return errors.NewError(errors.EInvalid, "HCL variables are not supported for the environment category")
+			return errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 		}
 	}
 
@@ -264,11 +264,11 @@ func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*
 	}
 
 	if input.Category == models.EnvironmentVariableCategory && input.Hcl {
-		return nil, errors.NewError(errors.EInvalid, "HCL variables are not supported for the environment category")
+		return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 	}
 
 	if input.Key == "" {
-		return nil, errors.NewError(errors.EInvalid, "Key cannot be empty")
+		return nil, errors.New(errors.EInvalid, "Key cannot be empty")
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -322,11 +322,11 @@ func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable)
 	}
 
 	if variable.Category == models.EnvironmentVariableCategory && variable.Hcl {
-		return nil, errors.NewError(errors.EInvalid, "HCL variables are not supported for the environment category")
+		return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 	}
 
 	if variable.Key == "" {
-		return nil, errors.NewError(errors.EInvalid, "Key cannot be empty")
+		return nil, errors.New(errors.EInvalid, "Key cannot be empty")
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)

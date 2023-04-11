@@ -11,8 +11,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -114,11 +114,7 @@ func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType mod
 			Sort:              &sortBy,
 		})
 	if err != nil {
-		return nil, errors.NewError(
-			errors.EInternal,
-			"Failed to get job",
-			errors.WithErrorErr(err),
-		)
+		return nil, errors.Wrap(err, errors.EInternal, "failed to get job")
 	}
 
 	if len(jobResult.Jobs) == 0 {
@@ -173,7 +169,7 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, j.dbClient.getConnection(ctx), query)

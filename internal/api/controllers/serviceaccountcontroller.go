@@ -8,9 +8,9 @@ import (
 	"github.com/hashicorp/jsonapi"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 type serviceAccountController struct {
@@ -42,12 +42,12 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 	}
 
 	if req.ServiceAccountPath == nil {
-		c.respWriter.RespondWithError(w, errors.NewError(errors.EInvalid, "ServiceAccountPath field is required"))
+		c.respWriter.RespondWithError(w, errors.New(errors.EInvalid, "ServiceAccountPath field is required"))
 		return
 	}
 
 	if req.Token == nil {
-		c.respWriter.RespondWithError(w, errors.NewError(errors.EInvalid, "Token field is required"))
+		c.respWriter.RespondWithError(w, errors.New(errors.EInvalid, "Token field is required"))
 		return
 	}
 

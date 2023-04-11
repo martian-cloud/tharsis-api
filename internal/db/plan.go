@@ -135,7 +135,7 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, p.dbClient.getConnection(ctx), query)

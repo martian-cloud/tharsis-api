@@ -80,7 +80,7 @@ func TestCreateToken(t *testing.T) {
 			serviceAccount: serviceAccountID,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(-time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      expiredTokenError,
+			expectErr:      errExpiredToken,
 		},
 		{
 			name:           "no matching trust policy",
@@ -92,21 +92,21 @@ func TestCreateToken(t *testing.T) {
 					BoundClaims: map[string]string{},
 				},
 			},
-			expectErr: failedCreateTokenError,
+			expectErr: errFailedCreateToken,
 		},
 		{
 			name:           "empty trust policy",
 			serviceAccount: serviceAccountID,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         []models.OIDCTrustPolicy{},
-			expectErr:      failedCreateTokenError,
+			expectErr:      errFailedCreateToken,
 		},
 		{
 			name:           "invalid token",
 			serviceAccount: "groupA/serviceAccount1",
 			token:          []byte("invalidtoken"),
 			policy:         basicPolicy,
-			expectErr:      errors.New("Failed to decode token failed to parse token: invalid character 'i' looking for beginning of value"),
+			expectErr:      errors.New("failed to decode token: failed to parse token: invalid character 'i' looking for beginning of value"),
 		},
 		{
 			name:           "missing issuer",
@@ -120,7 +120,7 @@ func TestCreateToken(t *testing.T) {
 			serviceAccount: "groupA/serviceAccount1",
 			token:          createJWT(t, invalidKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      failedCreateTokenError,
+			expectErr:      errFailedCreateToken,
 		},
 		{
 			name:           "negative: multiple trust policies with same issuer: all mismatch",

@@ -10,8 +10,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // WorkspaceVCSProviderLinks encapsulates the logic to access workspace vcs provider links from the database.
@@ -127,15 +127,15 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, "workspace is already linked with a vcs provider")
+				return nil, errors.New(errors.EConflict, "workspace is already linked with a vcs provider")
 			}
 
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_workspace_id":
-					return nil, errors.NewError(errors.ENotFound, "workspace does not exist")
+					return nil, errors.New(errors.ENotFound, "workspace does not exist")
 				case "fk_provider_id":
-					return nil, errors.NewError(errors.ENotFound, "vcs provider does not exist")
+					return nil, errors.New(errors.ENotFound, "vcs provider does not exist")
 				}
 			}
 		}

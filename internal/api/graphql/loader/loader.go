@@ -7,7 +7,7 @@ import (
 
 	"github.com/graph-gophers/dataloader"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // DataBatch type contains the results from the batch loader callback
@@ -67,7 +67,7 @@ func (ldr loader) loadBatch(ctx context.Context, keys dataloader.Keys) []*datalo
 
 		data, found := batch[id]
 		if !found {
-			results[i].Error = errors.NewError(errors.ENotFound, fmt.Sprintf("Resource with ID %s not found", id))
+			results[i].Error = errors.New(errors.ENotFound, "resource with ID %s not found", id)
 		}
 		results[i].Data = data
 	}

@@ -7,10 +7,10 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/aws/smithy-go/ptr"
@@ -41,7 +41,7 @@ type RunEdgeResolver struct {
 func (r *RunEdgeResolver) Cursor() (string, error) {
 	run, ok := r.edge.Node.(models.Run)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&run)
 	return *cursor, err
@@ -51,7 +51,7 @@ func (r *RunEdgeResolver) Cursor() (string, error) {
 func (r *RunEdgeResolver) Node() (*RunResolver, error) {
 	run, ok := r.edge.Node.(models.Run)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &RunResolver{run: &run}, nil
@@ -577,7 +577,7 @@ func loadRun(ctx context.Context, id string) (*models.Run, error) {
 
 	sv, ok := data.(models.Run)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &sv, nil

@@ -9,8 +9,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -190,7 +190,7 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
@@ -262,7 +262,7 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("terraform provider with name %s already exists", provider.Name))
+				return nil, errors.New(errors.EConflict, "terraform provider with name %s already exists", provider.Name)
 			}
 		}
 		return nil, err

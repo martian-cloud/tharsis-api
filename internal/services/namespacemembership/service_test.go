@@ -10,10 +10,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestCreateNamespaceMembership(t *testing.T) {
@@ -153,7 +153,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 
 			var authError error
 			if !test.hasOwnerRole {
-				authError = errors.NewError(errors.EForbidden, "not authorized")
+				authError = errors.New(errors.EForbidden, "not authorized")
 			}
 			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateNamespaceMembershipPermission, mock.Anything).Return(authError)
 
@@ -351,7 +351,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 			var authError error
 			if !test.hasOwnerRole {
-				authError = errors.NewError(errors.EForbidden, "not authorized")
+				authError = errors.New(errors.EForbidden, "not authorized")
 			}
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateNamespaceMembershipPermission, mock.Anything).Return(authError)
@@ -502,7 +502,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 			var authError error
 			if !test.hasOwnerRole {
-				authError = errors.NewError(errors.EForbidden, "not authorized")
+				authError = errors.New(errors.EForbidden, "not authorized")
 			}
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteNamespaceMembershipPermission, mock.Anything).Return(authError)

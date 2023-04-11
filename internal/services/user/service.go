@@ -3,13 +3,12 @@ package user
 
 import (
 	"context"
-	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -52,17 +51,17 @@ func (s *service) GetUserByID(ctx context.Context, userID string) (*models.User,
 
 	user, err := s.dbClient.Users.GetUserByID(ctx, userID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get user",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if user == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("User with ID %s not found", userID),
+			"User with ID %s not found", userID,
 		)
 	}
 
@@ -77,17 +76,17 @@ func (s *service) GetUserByUsername(ctx context.Context, username string) (*mode
 
 	user, err := s.dbClient.Users.GetUserByUsername(ctx, username)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get user",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if user == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("User with username %s not found", username),
+			"User with username %s not found", username,
 		)
 	}
 

@@ -11,8 +11,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -152,7 +152,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return errors.NewError(errors.EConflict, fmt.Sprintf("user with external id %s already exists for issuer %s", externalID, issuer))
+				return errors.New(errors.EConflict, "user with external id %s already exists for issuer %s", externalID, issuer)
 			}
 		}
 		return err
@@ -198,7 +198,7 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, u.dbClient.getConnection(ctx), query)
@@ -257,7 +257,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("user with username %s already exists", user.Username))
+				return nil, errors.New(errors.EConflict, "user with username %s already exists", user.Username)
 			}
 		}
 		return nil, err
@@ -291,7 +291,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("user with username %s already exists", user.Username))
+				return nil, errors.New(errors.EConflict, "user with username %s already exists", user.Username)
 			}
 		}
 		return nil, err

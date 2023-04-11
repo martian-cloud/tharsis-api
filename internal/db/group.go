@@ -12,8 +12,8 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -154,7 +154,7 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, g.dbClient.getConnection(ctx), query)
@@ -225,7 +225,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
-				return nil, errors.NewError(errors.EConflict, "invalid group parent: the specified parent group does not exist")
+				return nil, errors.New(errors.EConflict, "invalid group parent: the specified parent group does not exist")
 			}
 
 			if isInvalidIDViolation(pgErr) {
@@ -603,7 +603,7 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
-				return errors.NewError(errors.EConflict, "all nested groups and workspaces must be deleted before this group can be deleted")
+				return errors.New(errors.EConflict, "all nested groups and workspaces must be deleted before this group can be deleted")
 			}
 		}
 

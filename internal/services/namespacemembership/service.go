@@ -11,10 +11,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -140,8 +140,7 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 	case input.UserID != nil:
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok || (!userCaller.User.Admin && userCaller.User.Metadata.ID != *input.UserID) {
-			return nil, errors.NewError(errors.EForbidden,
-				fmt.Sprintf("User %s is not authorized to query namespace memberships for %s", userCaller.User.Username, *input.UserID))
+			return nil, errors.New(errors.EForbidden, "User %s is not authorized to query namespace memberships for %s", userCaller.User.Username, *input.UserID)
 		}
 	case input.ServiceAccount != nil:
 		// Verify caller has access to the group this service account is in.
@@ -150,7 +149,7 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 			return nil, err
 		}
 	default:
-		return nil, errors.NewError(errors.EInvalid, "input is missing required fields")
+		return nil, errors.New(errors.EInvalid, "input is missing required fields")
 	}
 
 	dbInput := &db.GetNamespaceMembershipsInput{
@@ -180,7 +179,7 @@ func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*m
 	}
 
 	if namespaceMembership == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("namespace membership with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "namespace membership with id %s not found", id)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithNamespacePath(namespaceMembership.Namespace.Path))
@@ -244,7 +243,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		count++
 	}
 	if count != 1 {
-		return nil, errors.NewError(errors.EInvalid, "Exactly one of User, ServiceAccount, team field must be defined")
+		return nil, errors.New(errors.EInvalid, "Exactly one of User, ServiceAccount, team field must be defined")
 	}
 
 	// If this is a service account, we need to verify that it's being added to the group that it is associated with
@@ -255,12 +254,10 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		serviceAccountNamespace := strings.Join(parts[:len(parts)-1], "/")
 
 		if serviceAccountNamespace != input.NamespacePath && !strings.HasPrefix(input.NamespacePath, serviceAccountNamespace+"/") {
-			return nil, errors.NewError(
+			return nil, errors.New(
 				errors.EInvalid,
-				fmt.Sprintf(
-					"Service account cannot be added as a member to group %s because it doesn't exist in the group or a parent group",
-					input.NamespacePath,
-				),
+				"Service account cannot be added as a member to group %s because it doesn't exist in the group or a parent group",
+				input.NamespacePath,
 			)
 		}
 	}
@@ -346,7 +343,7 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	}
 
 	if currentMembership == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("namespace membership with ID %s not found", namespaceMembership.Metadata.ID))
+		return nil, errors.New(errors.ENotFound, "namespace membership with ID %s not found", namespaceMembership.Metadata.ID)
 	}
 
 	if currentMembership.RoleID == namespaceMembership.RoleID {
@@ -480,7 +477,7 @@ func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *m
 	}
 
 	if !otherOwnerFound {
-		return errors.NewError(errors.EInvalid, fmt.Sprintf("namespace membership cannot be deleted because it's the only owner of group %s", namespaceMembership.Namespace.Path))
+		return errors.New(errors.EInvalid, "namespace membership cannot be deleted because it's the only owner of group %s", namespaceMembership.Namespace.Path)
 	}
 
 	return nil
@@ -502,7 +499,7 @@ func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, err
 	}
 
 	if role == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Role with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "role with id %s not found", id)
 	}
 
 	return role, nil

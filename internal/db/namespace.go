@@ -3,12 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 type namespaceRow struct {
@@ -78,7 +77,7 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("namespace %s already exists", namespace.path))
+				return nil, errors.New(errors.EConflict, "namespace %s already exists", namespace.path)
 			}
 		}
 		return nil, err

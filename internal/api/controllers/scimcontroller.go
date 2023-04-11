@@ -13,13 +13,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/scim"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // SCIMSchemaURI defines the SchemaURI used by SCIM resources.
@@ -122,22 +122,22 @@ const (
 )
 
 var (
-	// invalidStartIndexErr indicates an invalid start index for pagination
-	invalidStartIndexErr = errors.NewError(
+	// errInvalidStartIndex indicates an invalid start index for pagination
+	errInvalidStartIndex = errors.New(
 		errors.EInvalid,
-		"Invalid startIndex. Must be less than totalResults.",
+		"invalid startIndex. Must be less than totalResults",
 	)
 
-	// invalidCountErr indicates an invalid count for pagination.
-	invalidCountErr = errors.NewError(
+	// errInvalidCount indicates an invalid count for pagination.
+	errInvalidCount = errors.New(
 		errors.EInvalid,
-		"Invalid count. Must be zero or greater.",
+		"invalid count. Must be zero or greater",
 	)
 
-	// unsupportedFilterError is an error used to indicate an invalid filter.
-	unsupportedFilterError = errors.NewError(
+	// errUnsupportedFilter is an error used to indicate an invalid filter.
+	errUnsupportedFilter = errors.New(
 		errors.EInvalid,
-		"Supplied filter is invalid or not supported",
+		"supplied filter is invalid or not supported",
 	)
 )
 
@@ -503,7 +503,7 @@ func toListResponse(value interface{}, startIndex, count string) (*SCIMListRespo
 
 		// Can't return more than we have.
 		if start > valueSlice.Len() {
-			return nil, invalidStartIndexErr
+			return nil, errInvalidStartIndex
 		}
 
 		// Use default (1) per SCIM if value is less than 1.
@@ -518,7 +518,7 @@ func toListResponse(value interface{}, startIndex, count string) (*SCIMListRespo
 
 		// Can't return negative number of items.
 		if itemsPerPage < 0 {
-			return nil, invalidCountErr
+			return nil, errInvalidCount
 		}
 	}
 
@@ -547,7 +547,7 @@ func parseFilter(filter string) (string, error) {
 	parts := strings.SplitAfterN(filter, " ", 3)
 
 	if len(parts) < 3 {
-		return "", unsupportedFilterError
+		return "", errUnsupportedFilter
 	}
 
 	// Lowercasing as these must be case-insensitive per RFC specifications.
@@ -567,12 +567,12 @@ func parseFilter(filter string) (string, error) {
 func isFilterSupported(attribute, operator string) error {
 	// Check if filter attribute is supported.
 	if attribute != "externalid" {
-		return unsupportedFilterError
+		return errUnsupportedFilter
 	}
 
 	// Check if filter operator is supported.
 	if operator != "eq" {
-		return unsupportedFilterError
+		return errUnsupportedFilter
 	}
 
 	return nil

@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestGetLogs(t *testing.T) {
@@ -38,7 +38,7 @@ func TestGetLogs(t *testing.T) {
 		},
 		{
 			name: "logs not found",
-			retErr: errors.NewError(
+			retErr: errors.New(
 				errors.ENotFound,
 				"Not Found",
 			),
@@ -46,7 +46,7 @@ func TestGetLogs(t *testing.T) {
 		},
 		{
 			name: "unexpected error",
-			retErr: errors.NewError(
+			retErr: errors.New(
 				errors.EInternal,
 				"",
 			),
@@ -150,7 +150,7 @@ func TestSaveLogs(t *testing.T) {
 
 			mockDownloadResult := func(_ context.Context, _ string, w io.WriterAt, _ *objectstore.DownloadOptions) error {
 				if test.existingLogs == "" {
-					return errors.NewError(
+					return errors.New(
 						errors.ENotFound,
 						"Not Found",
 					)

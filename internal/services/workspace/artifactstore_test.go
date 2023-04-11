@@ -11,19 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 var (
-	notFoundError = errors.NewError(
+	errNotFound = errors.New(
 		errors.ENotFound,
-		"Not Found",
+		"not Found",
 	)
-	internalError = errors.NewError(
+	errInternal = errors.New(
 		errors.EInternal,
-		"Internal Error",
+		"internal Error",
 	)
 )
 
@@ -50,12 +50,12 @@ func TestDownloadConfigurationVersion(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			retErr:        notFoundError,
+			retErr:        errNotFound,
 			expectErrCode: errors.ENotFound,
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}
@@ -112,12 +112,12 @@ func TestDownloadStateVersion(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			retErr:        notFoundError,
+			retErr:        errNotFound,
 			expectErrCode: errors.ENotFound,
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}
@@ -174,12 +174,12 @@ func TestGetStateVersion(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			retErr:        notFoundError,
+			retErr:        errNotFound,
 			expectErrCode: errors.ENotFound,
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}
@@ -226,12 +226,12 @@ func TestDownloadPlanCache(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			retErr:        notFoundError,
+			retErr:        errNotFound,
 			expectErrCode: errors.ENotFound,
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}
@@ -288,7 +288,7 @@ func TestUploadConfigurationVersion(t *testing.T) {
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}
@@ -330,7 +330,7 @@ func TestUploadStateVersion(t *testing.T) {
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}
@@ -372,7 +372,7 @@ func TestUploadPlanCache(t *testing.T) {
 		},
 		{
 			name:          "internal error",
-			retErr:        internalError,
+			retErr:        errInternal,
 			expectErrCode: errors.EInternal,
 		},
 	}

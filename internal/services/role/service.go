@@ -5,15 +5,14 @@ package role
 
 import (
 	"context"
-	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -108,7 +107,7 @@ func (s *service) GetRoleByName(ctx context.Context, name string) (*models.Role,
 	}
 
 	if role == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Role with name %s not found", name))
+		return nil, errors.New(errors.ENotFound, "role with name %s not found", name)
 	}
 
 	return role, nil
@@ -155,12 +154,12 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return nil, errors.NewError(errors.EForbidden, "Unsupported caller type, only users are allowed to create roles")
+		return nil, errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to create roles")
 	}
 
 	// Only admins are allowed to create roles
 	if !userCaller.User.Admin {
-		return nil, errors.NewError(errors.EForbidden, "Only system admins can create roles")
+		return nil, errors.New(errors.EForbidden, "Only system admins can create roles")
 	}
 
 	toCreate := &models.Role{
@@ -221,16 +220,16 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return nil, errors.NewError(errors.EForbidden, "Unsupported caller type, only users are allowed to update roles")
+		return nil, errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to update roles")
 	}
 
 	// Only admins are allowed to update roles
 	if !userCaller.User.Admin {
-		return nil, errors.NewError(errors.EForbidden, "Only system admins can update roles")
+		return nil, errors.New(errors.EForbidden, "Only system admins can update roles")
 	}
 
 	if models.DefaultRoleID(input.Role.Metadata.ID).IsDefaultRole() {
-		return nil, errors.NewError(errors.EForbidden, "Default roles are read-only")
+		return nil, errors.New(errors.EForbidden, "Default roles are read-only")
 	}
 
 	if err = input.Role.Validate(); err != nil {
@@ -283,16 +282,16 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return errors.NewError(errors.EForbidden, "Unsupported caller type, only users are allowed to delete roles")
+		return errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to delete roles")
 	}
 
 	// Only admins are allowed to delete roles
 	if !userCaller.User.Admin {
-		return errors.NewError(errors.EForbidden, "Only system admins can delete roles")
+		return errors.New(errors.EForbidden, "Only system admins can delete roles")
 	}
 
 	if models.DefaultRoleID(input.Role.Metadata.ID).IsDefaultRole() {
-		return errors.NewError(errors.EForbidden, "Default roles are read-only")
+		return errors.New(errors.EForbidden, "Default roles are read-only")
 	}
 
 	// Get all the namespace memberships if any for this role.
@@ -306,10 +305,10 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 	}
 
 	if !input.Force && len(result.NamespaceMemberships) > 0 {
-		return errors.NewError(
+		return errors.New(
 			errors.EConflict,
-			fmt.Sprintf("This Role can't be deleted because it's currently associated with %d namespace memberships. "+
-				"Setting force to true will automatically remove all associated namespace memberships.", len(result.NamespaceMemberships)),
+			"This Role can't be deleted because it's currently associated with %d namespace memberships. "+
+				"Setting force to true will automatically remove all associated namespace memberships.", len(result.NamespaceMemberships),
 		)
 	}
 
@@ -329,7 +328,7 @@ func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, err
 	}
 
 	if role == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Role with id %s not found", id))
+		return nil, errors.New(errors.ENotFound, "role with id %s not found", id)
 	}
 
 	return role, nil
