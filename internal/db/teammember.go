@@ -10,8 +10,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -129,7 +129,7 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, tm.dbClient.getConnection(ctx), query)
@@ -205,7 +205,7 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 					teamName = teamRecord.Name
 				}
 
-				return nil, errors.NewError(errors.EConflict,
+				return nil, errors.New(errors.EConflict,
 					fmt.Sprintf("team member of user %s in team %s already exists", username, teamName))
 			}
 		}

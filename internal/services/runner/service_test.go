@@ -10,10 +10,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestGetRunnerByID(t *testing.T) {
@@ -51,7 +51,7 @@ func TestGetRunnerByID(t *testing.T) {
 				Name:     "test-runner",
 				Type:     models.GroupRunnerType,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -134,7 +134,7 @@ func TestGetRunnerByPath(t *testing.T) {
 				Name:     "test-runner",
 				Type:     models.GroupRunnerType,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -218,7 +218,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 				ResourcePath: "some-group/test-runner",
 				Type:         models.GroupRunnerType,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -308,7 +308,7 @@ func TestGetRunners(t *testing.T) {
 			input: &GetRunnersInput{
 				NamespacePath: "group-1",
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -405,7 +405,7 @@ func TestCreateRunner(t *testing.T) {
 				Name:    "test-runner",
 				GroupID: groupID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -492,7 +492,7 @@ func TestUpdateRunner(t *testing.T) {
 				GroupID:      &groupID,
 				ResourcePath: "group123/test-runner",
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -577,7 +577,7 @@ func TestDeleteRunner(t *testing.T) {
 				GroupID:      &groupID,
 				ResourcePath: "group123/test-runner",
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 	}

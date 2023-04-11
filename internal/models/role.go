@@ -1,10 +1,8 @@
 package models
 
 import (
-	"fmt"
-
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Role defines a subject's ability to access or modify
@@ -60,9 +58,9 @@ func (r *Role) Validate() error {
 	for _, perm := range r.permissions {
 		// Make sure the permission can be assigned.
 		if !perm.IsAssignable() {
-			return errors.NewError(
+			return errors.New(
 				errors.EInvalid,
-				fmt.Sprintf("Permission '%s' cannot be assigned to a role", perm),
+				"Permission '%s' cannot be assigned to a role", perm,
 			)
 		}
 

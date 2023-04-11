@@ -11,8 +11,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -193,7 +193,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, conn, query)
@@ -330,7 +330,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("Rule for run stage %s already exists", rule.RunStage))
+				return nil, errors.New(errors.EConflict, "rule for run stage %s already exists", rule.RunStage)
 			}
 		}
 		return nil, err
@@ -446,7 +446,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("Rule for run stage %s already exists", rule.RunStage))
+				return nil, errors.New(errors.EConflict, "rule for run stage %s already exists", rule.RunStage)
 			}
 		}
 		return nil, err
@@ -636,7 +636,7 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return errors.NewError(errors.EConflict, "managed identity already assigned to workspace")
+				return errors.New(errors.EConflict, "managed identity already assigned to workspace")
 			}
 		}
 		return err
@@ -794,7 +794,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
@@ -867,7 +867,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, "managed identity already exists in the specified group")
+				return nil, errors.New(errors.EConflict, "managed identity already exists in the specified group")
 			}
 		}
 		return nil, err
@@ -979,7 +979,7 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
-				return errors.NewError(errors.EConflict, "managed identity is still assigned to a workspace")
+				return errors.New(errors.EConflict, "managed identity is still assigned to a workspace")
 			}
 		}
 

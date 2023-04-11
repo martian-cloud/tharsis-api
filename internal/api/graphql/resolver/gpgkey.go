@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -31,7 +31,7 @@ type GPGKeyEdgeResolver struct {
 func (r *GPGKeyEdgeResolver) Cursor() (string, error) {
 	gpgKey, ok := r.edge.Node.(models.GPGKey)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&gpgKey)
 	return *cursor, err
@@ -41,7 +41,7 @@ func (r *GPGKeyEdgeResolver) Cursor() (string, error) {
 func (r *GPGKeyEdgeResolver) Node() (*GPGKeyResolver, error) {
 	gpgKey, ok := r.edge.Node.(models.GPGKey)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &GPGKeyResolver{gpgKey: &gpgKey}, nil
@@ -283,7 +283,7 @@ func loadGPGKey(ctx context.Context, id string) (*models.GPGKey, error) {
 
 	gpgKey, ok := data.(models.GPGKey)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &gpgKey, nil

@@ -11,8 +11,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -152,7 +152,7 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
@@ -231,11 +231,11 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_terraform_module_versions_on_latest":
-					return nil, errors.NewError(errors.EConflict, "another terraform module version is already marked as the latest for the same module")
+					return nil, errors.New(errors.EConflict, "another terraform module version is already marked as the latest for the same module")
 				case "index_terraform_module_versions_on_semantic_version":
-					return nil, errors.NewError(errors.EConflict, fmt.Sprintf("terraform module version %s already exists", moduleVersion.SemanticVersion))
+					return nil, errors.New(errors.EConflict, "terraform module version %s already exists", moduleVersion.SemanticVersion)
 				default:
-					return nil, errors.NewError(errors.EConflict, fmt.Sprintf("database constraint violated: %s", pgErr.ConstraintName))
+					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
 				}
 			}
 		}
@@ -290,9 +290,9 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_terraform_module_versions_on_latest":
-					return nil, errors.NewError(errors.EConflict, "another terraform module version is already marked as the latest for the same module")
+					return nil, errors.New(errors.EConflict, "another terraform module version is already marked as the latest for the same module")
 				default:
-					return nil, errors.NewError(errors.EConflict, fmt.Sprintf("database constraint violated: %s", pgErr.ConstraintName))
+					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
 				}
 			}
 		}

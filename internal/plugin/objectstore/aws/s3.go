@@ -18,9 +18,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 
-	tErrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore"
+	tErrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const (
@@ -129,12 +129,12 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return tErrors.NewError(tErrors.ENotFound, fmt.Sprintf("Key %s not found in bucket %s", key, s.bucket))
+			return tErrors.New(tErrors.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
 		}
 
 		var ae smithy.APIError
 		if errors.As(err, &ae) && ae.ErrorCode() == "InvalidRange" {
-			return tErrors.NewError(tErrors.ENotFound, fmt.Sprintf("Range %s not found in %s", *options.ContentRange, key))
+			return tErrors.New(tErrors.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
 		}
 
 		s.logger.Errorf("Failed to download file from key %s %v", key, err)
@@ -159,12 +159,12 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return nil, tErrors.NewError(tErrors.ENotFound, fmt.Sprintf("Key %s not found in bucket %s", key, s.bucket))
+			return nil, tErrors.New(tErrors.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
 		}
 
 		var ae smithy.APIError
 		if errors.As(err, &ae) && ae.ErrorCode() == "InvalidRange" {
-			return nil, tErrors.NewError(tErrors.ENotFound, fmt.Sprintf("Range %s not found in %s", *options.ContentRange, key))
+			return nil, tErrors.New(tErrors.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
 		}
 
 		s.logger.Errorf("Failed to get file from key %s %v", key, err)
@@ -206,7 +206,7 @@ func (s *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 
 	presignedReq, err := presignClient.PresignGetObject(ctx, input)
 	if err != nil {
-		return "", tErrors.NewError(tErrors.EInternal, fmt.Sprintf("Failed to create presigned URL: %s", err.Error()))
+		return "", tErrors.New(tErrors.EInternal, "Failed to create presigned URL: %s", err.Error())
 	}
 
 	return presignedReq.URL, nil

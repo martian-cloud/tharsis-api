@@ -7,10 +7,10 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 /* Job Query Resolvers */
@@ -384,7 +384,7 @@ func loadJob(ctx context.Context, id string) (*models.Job, error) {
 
 	job, ok := data.(models.Job)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &job, nil

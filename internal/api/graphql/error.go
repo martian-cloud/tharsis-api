@@ -3,7 +3,7 @@ package graphql
 
 import (
 	graphqlgo "github.com/graph-gophers/graphql-go/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 var tharsisErrorToStatusCode = map[string]string{

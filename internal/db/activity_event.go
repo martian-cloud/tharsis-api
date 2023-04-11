@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -202,7 +202,7 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
@@ -245,7 +245,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		}
 
 		if namespace == nil {
-			return nil, errors.NewError(errors.ENotFound, "Namespace not found")
+			return nil, errors.New(errors.ENotFound, "Namespace not found")
 		}
 
 		namespaceID = &namespace.id
@@ -366,47 +366,47 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_activity_events_user_id":
-					return nil, errors.NewError(errors.ENotFound, "user does not exist")
+					return nil, errors.New(errors.ENotFound, "user does not exist")
 				case "fk_activity_events_service_account_id":
-					return nil, errors.NewError(errors.ENotFound, "service account does not exist")
+					return nil, errors.New(errors.ENotFound, "service account does not exist")
 				case "fk_activity_events_namespace_id":
-					return nil, errors.NewError(errors.ENotFound, "namespace path does not exist")
+					return nil, errors.New(errors.ENotFound, "namespace path does not exist")
 				case "fk_activity_events_gpg_key_target_id":
-					return nil, errors.NewError(errors.ENotFound, "GPG key does not exist")
+					return nil, errors.New(errors.ENotFound, "GPG key does not exist")
 				case "fk_activity_events_group_target_id":
-					return nil, errors.NewError(errors.ENotFound, "group does not exist")
+					return nil, errors.New(errors.ENotFound, "group does not exist")
 				case "fk_activity_events_managed_identity_target_id":
-					return nil, errors.NewError(errors.ENotFound, "managed identity does not exist")
+					return nil, errors.New(errors.ENotFound, "managed identity does not exist")
 				case "fk_activity_events_managed_identity_rule_target_id":
-					return nil, errors.NewError(errors.ENotFound, "managed identity access rule does not exist")
+					return nil, errors.New(errors.ENotFound, "managed identity access rule does not exist")
 				case "fk_activity_events_namespace_membership_target_id":
-					return nil, errors.NewError(errors.ENotFound, "namespace membership does not exist")
+					return nil, errors.New(errors.ENotFound, "namespace membership does not exist")
 				case "fk_activity_events_run_target_id":
-					return nil, errors.NewError(errors.ENotFound, "run does not exist")
+					return nil, errors.New(errors.ENotFound, "run does not exist")
 				case "fk_activity_events_service_account_target_id":
-					return nil, errors.NewError(errors.ENotFound, "service account does not exist")
+					return nil, errors.New(errors.ENotFound, "service account does not exist")
 				case "fk_activity_events_state_version_target_id":
-					return nil, errors.NewError(errors.ENotFound, "state version does not exist")
+					return nil, errors.New(errors.ENotFound, "state version does not exist")
 				case "fk_activity_events_team_target_id":
-					return nil, errors.NewError(errors.ENotFound, "team does not exist")
+					return nil, errors.New(errors.ENotFound, "team does not exist")
 				case "fk_activity_events_terraform_provider_target_id":
-					return nil, errors.NewError(errors.ENotFound, "terraform provider does not exist")
+					return nil, errors.New(errors.ENotFound, "terraform provider does not exist")
 				case "fk_activity_events_terraform_provider_version_target_id":
-					return nil, errors.NewError(errors.ENotFound, "terraform provider version does not exist")
+					return nil, errors.New(errors.ENotFound, "terraform provider version does not exist")
 				case "fk_activity_events_terraform_module_target_id":
-					return nil, errors.NewError(errors.ENotFound, "terraform module does not exist")
+					return nil, errors.New(errors.ENotFound, "terraform module does not exist")
 				case "fk_activity_events_terraform_module_version_target_id":
-					return nil, errors.NewError(errors.ENotFound, "terraform module version does not exist")
+					return nil, errors.New(errors.ENotFound, "terraform module version does not exist")
 				case "fk_activity_events_variable_target_id":
-					return nil, errors.NewError(errors.ENotFound, "variable does not exist")
+					return nil, errors.New(errors.ENotFound, "variable does not exist")
 				case "fk_activity_events_workspace_target_id":
-					return nil, errors.NewError(errors.ENotFound, "workspace does not exist")
+					return nil, errors.New(errors.ENotFound, "workspace does not exist")
 				case "fk_activity_events_vcs_providers_target_id":
-					return nil, errors.NewError(errors.ENotFound, "vcs provider does not exist")
+					return nil, errors.New(errors.ENotFound, "vcs provider does not exist")
 				case "fk_activity_events_role_target_id":
-					return nil, errors.NewError(errors.ENotFound, "role does not exist")
+					return nil, errors.New(errors.ENotFound, "role does not exist")
 				case "fk_activity_events_runner_target_id":
-					return nil, errors.NewError(errors.ENotFound, "runner does not exist")
+					return nil, errors.New(errors.ENotFound, "runner does not exist")
 				}
 			}
 		}

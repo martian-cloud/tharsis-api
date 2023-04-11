@@ -5,15 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/lestrrat-go/jwx/jwt"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // InputData contains the input data fields specific to this managed identity type
@@ -87,16 +87,16 @@ func (d *Delegate) CreateCredentials(ctx context.Context, identity *models.Manag
 func (d *Delegate) SetManagedIdentityData(_ context.Context, managedIdentity *models.ManagedIdentity, input []byte) error {
 	decodedData, err := base64.StdEncoding.DecodeString(string(input))
 	if err != nil {
-		return errors.NewError(errors.EInvalid, "Failed to decode managed identity data", errors.WithErrorErr(err))
+		return te.Wrap(err, te.EInvalid, "failed to decode managed identity data")
 	}
 
 	inputData := InputData{}
 	if err = json.Unmarshal(decodedData, &inputData); err != nil {
-		return errors.NewError(errors.EInvalid, "Invalid managed identity data", errors.WithErrorErr(err))
+		return te.Wrap(err, te.EInvalid, "invalid managed identity data")
 	}
 
 	if inputData.Role == "" {
-		return fmt.Errorf("role field is missing from payload")
+		return errors.New("role field is missing from payload")
 	}
 
 	var federatedData *Data

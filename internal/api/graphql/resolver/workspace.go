@@ -7,13 +7,13 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/graph-gophers/dataloader"
@@ -43,7 +43,7 @@ type WorkspaceEdgeResolver struct {
 func (r *WorkspaceEdgeResolver) Cursor() (string, error) {
 	workspace, ok := r.edge.Node.(models.Workspace)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&workspace)
 	return *cursor, err
@@ -53,7 +53,7 @@ func (r *WorkspaceEdgeResolver) Cursor() (string, error) {
 func (r *WorkspaceEdgeResolver) Node() (*WorkspaceResolver, error) {
 	workspace, ok := r.edge.Node.(models.Workspace)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &WorkspaceResolver{workspace: &workspace}, nil
@@ -723,7 +723,7 @@ func loadWorkspace(ctx context.Context, id string) (*models.Workspace, error) {
 
 	ws, ok := data.(models.Workspace)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &ws, nil

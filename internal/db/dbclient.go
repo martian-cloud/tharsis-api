@@ -17,9 +17,8 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const initialResourceVersion int = 1
@@ -37,12 +36,12 @@ const (
 
 var (
 	// ErrOptimisticLockError is used for optimistic lock exceptions
-	ErrOptimisticLockError = te.NewError(
+	ErrOptimisticLockError = te.New(
 		te.EOptimisticLock,
 		"resource version does not match specified version",
 	)
 	// ErrInvalidID is used for invalid resource UUIDs
-	ErrInvalidID = te.NewError(
+	ErrInvalidID = te.New(
 		te.EInvalid,
 		"invalid id: the id must be a valid uuid",
 	)
@@ -116,7 +115,7 @@ func NewClient(
 
 	cfg, err := pgxpool.ParseConfig(dbURI)
 	if err != nil {
-		return nil, te.NewError(te.EInternal, "Failed to parse db connection URI", te.WithErrorErr(err))
+		return nil, fmt.Errorf("failed to parse db connection URI: %w", err)
 	}
 
 	if dbMaxConnections != 0 {
@@ -251,14 +250,4 @@ func nullableString(val string) sql.NullString {
 // before storing it.
 func currentTime() time.Time {
 	return time.Now().UTC().Round(time.Microsecond)
-}
-
-// handlePaginationError translates an invalid error from the
-// pagination package to a Tharsis equivalent.
-func handlePaginationError(err error) error {
-	if errors.Is(err, pagination.ErrInvalidCursor) || errors.Is(err, pagination.ErrInvalidSortBy) {
-		return te.NewError(te.EInvalid, err.Error())
-	}
-
-	return err
 }

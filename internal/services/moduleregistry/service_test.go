@@ -15,10 +15,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -58,7 +58,7 @@ func TestGetModuleByID(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -142,7 +142,7 @@ func TestGetModuleByPath(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -244,7 +244,7 @@ func TestGetModuleByAddress(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -361,7 +361,7 @@ func TestGetModulesByIDs(t *testing.T) {
 				ResourcePath: "some-group/test-module",
 				Private:      true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -461,7 +461,7 @@ func TestGetModules(t *testing.T) {
 					FullPath: "group-1",
 				},
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -656,7 +656,7 @@ func TestCreateModule(t *testing.T) {
 				GroupID: groupID,
 				Private: true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -754,7 +754,7 @@ func TestUpdateModule(t *testing.T) {
 				GroupID:      groupID,
 				ResourcePath: "group123/test-module/aws",
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -838,7 +838,7 @@ func TestDeleteModule(t *testing.T) {
 				GroupID:      groupID,
 				ResourcePath: "group123/test-module/aws",
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -946,7 +946,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1052,7 +1052,7 @@ func TestGetModuleVersions(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1187,7 +1187,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1288,7 +1288,7 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "0.1.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1513,7 +1513,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:     errors.New(errors.EForbidden, "Forbidden"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1761,7 +1761,7 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1845,7 +1845,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 				ModuleID: moduleID,
 				Status:   models.TerraformModuleVersionStatusPending,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:     errors.New(errors.EForbidden, "Forbidden"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2060,7 +2060,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2146,7 +2146,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 			input: CreateModuleAttestationInput{
 				ModuleID: moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2287,7 +2287,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
 				ModuleID: moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2390,7 +2390,7 @@ func TestGetModuleAttestations(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
 				ModuleID: moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2486,7 +2486,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "1"},
 				ModuleID: moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:     errors.New(errors.EForbidden, "Forbidden"),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2570,7 +2570,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "1"},
 				ModuleID: moduleID,
 			},
-			authError:     errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:     errors.New(errors.EForbidden, "Forbidden"),
 			expectErrCode: errors.EForbidden,
 		},
 		{

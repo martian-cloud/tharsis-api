@@ -13,6 +13,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Constants used for sorting
@@ -231,7 +232,7 @@ func NewPaginatedQueryBuilder(
 		((cur.secondary != nil && sortBy == nil) ||
 			(cur.secondary == nil && sortBy != nil) ||
 			(cur.secondary != nil && sortBy != nil && sortBy.Key != cur.secondary.name)) {
-		return nil, ErrInvalidSortBy
+		return nil, te.New(te.EInvalid, "sort by argument does not match cursor")
 	}
 
 	return &PaginatedQueryBuilder{

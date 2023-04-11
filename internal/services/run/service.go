@@ -17,7 +17,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -28,6 +27,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -221,7 +221,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	}
 
 	if options.WorkspaceID == nil {
-		return nil, errors.NewError(errors.EInvalid, "WorkspaceID option is required")
+		return nil, errors.New(errors.EInvalid, "WorkspaceID option is required")
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
@@ -302,10 +302,10 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// Build run variables
 	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"failed to build run variables",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -327,7 +327,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	if options.ModuleSource != nil {
 		moduleRegistrySource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *options.ModuleSource)
 		if err != nil {
-			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Failed to resolve module source: %v", err))
+			return nil, errors.Wrap(err, errors.EInvalid, "failed to resolve module source")
 		}
 
 		// registry source will be nil if this is a remote module source that doesn't use the terraform module registry protocol
@@ -335,7 +335,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			var resolvedVersion string
 			resolvedVersion, err = s.moduleResolver.ResolveModuleVersion(ctx, moduleRegistrySource, options.ModuleVersion, runEnvVars)
 			if err != nil {
-				return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Failed to resolve module source: %v", err))
+				return nil, errors.Wrap(err, errors.EInvalid, "failed to resolve module source")
 			}
 			moduleVersion = &resolvedVersion
 
@@ -356,7 +356,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 				}
 
 				if len(versionsResponse.ModuleVersions) == 0 {
-					return nil, errors.NewError(errors.EInternal, fmt.Sprintf("unable to find the module package for module %s with semantic version %s", *options.ModuleSource, resolvedVersion))
+					return nil, errors.New(errors.EInternal, "unable to find the module package for module %s with semantic version %s", *options.ModuleSource, resolvedVersion)
 				}
 
 				moduleDigest = versionsResponse.ModuleVersions[0].SHASum
@@ -367,15 +367,15 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// Retrieve workspace to find Terraform version and max job duration.
 	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get workspace associated with run",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if ws == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get workspace associated with run",
 		)
@@ -398,7 +398,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 
 	// Enforce the workspace's option to prevent a destroy run.
 	if options.IsDestroy && ws.PreventDestroyPlan {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EForbidden,
 			"Workspace does not allow destroy plan",
 		)
@@ -445,10 +445,10 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// Create plan resource
 	plan, err := s.dbClient.Plans.CreatePlan(txContext, &models.Plan{Status: models.PlanQueued, WorkspaceID: options.WorkspaceID})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to create plan",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -459,10 +459,10 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	if options.ConfigurationVersionID != nil {
 		configVersion, gcvErr := s.dbClient.ConfigurationVersions.GetConfigurationVersion(txContext, *options.ConfigurationVersionID)
 		if gcvErr != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				gcvErr,
 				errors.EInternal,
 				"Failed to get configuration version associated with run",
-				errors.WithErrorErr(gcvErr),
 			)
 		}
 		isSpeculative = configVersion.Speculative
@@ -490,10 +490,10 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		apply, aErr := s.dbClient.Applies.CreateApply(txContext, &models.Apply{Status: models.ApplyCreated, WorkspaceID: options.WorkspaceID})
 
 		if aErr != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				aErr,
 				errors.EInternal,
 				"Failed to create apply",
-				errors.WithErrorErr(aErr),
 			)
 		}
 
@@ -502,10 +502,10 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 
 	run, err := s.dbClient.Runs.CreateRun(txContext, &createRunOptions)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to create run",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -536,10 +536,10 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 
 	// Create Job
 	if _, err = s.dbClient.Jobs.CreateJob(txContext, &job); err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to create job",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -631,10 +631,10 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 	// Get apply resource
 	apply, err := s.dbClient.Applies.GetApply(ctx, run.ApplyID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get apply resource",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -658,10 +658,10 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 	_, err = s.runStateManager.UpdateApply(txContext, apply)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to update apply resource",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -682,10 +682,10 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 	// Create Job
 	if _, err := s.dbClient.Jobs.CreateJob(txContext, &job); err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to create job",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -728,19 +728,19 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		// If a run is in RunPlannedAndFinished state, meaning the run was for plan
 		// only and that plan has finished, the job cannot be canceled, so return a
 		// bad request error aka EInvalid.
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInvalid,
 			"run has been planned and finished, so it cannot be canceled",
 		)
 	case models.RunApplied:
 		// If a run is in RunApplied state, meaning the run was for apply and that plan has finished,
 		// the job cannot be canceled, so return a bad request error aka EInvalid.
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInvalid,
 			"run has been applied, so it cannot be canceled",
 		)
 	case models.RunCanceled:
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInvalid,
 			"run has already been canceled",
 		)
@@ -750,7 +750,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 	if options.Force {
 		// Verify that graceful cancel was already attempted
 		if run.ForceCancelAvailableAt == nil {
-			return nil, errors.NewError(
+			return nil, errors.New(
 				errors.EInvalid,
 				"run has not already received a graceful request to cancel",
 			)
@@ -758,12 +758,10 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 		// Error out with errors.EInvalid if not yet eligible.
 		if time.Now().Before(*run.ForceCancelAvailableAt) {
-			return nil, errors.NewError(
+			return nil, errors.New(
 				errors.EInvalid,
-				fmt.Sprintf(
-					"insufficient time has elapsed since graceful cancel request; force cancel will be available at %s",
-					*run.ForceCancelAvailableAt,
-				),
+				"insufficient time has elapsed since graceful cancel request; force cancel will be available at %s",
+				*run.ForceCancelAvailableAt,
 			)
 		}
 	}
@@ -776,20 +774,20 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 		apply, aErr := s.GetApply(ctx, run.ApplyID)
 		if aErr != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				aErr,
 				errors.EInternal,
 				"failed to get the apply object to cancel a planned run",
-				errors.WithErrorErr(aErr),
 			)
 		}
 
 		apply.Status = models.ApplyCanceled
 		_, err = s.runStateManager.UpdateApply(ctx, apply)
 		if err != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				err,
 				errors.EInternal,
 				"failed to update the apply to cancel a planned run",
-				errors.WithErrorErr(err),
 			)
 		}
 
@@ -797,20 +795,20 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 	case models.RunPlanQueued:
 		plan, pErr := s.GetPlan(ctx, run.PlanID)
 		if pErr != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				pErr,
 				errors.EInternal,
 				"failed to get the plan to cancel a queued run",
-				errors.WithErrorErr(pErr),
 			)
 		}
 
 		plan.Status = models.PlanCanceled
 		_, err = s.runStateManager.UpdatePlan(ctx, plan)
 		if err != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				err,
 				errors.EInternal,
 				"failed to update the plan to cancel a queued run",
-				errors.WithErrorErr(err),
 			)
 		}
 
@@ -820,10 +818,10 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 	// Wrap all the DB updates in a transaction, whether the cancel is forced or graceful.
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"failed to create a transaction to cancel a run",
-			errors.WithErrorErr(err),
 		)
 	}
 	defer func() {
@@ -860,10 +858,10 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"failed to commit the transaction to cancel a run",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -882,15 +880,15 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 	// Cancel latest job associated with run
 	job, err := s.jobService.GetLatestJobForRun(ctx, run)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get latest job for run",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if job == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Run has no job",
 		)
@@ -927,15 +925,15 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	// Cancel latest job associated with run
 	job, err := s.jobService.GetLatestJobForRun(ctx, run)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get latest job for run",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if job == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Run has no job",
 		)
@@ -950,10 +948,10 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	case models.JobPlanType:
 		plan, err := s.GetPlan(ctx, run.PlanID)
 		if err != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				err,
 				errors.EInternal,
 				"failed to get the plan object to cancel a run",
-				errors.WithErrorErr(err),
 			)
 		}
 
@@ -966,10 +964,10 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	case models.JobApplyType:
 		apply, err := s.GetApply(ctx, run.ApplyID)
 		if err != nil {
-			return nil, errors.NewError(
+			return nil, errors.Wrap(
+				err,
 				errors.EInternal,
 				"failed to get an apply object to cancel a run",
-				errors.WithErrorErr(err),
 			)
 		}
 
@@ -1030,7 +1028,7 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 			return nil, napErr
 		}
 		if !policy.AllowAll {
-			return nil, errors.NewError(errors.EInvalid, "either a workspace or group must be specified when querying for runs")
+			return nil, errors.New(errors.EInvalid, "either a workspace or group must be specified when querying for runs")
 		}
 	}
 
@@ -1040,10 +1038,10 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 		Filter:            filter,
 	})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get runs",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1062,10 +1060,10 @@ func (s *service) GetRunsByIDs(ctx context.Context, idList []string) ([]models.R
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get runs",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1091,10 +1089,10 @@ func (s *service) GetPlansByIDs(ctx context.Context, idList []string) ([]models.
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get plans",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1117,15 +1115,15 @@ func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, err
 
 	plan, err := s.dbClient.Plans.GetPlan(ctx, planID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get plan",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if plan == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Plan with ID %s not found", planID))
+		return nil, errors.New(errors.ENotFound, "plan with ID %s not found", planID)
 	}
 
 	run, err := s.dbClient.Runs.GetRunByPlanID(ctx, planID)
@@ -1173,10 +1171,10 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 
 	result, err := s.artifactStore.GetPlanCache(ctx, run)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get plan cache from artifact store",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1191,15 +1189,15 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 
 	run, err := s.dbClient.Runs.GetRun(ctx, runID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get run",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if run == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", runID))
+		return nil, errors.New(errors.ENotFound, "run with ID %s not found", runID)
 	}
 
 	// Only include variable values if the caller has UpdateRunPermission or ViewVariableValuePermission on workspace.
@@ -1212,10 +1210,10 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 
 	result, err := s.artifactStore.GetRunVariables(ctx, run)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get run variables from object store",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1269,10 +1267,10 @@ func (s *service) UploadPlan(ctx context.Context, planID string, reader io.Reade
 	}
 
 	if err := s.artifactStore.UploadPlanCache(ctx, run, reader); err != nil {
-		return errors.NewError(
+		return errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to write plan cache to object storage",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1291,10 +1289,10 @@ func (s *service) GetAppliesByIDs(ctx context.Context, idList []string) ([]model
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to list applies",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1317,15 +1315,15 @@ func (s *service) GetApply(ctx context.Context, applyID string) (*models.Apply, 
 
 	apply, err := s.dbClient.Applies.GetApply(ctx, applyID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get apply",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if apply == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Apply with ID %s not found", applyID))
+		return nil, errors.New(errors.ENotFound, "apply with ID %s not found", applyID)
 	}
 
 	run, err := s.dbClient.Runs.GetRunByApplyID(ctx, applyID)
@@ -1452,7 +1450,7 @@ func (s *service) buildRunVariables(ctx context.Context, workspaceID string, run
 	// Add run variables first since they have the highest precedence
 	for _, v := range runVariables {
 		if v.Category == models.EnvironmentVariableCategory && v.Hcl {
-			return nil, errors.NewError(errors.EInvalid, "HCL variables are not supported for the environment category")
+			return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 		}
 
 		variableMap[buildMapKey(v.Key, string(v.Category))] = Variable{
@@ -1493,7 +1491,7 @@ func (s *service) getLatestJobByRunAndType(ctx context.Context, runID string, jo
 	}
 
 	if job == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Latest %s job for run %s not found", jobType, runID))
+		return nil, errors.New(errors.ENotFound, "latest %s job for run %s not found", jobType, runID)
 	}
 
 	return job, nil
@@ -1513,15 +1511,15 @@ func (s *service) enforceManagedIdentityRules(ctx context.Context, managedIdenti
 func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error) {
 	run, err := s.dbClient.Runs.GetRun(ctx, runID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get run",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if run == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", runID))
+		return nil, errors.New(errors.ENotFound, "run with ID %s not found", runID)
 	}
 
 	return run, nil

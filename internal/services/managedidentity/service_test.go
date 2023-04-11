@@ -11,12 +11,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -92,7 +92,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			input: &GetManagedIdentitiesInput{
 				NamespacePath: "a-namespace/a-workspace",
 			},
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -198,7 +198,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 		},
 		{
 			name:      "negative: subject does not have permissions in group",
-			authError: errors.NewError(errors.EForbidden, "Forbidden"),
+			authError: errors.New(errors.EForbidden, "Forbidden"),
 			input: &DeleteManagedIdentityInput{
 				ManagedIdentity: sampleManagedIdentity,
 			},
@@ -287,7 +287,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 		{
 			name:            "negative: subject does not have viewer access to workspace",
 			workspaceID:     "some-workspace-id",
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -401,7 +401,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			name:              "negative: subject does not have permissions for workspace",
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
-			authError:         errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:         errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:   errors.EForbidden,
 		},
 	}
@@ -511,7 +511,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			name:              "negative: subject does not have permissions for workspace",
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
-			authError:         errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:         errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:   errors.EForbidden,
 		},
 	}
@@ -603,7 +603,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 			name:                  "negative: subject does not have access to resource",
 			searchID:              "some-managed-identity-id",
 			expectManagedIdentity: sampleManagedIdentity,
-			authError:             errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:             errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:       errors.EForbidden,
 		},
 	}
@@ -676,7 +676,7 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 			name:                  "negative: subject does not have access to group resource",
 			searchPath:            "some/resource/path",
 			expectManagedIdentity: sampleManagedIdentity,
-			authError:             errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:             errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:       errors.EForbidden,
 		},
 	}
@@ -862,7 +862,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -874,7 +874,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			},
 			existingManagedIdentity: sampleManagedIdentity,
 			existingGroup:           sampleGroup,
-			authError:               errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:               errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -1020,7 +1020,7 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 				ManagedIdentity: sampleManagedIdentityAlias,
 			},
 			sourceIdentity:  sampleSourceIdentity,
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1245,7 +1245,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Name:    "a-managed-identity",
 				GroupID: "some-group-id",
 			},
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1357,7 +1357,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 			expectResult: &db.ManagedIdentitiesResult{
 				ManagedIdentities: []models.ManagedIdentity{sampleManagedIdentity},
 			},
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1485,7 +1485,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				Data:        []byte("this is new data"),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:               errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -1610,7 +1610,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 					ManagedIdentityID: &sampleManagedIdentity.Metadata.ID,
 				},
 			},
-			authError: errors.NewError(errors.EForbidden, "Forbidden"),
+			authError: errors.New(errors.EForbidden, "Forbidden"),
 			dbResult: &db.ManagedIdentityAccessRulesResult{
 				ManagedIdentityAccessRules: sampleAccessRules,
 			},
@@ -1725,7 +1725,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 			dbResult: &db.ManagedIdentityAccessRulesResult{
 				ManagedIdentityAccessRules: sampleAccessRules,
 			},
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1807,7 +1807,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 			name:             "negative: subject does not have access to group resource",
 			searchID:         sampleAccessRule.Metadata.ID,
 			expectAccessRule: sampleAccessRule,
-			authError:        errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:        errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:  errors.EForbidden,
 		},
 	}
@@ -1936,7 +1936,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			name:                    "negative: subject does not have owner role for group",
 			input:                   sampleAccessRule,
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:               errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -2079,7 +2079,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			name:                    "negative: subject does not have owner role for group",
 			input:                   sampleAccessRule,
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:               errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -2203,7 +2203,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			name:                    "negative: subject does not have owner role for group",
 			input:                   sampleAccessRule,
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:               errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}

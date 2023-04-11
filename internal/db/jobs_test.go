@@ -1025,7 +1025,7 @@ func TestGetLatestJobByType(t *testing.T) {
 			name:          "defective run id",
 			searchRunID:   invalidID,
 			searchJobType: models.JobPlanType,
-			expectMsg:     ptr.String("Failed to get job: " + *invalidUUIDMsg2),
+			expectMsg:     ptr.String("failed to get job: " + *invalidUUIDMsg2),
 		},
 	}
 

@@ -7,10 +7,10 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // VCSProviderConnectionQueryArgs are used to query a vcsProvider connection
@@ -29,7 +29,7 @@ type VCSProviderEdgeResolver struct {
 func (r *VCSProviderEdgeResolver) Cursor() (string, error) {
 	vcsProvider, ok := r.edge.Node.(models.VCSProvider)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&vcsProvider)
 	return *cursor, err
@@ -39,7 +39,7 @@ func (r *VCSProviderEdgeResolver) Cursor() (string, error) {
 func (r *VCSProviderEdgeResolver) Node() (*VCSProviderResolver, error) {
 	vcsProvider, ok := r.edge.Node.(models.VCSProvider)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &VCSProviderResolver{vcsProvider: &vcsProvider}, nil
@@ -435,7 +435,7 @@ func loadVCSProvider(ctx context.Context, id string) (*models.VCSProvider, error
 
 	vp, ok := data.(models.VCSProvider)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &vp, nil

@@ -7,8 +7,8 @@ import (
 
 	"github.com/lestrrat-go/jwx/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 var (
@@ -51,19 +51,19 @@ func NewAuthenticator(userAuth *UserAuth, idp *IdentityProvider, dbClient *db.Cl
 // Authenticate verifies the token and returns a Caller
 func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
 	if tokenString == "" {
-		return nil, errors.NewError(errors.EUnauthorized, "Authentication token is missing")
+		return nil, errors.New(errors.EUnauthorized, "Authentication token is missing")
 	}
 
 	decodedToken, err := jwt.Parse([]byte(tokenString))
 	if err != nil {
-		return nil, errors.NewError(errors.EUnauthorized, fmt.Sprintf("Failed to decode token %v", err))
+		return nil, errors.Wrap(err, errors.EUnauthorized, "failed to decode token")
 	}
 
 	if decodedToken.Issuer() == a.issuerURL {
 		// This is a service account token
 		output, vtErr := a.idp.VerifyToken(ctx, tokenString)
 		if vtErr != nil {
-			return nil, errors.NewError(errors.EUnauthorized, errorReason(vtErr))
+			return nil, errors.New(errors.EUnauthorized, errorReason(vtErr))
 		}
 
 		tokenType, ok := output.PrivateClaims["type"]
@@ -90,24 +90,24 @@ func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, us
 		case SCIMTokenType:
 			scimCaller, sErr := a.verifySCIMTokenClaim(ctx, output.Token)
 			if sErr != nil {
-				return nil, errors.NewError(errors.EUnauthorized, errorReason(sErr))
+				return nil, errors.New(errors.EUnauthorized, errorReason(sErr))
 			}
 			return scimCaller, nil
 		case VCSWorkspaceLinkTokenType:
 			vcsCaller, sErr := a.verifyVCSToken(ctx, output)
 			if sErr != nil {
-				return nil, errors.NewError(errors.EUnauthorized, errorReason(sErr))
+				return nil, errors.New(errors.EUnauthorized, errorReason(sErr))
 			}
 			return vcsCaller, nil
 		default:
-			return nil, errors.NewError(errors.EInternal, "Unsupported token type received")
+			return nil, errors.New(errors.EInternal, "Unsupported token type received")
 		}
 	}
 
 	// This is a user token
 	caller, err := a.userAuth.Authenticate(ctx, tokenString, useCache)
 	if err != nil {
-		return nil, errors.NewError(errors.EUnauthorized, errorReason(err))
+		return nil, errors.New(errors.EUnauthorized, errorReason(err))
 	}
 
 	return caller, nil

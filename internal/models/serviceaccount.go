@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const (
@@ -49,27 +49,27 @@ func (s *ServiceAccount) Validate() error {
 	// Verify at least one trust policy is defined
 	policyCount := len(s.OIDCTrustPolicies)
 	if policyCount == 0 {
-		return errors.NewError(errors.EInvalid, "A minimum of one OIDC trust policy is required")
+		return errors.New(errors.EInvalid, "A minimum of one OIDC trust policy is required")
 	}
 	if policyCount > maximumTrustPolicies {
-		return errors.NewError(errors.EInvalid,
+		return errors.New(errors.EInvalid,
 			fmt.Sprintf("%d exceeds the limit of %d OIDC trust policies", policyCount, maximumTrustPolicies))
 	}
 
 	for _, policy := range s.OIDCTrustPolicies {
 		// Verify issuer is defined
 		if policy.Issuer == "" {
-			return errors.NewError(errors.EInvalid, "Issuer URL is required for trust policy")
+			return errors.New(errors.EInvalid, "Issuer URL is required for trust policy")
 		}
 
 		// Verify that issuer is a valid URL
 		if _, err := url.ParseRequestURI(policy.Issuer); err != nil {
-			return errors.NewError(errors.EInvalid, "Invalid issuer URL")
+			return errors.New(errors.EInvalid, "Invalid issuer URL")
 		}
 
 		// Verify at least one claim is present in each trust policy
 		if len(policy.BoundClaims) == 0 {
-			return errors.NewError(errors.EInvalid, "A minimum of one claim is required in each OIDC trust policy")
+			return errors.New(errors.EInvalid, "A minimum of one claim is required in each OIDC trust policy")
 		}
 	}
 

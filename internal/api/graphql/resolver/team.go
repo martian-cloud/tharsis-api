@@ -8,10 +8,10 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -37,7 +37,7 @@ type TeamEdgeResolver struct {
 func (r *TeamEdgeResolver) Cursor() (string, error) {
 	team, ok := r.edge.Node.(models.Team)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&team)
 	return *cursor, err
@@ -47,7 +47,7 @@ func (r *TeamEdgeResolver) Cursor() (string, error) {
 func (r *TeamEdgeResolver) Node() (*TeamResolver, error) {
 	team, ok := r.edge.Node.(models.Team)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &TeamResolver{team: &team}, nil
@@ -348,7 +348,7 @@ func loadTeam(ctx context.Context, id string) (*models.Team, error) {
 
 	team, ok := data.(models.Team)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &team, nil
@@ -380,7 +380,7 @@ type TeamMemberEdgeResolver struct {
 func (r *TeamMemberEdgeResolver) Cursor() (string, error) {
 	teamMember, ok := r.edge.Node.(models.TeamMember)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&teamMember)
 	return *cursor, err
@@ -390,7 +390,7 @@ func (r *TeamMemberEdgeResolver) Cursor() (string, error) {
 func (r *TeamMemberEdgeResolver) Node() (*TeamMemberResolver, error) {
 	teamMember, ok := r.edge.Node.(models.TeamMember)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &TeamMemberResolver{teamMember: &teamMember}, nil

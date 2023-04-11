@@ -3,10 +3,10 @@ package resolver
 import (
 	"context"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 	graphql "github.com/graph-gophers/graphql-go"
 )
@@ -28,7 +28,7 @@ type TerraformModuleAttestationEdgeResolver struct {
 func (r *TerraformModuleAttestationEdgeResolver) Cursor() (string, error) {
 	moduleAttestation, ok := r.edge.Node.(models.TerraformModuleAttestation)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&moduleAttestation)
 	return *cursor, err
@@ -38,7 +38,7 @@ func (r *TerraformModuleAttestationEdgeResolver) Cursor() (string, error) {
 func (r *TerraformModuleAttestationEdgeResolver) Node() (*TerraformModuleAttestationResolver, error) {
 	moduleAttestation, ok := r.edge.Node.(models.TerraformModuleAttestation)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &TerraformModuleAttestationResolver{moduleAttestation: &moduleAttestation}, nil

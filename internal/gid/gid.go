@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Type is the type of the global ID
@@ -83,7 +83,7 @@ func (t Type) IsValid() error {
 		RoleType:
 		return nil
 	}
-	return errors.NewError(errors.EInvalid, fmt.Sprintf("Invalid ID type %s", t))
+	return errors.New(errors.EInvalid, "invalid ID type %s", t)
 }
 
 // GlobalID is a model ID with type information
@@ -113,7 +113,7 @@ func ParseGlobalID(globalID string) (*GlobalID, error) {
 
 	index := strings.Index(decodedGlobalID, "_")
 	if index == -1 {
-		return nil, errors.NewError(errors.EInvalid, "Invalid ID")
+		return nil, errors.New(errors.EInvalid, "Invalid ID")
 	}
 
 	t := Type(decodedGlobalID[:index])

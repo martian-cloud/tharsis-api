@@ -10,7 +10,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -18,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 type mockDBClient struct {
@@ -148,7 +148,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 					},
 				},
 			},
-			enforceRulesResponse: errors.NewError(errors.EForbidden, "rule not satisfied"),
+			enforceRulesResponse: errors.New(errors.EForbidden, "rule not satisfied"),
 			expectErrorCode:      errors.EForbidden,
 		},
 	}
@@ -462,7 +462,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 					},
 				},
 			},
-			enforceRulesResponse: errors.NewError(errors.EForbidden, "rule not satisfied"),
+			enforceRulesResponse: errors.New(errors.EForbidden, "rule not satisfied"),
 			expectErrorCode:      errors.EForbidden,
 		},
 	}

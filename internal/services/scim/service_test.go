@@ -9,11 +9,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const (
@@ -413,7 +413,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 				},
 				// None of the other fields matter here.
 			},
-			authError:         errors.NewError(errors.ENotFound, "Resource not found"),
+			authError:         errors.New(errors.ENotFound, "Resource not found"),
 			expectedErrorCode: errors.ENotFound,
 		},
 	}
@@ -860,7 +860,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 					ID: resourceUUID,
 				},
 			},
-			authError:         errors.NewError(errors.ENotFound, "Resource not found"),
+			authError:         errors.New(errors.ENotFound, "Resource not found"),
 			expectedErrorCode: errors.ENotFound,
 		},
 	}

@@ -3,17 +3,16 @@ package scim
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // OP is the type of SCIM update operation.
@@ -33,10 +32,10 @@ const (
 )
 
 var (
-	// unsupportedOperationValueError is an error used to indicate an invalid resource modification.
-	unsupportedOperationValueError = errors.NewError(
+	// errUnsupportedOperationValue is an error used to indicate an invalid resource modification.
+	errUnsupportedOperationValue = errors.New(
 		errors.EInvalid,
-		"Invalid operation value.",
+		"invalid operation value",
 	)
 
 	// supportedSCIMUserOperations contains the list of supported user update operations.
@@ -130,7 +129,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 	// Verify caller is a user.
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EForbidden,
 			"Unsupported caller type, only users are allowed to create SCIM tokens",
 		)
@@ -138,7 +137,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 
 	// Only admins are allows to create SCIM tokens.
 	if !userCaller.User.Admin {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EForbidden,
 			"Only system admins can create SCIM tokens",
 		)
@@ -220,11 +219,7 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput)
 	if input.SCIMExternalID != "" {
 		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, input.SCIMExternalID)
 		if err != nil {
-			return nil, errors.NewError(
-				errors.ENotFound,
-				"Failed to get a SCIM user by scimExternalID",
-				errors.WithErrorErr(err),
-			)
+			return nil, errors.Wrap(err, errors.ENotFound, "failed to get a SCIM user by scimExternalID")
 		}
 
 		// If a user is not found, do not return an error.
@@ -340,9 +335,9 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 	}
 
 	if user == nil {
-		return errors.NewError(
+		return errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("SCIM user with ID %s does not exist", input.ID),
+			"SCIM user with ID %s does not exist", input.ID,
 		)
 	}
 
@@ -361,11 +356,7 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput
 	if input.SCIMExternalID != "" {
 		team, err := s.dbClient.Teams.GetTeamBySCIMExternalID(ctx, input.SCIMExternalID)
 		if err != nil {
-			return nil, errors.NewError(
-				errors.ENotFound,
-				"Failed to get a SCIM group by scimExternalID",
-				errors.WithErrorErr(err),
-			)
+			return nil, errors.Wrap(err, errors.ENotFound, "failed to get a SCIM group by scimExternalID")
 		}
 
 		// If a team is not found, do not return an error.
@@ -470,9 +461,9 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 	}
 
 	if team == nil {
-		return errors.NewError(
+		return errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("SCIM group with ID %s not found", input.ID),
+			"SCIM group with ID %s not found", input.ID,
 		)
 	}
 
@@ -489,7 +480,7 @@ func (s *service) processSCIMUserOperations(ctx context.Context, operations []Op
 	}
 
 	if user == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get a SCIM user for processing update operations",
 		)
@@ -515,9 +506,9 @@ func (s *service) processSCIMUserOperations(ctx context.Context, operations []Op
 		// More fields can be added here.
 
 		default:
-			return nil, errors.NewError(
+			return nil, errors.New(
 				errors.EInvalid,
-				fmt.Sprintf("Unsupported SCIM user operation path: %s", operation.Path),
+				"Unsupported SCIM user operation path: %s", operation.Path,
 			)
 		}
 	}
@@ -536,7 +527,7 @@ func (s *service) processSCIMGroupOperations(ctx context.Context, ops []Operatio
 	}
 
 	if team == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get SCIM group for processing update operations",
 		)
@@ -626,9 +617,9 @@ func (s *service) addRemoveSCIMGroupMember(ctx context.Context, operation *Opera
 	}
 
 	if user == nil {
-		return errors.NewError(
+		return errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("SCIM user with id %s does not exist.", userID),
+			"scim user with id %s does not exist", userID,
 		)
 	}
 
@@ -652,12 +643,11 @@ func (s *service) addRemoveSCIMGroupMember(ctx context.Context, operation *Opera
 		}
 
 		if teamMember == nil {
-			return errors.NewError(
+			return errors.New(
 				errors.ENotFound,
-				fmt.Sprintf("SCIM group member %s in SCIM group %s does not exist.",
-					user.Username,
-					team.Name,
-				),
+				"scim group member %s in SCIM group %s does not exist",
+				user.Username,
+				team.Name,
 			)
 		}
 
@@ -740,9 +730,9 @@ func (s *service) isSCIMGroupUpdateRequired(ctx context.Context, operations []Op
 			}
 
 		default:
-			return false, errors.NewError(
+			return false, errors.New(
 				errors.EInvalid,
-				fmt.Sprintf("Unsupported SCIM group operation path: %s", operation.Path),
+				"Unsupported SCIM group operation path: %s", operation.Path,
 			)
 		}
 	}
@@ -793,19 +783,19 @@ func parseSCIMGroupMemberID(operation *Operation) (string, error) {
 	// Expecting a slice of maps here.
 	valueSlice, ok := operation.Value.([]interface{})
 	if !ok {
-		return "", unsupportedOperationValueError
+		return "", errUnsupportedOperationValue
 	}
 
 	// Get the first element from the slice and make sure its a map.
 	firstElement, ok := valueSlice[0].(map[string]interface{})
 	if !ok {
-		return "", unsupportedOperationValueError
+		return "", errUnsupportedOperationValue
 	}
 
 	// Get the string userID.
 	userID, ok := firstElement["value"].(string)
 	if !ok {
-		return "", unsupportedOperationValueError
+		return "", errUnsupportedOperationValue
 	}
 
 	return gid.FromGlobalID(userID), nil
@@ -820,9 +810,9 @@ func isSCIMUserOperationSupported(operation OP) error {
 		}
 	}
 
-	return errors.NewError(
+	return errors.New(
 		errors.EInvalid,
-		fmt.Sprintf("Unsupported SCIM user operation: %s", operation),
+		"Unsupported SCIM user operation: %s", operation,
 	)
 }
 
@@ -835,8 +825,8 @@ func isSCIMGroupOperationSupported(operation OP) error {
 		}
 	}
 
-	return errors.NewError(
+	return errors.New(
 		errors.EInvalid,
-		fmt.Sprintf("Unsupported SCIM group operation: %s", operation),
+		"Unsupported SCIM group operation: %s", operation,
 	)
 }

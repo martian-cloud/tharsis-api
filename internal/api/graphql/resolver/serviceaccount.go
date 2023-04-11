@@ -2,16 +2,15 @@ package resolver
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/graph-gophers/dataloader"
@@ -53,7 +52,7 @@ type ServiceAccountEdgeResolver struct {
 func (r *ServiceAccountEdgeResolver) Cursor() (string, error) {
 	serviceAccount, ok := r.edge.Node.(models.ServiceAccount)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&serviceAccount)
 	return *cursor, err
@@ -63,7 +62,7 @@ func (r *ServiceAccountEdgeResolver) Cursor() (string, error) {
 func (r *ServiceAccountEdgeResolver) Node() (*ServiceAccountResolver, error) {
 	serviceAccount, ok := r.edge.Node.(models.ServiceAccount)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &ServiceAccountResolver{serviceAccount: &serviceAccount}, nil
@@ -428,9 +427,9 @@ func convertOIDCTrustPolicies(src []OIDCTrustPolicy) ([]models.OIDCTrustPolicy, 
 		for _, claim := range p.BoundClaims {
 			if _, ok := policy.BoundClaims[claim.Name]; ok {
 				return nil,
-					errors.NewError(
+					errors.New(
 						errors.EInvalid,
-						fmt.Sprintf("Claim with name %s can only be defined once for each trust policy", claim.Name),
+						"Claim with name %s can only be defined once for each trust policy", claim.Name,
 					)
 			}
 			policy.BoundClaims[claim.Name] = claim.Value
@@ -463,7 +462,7 @@ func loadServiceAccount(ctx context.Context, id string) (*models.ServiceAccount,
 
 	serviceAccount, ok := data.(models.ServiceAccount)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &serviceAccount, nil

@@ -1,4 +1,5 @@
-// Package errors package
+// Package errors provides an interface for all
+// errors returned from Tharsis.
 package errors
 
 import (
@@ -22,42 +23,42 @@ const (
 
 // TharsisError is the internal error implementation for the Tharsis API
 type TharsisError struct {
-	Err  error
-	Code string
-	Msg  string
+	err     error
+	code    string
+	message string
 }
 
-// NewError creates an instance of TharsisError
-func NewError(code string, msg string, options ...func(*TharsisError)) *TharsisError {
-	err := &TharsisError{Code: code, Msg: msg}
-	for _, o := range options {
-		o(err)
+// New returns a new Tharsis error with the code and message fields set
+func New(code string, format string, a ...any) *TharsisError {
+	return &TharsisError{
+		code:    code,
+		message: fmt.Sprintf(format, a...),
 	}
-
-	return err
 }
 
-// WithErrorErr sets the err on the error.
-func WithErrorErr(err error) func(*TharsisError) {
-	return func(e *TharsisError) {
-		e.Err = err
+// Wrap returns a new TharsisError which wraps an existing error
+func Wrap(err error, code string, format string, a ...any) *TharsisError {
+	return &TharsisError{
+		code:    code,
+		message: fmt.Sprintf(format, a...),
+		err:     err,
 	}
 }
 
 // Error implements the error interface by writing out the recursive messages.
 func (e *TharsisError) Error() string {
-	if e.Msg != "" && e.Err != nil {
+	if e.message != "" && e.err != nil {
 		var b strings.Builder
-		b.WriteString(e.Msg)
+		b.WriteString(e.message)
 		b.WriteString(": ")
-		b.WriteString(e.Err.Error())
+		b.WriteString(e.err.Error())
 		return b.String()
-	} else if e.Msg != "" {
-		return e.Msg
-	} else if e.Err != nil {
-		return e.Err.Error()
+	} else if e.message != "" {
+		return e.message
+	} else if e.err != nil {
+		return e.err.Error()
 	}
-	return fmt.Sprintf("<%s>", e.Code)
+	return fmt.Sprintf("<%s>", e.code)
 }
 
 // ErrorCode returns the code of the root error, if available; otherwise returns EINTERNAL.
@@ -75,12 +76,12 @@ func ErrorCode(err error) string {
 		return ""
 	}
 
-	if e.Code != "" {
-		return e.Code
+	if e.code != "" {
+		return e.code
 	}
 
-	if e.Err != nil {
-		return ErrorCode(e.Err)
+	if e.err != nil {
+		return ErrorCode(e.err)
 	}
 
 	return EInternal
@@ -101,12 +102,12 @@ func ErrorMessage(err error) string {
 		return ""
 	}
 
-	if e.Msg != "" {
-		return e.Msg
+	if e.message != "" {
+		return e.message
 	}
 
-	if e.Err != nil {
-		return ErrorMessage(e.Err)
+	if e.err != nil {
+		return ErrorMessage(e.err)
 	}
 
 	return "An internal error has occurred."

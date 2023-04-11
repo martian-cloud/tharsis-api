@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // maxDescriptionLength is the maximum length for a resource's description field.
@@ -42,7 +42,7 @@ func (r *ResourceMetadata) resolveFieldValue(key string) (string, error) {
 
 func verifyValidName(name string) error {
 	if !nameRegex.MatchString(name) {
-		return errors.NewError(errors.EInvalid, "Invalid name, name can only include lowercase letters and numbers with - and _ supported "+
+		return errors.New(errors.EInvalid, "Invalid name, name can only include lowercase letters and numbers with - and _ supported "+
 			"in non leading or trailing positions. Max length is 64 characters.")
 	}
 	return nil
@@ -50,7 +50,7 @@ func verifyValidName(name string) error {
 
 func verifyValidDescription(description string) error {
 	if len(description) > maxDescriptionLength {
-		return errors.NewError(errors.EInvalid, fmt.Sprintf("Invalid description, cannot be greater than %d characters", maxDescriptionLength))
+		return errors.New(errors.EInvalid, "invalid description, cannot be greater than %d characters", maxDescriptionLength)
 	}
 	return nil
 }

@@ -3,7 +3,6 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter/memorystore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider/awskms"
@@ -19,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore/aws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Catalog contains the available plugins
@@ -58,7 +57,7 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, cfg *config.Conf
 	case "redis":
 		endpoint, ok := cfg.RateLimitStorePluginData["redis_endpoint"]
 		if !ok {
-			return nil, errors.NewError(errors.EInternal, "'redis_endpoint' is required when using the redis rate limit store")
+			return nil, errors.New(errors.EInternal, "'redis_endpoint' is required when using the redis rate limit store")
 		}
 
 		pool := &redis.Pool{
@@ -95,9 +94,10 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, cfg *config.Conf
 
 		return mem, nil
 	default:
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"The specified rate limit store type %s is not currently supported",
+			cfg.RateLimitStorePluginType,
 		)
 
 	}
@@ -113,9 +113,9 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 	case "aws_s3":
 		store, err = aws.New(ctx, logger, cfg.ObjectStorePluginData)
 	default:
-		err = errors.NewError(
+		err = errors.New(
 			errors.EInternal,
-			fmt.Sprintf("The specified object store %s is not currently supported", cfg.ObjectStorePluginType),
+			"The specified object store %s is not currently supported", cfg.ObjectStorePluginType,
 		)
 	}
 
@@ -134,9 +134,9 @@ func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Conf
 	case "awskms":
 		plugin, err = awskms.New(ctx, cfg.JWSProviderPluginData)
 	default:
-		err = errors.NewError(
+		err = errors.New(
 			errors.EInternal,
-			fmt.Sprintf("The specified JWS Provider plugin %s is not currently supported", cfg.JWSProviderPluginType),
+			"The specified JWS Provider plugin %s is not currently supported", cfg.JWSProviderPluginType,
 		)
 	}
 

@@ -1,11 +1,10 @@
 package models
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // ManagedIdentityType represents the supported managed identity types
@@ -57,27 +56,27 @@ func (m *ManagedIdentityAccessRule) Validate() error {
 	switch m.Type {
 	case ManagedIdentityAccessRuleEligiblePrincipals:
 		if len(m.ModuleAttestationPolicies) > 0 {
-			return errors.NewError(errors.EInvalid, "eligible principals rule type does not support module attestation policies")
+			return errors.New(errors.EInvalid, "eligible principals rule type does not support module attestation policies")
 		}
 	case ManagedIdentityAccessRuleModuleAttestation:
 		if len(m.ModuleAttestationPolicies) == 0 {
-			return errors.NewError(errors.EInvalid, "a minimum of one module attestation policy is required for rule type module_attestation")
+			return errors.New(errors.EInvalid, "a minimum of one module attestation policy is required for rule type module_attestation")
 		}
 
 		for _, policy := range m.ModuleAttestationPolicies {
 			if _, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(policy.PublicKey)); err != nil {
-				return errors.NewError(errors.EInvalid, fmt.Sprintf("invalid public key: %v", err))
+				return errors.Wrap(err, errors.EInvalid, "invalid public key")
 			}
 			if policy.PredicateType != nil && *policy.PredicateType == "" {
-				return errors.NewError(errors.EInvalid, "predicate type cannot be an empty string")
+				return errors.New(errors.EInvalid, "predicate type cannot be an empty string")
 			}
 		}
 
 		if len(m.AllowedServiceAccountIDs) > 0 || len(m.AllowedUserIDs) > 0 || len(m.AllowedTeamIDs) > 0 {
-			return errors.NewError(errors.EInvalid, "module attestation rule type does not support allowed users, service accounts, or teams")
+			return errors.New(errors.EInvalid, "module attestation rule type does not support allowed users, service accounts, or teams")
 		}
 	default:
-		return errors.NewError(errors.EInvalid, fmt.Sprintf("rule type %s is not supported", m.Type))
+		return errors.New(errors.EInvalid, "rule type %s is not supported", m.Type)
 	}
 
 	return nil

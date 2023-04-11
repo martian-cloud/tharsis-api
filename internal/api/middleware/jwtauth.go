@@ -1,13 +1,12 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // NewJwtAuthMiddleware creates an instance of JwtAuthMiddleware
@@ -22,7 +21,7 @@ func NewJwtAuthMiddleware(
 			if err != nil {
 				logger.Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
 				respWriter.RespondWithError(w,
-					te.NewError(te.EUnauthorized, fmt.Sprintf("Unauthorized: %v", err)))
+					te.Wrap(err, te.EUnauthorized, "Unauthorized"))
 				return
 			}
 

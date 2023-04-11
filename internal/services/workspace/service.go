@@ -15,13 +15,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -42,13 +42,13 @@ const (
 // These error messages must be translated to TFE equivalent by caller.
 var (
 	// Error returned when workspace is already locked.
-	WorkspaceLockedError = errors.NewError(errors.EConflict, "workspace locked")
+	ErrWorkspaceLocked = errors.New(errors.EConflict, "workspace locked")
 
 	// Error returned when workspace is already unlocked.
-	WorkspaceUnlockedError = errors.NewError(errors.EConflict, "workspace unlocked")
+	ErrWorkspaceUnlocked = errors.New(errors.EConflict, "workspace unlocked")
 
 	// Error returned when a workspace unlock is attempted but it's locked by a run.
-	WorkspaceLockedByRunError = errors.NewError(errors.EConflict, "workspace locked by run")
+	ErrWorkspaceLockedByRun = errors.New(errors.EConflict, "workspace locked by run")
 )
 
 // Event represents a workspace event
@@ -314,9 +314,9 @@ func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*mod
 	}
 
 	if workspace == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("Workspace with path %s not found", path),
+			"Workspace with path %s not found", path,
 		)
 	}
 
@@ -361,7 +361,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 		// A state version could be created by something other than a run e.g. 'terraform import'.
 		if sv.RunID == nil {
-			return errors.NewError(
+			return errors.New(
 				errors.EConflict,
 				"current state version was not created by a destroy run")
 		}
@@ -372,12 +372,12 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		}
 
 		if run == nil {
-			return errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", *sv.RunID))
+			return errors.New(errors.ENotFound, "run with ID %s not found", *sv.RunID)
 		}
 
 		// Check to keep from accidentally deleting a workspace when resources are still deployed.
 		if !run.IsDestroy {
-			return errors.NewError(
+			return errors.New(
 				errors.EConflict,
 				"run associated with the current state version was not a destroy run")
 		}
@@ -592,7 +592,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 
 	// Check if workspace is already locked.
 	if workspace.Locked {
-		return nil, WorkspaceLockedError
+		return nil, ErrWorkspaceLocked
 	}
 
 	// Update the field.
@@ -650,12 +650,12 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 
 	// Check if workspace is already unlocked.
 	if !workspace.Locked {
-		return nil, WorkspaceUnlockedError
+		return nil, ErrWorkspaceUnlocked
 	}
 
 	// Check if workspace is locked by a run.
 	if workspace.CurrentJobID != "" {
-		return nil, WorkspaceLockedByRunError
+		return nil, ErrWorkspaceLockedByRun
 	}
 
 	// Update the field.
@@ -929,10 +929,10 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	// Upload state version data to object store
 	// Does not touch the DB, so no need to use the transaction context.
 	if err = s.artifactStore.UploadStateVersion(ctx, createdStateVersion, bytes.NewBuffer(decoded)); err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to write state version to object storage",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -968,15 +968,15 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 
 	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to query state version from the database",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if sv == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("State version with ID %s not found", stateVersionID))
+		return nil, errors.New(errors.ENotFound, "state version with ID %s not found", stateVersionID)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
@@ -1016,10 +1016,10 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 
 	result, err := s.artifactStore.GetStateVersion(ctx, sv)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get state version from artifact store",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1039,10 +1039,10 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get state versions",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1064,10 +1064,10 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 
 	result, err := s.artifactStore.GetConfigurationVersion(ctx, cv)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get configuration version from artifact store",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1114,17 +1114,17 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 
 	cv, err := s.dbClient.ConfigurationVersions.GetConfigurationVersion(ctx, configurationVersionID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get configuration version",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	if cv == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("Configuration version with ID %s not found", configurationVersionID),
+			"Configuration version with ID %s not found", configurationVersionID,
 		)
 	}
 
@@ -1148,10 +1148,10 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to get configuration versions",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1183,20 +1183,20 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 	}
 
 	if err := s.artifactStore.UploadConfigurationVersion(ctx, cv, reader); err != nil {
-		return errors.NewError(
+		return errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to write configuration version to object storage",
-			errors.WithErrorErr(err),
 		)
 	}
 
 	// Update status of configuration version to uploaded
 	cv.Status = models.ConfigurationUploaded
 	if _, err := s.dbClient.ConfigurationVersions.UpdateConfigurationVersion(ctx, *cv); err != nil {
-		return errors.NewError(
+		return errors.Wrap(
+			err,
 			errors.EInternal,
 			"Failed to to update configuration version",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1212,17 +1212,15 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 	// sv is needed for access check
 	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"failed to query state version from the database",
-			errors.WithErrorErr(err),
 		)
 	}
+
 	if sv == nil {
-		return nil, errors.NewError(
-			errors.EInternal,
-			fmt.Sprintf("state version ID %s does not exist.", stateVersionID),
-		)
+		return nil, errors.New(errors.ENotFound, "state version with id %s not found", stateVersionID)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
@@ -1232,10 +1230,10 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 
 	result, err := s.dbClient.StateVersionOutputs.GetStateVersionOutputs(ctx, stateVersionID)
 	if err != nil {
-		return nil, errors.NewError(
+		return nil, errors.Wrap(
+			err,
 			errors.EInternal,
 			"failed to list state version outputs",
-			errors.WithErrorErr(err),
 		)
 	}
 
@@ -1249,9 +1247,9 @@ func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Work
 	}
 
 	if workspace == nil {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.ENotFound,
-			fmt.Sprintf("Workspace with id %s not found", id),
+			"Workspace with id %s not found", id,
 		)
 	}
 
@@ -1261,11 +1259,10 @@ func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Work
 // validateMaxJobDuration validates if duration is within MaxJobDuration limits.
 func validateMaxJobDuration(duration int32) error {
 	if duration < int32(lowerLimitMaxJobDuration.Minutes()) || duration > int32(upperLimitMaxJobDuration.Minutes()) {
-		return errors.NewError(errors.EInvalid,
-			fmt.Sprintf("Invalid maxJobDuration. Must be between %d and %d.",
-				int32(lowerLimitMaxJobDuration.Minutes()),
-				int32(upperLimitMaxJobDuration.Minutes()),
-			),
+		return errors.New(errors.EInvalid,
+			"invalid maxJobDuration. Must be between %d and %d",
+			int32(lowerLimitMaxJobDuration.Minutes()),
+			int32(upperLimitMaxJobDuration.Minutes()),
 		)
 	}
 

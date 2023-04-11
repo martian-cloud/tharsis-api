@@ -9,8 +9,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -120,7 +120,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 	}
 
 	if namespace == nil {
-		return nil, errors.NewError(errors.ENotFound, "Namespace not found")
+		return nil, errors.New(errors.ENotFound, "Namespace not found")
 	}
 
 	timestamp := currentTime()
@@ -151,15 +151,15 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(
+				return nil, errors.New(
 					errors.EConflict,
-					fmt.Sprintf("Variable with key %s in namespace %s already exists", input.Key, input.NamespacePath),
+					"Variable with key %s in namespace %s already exists", input.Key, input.NamespacePath,
 				)
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_variables_namespace_id":
-					return nil, errors.NewError(errors.ENotFound, "namespace does not exist")
+					return nil, errors.New(errors.ENotFound, "namespace does not exist")
 				}
 			}
 		}
@@ -178,7 +178,7 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 	}
 
 	if namespace == nil {
-		return errors.NewError(errors.ENotFound, "Namespace not found")
+		return errors.New(errors.ENotFound, "Namespace not found")
 	}
 
 	timestamp := currentTime()
@@ -210,15 +210,15 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return errors.NewError(
+				return errors.New(
 					errors.EConflict,
-					fmt.Sprintf("Variable with key already exists in namespace %s", namespacePath),
+					"Variable with key already exists in namespace %s", namespacePath,
 				)
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_variables_namespace_id":
-					return errors.NewError(errors.ENotFound, "namespace does not exist")
+					return errors.New(errors.ENotFound, "namespace does not exist")
 				}
 			}
 		}
@@ -254,9 +254,9 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(
+				return nil, errors.New(
 					errors.EConflict,
-					fmt.Sprintf("Variable with key %s in namespace %s already exists", variable.Key, variable.NamespacePath),
+					"Variable with key %s in namespace %s already exists", variable.Key, variable.NamespacePath,
 				)
 			}
 		}
@@ -349,7 +349,7 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)

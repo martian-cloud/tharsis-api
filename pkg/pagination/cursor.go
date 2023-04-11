@@ -3,16 +3,9 @@ package pagination
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
-)
 
-var (
-	// ErrInvalidCursor is the error returned for an invalid cursor
-	ErrInvalidCursor = errors.New("invalid cursor")
-
-	// ErrInvalidSortBy is the error returned an invalid sortBy
-	ErrInvalidSortBy = errors.New("sort by argument does not match cursor")
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 type cursorField struct {
@@ -30,11 +23,11 @@ func newCursor(v string) (*cursor, error) {
 
 	bytes, err := base64.StdEncoding.DecodeString(v)
 	if err != nil {
-		return nil, ErrInvalidCursor
+		return nil, errors.Wrap(err, errors.EInvalid, "invalid cursor")
 	}
 
 	if err := json.Unmarshal(bytes, &parts); err != nil {
-		return nil, ErrInvalidCursor
+		return nil, errors.Wrap(err, errors.EInvalid, "invalid cursor")
 	}
 
 	c := cursor{primary: &cursorField{name: parts[0], value: parts[1]}}

@@ -9,8 +9,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -100,7 +100,7 @@ func (t *terraformModules) GetModuleByPath(ctx context.Context, path string) (*m
 	pathParts := strings.Split(path, "/")
 
 	if len(pathParts) < 3 {
-		return nil, errors.NewError(errors.EInvalid, "Invalid resource path for module")
+		return nil, errors.New(errors.EInvalid, "Invalid resource path for module")
 	}
 
 	moduleName := pathParts[len(pathParts)-2]
@@ -203,7 +203,7 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
@@ -276,7 +276,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("terraform module with name %s and system %s already exists", module.Name, module.System))
+				return nil, errors.New(errors.EConflict, "terraform module with name %s and system %s already exists", module.Name, module.System)
 			}
 		}
 		return nil, err
@@ -337,7 +337,7 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("terraform module with name %s and system %s already exists", module.Name, module.System))
+				return nil, errors.New(errors.EConflict, "terraform module with name %s and system %s already exists", module.Name, module.System)
 			}
 		}
 		return nil, err

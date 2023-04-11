@@ -12,8 +12,8 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -162,7 +162,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, w.dbClient.getConnection(ctx), query)
@@ -281,7 +281,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
-				return nil, errors.NewError(errors.EConflict, "invalid group parent: the specified parent group does not exist")
+				return nil, errors.New(errors.EConflict, "invalid group parent: the specified parent group does not exist")
 			}
 
 			if isInvalidIDViolation(pgErr) {

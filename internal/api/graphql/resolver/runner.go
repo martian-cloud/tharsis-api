@@ -5,11 +5,11 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/graph-gophers/dataloader"
@@ -33,7 +33,7 @@ type RunnerEdgeResolver struct {
 func (r *RunnerEdgeResolver) Cursor() (string, error) {
 	runner, ok := r.edge.Node.(models.Runner)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&runner)
 	return *cursor, err
@@ -43,7 +43,7 @@ func (r *RunnerEdgeResolver) Cursor() (string, error) {
 func (r *RunnerEdgeResolver) Node() (*RunnerResolver, error) {
 	runner, ok := r.edge.Node.(models.Runner)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &RunnerResolver{runner: &runner}, nil
@@ -402,7 +402,7 @@ func loadRunner(ctx context.Context, id string) (*models.Runner, error) {
 
 	runner, ok := data.(models.Runner)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Wrong type")
+		return nil, errors.New(errors.EInternal, "Wrong type")
 	}
 
 	return &runner, nil

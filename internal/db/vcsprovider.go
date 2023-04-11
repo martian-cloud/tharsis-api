@@ -11,8 +11,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -186,7 +186,7 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		sortDirection,
 	)
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, vp.dbClient.getConnection(ctx), query)
@@ -265,11 +265,11 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, "vcs provider already exists in the specified group")
+				return nil, errors.New(errors.EConflict, "vcs provider already exists in the specified group")
 			}
 
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
-				return nil, errors.NewError(errors.EConflict, "invalid group: the specified group does not exist")
+				return nil, errors.New(errors.EConflict, "invalid group: the specified group does not exist")
 			}
 		}
 		return nil, err
@@ -369,9 +369,9 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_workspace_id" {
-				return errors.NewError(
+				return errors.New(
 					errors.EConflict,
-					fmt.Sprintf("VCS provider %s has workspace configurations", provider.Name),
+					"VCS provider %s has workspace configurations", provider.Name,
 				)
 			}
 		}

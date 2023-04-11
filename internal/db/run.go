@@ -11,8 +11,8 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -145,15 +145,11 @@ func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, 
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
-			errors.EInternal,
-			"Failed to get run for plan",
-			errors.WithErrorErr(err),
-		)
+		return nil, errors.Wrap(err, errors.EInternal, "failed to get run for plan")
 	}
 
 	if len(result.Runs) == 0 {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get run for plan",
 		)
@@ -174,15 +170,11 @@ func (r *runs) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run
 		},
 	})
 	if err != nil {
-		return nil, errors.NewError(
-			errors.EInternal,
-			"Failed to get run for apply",
-			errors.WithErrorErr(err),
-		)
+		return nil, errors.Wrap(err, errors.EInternal, "failed to get run for apply")
 	}
 
 	if len(result.Runs) == 0 {
-		return nil, errors.NewError(
+		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get run for apply",
 		)
@@ -238,7 +230,7 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)

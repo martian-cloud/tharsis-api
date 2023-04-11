@@ -11,8 +11,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -127,7 +127,7 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
@@ -195,9 +195,9 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_terraform_module_attestations_on_module_and_data_sha_sum":
-					return nil, errors.NewError(errors.EConflict, "another module attestation with the same data already exists for this module")
+					return nil, errors.New(errors.EConflict, "another module attestation with the same data already exists for this module")
 				default:
-					return nil, errors.NewError(errors.EConflict, fmt.Sprintf("database constraint violated: %s", pgErr.ConstraintName))
+					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
 				}
 			}
 		}

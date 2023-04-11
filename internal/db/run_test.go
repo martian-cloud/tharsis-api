@@ -130,7 +130,7 @@ func TestGetRunByPlanID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: ptr.String("Failed to get run for plan: failed to scan query count result: " + *invalidUUIDMsg1),
+			expectMsg: ptr.String("failed to get run for plan: failed to scan query count result: " + *invalidUUIDMsg1),
 		},
 	}
 
@@ -191,7 +191,7 @@ func TestGetRunByApplyID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: ptr.String("Failed to get run for apply: failed to scan query count result: " + *invalidUUIDMsg1),
+			expectMsg: ptr.String("failed to get run for apply: failed to scan query count result: " + *invalidUUIDMsg1),
 		},
 	}
 

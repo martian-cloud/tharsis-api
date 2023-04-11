@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // All possible Permissions.
@@ -225,7 +225,7 @@ func ParsePermissions(perms []string) ([]Permission, error) {
 		// Make sure there are exactly two parts.
 		pair := strings.Split(p, ":")
 		if len(pair) != 2 {
-			return nil, errors.NewError(errors.EInvalid, fmt.Sprintf("Invalid permission: %s", p))
+			return nil, errors.New(errors.EInvalid, "invalid permission: %s", p)
 		}
 
 		perm := Permission{

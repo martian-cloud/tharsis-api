@@ -12,8 +12,8 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -129,7 +129,7 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
@@ -191,7 +191,7 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(errors.EConflict, fmt.Sprintf("role with name %s already exists", role.Name))
+				return nil, errors.New(errors.EConflict, "role with name %s already exists", role.Name)
 			}
 		}
 		return nil, err

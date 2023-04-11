@@ -10,8 +10,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Authorizer is used to authorize access to namespaces
@@ -485,9 +485,9 @@ func authorizationError(ctx context.Context, hasViewerAccessLevel bool) error {
 	}
 	// If subject has at least viewer permissions then return 403, if not, return 404
 	if hasViewerAccessLevel {
-		return errors.NewError(errors.EForbidden, fmt.Sprintf("%s is not authorized to perform the requested operation", caller.GetSubject()))
+		return errors.New(errors.EForbidden, "%s is not authorized to perform the requested operation", caller.GetSubject())
 	}
-	return errors.NewError(errors.ENotFound, resourceNotFoundErrorMsg)
+	return errors.New(errors.ENotFound, resourceNotFoundErrorMsg)
 }
 
 func expandNamespaceDescOrder(path string) []string {

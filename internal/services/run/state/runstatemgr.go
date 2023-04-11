@@ -3,17 +3,16 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 type eventType string
@@ -167,7 +166,7 @@ func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 	}
 
 	if oldRun == nil {
-		return nil, errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", run.Metadata.ID))
+		return nil, errors.New(errors.ENotFound, "run with ID %s not found", run.Metadata.ID)
 	}
 
 	if rErr := checkRunStatusChange(oldRun.Status, run.Status); rErr != nil {
@@ -424,7 +423,7 @@ func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *mo
 		}
 
 		if run == nil {
-			return errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", newJob.RunID))
+			return errors.New(errors.ENotFound, "run with ID %s not found", newJob.RunID)
 		}
 
 		plan, err := p.manager.dbClient.Plans.GetPlan(ctx, run.PlanID)
@@ -464,7 +463,7 @@ func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *m
 		}
 
 		if run == nil {
-			return errors.NewError(errors.ENotFound, fmt.Sprintf("Run with ID %s not found", newJob.RunID))
+			return errors.New(errors.ENotFound, "run with ID %s not found", newJob.RunID)
 		}
 
 		apply, err := a.manager.dbClient.Applies.GetApply(ctx, run.ApplyID)
@@ -630,7 +629,7 @@ func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJo
 
 		if newJob.Status == models.JobPending {
 			if ws.Locked {
-				return errors.NewError(errors.EConflict, fmt.Sprintf("Runner cannot claim job %s because workspace is locked", newJob.Metadata.ID))
+				return errors.New(errors.EConflict, "runner cannot claim job %s because workspace is locked", newJob.Metadata.ID)
 			}
 			ws.Locked = true
 			ws.CurrentJobID = newJob.Metadata.ID
@@ -672,9 +671,9 @@ func checkPlanStatusChange(old, new models.PlanStatus) error {
 
 	// If an error was found, turn it into an error.
 	if !transitionValid {
-		return errors.NewError(
+		return errors.New(
 			errors.EInvalid,
-			fmt.Sprintf("plan status is not allowed to transition from %s to %s", old, new),
+			"plan status is not allowed to transition from %s to %s", old, new,
 		)
 	}
 
@@ -712,9 +711,9 @@ func checkApplyStatusChange(old, new models.ApplyStatus) error {
 
 	// If an error was found, turn it into an error.
 	if !transitionValid {
-		return errors.NewError(
+		return errors.New(
 			errors.EInvalid,
-			fmt.Sprintf("apply status is not allowed to transition from %s to %s", old, new),
+			"apply status is not allowed to transition from %s to %s", old, new,
 		)
 	}
 
@@ -750,9 +749,9 @@ func checkRunStatusChange(old, new models.RunStatus) error {
 	}
 
 	if !transitionValid {
-		return errors.NewError(
+		return errors.New(
 			errors.EInvalid,
-			fmt.Sprintf("run status is not allowed to transition from %s to %s", old, new),
+			"run status is not allowed to transition from %s to %s", old, new,
 		)
 	}
 

@@ -7,7 +7,7 @@ import (
 	"github.com/graph-gophers/dataloader"
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestLoaderBatchFunc(t *testing.T) {
@@ -30,7 +30,7 @@ func TestLoaderBatchFunc(t *testing.T) {
 			name:          "load batch with missing data",
 			keys:          []string{"key1", "key2"},
 			batchResponse: DataBatch{"key1": "r1"},
-			expectResults: []dataloader.Result{{Data: "r1"}, {Error: errors.NewError(errors.ENotFound, "Resource with ID key2 not found")}},
+			expectResults: []dataloader.Result{{Data: "r1"}, {Error: errors.New(errors.ENotFound, "resource with ID key2 not found")}},
 		},
 		{
 			name:          "load batch with single key",
@@ -42,8 +42,8 @@ func TestLoaderBatchFunc(t *testing.T) {
 			name:          "load batch with error response",
 			keys:          []string{"key1"},
 			batchResponse: DataBatch{"key1": "r1"},
-			batchErr:      errors.NewError(errors.ENotFound, "Failed to execute batch function"),
-			expectResults: []dataloader.Result{{Error: errors.NewError(errors.ENotFound, "Failed to execute batch function")}},
+			batchErr:      errors.New(errors.ENotFound, "Failed to execute batch function"),
+			expectResults: []dataloader.Result{{Error: errors.New(errors.ENotFound, "Failed to execute batch function")}},
 		},
 	}
 

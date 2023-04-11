@@ -1,9 +1,7 @@
 package resolver
 
 import (
-	"fmt"
-
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -21,19 +19,19 @@ type ConnectionQueryArgs struct {
 // Validate query args
 func (c ConnectionQueryArgs) Validate() error {
 	if c.First != nil && c.Last != nil {
-		return errors.NewError(errors.EInvalid, "invalid args: only first or last can be used")
+		return errors.New(errors.EInvalid, "invalid args: only first or last can be used")
 	}
 
 	if c.First == nil && c.Last == nil {
-		return errors.NewError(errors.EInvalid, "invalid args: either first or last must be specified")
+		return errors.New(errors.EInvalid, "invalid args: either first or last must be specified")
 	}
 
 	if c.First != nil && (*c.First < 0 || *c.First > maxQueryLimit) {
-		return errors.NewError(errors.EInvalid, fmt.Sprintf("invalid args: first must be between 0-%d", maxQueryLimit))
+		return errors.New(errors.EInvalid, "invalid args: first must be between 0-%d", maxQueryLimit)
 	}
 
 	if c.Last != nil && (*c.Last < 0 || *c.Last > maxQueryLimit) {
-		return errors.NewError(errors.EInvalid, fmt.Sprintf("invalid args: last must be between 0-%d", maxQueryLimit))
+		return errors.New(errors.EInvalid, "invalid args: last must be between 0-%d", maxQueryLimit)
 	}
 
 	return nil

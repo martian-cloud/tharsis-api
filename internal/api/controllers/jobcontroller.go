@@ -12,11 +12,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 const defaultLogReadLimit = 1024 * 1024 // 1 MiB
@@ -51,13 +51,13 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 
 	token := chi.URLParam(r, "token")
 	if token == "" {
-		c.respWriter.RespondWithError(w, errors.NewError(errors.EUnauthorized, "Missing token query parameter in log URL"))
+		c.respWriter.RespondWithError(w, errors.New(errors.EUnauthorized, "Missing token query parameter in log URL"))
 		return
 	}
 
 	// Validate token
 	if err := c.verifyJobLogToken(r.Context(), []byte(token), jobID); err != nil {
-		c.respWriter.RespondWithError(w, errors.NewError(errors.EUnauthorized, fmt.Sprintf("invalid token: %v", err)))
+		c.respWriter.RespondWithError(w, errors.Wrap(err, errors.EUnauthorized, "invalid token"))
 		return
 	}
 

@@ -10,8 +10,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -148,7 +148,7 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 	)
 
 	if err != nil {
-		return nil, handlePaginationError(err)
+		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
@@ -219,9 +219,9 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				return nil, errors.NewError(
+				return nil, errors.New(
 					errors.EConflict,
-					fmt.Sprintf("runner with name %s already exists in group", runner.Name),
+					"runner with name %s already exists in group", runner.Name,
 				)
 			}
 		}

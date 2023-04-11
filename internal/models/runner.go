@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // RunnerType constant
@@ -43,15 +43,15 @@ func (r *Runner) Validate() error {
 	}
 
 	if r.Type == "" {
-		return errors.NewError(errors.EInvalid, "runner type must be specified")
+		return errors.New(errors.EInvalid, "runner type must be specified")
 	}
 
 	if r.Type == SharedRunnerType && r.GroupID != nil {
-		return errors.NewError(errors.EInvalid, "shared runner should not have a group specified")
+		return errors.New(errors.EInvalid, "shared runner should not have a group specified")
 	}
 
 	if r.Type == GroupRunnerType && r.GroupID == nil {
-		return errors.NewError(errors.EInvalid, "group runner must specify a group")
+		return errors.New(errors.EInvalid, "group runner must specify a group")
 	}
 
 	return nil

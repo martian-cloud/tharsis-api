@@ -9,11 +9,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestCreateTopLevelGroup(t *testing.T) {
@@ -120,7 +120,7 @@ func TestCreateNestedGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "group1"},
 				ParentID: "group0",
 			},
-			authError:       errors.NewError(errors.EForbidden, "Forbidden"),
+			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -286,10 +286,10 @@ func TestMigrateGroup(t *testing.T) {
 
 			var groupAccessError, parentAccessError error
 			if !test.isGroupOwner {
-				groupAccessError = errors.NewError(errors.EForbidden, "test user is not owner of group being moved")
+				groupAccessError = errors.New(errors.EForbidden, "test user is not owner of group being moved")
 			}
 			if !test.isCallerDeployerOfParent {
-				parentAccessError = errors.NewError(errors.EForbidden, "test user is not deployer of new parent")
+				parentAccessError = errors.New(errors.EForbidden, "test user is not deployer of new parent")
 			}
 
 			mockAuthorizer := auth.MockAuthorizer{}

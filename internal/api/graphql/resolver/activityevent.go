@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	graphql "github.com/graph-gophers/graphql-go"
@@ -40,7 +40,7 @@ type ActivityEventEdgeResolver struct {
 func (r *ActivityEventEdgeResolver) Cursor() (string, error) {
 	activityEvent, ok := r.edge.Node.(models.ActivityEvent)
 	if !ok {
-		return "", errors.NewError(errors.EInternal, "Failed to convert node type")
+		return "", errors.New(errors.EInternal, "Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&activityEvent)
 	return *cursor, err
@@ -50,7 +50,7 @@ func (r *ActivityEventEdgeResolver) Cursor() (string, error) {
 func (r *ActivityEventEdgeResolver) Node() (*ActivityEventResolver, error) {
 	activityEvent, ok := r.edge.Node.(models.ActivityEvent)
 	if !ok {
-		return nil, errors.NewError(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New(errors.EInternal, "Failed to convert node type")
 	}
 
 	return &ActivityEventResolver{activityEvent: &activityEvent}, nil
@@ -437,7 +437,7 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 		}
 		return &NodeResolver{result: &RunnerResolver{runner: runner}}, nil
 	default:
-		return nil, errors.NewError(errors.EInvalid, "valid TargetType must be specified")
+		return nil, errors.New(errors.EInvalid, "valid TargetType must be specified")
 	}
 }
 
