@@ -303,9 +303,17 @@ type DeleteServiceAccountInput struct {
 	ID               string
 }
 
-func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
-	problems := []Problem{}
+func handleServiceAccountMutationProblem(e error, clientMutationID *string) (*ServiceAccountMutationPayloadResolver, error) {
+	problem, err := buildProblem(e)
+	if err != nil {
+		return nil, err
+	}
 
+	payload := ServiceAccountMutationPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
+	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
+}
+
+func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
 	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
 	if err != nil {
 		return nil, err
@@ -328,20 +336,14 @@ func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccou
 
 	createdServiceAccount, err := saService.CreateServiceAccount(ctx, &serviceAccountCreateOptions)
 	if err != nil {
-		problem, pErr := buildProblem(err)
-		if pErr != nil {
-			return nil, pErr
-		}
-		problems = append(problems, *problem)
+		return nil, err
 	}
 
-	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: createdServiceAccount, Problems: problems}
+	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: createdServiceAccount, Problems: []Problem{}}
 	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
 }
 
 func updateServiceAccountMutation(ctx context.Context, input *UpdateServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
-	problems := []Problem{}
-
 	saService := getSAService(ctx)
 
 	serviceAccount, err := saService.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ID))
@@ -368,20 +370,14 @@ func updateServiceAccountMutation(ctx context.Context, input *UpdateServiceAccou
 
 	serviceAccount, err = saService.UpdateServiceAccount(ctx, serviceAccount)
 	if err != nil {
-		problem, pErr := buildProblem(err)
-		if pErr != nil {
-			return nil, pErr
-		}
-		problems = append(problems, *problem)
+		return nil, err
 	}
 
-	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: serviceAccount, Problems: problems}
+	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: serviceAccount, Problems: []Problem{}}
 	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
 }
 
 func deleteServiceAccountMutation(ctx context.Context, input *DeleteServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
-	problems := []Problem{}
-
 	saService := getSAService(ctx)
 
 	serviceAccount, err := saService.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ID))
@@ -400,19 +396,10 @@ func deleteServiceAccountMutation(ctx context.Context, input *DeleteServiceAccou
 	}
 
 	if err := saService.DeleteServiceAccount(ctx, serviceAccount); err != nil {
-		problem, pErr := buildProblem(err)
-		if pErr != nil {
-			return nil, pErr
-		}
-		problems = append(problems, *problem)
+		return nil, err
 	}
 
-	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, Problems: problems}
-
-	if len(problems) == 0 {
-		payload.ServiceAccount = serviceAccount
-	}
-
+	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: serviceAccount, Problems: []Problem{}}
 	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
 }
 
