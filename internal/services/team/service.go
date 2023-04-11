@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // GetTeamsInput is the input for querying a list of teams
@@ -19,7 +20,7 @@ type GetTeamsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.TeamSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// TeamNamePrefix filters team list by teamName prefix
 	TeamNamePrefix *string
 }
@@ -29,7 +30,7 @@ type GetTeamMembersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.TeamMemberSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// UserID filters the team members by user ID
 	UserID *string
 	// TeamID filters the team members by user ID

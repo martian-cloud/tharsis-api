@@ -16,6 +16,11 @@ type GPGKey struct {
 	GPGKeyID     uint64
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (g *GPGKey) ResolveMetadata(key string) (string, error) {
+	return g.Metadata.resolveFieldValue(key)
+}
+
 // GetHexGPGKeyID returns the GPG key ID in hex format
 func (g *GPGKey) GetHexGPGKeyID() string {
 	return fmt.Sprintf("%016X", g.GPGKeyID)

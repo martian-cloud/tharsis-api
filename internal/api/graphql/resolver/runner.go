@@ -5,12 +5,12 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -178,7 +178,7 @@ func (r *RunnerResolver) AssignedServiceAccounts(ctx context.Context, args *Conn
 	}
 
 	input := &serviceaccount.GetServiceAccountsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,

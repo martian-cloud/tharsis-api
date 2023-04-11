@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -121,7 +122,7 @@ func TestGetJobs(t *testing.T) {
 	allJobIDsByUpdateTime := jobIDsFromJobInfos(allJobInfos)
 	reverseJobIDsByUpdateTime := reverseStringSlice(allJobIDsByUpdateTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -129,7 +130,7 @@ func TestGetJobs(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetJobsInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectJobIDs                []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -147,7 +148,7 @@ func TestGetJobs(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectJobIDs                []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -176,7 +177,7 @@ func TestGetJobs(t *testing.T) {
 				Filter:            nil,
 			},
 			expectJobIDs:         allJobIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -185,13 +186,13 @@ func TestGetJobs(t *testing.T) {
 			name: "populated pagination, sort in ascending order of creation time, nil filter",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectJobIDs:         allJobIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -200,13 +201,13 @@ func TestGetJobs(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectJobIDs:         allJobIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -217,7 +218,7 @@ func TestGetJobs(t *testing.T) {
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtDesc),
 			},
 			expectJobIDs:         reverseJobIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -226,12 +227,12 @@ func TestGetJobs(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectJobIDs:         allJobIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -240,12 +241,12 @@ func TestGetJobs(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectJobIDs: allJobIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allJobIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -259,13 +260,13 @@ func TestGetJobs(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectJobIDs:               allJobIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allJobIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -279,13 +280,13 @@ func TestGetJobs(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectJobIDs:               allJobIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allJobIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -300,12 +301,12 @@ func TestGetJobs(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectJobIDs: reverseJobIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allJobIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -329,26 +330,26 @@ func TestGetJobs(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetJobsInput{
 				Sort:              ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectJobIDs:                []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allJobIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -362,7 +363,7 @@ func TestGetJobs(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetJobsInput{
 				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &JobFilter{
@@ -376,7 +377,7 @@ func TestGetJobs(t *testing.T) {
 			},
 			expectMsg:      emptyUUIDMsg2,
 			expectJobIDs:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -388,7 +389,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         allJobIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -402,7 +403,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -416,7 +417,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -430,7 +431,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         allJobIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -444,7 +445,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -458,7 +459,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -472,7 +473,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[0], allJobIDsByCreateTime[2], allJobIDsByCreateTime[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -486,7 +487,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[1], allJobIDsByCreateTime[3]},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -500,7 +501,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -514,7 +515,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[0], allJobIDsByCreateTime[4]},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -528,7 +529,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[1]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -542,7 +543,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[2]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -556,7 +557,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[3]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -570,7 +571,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -584,7 +585,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{allJobIDsByCreateTime[0], allJobIDsByCreateTime[1], allJobIDsByCreateTime[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -598,7 +599,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectJobIDs:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -612,7 +613,7 @@ func TestGetJobs(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

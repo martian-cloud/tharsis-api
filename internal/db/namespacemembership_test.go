@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -117,7 +118,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 
 	*/
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -125,7 +126,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 		input                       *GetNamespaceMembershipsInput
 		expectMsg                   *string
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectTrails                []string
 		getBeforeCursorFromPrevious bool
 		sortedDescending            bool
@@ -149,7 +150,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			getAfterCursorFromPrevious:  false,
 			expectMsg:                   nil,
 			expectTrails:                []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				Cursor:          nil,
 				TotalCount:      0,
 				HasNextPage:     false,
@@ -173,7 +174,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				Filter:            nil,
 			},
 			expectTrails:         allTrails,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -182,13 +183,13 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectTrails:         allTrails,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -199,7 +200,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
 			},
 			expectTrails:         allTrails,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -211,7 +212,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			sortedDescending:     true,
 			expectTrails:         reverseTrails,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -222,7 +223,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldUpdatedAtAsc),
 			},
 			expectTrails:         allTrailsByTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrailsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrailsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -234,7 +235,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			sortedDescending:     true,
 			expectTrails:         reverseTrailsByTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrailsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrailsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -243,12 +244,12 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectTrails:         allTrails,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTrails)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -261,12 +262,12 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "pagination: first six",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(6),
 				},
 			},
 			expectTrails: allTrails[:6],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTrails)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -280,13 +281,13 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "pagination: middle six",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(6),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectTrails:               allTrails[6:12],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTrails)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -300,13 +301,13 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "pagination: final three",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectTrails:               allTrails[12:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTrails)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -321,13 +322,13 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			sortedDescending: true,
 			expectTrails:     reverseTrails[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTrails)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -351,27 +352,27 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetNamespaceMembershipsInput{
 				Sort:              ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectTrails:                []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:    ptr.String("only first or last can be defined, not both"),
 			expectTrails: allTrails[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTrails)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -385,7 +386,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetNamespaceMembershipsInput{
 				Sort: ptrNamespaceMembershipSortableField(NamespaceMembershipSortableFieldNamespacePathAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &NamespaceMembershipFilter{
@@ -400,7 +401,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:      emptyUUIDMsg2,
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -412,7 +413,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.users[0].Username),
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -426,7 +427,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.users[1].Username),
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -440,7 +441,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -452,7 +453,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -465,7 +466,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -477,7 +478,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.serviceAccounts[0].Name),
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -491,7 +492,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.serviceAccounts[1].Name),
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -505,7 +506,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -517,7 +518,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -530,7 +531,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -542,7 +543,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.teams[0].Name),
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -556,7 +557,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.teams[1].Name),
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -570,7 +571,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -582,7 +583,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -595,7 +596,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -607,7 +608,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.groups[0].Name+"--"),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -621,7 +622,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.groups[1].Name+"--"),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -635,7 +636,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.groups[2].Name+"--"),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -649,7 +650,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -663,7 +664,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -676,7 +677,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -688,7 +689,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.workspaces[0].Name),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -702,7 +703,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.workspaces[1].Name),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -716,7 +717,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, createdWarmupOutput.workspaces[2].Name),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -730,7 +731,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -742,7 +743,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -755,7 +756,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -767,7 +768,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails,
-			expectPageInfo:       PageInfo{TotalCount: 18, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 18, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -781,7 +782,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b"),
-			expectPageInfo:       PageInfo{TotalCount: 12, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 12, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -795,7 +796,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, "group-a/workspace-a1"),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -809,7 +810,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b/group-c"),
-			expectPageInfo:       PageInfo{TotalCount: 6, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 6, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -823,7 +824,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b/workspace-b2"),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -837,7 +838,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         findMatchingTrails(allTrails, "group-a/group-b/group-c/workspace-c3"),
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -851,7 +852,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -865,7 +866,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -877,7 +878,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		// The namespace path prefix is not required to be a UUID, so no check for UUID format can be done.
@@ -891,7 +892,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails,
-			expectPageInfo:       PageInfo{TotalCount: 18, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 18, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -905,7 +906,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails[:3],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -919,7 +920,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails[15:],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -933,7 +934,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails[3:6],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -947,7 +948,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails[12:15],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -961,7 +962,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails[6:9],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -975,7 +976,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         allTrails[9:12],
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1001,7 +1002,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				allTrails[13],
 				allTrails[14],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 9, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 9, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1015,7 +1016,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1031,7 +1032,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{allTrails[4]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1045,7 +1046,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1060,7 +1061,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectTrails:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1078,7 +1079,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{allTrails[2]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1093,7 +1094,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{allTrails[12]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1108,7 +1109,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{allTrails[4]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1123,7 +1124,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1138,7 +1139,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 				},
 			},
 			expectTrails:         []string{allTrails[7]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

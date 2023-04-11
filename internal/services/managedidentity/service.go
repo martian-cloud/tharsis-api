@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // GetManagedIdentitiesInput is the input for listing managed identities
@@ -21,7 +22,7 @@ type GetManagedIdentitiesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.ManagedIdentitySortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Search returns only the managed identities with a name or resource path that starts with the value of search
 	Search *string
 	// AliasSourceID is used to return aliases for a given managed identity

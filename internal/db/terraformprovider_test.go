@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -225,7 +226,7 @@ func TestGetProviders(t *testing.T) {
 	allTerraformProviderIDsByTime := terraformProviderIDsFromTerraformProviderInfos(allTerraformProviderInfos)
 	reverseTerraformProviderIDsByTime := reverseStringSlice(allTerraformProviderIDsByTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -233,7 +234,7 @@ func TestGetProviders(t *testing.T) {
 		input                       *GetProvidersInput
 		expectMsg                   *string
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectTerraformProviderIDs  []string
 		getBeforeCursorFromPrevious bool
 		sortedDescending            bool
@@ -257,7 +258,7 @@ func TestGetProviders(t *testing.T) {
 			getAfterCursorFromPrevious:  false,
 			expectMsg:                   nil,
 			expectTerraformProviderIDs:  []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				Cursor:          nil,
 				TotalCount:      0,
 				HasNextPage:     false,
@@ -281,7 +282,7 @@ func TestGetProviders(t *testing.T) {
 				Filter:            nil,
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDs,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -290,13 +291,13 @@ func TestGetProviders(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -307,7 +308,7 @@ func TestGetProviders(t *testing.T) {
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldNameAsc),
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByName,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -319,7 +320,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			sortedDescending:           true,
 			expectTerraformProviderIDs: reverseTerraformProviderIDsByName,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -330,7 +331,7 @@ func TestGetProviders(t *testing.T) {
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -342,7 +343,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			sortedDescending:           true,
 			expectTerraformProviderIDs: reverseTerraformProviderIDsByTime,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDsByTime)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -351,12 +352,12 @@ func TestGetProviders(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -365,12 +366,12 @@ func TestGetProviders(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTerraformProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -384,13 +385,13 @@ func TestGetProviders(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTerraformProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -404,13 +405,13 @@ func TestGetProviders(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTerraformProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -425,13 +426,13 @@ func TestGetProviders(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			sortedDescending:           true,
 			expectTerraformProviderIDs: reverseTerraformProviderIDsByTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTerraformProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -455,27 +456,27 @@ func TestGetProviders(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetProvidersInput{
 				Sort:              ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectTerraformProviderIDs:  []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:                  ptr.String("only first or last can be defined, not both"),
 			expectTerraformProviderIDs: allTerraformProviderIDs[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTerraformProviderIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -489,7 +490,7 @@ func TestGetProviders(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetProvidersInput{
 				Sort: ptrTerraformProviderSortableField(TerraformProviderSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &TerraformProviderFilter{
@@ -506,7 +507,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			expectMsg:                  emptyUUIDMsg2,
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{},
+			expectPageInfo:             pagination.PageInfo{},
 		},
 
 		{
@@ -518,7 +519,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime,
-			expectPageInfo:             PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(len(allTerraformProviderIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -532,7 +533,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[0:2],
-			expectPageInfo:             PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -546,7 +547,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[2:4],
-			expectPageInfo:             PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -560,7 +561,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[4:],
-			expectPageInfo:             PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -574,7 +575,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -588,7 +589,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[0:1],
-			expectPageInfo:             PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -602,7 +603,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -614,7 +615,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[0:1],
-			expectPageInfo:             PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -628,7 +629,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -641,7 +642,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			expectMsg:                  invalidUUIDMsg2,
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{},
+			expectPageInfo:             pagination.PageInfo{},
 		},
 
 		{
@@ -653,7 +654,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: allTerraformProviderIDsByTime[0:1],
-			expectPageInfo:             PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -667,7 +668,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -680,7 +681,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			expectMsg:                  invalidUUIDMsg2,
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{},
+			expectPageInfo:             pagination.PageInfo{},
 		},
 
 		{
@@ -693,7 +694,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			// Gets 0 because it's public, 4 by user ID.
 			expectTerraformProviderIDs: []string{allTerraformProviderIDsByName[0], allTerraformProviderIDsByName[4]},
-			expectPageInfo:             PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -708,7 +709,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			// Gets 0 because it's public.
 			expectTerraformProviderIDs: []string{allTerraformProviderIDsByName[0]},
-			expectPageInfo:             PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -723,7 +724,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			expectMsg:                  invalidUUIDMsg2,
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{},
+			expectPageInfo:             pagination.PageInfo{},
 		},
 
 		{
@@ -736,7 +737,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			// Gets 0 because it's public, 4 by service account ID.
 			expectTerraformProviderIDs: []string{allTerraformProviderIDsByName[0], allTerraformProviderIDsByName[4]},
-			expectPageInfo:             PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -751,7 +752,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			// Gets 0 because it's public.
 			expectTerraformProviderIDs: []string{allTerraformProviderIDsByName[0]},
-			expectPageInfo:             PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -766,7 +767,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			expectMsg:                  invalidUUIDMsg2,
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{},
+			expectPageInfo:             pagination.PageInfo{},
 		},
 
 		{
@@ -782,7 +783,7 @@ func TestGetProviders(t *testing.T) {
 			expectTerraformProviderIDs: []string{
 				allTerraformProviderIDsByTime[0], allTerraformProviderIDsByTime[1], allTerraformProviderIDsByTime[3],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -796,7 +797,7 @@ func TestGetProviders(t *testing.T) {
 				},
 			},
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},
@@ -811,7 +812,7 @@ func TestGetProviders(t *testing.T) {
 			},
 			expectMsg:                  invalidUUIDMsg2,
 			expectTerraformProviderIDs: []string{},
-			expectPageInfo:             PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:             pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
 			expectHasEndCursor:         true,
 		},

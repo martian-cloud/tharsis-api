@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // GetRunnersInput is the input for querying a list of runners
@@ -20,7 +21,7 @@ type GetRunnersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.RunnerSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// NamespacePath is the namespace to return runners for
 	NamespacePath string
 	// IncludeInherited includes inherited runners in the result

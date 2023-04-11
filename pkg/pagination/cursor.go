@@ -1,10 +1,18 @@
-package db
+package pagination
 
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+)
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
+var (
+	// ErrInvalidCursor is the error returned for an invalid cursor
+	ErrInvalidCursor = errors.New("invalid cursor")
+
+	// ErrInvalidSortBy is the error returned an invalid sortBy
+	ErrInvalidSortBy = errors.New("sort by argument does not match cursor")
 )
 
 type cursorField struct {
@@ -22,11 +30,11 @@ func newCursor(v string) (*cursor, error) {
 
 	bytes, err := base64.StdEncoding.DecodeString(v)
 	if err != nil {
-		return nil, errors.NewError(errors.EInvalid, "Invalid cursor", errors.WithErrorErr(err))
+		return nil, ErrInvalidCursor
 	}
 
 	if err := json.Unmarshal(bytes, &parts); err != nil {
-		return nil, errors.NewError(errors.EInvalid, "Invalid cursor", errors.WithErrorErr(err))
+		return nil, ErrInvalidCursor
 	}
 
 	c := cursor{primary: &cursorField{name: parts[0], value: parts[1]}}
@@ -49,7 +57,7 @@ func (c *cursor) encode() (string, error) {
 
 	bytes, err := json.Marshal(parts)
 	if err != nil {
-		return "", errors.NewError(errors.EInternal, "Failed to encode cursor", errors.WithErrorErr(err))
+		return "", fmt.Errorf("failed to encode cursor: %w", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(bytes), nil

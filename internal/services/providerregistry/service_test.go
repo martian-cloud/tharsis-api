@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestCreateProviderVersion(t *testing.T) {
@@ -167,7 +168,7 @@ func TestCreateProviderVersion(t *testing.T) {
 			}
 
 			mockProviderVersions.On("GetProviderVersions", mock.Anything, &db.GetProviderVersionsInput{
-				PaginationOptions: &db.PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 				},
 				Filter: &db.TerraformProviderVersionFilter{

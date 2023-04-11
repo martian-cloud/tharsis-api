@@ -47,6 +47,11 @@ type ManagedIdentityAccessRule struct {
 	AllowedTeamIDs            []string
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (m *ManagedIdentityAccessRule) ResolveMetadata(key string) (string, error) {
+	return m.Metadata.resolveFieldValue(key)
+}
+
 // Validate returns an error if the model is not valid
 func (m *ManagedIdentityAccessRule) Validate() error {
 	switch m.Type {
@@ -89,6 +94,11 @@ type ManagedIdentity struct {
 	AliasSourceID *string
 	Metadata      ResourceMetadata
 	Data          []byte
+}
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (m *ManagedIdentity) ResolveMetadata(key string) (string, error) {
+	return m.Metadata.resolveFieldValue(key)
 }
 
 // Validate returns an error if the model is not valid

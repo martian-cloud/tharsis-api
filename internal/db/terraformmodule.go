@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // TerraformModules encapsulates the logic to access terraform modules from the database
@@ -34,22 +35,22 @@ const (
 	TerraformModuleSortableFieldUpdatedAtDesc TerraformModuleSortableField = "UPDATED_AT_DESC"
 )
 
-func (ts TerraformModuleSortableField) getFieldDescriptor() *fieldDescriptor {
+func (ts TerraformModuleSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch ts {
 	case TerraformModuleSortableFieldNameAsc, TerraformModuleSortableFieldNameDesc:
-		return &fieldDescriptor{key: "name", table: "terraform_modules", col: "name"}
+		return &pagination.FieldDescriptor{Key: "name", Table: "terraform_modules", Col: "name"}
 	case TerraformModuleSortableFieldUpdatedAtAsc, TerraformModuleSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "terraform_modules", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "terraform_modules", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (ts TerraformModuleSortableField) getSortDirection() SortDirection {
+func (ts TerraformModuleSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(ts), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // TerraformModuleFilter contains the supported fields for filtering TerraformModule resources
@@ -69,14 +70,14 @@ type GetModulesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *TerraformModuleSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *TerraformModuleFilter
 }
 
 // ModulesResult contains the response data and page information
 type ModulesResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Modules  []models.TerraformModule
 }
 
@@ -186,27 +187,26 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "terraform_modules", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "terraform_modules", Col: "id"},
 		sortBy,
 		sortDirection,
-		moduleFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, t.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -224,12 +224,12 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := ModulesResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Modules:  results,
 	}
 
@@ -453,23 +453,4 @@ func scanTerraformModule(row scanner, withResourcePath bool) (*models.TerraformM
 	}
 
 	return module, nil
-}
-
-func moduleFieldResolver(key string, model interface{}) (string, error) {
-	module, ok := model.(*models.TerraformModule)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected module type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &module.Metadata)
-	if !ok {
-		switch key {
-		case "name":
-			val = module.Name
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }

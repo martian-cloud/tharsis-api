@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // VCSEvents encapsulates the logic for accessing vcs events form the database.
@@ -32,22 +33,22 @@ const (
 	VCSEventSortableFieldUpdatedAtDesc VCSEventSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf VCSEventSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf VCSEventSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case VCSEventSortableFieldCreatedAtAsc, VCSEventSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "vcs_events", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "vcs_events", Col: "created_at"}
 	case VCSEventSortableFieldUpdatedAtAsc, VCSEventSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "vcs_events", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "vcs_events", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf VCSEventSortableField) getSortDirection() SortDirection {
+func (sf VCSEventSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // VCSEventFilter contains the supported fields for filtering vcs event resources
@@ -61,14 +62,14 @@ type GetVCSEventsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *VCSEventSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter contains the supported fields for filtering VCSEvent resources
 	Filter *VCSEventFilter
 }
 
 // VCSEventsResult contains the response data and page information
 type VCSEventsResult struct {
-	PageInfo  *PageInfo
+	PageInfo  *pagination.PageInfo
 	VCSEvents []models.VCSEvent
 }
 
@@ -113,27 +114,26 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 		Select(ve.getSelectFields()...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "vcs_events", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "vcs_events", Col: "id"},
 		sortBy,
 		sortDirection,
-		vcsEventFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, ve.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, ve.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -151,12 +151,12 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := VCSEventsResult{
-		PageInfo:  rows.getPageInfo(),
+		PageInfo:  rows.GetPageInfo(),
 		VCSEvents: results,
 	}
 
@@ -288,18 +288,4 @@ func scanVCSEvent(row scanner) (*models.VCSEvent, error) {
 	}
 
 	return ve, nil
-}
-
-func vcsEventFieldResolver(key string, model interface{}) (string, error) {
-	vcsEvent, ok := model.(*models.VCSEvent)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected vcs event type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &vcsEvent.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

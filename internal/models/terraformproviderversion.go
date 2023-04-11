@@ -19,6 +19,21 @@ type TerraformProviderVersion struct {
 	Latest                   bool
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (t *TerraformProviderVersion) ResolveMetadata(key string) (string, error) {
+	val, err := t.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "sem_version":
+			val = t.SemanticVersion
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
+}
+
 // GetHexGPGKeyID returns the GPG key id in hex format
 func (t *TerraformProviderVersion) GetHexGPGKeyID() *string {
 	if t.GPGKeyID != nil {

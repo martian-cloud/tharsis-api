@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // VCSProviders encapsulates the logic to access VCS providers from the database.
@@ -36,22 +37,22 @@ const (
 	VCSProviderSortableFieldUpdatedAtDesc VCSProviderSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf VCSProviderSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf VCSProviderSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case VCSProviderSortableFieldCreatedAtAsc, VCSProviderSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "vcs_providers", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "vcs_providers", Col: "created_at"}
 	case VCSProviderSortableFieldUpdatedAtAsc, VCSProviderSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "vcs_providers", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "vcs_providers", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf VCSProviderSortableField) getSortDirection() SortDirection {
+func (sf VCSProviderSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // VCSProviderFilter contains the supported fields for filtering VCSProvider resources.
@@ -66,14 +67,14 @@ type GetVCSProvidersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *VCSProviderSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *VCSProviderFilter
 }
 
 // VCSProvidersResult contains the response data and page information.
 type VCSProvidersResult struct {
-	PageInfo     *PageInfo
+	PageInfo     *pagination.PageInfo
 	VCSProviders []models.VCSProvider
 }
 
@@ -170,26 +171,25 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "vcs_providers", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "vcs_providers", Col: "id"},
 		sortBy,
 		sortDirection,
-		vcsProviderFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, vp.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, vp.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +207,12 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := VCSProvidersResult{
-		PageInfo:     rows.getPageInfo(),
+		PageInfo:     rows.GetPageInfo(),
 		VCSProviders: results,
 	}
 
@@ -469,18 +469,4 @@ func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, e
 	vp.URL = *parsedURL
 
 	return vp, nil
-}
-
-func vcsProviderFieldResolver(key string, model interface{}) (string, error) {
-	vcsProvider, ok := model.(*models.VCSProvider)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected VCSProvider type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &vcsProvider.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

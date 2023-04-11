@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -55,7 +56,7 @@ type GetServiceAccountsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.ServiceAccountSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Search returns only the service accounts with a name or resource path that starts with the value of search
 	Search *string
 	// RunnerID will filter service accounts that are assigned to the specified runner

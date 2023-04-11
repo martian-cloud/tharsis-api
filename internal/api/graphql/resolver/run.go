@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -317,7 +318,7 @@ func runsQuery(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectio
 	}
 
 	input := run.GetRunsInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 	}
 
 	if args.WorkspaceID != nil && args.WorkspacePath != nil {

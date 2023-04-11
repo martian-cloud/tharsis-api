@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // TerraformModuleAttestations encapsulates the logic to access terraform module attestationsfrom the database
@@ -35,22 +36,22 @@ const (
 	TerraformModuleAttestationSortableFieldCreatedAtDesc TerraformModuleAttestationSortableField = "CREATED_AT_DESC"
 )
 
-func (ts TerraformModuleAttestationSortableField) getFieldDescriptor() *fieldDescriptor {
+func (ts TerraformModuleAttestationSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch ts {
 	case TerraformModuleAttestationSortableFieldPredicateAsc, TerraformModuleAttestationSortableFieldPredicateDesc:
-		return &fieldDescriptor{key: "predicate", table: "terraform_module_attestations", col: "predicate_type"}
+		return &pagination.FieldDescriptor{Key: "predicate", Table: "terraform_module_attestations", Col: "predicate_type"}
 	case TerraformModuleAttestationSortableFieldCreatedAtAsc, TerraformModuleAttestationSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "terraform_module_attestations", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "terraform_module_attestations", Col: "created_at"}
 	default:
 		return nil
 	}
 }
 
-func (ts TerraformModuleAttestationSortableField) getSortDirection() SortDirection {
+func (ts TerraformModuleAttestationSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(ts), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // TerraformModuleAttestationFilter contains the supported fields for filtering TerraformModuleAttestation resources
@@ -65,14 +66,14 @@ type GetModuleAttestationsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *TerraformModuleAttestationSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *TerraformModuleAttestationFilter
 }
 
 // ModuleAttestationsResult contains the response data and page information
 type ModuleAttestationsResult struct {
-	PageInfo           *PageInfo
+	PageInfo           *pagination.PageInfo
 	ModuleAttestations []models.TerraformModuleAttestation
 }
 
@@ -110,27 +111,26 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 		Select(t.getSelectFields()...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "terraform_module_attestations", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "terraform_module_attestations", Col: "id"},
 		sortBy,
 		sortDirection,
-		moduleAttestationFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, t.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +148,12 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := ModuleAttestationsResult{
-		PageInfo:           rows.getPageInfo(),
+		PageInfo:           rows.GetPageInfo(),
 		ModuleAttestations: results,
 	}
 
@@ -324,23 +324,4 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 	}
 
 	return moduleAttestation, nil
-}
-
-func moduleAttestationFieldResolver(key string, model interface{}) (string, error) {
-	moduleAttestation, ok := model.(*models.TerraformModuleAttestation)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected moduleAttestation type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &moduleAttestation.Metadata)
-	if !ok {
-		switch key {
-		case "predicate":
-			val = moduleAttestation.PredicateType
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }

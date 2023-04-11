@@ -17,12 +17,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetManagedIdentities(t *testing.T) {
 	sampleResult := &db.ManagedIdentitiesResult{
-		PageInfo: &db.PageInfo{
-			Cursor: func(item interface{}) (*string, error) {
+		PageInfo: &pagination.PageInfo{
+			Cursor: func(cp pagination.CursorPaginatable) (*string, error) {
 				return nil, nil
 			},
 			TotalCount:      1,

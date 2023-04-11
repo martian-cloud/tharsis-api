@@ -22,3 +22,8 @@ type Apply struct {
 	Comment     string
 	Metadata    ResourceMetadata
 }
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (a *Apply) ResolveMetadata(key string) (string, error) {
+	return a.Metadata.resolveFieldValue(key)
+}

@@ -24,3 +24,18 @@ type NamespaceMembership struct {
 	RoleID           string
 	Metadata         ResourceMetadata
 }
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (nm *NamespaceMembership) ResolveMetadata(key string) (string, error) {
+	val, err := nm.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "namespace_path":
+			val = nm.Namespace.Path
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
+}

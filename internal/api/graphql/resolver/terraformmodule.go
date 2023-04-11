@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
@@ -198,7 +199,7 @@ func (r *TerraformModuleResolver) Source(ctx context.Context) string {
 // Versions resolver
 func (r *TerraformModuleResolver) Versions(ctx context.Context, args *TerraformModuleVersionsConnectionQueryArgs) (*TerraformModuleVersionConnectionResolver, error) {
 	input := &moduleregistry.GetModuleVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -218,7 +219,7 @@ func (r *TerraformModuleResolver) Versions(ctx context.Context, args *TerraformM
 // Attestations resolver
 func (r *TerraformModuleResolver) Attestations(ctx context.Context, args *TerraformModuleAttestationConnectionQueryArgs) (*TerraformModuleAttestationConnectionResolver, error) {
 	input := &moduleregistry.GetModuleAttestationsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -239,7 +240,7 @@ func (r *TerraformModuleResolver) Attestations(ctx context.Context, args *Terraf
 // LatestVersion resolver
 func (r *TerraformModuleResolver) LatestVersion(ctx context.Context) (*TerraformModuleVersionResolver, error) {
 	versionsResp, err := getModuleRegistryService(ctx).GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		ModuleID: r.module.Metadata.ID,
@@ -262,7 +263,7 @@ func terraformModulesQuery(ctx context.Context, args *TerraformModuleConnectionQ
 	}
 
 	input := moduleregistry.GetModulesInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 	}
 

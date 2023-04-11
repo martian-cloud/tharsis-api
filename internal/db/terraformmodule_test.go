@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // terraformModuleInfo aids convenience in accessing the information
@@ -163,7 +164,7 @@ func TestGetModulesWithPagination(t *testing.T) {
 	// Query for first page
 	middleIndex := len(warmupItems.terraformModules) / 2
 	page1, err := testClient.client.TerraformModules.GetModules(ctx, &GetModulesInput{
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(int32(middleIndex)),
 		},
 	})
@@ -178,7 +179,7 @@ func TestGetModulesWithPagination(t *testing.T) {
 
 	remaining := len(warmupItems.terraformModules) - middleIndex
 	page2, err := testClient.client.TerraformModules.GetModules(ctx, &GetModulesInput{
-		PaginationOptions: &PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(int32(remaining)),
 			After: cursor,
 		},
@@ -246,7 +247,7 @@ func TestGetModules(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetModulesInput{
 				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
@@ -290,7 +291,7 @@ func TestGetModules(t *testing.T) {
 			name: "pagination, first one and last two, expect error",
 			input: &GetModulesInput{
 				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
@@ -303,7 +304,7 @@ func TestGetModules(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetModulesInput{
 				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &TerraformModuleFilter{

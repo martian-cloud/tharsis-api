@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Users encapsulates the logic to access users from the database
@@ -38,20 +39,20 @@ const (
 	UserSortableFieldUpdatedAtDesc UserSortableField = "UPDATED_AT_DESC"
 )
 
-func (js UserSortableField) getFieldDescriptor() *fieldDescriptor {
+func (js UserSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch js {
 	case UserSortableFieldUpdatedAtAsc, UserSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "users", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "users", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (js UserSortableField) getSortDirection() SortDirection {
+func (js UserSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(js), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // UserFilter contains the supported fields for filtering User resources
@@ -67,14 +68,14 @@ type GetUsersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *UserSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *UserFilter
 }
 
 // UsersResult contains the response data and page information
 type UsersResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Users    []models.User
 }
 
@@ -182,26 +183,25 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		Select(userFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "users", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "users", Col: "id"},
 		sortBy,
 		sortDirection,
-		userFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, u.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, u.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -219,12 +219,12 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := UsersResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Users:    results,
 	}
 
@@ -381,18 +381,4 @@ func scanUser(row scanner) (*models.User, error) {
 	}
 
 	return user, nil
-}
-
-func userFieldResolver(key string, model interface{}) (string, error) {
-	user, ok := model.(*models.User)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected user type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &user.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -188,7 +189,7 @@ func TestGetRoles(t *testing.T) {
 	allRoleIDsByName := roleIDsFromRoleInfos(allRoleInfos)
 	reverseRoleIDsByName := reverseStringSlice(allRoleIDsByName)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -196,7 +197,7 @@ func TestGetRoles(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetRolesInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectRoleIDs               []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -214,7 +215,7 @@ func TestGetRoles(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectRoleIDs               []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -234,7 +235,7 @@ func TestGetRoles(t *testing.T) {
 				Filter:            nil,
 			},
 			expectRoleIDs:        allRoleIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -243,13 +244,13 @@ func TestGetRoles(t *testing.T) {
 			name: "populated pagination, sort in ascending order of name, nil filter",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectRoleIDs:        allRoleIDsByName,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -260,7 +261,7 @@ func TestGetRoles(t *testing.T) {
 				Sort: ptrRoleSortableField(RoleSortableFieldNameDesc),
 			},
 			expectRoleIDs:        reverseRoleIDsByName,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -269,13 +270,13 @@ func TestGetRoles(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectRoleIDs:        allRoleIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -286,7 +287,7 @@ func TestGetRoles(t *testing.T) {
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtDesc),
 			},
 			expectRoleIDs:        reverseRoleIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -295,12 +296,12 @@ func TestGetRoles(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectRoleIDs:        allRoleIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -309,12 +310,12 @@ func TestGetRoles(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectRoleIDs: allRoleIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRoleIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -328,13 +329,13 @@ func TestGetRoles(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectRoleIDs:              allRoleIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRoleIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -348,13 +349,13 @@ func TestGetRoles(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectRoleIDs:              allRoleIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRoleIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -369,12 +370,12 @@ func TestGetRoles(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectRoleIDs: reverseRoleIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRoleIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -398,26 +399,26 @@ func TestGetRoles(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetRolesInput{
 				Sort:              ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectRoleIDs:               []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRoleIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -432,7 +433,7 @@ func TestGetRoles(t *testing.T) {
 			name: "fully-populated types, everything allowed through filters",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &RoleFilter{
@@ -440,7 +441,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs: allRoleIDsByName,
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRoleIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -459,7 +460,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRoleIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -473,7 +474,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[1:2],
-			expectPageInfo:       PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -487,7 +488,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[2:3],
-			expectPageInfo:       PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -501,7 +502,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[3:4],
-			expectPageInfo:       PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -515,7 +516,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[4:],
-			expectPageInfo:       PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -529,7 +530,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -546,7 +547,7 @@ func TestGetRoles(t *testing.T) {
 			expectRoleIDs: []string{
 				allRoleIDsByName[0], allRoleIDsByName[1], allRoleIDsByName[3],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -560,7 +561,7 @@ func TestGetRoles(t *testing.T) {
 				},
 			},
 			expectRoleIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -575,7 +576,7 @@ func TestGetRoles(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectRoleIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

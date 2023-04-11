@@ -26,6 +26,11 @@ type Runner struct {
 	Metadata     ResourceMetadata
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (r *Runner) ResolveMetadata(key string) (string, error) {
+	return r.Metadata.resolveFieldValue(key)
+}
+
 // Validate returns an error if the model is not valid
 func (r *Runner) Validate() error {
 	// Verify name satisfies constraints

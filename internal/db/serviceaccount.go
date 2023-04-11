@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // ServiceAccounts encapsulates the logic to access service accounts from the database
@@ -38,22 +39,22 @@ const (
 	ServiceAccountSortableFieldUpdatedAtDesc ServiceAccountSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf ServiceAccountSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf ServiceAccountSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case ServiceAccountSortableFieldCreatedAtAsc, ServiceAccountSortableFieldCreatedAtDesc:
-		return &fieldDescriptor{key: "created_at", table: "service_accounts", col: "created_at"}
+		return &pagination.FieldDescriptor{Key: "created_at", Table: "service_accounts", Col: "created_at"}
 	case ServiceAccountSortableFieldUpdatedAtAsc, ServiceAccountSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "service_accounts", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "service_accounts", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf ServiceAccountSortableField) getSortDirection() SortDirection {
+func (sf ServiceAccountSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // ServiceAccountFilter contains the supported fields for filtering ServiceAccount resources
@@ -75,14 +76,14 @@ type GetServiceAccountsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *ServiceAccountSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *ServiceAccountFilter
 }
 
 // ServiceAccountsResult contains the response data and page information
 type ServiceAccountsResult struct {
-	PageInfo        *PageInfo
+	PageInfo        *pagination.PageInfo
 	ServiceAccounts []models.ServiceAccount
 }
 
@@ -179,26 +180,25 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 
 	query = query.Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "service_accounts", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "service_accounts", Col: "id"},
 		sortBy,
 		sortDirection,
-		serviceAccountFieldResolver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, s.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -216,12 +216,12 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := ServiceAccountsResult{
-		PageInfo:        rows.getPageInfo(),
+		PageInfo:        rows.GetPageInfo(),
 		ServiceAccounts: results,
 	}
 
@@ -526,18 +526,4 @@ func scanServiceAccount(row scanner, withResourcePath bool) (*models.ServiceAcco
 	}
 
 	return serviceAccount, nil
-}
-
-func serviceAccountFieldResolver(key string, model interface{}) (string, error) {
-	serviceAccount, ok := model.(*models.ServiceAccount)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected ServiceAccount type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &serviceAccount.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
@@ -243,7 +244,7 @@ func (r *WorkspaceResolver) ServiceAccounts(ctx context.Context, args *ServiceAc
 	}
 
 	input := &serviceaccount.GetServiceAccountsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -267,7 +268,7 @@ func (r *WorkspaceResolver) ManagedIdentities(ctx context.Context, args *Managed
 	}
 
 	input := managedidentity.GetManagedIdentitiesInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 		NamespacePath:     r.workspace.FullPath,
 	}
@@ -304,7 +305,7 @@ func (r *WorkspaceResolver) StateVersions(ctx context.Context, args *StateVersio
 	sort := db.StateVersionSortableFieldUpdatedAtDesc
 	input := &workspace.GetStateVersionsInput{
 		Sort: &sort,
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First:  args.First,
 			Last:   args.Last,
 			Before: args.Before,
@@ -354,7 +355,7 @@ func (r *WorkspaceResolver) VCSProviders(ctx context.Context, args *VCSProviderC
 	}
 
 	input := vcs.GetVCSProvidersInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 		NamespacePath:     r.workspace.FullPath,
 	}
@@ -398,7 +399,7 @@ func (r *WorkspaceResolver) VCSEvents(ctx context.Context, args *VCSEventConnect
 	}
 
 	input := vcs.GetVCSEventsInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		WorkspaceID:       r.workspace.Metadata.ID,
 	}
 
@@ -430,7 +431,7 @@ func workspacesQuery(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*
 	}
 
 	input := workspace.GetWorkspacesInput{
-		PaginationOptions: &db.PaginationOptions{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		Search:            args.Search,
 	}
 

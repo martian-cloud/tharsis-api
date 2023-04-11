@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // applyInfo aids convenience in accessing the information TestGetApplies needs about the warmup applies.
@@ -106,7 +107,7 @@ func TestGetApplies(t *testing.T) {
 	allApplyIDsByUpdateTime := applyIDsFromApplyInfos(allApplyInfos)
 	reverseApplyIDsByUpdateTime := reverseStringSlice(allApplyIDsByUpdateTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -114,7 +115,7 @@ func TestGetApplies(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetAppliesInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectApplyIDs              []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -132,7 +133,7 @@ func TestGetApplies(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectApplyIDs              []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -151,7 +152,7 @@ func TestGetApplies(t *testing.T) {
 				Filter:            nil,
 			},
 			expectApplyIDs:       allApplyIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -160,13 +161,13 @@ func TestGetApplies(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectApplyIDs:       allApplyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -177,7 +178,7 @@ func TestGetApplies(t *testing.T) {
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtDesc),
 			},
 			expectApplyIDs:       reverseApplyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -186,12 +187,12 @@ func TestGetApplies(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectApplyIDs:       allApplyIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allApplyIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -200,12 +201,12 @@ func TestGetApplies(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectApplyIDs: allApplyIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allApplyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -219,13 +220,13 @@ func TestGetApplies(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectApplyIDs:             allApplyIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allApplyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -239,13 +240,13 @@ func TestGetApplies(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectApplyIDs:             allApplyIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allApplyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -260,12 +261,12 @@ func TestGetApplies(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectApplyIDs: reverseApplyIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allApplyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -289,26 +290,26 @@ func TestGetApplies(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetAppliesInput{
 				Sort:              ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectApplyIDs:              []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetAppliesInput{
 				Sort: ptrApplySortableField(ApplySortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allApplyIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -330,7 +331,7 @@ func TestGetApplies(t *testing.T) {
 				},
 			},
 			expectApplyIDs:       []string{allApplyIDsByUpdateTime[0], allApplyIDsByUpdateTime[2], allApplyIDsByUpdateTime[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -344,7 +345,7 @@ func TestGetApplies(t *testing.T) {
 				},
 			},
 			expectApplyIDs:       []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -358,7 +359,7 @@ func TestGetApplies(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

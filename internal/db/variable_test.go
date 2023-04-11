@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -66,7 +67,7 @@ func TestGetVariables(t *testing.T) {
 	sort.Sort(variableInfoNamespacePathSlice(allVariableInfos))
 	allVariableIDsByNamespacePath := variableIDsFromVariableInfos(allVariableInfos)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -74,7 +75,7 @@ func TestGetVariables(t *testing.T) {
 		input                       *GetVariablesInput
 		expectMsg                   *string
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectVariableIDs           []string
 		getBeforeCursorFromPrevious bool
 		sortedDescending            bool
@@ -100,7 +101,7 @@ func TestGetVariables(t *testing.T) {
 			getAfterCursorFromPrevious:  false,
 			expectMsg:                   nil,
 			expectVariableIDs:       []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				Cursor:          nil,
 				TotalCount:      0,
 				HasNextPage:     false,
@@ -124,7 +125,7 @@ func TestGetVariables(t *testing.T) {
 				Filter:            nil,
 			},
 			expectVariableIDs:    allVariableIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -133,13 +134,13 @@ func TestGetVariables(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectVariableIDs:    allVariableIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -150,7 +151,7 @@ func TestGetVariables(t *testing.T) {
 				Sort: ptrVariableSortableField(VariableSortableFieldKeyAsc),
 			},
 			expectVariableIDs:    allVariableIDsByKey,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -162,7 +163,7 @@ func TestGetVariables(t *testing.T) {
 			},
 			sortedDescending:     true,
 			expectVariableIDs:    reverseVariableIDsByKey,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -173,7 +174,7 @@ func TestGetVariables(t *testing.T) {
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
 			},
 			expectVariableIDs:    allVariableIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -185,7 +186,7 @@ func TestGetVariables(t *testing.T) {
 			},
 			sortedDescending:     true,
 			expectVariableIDs:    reverseVariableIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -199,7 +200,7 @@ func TestGetVariables(t *testing.T) {
 			},
 			externalFilterHcl:    true,
 			expectVariableIDs:    []string{allVariableIDsByNamespacePath[0], allVariableIDsByNamespacePath[3]},
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -212,7 +213,7 @@ func TestGetVariables(t *testing.T) {
 			externalFilterHcl:    true,
 			sortedDescending:     true,
 			expectVariableIDs:    []string{allVariableIDsByNamespacePath[3], allVariableIDsByNamespacePath[0]},
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -221,12 +222,12 @@ func TestGetVariables(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectVariableIDs:    allVariableIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVariableIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -235,12 +236,12 @@ func TestGetVariables(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectVariableIDs: allVariableIDsByCreateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVariableIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -254,13 +255,13 @@ func TestGetVariables(t *testing.T) {
 			name: "pagination: middle three",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(3),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectVariableIDs:          allVariableIDsByCreateTime[2:5],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVariableIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -274,13 +275,13 @@ func TestGetVariables(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectVariableIDs:          allVariableIDsByCreateTime[5:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVariableIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -295,13 +296,13 @@ func TestGetVariables(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			sortedDescending:  true,
 			expectVariableIDs: reverseVariableIDsByCreateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVariableIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -325,27 +326,27 @@ func TestGetVariables(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetVariablesInput{
 				Sort:              ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectVariableIDs:           []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:         ptr.String("only first or last can be defined, not both"),
 			expectVariableIDs: allVariableIDs[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVariableIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -360,7 +361,7 @@ func TestGetVariables(t *testing.T) {
 			name: "fully-populated types, everything allowed through filters",
 			input: &GetVariablesInput{
 				Sort: ptrVariableSortableField(VariableSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &VariableFilter{
@@ -369,7 +370,7 @@ func TestGetVariables(t *testing.T) {
 				},
 			},
 			expectVariableIDs: allVariableIDsByCreateTime,
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount: int32(len(allVariableIDs)),
 				Cursor:     dummyCursorFunc,
 			},
@@ -388,7 +389,7 @@ func TestGetVariables(t *testing.T) {
 			expectVariableIDs: []string{
 				allVariableIDsByCreateTime[0], allVariableIDsByCreateTime[1], allVariableIDsByCreateTime[2],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -402,7 +403,7 @@ func TestGetVariables(t *testing.T) {
 				},
 			},
 			expectVariableIDs:    []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -416,7 +417,7 @@ func TestGetVariables(t *testing.T) {
 				},
 			},
 			expectVariableIDs:    []string{allVariableIDsByCreateTime[0]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -430,7 +431,7 @@ func TestGetVariables(t *testing.T) {
 				},
 			},
 			expectVariableIDs:    []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -444,7 +445,7 @@ func TestGetVariables(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectVariableIDs:    []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

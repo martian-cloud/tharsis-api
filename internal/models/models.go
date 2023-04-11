@@ -22,6 +22,24 @@ type ResourceMetadata struct {
 	Version              int        `json:"version"`
 }
 
+// resolveFieldValue resolves metadata field values for cursor based pagination
+func (r *ResourceMetadata) resolveFieldValue(key string) (string, error) {
+	var resp string
+
+	switch key {
+	case "id":
+		resp = r.ID
+	case "updated_at":
+		resp = r.LastUpdatedTimestamp.Format(time.RFC3339Nano)
+	case "created_at":
+		resp = r.CreationTimestamp.Format(time.RFC3339Nano)
+	default:
+		return "", fmt.Errorf("invalid field key requested: %s", key)
+	}
+
+	return resp, nil
+}
+
 func verifyValidName(name string) error {
 	if !nameRegex.MatchString(name) {
 		return errors.NewError(errors.EInvalid, "Invalid name, name can only include lowercase letters and numbers with - and _ supported "+

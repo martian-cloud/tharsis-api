@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -129,7 +130,7 @@ func TestGetRunByPlanID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: ptr.String("Failed to get run for plan: Failed to scan query count result: " + *invalidUUIDMsg1),
+			expectMsg: ptr.String("Failed to get run for plan: failed to scan query count result: " + *invalidUUIDMsg1),
 		},
 	}
 
@@ -190,7 +191,7 @@ func TestGetRunByApplyID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: ptr.String("Failed to get run for apply: Failed to scan query count result: " + *invalidUUIDMsg1),
+			expectMsg: ptr.String("Failed to get run for apply: failed to scan query count result: " + *invalidUUIDMsg1),
 		},
 	}
 
@@ -476,7 +477,7 @@ func TestGetRuns(t *testing.T) {
 	allRunIDsByUpdateTime := runIDsFromRunInfos(allRunInfos)
 	reverseRunIDsByUpdateTime := reverseStringSlice(allRunIDsByUpdateTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -484,7 +485,7 @@ func TestGetRuns(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetRunsInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectRunIDs                []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -502,7 +503,7 @@ func TestGetRuns(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectRunIDs                []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -521,7 +522,7 @@ func TestGetRuns(t *testing.T) {
 				Filter:            nil,
 			},
 			expectRunIDs:         allRunIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -530,13 +531,13 @@ func TestGetRuns(t *testing.T) {
 			name: "populated pagination, sort in ascending order of creation time, nil filter",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectRunIDs:         allRunIDsByCreationTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -547,7 +548,7 @@ func TestGetRuns(t *testing.T) {
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtDesc),
 			},
 			expectRunIDs:         reverseRunIDsByCreationTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -558,7 +559,7 @@ func TestGetRuns(t *testing.T) {
 				Sort: ptrRunSortableField(RunSortableFieldUpdatedAtAsc),
 			},
 			expectRunIDs:         allRunIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -569,7 +570,7 @@ func TestGetRuns(t *testing.T) {
 				Sort: ptrRunSortableField(RunSortableFieldUpdatedAtDesc),
 			},
 			expectRunIDs:         reverseRunIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -578,12 +579,12 @@ func TestGetRuns(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectRunIDs:         allRunIDsByCreationTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -592,12 +593,12 @@ func TestGetRuns(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectRunIDs: allRunIDsByCreationTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRunIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -611,13 +612,13 @@ func TestGetRuns(t *testing.T) {
 			name: "pagination: middle one",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectRunIDs:               allRunIDsByCreationTime[2:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRunIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -631,13 +632,13 @@ func TestGetRuns(t *testing.T) {
 			name: "pagination: final two",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectRunIDs:               allRunIDsByCreationTime[3:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRunIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -652,12 +653,12 @@ func TestGetRuns(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectRunIDs: reverseRunIDsByCreationTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRunIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -681,26 +682,26 @@ func TestGetRuns(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetRunsInput{
 				Sort:              ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectRunIDs:                []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allRunIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -714,7 +715,7 @@ func TestGetRuns(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetRunsInput{
 				Sort: ptrRunSortableField(RunSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &RunFilter{
@@ -728,7 +729,7 @@ func TestGetRuns(t *testing.T) {
 			},
 			expectMsg:      emptyUUIDMsg2,
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -740,7 +741,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:         []string{allRunIDsByCreationTime[0], allRunIDsByCreationTime[2], allRunIDsByCreationTime[4]},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -754,7 +755,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:         []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -768,7 +769,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -782,7 +783,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:         []string{allRunIDsByCreationTime[1]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -796,7 +797,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -809,7 +810,7 @@ func TestGetRuns(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -821,7 +822,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:         []string{allRunIDsByCreationTime[2]},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -835,7 +836,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -848,7 +849,7 @@ func TestGetRuns(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -860,7 +861,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:         allRunIDsByCreationTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -874,7 +875,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -887,7 +888,7 @@ func TestGetRuns(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 
 		{
@@ -899,7 +900,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:         allRunIDsByCreationTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allRunIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -913,7 +914,7 @@ func TestGetRuns(t *testing.T) {
 				},
 			},
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo: pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 		},
 
 		{
@@ -926,7 +927,7 @@ func TestGetRuns(t *testing.T) {
 			},
 			expectMsg:      invalidUUIDMsg2,
 			expectRunIDs:   []string{},
-			expectPageInfo: PageInfo{},
+			expectPageInfo: pagination.PageInfo{},
 		},
 	}
 

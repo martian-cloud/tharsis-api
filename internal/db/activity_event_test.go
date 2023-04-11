@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 type activityEventWarmups struct {
@@ -87,7 +88,7 @@ func TestGetActivityEvents(t *testing.T) {
 	allActivityEventIDsByAction := activityEventIDsFromActivityEventInfos(allActivityEventInfos)
 	reverseActivityEventIDsByAction := reverseStringSlice(allActivityEventIDsByAction)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -95,7 +96,7 @@ func TestGetActivityEvents(t *testing.T) {
 		input                       *GetActivityEventsInput
 		expectMsg                   *string
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectActivityEventIDs      []string
 		getBeforeCursorFromPrevious bool
 		sortedDescending            bool
@@ -119,7 +120,7 @@ func TestGetActivityEvents(t *testing.T) {
 			getAfterCursorFromPrevious:  false,
 			expectMsg:                   nil,
 			expectActivityEventIDs:       []string{},
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				Cursor:          nil,
 				TotalCount:      0,
 				HasNextPage:     false,
@@ -143,7 +144,7 @@ func TestGetActivityEvents(t *testing.T) {
 				Filter:            nil,
 			},
 			expectActivityEventIDs: allActivityEventIDs,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -152,13 +153,13 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "populated sort and pagination, nil filter",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -169,7 +170,7 @@ func TestGetActivityEvents(t *testing.T) {
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -181,7 +182,7 @@ func TestGetActivityEvents(t *testing.T) {
 			},
 			sortedDescending:       true,
 			expectActivityEventIDs: reverseActivityEventIDsByCreationTime,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -192,7 +193,7 @@ func TestGetActivityEvents(t *testing.T) {
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldNamespacePathAsc),
 			},
 			expectActivityEventIDs: allActivityEventIDsByNamespacePath,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -204,7 +205,7 @@ func TestGetActivityEvents(t *testing.T) {
 			},
 			sortedDescending:       true,
 			expectActivityEventIDs: reverseActivityEventIDsByNamespacePath,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -215,7 +216,7 @@ func TestGetActivityEvents(t *testing.T) {
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldActionAsc),
 			},
 			expectActivityEventIDs: allActivityEventIDsByAction,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -227,7 +228,7 @@ func TestGetActivityEvents(t *testing.T) {
 			},
 			sortedDescending:       true,
 			expectActivityEventIDs: reverseActivityEventIDsByAction,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -236,12 +237,12 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime,
-			expectPageInfo:         PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(len(allActivityEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -250,12 +251,12 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "pagination: first one",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 				},
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime[:1],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allActivityEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -269,13 +270,13 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectActivityEventIDs:     allActivityEventIDsByCreationTime[1:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allActivityEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -289,13 +290,13 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectActivityEventIDs:     allActivityEventIDsByCreationTime[3:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allActivityEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -310,13 +311,13 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			sortedDescending:       true,
 			expectActivityEventIDs: reverseActivityEventIDsByCreationTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allActivityEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -340,27 +341,27 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetActivityEventsInput{
 				Sort:              ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectActivityEventIDs:      []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg:              ptr.String("only first or last can be defined, not both"),
 			expectActivityEventIDs: allActivityEventIDs[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allActivityEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -374,7 +375,7 @@ func TestGetActivityEvents(t *testing.T) {
 			name: "fully-populated types, nothing allowed through filters",
 			input: &GetActivityEventsInput{
 				Sort: ptrActivityEventSortableField(ActivityEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &ActivityEventFilter{
@@ -388,7 +389,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime,
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount: int32(len(allActivityEventIDs)),
 				Cursor:     dummyCursorFunc,
 			},
@@ -411,7 +412,7 @@ func TestGetActivityEvents(t *testing.T) {
 				allActivityEventIDsByCreationTime[1],
 				allActivityEventIDsByCreationTime[2],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -425,7 +426,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -440,7 +441,7 @@ func TestGetActivityEvents(t *testing.T) {
 			},
 			expectMsg:              invalidUUIDMsg2,
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -456,7 +457,7 @@ func TestGetActivityEvents(t *testing.T) {
 			expectActivityEventIDs: []string{
 				warmupItems.activityEvents[0].Metadata.ID,
 			},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -472,7 +473,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -486,7 +487,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -501,7 +502,7 @@ func TestGetActivityEvents(t *testing.T) {
 			},
 			expectMsg:              invalidUUIDMsg2,
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -517,7 +518,7 @@ func TestGetActivityEvents(t *testing.T) {
 			expectActivityEventIDs: []string{
 				warmupItems.activityEvents[1].Metadata.ID,
 			},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -533,7 +534,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -547,7 +548,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -562,7 +563,7 @@ func TestGetActivityEvents(t *testing.T) {
 			},
 			expectMsg:              invalidUUIDMsg2,
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -578,7 +579,7 @@ func TestGetActivityEvents(t *testing.T) {
 			expectActivityEventIDs: []string{
 				warmupItems.activityEvents[0].Metadata.ID,
 			},
-			expectPageInfo:       PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -592,7 +593,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -606,7 +607,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime,
-			expectPageInfo:         PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -620,7 +621,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -634,7 +635,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: allActivityEventIDsByCreationTime,
-			expectPageInfo:         PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -648,7 +649,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -668,7 +669,7 @@ func TestGetActivityEvents(t *testing.T) {
 				warmupItems.activityEvents[0].Metadata.ID,
 				warmupItems.activityEvents[1].Metadata.ID,
 			},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -682,7 +683,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},
@@ -702,7 +703,7 @@ func TestGetActivityEvents(t *testing.T) {
 				warmupItems.activityEvents[0].Metadata.ID,
 				warmupItems.activityEvents[2].Metadata.ID,
 			},
-			expectPageInfo:       PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -716,7 +717,7 @@ func TestGetActivityEvents(t *testing.T) {
 				},
 			},
 			expectActivityEventIDs: []string{},
-			expectPageInfo:         PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
 			expectHasEndCursor:     true,
 		},

@@ -18,6 +18,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // CreateProviderInput is the input for creating a terraform provider
@@ -49,7 +50,7 @@ type GetProvidersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.TerraformProviderSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// Group filters providers be the specified group
 	Group *models.Group
 	// Search filters provider list by providers with a name that contains the search query
@@ -59,7 +60,7 @@ type GetProvidersInput struct {
 // GetProviderVersionsInput is the input for getting a list of provider versions
 type GetProviderVersionsInput struct {
 	Sort                     *db.TerraformProviderVersionSortableField
-	PaginationOptions        *db.PaginationOptions
+	PaginationOptions        *pagination.Options
 	SHASumsUploaded          *bool
 	SHASumsSignatureUploaded *bool
 	SemanticVersion          *string
@@ -70,7 +71,7 @@ type GetProviderVersionsInput struct {
 // GetProviderPlatformsInput is the input for listing provider platforms
 type GetProviderPlatformsInput struct {
 	Sort              *db.TerraformProviderPlatformSortableField
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	ProviderID        *string
 	ProviderVersionID *string
 	BinaryUploaded    *bool
@@ -196,7 +197,7 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 	}
 
 	providerResult, err := s.dbClient.TerraformProviders.GetProviders(ctx, &db.GetProvidersInput{
-		PaginationOptions: &db.PaginationOptions{First: ptr.Int32(1)},
+		PaginationOptions: &pagination.Options{First: ptr.Int32(1)},
 		Filter: &db.TerraformProviderFilter{
 			RootGroupID: &rootGroup.Metadata.ID,
 			Name:        &name,
@@ -623,7 +624,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 
 	// Check if this version is greater than the previous latest
 	versionsResp, err := s.dbClient.TerraformProviderVersions.GetProviderVersions(ctx, &db.GetProviderVersionsInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
 		Filter: &db.TerraformProviderVersionFilter{
@@ -1160,7 +1161,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 
 	// Find key by GPG key id
 	searchKeyResult, err := s.dbClient.GPGKeys.GetGPGKeys(ctx, &db.GetGPGKeysInput{
-		PaginationOptions: &db.PaginationOptions{
+		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1), // Only return first key that matches
 		},
 		Filter: &db.GPGKeyFilter{

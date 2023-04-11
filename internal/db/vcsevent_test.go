@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -141,7 +142,7 @@ func TestGetEvents(t *testing.T) {
 	allVCSEventIDsByUpdateTime := vcsEventIDsFromVCSEventInfos(allVCSEventInfos)
 	reverseVCSEventIDsByUpdateTime := reverseStringSlice(allVCSEventIDsByUpdateTime)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -149,7 +150,7 @@ func TestGetEvents(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetVCSEventsInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectVCSEventIDs           []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -167,7 +168,7 @@ func TestGetEvents(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectVCSEventIDs    		[]string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -186,7 +187,7 @@ func TestGetEvents(t *testing.T) {
 				Filter:            nil,
 			},
 			expectVCSEventIDs:    allVCSEventIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -195,13 +196,13 @@ func TestGetEvents(t *testing.T) {
 			name: "populated pagination, sort in ascending order of creation time, nil filter",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectVCSEventIDs:    allVCSEventIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -212,7 +213,7 @@ func TestGetEvents(t *testing.T) {
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldCreatedAtDesc),
 			},
 			expectVCSEventIDs:    reverseVCSEventIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -221,13 +222,13 @@ func TestGetEvents(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectVCSEventIDs:    allVCSEventIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -238,7 +239,7 @@ func TestGetEvents(t *testing.T) {
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtDesc),
 			},
 			expectVCSEventIDs:    reverseVCSEventIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -247,12 +248,12 @@ func TestGetEvents(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectVCSEventIDs:    allVCSEventIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allVCSEventIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -261,12 +262,12 @@ func TestGetEvents(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectVCSEventIDs: allVCSEventIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -280,13 +281,13 @@ func TestGetEvents(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectVCSEventIDs:          allVCSEventIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -300,13 +301,13 @@ func TestGetEvents(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectVCSEventIDs:          allVCSEventIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -321,12 +322,12 @@ func TestGetEvents(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectVCSEventIDs: reverseVCSEventIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -350,26 +351,26 @@ func TestGetEvents(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetVCSEventsInput{
 				Sort:              ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectVCSEventIDs:           []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetVCSEventsInput{
 				Sort: ptrVCSEventSortableField(VCSEventSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVCSEventIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -388,7 +389,7 @@ func TestGetEvents(t *testing.T) {
 				},
 			},
 			expectVCSEventIDs:    allVCSEventIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(5), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(5), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -402,7 +403,7 @@ func TestGetEvents(t *testing.T) {
 				},
 			},
 			expectVCSEventIDs:    []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -416,7 +417,7 @@ func TestGetEvents(t *testing.T) {
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -430,7 +431,7 @@ func TestGetEvents(t *testing.T) {
 				},
 			},
 			expectVCSEventIDs:    allVCSEventIDsByCreateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(5), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(5), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -444,7 +445,7 @@ func TestGetEvents(t *testing.T) {
 				},
 			},
 			expectVCSEventIDs:    []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

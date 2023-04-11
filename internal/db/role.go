@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Roles encapsulates the logic to access Tharsis roles from the database.
@@ -37,22 +38,22 @@ const (
 	RoleSortableFieldUpdatedAtDesc RoleSortableField = "UPDATED_AT_DESC"
 )
 
-func (r RoleSortableField) getFieldDescriptor() *fieldDescriptor {
+func (r RoleSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch r {
 	case RoleSortableFieldNameAsc, RoleSortableFieldNameDesc:
-		return &fieldDescriptor{key: "name", table: "roles", col: "name"}
+		return &pagination.FieldDescriptor{Key: "name", Table: "roles", Col: "name"}
 	case RoleSortableFieldUpdatedAtAsc, RoleSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "roles", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "roles", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (r RoleSortableField) getSortDirection() SortDirection {
+func (r RoleSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(r), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // RoleFilter contains the supported fields for filtering Role resources
@@ -66,14 +67,14 @@ type GetRolesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *RoleSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *RoleFilter
 }
 
 // RolesResult contains the response data and page information
 type RolesResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Roles    []models.Role
 }
 
@@ -112,27 +113,26 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 		Select(rolesFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "roles", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "roles", Col: "id"},
 		sortBy,
 		sortDirection,
-		roleFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, r.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +150,12 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := RolesResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Roles:    results,
 	}
 
@@ -312,23 +312,4 @@ func scanRole(row scanner) (*models.Role, error) {
 	r.SetPermissions(perms)
 
 	return r, nil
-}
-
-func roleFieldResolver(key string, model interface{}) (string, error) {
-	role, ok := model.(*models.Role)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected Role type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &role.Metadata)
-	if !ok {
-		switch key {
-		case "name":
-			val = role.Name
-		default:
-			return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-		}
-	}
-
-	return val, nil
 }

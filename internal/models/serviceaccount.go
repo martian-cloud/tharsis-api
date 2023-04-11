@@ -29,6 +29,11 @@ type ServiceAccount struct {
 	OIDCTrustPolicies []OIDCTrustPolicy
 }
 
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (s *ServiceAccount) ResolveMetadata(key string) (string, error) {
+	return s.Metadata.resolveFieldValue(key)
+}
+
 // Validate returns an error if the model is not valid
 func (s *ServiceAccount) Validate() error {
 	// Verify name satisfies constraints

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -383,7 +384,7 @@ func TestGetUsers(t *testing.T) {
 
 	allActiveUsers := activeUsersFromUserInfos(allUserInfos)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -391,7 +392,7 @@ func TestGetUsers(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetUsersInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectUserIDs               []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -409,7 +410,7 @@ func TestGetUsers(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectUserIDs               []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -428,7 +429,7 @@ func TestGetUsers(t *testing.T) {
 				Filter:            nil,
 			},
 			expectUserIDs:        allUserIDs,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -437,13 +438,13 @@ func TestGetUsers(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectUserIDs:        allUserIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -454,7 +455,7 @@ func TestGetUsers(t *testing.T) {
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtDesc),
 			},
 			expectUserIDs:        reverseUserIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -463,12 +464,12 @@ func TestGetUsers(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectUserIDs:        allUserIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -477,12 +478,12 @@ func TestGetUsers(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectUserIDs: allUserIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allUserIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -496,13 +497,13 @@ func TestGetUsers(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectUserIDs:              allUserIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allUserIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -516,13 +517,13 @@ func TestGetUsers(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectUserIDs:              allUserIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allUserIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -537,12 +538,12 @@ func TestGetUsers(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectUserIDs: reverseUserIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allUserIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -566,26 +567,26 @@ func TestGetUsers(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetUsersInput{
 				Sort:              ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectUserIDs:               []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allUserIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -600,7 +601,7 @@ func TestGetUsers(t *testing.T) {
 			name: "fully-populated types, everything allowed through filters",
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &UserFilter{
@@ -611,7 +612,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs: allUserIDsByUpdateTime,
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allUserIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -634,7 +635,7 @@ func TestGetUsers(t *testing.T) {
 			expectUserIDs: []string{
 				allUserIDsByName[0], allUserIDsByName[1], allUserIDsByName[3],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -648,7 +649,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -663,7 +664,7 @@ func TestGetUsers(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectUserIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -677,7 +678,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs:        allUserIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -691,7 +692,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs:        allUserIDsByUpdateTime,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allUserIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -705,7 +706,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs:        allActiveUsers,
-			expectPageInfo:       PageInfo{TotalCount: int32(len(allActiveUsers)), Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allActiveUsers)), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -719,7 +720,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -733,7 +734,7 @@ func TestGetUsers(t *testing.T) {
 				},
 			},
 			expectUserIDs:        []string{},
-			expectPageInfo:       PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},

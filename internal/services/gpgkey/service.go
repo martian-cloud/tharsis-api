@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // CreateGPGKeyInput is the input for creating a GPG key
@@ -28,7 +29,7 @@ type GetGPGKeysInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.GPGKeySortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// NamespacePath is the namespace to return gpg keys for
 	NamespacePath string
 	// IncludeInherited includes inherited gpg keys in the result

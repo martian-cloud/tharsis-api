@@ -14,6 +14,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // GetVariablesInput is the input for querying a list of variables
@@ -21,7 +22,7 @@ type GetVariablesInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *db.VariableSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	// NamespacePaths filters the variables by the specified paths
 	NamespacePaths []string
 	// Include Values

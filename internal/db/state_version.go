@@ -4,14 +4,13 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // StateVersionSortableField represents the fields that a list of state versions can be sorted by
@@ -23,20 +22,20 @@ const (
 	StateVersionSortableFieldUpdatedAtDesc StateVersionSortableField = "UPDATED_AT_DESC"
 )
 
-func (sf StateVersionSortableField) getFieldDescriptor() *fieldDescriptor {
+func (sf StateVersionSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch sf {
 	case StateVersionSortableFieldUpdatedAtAsc, StateVersionSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "state_versions", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "state_versions", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (sf StateVersionSortableField) getSortDirection() SortDirection {
+func (sf StateVersionSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(sf), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // StateVersionFilter contains the supported fields for filtering StateVersion resources
@@ -50,14 +49,14 @@ type GetStateVersionsInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *StateVersionSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *StateVersionFilter
 }
 
 // StateVersionsResult contains the response data and page information
 type StateVersionsResult struct {
-	PageInfo      *PageInfo
+	PageInfo      *pagination.PageInfo
 	StateVersions []models.StateVersion
 }
 
@@ -100,27 +99,26 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 		Select(stateVersionFieldList...).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "state_versions", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "state_versions", Col: "id"},
 		sortBy,
 		sortDirection,
-		stateVersionFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, s.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -138,12 +136,12 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := StateVersionsResult{
-		PageInfo:      rows.getPageInfo(),
+		PageInfo:      rows.GetPageInfo(),
 		StateVersions: results,
 	}
 
@@ -242,19 +240,3 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 
 	return stateVersion, nil
 }
-
-func stateVersionFieldResolver(key string, model interface{}) (string, error) {
-	stateVersion, ok := model.(*models.StateVersion)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected stateVersion type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &stateVersion.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
-}
-
-// The End.

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -435,7 +436,7 @@ func TestGetServiceAccounts(t *testing.T) {
 	sort.Sort(serviceAccountInfoNameSlice(allServiceAccountInfos))
 	allServiceAccountIDsByName := serviceAccountIDsFromServiceAccountInfos(allServiceAccountInfos)
 
-	dummyCursorFunc := func(item interface{}) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
 
 	type testCase struct {
 		expectStartCursorError      error
@@ -443,7 +444,7 @@ func TestGetServiceAccounts(t *testing.T) {
 		expectMsg                   *string
 		input                       *GetServiceAccountsInput
 		name                        string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectServiceAccountIDs     []string
 		getBeforeCursorFromPrevious bool
 		getAfterCursorFromPrevious  bool
@@ -461,7 +462,7 @@ func TestGetServiceAccounts(t *testing.T) {
 		getBeforeCursorFromPrevious bool
 		expectMsg                   *string
 		expectServiceAccountIDs     []string
-		expectPageInfo              PageInfo
+		expectPageInfo              pagination.PageInfo
 		expectStartCursorError      error
 		expectEndCursorError        error
 		expectHasStartCursor        bool
@@ -480,7 +481,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				Filter:            nil,
 			},
 			expectServiceAccountIDs: allServiceAccountIDs,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -489,13 +490,13 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "populated pagination, sort in ascending order of creation time, nil filter",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByCreateTime,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -506,7 +507,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtDesc),
 			},
 			expectServiceAccountIDs: reverseServiceAccountIDsByCreateTime,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -515,13 +516,13 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "populated pagination, sort in ascending order of last update time, nil filter",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: nil,
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByUpdateTime,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -532,7 +533,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtDesc),
 			},
 			expectServiceAccountIDs: reverseServiceAccountIDsByUpdateTime,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -541,12 +542,12 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "pagination: everything at once",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByUpdateTime,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -555,12 +556,12 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "pagination: first two",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByUpdateTime[:2],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allServiceAccountIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -574,13 +575,13 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "pagination: middle two",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectServiceAccountIDs:    allServiceAccountIDsByUpdateTime[2:4],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allServiceAccountIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -594,13 +595,13 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "pagination: final one",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 			},
 			getAfterCursorFromPrevious: true,
 			expectServiceAccountIDs:    allServiceAccountIDsByUpdateTime[4:],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allServiceAccountIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -615,12 +616,12 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "pagination: last three",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					Last: ptr.Int32(3),
 				},
 			},
 			expectServiceAccountIDs: reverseServiceAccountIDsByUpdateTime[:3],
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allServiceAccountIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -644,26 +645,26 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "pagination, before and after, expect error",
 			input: &GetServiceAccountsInput{
 				Sort:              ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{},
+				PaginationOptions: &pagination.Options{},
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
 			expectMsg:                   ptr.String("only before or after can be defined, not both"),
 			expectServiceAccountIDs:     []string{},
-			expectPageInfo:              PageInfo{},
+			expectPageInfo:              pagination.PageInfo{},
 		},
 
 		{
 			name: "pagination, first one and last two, expect error",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
 					Last:  ptr.Int32(2),
 				},
 			},
 			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allServiceAccountIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     true,
@@ -678,7 +679,7 @@ func TestGetServiceAccounts(t *testing.T) {
 			name: "fully-populated types, everything allowed through filters",
 			input: &GetServiceAccountsInput{
 				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				PaginationOptions: &PaginationOptions{
+				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(100),
 				},
 				Filter: &ServiceAccountFilter{
@@ -690,7 +691,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByCreateTime,
-			expectPageInfo: PageInfo{
+			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allServiceAccountIDs)),
 				Cursor:          dummyCursorFunc,
 				HasNextPage:     false,
@@ -709,7 +710,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByName,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -723,7 +724,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByName[0:2],
-			expectPageInfo:          PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -737,7 +738,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByName[2:4],
-			expectPageInfo:          PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -751,7 +752,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByName[4:],
-			expectPageInfo:          PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -765,7 +766,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: []string{},
-			expectPageInfo:          PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -783,7 +784,7 @@ func TestGetServiceAccounts(t *testing.T) {
 			expectServiceAccountIDs: []string{
 				allServiceAccountIDsByName[0], allServiceAccountIDsByName[1], allServiceAccountIDsByName[3],
 			},
-			expectPageInfo:       PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -797,7 +798,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: []string{},
-			expectPageInfo:          PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -812,7 +813,7 @@ func TestGetServiceAccounts(t *testing.T) {
 			},
 			expectMsg:               invalidUUIDMsg2,
 			expectServiceAccountIDs: []string{},
-			expectPageInfo:          PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -826,7 +827,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: allServiceAccountIDsByName,
-			expectPageInfo:          PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},
@@ -840,7 +841,7 @@ func TestGetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectServiceAccountIDs: []string{},
-			expectPageInfo:          PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
 			expectHasEndCursor:      true,
 		},

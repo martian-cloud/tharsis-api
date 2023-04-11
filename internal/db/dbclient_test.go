@@ -56,10 +56,10 @@ var (
 	invalidUUIDMsg1 = ptr.String("ERROR: invalid input syntax for type uuid: \"" + invalidID + "\" (SQLSTATE 22P02)")
 
 	// returned for some other invalid UUID cases
-	invalidUUIDMsg2 = ptr.String(fmt.Sprintf("Failed to scan query count result: %s", *invalidUUIDMsg1))
+	invalidUUIDMsg2 = ptr.String(fmt.Sprintf("failed to scan query count result: %s", *invalidUUIDMsg1))
 
 	// returned for some other invalid UUID cases
-	emptyUUIDMsg2 = ptr.String("Failed to scan query count result: ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
+	emptyUUIDMsg2 = ptr.String("failed to scan query count result: ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
 
 	// returned for some invalid UUID cases
 	invalidUUIDMsg4 = ptr.String("ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Runners encapsulates the logic to access runners from the database
@@ -33,20 +34,20 @@ const (
 	RunnerSortableFieldUpdatedAtDesc RunnerSortableField = "UPDATED_AT_DESC"
 )
 
-func (ts RunnerSortableField) getFieldDescriptor() *fieldDescriptor {
+func (ts RunnerSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch ts {
 	case RunnerSortableFieldUpdatedAtAsc, RunnerSortableFieldUpdatedAtDesc:
-		return &fieldDescriptor{key: "updated_at", table: "runners", col: "updated_at"}
+		return &pagination.FieldDescriptor{Key: "updated_at", Table: "runners", Col: "updated_at"}
 	default:
 		return nil
 	}
 }
 
-func (ts RunnerSortableField) getSortDirection() SortDirection {
+func (ts RunnerSortableField) getSortDirection() pagination.SortDirection {
 	if strings.HasSuffix(string(ts), "_DESC") {
-		return DescSort
+		return pagination.DescSort
 	}
-	return AscSort
+	return pagination.AscSort
 }
 
 // RunnerFilter contains the supported fields for filtering Runner resources
@@ -63,14 +64,14 @@ type GetRunnersInput struct {
 	// Sort specifies the field to sort on and direction
 	Sort *RunnerSortableField
 	// PaginationOptions supports cursor based pagination
-	PaginationOptions *PaginationOptions
+	PaginationOptions *pagination.Options
 	// Filter is used to filter the results
 	Filter *RunnerFilter
 }
 
 // RunnersResult contains the response data and page information
 type RunnersResult struct {
-	PageInfo *PageInfo
+	PageInfo *pagination.PageInfo
 	Runners  []models.Runner
 }
 
@@ -131,27 +132,26 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
-	sortDirection := AscSort
+	sortDirection := pagination.AscSort
 
-	var sortBy *fieldDescriptor
+	var sortBy *pagination.FieldDescriptor
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
 	}
 
-	qBuilder, err := newPaginatedQueryBuilder(
+	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
-		&fieldDescriptor{key: "id", table: "runners", col: "id"},
+		&pagination.FieldDescriptor{Key: "id", Table: "runners", Col: "id"},
 		sortBy,
 		sortDirection,
-		runnerFieldResolver,
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, handlePaginationError(err)
 	}
 
-	rows, err := qBuilder.execute(ctx, t.dbClient.getConnection(ctx), query)
+	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
 		return nil, err
 	}
@@ -169,12 +169,12 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 		results = append(results, *item)
 	}
 
-	if err := rows.finalize(&results); err != nil {
+	if err := rows.Finalize(&results); err != nil {
 		return nil, err
 	}
 
 	result := RunnersResult{
-		PageInfo: rows.getPageInfo(),
+		PageInfo: rows.GetPageInfo(),
 		Runners:  results,
 	}
 
@@ -397,18 +397,4 @@ func scanRunner(row scanner, withResourcePath bool) (*models.Runner, error) {
 	}
 
 	return runner, nil
-}
-
-func runnerFieldResolver(key string, model interface{}) (string, error) {
-	runner, ok := model.(*models.Runner)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Expected runner type, got %T", model))
-	}
-
-	val, ok := metadataFieldResolver(key, &runner.Metadata)
-	if !ok {
-		return "", errors.NewError(errors.EInternal, fmt.Sprintf("Invalid field key requested %s", key))
-	}
-
-	return val, nil
 }

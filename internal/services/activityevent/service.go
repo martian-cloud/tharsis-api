@@ -13,12 +13,13 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // GetActivityEventsInput is the input for querying a list of activity events
 type GetActivityEventsInput struct {
 	Sort              *db.ActivityEventSortableField
-	PaginationOptions *db.PaginationOptions
+	PaginationOptions *pagination.Options
 	UserID            *string
 	ServiceAccountID  *string
 	NamespacePath     *string
