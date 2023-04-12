@@ -14,9 +14,9 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 const defaultLogReadLimit = 1024 * 1024 // 1 MiB
@@ -24,7 +24,7 @@ const defaultLogReadLimit = 1024 * 1024 // 1 MiB
 type jobController struct {
 	respWriter        response.Writer
 	jwtAuthMiddleware middleware.Handler
-	jwsProvider       jwsprovider.JWSProvider
+	jwsProvider       jws.Provider
 	logger            logger.Logger
 	jobService        job.Service
 }
@@ -34,7 +34,7 @@ func NewJobController(
 	logger logger.Logger,
 	respWriter response.Writer,
 	jwtAuthMiddleware middleware.Handler,
-	jwsProvider jwsprovider.JWSProvider,
+	jwsProvider jws.Provider,
 	jobService job.Service,
 ) Controller {
 	return &jobController{respWriter, jwtAuthMiddleware, jwsProvider, logger, jobService}

@@ -11,8 +11,8 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 // InputData contains the input data fields specific to this managed identity type
@@ -28,12 +28,12 @@ type Data struct {
 
 // Delegate for the Tharsis OIDC Federated managed identity type
 type Delegate struct {
-	jwsProvider jwsprovider.JWSProvider
+	jwsProvider jws.Provider
 	issuerURL   string
 }
 
 // New creates a new Delegate instance
-func New(_ context.Context, jwsProvider jwsprovider.JWSProvider, issuerURL string) (*Delegate, error) {
+func New(_ context.Context, jwsProvider jws.Provider, issuerURL string) (*Delegate, error) {
 	return &Delegate{
 		jwsProvider: jwsProvider,
 		issuerURL:   issuerURL,

@@ -20,8 +20,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 type keyPair struct {
@@ -209,7 +209,7 @@ func TestCreateToken(t *testing.T) {
 			mockServiceAccounts.On("GetServiceAccountByPath", mock.Anything, test.serviceAccount).Return(&sa, nil)
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, test.serviceAccount).Return(&sa, nil)
 
-			mockJWSProvider := jwsprovider.MockJWSProvider{}
+			mockJWSProvider := jwsprovider.MockProvider{}
 			mockJWSProvider.Test(t)
 
 			mockJWSProvider.On("Sign", ctx, mock.MatchedBy(func(payload []byte) bool {

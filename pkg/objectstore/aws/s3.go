@@ -4,7 +4,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -19,8 +18,8 @@ import (
 	"github.com/aws/smithy-go"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore"
-	tErrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
 
 const (
@@ -45,12 +44,12 @@ type ObjectStore struct {
 func New(ctx context.Context, logger logger.Logger, pluginData map[string]string) (*ObjectStore, error) {
 	bucket, ok := pluginData["bucket"]
 	if !ok {
-		return nil, fmt.Errorf("s3 object store plugin is missing the 'bucket' field")
+		return nil, errors.New("s3 object store plugin is missing the 'bucket' field")
 	}
 
 	region, ok := pluginData["region"]
 	if !ok {
-		return nil, fmt.Errorf("s3 object store plugin is missing the 'region' field")
+		return nil, errors.New("s3 object store plugin is missing the 'region' field")
 	}
 
 	accessKeyID := pluginData["aws_access_key_id"]
@@ -58,7 +57,7 @@ func New(ctx context.Context, logger logger.Logger, pluginData map[string]string
 
 	// Make sure secretKey is specified when using accessKeyID.
 	if accessKeyID != "" && secretKey == "" {
-		return nil, fmt.Errorf("s3 object store plugin is missing 'aws_secret_access_key' field but using 'aws_access_key_id'")
+		return nil, errors.New("s3 object store plugin is missing 'aws_secret_access_key' field but using 'aws_access_key_id'")
 	}
 
 	// Use a custom endpoint resolver.
@@ -129,12 +128,12 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return tErrors.New(tErrors.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
+			return te.New(te.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
 		}
 
 		var ae smithy.APIError
 		if errors.As(err, &ae) && ae.ErrorCode() == "InvalidRange" {
-			return tErrors.New(tErrors.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
+			return te.New(te.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
 		}
 
 		s.logger.Errorf("Failed to download file from key %s %v", key, err)
@@ -159,12 +158,12 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return nil, tErrors.New(tErrors.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
+			return nil, te.New(te.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
 		}
 
 		var ae smithy.APIError
 		if errors.As(err, &ae) && ae.ErrorCode() == "InvalidRange" {
-			return nil, tErrors.New(tErrors.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
+			return nil, te.New(te.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
 		}
 
 		s.logger.Errorf("Failed to get file from key %s %v", key, err)
@@ -184,7 +183,7 @@ func (s *ObjectStore) DoesObjectExist(ctx context.Context, key string) (bool, er
 
 	if _, err := s.client.HeadObject(ctx, input); err != nil {
 		var respErr *awshttp.ResponseError
-		if errors.As(err, &respErr) && respErr.ResponseError.HTTPStatusCode() == http.StatusNotFound {
+		if errors.As(err, &respErr) && respErr.HTTPStatusCode() == http.StatusNotFound {
 			return false, nil
 		}
 		return false, err
@@ -206,7 +205,7 @@ func (s *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 
 	presignedReq, err := presignClient.PresignGetObject(ctx, input)
 	if err != nil {
-		return "", tErrors.New(tErrors.EInternal, "Failed to create presigned URL: %s", err.Error())
+		return "", te.Wrap(err, te.EInternal, "failed to create presigned URL")
 	}
 
 	return presignedReq.URL, nil
