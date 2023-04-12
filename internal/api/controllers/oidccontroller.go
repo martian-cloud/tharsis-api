@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 type openIDConfig struct {
@@ -20,12 +20,12 @@ type openIDConfig struct {
 
 type oidcController struct {
 	respWriter    response.Writer
-	jwsProvider   jwsprovider.JWSProvider
+	jwsProvider   jws.Provider
 	tharsisAPIURL string
 }
 
 // NewOIDCController creates an instance of oidcController
-func NewOIDCController(respWriter response.Writer, jwsProvider jwsprovider.JWSProvider, tharsisAPIURL string) Controller {
+func NewOIDCController(respWriter response.Writer, jwsProvider jws.Provider, tharsisAPIURL string) Controller {
 	return &oidcController{
 		respWriter:    respWriter,
 		jwsProvider:   jwsProvider,

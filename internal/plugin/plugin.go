@@ -11,19 +11,19 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider/awskms"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider/memory"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/objectstore/aws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/awskms"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/memory"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore/aws"
 )
 
 // Catalog contains the available plugins
 type Catalog struct {
 	ObjectStore    objectstore.ObjectStore
-	JWSProvider    jwsprovider.JWSProvider
+	JWSProvider    jws.Provider
 	RateLimitStore ratelimitstore.Store
 }
 
@@ -122,9 +122,9 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 	return store, err
 }
 
-func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Config) (jwsprovider.JWSProvider, error) {
+func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Config) (jws.Provider, error) {
 	var (
-		plugin jwsprovider.JWSProvider
+		plugin jws.Provider
 		err    error
 	)
 

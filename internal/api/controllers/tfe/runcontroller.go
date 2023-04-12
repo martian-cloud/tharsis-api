@@ -20,14 +20,14 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 type runController struct {
 	respWriter        response.Writer
 	jwtAuthMiddleware middleware.Handler
-	jwsProvider       jwsprovider.JWSProvider
+	jwsProvider       jws.Provider
 	logger            logger.Logger
 	runService        run.Service
 	tharsisAPIURL     string
@@ -38,7 +38,7 @@ func NewRunController(
 	logger logger.Logger,
 	respWriter response.Writer,
 	jwtAuthMiddleware middleware.Handler,
-	jwsProvider jwsprovider.JWSProvider,
+	jwsProvider jws.Provider,
 	runService run.Service,
 	tharsisAPIURL string,
 ) controllers.Controller {

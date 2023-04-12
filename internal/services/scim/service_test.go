@@ -12,8 +12,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 const (
@@ -92,7 +92,7 @@ func TestCreateSCIMToken(t *testing.T) {
 				Transactions: &mockTransactions,
 			}
 
-			mockJWSProvider := jwsprovider.MockJWSProvider{}
+			mockJWSProvider := jws.MockProvider{}
 			mockJWSProvider.Test(t)
 
 			mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil)

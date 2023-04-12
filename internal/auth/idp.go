@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/jwx/jwt"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 const privateClaimPrefix = "tharsis_"
@@ -28,12 +28,12 @@ type VerifyTokenOutput struct {
 
 // IdentityProvider is used to create and verify service account tokens
 type IdentityProvider struct {
-	jwsPlugin jwsprovider.JWSProvider
+	jwsPlugin jws.Provider
 	issuerURL string
 }
 
 // NewIdentityProvider initializes the IdentityProvider type
-func NewIdentityProvider(jwsPlugin jwsprovider.JWSProvider, issuerURL string) *IdentityProvider {
+func NewIdentityProvider(jwsPlugin jws.Provider, issuerURL string) *IdentityProvider {
 	return &IdentityProvider{
 		jwsPlugin: jwsPlugin,
 		issuerURL: issuerURL,

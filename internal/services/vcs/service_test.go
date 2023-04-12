@@ -21,12 +21,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	types "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -1150,7 +1150,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockProviders := MockProvider{}
 			mockTransactions := db.MockTransactions{}
 			mockVCSProviders := db.MockVCSProviders{}
-			mockJWSProvider := jwsprovider.MockJWSProvider{}
+			mockJWSProvider := jws.MockProvider{}
 			mockWorkspaceVCSProviderLinks := db.MockWorkspaceVCSProviderLinks{}
 
 			mockCaller.Test(t)

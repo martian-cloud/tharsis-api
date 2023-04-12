@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/jwsprovider"
+	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 func TestSetManagedIdentityData(t *testing.T) {
@@ -57,7 +57,7 @@ func TestSetManagedIdentityData(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			delegate, err := New(ctx, &jwsprovider.MockJWSProvider{}, "http://test")
+			delegate, err := New(ctx, &jwsprovider.MockProvider{}, "http://test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +107,7 @@ func TestCreateCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mockJWSProvider := jwsprovider.MockJWSProvider{}
+	mockJWSProvider := jwsprovider.MockProvider{}
 	mockJWSProvider.Test(t)
 
 	mockJWSProvider.On("Sign", ctx, mock.Anything).Return(func(_ context.Context, token []byte) []byte {
