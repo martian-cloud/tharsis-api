@@ -352,17 +352,32 @@ func (r RootResolver) ServiceAccount(ctx context.Context, args *ServiceAccountQu
 
 // CreateServiceAccount creates a new service account
 func (r RootResolver) CreateServiceAccount(ctx context.Context, args *struct{ Input *CreateServiceAccountInput }) (*ServiceAccountMutationPayloadResolver, error) {
-	return createServiceAccountMutation(ctx, args.Input)
+	response, err := createServiceAccountMutation(ctx, args.Input)
+	if err != nil {
+		return handleServiceAccountMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
 }
 
 // UpdateServiceAccount updates an existing service account
 func (r RootResolver) UpdateServiceAccount(ctx context.Context, args *struct{ Input *UpdateServiceAccountInput }) (*ServiceAccountMutationPayloadResolver, error) {
-	return updateServiceAccountMutation(ctx, args.Input)
+	response, err := updateServiceAccountMutation(ctx, args.Input)
+	if err != nil {
+		return handleServiceAccountMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
 }
 
 // DeleteServiceAccount deletes a service account
 func (r RootResolver) DeleteServiceAccount(ctx context.Context, args *struct{ Input *DeleteServiceAccountInput }) (*ServiceAccountMutationPayloadResolver, error) {
-	return deleteServiceAccountMutation(ctx, args.Input)
+	response, err := deleteServiceAccountMutation(ctx, args.Input)
+	if err != nil {
+		return handleServiceAccountMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
 }
 
 // ServiceAccountCreateToken creates a token for a service account
