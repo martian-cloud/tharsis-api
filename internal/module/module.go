@@ -75,7 +75,7 @@ func GetModuleRegistryEndpointForHost(httpClient *http.Client, host string) (*ur
 }
 
 // BuildTokenEnvVar builds the environment variable name to supply the authorization token for the specified host.
-// For reasoning for implementatino - https://www.terraform.io/cli/config/config-file#environment-variable-credentials
+// For reasoning for implementation - https://www.terraform.io/cli/config/config-file#environment-variable-credentials
 func BuildTokenEnvVar(host string) (string, error) {
 	// Use HashiCorp's svchost package to help us consistently convert from unicode to ASCII using punycode.
 	hostname, err := svchost.ForComparison(host)

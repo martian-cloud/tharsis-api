@@ -33,10 +33,10 @@ func resolveModuleSource(moduleSource string, moduleVersion string, variables ma
 		return "", fmt.Errorf("unable to find an authorization token for host %s; invalid host %v", host, err)
 	}
 
-	token, ok := variables[wantVar]
-	if !ok {
-		return "", fmt.Errorf("unable to find an authorization token for host %s; expected environment variable %s",
-			host, wantVar)
+	var token *string
+	if t, ok := variables[wantVar]; ok {
+		// Use token if one is provided.
+		token = &t
 	}
 
 	// Create an HTTP client to use for the next requests:
@@ -65,21 +65,32 @@ func resolveModuleSource(moduleSource string, moduleVersion string, variables ma
 
 // getPreSignedURL returns a string of the pre-signed URL to download the actual module content
 // for example, https://gitlab.com/api/v4/packages/terraform/modules/v1/mygroup/module-001/aws/0.0.1/download
-func getPreSignedURL(httpClient http.Client, token string, registryURL *url.URL) (string, error) {
+func getPreSignedURL(httpClient http.Client, token *string, registryURL *url.URL) (string, error) {
 	downloadURLString := registryURL.String()
 
 	req, err := http.NewRequest(http.MethodGet, downloadURLString, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate the download GET request: %s", downloadURLString)
 	}
-	req.Header.Set("AUTHORIZATION", fmt.Sprintf("Bearer %s", token))
+
+	if token != nil {
+		req.Header.Set("AUTHORIZATION", fmt.Sprintf("Bearer %s", *token))
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		if resp.StatusCode == http.StatusUnauthorized {
-			// Since we were able to make the request, we can assume the host is correct
-			envVar, _ := module.BuildTokenEnvVar(registryURL.Host)
-			return "", fmt.Errorf("token in environment variable '%s' is apparently not authorized to access this module", envVar)
+			envVar, bErr := module.BuildTokenEnvVar(registryURL.Host)
+			if bErr != nil {
+				return "", bErr
+			}
+
+			if token != nil {
+				// Since we were able to make the request with a token we can assume the host is correct but token is bad.
+				return "", fmt.Errorf("token in environment variable '%s' is apparently not authorized to access this module", envVar)
+			}
+			// Required token environment variable was not provided.
+			return "", fmt.Errorf("missing required environment variable '%s' for host %s", envVar, registryURL.Host)
 		}
 		return "", fmt.Errorf("failed to visit download URL: %s", downloadURLString)
 	}
