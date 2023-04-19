@@ -3,6 +3,7 @@
 package pagination
 
 //go:generate mockery --name Connection --inpackage --case underscore
+//go:generate mockery --srcpkg github.com/jackc/pgx/v4 --name Rows
 
 import (
 	"context"

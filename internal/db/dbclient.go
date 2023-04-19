@@ -1,7 +1,5 @@
 package db
 
-//go:generate mockery --srcpkg github.com/jackc/pgx/v4 --name Rows
-
 import (
 	"context"
 	"database/sql"
@@ -17,8 +15,8 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 const initialResourceVersion int = 1

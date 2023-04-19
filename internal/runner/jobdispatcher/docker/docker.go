@@ -20,7 +20,7 @@ import (
 	"github.com/dustin/go-humanize"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 var pluginDataRequiredFields = []string{"host", "image", "api_url"}
