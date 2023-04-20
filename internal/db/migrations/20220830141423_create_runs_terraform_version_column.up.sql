@@ -1,2 +1,0 @@
-ALTER TABLE runs
-    ADD COLUMN IF NOT EXISTS terraform_version VARCHAR NOT NULL DEFAULT '1.2.2';

@@ -2,6 +2,7 @@ DROP TRIGGER jobs_notify_event ON jobs;
 DROP TRIGGER runs_notify_event ON runs;
 DROP TRIGGER workspaces_notify_event ON workspaces;
 DROP TRIGGER job_log_descriptors_notify_event ON job_log_descriptors;
+DROP TRIGGER runners_notify_event ON runners;
 
 DROP FUNCTION notify_event;
 
@@ -9,6 +10,19 @@ DROP FUNCTION notify_event;
 ALTER TABLE workspaces DROP CONSTRAINT fk_current_job_id;
 ALTER TABLE workspaces DROP CONSTRAINT fk_current_state_version_id;
 
+DROP TABLE activity_events;
+DROP TABLE service_account_runner_relation;
+DROP TABLE runners;
+DROP TABLE terraform_module_attestations;
+DROP TABLE terraform_module_versions;
+DROP TABLE terraform_modules;
+DROP TABLE workspace_vcs_provider_links;
+DROP TABLE vcs_providers;
+DROP TABLE scim_tokens;
+DROP TABLE terraform_provider_platforms;
+DROP TABLE terraform_provider_versions;
+DROP TABLE terraform_providers;
+DROP TABLE gpg_keys;
 DROP TABLE namespace_variables;
 DROP TABLE job_log_descriptors;
 DROP TABLE jobs;
@@ -25,7 +39,9 @@ DROP TABLE runs;
 DROP TABLE plans;
 DROP TABLE applies;
 DROP TABLE configuration_versions;
+DROP TABLE vcs_events;
 DROP TABLE namespace_memberships;
+DROP TABLE roles;
 DROP TABLE teams;
 DROP TABLE service_accounts;
 DROP TABLE namespaces;
