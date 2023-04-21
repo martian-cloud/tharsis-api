@@ -141,12 +141,9 @@ func (j *JobCaller) requireRunAccess(ctx context.Context, _ *permissions.Permiss
 		return nil
 	}
 
-	if checks.workspaceID != nil && j.WorkspaceID == *checks.workspaceID {
-		// Job belongs to workspace.
-		return nil
-	}
-
-	return authorizationError(ctx, false)
+	// TODO: revert to previous behavior (only compare workspaceIDs) after SDK has been
+	// updated to not query for Run when only the current state version outputs are needed.
+	return j.requireAccessToWorkspaces(ctx, nil, checks)
 }
 
 // requirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
