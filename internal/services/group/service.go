@@ -24,6 +24,10 @@ type GetGroupsInput struct {
 	PaginationOptions *pagination.Options
 	// ParentGroup filters the groups by the parent group
 	ParentGroup *models.Group
+	// Search is used to search for a group by name or namespace path
+	Search *string
+	// Set RootOnly true to get only root groups returned by the query.
+	RootOnly bool
 }
 
 // DeleteGroupInput is the input for deleting a group
@@ -110,7 +114,10 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 	dbInput := db.GetGroupsInput{
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
-		Filter:            &db.GroupFilter{},
+		Filter: &db.GroupFilter{
+			Search:   input.Search,
+			RootOnly: input.RootOnly,
+		},
 	}
 
 	if input.ParentGroup != nil {
@@ -126,10 +133,27 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 			return nil, err
 		}
 
+		// Return only groups that the caller has access to.
 		if !policy.AllowAll {
-			dbInput.Filter.NamespaceIDs = policy.RootNamespaceIDs
-		} else {
-			dbInput.Filter.RootOnly = true
+			if input.RootOnly {
+				dbInput.Filter.NamespaceIDs = policy.RootNamespaceIDs
+			} else {
+
+				// This is not needed if RootOnly is true, because policy.RootNamespaceIDs has already done auth filtering.
+				if err = auth.HandleCaller(
+					ctx,
+					func(_ context.Context, c *auth.UserCaller) error {
+						dbInput.Filter.UserMemberID = &c.User.Metadata.ID
+						return nil
+					},
+					func(_ context.Context, c *auth.ServiceAccountCaller) error {
+						dbInput.Filter.ServiceAccountMemberID = &c.ServiceAccountID
+						return nil
+					},
+				); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 

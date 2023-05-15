@@ -390,7 +390,26 @@ func TestGetGroups(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
+	createdWarmupGroups, groupMap, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
+	require.Nil(t, err)
+
+	// Users for testing search.
+	createdWarmupUsers, userMap, err := createInitialUsers(ctx, testClient, warmupUsersForSearch)
+	require.Nil(t, err)
+
+	// Service account(s) for testing search.
+	createdWarmupServiceAccounts, serviceAccountMap, err := createInitialServiceAccounts(ctx, testClient,
+		groupMap, warmupServiceAccountsForSearch)
+	require.Nil(t, err)
+
+	// Must create a role before creating namespace memberships.
+	_, rolesMap, err := createInitialRoles(ctx, testClient, warmupRolesForSearch)
+	require.Nil(t, err)
+
+	// Namespace memberships for testing search.
+	emptyMap := map[string]string{}
+	_, err = createInitialNamespaceMemberships(ctx, testClient,
+		emptyMap, userMap, groupMap, serviceAccountMap, rolesMap, warmupNamespaceMembershipsForSearch)
 	require.Nil(t, err)
 
 	allGroupInfos, err := groupInfoFromGroups(ctx, testClient.client.getConnection(ctx), createdWarmupGroups)
@@ -921,6 +940,182 @@ func TestGetGroups(t *testing.T) {
 			},
 			expectGroupPaths:     []string{allPaths[3]},
 			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, empty string, no other restrictions",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String(""),
+				},
+			},
+			expectGroupPaths:     allPaths, // should find all 6 of them
+			expectPageInfo:       pagination.PageInfo{TotalCount: 6, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, no other restrictions",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("group"),
+				},
+			},
+			expectGroupPaths:     allPaths, // should find all 6 of them
+			expectPageInfo:       pagination.PageInfo{TotalCount: 6, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, 1, no other restrictions",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("1"),
+				},
+			},
+			expectGroupPaths:     allPaths[0:4],
+			expectPageInfo:       pagination.PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, a, no other restrictions",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("a"),
+				},
+			},
+			expectGroupPaths:     allPaths[1:2],
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, 2, no other restrictions",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("2"),
+				},
+			},
+			expectGroupPaths:     allPaths[1:5],
+			expectPageInfo:       pagination.PageInfo{TotalCount: 4, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, parent ID non-empty",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search:   ptr.String("group"),
+					ParentID: &allGroupIDs[0], // top-level-group-1
+				},
+			},
+			expectGroupPaths:     allPaths[1:3], // 1, 2
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, with UserMemberID", // verifies auth checks for non-root-only
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search:       ptr.String("group"),
+					UserMemberID: &createdWarmupUsers[0].Metadata.ID, // top-level-group-1/2nd-level-group-1a
+				},
+			},
+			expectGroupPaths:     allPaths[1:2], // top-level-group-1/2nd-level-group-1a
+			expectPageInfo:       pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, with ServiceAccountMemberID", // verifies auth checks for non-root-only
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search:                 ptr.String("group"),
+					ServiceAccountMemberID: &createdWarmupServiceAccounts[0].Metadata.ID, // top-level-group-1/2nd-level-group-1b...
+				},
+			},
+			expectGroupPaths:     allPaths[2:4], // top-level-group-1/2nd-level-group-1b...
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, GroupIDs",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("group"),
+					GroupIDs: []string{
+						allGroupIDs[1], // top-level-group-1/2nd-level-group-1a
+						allGroupIDs[4], // top-level-group-2
+					},
+				},
+			},
+			expectGroupPaths:     []string{allPaths[1], allPaths[4]}, // top-level-group-1/2nd-level-group-1a, top-level-group-2
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, NamespaceIDs",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("group"),
+					NamespaceIDs: []string{
+						allNamespaceIDs[5], // top-level-group-3
+						allNamespaceIDs[3], // top-level-group-1/2nd-level-group-1b/3rd-level-group-1b1
+					},
+				},
+			},
+			expectGroupPaths: []string{
+				allPaths[3], // top-level-group-1/2nd-level-group-1b/3rd-level-group-1b1
+				allPaths[5], // top-level-group-3
+			},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, root only",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search:   ptr.String("group"),
+					RootOnly: true,
+				},
+			},
+			expectGroupPaths:     []string{allPaths[0], allPaths[4], allPaths[5]}, // top-level-group-{1,2,3}
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "search, plain search, group, NamespaceIDs and root only", // verifies auth checks for root-only
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					Search: ptr.String("group"),
+					NamespaceIDs: []string{
+						allNamespaceIDs[5], // top-level-group-3
+						allNamespaceIDs[0], // top-level-group-1
+					},
+					RootOnly: true,
+				},
+			},
+			expectGroupPaths:     []string{allPaths[0], allPaths[5]}, // top-level-group-{1,3}
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1775,6 +1970,53 @@ var standardWarmupGroups = []models.Group{
 		Description: "third level group 1b1 for testing group functions",
 		FullPath:    "top-level-group-1/2nd-level-group-1b/3rd-level-group-1b1",
 		CreatedBy:   "someone-third",
+	},
+}
+
+// Warmup users for GetGroups search.
+var warmupUsersForSearch = []models.User{
+	{
+		Username: "plain-user",
+		Email:    "plain-user@invalid.example",
+		Admin:    false,
+		Active:   true,
+	},
+}
+
+// Warmup service account(s) for GetGroups search.
+var warmupServiceAccountsForSearch = []models.ServiceAccount{
+	{
+		ResourcePath:      "sa-resource-path-for-search",
+		Name:              "service-account-for-search",
+		Description:       "service account for search",
+		GroupID:           "top-level-group-1", // will be fixed later
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	},
+}
+
+// A role is a prerequisite for the namespace memberships.
+var warmupRolesForSearch = []models.Role{
+	{
+		Name:        "role-a",
+		Description: "role a for namespace membership tests",
+		CreatedBy:   "someone-a",
+	},
+}
+
+// Namespace memberships for GetGroups search.
+var warmupNamespaceMembershipsForSearch = []CreateNamespaceMembershipInput{
+	{
+		UserID:           ptr.String("plain-user"),
+		ServiceAccountID: nil,
+		NamespacePath:    "top-level-group-1/2nd-level-group-1a",
+		RoleID:           "role-a",
+	},
+	{
+		UserID:           nil,
+		ServiceAccountID: ptr.String("service-account-for-search"),
+		NamespacePath:    "top-level-group-1/2nd-level-group-1b",
+		RoleID:           "role-a",
 	},
 }
 

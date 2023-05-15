@@ -37,10 +37,13 @@ type Groups interface {
 
 // GroupFilter contains the supported fields for filtering Group resources
 type GroupFilter struct {
-	ParentID     *string
-	GroupIDs     []string
-	NamespaceIDs []string
-	RootOnly     bool
+	ParentID               *string
+	UserMemberID           *string
+	ServiceAccountMemberID *string
+	Search                 *string
+	GroupIDs               []string
+	NamespaceIDs           []string
+	RootOnly               bool
 }
 
 // GroupSortableField represents the fields that a group can be sorted by
@@ -104,22 +107,22 @@ func (g *groups) GetGroupByFullPath(ctx context.Context, path string) (*models.G
 }
 
 func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsResult, error) {
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.RootOnly {
-			ex["groups.parent_id"] = nil
+			ex = ex.Append(goqu.I("groups.parent_id").Eq(nil))
 		}
 
 		if input.Filter.GroupIDs != nil {
 			// This check avoids an SQL syntax error if an empty slice is provided.
 			if len(input.Filter.GroupIDs) > 0 {
-				ex["groups.id"] = input.Filter.GroupIDs
+				ex = ex.Append(goqu.I("groups.id").In(input.Filter.GroupIDs))
 			}
 		}
 
 		if input.Filter.ParentID != nil {
-			ex["groups.parent_id"] = *input.Filter.ParentID
+			ex = ex.Append(goqu.I("groups.parent_id").Eq(*input.Filter.ParentID))
 		}
 
 		if input.Filter.NamespaceIDs != nil {
@@ -130,7 +133,27 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 				}, nil
 			}
 
-			ex["namespaces.id"] = input.Filter.NamespaceIDs
+			ex = ex.Append(goqu.I("namespaces.id").In(input.Filter.NamespaceIDs))
+		}
+
+		if input.Filter.UserMemberID != nil {
+			ex = ex.Append(
+				namespaceMembershipExpressionBuilder{
+					userID: input.Filter.UserMemberID,
+				}.build(),
+			)
+		}
+
+		if input.Filter.ServiceAccountMemberID != nil {
+			ex = ex.Append(
+				namespaceMembershipExpressionBuilder{
+					serviceAccountID: input.Filter.ServiceAccountMemberID,
+				}.build(),
+			)
+		}
+
+		if input.Filter.Search != nil && *input.Filter.Search != "" {
+			ex = ex.Append(goqu.I("namespaces.path").Like("%" + *input.Filter.Search + "%"))
 		}
 	}
 
