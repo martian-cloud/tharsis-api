@@ -19,6 +19,7 @@ type Query {
     first: Int
     last: Int
     parentPath: String
+    search: String
     sort: GroupSort
   ): GroupConnection!
   workspace(fullPath: String!): Workspace

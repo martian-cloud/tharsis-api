@@ -30,6 +30,7 @@ import (
 type GroupConnectionQueryArgs struct {
 	ConnectionQueryArgs
 	ParentPath *string
+	Search     *string
 }
 
 // GroupQueryArgs are used to query a single group
@@ -403,11 +404,14 @@ func groupsQuery(ctx context.Context, args *GroupConnectionQueryArgs) (*GroupCon
 		return nil, err
 	}
 
+	// If parent-path is not nil and empty, set RootOnly in the input struct.
 	input := group.GetGroupsInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		Search:            args.Search,
+		RootOnly:          (args.ParentPath != nil) && (*args.ParentPath == ""),
 	}
 
-	if args.ParentPath != nil {
+	if (args.ParentPath != nil) && (*args.ParentPath != "") {
 		parent, err := getGroupService(ctx).GetGroupByFullPath(ctx, *args.ParentPath)
 		if err != nil {
 			return nil, err

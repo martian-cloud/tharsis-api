@@ -16,6 +16,29 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
+type mockDBClient struct {
+	*db.Client
+	MockTransactions *db.MockTransactions
+	MockGroups       *db.MockGroups
+}
+
+func buildDBClientWithMocks(t *testing.T) *mockDBClient {
+	mockTransactions := db.MockTransactions{}
+	mockTransactions.Test(t)
+
+	mockGroups := db.MockGroups{}
+	mockGroups.Test(t)
+
+	return &mockDBClient{
+		Client: &db.Client{
+			Transactions: &mockTransactions,
+			Groups:       &mockGroups,
+		},
+		MockTransactions: &mockTransactions,
+		MockGroups:       &mockGroups,
+	}
+}
+
 func TestCreateTopLevelGroup(t *testing.T) {
 	// Test cases
 	tests := []struct {
@@ -166,6 +189,609 @@ func TestCreateNestedGroup(t *testing.T) {
 			} else {
 				assert.Equal(t, &test.input, group)
 			}
+		})
+	}
+}
+
+// TestGetGroups verifies that the auth filters are correctly passed to the DB layer for various conditions.
+// This test currently mainly exercises the search feature.
+func TestGetGroups(t *testing.T) {
+	parentGroupID := "this-is-a-fake-parent-group-ID"
+	parentGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: parentGroupID,
+		},
+	}
+	emptySearch := ""
+	nonEmptySearch := "non-empty-search-string"
+	userMemberID := "this-is-a-fake-user-member-ID"
+	serviceAccountMemberID := "this is a fake-service-account-member-ID"
+	serviceAccountPath := "this/is/a/fake/service/account/path"
+
+	// Because this test focuses only on the filters passed to the DB layer, don't worry about end-to-end errors and such.
+	type testCase struct {
+		svcInput   *GetGroupsInput
+		dbInput    *db.GetGroupsInput
+		name       string
+		callerType string // "admin", "user", "service-account"
+	}
+
+	// Test cases
+	testCases := []testCase{
+		{
+			name:       "admin caller, no parent group, search absent/nil, no root-only",
+			callerType: "admin",
+			svcInput:   &GetGroupsInput{
+				// everything nil/false
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					// everything nil/false
+				},
+			},
+		},
+		{
+			name:       "admin caller, no parent group, search absent/nil, with root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "admin caller, no parent group, search empty, no root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				Search: &emptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search: &emptySearch,
+				},
+			},
+		},
+		{
+			name:       "admin caller, no parent group, search empty, with root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				Search:   &emptySearch,
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search:   &emptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "admin caller, no parent group, search non-empty, no root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				Search: &nonEmptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search: &nonEmptySearch,
+				},
+			},
+		},
+		{
+			name:       "admin caller, no parent group, search non-empty, with root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				Search:   &nonEmptySearch,
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search:   &nonEmptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "admin caller, with parent group, search absent/nil, no root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+				},
+			},
+		},
+		{
+			name:       "admin caller, with parent group, search absent/nil, with root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "admin caller, with parent group, search empty, no root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &emptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &emptySearch,
+				},
+			},
+		},
+		{
+			name:       "admin caller, with parent group, search empty, with root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &emptySearch,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &emptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "admin caller, with parent group, search non-empty, no root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &nonEmptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &nonEmptySearch,
+				},
+			},
+		},
+		{
+			name:       "admin caller, with parent group, search non-empty, with root-only",
+			callerType: "admin",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &nonEmptySearch,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &nonEmptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "user member caller, no parent group, search absent/nil, no root-only",
+			callerType: "user",
+			svcInput:   &GetGroupsInput{
+				// everything nil/false
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					UserMemberID: &userMemberID,
+				},
+			},
+		},
+		{
+			name:       "user member caller, no parent group, search absent/nil, with root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					NamespaceIDs: []string{},
+					RootOnly:     true,
+				},
+			},
+		},
+		{
+			name:       "user member caller, no parent group, search empty, no root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				Search: &emptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					UserMemberID: &userMemberID,
+					Search:       &emptySearch,
+				},
+			},
+		},
+		{
+			name:       "user member caller, no parent group, search empty, with root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				Search:   &emptySearch,
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search:       &emptySearch,
+					NamespaceIDs: []string{},
+					RootOnly:     true,
+				},
+			},
+		},
+		{
+			name:       "user member caller, no parent group, search non-empty, no root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				Search: &nonEmptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					UserMemberID: &userMemberID,
+					Search:       &nonEmptySearch,
+				},
+			},
+		},
+		{
+			name:       "user member caller, no parent group, search non-empty, with root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				Search:   &nonEmptySearch,
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search:       &nonEmptySearch,
+					NamespaceIDs: []string{},
+					RootOnly:     true,
+				},
+			},
+		},
+		{
+			name:       "user member caller, with parent group, search absent/nil, no root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+				},
+			},
+		},
+		{
+			name:       "user member caller, with parent group, search absent/nil, with root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "user member caller, with parent group, search empty, no root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &emptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &emptySearch,
+				},
+			},
+		},
+		{
+			name:       "user member caller, with parent group, search empty, with root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &emptySearch,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &emptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "user member caller, with parent group, search non-empty, no root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &nonEmptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &nonEmptySearch,
+				},
+			},
+		},
+		{
+			name:       "user member caller, with parent group, search non-empty, with root-only",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &nonEmptySearch,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &nonEmptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, no parent group, search absent/nil, no root-only",
+			callerType: "service-account",
+			svcInput:   &GetGroupsInput{
+				// everything nil/false
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ServiceAccountMemberID: &serviceAccountMemberID,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, no parent group, search absent/nil, with root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					NamespaceIDs: []string{},
+					RootOnly:     true,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, no parent group, search empty, no root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				Search: &emptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ServiceAccountMemberID: &serviceAccountMemberID,
+					Search:                 &emptySearch,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, no parent group, search empty, with root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				Search:   &emptySearch,
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search:       &emptySearch,
+					NamespaceIDs: []string{},
+					RootOnly:     true,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, no parent group, search non-empty, no root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				Search: &nonEmptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ServiceAccountMemberID: &serviceAccountMemberID,
+					Search:                 &nonEmptySearch,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, no parent group, search non-empty, with root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				Search:   &nonEmptySearch,
+				RootOnly: true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					Search:       &nonEmptySearch,
+					NamespaceIDs: []string{},
+					RootOnly:     true,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, with parent group, search absent/nil, no root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, with parent group, search absent/nil, with root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, with parent group, search empty, no root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &emptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &emptySearch,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, with parent group, search empty, with root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &emptySearch,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &emptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, with parent group, search non-empty, no root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &nonEmptySearch,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &nonEmptySearch,
+				},
+			},
+		},
+		{
+			name:       "service account member caller, with parent group, search non-empty, with root-only",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				ParentGroup: parentGroup,
+				Search:      &nonEmptySearch,
+				RootOnly:    true,
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &parentGroupID,
+					Search:   &nonEmptySearch,
+					RootOnly: true,
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			dbClient := buildDBClientWithMocks(t)
+
+			mockAuthorizer := auth.MockAuthorizer{}
+			mockAuthorizer.Test(t)
+
+			mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{}, nil)
+
+			mockAuthorizer.On("RequireAccess", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			var testCaller auth.Caller
+			switch test.callerType {
+			case "admin":
+				testCaller = auth.NewUserCaller(
+					&models.User{
+						Metadata: models.ResourceMetadata{
+							ID: userMemberID,
+						},
+						Admin:    true,
+						Username: "user1",
+					},
+					&mockAuthorizer,
+					dbClient.Client,
+				)
+			case "user":
+				testCaller = auth.NewUserCaller(
+					&models.User{
+						Metadata: models.ResourceMetadata{
+							ID: userMemberID,
+						},
+						Admin:    false,
+						Username: "user1",
+					},
+					&mockAuthorizer,
+					dbClient.Client,
+				)
+			case "service-account":
+				testCaller = auth.NewServiceAccountCaller(
+					serviceAccountMemberID,
+					serviceAccountPath,
+					&mockAuthorizer,
+					dbClient.Client,
+				)
+			default:
+				assert.Fail(t, "invalid caller type in test")
+			}
+
+			// If the service layer sends wrong/unexpected auth values, the last argument will prevent the
+			// mocking of the function from taking effect.  Because the mock state is cleared between test
+			// cases, an earlier .On(...) won't mask an error by the service layer.
+			dbClient.MockGroups.On("GetGroups", mock.Anything, test.dbInput).
+				Return(func(_ context.Context, input *db.GetGroupsInput) *db.GroupsResult {
+					return &db.GroupsResult{
+						Groups: []models.Group{},
+					}
+				}, nil,
+				)
+
+			logger, _ := logger.NewForTest()
+			activityService := activityevent.NewService(dbClient.Client, logger)
+			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, activityService)
+			service := NewService(logger, dbClient.Client, namespaceMembershipService, activityService)
+
+			// Call the service function.
+			actualOutput, actualError := service.GetGroups(auth.WithCaller(ctx, testCaller), test.svcInput)
+			if actualError != nil {
+				t.Fatal(actualError)
+			}
+
+			assert.Equal(t, &db.GroupsResult{
+				Groups: []models.Group{},
+			}, actualOutput)
 		})
 	}
 }
