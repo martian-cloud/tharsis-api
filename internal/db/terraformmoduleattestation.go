@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -89,10 +90,18 @@ func NewTerraformModuleAttestations(dbClient *Client) TerraformModuleAttestation
 }
 
 func (t *terraformModuleAttestations) GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleAttestationByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getModuleAttestation(ctx, goqu.Ex{"terraform_module_attestations.id": id})
 }
 
 func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*ModuleAttestationsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleAttestations")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -127,11 +136,13 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -142,6 +153,7 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 	for rows.Next() {
 		item, err := scanTerraformModuleAttestation(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -149,6 +161,7 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -161,10 +174,15 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 }
 
 func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateModuleAttestation")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	digests, err := json.Marshal(moduleAttestation.Digests)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal module attestation digests")
 		return nil, err
 	}
 
@@ -186,6 +204,7 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 		}).
 		Returning(moduleAttestationFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -195,12 +214,17 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 			if isUniqueViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "index_terraform_module_attestations_on_module_and_data_sha_sum":
+					tracing.RecordError(span, nil,
+						"another module attestation with the same data already exists for this module")
 					return nil, errors.New(errors.EConflict, "another module attestation with the same data already exists for this module")
 				default:
+					tracing.RecordError(span, nil,
+						"database constraint violated: %s", pgErr.ConstraintName)
 					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
 				}
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -208,6 +232,10 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 }
 
 func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateModuleAttestation")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	record := goqu.Record{
@@ -222,14 +250,17 @@ func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Contex
 		Where(goqu.Ex{"id": moduleAttestation.Metadata.ID, "version": moduleAttestation.Metadata.Version}).Returning(moduleAttestationFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedModuleAttestation, err := scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -237,6 +268,9 @@ func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Contex
 }
 
 func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteModuleAttestation")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.Delete("terraform_module_attestations").
 		Prepared(true).
@@ -247,14 +281,17 @@ func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Contex
 			},
 		).Returning(moduleAttestationFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanTerraformModuleAttestation(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

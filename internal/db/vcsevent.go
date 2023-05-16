@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -94,10 +95,17 @@ var vcsEventsFieldList = append(
 )
 
 func (ve *vcsEvents) GetEventByID(ctx context.Context, id string) (*models.VCSEvent, error) {
+	ctx, span := tracer.Start(ctx, "db.GetEventByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return ve.getEvent(ctx, goqu.Ex{"vcs_events.id": id})
 }
 
 func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*VCSEventsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetEvents")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	ex := goqu.And()
 	if input.Filter != nil {
@@ -130,11 +138,13 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, ve.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -145,6 +155,7 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 	for rows.Next() {
 		item, err := scanVCSEvent(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -152,6 +163,7 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -164,6 +176,10 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 }
 
 func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateEvent")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("vcs_events").
@@ -183,6 +199,7 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 		}).
 		Returning(vcsEventsFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -192,10 +209,12 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_workspace_id":
+					tracing.RecordError(span, nil, "workspace does not exist")
 					return nil, errors.New(errors.ENotFound, "workspace does not exist")
 				}
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -203,6 +222,10 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 }
 
 func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateEvent")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("vcs_events").
@@ -218,6 +241,7 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 		Returning(vcsEventsFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -225,8 +249,10 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 

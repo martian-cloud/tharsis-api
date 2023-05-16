@@ -25,6 +25,7 @@ const (
 	defaultVCSRepositorySizeLimit      = 1024 * 1024 * 5  // 5 MebiBytes in bytes.
 	defaultAsyncTaskTimeout            = 100              // seconds
 	defaultDBAutoMigrateEnabled        = true
+	defaultOtelTraceEnabled            = false
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -105,6 +106,12 @@ type Config struct {
 
 	// Whether to auto migrate the database
 	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED"`
+
+	// Host and port for OTel gRPC tracing
+	OtelTraceEnabled       bool   `yaml:"otel_trace_enabled" env:"OTEL_TRACE_ENABLED"`
+	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
+	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST"`
+	OtelTraceCollectorPort int    `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT"`
 }
 
 // Validate validates the application configuration.
@@ -128,6 +135,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		VCSRepositorySizeLimit:      defaultVCSRepositorySizeLimit,
 		AsyncTaskTimeout:            defaultAsyncTaskTimeout,
 		DBAutoMigrateEnabled:        defaultDBAutoMigrateEnabled,
+		OtelTraceEnabled:            defaultOtelTraceEnabled,
 	}
 
 	// load from YAML config file

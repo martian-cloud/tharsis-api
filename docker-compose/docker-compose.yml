@@ -114,6 +114,10 @@ services:
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_EXTRA_HOSTS=localhost:host-gateway
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_LOCAL_IMAGE=false # Set to true if using local image.
+      - THARSIS_OTEL_TRACE_ENABLED=true
+      - THARSIS_OTEL_TRACE_TYPE=otlp
+      - THARSIS_OTEL_TRACE_HOST=localhost
+      - THARSIS_OTEL_TRACE_PORT=4317
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Required for job-executor.
     networks:
@@ -139,6 +143,18 @@ services:
       - "127.0.0.1:3000:3000"
     depends_on:
       - api
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.44
+    container_name: tharsis-jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - tharsis
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317" # OTEL port
 
 networks:
   tharsis:

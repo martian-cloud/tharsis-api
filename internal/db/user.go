@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -91,22 +92,42 @@ func NewUsers(dbClient *Client) Users {
 }
 
 func (u *users) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUserByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return u.getUser(ctx, goqu.Ex{"users.id": id})
 }
 
 func (u *users) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUserByEmail")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return u.getUser(ctx, goqu.Ex{"users.email": email})
 }
 
 func (u *users) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUserByUsername")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return u.getUser(ctx, goqu.Ex{"users.username": username})
 }
 
 func (u *users) GetUserBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUserBySCIMExternalID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return u.getUser(ctx, goqu.Ex{"users.scim_external_id": scimExternalID})
 }
 
 func (u *users) GetUserByExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUserByExternalID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	query := dialect.From(goqu.T("users")).
 		Prepared(true).
 		Select(u.getSelectFields()...).
@@ -115,6 +136,7 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -123,6 +145,7 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -130,6 +153,10 @@ func (u *users) GetUserByExternalID(ctx context.Context, issuer string, external
 }
 
 func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error {
+	ctx, span := tracer.Start(ctx, "db.LinkUserWithExternalID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("user_external_identities").
@@ -144,6 +171,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 			"user_id":     userID,
 		}).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
@@ -152,9 +180,12 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"user with external id %s already exists for issuer %s", externalID, issuer)
 				return errors.New(errors.EConflict, "user with external id %s already exists for issuer %s", externalID, issuer)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -162,6 +193,10 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 }
 
 func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUsers")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -198,11 +233,13 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, u.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -213,6 +250,7 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 	for rows.Next() {
 		item, err := scanUser(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -220,6 +258,7 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -232,6 +271,10 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 }
 
 func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateUser")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("users").
@@ -247,19 +290,24 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 			},
 		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedUser, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"user with username %s already exists", user.Username)
 				return nil, errors.New(errors.EConflict, "user with username %s already exists", user.Username)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -267,6 +315,10 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 }
 
 func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateUser")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("users").
@@ -284,6 +336,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 		}).
 		Returning(userFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -291,9 +344,11 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "user with username %s already exists", user.Username)
 				return nil, errors.New(errors.EConflict, "user with username %s already exists", user.Username)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -301,6 +356,10 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 }
 
 func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteUser")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("users").
 		Prepared(true).
 		Where(
@@ -310,14 +369,17 @@ func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
 			},
 		).Returning(userFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

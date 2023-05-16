@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -84,6 +85,10 @@ func NewStateVersions(dbClient *Client) StateVersions {
 
 func (s *stateVersions) GetStateVersions(ctx context.Context,
 	input *GetStateVersionsInput) (*StateVersionsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -115,11 +120,13 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -130,6 +137,7 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	for rows.Next() {
 		item, err := scanStateVersion(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -137,6 +145,7 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -149,6 +158,10 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 }
 
 func (s *stateVersions) GetStateVersionByRunID(ctx context.Context, runID string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersionByRunID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("state_versions").
 		Prepared(true).
 		Select(stateVersionFieldList...).
@@ -156,6 +169,7 @@ func (s *stateVersions) GetStateVersionByRunID(ctx context.Context, runID string
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -165,12 +179,16 @@ func (s *stateVersions) GetStateVersionByRunID(ctx context.Context, runID string
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return stateVersion, nil
 }
 
 func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.From("state_versions").
 		Prepared(true).
@@ -179,6 +197,7 @@ func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -188,12 +207,17 @@ func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return stateVersion, nil
 }
 
 func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateStateVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("state_versions").
@@ -210,6 +234,7 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 		Returning(stateVersionFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -217,6 +242,7 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 
 	if err != nil {
 		s.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return createdStateVersion, nil

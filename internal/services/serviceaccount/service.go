@@ -17,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -125,13 +126,19 @@ func newService(
 }
 
 func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*db.ServiceAccountsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetServiceAccounts")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewServiceAccountPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -163,6 +170,7 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 		Filter:            filter,
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get service accounts")
 		return nil, err
 	}
 
@@ -170,8 +178,13 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 }
 
 func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) ([]models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetServiceAccountsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -181,6 +194,7 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get service accounts")
 		return nil, err
 	}
 
@@ -192,6 +206,7 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -200,13 +215,19 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 }
 
 func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteServiceAccount")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -218,6 +239,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -229,6 +251,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 
 	err = s.dbClient.ServiceAccounts.DeleteServiceAccount(txContext, serviceAccount)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to delete service account")
 		return err
 	}
 
@@ -246,6 +269,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 				Type: string(models.TargetServiceAccount),
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 
@@ -253,23 +277,31 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 }
 
 func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetServiceAccountByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get serviceAccount from DB
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByPath(ctx, path)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get service account by path")
 		return nil, err
 	}
 
 	if serviceAccount == nil {
+		tracing.RecordError(span, nil, "service account with path %s not found", path)
 		return nil, errors.New(errors.ENotFound, "service account with path %s not found", path)
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -277,23 +309,31 @@ func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*mo
 }
 
 func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetServiceAccountByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get serviceAccount from DB
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get service account by ID")
 		return nil, err
 	}
 
 	if serviceAccount == nil {
+		tracing.RecordError(span, nil, "service account with ID %s not found", id)
 		return nil, errors.New(errors.ENotFound, "service account with ID %s not found", id)
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
 	}
 
@@ -301,18 +341,25 @@ func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models
 }
 
 func (s *service) CreateServiceAccount(ctx context.Context, input *models.ServiceAccount) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateServiceAccount")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateServiceAccountPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model
 	if err = input.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate service account model")
 		return nil, err
 	}
 
@@ -326,6 +373,7 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -338,6 +386,7 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 	// Store service account in DB
 	createdServiceAccount, err := s.dbClient.ServiceAccounts.CreateServiceAccount(txContext, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create service account")
 		return nil, err
 	}
 
@@ -350,10 +399,12 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 			TargetType:    models.TargetServiceAccount,
 			TargetID:      createdServiceAccount.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -361,18 +412,25 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 }
 
 func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateServiceAccount")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model
 	if err = serviceAccount.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate service account model")
 		return nil, err
 	}
 
@@ -384,6 +442,7 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -396,6 +455,7 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 	// Store serviceAccount in DB
 	updatedServiceAccount, err := s.dbClient.ServiceAccounts.UpdateServiceAccount(txContext, serviceAccount)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update service account")
 		return nil, err
 	}
 
@@ -408,10 +468,12 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 			TargetType:    models.TargetServiceAccount,
 			TargetID:      updatedServiceAccount.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -419,15 +481,21 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 }
 
 func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*CreateTokenResponse, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateToken")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	// Parse token
 	token, err := jwt.Parse(input.Token)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to decode token")
 		return nil, errors.Wrap(err, errors.EUnauthorized, "failed to decode token")
 	}
 
 	// Check if token is from a valid issuer associated with the service account
 	issuer := token.Issuer()
 	if issuer == "" {
+		tracing.RecordError(span, nil, "JWT is missing issuer claim")
 		return nil, errors.New(errors.EUnauthorized, "JWT is missing issuer claim")
 	}
 
@@ -435,12 +503,16 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByPath(ctx, input.ServiceAccount)
 	if err != nil || serviceAccount == nil {
 		s.logger.Infof("Failed to create token for service account; resource path %s does not exist", input.ServiceAccount)
+		tracing.RecordError(span, nil,
+			"failed to create token for service account; resource path does not exist")
 		return nil, errFailedCreateToken
 	}
 
 	trustPolicies := s.findMatchingTrustPolicies(issuer, serviceAccount.OIDCTrustPolicies)
 	if len(trustPolicies) == 0 {
 		s.logger.Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.ResourcePath, issuer)
+		tracing.RecordError(span, nil,
+			"failed to create token for service account; issuer not found in trust policy")
 		return nil, errFailedCreateToken
 	}
 
@@ -456,6 +528,8 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			if strings.Contains(err.Error(), failedToVerifyJWSSignature) {
 				s.logger.Infof("Failed to create token for service account %s due to invalid token signature",
 					serviceAccount.ResourcePath)
+				tracing.RecordError(span, nil,
+					"failed to create token for service account; invalid token signature")
 				return nil, errFailedCreateToken
 			}
 
@@ -463,6 +537,8 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			if strings.Contains(err.Error(), expiredTokenDetector) {
 				s.logger.Infof("Failed to create token for service account %s due to expired token",
 					serviceAccount.ResourcePath)
+				tracing.RecordError(span, nil,
+					"failed to create token for service account; expired token")
 				return nil, errExpiredToken
 			}
 
@@ -484,6 +560,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 				},
 			})
 			if err != nil {
+				tracing.RecordError(span, err, "failed to generate token for service account")
 				return nil, err
 			}
 
@@ -499,6 +576,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 
 	// We know there was at least one trust policy checked, otherwise we would have returned before the for loop.
 	// To get here, all of the trust policies that were checked must have failed.
+	tracing.RecordError(span, nil, "of the trust policies for issuer, none was satisfied")
 	return nil, errors.New(errors.EUnauthorized,
 		fmt.Sprintf("of the trust policies for issuer %s, none was satisfied", issuer))
 }

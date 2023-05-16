@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -77,12 +78,18 @@ func NewService(
 // Methods for teams.
 
 func (s *service) GetTeamByID(ctx context.Context, id string) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTeamByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	team, err := s.getTeamByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team by ID")
 		return nil, err
 	}
 
@@ -90,12 +97,18 @@ func (s *service) GetTeamByID(ctx context.Context, id string) (*models.Team, err
 }
 
 func (s *service) GetTeamByName(ctx context.Context, name string) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTeamByName")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	team, err := s.dbClient.Teams.GetTeamByName(ctx, name)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team by name")
 		return nil, err
 	}
 
@@ -107,8 +120,13 @@ func (s *service) GetTeamByName(ctx context.Context, name string) (*models.Team,
 }
 
 func (s *service) GetTeamsByIDs(ctx context.Context, idList []string) ([]models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTeamsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	resp, err := s.dbClient.Teams.GetTeams(ctx, &db.GetTeamsInput{Filter: &db.TeamFilter{TeamIDs: idList}})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get teams")
 		return nil, err
 	}
 	teams := resp.Teams
@@ -117,7 +135,12 @@ func (s *service) GetTeamsByIDs(ctx context.Context, idList []string) ([]models.
 }
 
 func (s *service) GetTeams(ctx context.Context, input *GetTeamsInput) (*db.TeamsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTeams")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -133,23 +156,31 @@ func (s *service) GetTeams(ctx context.Context, input *GetTeamsInput) (*db.Teams
 }
 
 func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Team has not yet been created, so it cannot have an ID.
 	if err = caller.RequirePermission(ctx, permissions.CreateTeamPermission); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model
 	if err = team.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate team model")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -161,6 +192,7 @@ func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Te
 
 	createdTeam, err := s.dbClient.Teams.CreateTeam(txContext, team)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create team")
 		return nil, err
 	}
 
@@ -170,10 +202,12 @@ func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Te
 			TargetType: models.TargetTeam,
 			TargetID:   createdTeam.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -186,23 +220,31 @@ func (s *service) CreateTeam(ctx context.Context, team *models.Team) (*models.Te
 }
 
 func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model
 	if vErr := team.Validate(); vErr != nil {
+		tracing.RecordError(span, vErr, "failed to validate team model")
 		return nil, vErr
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -214,6 +256,7 @@ func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Te
 
 	updatedTeam, err := s.dbClient.Teams.UpdateTeam(txContext, team)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update team")
 		return nil, err
 	}
 
@@ -223,10 +266,12 @@ func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Te
 			TargetType: models.TargetTeam,
 			TargetID:   updatedTeam.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -239,17 +284,24 @@ func (s *service) UpdateTeam(ctx context.Context, team *models.Team) (*models.Te
 }
 
 func (s *service) DeleteTeam(ctx context.Context, team *models.Team) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if err = s.dbClient.Teams.DeleteTeam(ctx, team); err != nil {
+		tracing.RecordError(span, err, "failed to delete team")
 		return err
 	}
 
@@ -266,12 +318,18 @@ func (s *service) DeleteTeam(ctx context.Context, team *models.Team) error {
 // Methods for team members.
 
 func (s *service) GetTeamMember(ctx context.Context, username, teamName string) (*models.TeamMember, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTeamMember")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	user, err := s.dbClient.Users.GetUserByUsername(ctx, username)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get user by username")
 		return nil, err
 	}
 	if user == nil {
@@ -281,11 +339,13 @@ func (s *service) GetTeamMember(ctx context.Context, username, teamName string) 
 	team, err := s.GetTeamByName(ctx, teamName)
 	if err != nil {
 		// This catches both access errors and team not found.
+		tracing.RecordError(span, err, "failed to get team by name")
 		return nil, err
 	}
 
 	teamMember, err := s.dbClient.TeamMembers.GetTeamMember(ctx, user.Metadata.ID, team.Metadata.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team member")
 		return nil, err
 	}
 
@@ -300,13 +360,19 @@ func (s *service) GetTeamMember(ctx context.Context, username, teamName string) 
 }
 
 func (s *service) GetTeamMembers(ctx context.Context, input *db.GetTeamMembersInput) (*db.TeamMembersResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTeamMembers")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Do the query.
 	results, err := s.dbClient.TeamMembers.GetTeamMembers(ctx, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team members")
 		return nil, err
 	}
 
@@ -316,18 +382,25 @@ func (s *service) GetTeamMembers(ctx context.Context, input *db.GetTeamMembersIn
 }
 
 func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (*models.TeamMember, error) {
+	ctx, span := tracer.Start(ctx, "svc.AddUserToTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	team, err := s.getTeamByID(ctx, input.TeamID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team by ID")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -340,6 +413,7 @@ func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -351,6 +425,7 @@ func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (
 
 	addedTeamMember, err := s.dbClient.TeamMembers.AddUserToTeam(txContext, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to add user to team")
 		return nil, err
 	}
 
@@ -364,10 +439,12 @@ func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (
 				Maintainer: input.IsMaintainer,
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -375,18 +452,25 @@ func (s *service) AddUserToTeam(ctx context.Context, input *models.TeamMember) (
 }
 
 func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember) (*models.TeamMember, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateTeamMember")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	team, err := s.getTeamByID(ctx, input.TeamID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get am by ID")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -399,6 +483,7 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -410,6 +495,7 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember
 
 	updatedTeamMember, err := s.dbClient.TeamMembers.UpdateTeamMember(txContext, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update team member")
 		return nil, err
 	}
 
@@ -423,10 +509,12 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember
 				Maintainer: input.IsMaintainer,
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -434,18 +522,25 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *models.TeamMember
 }
 
 func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMember) error {
+	ctx, span := tracer.Start(ctx, "svc.RemoveUserFromTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	team, err := s.getTeamByID(ctx, input.TeamID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team by ID")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(team.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -458,6 +553,7 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMemb
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -469,6 +565,7 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMemb
 
 	err = s.dbClient.TeamMembers.RemoveUserFromTeam(txContext, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to remove user from team")
 		return err
 	}
 
@@ -481,6 +578,7 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *models.TeamMemb
 				UserID: &input.UserID,
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 

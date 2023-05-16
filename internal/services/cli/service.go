@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/hc-install/releases"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -89,13 +90,19 @@ func NewService(
 
 // GetTerraformCLIVersions returns all available Terraform CLI versions.
 func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVersions, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetTerraformCLIVersions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Returned versions should adhere to terraformCLIVersionConstraints.
 	constraints, err := version.NewConstraint(terraformCLIVersionConstraints)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate a Terraform CLI version constraint")
 		return nil, err
 	}
 
@@ -107,11 +114,13 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 	// List all the versions that meet constraints above.
 	versionSources, err := versions.List(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to list the versions that meet the specified constraints")
 		return nil, err
 	}
 
 	// If the length here is zero, then the retrieval failed.
 	if len(versionSources) == 0 {
+		tracing.RecordError(span, nil, "failed to get a list of Terraform CLI versions")
 		return nil, errors.New(
 			errors.EInternal,
 			"failed to get a list of Terraform CLI versions",
@@ -131,12 +140,18 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 
 // CreateTerraformCLIDownloadURL
 func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *TerraformCLIVersionsInput) (string, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateTerraformCLIDownloadURL")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return "", err
 	}
 
 	exists, err := s.cliStore.DoesTerraformCLIBinaryExist(ctx, input.Version, input.OS, input.Architecture)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to check whether the Terraform CLI version binary exists")
 		return "", err
 	}
 
@@ -144,6 +159,7 @@ func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *Terr
 	if !exists {
 		s.taskManager.StartTask(func(taskCtx context.Context) {
 			if err := s.downloadTerraformCLIRelease(taskCtx, input); err != nil {
+				// Cannot trace an error, because the span will have already been ended.
 				s.logger.Errorf("error while downloading Terraform CLI release: %v", err)
 			}
 		})

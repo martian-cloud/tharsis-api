@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -100,10 +101,18 @@ func NewServiceAccounts(dbClient *Client) ServiceAccounts {
 
 // GetServiceAccount returns a serviceAccount by ID
 func (s *serviceAccounts) GetServiceAccountByID(ctx context.Context, id string) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "db.GetServiceAccountByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return s.getServiceAccount(ctx, goqu.Ex{"service_accounts.id": id})
 }
 
 func (s *serviceAccounts) GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "db.GetServiceAccountByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	parts := strings.Split(path, "/")
 	name := parts[len(parts)-1]
 	namespace := strings.Join(parts[:len(parts)-1], "/")
@@ -112,6 +121,10 @@ func (s *serviceAccounts) GetServiceAccountByPath(ctx context.Context, path stri
 }
 
 func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*ServiceAccountsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetServiceAccounts")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -195,11 +208,13 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, s.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -210,6 +225,7 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 	for rows.Next() {
 		item, err := scanServiceAccount(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -217,6 +233,7 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -230,10 +247,15 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 
 // CreateServiceAccount creates a new serviceAccount
 func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateServiceAccount")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := s.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -247,6 +269,7 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 
 	trustPoliciesJSON, err := s.marshalOIDCTrustPolicies(serviceAccount.OIDCTrustPolicies)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal OIDC trust policies")
 		return nil, err
 	}
 
@@ -265,6 +288,7 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		}).
 		Returning(serviceAccountFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -272,25 +296,31 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID)
 				return nil, errors.New(
 					errors.EConflict,
 					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID,
 				)
 			}
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
+				tracing.RecordError(span, nil, "invalid group: the specified group does not exist")
 				return nil, errors.New(errors.EConflict, "invalid group: the specified group does not exist")
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, createdServiceAccount.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -301,8 +331,13 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 
 // UpdateServiceAccount updates an existing serviceAccount by name
 func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateServiceAccount")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	trustPoliciesJSON, err := s.marshalOIDCTrustPolicies(serviceAccount.OIDCTrustPolicies)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal OIDC trust policies")
 		return nil, err
 	}
 
@@ -310,6 +345,7 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 
 	tx, err := s.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -332,24 +368,29 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 			},
 		).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).Returning(serviceAccountFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, updatedServiceAccount.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -359,6 +400,10 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 }
 
 func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteServiceAccount")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("service_accounts").
 		Prepared(true).
 		Where(
@@ -368,16 +413,20 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 			},
 		).Returning(serviceAccountFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name)
 				return errors.New(
 					errors.EConflict,
 					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name,
@@ -385,6 +434,7 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 			}
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -413,6 +463,10 @@ func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*m
 }
 
 func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	ctx, span := tracer.Start(ctx, "db.AssignServiceAccountToRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Insert("service_account_runner_relation").
 		Prepared(true).
 		Rows(goqu.Record{
@@ -421,15 +475,18 @@ func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serv
 		}).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "service account already assigned to runner")
 				return errors.New(errors.EConflict, "service account already assigned to runner")
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -437,6 +494,10 @@ func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serv
 }
 
 func (s *serviceAccounts) UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	ctx, span := tracer.Start(ctx, "db.UnassignServiceAccountFromRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("service_account_runner_relation").
 		Prepared(true).
 		Where(
@@ -447,10 +508,12 @@ func (s *serviceAccounts) UnassignServiceAccountFromRunner(ctx context.Context, 
 		).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err = s.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

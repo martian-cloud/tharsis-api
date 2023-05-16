@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -149,6 +150,10 @@ func NewManagedIdentities(dbClient *Client) ManagedIdentities {
 func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 	input *GetManagedIdentityAccessRulesInput,
 ) (*ManagedIdentityAccessRulesResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetManagedIdentityAccessRules")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	conn := m.dbClient.getConnection(ctx)
 	ex := goqu.And()
 
@@ -193,11 +198,13 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, conn, query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -208,6 +215,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 	for rows.Next() {
 		rule, err := scanManagedIdentityRule(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -217,16 +225,19 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 	for i, rule := range rules {
 		allowedUserIDs, err := m.getManagedIdentityAccessRuleAllowedUserIDs(ctx, conn, rule.Metadata.ID)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get managed identity access rule allowed user IDs")
 			return nil, err
 		}
 
 		allowedServiceAccountIDs, err := m.getManagedIdentityAccessRuleAllowedServiceAccountIDs(ctx, conn, rule.Metadata.ID)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get managed identity access rule allowed service account IDs")
 			return nil, err
 		}
 
 		allowedTeamIDs, err := m.getManagedIdentityAccessRuleAllowedTeamIDs(ctx, conn, rule.Metadata.ID)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get managed identity access rule allowed team IDs")
 			return nil, err
 		}
 
@@ -244,6 +255,10 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 }
 
 func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
+	ctx, span := tracer.Start(ctx, "db.GetManagedIdentityAccessRule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	conn := m.dbClient.getConnection(ctx)
 
 	sql, args, err := dialect.From("managed_identity_rules").
@@ -251,6 +266,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ru
 		Select(managedIdentityRuleFieldList...).
 		Where(goqu.Ex{"id": ruleID}).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -259,21 +275,25 @@ func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ru
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	allowedUserIDs, err := m.getManagedIdentityAccessRuleAllowedUserIDs(ctx, conn, ruleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity access rule allowed user IDs")
 		return nil, err
 	}
 
 	allowedServiceAccountIDs, err := m.getManagedIdentityAccessRuleAllowedServiceAccountIDs(ctx, conn, ruleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity access rule allowed service account IDs")
 		return nil, err
 	}
 
 	allowedTeamIDs, err := m.getManagedIdentityAccessRuleAllowedTeamIDs(ctx, conn, ruleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity access rule allowed team IDs")
 		return nil, err
 	}
 
@@ -285,10 +305,15 @@ func (m *managedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ru
 }
 
 func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateManagedIdentityAccessRule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -304,6 +329,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 	if rule.ModuleAttestationPolicies != nil {
 		moduleAttestationPolicies, err = json.Marshal(rule.ModuleAttestationPolicies)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to marshal module attestation policies")
 			return nil, err
 		}
 	}
@@ -323,6 +349,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 		}).
 		Returning(managedIdentityRuleFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -330,9 +357,11 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "rule for run stage %s already exists", rule.RunStage)
 				return nil, errors.New(errors.EConflict, "rule for run stage %s already exists", rule.RunStage)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -346,10 +375,12 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				"user_id": userID,
 			}).ToSQL()
 		if err != nil {
+			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
 		}
 
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			tracing.RecordError(span, err, "failed to execute DB query")
 			return nil, err
 		}
 	}
@@ -364,10 +395,12 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				"service_account_id": serviceAccountID,
 			}).ToSQL()
 		if err != nil {
+			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
 		}
 
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			tracing.RecordError(span, err, "failed to execute DB query")
 			return nil, err
 		}
 	}
@@ -382,15 +415,18 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 				"team_id": teamID,
 			}).ToSQL()
 		if err != nil {
+			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
 		}
 
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			tracing.RecordError(span, err, "failed to execute DB query")
 			return nil, err
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -402,10 +438,15 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 }
 
 func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateManagedIdentityAccessRule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -421,6 +462,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 	if rule.ModuleAttestationPolicies != nil {
 		moduleAttestationPolicies, err = json.Marshal(rule.ModuleAttestationPolicies)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to marshal module attestation policies")
 			return nil, err
 		}
 	}
@@ -436,19 +478,23 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			},
 		).Where(goqu.Ex{"id": rule.Metadata.ID, "version": rule.Metadata.Version}).Returning(managedIdentityRuleFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedRule, err := scanManagedIdentityRule(tx.QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "rule for run stage %s already exists", rule.RunStage)
 				return nil, errors.New(errors.EConflict, "rule for run stage %s already exists", rule.RunStage)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -461,10 +507,12 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			},
 		).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	if _, err = tx.Exec(ctx, deleteAllowedUsersSQL, args...); err != nil {
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return nil, err
 	}
 
@@ -477,10 +525,12 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			},
 		).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	if _, err = tx.Exec(ctx, deleteAllowedServiceAccountsSQL, args...); err != nil {
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return nil, err
 	}
 
@@ -493,10 +543,12 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 			},
 		).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	if _, err := tx.Exec(ctx, deleteAllowedTeamsSQL, args...); err != nil {
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return nil, err
 	}
 
@@ -510,10 +562,12 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"user_id": userID,
 			}).ToSQL()
 		if err != nil {
+			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
 		}
 
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			tracing.RecordError(span, err, "failed to execute DB query")
 			return nil, err
 		}
 	}
@@ -528,10 +582,12 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"service_account_id": serviceAccountID,
 			}).ToSQL()
 		if err != nil {
+			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
 		}
 
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			tracing.RecordError(span, err, "failed to execute DB query")
 			return nil, err
 		}
 	}
@@ -546,15 +602,18 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"team_id": teamID,
 			}).ToSQL()
 		if err != nil {
+			tracing.RecordError(span, err, "failed to generate SQL")
 			return nil, err
 		}
 
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			tracing.RecordError(span, err, "failed to execute DB query")
 			return nil, err
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -566,6 +625,10 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 }
 
 func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteManagedIdentityAccessRule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("managed_identity_rules").
 		Prepared(true).
 		Where(
@@ -575,14 +638,17 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 			},
 		).Returning(managedIdentityRuleFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanManagedIdentityRule(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -590,6 +656,10 @@ func (m *managedIdentities) DeleteManagedIdentityAccessRule(ctx context.Context,
 }
 
 func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context, workspaceID string) ([]models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "db.GetManagedIdentitiesForWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From(t1).
 		Prepared(true).
 		Select(m.getSelectFields(true)...).
@@ -598,11 +668,13 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 		LeftJoin(t2, goqu.On(goqu.Ex{"t1.alias_source_id": goqu.I("t2.id")})).
 		Where(goqu.Ex{"workspace_managed_identity_relation.workspace_id": workspaceID}).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	rows, err := m.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -613,6 +685,7 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 	for rows.Next() {
 		item, err := scanManagedIdentity(rows, true, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -623,6 +696,10 @@ func (m *managedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Context
 }
 
 func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error {
+	ctx, span := tracer.Start(ctx, "db.AddManagedIdentityToWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Insert("workspace_managed_identity_relation").
 		Prepared(true).
 		Rows(goqu.Record{
@@ -630,15 +707,18 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 			"workspace_id":        workspaceID,
 		}).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "managed identity already assigned to workspace")
 				return errors.New(errors.EConflict, "managed identity already assigned to workspace")
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return err
 	}
 
@@ -646,6 +726,10 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 }
 
 func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error {
+	ctx, span := tracer.Start(ctx, "db.RemoveManagedIdentityFromWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("workspace_managed_identity_relation").
 		Prepared(true).
 		Where(
@@ -655,10 +739,12 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 			},
 		).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err = m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return err
 	}
 
@@ -667,6 +753,10 @@ func (m *managedIdentities) RemoveManagedIdentityFromWorkspace(ctx context.Conte
 
 // GetManagedIdentityByID returns a managedIdentity by ID
 func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "db.GetManagedIdentityByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From(t1).
 		Prepared(true).
 		Select(m.getSelectFields(true)...).
@@ -675,6 +765,7 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 		Where(goqu.Ex{"t1.id": id}).
 		ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -683,6 +774,7 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -691,6 +783,10 @@ func (m *managedIdentities) GetManagedIdentityByID(ctx context.Context, id strin
 
 // GetManagedIdentity returns a managedIdentity by namespace path and name.
 func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "db.GetManagedIdentityByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	index := strings.LastIndex(path, "/")
 	sql, args, err := dialect.From(t1).
 		Prepared(true).
@@ -700,6 +796,7 @@ func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path s
 		Where(goqu.Ex{"t1.name": path[index+1:], "namespaces.path": path[:index]}).
 		ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -708,12 +805,17 @@ func (m *managedIdentities) GetManagedIdentityByPath(ctx context.Context, path s
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return managedIdentity, nil
 }
 
 func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *GetManagedIdentitiesInput) (*ManagedIdentitiesResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetManagedIdentities")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -794,11 +896,13 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -809,6 +913,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 	for rows.Next() {
 		item, err := scanManagedIdentity(rows, true, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -816,6 +921,7 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -829,11 +935,16 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 
 // CreateManagedIdentity creates a new managedIdentity
 func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateManagedIdentity")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 	createdID := newResourceID()
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -861,15 +972,18 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 			"alias_source_id": managedIdentity.AliasSourceID,
 		}).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	if _, err = tx.Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "managed identity already exists in the specified group")
 				return nil, errors.New(errors.EConflict, "managed identity already exists in the specified group")
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return nil, err
 	}
 
@@ -882,21 +996,25 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	createdManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql, args...), true, false)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, createdManagedIdentity.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -907,10 +1025,15 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 
 // UpdateManagedIdentity updates an existing managedIdentity by name
 func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateManagedIdentity")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := m.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -933,24 +1056,29 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 			},
 		).Where(goqu.Ex{"id": managedIdentity.Metadata.ID, "version": managedIdentity.Metadata.Version}).Returning(managedIdentityFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedManagedIdentity, err := scanManagedIdentity(tx.QueryRow(ctx, sql, args...), false, false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, updatedManagedIdentity.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -960,6 +1088,10 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 }
 
 func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteManagedIdentity")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("managed_identities").
 		Prepared(true).
 		Where(
@@ -969,20 +1101,24 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 			},
 		).Returning(managedIdentityFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanManagedIdentity(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false, false); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
+				tracing.RecordError(span, nil, "managed identity is still assigned to a workspace")
 				return errors.New(errors.EConflict, "managed identity is still assigned to a workspace")
 			}
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

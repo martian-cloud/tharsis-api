@@ -9,6 +9,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -88,6 +89,10 @@ func NewConfigurationVersions(dbClient *Client) ConfigurationVersions {
 }
 
 func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, input *GetConfigurationVersionsInput) (*ConfigurationVersionsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetConfigurationVersions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -116,11 +121,13 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, c.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -131,6 +138,7 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	for rows.Next() {
 		item, err := scanConfigurationVersion(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -138,6 +146,7 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -150,6 +159,9 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 }
 
 func (c *configurationVersions) GetConfigurationVersion(ctx context.Context, id string) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetConfigurationVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.From("configuration_versions").
 		Prepared(true).
@@ -158,18 +170,24 @@ func (c *configurationVersions) GetConfigurationVersion(ctx context.Context, id 
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	configurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return configurationVersion, nil
 }
 
 func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateConfigurationVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("configuration_versions").
@@ -188,18 +206,24 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 		Returning(configurationVersionFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	createdConfigurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		c.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return createdConfigurationVersion, nil
 }
 
 func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateConfigurationVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("configuration_versions").
@@ -215,6 +239,7 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 		).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).Returning(configurationVersionFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -222,9 +247,11 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		c.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return updatedConfigurationVersion, nil

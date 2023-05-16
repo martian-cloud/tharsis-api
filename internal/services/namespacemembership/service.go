@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -70,13 +71,19 @@ func NewService(
 }
 
 func (s *service) GetNamespaceMembershipsForNamespace(ctx context.Context, namespacePath string) ([]models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceMembershipsForNamespace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithNamespacePath(namespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -99,6 +106,7 @@ func (s *service) GetNamespaceMembershipsForNamespace(ctx context.Context, names
 
 	result, err := s.dbClient.NamespaceMemberships.GetNamespaceMemberships(ctx, dbInput)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace memberships")
 		return nil, err
 	}
 
@@ -130,8 +138,13 @@ func (s *service) GetNamespaceMembershipsForNamespace(ctx context.Context, names
 func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 	input *GetNamespaceMembershipsForSubjectInput,
 ) (*db.NamespaceMembershipResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceMembershipsForSubject")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -146,6 +159,7 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 		// Verify caller has access to the group this service account is in.
 		err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithGroupID(input.ServiceAccount.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	default:
@@ -168,13 +182,19 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 }
 
 func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceMembershipByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	namespaceMembership, err := s.dbClient.NamespaceMemberships.GetNamespaceMembershipByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace membership by ID")
 		return nil, err
 	}
 
@@ -184,6 +204,7 @@ func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*m
 
 	err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithNamespacePath(namespaceMembership.Namespace.Path))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -191,8 +212,13 @@ func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*m
 }
 
 func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string) ([]models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceMembershipsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -204,6 +230,7 @@ func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string
 			},
 		})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace memberships")
 		return nil, err
 	}
 
@@ -215,6 +242,7 @@ func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.NamespaceMembershipResourceType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -225,9 +253,13 @@ func (s *service) GetNamespaceMembershipsByIDs(ctx context.Context, ids []string
 func (s *service) CreateNamespaceMembership(ctx context.Context,
 	input *CreateNamespaceMembershipInput,
 ) (*models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateNamespaceMembership")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	err := s.requirePermissionForNamespace(ctx, input.NamespacePath, permissions.CreateNamespaceMembershipPermission)
 	if err != nil {
+		tracing.RecordError(span, err, "namespace permission check failed")
 		return nil, err
 	}
 
@@ -275,6 +307,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -293,12 +326,14 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 			TeamID:           teamID,
 		})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create namespace membership")
 		return nil, err
 	}
 
 	// Find the role name.
 	role, err := s.getRoleByID(ctx, input.RoleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get role by ID")
 		return nil, err
 	}
 
@@ -317,10 +352,12 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 				Role:             string(role.Name),
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -330,15 +367,20 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	namespaceMembership *models.NamespaceMembership,
 ) (*models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateNamespaceMembership")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	err := s.requirePermissionForNamespace(ctx, namespaceMembership.Namespace.Path, permissions.UpdateNamespaceMembershipPermission)
 	if err != nil {
+		tracing.RecordError(span, err, "namespace permission check failed")
 		return nil, err
 	}
 
 	// Get current state of namespace membership
 	currentMembership, err := s.dbClient.NamespaceMemberships.GetNamespaceMembershipByID(ctx, namespaceMembership.Metadata.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace membership by ID")
 		return nil, err
 	}
 
@@ -354,12 +396,14 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	// Find the previous role to find its name.
 	prevRole, err := s.getRoleByID(ctx, currentMembership.RoleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get role by ID")
 		return nil, err
 	}
 
 	// Find the new role for find its name.
 	newRole, err := s.getRoleByID(ctx, namespaceMembership.RoleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get role by ID")
 		return nil, err
 	}
 
@@ -367,12 +411,14 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	// to prevent the group from becoming orphaned
 	if prevRole.Metadata.ID == models.OwnerRoleID.String() && newRole.Metadata.ID != models.OwnerRoleID.String() && currentMembership.Namespace.IsTopLevel() {
 		if err = s.verifyNotOnlyOwner(ctx, currentMembership); err != nil {
+			tracing.RecordError(span, err, "failed to verify this membership is not the only owner")
 			return nil, err
 		}
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -384,6 +430,7 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 
 	updatedNamespaceMembership, err := s.dbClient.NamespaceMemberships.UpdateNamespaceMembership(txContext, namespaceMembership)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update namespace membership")
 		return nil, err
 	}
 
@@ -398,10 +445,12 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 				NewRole:  string(newRole.Name),
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -409,8 +458,13 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 }
 
 func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteNamespaceMembership")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	err := s.requirePermissionForNamespace(ctx, namespaceMembership.Namespace.Path, permissions.DeleteNamespaceMembershipPermission)
 	if err != nil {
+		tracing.RecordError(span, err, "namespace permission check failed")
 		return err
 	}
 
@@ -418,12 +472,14 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 	// to prevent the group from becoming orphaned
 	if namespaceMembership.RoleID == models.OwnerRoleID.String() && namespaceMembership.Namespace.IsTopLevel() {
 		if err = s.verifyNotOnlyOwner(ctx, namespaceMembership); err != nil {
+			tracing.RecordError(span, err, "failed to verify not the only owner")
 			return err
 		}
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -434,6 +490,7 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 	}()
 
 	if err = s.dbClient.NamespaceMemberships.DeleteNamespaceMembership(txContext, namespaceMembership); err != nil {
+		tracing.RecordError(span, err, "failed to delete namespace membership")
 		return err
 	}
 
@@ -451,6 +508,7 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 				TeamID:           namespaceMembership.TeamID,
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 

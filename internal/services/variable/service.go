@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -67,8 +68,13 @@ func NewService(
 }
 
 func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVariables")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -77,6 +83,7 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 	if err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath)); err == nil {
 		hasViewVariableValuePerm = true
 	} else if err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -100,6 +107,7 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 
 	result, err := s.dbClient.Variables.GetVariables(ctx, dbInput)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get variables")
 		return nil, err
 	}
 
@@ -133,22 +141,30 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 }
 
 func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVariableByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	variable, err := s.dbClient.Variables.GetVariableByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get variable by ID")
 		return nil, err
 	}
 
 	if variable == nil {
+		tracing.RecordError(span, nil, "variable with id %s not found", id)
 		return nil, errors.New(errors.ENotFound, "variable with id %s not found", id)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -156,8 +172,13 @@ func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Varia
 }
 
 func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVariablesByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -168,6 +189,7 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get variables")
 		return nil, err
 	}
 
@@ -179,6 +201,7 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 	if len(namespacePaths) > 0 {
 		err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -187,19 +210,26 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 }
 
 func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) error {
+	ctx, span := tracer.Start(ctx, "svc.SetVariables")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	// Start transaction
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -211,31 +241,37 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 
 	// Delete existing namespace variables
 	if dErr := s.dbClient.Variables.DeleteVariables(txContext, input.NamespacePath, input.Category); dErr != nil {
+		tracing.RecordError(span, dErr, "failed to begin DB transaction")
 		return dErr
 	}
 
 	for _, v := range input.Variables {
 		if input.Category != v.Category {
+			tracing.RecordError(span, nil, "variable category does not match input")
 			return errors.New(errors.EInternal, "variable category does not match input")
 		}
 
 		if input.NamespacePath != v.NamespacePath {
+			tracing.RecordError(span, nil, "variable namespace path does not match input")
 			return errors.New(errors.EInternal, "variable namespace path does not match input")
 		}
 
 		if input.Category == models.EnvironmentVariableCategory && v.Hcl {
+			tracing.RecordError(span, nil, "HCL variables are not supported for the environment category")
 			return errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 		}
 	}
 
 	if len(input.Variables) > 0 {
 		if cErr := s.dbClient.Variables.CreateVariables(txContext, input.NamespacePath, input.Variables); cErr != nil {
+			tracing.RecordError(span, cErr, "failed to create variables")
 			return cErr
 		}
 	}
 
 	targetType, targetID, err := s.getTargetTypeID(txContext, input.NamespacePath)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get target type by ID")
 		return err
 	}
 
@@ -246,6 +282,7 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 			TargetType:    targetType,
 			TargetID:      targetID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 
@@ -253,26 +290,35 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 }
 
 func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateVariable")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if input.Category == models.EnvironmentVariableCategory && input.Hcl {
+		tracing.RecordError(span, nil, "failed to commit DB transaction")
 		return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 	}
 
 	if input.Key == "" {
+		tracing.RecordError(span, nil, "Key cannot be empty")
 		return nil, errors.New(errors.EInvalid, "Key cannot be empty")
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -284,6 +330,7 @@ func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*
 
 	variable, err := s.dbClient.Variables.CreateVariable(txContext, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -294,10 +341,12 @@ func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*
 			TargetType:    models.TargetVariable,
 			TargetID:      variable.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -311,26 +360,35 @@ func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*
 }
 
 func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateVariable")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if variable.Category == models.EnvironmentVariableCategory && variable.Hcl {
+		tracing.RecordError(span, nil, "HCL variables are not supported for the environment category")
 		return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
 	}
 
 	if variable.Key == "" {
+		tracing.RecordError(span, nil, "Key cannot be empty")
 		return nil, errors.New(errors.EInvalid, "Key cannot be empty")
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -342,6 +400,7 @@ func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable)
 
 	updatedVariable, err := s.dbClient.Variables.UpdateVariable(txContext, variable)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -352,10 +411,12 @@ func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable)
 			TargetType:    models.TargetVariable,
 			TargetID:      updatedVariable.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -368,18 +429,25 @@ func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable)
 }
 
 func (s *service) DeleteVariable(ctx context.Context, variable *models.Variable) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteVariable")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -397,11 +465,13 @@ func (s *service) DeleteVariable(ctx context.Context, variable *models.Variable)
 
 	err = s.dbClient.Variables.DeleteVariable(txContext, variable)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
 	targetType, targetID, err := s.getTargetTypeID(txContext, variable.NamespacePath)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get target type ID")
 		return err
 	}
 
@@ -418,6 +488,7 @@ func (s *service) DeleteVariable(ctx context.Context, variable *models.Variable)
 				Type: string(models.TargetVariable),
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 

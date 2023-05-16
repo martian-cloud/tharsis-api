@@ -9,6 +9,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -83,6 +84,9 @@ func NewPlans(dbClient *Client) Plans {
 
 // GetPlan returns a plan by name
 func (p *plans) GetPlan(ctx context.Context, id string) (*models.Plan, error) {
+	ctx, span := tracer.Start(ctx, "db.GetPlan")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.From("plans").
 		Prepared(true).
@@ -91,6 +95,7 @@ func (p *plans) GetPlan(ctx context.Context, id string) (*models.Plan, error) {
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -100,6 +105,7 @@ func (p *plans) GetPlan(ctx context.Context, id string) (*models.Plan, error) {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return plan, nil
@@ -107,6 +113,10 @@ func (p *plans) GetPlan(ctx context.Context, id string) (*models.Plan, error) {
 
 // GetPlans returns a list of plans
 func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetPlans")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -135,11 +145,13 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, p.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -150,6 +162,7 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 	for rows.Next() {
 		item, err := scanPlan(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -157,6 +170,7 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -170,6 +184,10 @@ func (p *plans) GetPlans(ctx context.Context, input *GetPlansInput) (*PlansResul
 
 // CreatePlan creates a new plan by name
 func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
+	ctx, span := tracer.Start(ctx, "db.CreatePlan")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("plans").
@@ -189,6 +207,7 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 		Returning(planFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -196,6 +215,7 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 
 	if err != nil {
 		p.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return createdPlan, nil
@@ -203,6 +223,10 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 
 // UpdatePlan updates an existing plan
 func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdatePlan")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("plans").
@@ -220,6 +244,7 @@ func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 		).Where(goqu.Ex{"id": plan.Metadata.ID, "version": plan.Metadata.Version}).Returning(planFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -227,9 +252,11 @@ func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		p.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return updatedPlan, nil

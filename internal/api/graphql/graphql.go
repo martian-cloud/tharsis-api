@@ -14,6 +14,7 @@ import (
 	"github.com/graph-gophers/dataloader"
 	"github.com/graph-gophers/graphql-go"
 	grapherrors "github.com/graph-gophers/graphql-go/errors"
+	"github.com/graph-gophers/graphql-go/trace/otel"
 
 	complexity "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -99,7 +100,11 @@ func NewGraphQL(
 	resolver.RegisterRoleLoader(loaderCollection)
 	resolver.RegisterRunnerLoader(loaderCollection)
 
-	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers())
+	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers(),
+		graphql.Tracer(&otel.Tracer{
+			Tracer: tracer,
+		}),
+	)
 
 	httpHandler := httpHandler{
 		schema:         schema,

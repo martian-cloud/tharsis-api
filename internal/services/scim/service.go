@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -121,8 +122,13 @@ func NewService(
 }
 
 func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateSCIMToken")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -146,6 +152,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 	// Transaction is used to avoid invalidating previous token if new one fails creation.
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -158,6 +165,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 	// Find any previous token, so it can be invalidated (deleted).
 	tokens, err := s.dbClient.SCIMTokens.GetTokens(txContext)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get tokens to invalidate")
 		return nil, err
 	}
 
@@ -167,6 +175,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 			tokenCopy := token
 			err = s.dbClient.SCIMTokens.DeleteToken(txContext, &tokenCopy)
 			if err != nil {
+				tracing.RecordError(span, err, "failed to delete any previous tokens")
 				return nil, err
 			}
 		}
@@ -182,6 +191,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate token")
 		return nil, err
 	}
 
@@ -193,10 +203,12 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 	// Returned models is not needed.
 	_, err = s.dbClient.SCIMTokens.CreateToken(txContext, input)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create token")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -208,8 +220,13 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 }
 
 func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput) ([]models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetSCIMUsers")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	// Any authenticated user can view basic user information.
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -219,6 +236,7 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput)
 	if input.SCIMExternalID != "" {
 		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, input.SCIMExternalID)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get a SCIM user by scimExternalID")
 			return nil, errors.Wrap(err, errors.ENotFound, "failed to get a SCIM user by scimExternalID")
 		}
 
@@ -236,6 +254,7 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput)
 		}
 		result, err := s.dbClient.Users.GetUsers(ctx, input)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get users")
 			return nil, err
 		}
 
@@ -246,12 +265,18 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput)
 }
 
 func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateSCIMUser")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = caller.RequirePermission(ctx, permissions.CreateUserPermission); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -260,6 +285,7 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 	// Check if user with the email already exists.
 	existingUser, err := s.dbClient.Users.GetUserByEmail(ctx, input.Email)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get user by email")
 		return nil, err
 	}
 
@@ -272,6 +298,7 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 
 		createdUser, err = s.dbClient.Users.UpdateUser(ctx, existingUser)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to update user")
 			return nil, err
 		}
 	}
@@ -287,6 +314,7 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 
 		createdUser, err = s.dbClient.Users.CreateUser(ctx, newUser)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to create user")
 			return nil, err
 		}
 	}
@@ -295,23 +323,31 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 }
 
 func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateSCIMUser")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	updatedUser, err := s.processSCIMUserOperations(ctx, input.Operations, input.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to process SCIM user operations")
 		return nil, err
 	}
 
 	updatedUser, err = s.dbClient.Users.UpdateUser(ctx, updatedUser)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update user")
 		return nil, err
 	}
 
@@ -319,18 +355,25 @@ func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput
 }
 
 func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceInput) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteSCIMUser")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	user, err := s.dbClient.Users.GetUserByID(ctx, input.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get user by ID")
 		return err
 	}
 
@@ -345,8 +388,13 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 }
 
 func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput) ([]models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetSCIMGroups")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	// Any authenticated user can view basic scim group information.
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -356,6 +404,7 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput
 	if input.SCIMExternalID != "" {
 		team, err := s.dbClient.Teams.GetTeamBySCIMExternalID(ctx, input.SCIMExternalID)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get a SCIM group by scimExternalID")
 			return nil, errors.Wrap(err, errors.ENotFound, "failed to get a SCIM group by scimExternalID")
 		}
 
@@ -373,6 +422,7 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput
 		}
 		result, err := s.dbClient.Teams.GetTeams(ctx, input)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get teams")
 			return nil, err
 		}
 
@@ -383,18 +433,25 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput
 }
 
 func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInput) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateSCIMGroup")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if err = caller.RequirePermission(ctx, permissions.CreateTeamPermission); err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Check if team with same name exists.
 	existingTeam, err := s.dbClient.Teams.GetTeamByName(ctx, input.Name)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team by name")
 		return nil, err
 	}
 
@@ -405,6 +462,7 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 		existingTeam.SCIMExternalID = input.SCIMExternalID
 		createdTeam, err = s.dbClient.Teams.UpdateTeam(ctx, existingTeam)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to update team")
 			return nil, err
 		}
 	}
@@ -418,6 +476,7 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 
 		createdTeam, err = s.dbClient.Teams.CreateTeam(ctx, newTeam)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to create team")
 			return nil, err
 		}
 	}
@@ -426,18 +485,25 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 }
 
 func (s *service) UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInput) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateSCIMGroup")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	updatedTeam, err := s.processSCIMGroupOperations(ctx, input.Operations, input.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failes to process SCIM group operations")
 		return nil, err
 	}
 
@@ -445,18 +511,25 @@ func (s *service) UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInpu
 }
 
 func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResourceInput) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteSCIMGroup")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	team, err := s.dbClient.Teams.GetTeamByID(ctx, input.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get team by ID")
 		return err
 	}
 

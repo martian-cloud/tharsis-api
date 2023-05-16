@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -33,20 +34,30 @@ func NewSCIMTokens(dbClient *Client) SCIMTokens {
 }
 
 func (s *scimTokens) GetTokenByNonce(ctx context.Context, nonce string) (*models.SCIMToken, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTokenByNonce")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return s.getToken(ctx, goqu.Ex{"scim_tokens.nonce": nonce})
 }
 
 func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTokens")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("scim_tokens").
 		Prepared(true).
 		Select(s.getSelectFields()...).
 		ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	rows, err := s.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -56,6 +67,7 @@ func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) 
 	for rows.Next() {
 		item, err := scanSCIMToken(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -66,6 +78,10 @@ func (s *scimTokens) GetTokens(ctx context.Context) ([]models.SCIMToken, error) 
 }
 
 func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (*models.SCIMToken, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateToken")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("scim_tokens").
@@ -80,6 +96,7 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 		}).
 		Returning(scimTokensFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -87,9 +104,11 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "SCIM token already exists")
 				return nil, errors.New(errors.EConflict, "SCIM token already exists")
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -97,6 +116,10 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 }
 
 func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteToken")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("scim_tokens").
 		Prepared(true).
 		Where(
@@ -106,14 +129,17 @@ func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) e
 			},
 		).Returning(scimTokensFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err = scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

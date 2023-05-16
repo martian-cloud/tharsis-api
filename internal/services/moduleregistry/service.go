@@ -26,6 +26,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -188,19 +189,26 @@ func newService(
 }
 
 func (s *service) GetModuleByID(ctx context.Context, id string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -209,13 +217,19 @@ func (s *service) GetModuleByID(ctx context.Context, id string) (*models.Terrafo
 }
 
 func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.dbClient.TerraformModules.GetModuleByPath(ctx, path)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by path")
 		return nil, err
 	}
 
@@ -226,6 +240,7 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -234,13 +249,19 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 }
 
 func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name string, system string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleByAddress")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	rootGroup, err := s.dbClient.Groups.GetGroupByFullPath(ctx, namespace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get group by full path")
 		return nil, err
 	}
 
@@ -257,6 +278,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get modules")
 		return nil, err
 	}
 
@@ -269,6 +291,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -277,8 +300,13 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 }
 
 func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.ModulesResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModules")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -293,12 +321,14 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 	if input.Group != nil {
 		err = caller.RequirePermission(ctx, permissions.ViewTerraformModulePermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		dbInput.Filter.GroupID = &input.Group.Metadata.ID
 	} else {
 		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
 		if napErr != nil {
+			tracing.RecordError(span, napErr, "failed to get namespace access policy")
 			return nil, napErr
 		}
 
@@ -314,6 +344,7 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 					return nil
 				},
 			); err != nil {
+				tracing.RecordError(span, err, "failed to set filters for non-admin access")
 				return nil, err
 			}
 		}
@@ -323,22 +354,30 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 }
 
 func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateModule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	if vErr := module.Validate(); vErr != nil {
+		tracing.RecordError(span, vErr, "failed to validate terraform module model")
 		return nil, vErr
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -350,6 +389,7 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 
 	updatedModule, err := s.dbClient.TerraformModules.UpdateModule(txContext, module)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update module")
 		return nil, err
 	}
 
@@ -362,10 +402,12 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 			TargetType:    models.TargetTerraformModule,
 			TargetID:      updatedModule.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -373,18 +415,25 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 }
 
 func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModuleAttestationInput) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateModuleAttestation")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, input.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -393,6 +442,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	// Compute the checksum.
 	size, err := io.Copy(hash, strings.NewReader(input.AttestationData))
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get reader to compute checksum")
 		return nil, err
 	}
 
@@ -403,12 +453,14 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 
 	decodedSig, err := base64.StdEncoding.DecodeString(input.AttestationData)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to decode base64 string")
 		return nil, errors.Wrap(err, errors.EInvalid, "failed to decode attestation data")
 	}
 
 	// Decode DSSE Envelope
 	env := dsseEnvelope{}
 	if err = json.Unmarshal(decodedSig, &env); err != nil {
+		tracing.RecordError(span, err, "failed to unmarshal DSEE attestation data")
 		return nil, errors.Wrap(err, errors.EInvalid, "attestation data is not in dsse format")
 	}
 
@@ -419,10 +471,12 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	// Get the expected digest from the attestation
 	decodedPredicate, err := base64.StdEncoding.DecodeString(env.Payload)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to decode base64 string")
 		return nil, errors.Wrap(err, errors.EInvalid, "decoding dsse envelope payload")
 	}
 	var statement in_toto.Statement
 	if err = json.Unmarshal(decodedPredicate, &statement); err != nil {
+		tracing.RecordError(span, err, "failed to unmarshal the in-toto statement")
 		return nil, errors.Wrap(err, errors.EInvalid, "decoding predicate")
 	}
 
@@ -464,11 +518,13 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	}
 
 	if err = attestationToCreate.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate terraform module model")
 		return nil, err
 	}
 
 	createdAttestation, err := s.dbClient.TerraformModuleAttestations.CreateModuleAttestation(ctx, &attestationToCreate)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create module attestation")
 		return nil, err
 	}
 
@@ -483,23 +539,31 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 }
 
 func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateModuleAttestation")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, attestation.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	updatedAttestation, err := s.dbClient.TerraformModuleAttestations.UpdateModuleAttestation(ctx, attestation)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update module attestation")
 		return nil, err
 	}
 
@@ -514,13 +578,19 @@ func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *mode
 }
 
 func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleAttestationByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	moduleAttestation, err := s.dbClient.TerraformModuleAttestations.GetModuleAttestationByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module attestation by ID")
 		return nil, err
 	}
 
@@ -530,12 +600,14 @@ func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*mod
 
 	module, err := s.getModuleByID(ctx, moduleAttestation.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -544,19 +616,26 @@ func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*mod
 }
 
 func (s *service) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*db.ModuleAttestationsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleAttestations")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, input.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -574,23 +653,31 @@ func (s *service) GetModuleAttestations(ctx context.Context, input *GetModuleAtt
 }
 
 func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteModuleAttestation")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	module, err := s.getModuleByID(ctx, attestation.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	err = s.dbClient.TerraformModuleAttestations.DeleteModuleAttestation(ctx, attestation)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to delete module attestation")
 		return err
 	}
 
@@ -605,18 +692,25 @@ func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *mode
 }
 
 func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateModule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateTerraformModulePermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get group by ID")
 		return nil, err
 	}
 
@@ -630,6 +724,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 	} else {
 		rootGroup, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
 		if gErr != nil {
+			tracing.RecordError(span, gErr, "failed to get group by full path")
 			return nil, gErr
 		}
 
@@ -650,11 +745,13 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 	}
 
 	if vErr := moduleToCreate.Validate(); vErr != nil {
+		tracing.RecordError(span, vErr, "failed to validate terraform module model")
 		return nil, vErr
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -666,6 +763,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 
 	createdModule, err := s.dbClient.TerraformModules.CreateModule(txContext, moduleToCreate)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create module")
 		return nil, err
 	}
 
@@ -676,10 +774,12 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 			TargetType:    models.TargetTerraformModule,
 			TargetID:      createdModule.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -687,18 +787,25 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 }
 
 func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModule) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteModule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -710,6 +817,7 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 
 	err = s.dbClient.TerraformModules.DeleteModule(txContext, module)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to delete module")
 		return err
 	}
 
@@ -727,6 +835,7 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 				Type: string(models.TargetTerraformModule),
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 
@@ -734,8 +843,13 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 }
 
 func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModulesByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -745,6 +859,7 @@ func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.T
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get modules")
 		return nil, err
 	}
 
@@ -758,6 +873,7 @@ func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.T
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -766,31 +882,40 @@ func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.T
 }
 
 func (s *service) GetModuleConfigurationDetails(ctx context.Context, moduleVersion *models.TerraformModuleVersion, path string) (*ModuleConfigurationDetails, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleConfigurationDetails")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, moduleVersion.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
 
 	reader, err := s.registryStore.GetModuleConfigurationDetails(ctx, moduleVersion, module, path)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module configuration details")
 		return nil, err
 	}
 	defer reader.Close()
 
 	var moduleMetadata ModuleConfigurationDetails
 	if err := json.NewDecoder(reader).Decode(&moduleMetadata); err != nil {
+		tracing.RecordError(span, err, "failed to decode module metadata")
 		return nil, err
 	}
 
@@ -798,24 +923,32 @@ func (s *service) GetModuleConfigurationDetails(ctx context.Context, moduleVersi
 }
 
 func (s *service) GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleVersionByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	moduleVersion, err := s.getModuleVersionByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module version by ID")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, moduleVersion.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -824,19 +957,26 @@ func (s *service) GetModuleVersionByID(ctx context.Context, id string) (*models.
 }
 
 func (s *service) GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*db.ModuleVersionsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleVersions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, input.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -857,7 +997,12 @@ func (s *service) GetModuleVersions(ctx context.Context, input *GetModuleVersion
 }
 
 func (s *service) GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]models.TerraformModuleVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleVersionsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -867,6 +1012,7 @@ func (s *service) GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]m
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module versions")
 		return nil, err
 	}
 
@@ -880,6 +1026,7 @@ func (s *service) GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]m
 	// can view the requested modules
 	if len(moduleIDList) > 0 {
 		if _, err := s.GetModulesByIDs(ctx, moduleIDList); err != nil {
+			tracing.RecordError(span, err, "failed to get modules by IDs")
 			return nil, err
 		}
 	}
@@ -888,24 +1035,32 @@ func (s *service) GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]m
 }
 
 func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVersionInput) (*models.TerraformModuleVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateModuleVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	module, err := s.getModuleByID(ctx, input.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Verify semantic version is valid
 	semVersion, err := version.NewSemver(input.SemanticVersion)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to verify semantic version")
 		return nil, errors.Wrap(err, errors.EInvalid, "invalid semantic version")
 	}
 
@@ -920,11 +1075,13 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module versions")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -939,6 +1096,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		prevLatest := versionsResp.ModuleVersions[0]
 		prevSemVersion, sErr := version.NewSemver(prevLatest.SemanticVersion)
 		if sErr != nil {
+			tracing.RecordError(span, sErr, "semver validation failed")
 			return nil, sErr
 		}
 		if semver.IsSemverGreaterThan(semVersion, prevSemVersion) {
@@ -946,6 +1104,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 			// Remove latest from version
 			prevLatest.Latest = false
 			if _, uErr := s.dbClient.TerraformModuleVersions.UpdateModuleVersion(txContext, &prevLatest); uErr != nil {
+				tracing.RecordError(span, uErr, "failed to update module version")
 				return nil, uErr
 			}
 		}
@@ -963,6 +1122,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		CreatedBy:       caller.GetSubject(),
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create module version")
 		return nil, err
 	}
 
@@ -975,10 +1135,12 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 			TargetType:    models.TargetTerraformModuleVersion,
 			TargetID:      moduleVersion.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -992,18 +1154,25 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 }
 
 func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteModuleVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	module, err := s.getModuleByID(ctx, moduleVersion.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1016,6 +1185,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 			},
 		})
 		if gpErr != nil {
+			tracing.RecordError(span, err, "failed to get module version")
 			return err
 		}
 
@@ -1034,11 +1204,13 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 
 			latestSemver, lsErr := version.NewSemver(newLatestVersion.SemanticVersion)
 			if lsErr != nil {
+				tracing.RecordError(span, lsErr, "failed to validate semver")
 				return lsErr
 			}
 
 			currentSemver, csErr := version.NewSemver(vCopy.SemanticVersion)
 			if csErr != nil {
+				tracing.RecordError(span, csErr, "failed to validate semver")
 				return csErr
 			}
 
@@ -1050,6 +1222,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -1061,6 +1234,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 
 	// Delete module version from DB
 	if err = s.dbClient.TerraformModuleVersions.DeleteModuleVersion(txContext, moduleVersion); err != nil {
+		tracing.RecordError(span, err, "failed to delete module version")
 		return err
 	}
 
@@ -1072,11 +1246,13 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 		)
 		newLatestVersion.Latest = true
 		if _, err = s.dbClient.TerraformModuleVersions.UpdateModuleVersion(txContext, newLatestVersion); err != nil {
+			tracing.RecordError(span, err, "failed to update module version")
 			return err
 		}
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return err
 	}
 
@@ -1090,18 +1266,25 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 }
 
 func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion *models.TerraformModuleVersion, reader io.Reader) error {
+	ctx, span := tracer.Start(ctx, "svc.UploadModuleVersionPackage")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	module, err := s.getModuleByID(ctx, moduleVersion.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
@@ -1115,6 +1298,7 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -1130,6 +1314,7 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 	moduleVersion.Status = models.TerraformModuleVersionStatusUploadInProgress
 	updatedModuleVersion, err := s.dbClient.TerraformModuleVersions.UpdateModuleVersion(txContext, moduleVersion)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update module version")
 		return err
 	}
 
@@ -1139,10 +1324,12 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 	teeReader := io.TeeReader(reader, checksum)
 
 	if err = s.registryStore.UploadModulePackage(ctx, updatedModuleVersion, module, teeReader); err != nil {
+		tracing.RecordError(span, err, "failed to upload module package")
 		return err
 	}
 
 	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return err
 	}
 
@@ -1152,6 +1339,7 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 	shaSum := hex.EncodeToString(checksum.Sum(nil))
 	if shaSum != updatedModuleVersion.GetSHASumHex() {
 		if err = s.setModuleVersionError(ctx, moduleVersion.Metadata.ID, fmt.Sprintf("Expected checksum of %s does not match received checksum %s", updatedModuleVersion.GetSHASumHex(), shaSum)); err != nil {
+			tracing.RecordError(span, err, "failed to set module version status to errored")
 			s.logger.Errorf("failed to set terraform module version status to errored %v", err)
 		}
 		return nil
@@ -1170,25 +1358,33 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 }
 
 func (s *service) GetModuleVersionPackageDownloadURL(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (string, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleVersionPackageDownloadURL")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return "", err
 	}
 
 	module, err := s.getModuleByID(ctx, moduleVersion.ModuleID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
 		return "", err
 	}
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return "", err
 		}
 	}
 
 	downloadURL, err := s.registryStore.GetModulePackagePresignedURL(ctx, moduleVersion, module)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get module package presigned URL")
 		return "", err
 	}
 

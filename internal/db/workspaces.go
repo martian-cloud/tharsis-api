@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -107,14 +108,26 @@ func NewWorkspaces(dbClient *Client) Workspaces {
 }
 
 func (w *workspaces) GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspaceByFullPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return w.getWorkspace(ctx, goqu.Ex{"namespaces.path": path})
 }
 
 func (w *workspaces) GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspaceByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return w.getWorkspace(ctx, goqu.Ex{"workspaces.id": id})
 }
 
 func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) (*WorkspacesResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspaces")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -162,11 +175,13 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, w.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -177,6 +192,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 	for rows.Next() {
 		item, err := scanWorkspace(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -184,6 +200,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -196,6 +213,10 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 }
 
 func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("workspaces").
@@ -215,19 +236,23 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 			},
 		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	namespace, err := getNamespaceByWorkspaceID(ctx, w.dbClient.getConnection(ctx), updatedWorkspace.Metadata.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by workspace ID")
 		return nil, err
 	}
 
@@ -237,9 +262,14 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 }
 
 func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	// Use transaction to update workspaces and namespaces tables
 	tx, err := w.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -274,6 +304,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 		}).
 		Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -281,20 +312,25 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
+				tracing.RecordError(span, nil,
+					"invalid group parent: the specified parent group does not exist")
 				return nil, errors.New(errors.EConflict, "invalid group parent: the specified parent group does not exist")
 			}
 
 			if isInvalidIDViolation(pgErr) {
+				tracing.RecordError(span, pgErr, "invalid ID")
 				return nil, ErrInvalidID
 			}
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for parent group
 	parentNamespace, err := getNamespaceByGroupID(ctx, tx, workspace.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
@@ -302,10 +338,12 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 
 	// Create new namespace resource for workspace
 	if _, err := createNamespace(ctx, tx, &namespaceRow{path: fullPath, workspaceID: createdWorkspace.Metadata.ID}); err != nil {
+		tracing.RecordError(span, err, "failed to create namespace")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -315,6 +353,10 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 }
 
 func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Workspace) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("workspaces").
 		Prepared(true).
 		Where(
@@ -324,14 +366,17 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 			},
 		).Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -339,6 +384,10 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 }
 
 func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, managedIdentityID string) ([]models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspacesForManagedIdentity")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("workspaces").
 		Prepared(true).
 		Select(w.getSelectFields()...).
@@ -346,11 +395,13 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
 		Where(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": managedIdentityID}).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	rows, err := w.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -361,6 +412,7 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 	for rows.Next() {
 		item, err := scanWorkspace(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -101,10 +102,18 @@ func NewJobs(dbClient *Client) Jobs {
 }
 
 func (j *jobs) GetJobByID(ctx context.Context, id string) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.GetJobByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return j.getJob(ctx, goqu.Ex{"jobs.id": id})
 }
 
 func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType models.JobType) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.GetLatestJobByType")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sortBy := JobSortableFieldUpdatedAtDesc
 	jobResult, err := j.GetJobs(
 		ctx,
@@ -114,6 +123,7 @@ func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType mod
 			Sort:              &sortBy,
 		})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get job")
 		return nil, errors.Wrap(err, errors.EInternal, "failed to get job")
 	}
 
@@ -125,6 +135,10 @@ func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType mod
 }
 
 func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetJobs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -169,11 +183,13 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, j.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -184,6 +200,7 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	for rows.Next() {
 		item, err := scanJob(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -191,6 +208,7 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -203,6 +221,10 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 }
 
 func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateJob")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("jobs").
@@ -227,6 +249,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).Returning(jobFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -234,8 +257,10 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -243,6 +268,10 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 }
 
 func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateJob")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("jobs").
@@ -269,12 +298,14 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		Returning(jobFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	createdJob, err := scanJob(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -282,6 +313,10 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 }
 
 func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*models.JobLogDescriptor, error) {
+	ctx, span := tracer.Start(ctx, "db.GetJobLogDescriptorByJobID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	query := dialect.From(goqu.T("job_log_descriptors")).
 		Prepared(true).
 		Select(jobLogDescriptorFieldList...).
@@ -289,6 +324,7 @@ func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*m
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -298,6 +334,7 @@ func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*m
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -305,6 +342,10 @@ func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*m
 }
 
 func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobLogDescriptor, error) {
+	ctx, span := tracer.Start(ctx, "db.GetJobLogDescriptor")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	query := dialect.From(goqu.T("job_log_descriptors")).
 		Prepared(true).
 		Select(jobLogDescriptorFieldList...).
@@ -312,6 +353,7 @@ func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobL
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -321,6 +363,7 @@ func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobL
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -328,6 +371,10 @@ func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobL
 }
 
 func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateJobLogDescriptor")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("job_log_descriptors").
@@ -343,12 +390,14 @@ func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 		Returning(jobLogDescriptorFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	createdDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -356,6 +405,10 @@ func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 }
 
 func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateJobLogDescriptor")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("job_log_descriptors").
@@ -371,6 +424,7 @@ func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 		Returning(jobLogDescriptorFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -378,8 +432,10 @@ func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -387,6 +443,10 @@ func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.Jo
 }
 
 func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, error) {
+	ctx, span := tracer.Start(ctx, "db.GetJobCountForRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	var count int
 	query := dialect.From(goqu.T("jobs")).
 		Prepared(true).
@@ -397,17 +457,23 @@ func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, 
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return 0, err
 	}
 
 	err = j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...).Scan(&count)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return 0, err
 	}
 	return count, nil
 }
 
 func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.getJob")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	query := dialect.From(goqu.T("jobs")).
 		Prepared(true).
 		Select(jobFieldList...).
@@ -415,6 +481,7 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -424,6 +491,7 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 

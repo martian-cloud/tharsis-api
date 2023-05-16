@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -83,12 +84,17 @@ func NewApplies(dbClient *Client) Applies {
 }
 
 func (a *applies) GetApply(ctx context.Context, id string) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "db.GetApply")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("applies").
 		Prepared(true).
 		Select(applyFieldList...).
 		Where(goqu.Ex{"id": id}).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -98,12 +104,17 @@ func (a *applies) GetApply(ctx context.Context, id string) (*models.Apply, error
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return apply, nil
 }
 
 func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*AppliesResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetApplies")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -132,11 +143,13 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, a.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -147,6 +160,7 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 	for rows.Next() {
 		item, err := scanApply(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan a row")
 			return nil, err
 		}
 
@@ -154,6 +168,7 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -166,6 +181,10 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 }
 
 func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateApply")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("applies").
@@ -183,6 +202,7 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 		Returning(applyFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -190,12 +210,17 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 
 	if err != nil {
 		a.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return createdApply, nil
 }
 
 func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateApply")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("applies").
@@ -211,6 +236,7 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).Returning(applyFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -218,9 +244,11 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		a.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return updatedApply, nil

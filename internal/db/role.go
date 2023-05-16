@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -90,14 +91,26 @@ func NewRoles(dbClient *Client) Roles {
 }
 
 func (r *roles) GetRoleByID(ctx context.Context, id string) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRoleByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return r.getRole(ctx, goqu.Ex{"roles.id": id})
 }
 
 func (r *roles) GetRoleByName(ctx context.Context, name string) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRoleByName")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return r.getRole(ctx, goqu.Ex{"roles.name": name})
 }
 
 func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRoles")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -129,11 +142,13 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -144,6 +159,7 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	for rows.Next() {
 		item, err := scanRole(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -151,6 +167,7 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -163,10 +180,15 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 }
 
 func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	permissions, err := r.marshalPermissions(role.GetPermissions())
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal permissions")
 		return nil, err
 	}
 
@@ -184,6 +206,7 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 		}).
 		Returning(rolesFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -191,9 +214,11 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "role with name %s already exists", role.Name)
 				return nil, errors.New(errors.EConflict, "role with name %s already exists", role.Name)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -201,10 +226,15 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 }
 
 func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	permissions, err := r.marshalPermissions(role.GetPermissions())
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal permissions")
 		return nil, err
 	}
 
@@ -219,14 +249,17 @@ func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role
 			},
 		).Where(goqu.Ex{"id": role.Metadata.ID, "version": role.Metadata.Version}).Returning(rolesFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedRole, err := scanRole(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -234,6 +267,10 @@ func (r *roles) UpdateRole(ctx context.Context, role *models.Role) (*models.Role
 }
 
 func (r *roles) DeleteRole(ctx context.Context, role *models.Role) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("roles").
 		Prepared(true).
 		Where(
@@ -244,14 +281,17 @@ func (r *roles) DeleteRole(ctx context.Context, role *models.Role) error {
 		).Returning(rolesFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanRole(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -268,6 +308,10 @@ func (r *roles) marshalPermissions(input []permissions.Permission) ([]byte, erro
 }
 
 func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "db.getRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("roles").
 		Prepared(true).
 		Select(rolesFieldList...).
@@ -275,6 +319,7 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -284,6 +329,7 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 

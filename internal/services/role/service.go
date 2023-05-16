@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -76,7 +77,12 @@ func NewService(
 }
 
 func (s *service) GetAvailablePermissions(ctx context.Context) ([]string, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetAvailablePermissions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -84,12 +90,18 @@ func (s *service) GetAvailablePermissions(ctx context.Context) ([]string, error)
 }
 
 func (s *service) GetRoleByID(ctx context.Context, id string) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRoleByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	role, err := s.getRoleByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get role by ID")
 		return nil, err
 	}
 
@@ -97,12 +109,18 @@ func (s *service) GetRoleByID(ctx context.Context, id string) (*models.Role, err
 }
 
 func (s *service) GetRoleByName(ctx context.Context, name string) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRoleByName")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	role, err := s.dbClient.Roles.GetRoleByName(ctx, name)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get role by name")
 		return nil, err
 	}
 
@@ -114,7 +132,12 @@ func (s *service) GetRoleByName(ctx context.Context, name string) (*models.Role,
 }
 
 func (s *service) GetRolesByIDs(ctx context.Context, idList []string) ([]models.Role, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRolesByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -124,6 +147,7 @@ func (s *service) GetRolesByIDs(ctx context.Context, idList []string) ([]models.
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get roles")
 		return nil, err
 	}
 
@@ -131,7 +155,12 @@ func (s *service) GetRolesByIDs(ctx context.Context, idList []string) ([]models.
 }
 
 func (s *service) GetRoles(ctx context.Context, input *GetRolesInput) (*db.RolesResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRoles")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -147,8 +176,13 @@ func (s *service) GetRoles(ctx context.Context, input *GetRolesInput) (*db.Roles
 }
 
 func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -171,11 +205,13 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 	toCreate.SetPermissions(input.Permissions)
 
 	if err = toCreate.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate role model")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -187,6 +223,7 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 
 	createdRole, err := s.dbClient.Roles.CreateRole(txContext, toCreate)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create role")
 		return nil, err
 	}
 
@@ -196,10 +233,12 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 			TargetType: models.TargetRole,
 			TargetID:   createdRole.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -213,8 +252,13 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 }
 
 func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -233,11 +277,13 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 	}
 
 	if err = input.Role.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate role model")
 		return nil, err
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -249,6 +295,7 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 
 	updatedRole, err := s.dbClient.Roles.UpdateRole(txContext, input.Role)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update role")
 		return nil, err
 	}
 
@@ -258,10 +305,12 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 			TargetType: models.TargetRole,
 			TargetID:   updatedRole.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -275,8 +324,13 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 }
 
 func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteRole")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
@@ -301,6 +355,7 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace memberships")
 		return err
 	}
 

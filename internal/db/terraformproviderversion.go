@@ -11,6 +11,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -96,10 +97,18 @@ func NewTerraformProviderVersions(dbClient *Client) TerraformProviderVersions {
 }
 
 func (t *terraformProviderVersions) GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderVersionByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getProviderVersion(ctx, goqu.Ex{"terraform_provider_versions.id": id})
 }
 
 func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderVersions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -143,11 +152,13 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -158,6 +169,7 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 	for rows.Next() {
 		item, err := scanTerraformProviderVersion(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -165,6 +177,7 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -177,10 +190,15 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 }
 
 func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateProviderVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	protocolsJSON, err := json.Marshal(providerVersion.Protocols)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal provider version protocols")
 		return nil, err
 	}
 
@@ -204,6 +222,7 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 		}).
 		Returning(providerVersionFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -211,9 +230,12 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"terraform provider version %s already exists", providerVersion.SemanticVersion)
 				return nil, errors.New(errors.EConflict, "terraform provider version %s already exists", providerVersion.SemanticVersion)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -221,10 +243,15 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 }
 
 func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateProviderVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	protocolsJSON, err := json.Marshal(providerVersion.Protocols)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal provider version protocols")
 		return nil, err
 	}
 
@@ -245,6 +272,7 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 		).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).Returning(providerVersionFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -252,8 +280,10 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -261,6 +291,9 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 }
 
 func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteProviderVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.Delete("terraform_provider_versions").
 		Prepared(true).
@@ -271,14 +304,17 @@ func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, p
 			},
 		).Returning(providerVersionFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

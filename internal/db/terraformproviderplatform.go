@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -85,10 +86,18 @@ func NewTerraformProviderPlatforms(dbClient *Client) TerraformProviderPlatforms 
 }
 
 func (t *terraformProviderPlatforms) GetProviderPlatformByID(ctx context.Context, id string) (*models.TerraformProviderPlatform, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderPlatformByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getProviderPlatform(ctx, goqu.Ex{"terraform_provider_platforms.id": id})
 }
 
 func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, input *GetProviderPlatformsInput) (*ProviderPlatformsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderPlatforms")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -134,11 +143,13 @@ func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, i
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -149,6 +160,7 @@ func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, i
 	for rows.Next() {
 		item, err := scanTerraformProviderPlatform(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -156,6 +168,7 @@ func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, i
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -168,6 +181,10 @@ func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, i
 }
 
 func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*models.TerraformProviderPlatform, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateProviderPlatform")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("terraform_provider_platforms").
@@ -187,6 +204,7 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 		}).
 		Returning(providerPlatformFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -194,12 +212,15 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"terraform provider platform %s_%s already exists", providerPlatform.OperatingSystem, providerPlatform.Architecture)
 				return nil, errors.New(
 					errors.EConflict,
 					"terraform provider platform %s_%s already exists", providerPlatform.OperatingSystem, providerPlatform.Architecture,
 				)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -207,6 +228,10 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 }
 
 func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) (*models.TerraformProviderPlatform, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateProviderPlatform")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("terraform_provider_platforms").
@@ -220,6 +245,7 @@ func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context,
 		).Where(goqu.Ex{"id": providerPlatform.Metadata.ID, "version": providerPlatform.Metadata.Version}).Returning(providerPlatformFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -227,8 +253,10 @@ func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context,
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -236,6 +264,9 @@ func (t *terraformProviderPlatforms) UpdateProviderPlatform(ctx context.Context,
 }
 
 func (t *terraformProviderPlatforms) DeleteProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteProviderPlatform")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.Delete("terraform_provider_platforms").
 		Prepared(true).
@@ -246,14 +277,17 @@ func (t *terraformProviderPlatforms) DeleteProviderPlatform(ctx context.Context,
 			},
 		).Returning(providerPlatformFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanTerraformProviderPlatform(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
