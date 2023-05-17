@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -92,12 +93,17 @@ func NewVariables(dbClient *Client) Variables {
 }
 
 func (m *variables) GetVariableByID(ctx context.Context, id string) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "db.GetVariableByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, _, err := dialect.From("namespace_variables").
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_variables.namespace_id": goqu.I("namespaces.id")})).
 		Select(m.getSelectFields()...).
 		Where(goqu.Ex{"namespace_variables.id": id}).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -107,6 +113,7 @@ func (m *variables) GetVariableByID(ctx context.Context, id string) (*models.Var
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -114,12 +121,18 @@ func (m *variables) GetVariableByID(ctx context.Context, id string) (*models.Var
 }
 
 func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateVariable")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	namespace, err := getNamespaceByPath(ctx, m.dbClient.getConnection(ctx), input.NamespacePath)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by path")
 		return nil, err
 	}
 
 	if namespace == nil {
+		tracing.RecordError(span, nil, "Namespace not found")
 		return nil, errors.New(errors.ENotFound, "Namespace not found")
 	}
 
@@ -143,6 +156,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 		Returning(variableFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -151,6 +165,8 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"Variable with key %s in namespace %s already exists", input.Key, input.NamespacePath)
 				return nil, errors.New(
 					errors.EConflict,
 					"Variable with key %s in namespace %s already exists", input.Key, input.NamespacePath,
@@ -159,10 +175,12 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_variables_namespace_id":
+					tracing.RecordError(span, nil, "namespace does not exist")
 					return nil, errors.New(errors.ENotFound, "namespace does not exist")
 				}
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -172,12 +190,18 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 }
 
 func (m *variables) CreateVariables(ctx context.Context, namespacePath string, variables []models.Variable) error {
+	ctx, span := tracer.Start(ctx, "db.CreateVariables")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	namespace, err := getNamespaceByPath(ctx, m.dbClient.getConnection(ctx), namespacePath)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by path")
 		return err
 	}
 
 	if namespace == nil {
+		tracing.RecordError(span, nil, "Namespace not found")
 		return errors.New(errors.ENotFound, "Namespace not found")
 	}
 
@@ -204,12 +228,15 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"Variable with key already exists in namespace %s", namespacePath)
 				return errors.New(
 					errors.EConflict,
 					"Variable with key already exists in namespace %s", namespacePath,
@@ -218,10 +245,12 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_variables_namespace_id":
+					tracing.RecordError(span, nil, "namespace does not exist")
 					return errors.New(errors.ENotFound, "namespace does not exist")
 				}
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -229,6 +258,10 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 }
 
 func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variable) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateVariable")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("namespace_variables").
@@ -243,6 +276,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 		Where(goqu.Ex{"id": variable.Metadata.ID, "version": variable.Metadata.Version}).Returning(variableFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -250,16 +284,20 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"Variable with key %s in namespace %s already exists", variable.Key, variable.NamespacePath)
 				return nil, errors.New(
 					errors.EConflict,
 					"Variable with key %s in namespace %s already exists", variable.Key, variable.NamespacePath,
 				)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -269,6 +307,10 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 }
 
 func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variable) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteVariable")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("namespace_variables").
 		Prepared(true).
 		Where(
@@ -279,14 +321,17 @@ func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variabl
 		).Returning(variableFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanVariable(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -294,6 +339,10 @@ func (m *variables) DeleteVariable(ctx context.Context, variable *models.Variabl
 }
 
 func (m *variables) DeleteVariables(ctx context.Context, namespacePath string, category models.VariableCategory) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteVariables")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("namespace_variables").
 		Prepared(true).
 		Where(goqu.Ex{
@@ -302,10 +351,12 @@ func (m *variables) DeleteVariables(ctx context.Context, namespacePath string, c
 		}).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := m.dbClient.getConnection(ctx).Exec(ctx, sql, args...); err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
@@ -313,6 +364,10 @@ func (m *variables) DeleteVariables(ctx context.Context, namespacePath string, c
 }
 
 func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) (*VariableResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetVariables")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -349,11 +404,13 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, m.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -364,6 +421,7 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 	for rows.Next() {
 		item, err := scanVariable(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -371,6 +429,7 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 

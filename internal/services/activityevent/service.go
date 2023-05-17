@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -59,13 +60,19 @@ func NewService(dbClient *db.Client, logger logger.Logger) Service {
 func (s *service) GetActivityEvents(ctx context.Context,
 	input *GetActivityEventsInput,
 ) (*db.ActivityEventsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetActivityEvents")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	accessPolicy, err := caller.GetNamespaceAccessPolicy(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace access policy")
 		return nil, err
 	}
 
@@ -78,6 +85,7 @@ func (s *service) GetActivityEvents(ctx context.Context,
 		case *auth.ServiceAccountCaller:
 			membershipRequirement = &db.ActivityEventNamespaceMembershipRequirement{ServiceAccountID: &c.ServiceAccountID}
 		default:
+			tracing.RecordError(span, nil, "invalid caller type: %T", caller)
 			return nil, errors.New(errors.EUnauthorized, "invalid caller type")
 		}
 	}
@@ -102,6 +110,7 @@ func (s *service) GetActivityEvents(ctx context.Context,
 
 	activityEventsResult, err := s.dbClient.ActivityEvents.GetActivityEvents(ctx, &dbInput)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get activity events")
 		return nil, err
 	}
 
@@ -109,8 +118,13 @@ func (s *service) GetActivityEvents(ctx context.Context,
 }
 
 func (s *service) CreateActivityEvent(ctx context.Context, input *CreateActivityEventInput) (*models.ActivityEvent, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateActivityEvent")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to authorize caller")
 		return nil, err
 	}
 
@@ -129,6 +143,7 @@ func (s *service) CreateActivityEvent(ctx context.Context, input *CreateActivity
 	if input.Payload != nil {
 		payloadBuffer, err = json.Marshal(input.Payload)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to marshal payload")
 			return nil, err
 		}
 	}
@@ -145,6 +160,7 @@ func (s *service) CreateActivityEvent(ctx context.Context, input *CreateActivity
 
 	activityEvent, err := s.dbClient.ActivityEvents.CreateActivityEvent(ctx, &toCreate)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 

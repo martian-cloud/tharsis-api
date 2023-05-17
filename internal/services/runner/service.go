@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -68,13 +69,19 @@ func NewService(
 }
 
 func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.RunnersResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunners")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewRunnerPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -103,14 +110,20 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 		Filter:            filter,
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runners")
 		return nil, err
 	}
 	return result, nil
 }
 
 func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnersByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -120,6 +133,7 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runners")
 		return nil, err
 	}
 
@@ -133,6 +147,7 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 	if len(namespacePaths) > 0 {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -141,14 +156,20 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 }
 
 func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	if runner.GroupID != nil {
 		err = caller.RequirePermission(ctx, permissions.DeleteRunnerPermission, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return err
 		}
 	} else {
@@ -177,6 +198,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -188,6 +210,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 	err = s.dbClient.Runners.DeleteRunner(txContext, runner)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to delete runner")
 		return err
 	}
 
@@ -206,6 +229,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 					Type: string(models.TargetRunner),
 				},
 			}); err != nil {
+			tracing.RecordError(span, err, "failed to create activity event")
 			return err
 		}
 	}
@@ -214,14 +238,20 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 }
 
 func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get runner from DB
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runner by ID")
 		return nil, err
 	}
 
@@ -232,6 +262,7 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 	if runner.GroupID != nil {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -240,14 +271,20 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 }
 
 func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// Get runner from DB
 	runner, err := s.dbClient.Runners.GetRunnerByPath(ctx, path)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runner by path")
 		return nil, err
 	}
 
@@ -258,6 +295,7 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 	if runner.GroupID != nil {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
 		}
 	}
@@ -266,14 +304,20 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 }
 
 func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if input.GroupID != "" {
 		err = caller.RequirePermission(ctx, permissions.CreateRunnerPermission, auth.WithGroupID(input.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else {
@@ -290,6 +334,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 
 	// Validate model
 	if err = runnerToCreate.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate runner model")
 		return nil, err
 	}
 
@@ -301,6 +346,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -313,6 +359,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	// Store runner in DB
 	createdRunner, err := s.dbClient.Runners.CreateRunner(txContext, &runnerToCreate)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create runner")
 		return nil, err
 	}
 
@@ -325,10 +372,12 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 			TargetType:    models.TargetRunner,
 			TargetID:      createdRunner.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -336,14 +385,20 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 }
 
 func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if runner.GroupID != nil {
 		err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	} else {
@@ -367,6 +422,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 	// Validate model
 	if err = runner.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate runner model")
 		return nil, err
 	}
 
@@ -377,6 +433,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -389,6 +446,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 	// Store runner in DB
 	updatedRunner, err := s.dbClient.Runners.UpdateRunner(txContext, runner)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update runner")
 		return nil, err
 	}
 
@@ -402,11 +460,13 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 				TargetType:    models.TargetRunner,
 				TargetID:      updatedRunner.Metadata.ID,
 			}); err != nil {
+			tracing.RecordError(span, err, "failed to create activity event")
 			return nil, err
 		}
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -414,13 +474,19 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 }
 
 func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	ctx, span := tracer.Start(ctx, "svc.AssignServiceAccountToRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runner by ID")
 		return err
 	}
 
@@ -435,11 +501,13 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 
 	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	sa, err := s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, serviceAccountID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get service account by ID")
 		return err
 	}
 
@@ -459,13 +527,19 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 }
 
 func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error {
+	ctx, span := tracer.Start(ctx, "svc.UnassignServiceAccountFromRunner")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runner by ID")
 		return err
 	}
 
@@ -480,6 +554,7 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 
 	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 

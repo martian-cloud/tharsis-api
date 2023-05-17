@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -105,14 +106,26 @@ func NewVCSProviders(dbClient *Client) VCSProviders {
 }
 
 func (vp *vcsProviders) GetProviderByID(ctx context.Context, id string) (*models.VCSProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return vp.getProvider(ctx, goqu.Ex{"vcs_providers.id": id})
 }
 
 func (vp *vcsProviders) GetProviderByOAuthState(ctx context.Context, state string) (*models.VCSProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderByOAuthState")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return vp.getProvider(ctx, goqu.Ex{"vcs_providers.oauth_state": state})
 }
 
 func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProvidersInput) (*VCSProvidersResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviders")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -186,11 +199,13 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, vp.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -201,6 +216,7 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 	for rows.Next() {
 		item, err := scanVCSProvider(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -208,6 +224,7 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -220,10 +237,15 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 }
 
 func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCSProvider) (*models.VCSProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateProvider")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := vp.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -258,6 +280,7 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 		}).
 		Returning(vcsProvidersFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -265,23 +288,28 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "vcs provider already exists in the specified group")
 				return nil, errors.New(errors.EConflict, "vcs provider already exists in the specified group")
 			}
 
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
+				tracing.RecordError(span, nil, "invalid group: the specified group does not exist")
 				return nil, errors.New(errors.EConflict, "invalid group: the specified group does not exist")
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, createdProvider.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -291,10 +319,15 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 }
 
 func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCSProvider) (*models.VCSProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateProvider")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := vp.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -323,24 +356,29 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
 		Returning(vcsProvidersFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, updatedProvider.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -350,6 +388,10 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 }
 
 func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCSProvider) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteProvider")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("vcs_providers").
 		Prepared(true).
 		Where(
@@ -359,16 +401,20 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 			},
 		).Returning(vcsProvidersFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	if _, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_workspace_id" {
+				tracing.RecordError(span, nil,
+					"VCS provider %s has workspace configurations", provider.Name)
 				return errors.New(
 					errors.EConflict,
 					"VCS provider %s has workspace configurations", provider.Name,
@@ -376,6 +422,7 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 			}
 		}
 
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

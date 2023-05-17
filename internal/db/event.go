@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -36,11 +37,16 @@ func NewEvents(dbClient *Client) Events {
 }
 
 func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
+	ctx, span := tracer.Start(ctx, "db.Listen")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ch := make(chan Event)
 	fatalErrors := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	// Recording errors on the tracing span is okay because of the wait group wait below.
 	go func() {
 		defer close(ch)
 		defer close(fatalErrors)
@@ -49,6 +55,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 		conn, err := e.dbClient.conn.Acquire(ctx)
 		if err != nil {
 			fatalErrors <- errors.Wrap(err, errors.EInternal, "failed to acquire db connection from pool")
+			tracing.RecordError(span, err, "failed to acquire db connection from pool")
 			wg.Done()
 			return
 		}
@@ -57,6 +64,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 		_, err = conn.Exec(ctx, "listen events")
 		if err != nil {
 			fatalErrors <- errors.Wrap(err, errors.EInternal, "error when listening on events channel")
+			tracing.RecordError(span, err, "error when listening on events channel")
 			wg.Done()
 			return
 		}
@@ -74,12 +82,14 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 
 			if err != nil {
 				fatalErrors <- errors.Wrap(err, errors.EInternal, "error waiting for db notification")
+				tracing.RecordError(span, err, "error waiting for db notification")
 				return
 			}
 
 			var event Event
 			if err := json.Unmarshal([]byte(notification.Payload), &event); err != nil {
 				e.dbClient.logger.Errorf("Failed to unmarshal db event %v", err)
+				tracing.RecordError(span, err, "Failed to unmarshal db event")
 				continue
 			}
 
@@ -92,6 +102,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 		}
 	}()
 
+	// Recording errors to the tracing span above is okay because of this wait.
 	wg.Wait()
 	return ch, fatalErrors
 }

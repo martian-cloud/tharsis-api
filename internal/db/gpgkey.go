@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -82,10 +83,18 @@ func NewGPGKeys(dbClient *Client) GPGKeys {
 }
 
 func (t *terraformGPGKeys) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey, error) {
+	ctx, span := tracer.Start(ctx, "db.GetGPGKeyByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getGPGKey(ctx, goqu.Ex{"gpg_keys.id": id})
 }
 
 func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*GPGKeysResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetGPGKeys")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -123,11 +132,13 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -138,6 +149,7 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 	for rows.Next() {
 		item, err := scanGPGKey(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -145,6 +157,7 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -157,10 +170,15 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 }
 
 func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGKey) (*models.GPGKey, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateGPGKey")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -187,6 +205,7 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 		}).
 		Returning(gpgKeyFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -194,22 +213,27 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"GPG key with key fingerprint %s already exists in group", gpgKey.Fingerprint)
 				return nil, errors.New(
 					errors.EConflict,
 					"GPG key with key fingerprint %s already exists in group", gpgKey.Fingerprint,
 				)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, createdKey.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -220,6 +244,9 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 }
 
 func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteGPGKey")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.Delete("gpg_keys").
 		Prepared(true).
@@ -230,14 +257,17 @@ func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGK
 			},
 		).Returning(gpgKeyFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

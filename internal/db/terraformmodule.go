@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -93,13 +94,22 @@ func NewTerraformModules(dbClient *Client) TerraformModules {
 }
 
 func (t *terraformModules) GetModuleByID(ctx context.Context, id string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getModule(ctx, goqu.Ex{"terraform_modules.id": id})
 }
 
 func (t *terraformModules) GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	pathParts := strings.Split(path, "/")
 
 	if len(pathParts) < 3 {
+		tracing.RecordError(span, nil, "Invalid resource path for module")
 		return nil, errors.New(errors.EInvalid, "Invalid resource path for module")
 	}
 
@@ -110,6 +120,10 @@ func (t *terraformModules) GetModuleByPath(ctx context.Context, path string) (*m
 }
 
 func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInput) (*ModulesResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModules")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -203,11 +217,13 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -218,6 +234,7 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 	for rows.Next() {
 		item, err := scanTerraformModule(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -225,6 +242,7 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -237,10 +255,15 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 }
 
 func (t *terraformModules) CreateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateModule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -269,6 +292,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 		}).
 		Returning(moduleFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -276,19 +300,24 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"terraform module with name %s and system %s already exists", module.Name, module.System)
 				return nil, errors.New(errors.EConflict, "terraform module with name %s and system %s already exists", module.Name, module.System)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, module.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -298,10 +327,15 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 }
 
 func (t *terraformModules) UpdateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateModule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -326,6 +360,7 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 		).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).Returning(moduleFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -333,23 +368,29 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"terraform module with name %s and system %s already exists", module.Name, module.System)
 				return nil, errors.New(errors.EConflict, "terraform module with name %s and system %s already exists", module.Name, module.System)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, module.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -359,6 +400,9 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 }
 
 func (t *terraformModules) DeleteModule(ctx context.Context, module *models.TerraformModule) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteModule")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.Delete("terraform_modules").
 		Prepared(true).
@@ -369,14 +413,17 @@ func (t *terraformModules) DeleteModule(ctx context.Context, module *models.Terr
 			},
 		).Returning(moduleFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 

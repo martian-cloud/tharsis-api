@@ -20,6 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -164,13 +165,19 @@ func NewService(
 }
 
 func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error) {
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToWorkspaceEvents")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -220,13 +227,19 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 }
 
 func (s *service) GetWorkspacesByIDs(ctx context.Context, idList []string) ([]models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspacesByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	resp, err := s.dbClient.Workspaces.GetWorkspaces(ctx, &db.GetWorkspacesInput{Filter: &db.WorkspaceFilter{WorkspaceIDs: idList}})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspaces")
 		return nil, err
 	}
 
@@ -239,6 +252,7 @@ func (s *service) GetWorkspacesByIDs(ctx context.Context, idList []string) ([]mo
 	if len(wsPaths) > 0 {
 		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePaths(wsPaths))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -247,8 +261,13 @@ func (s *service) GetWorkspacesByIDs(ctx context.Context, idList []string) ([]mo
 }
 
 func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) (*db.WorkspacesResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaces")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -263,12 +282,14 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 	if input.Group != nil {
 		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		dbInput.Filter.GroupID = &input.Group.Metadata.ID
 	} else {
 		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
 		if napErr != nil {
+			tracing.RecordError(span, napErr, "failed to get namespace access policy")
 			return nil, napErr
 		}
 
@@ -284,6 +305,7 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 					return nil
 				},
 			); err != nil {
+				tracing.RecordError(span, err, "failed to set filters for non-admin caller")
 				return nil, err
 			}
 		}
@@ -291,6 +313,7 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 
 	workspacesResult, err := s.dbClient.Workspaces.GetWorkspaces(ctx, &dbInput)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspaces")
 		return nil, err
 	}
 
@@ -298,22 +321,30 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 }
 
 func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceByFullPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(path))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	workspace, err := s.dbClient.Workspaces.GetWorkspaceByFullPath(ctx, path)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace by full path")
 		return nil, err
 	}
 
 	if workspace == nil {
+		tracing.RecordError(span, nil, "Workspace with path %s not found", path)
 		return nil, errors.New(
 			errors.ENotFound,
 			"Workspace with path %s not found", path,
@@ -324,18 +355,25 @@ func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*mod
 }
 
 func (s *service) GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	workspace, err := s.getWorkspaceByID(ctx, id)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace by ID")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -343,24 +381,32 @@ func (s *service) GetWorkspaceByID(ctx context.Context, id string) (*models.Work
 }
 
 func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspace, force bool) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.DeleteWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if !force && workspace.CurrentStateVersionID != "" {
 		sv, gErr := s.GetStateVersion(ctx, workspace.CurrentStateVersionID)
 		if gErr != nil {
+			tracing.RecordError(span, gErr, "failed to get state version")
 			return gErr
 		}
 
 		// A state version could be created by something other than a run e.g. 'terraform import'.
 		if sv.RunID == nil {
+			tracing.RecordError(span, nil, "current state version was not created by a destroy run")
 			return errors.New(
 				errors.EConflict,
 				"current state version was not created by a destroy run")
@@ -368,15 +414,18 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 		run, rErr := s.dbClient.Runs.GetRun(ctx, *sv.RunID)
 		if rErr != nil {
+			tracing.RecordError(span, rErr, "failed to get run")
 			return rErr
 		}
 
 		if run == nil {
+			tracing.RecordError(span, nil, "run with ID %s not found", *sv.RunID)
 			return errors.New(errors.ENotFound, "run with ID %s not found", *sv.RunID)
 		}
 
 		// Check to keep from accidentally deleting a workspace when resources are still deployed.
 		if !run.IsDestroy {
+			tracing.RecordError(span, nil, "run associated with the current state version was not a destroy run")
 			return errors.New(
 				errors.EConflict,
 				"run associated with the current state version was not a destroy run")
@@ -391,6 +440,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
 
@@ -404,6 +454,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 	err = s.dbClient.Workspaces.DeleteWorkspace(txContext, workspace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to delete workspace")
 		return err
 	}
 
@@ -420,6 +471,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 				Type: string(models.TargetWorkspace),
 			},
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
 
@@ -427,18 +479,25 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 }
 
 func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateWorkspacePermission, auth.WithGroupID(workspace.GroupID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model
 	if wErr := workspace.Validate(); wErr != nil {
+		tracing.RecordError(span, wErr, "failed to commit DB transaction")
 		return nil, wErr
 	}
 
@@ -446,6 +505,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	if d := workspace.MaxJobDuration; d != nil {
 		if vErr := validateMaxJobDuration(*d); vErr != nil {
+			tracing.RecordError(span, vErr, "failed to validate max job duration")
 			return nil, vErr
 		}
 	} else {
@@ -456,12 +516,14 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 	// Get a list of all the supported Terraform versions.
 	versions, err := s.cliService.GetTerraformCLIVersions(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get Terraform CLI versions")
 		return nil, err
 	}
 
 	// Check if requested Terraform version is supported.
 	if workspace.TerraformVersion != "" {
 		if terr := versions.Supported(workspace.TerraformVersion); terr != nil {
+			tracing.RecordError(span, terr, "requested Terraform version is not supported")
 			return nil, terr
 		}
 	}
@@ -473,6 +535,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -489,6 +552,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 	)
 	createdWorkspace, err := s.dbClient.Workspaces.CreateWorkspace(txContext, workspace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create workspace")
 		return nil, err
 	}
 
@@ -499,10 +563,12 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 			TargetType:    models.TargetWorkspace,
 			TargetID:      createdWorkspace.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -510,33 +576,43 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 }
 
 func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Validate model.
 	if wErr := workspace.Validate(); wErr != nil {
+		tracing.RecordError(span, wErr, "failed to validate workspace model")
 		return nil, wErr
 	}
 
 	if vErr := validateMaxJobDuration(*workspace.MaxJobDuration); vErr != nil {
+		tracing.RecordError(span, vErr, "failed to validate max job duration")
 		return nil, vErr
 	}
 
 	// Get a list of all the supported versions.
 	versions, err := s.cliService.GetTerraformCLIVersions(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get list of supported Terraform CLI versions")
 		return nil, err
 	}
 
 	// Check if requested Terraform version is supported.
 	if err = versions.Supported(workspace.TerraformVersion); err != nil {
+		tracing.RecordError(span, err, "requested Terraform CLI version is not supported")
 		return nil, err
 	}
 
@@ -548,6 +624,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -559,6 +636,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update workspace")
 		return nil, err
 	}
 
@@ -569,10 +647,12 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 			TargetType:    models.TargetWorkspace,
 			TargetID:      updatedWorkspace.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -580,18 +660,25 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 }
 
 func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.LockWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Check if workspace is already locked.
 	if workspace.Locked {
+		tracing.RecordError(span, nil, "workspace is already locked")
 		return nil, ErrWorkspaceLocked
 	}
 
@@ -606,6 +693,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -617,6 +705,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 
 	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update workspace")
 		return nil, err
 	}
 
@@ -627,10 +716,12 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 			TargetType:    models.TargetWorkspace,
 			TargetID:      updatedWorkspace.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -638,23 +729,31 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 }
 
 func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.UnlockWorkspace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Check if workspace is already unlocked.
 	if !workspace.Locked {
+		tracing.RecordError(span, nil, "workspace is already unlocked")
 		return nil, ErrWorkspaceUnlocked
 	}
 
 	// Check if workspace is locked by a run.
 	if workspace.CurrentJobID != "" {
+		tracing.RecordError(span, nil, "workspace is locked by a run")
 		return nil, ErrWorkspaceLockedByRun
 	}
 
@@ -669,6 +768,7 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -680,6 +780,7 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 
 	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update workspace")
 		return nil, err
 	}
 
@@ -690,10 +791,12 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 			TargetType:    models.TargetWorkspace,
 			TargetID:      updatedWorkspace.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -701,22 +804,30 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 }
 
 func (s *service) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetCurrentStateVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	workspace, err := s.getWorkspaceByID(ctx, workspaceID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace by ID")
 		return nil, err
 	}
 
 	if workspace == nil || workspace.CurrentStateVersionID == "" {
+		tracing.RecordError(span, nil, "workspace not found or current state version ID is empty")
 		return nil, nil
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithNamespacePath(workspace.FullPath))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -724,28 +835,37 @@ func (s *service) GetCurrentStateVersion(ctx context.Context, workspaceID string
 }
 
 func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionResources")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	reader, err := s.artifactStore.GetStateVersion(ctx, stateVersion)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version")
 		return nil, err
 	}
 
 	// Attempt to unmarshal to a stateV4:
 	var state stateV4
 	if err := json.NewDecoder(reader).Decode(&state); err != nil {
+		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
 		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
 	}
 
 	if state.Version != version4 {
+		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
 		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
 	}
 
@@ -765,10 +885,14 @@ func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *mo
 
 		startIndex := strings.Index(r.ProviderConfig, "[\"")
 		if startIndex == -1 {
+			tracing.RecordError(span, nil,
+				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
 			return nil, fmt.Errorf("invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
 		}
 		endIndex := strings.LastIndex(r.ProviderConfig, "\"]")
 		if endIndex == -1 {
+			tracing.RecordError(span, nil,
+				"invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
 			return nil, fmt.Errorf("invalid provider config encountered when parsing state version resources %s", r.ProviderConfig)
 		}
 
@@ -781,28 +905,37 @@ func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *mo
 }
 
 func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionDependencies")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	reader, err := s.artifactStore.GetStateVersion(ctx, stateVersion)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version")
 		return nil, err
 	}
 
 	// Attempt to unmarshal to a stateV4:
 	var state stateV4
 	if err := json.NewDecoder(reader).Decode(&state); err != nil {
+		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
 		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
 	}
 
 	if state.Version != version4 {
+		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
 		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
 	}
 
@@ -811,26 +944,36 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 	for _, r := range state.Resources {
 		if r.ProviderConfig == tharsisTerraformProviderConfig && r.Type == tharsisWorkspaceOutputsDatasourceName {
 			if len(r.Instances) != 1 {
+				tracing.RecordError(span, nil,
+					"expected one instance for %s but found %d", r.Type, len(r.Instances))
 				return nil, fmt.Errorf("expected one instance for %s but found %d", r.Type, len(r.Instances))
 			}
 
 			attributes := map[string]interface{}{}
 			if err := json.Unmarshal(r.Instances[0].AttributesRaw, &attributes); err != nil {
+				tracing.RecordError(span, nil,
+					"failed to unmarshal attributes for tharsis terraform provider %v", err)
 				return nil, fmt.Errorf("failed to unmarshal attributes for tharsis terraform provider %v", err)
 			}
 
 			fullPath, ok := attributes["full_path"]
 			if !ok {
+				tracing.RecordError(span, nil,
+					"full_path attribute missing from %s resource %s", r.Type, r.Name)
 				return nil, fmt.Errorf("full_path attribute missing from %s resource %s", r.Type, r.Name)
 			}
 
 			stateVersionID, ok := attributes["state_version_id"]
 			if !ok {
+				tracing.RecordError(span, nil,
+					"state_version_id attribute missing from %s resource %s", r.Type, r.Name)
 				return nil, fmt.Errorf("state_version_id attribute missing from %s resource %s", r.Type, r.Name)
 			}
 
 			workspaceID, ok := attributes["workspace_id"]
 			if !ok {
+				tracing.RecordError(span, nil,
+					"workspace_id attribute missing from %s resource %s", r.Type, r.Name)
 				return nil, fmt.Errorf("workspace_id attribute missing from %s resource %s", r.Type, r.Name)
 			}
 
@@ -846,25 +989,33 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 }
 
 func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data *string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateStateVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// We need to decode the base64 encoded string
 	decoded, err := base64.StdEncoding.DecodeString(*data)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to decoded base64-encoded state version")
 		return nil, err
 	}
 
 	// Wrap a transaction around persisting the state version and the state version outputs.
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -879,6 +1030,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 
 	createdStateVersion, err := s.dbClient.StateVersions.CreateStateVersion(txContext, stateVersion)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create state version")
 		return nil, err
 	}
 
@@ -886,6 +1038,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	// This is a read-only operation, so there's no need to use the transaction context.
 	workspace, wErr := s.getWorkspaceByID(ctx, createdStateVersion.WorkspaceID)
 	if wErr != nil {
+		tracing.RecordError(span, wErr, "failed to get workspace by ID")
 		return nil, wErr
 	}
 
@@ -895,6 +1048,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	// Update the workspace and ignore the returned model since its not needed.
 	_, err = s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to update workspace")
 		return nil, err
 	}
 
@@ -902,9 +1056,11 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	var state stateV4
 	err = json.Unmarshal(decoded, &state)
 	if err != nil {
+		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
 		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
 	}
 	if state.Version != version4 {
+		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
 		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
 	}
 
@@ -921,6 +1077,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		// There's nothing that needs to be done with the stored new output, so ignore it.
 		_, err = s.dbClient.StateVersionOutputs.CreateStateVersionOutput(txContext, &newOutput)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to create state version output")
 			return nil, err
 		}
 
@@ -929,6 +1086,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	// Upload state version data to object store
 	// Does not touch the DB, so no need to use the transaction context.
 	if err = s.artifactStore.UploadStateVersion(ctx, createdStateVersion, bytes.NewBuffer(decoded)); err != nil {
+		tracing.RecordError(span, err, "failed to upload state version")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -943,11 +1101,13 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 			TargetType:    models.TargetStateVersion,
 			TargetID:      createdStateVersion.Metadata.ID,
 		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
 
 	// Commit the transaction here.  If the upload fails, the transaction will be aborted.
 	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -961,13 +1121,19 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 
 // GetStateVersion returns a state version by ID
 func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to query state version from the database")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -976,11 +1142,13 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 	}
 
 	if sv == nil {
+		tracing.RecordError(span, nil, "state version with ID %s not found", stateVersionID)
 		return nil, errors.New(errors.ENotFound, "state version with ID %s not found", stateVersionID)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -988,13 +1156,19 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 }
 
 func (s *service) GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*db.StateVersionsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersions")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1009,13 +1183,19 @@ func (s *service) GetStateVersions(ctx context.Context, input *GetStateVersionsI
 
 // GetStateVersionContent returns the contents of the state version file
 func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionContent")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sv, err := s.GetStateVersion(ctx, stateVersionID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version")
 		return nil, err
 	}
 
 	result, err := s.artifactStore.GetStateVersion(ctx, sv)
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to get state version from artifact store")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1028,8 +1208,13 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 
 func (s *service) GetStateVersionsByIDs(ctx context.Context,
 	idList []string) ([]models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1039,6 +1224,7 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to get state versions")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1049,6 +1235,7 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 	for _, sv := range result.StateVersions {
 		err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -1057,6 +1244,10 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 }
 
 func (s *service) GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (io.ReadCloser, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersionContent")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	cv, err := s.GetConfigurationVersion(ctx, configurationVersionID)
 	if err != nil {
 		return nil, err
@@ -1064,6 +1255,7 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 
 	result, err := s.artifactStore.GetConfigurationVersion(ctx, cv)
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to get configuration version from artifact store")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1076,13 +1268,19 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 
 // CreateConfigurationVersion creates a new configuration version
 func (s *service) CreateConfigurationVersion(ctx context.Context, options *CreateConfigurationVersionInput) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateConfigurationVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.CreateConfigurationVersionPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1094,6 +1292,7 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 		CreatedBy:   caller.GetSubject(),
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to create configuration version")
 		return nil, err
 	}
 
@@ -1107,13 +1306,19 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 
 // GetConfigurationVersion returns a tfe configuration version
 func (s *service) GetConfigurationVersion(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	cv, err := s.dbClient.ConfigurationVersions.GetConfigurationVersion(ctx, configurationVersionID)
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to get configuration version")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1122,6 +1327,7 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 	}
 
 	if cv == nil {
+		tracing.RecordError(span, nil, "Configuration version with ID %s not found", configurationVersionID)
 		return nil, errors.New(
 			errors.ENotFound,
 			"Configuration version with ID %s not found", configurationVersionID,
@@ -1130,6 +1336,7 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 
 	err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -1137,8 +1344,13 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 }
 
 func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []string) ([]models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersionsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -1148,6 +1360,7 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to get configuration versions")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1158,6 +1371,7 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 	for _, cv := range result.ConfigurationVersions {
 		err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -1167,22 +1381,30 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 
 // UploadConfigurationVersion uploads a new configuration version file
 func (s *service) UploadConfigurationVersion(ctx context.Context, configurationVersionID string, reader io.Reader) error {
+	ctx, span := tracer.Start(ctx, "svc.UploadConfigurationVersion")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	cv, err := s.GetConfigurationVersion(ctx, configurationVersionID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get configuration version")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if err := s.artifactStore.UploadConfigurationVersion(ctx, cv, reader); err != nil {
+		tracing.RecordError(span, err, "Failed to write configuration version to object storage")
 		return errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1193,6 +1415,7 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 	// Update status of configuration version to uploaded
 	cv.Status = models.ConfigurationUploaded
 	if _, err := s.dbClient.ConfigurationVersions.UpdateConfigurationVersion(ctx, *cv); err != nil {
+		tracing.RecordError(span, err, "Failed to to update configuration version")
 		return errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1204,14 +1427,20 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 }
 
 func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionOutputs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	// sv is needed for access check
 	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to query state version from the database")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -1220,16 +1449,19 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 	}
 
 	if sv == nil {
+		tracing.RecordError(span, nil, "state version with id %s not found", stateVersionID)
 		return nil, errors.New(errors.ENotFound, "state version with id %s not found", stateVersionID)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	result, err := s.dbClient.StateVersionOutputs.GetStateVersionOutputs(ctx, stateVersionID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to list state version outputs")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,

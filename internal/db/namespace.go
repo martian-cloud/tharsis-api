@@ -7,6 +7,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -21,24 +22,41 @@ type namespaceRow struct {
 var namespaceFieldList = []interface{}{"id", "version", "path", "group_id", "workspace_id"}
 
 func getNamespaceByGroupID(ctx context.Context, conn connection, groupID string) (*namespaceRow, error) {
+	ctx, span := tracer.Start(ctx, "db.getNamespaceByGroupID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return getNamespace(ctx, conn, goqu.Ex{"group_id": groupID})
 }
 
 func getNamespaceByWorkspaceID(ctx context.Context, conn connection, workspaceID string) (*namespaceRow, error) {
+	ctx, span := tracer.Start(ctx, "db.getNamespaceByWorkspaceID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return getNamespace(ctx, conn, goqu.Ex{"workspace_id": workspaceID})
 }
 
 func getNamespaceByPath(ctx context.Context, conn connection, path string) (*namespaceRow, error) {
+	ctx, span := tracer.Start(ctx, "db.getNamespaceByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return getNamespace(ctx, conn, goqu.Ex{"path": path})
 }
 
 func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceRow, error) {
+	ctx, span := tracer.Start(ctx, "db.getNamespace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("namespaces").
 		Prepared(true).
 		Select(namespaceFieldList...).
 		Where(ex).
 		ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -47,6 +65,7 @@ func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceR
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -54,6 +73,10 @@ func getNamespace(ctx context.Context, conn connection, ex goqu.Ex) (*namespaceR
 }
 
 func createNamespace(ctx context.Context, conn connection, namespace *namespaceRow) (*namespaceRow, error) {
+	ctx, span := tracer.Start(ctx, "db.createNamespace")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("namespaces").
@@ -70,6 +93,7 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 		Returning(namespaceFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -77,9 +101,11 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "namespace %s already exists", namespace.path)
 				return nil, errors.New(errors.EConflict, "namespace %s already exists", namespace.path)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -88,6 +114,10 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 
 // migrateNamespaces migrates all namespaces that either exactly match an old path or have the old path as a prefix.
 func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath string) error {
+	ctx, span := tracer.Start(ctx, "db.migrateNamespaces")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("namespaces").
@@ -104,11 +134,13 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 	)).Returning(namespaceFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = conn.Exec(ctx, sql, args...)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute DB query")
 		return err
 	}
 

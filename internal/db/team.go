@@ -11,6 +11,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -91,18 +92,34 @@ func NewTeams(dbClient *Client) Teams {
 }
 
 func (t *teams) GetTeamBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTeamBySCIMExternalID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getTeam(ctx, goqu.Ex{"teams.scim_external_id": scimExternalID})
 }
 
 func (t *teams) GetTeamByID(ctx context.Context, id string) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTeamByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getTeam(ctx, goqu.Ex{"teams.id": id})
 }
 
 func (t *teams) GetTeamByName(ctx context.Context, name string) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTeamByName")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getTeam(ctx, goqu.Ex{"teams.name": name})
 }
 
 func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTeams")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -147,11 +164,13 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 		sortDirection,
 	)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -162,6 +181,7 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 	for rows.Next() {
 		item, err := scanTeam(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -169,6 +189,7 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -181,6 +202,10 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 }
 
 func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("teams").
@@ -196,6 +221,7 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 		}).
 		Returning(teamFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -203,9 +229,11 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil, "team with name %s already exists", team.Name)
 				return nil, errors.New(errors.EConflict, "team with name %s already exists", team.Name)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -213,6 +241,10 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 }
 
 func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("teams").
@@ -226,14 +258,17 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 			},
 		).Where(goqu.Ex{"id": team.Metadata.ID, "version": team.Metadata.Version}).Returning(teamFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedTeam, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -241,6 +276,10 @@ func (t *teams) UpdateTeam(ctx context.Context, team *models.Team) (*models.Team
 }
 
 func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteTeam")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.Delete("teams").
 		Prepared(true).
 		Where(
@@ -250,11 +289,13 @@ func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
 			},
 		).Returning(teamFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err == pgx.ErrNoRows {
+		tracing.RecordError(span, err, "optimistic lock error")
 		return ErrOptimisticLockError
 	}
 

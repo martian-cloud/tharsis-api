@@ -1,12 +1,14 @@
 package db
 
 import (
+	"context"
 	"embed"
 	"net/url"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx" // Instantiating migrate command
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -38,14 +40,20 @@ func newMigrations(logger logger.Logger, databaseURL string) (*migrations, error
 
 // migrateUp migrates the DB to the latest version.
 func (m *migrations) migrateUp() error {
+	_, span := tracer.Start(context.Background(), "db.migrateUp")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	fsDriver, err := iofs.New(migrationSchema, "migrations")
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get new iofs driver")
 		return err
 	}
 	defer fsDriver.Close()
 
 	migrateCmd, err := migrate.NewWithSourceInstance("iofs", fsDriver, m.databaseURL)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build migration command")
 		return err
 	}
 

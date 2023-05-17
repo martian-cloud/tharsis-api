@@ -212,7 +212,7 @@ func TestCreateToken(t *testing.T) {
 			mockJWSProvider := jwsprovider.MockProvider{}
 			mockJWSProvider.Test(t)
 
-			mockJWSProvider.On("Sign", ctx, mock.MatchedBy(func(payload []byte) bool {
+			mockJWSProvider.On("Sign", mock.Anything, mock.MatchedBy(func(payload []byte) bool {
 				parsedToken, err := jwt.Parse(payload)
 				if err != nil {
 					t.Fatal(err)

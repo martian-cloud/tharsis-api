@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -88,13 +89,20 @@ func NewService(
 }
 
 func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, options *LogEventSubscriptionOptions) (<-chan *LogEvent, error) {
+	outerCtx := ctx // for goroutine
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToJobLogEvents")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -103,6 +111,10 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 	go func() {
 		// Defer close of outgoing channel
 		defer close(outgoing)
+
+		// A new span not nested inside that of the parent function.
+		innerCtx, innerSpan := tracer.Start(outerCtx, "svc.SubscribeToJobLogEvents.goroutine")
+		defer innerSpan.End()
 
 		subscription := events.Subscription{
 			Type: events.JobLogSubscription,
@@ -116,8 +128,9 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 		defer s.eventManager.Unsubscribe(subscriber)
 
 		if options.LastSeenLogSize != nil {
-			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptorByJobID(ctx, job.Metadata.ID)
+			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptorByJobID(innerCtx, job.Metadata.ID)
 			if err != nil {
+				tracing.RecordError(innerSpan, err, "failed to get job log descriptor by job ID")
 				return
 			}
 
@@ -128,7 +141,7 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 
 			if size != *options.LastSeenLogSize {
 				select {
-				case <-ctx.Done():
+				case <-innerCtx.Done():
 					return
 				case outgoing <- &LogEvent{Action: string(events.UpdateAction), JobID: job.Metadata.ID, Size: size}:
 				}
@@ -137,21 +150,26 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 
 		// Wait for job updates
 		for {
-			event, err := subscriber.GetEvent(ctx)
+			event, err := subscriber.GetEvent(innerCtx)
 			if err != nil {
 				if err != context.Canceled {
+					tracing.RecordError(innerSpan, err, "Error occurred while waiting for job log events: %v", err)
 					s.logger.Errorf("Error occurred while waiting for job log events: %v", err)
 				}
 				return
 			}
 
-			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptor(ctx, event.ID)
+			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptor(innerCtx, event.ID)
 			if err != nil {
+				tracing.RecordError(innerSpan, err,
+					"Error occurred while querying for job log descriptor associated with job log event %s", event.ID)
 				s.logger.Errorf("Error occurred while querying for job log descriptor associated with job log event %s: %v", event.ID, err)
 				return
 			}
 
 			if descriptor == nil {
+				tracing.RecordError(innerSpan, nil,
+					"Error occurred while querying for job log descriptor associated with job log event %s: descriptor not found", event.ID)
 				s.logger.Errorf("Error occurred while querying for job log descriptor associated with job log event %s: descriptor not found", event.ID)
 				continue
 			}
@@ -162,7 +180,7 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 			}
 
 			select {
-			case <-ctx.Done():
+			case <-innerCtx.Done():
 				return
 			case outgoing <- &LogEvent{Action: event.Action, JobID: descriptor.JobID, Size: descriptor.Size}:
 			}
@@ -173,18 +191,25 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 }
 
 func (s *service) GetJobLogDescriptor(ctx context.Context, job *models.Job) (*models.JobLogDescriptor, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetJobLogDescriptor")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	descriptor, err := s.dbClient.Jobs.GetJobLogDescriptorByJobID(ctx, job.Metadata.ID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get job log descriptor by job ID")
 		return nil, err
 	}
 
@@ -192,13 +217,19 @@ func (s *service) GetJobLogDescriptor(ctx context.Context, job *models.Job) (*mo
 }
 
 func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetJob")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
 	if err != nil {
+		tracing.RecordError(span, err, "Failed to get job")
 		return nil, errors.Wrap(
 			err,
 			errors.EInternal,
@@ -207,11 +238,13 @@ func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error)
 	}
 
 	if job == nil {
+		tracing.RecordError(span, nil, "Job with ID %s not found", jobID)
 		return nil, errors.New(errors.ENotFound, "Job with ID %s not found", jobID)
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -219,13 +252,19 @@ func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error)
 }
 
 func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetJobsByIDs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	resp, err := s.dbClient.Jobs.GetJobs(ctx, &db.GetJobsInput{Filter: &db.JobFilter{JobIDs: idList}})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get jobs")
 		return nil, err
 	}
 
@@ -233,6 +272,7 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 	for _, job := range resp.Jobs {
 		err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 	}
@@ -241,8 +281,13 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 }
 
 func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetLatestJobForRun")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -254,6 +299,7 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get jobs")
 		return nil, err
 	}
 
@@ -263,6 +309,7 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobsResult.Jobs[0].Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -270,20 +317,28 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 }
 
 func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error) {
+	outerCtx := ctx // for goroutine
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToCancellationEvent")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	jobID := options.JobID
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	job, err := s.GetJob(ctx, jobID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get job")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -291,6 +346,11 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 
 	go func() {
 		defer close(outgoing)
+
+		// Because this goroutine will survive after the parent function returns,
+		// this span is not nested inside that for the parent function.
+		innerCtx, innerSpan := tracer.Start(outerCtx, "svc.SubscribeToCancellationEvent.goroutine")
+		defer innerSpan.End()
 
 		subscription := events.Subscription{
 			Type:    events.JobSubscription,
@@ -301,8 +361,9 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		defer s.eventManager.Unsubscribe(subscriber)
 
 		// Query for the job after the subscription is setup to ensure no events are missed
-		job, err := s.GetJob(ctx, jobID)
+		job, err := s.GetJob(innerCtx, jobID)
 		if err != nil {
+			tracing.RecordError(innerSpan, err, "Error occurred while checking for job cancellation")
 			s.logger.Errorf("Error occurred while checking for job cancellation: %v", err)
 			return
 		}
@@ -314,21 +375,25 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 
 		// Wait for job updates
 		for {
-			event, err := subscriber.GetEvent(ctx)
+			event, err := subscriber.GetEvent(innerCtx)
 			if err != nil {
 				if err != context.Canceled {
+					tracing.RecordError(innerSpan, err, "Error occurred while waiting for job cancellation events")
 					s.logger.Errorf("Error occurred while waiting for job cancellation events: %v", err)
 				}
 				return
 			}
 
-			job, err := s.GetJob(ctx, event.ID)
+			job, err := s.GetJob(innerCtx, event.ID)
 			if err != nil {
+				tracing.RecordError(innerSpan, err,
+					"Error occurred while querying for job associated with cancellation event %s", event.ID)
 				s.logger.Errorf("Error occurred while querying for job associated with cancellation event %s: %v", event.ID, err)
 				return
 			}
 
 			if job == nil {
+				tracing.RecordError(innerSpan, nil, "Job not found for event with ID %s", event.ID)
 				s.logger.Errorf("Job not found for event with ID %s", event.ID)
 				continue
 			}
@@ -337,7 +402,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 				continue
 			}
 			select {
-			case <-ctx.Done():
+			case <-innerCtx.Done():
 				return
 			case outgoing <- &CancellationEvent{Job: *job}:
 			}
@@ -348,22 +413,30 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 }
 
 func (s *service) SaveLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error {
+	ctx, span := tracer.Start(ctx, "svc.SaveLogs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return err
 	}
 
 	job, err := s.GetJob(ctx, jobID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get job")
 		return err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.UpdateJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if err := s.logStore.SaveLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, buffer); err != nil {
+		tracing.RecordError(span, err, "Failed to save logs")
 		return errors.Wrap(err, errors.EInvalid, "Failed to save logs")
 	}
 
@@ -371,22 +444,30 @@ func (s *service) SaveLogs(ctx context.Context, jobID string, startOffset int, b
 }
 
 func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetLogs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	if limit < 0 || startOffset < 0 {
+		tracing.RecordError(span, nil, "limit and offset cannot be negative")
 		return nil, errors.New(errors.EInvalid, "limit and offset cannot be negative")
 	}
 
 	job, err := s.GetJob(ctx, jobID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get job")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
@@ -394,8 +475,13 @@ func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, li
 }
 
 func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error) {
+	ctx, span := tracer.Start(ctx, "svc.ClaimJob")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
@@ -411,9 +497,11 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 		groupPath := strings.Join(pathParts[:len(pathParts)-1], "/")
 		group, ggErr := s.dbClient.Groups.GetGroupByFullPath(ctx, groupPath)
 		if ggErr != nil {
+			tracing.RecordError(span, ggErr, "failed to get group by full path")
 			return nil, ggErr
 		}
 		if group == nil {
+			tracing.RecordError(span, nil, "runner not found")
 			return nil, errors.New(errors.ENotFound, "runner not found")
 		}
 		getRunnerInput.Filter.GroupID = &group.Metadata.ID
@@ -421,10 +509,12 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 
 	runnersResp, err := s.dbClient.Runners.GetRunners(ctx, &getRunnerInput)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get runners")
 		return nil, err
 	}
 
 	if len(runnersResp.Runners) == 0 {
+		tracing.RecordError(span, nil, "runner not found")
 		return nil, errors.New(errors.ENotFound, "runner not found")
 	}
 
@@ -432,12 +522,14 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 
 	err = caller.RequirePermission(ctx, permissions.ClaimJobPermission, auth.WithRunnerID(runner.Metadata.ID))
 	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	for {
 		job, err := s.getNextAvailableQueuedJob(ctx, &runner)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to get next available queued job")
 			return nil, err
 		}
 
@@ -453,6 +545,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 			if err == db.ErrOptimisticLockError {
 				continue
 			}
+			tracing.RecordError(span, err, "failed to update job")
 			return nil, err
 		}
 
@@ -471,6 +564,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 				},
 			})
 			if err != nil {
+				tracing.RecordError(span, err, "failed to generate token")
 				return nil, err
 			}
 

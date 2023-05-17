@@ -50,6 +50,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -79,15 +80,16 @@ func (r *runnerClient) ClaimJob(ctx context.Context, input *rnr.ClaimJobInput) (
 
 // APIServer represents an instance of a server
 type APIServer struct {
-	shutdownOnce sync.Once
-	logger       logger.Logger
-	dbClient     *db.Client
-	taskManager  asynctask.Manager
-	srv          *http.Server
+	shutdownOnce  sync.Once
+	logger        logger.Logger
+	dbClient      *db.Client
+	taskManager   asynctask.Manager
+	srv           *http.Server
+	traceShutdown func(context.Context) error
 }
 
 // New creates a new APIServer instance
-func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APIServer, error) {
+func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version string) (*APIServer, error) {
 	openIDConfigFetcher := auth.NewOpenIDConfigFetcher()
 
 	var oauthProviders []auth.IdentityProviderConfig
@@ -105,6 +107,22 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 			ClientID:      idpConfig.ClientID,
 			UsernameClaim: idpConfig.UsernameClaim,
 		})
+	}
+
+	// Initialize a trace provider.
+	traceProviderShutdown, err := tracing.NewProvider(ctx,
+		&tracing.NewProviderInput{
+			Enabled: cfg.OtelTraceEnabled,
+			Type:    cfg.OtelTraceType,
+			Host:    cfg.OtelTraceCollectorHost,
+			Port:    cfg.OtelTraceCollectorPort,
+			Version: version,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize trace provider: %w", err)
+	}
+	if !cfg.OtelTraceEnabled {
+		logger.Info("Tracing is disabled.")
 	}
 
 	dbClient, err := db.NewClient(
@@ -424,6 +442,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*APISer
 			Handler:           routeBuilder.Router(),
 			ReadHeaderTimeout: time.Minute,
 		},
+		traceShutdown: traceProviderShutdown,
 	}, nil
 }
 
@@ -460,6 +479,13 @@ func (api *APIServer) Shutdown(ctx context.Context) {
 		}
 
 		api.logger.Info("HTTP server shutdown successfully")
+
+		// Shutdown trace provider.
+		if err := api.traceShutdown(ctx); err != nil {
+			api.logger.Errorf("Shutdown trace provider failed: %w", err)
+		} else {
+			api.logger.Info("Shutdown trace provider successfully.")
+		}
 
 		api.logger.Info("Starting Async Task Manager shutdown")
 		api.taskManager.Shutdown()

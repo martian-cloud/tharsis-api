@@ -5,6 +5,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 )
 
 // StateVersionOutputs encapsulates the logic to access state version outputs from the database
@@ -29,6 +30,10 @@ func NewStateVersionOutputs(dbClient *Client) StateVersionOutputs {
 // CreateStateVersionOutput creates a new state version output by name
 func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 	stateVersionOutput *models.StateVersionOutput) (*models.StateVersionOutput, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateStateVersionOutput")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("state_version_outputs").
@@ -47,6 +52,7 @@ func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 		Returning(stateVersionOutputFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -54,6 +60,7 @@ func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 
 	if err != nil {
 		ro.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return createdStateVersionOutput, nil
@@ -62,6 +69,10 @@ func (ro *stateVersionOutputs) CreateStateVersionOutput(ctx context.Context,
 // GetStateVersionOutputs returns a slice of state version outputs.  It does _NOT_ do pagination.
 func (ro *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 	stateVersionID string) ([]models.StateVersionOutput, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersionOutputs")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("state_version_outputs").
 		Prepared(true).
 		Select(stateVersionOutputFieldList...).
@@ -69,11 +80,13 @@ func (ro *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	rows, err := ro.dbClient.getConnection(ctx).Query(ctx, sql, args...)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	defer rows.Close()
@@ -83,6 +96,7 @@ func (ro *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 	for rows.Next() {
 		item, err := scanStateVersionOutput(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 		results = append(results, *item)
@@ -94,18 +108,24 @@ func (ro *stateVersionOutputs) GetStateVersionOutputs(ctx context.Context,
 // GetStateVersionOutputByName returns a state version output by name
 func (ro *stateVersionOutputs) GetStateVersionOutputByName(ctx context.Context,
 	stateVersionID, outputName string) (*models.StateVersionOutput, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersionOutputByName")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("state_version_outputs").
 		Select(stateVersionOutputFieldList...).
 		Where(goqu.Ex{"state_version_id": stateVersionID, "name": outputName}).
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	stateVersionOutput, err := scanStateVersionOutput(ro.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return stateVersionOutput, nil

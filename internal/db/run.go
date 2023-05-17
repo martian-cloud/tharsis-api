@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -112,6 +113,10 @@ func NewRuns(dbClient *Client) Runs {
 
 // GetRun returns a run by ID
 func (r *runs) GetRun(ctx context.Context, id string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRun")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sql, args, err := dialect.From("runs").
 		Prepared(true).
 		Select(runFieldList...).
@@ -119,6 +124,7 @@ func (r *runs) GetRun(ctx context.Context, id string) (*models.Run, error) {
 		ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -128,12 +134,17 @@ func (r *runs) GetRun(ctx context.Context, id string) (*models.Run, error) {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return run, nil
 }
 
 func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRunByPlanID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sort := RunSortableFieldUpdatedAtDesc
 	result, err := r.GetRuns(ctx, &GetRunsInput{
 		Sort: &sort,
@@ -145,10 +156,12 @@ func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, 
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get run for plan")
 		return nil, errors.Wrap(err, errors.EInternal, "failed to get run for plan")
 	}
 
 	if len(result.Runs) == 0 {
+		tracing.RecordError(span, nil, "Failed to get run for plan")
 		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get run for plan",
@@ -159,6 +172,10 @@ func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, 
 }
 
 func (r *runs) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRunByApplyID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	sort := RunSortableFieldUpdatedAtDesc
 	result, err := r.GetRuns(ctx, &GetRunsInput{
 		Sort: &sort,
@@ -170,10 +187,12 @@ func (r *runs) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run
 		},
 	})
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get run for apply")
 		return nil, errors.Wrap(err, errors.EInternal, "failed to get run for apply")
 	}
 
 	if len(result.Runs) == 0 {
+		tracing.RecordError(span, nil, "Failed to get run for apply")
 		return nil, errors.New(
 			errors.EInternal,
 			"Failed to get run for apply",
@@ -184,6 +203,10 @@ func (r *runs) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run
 }
 
 func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRuns")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.Ex{}
 
 	if input.Filter != nil {
@@ -230,11 +253,13 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, r.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -245,6 +270,7 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	for rows.Next() {
 		item, err := scanRun(rows)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -252,6 +278,7 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -265,6 +292,10 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 
 // CreateRun creates a new run
 func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateRun")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("runs").
@@ -295,6 +326,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		Returning(runFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -302,6 +334,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	if err != nil {
 		r.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return createdRun, nil
@@ -309,6 +342,10 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 // UpdateRun updates an existing run by ID
 func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateRun")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("runs").
@@ -332,6 +369,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).Returning(r.getSelectFields()...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -339,9 +377,11 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		r.dbClient.logger.Error(err)
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 	return updatedRun, nil

@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	apiServer, err := apiserver.New(ctx, cfg, logger)
+	apiServer, err := apiserver.New(ctx, cfg, logger, Version)
 	if err != nil {
 		logger.Errorf("Failed to start API server: %v", err)
 		os.Exit(1)

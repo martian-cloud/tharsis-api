@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -92,15 +93,27 @@ func NewTerraformProviders(dbClient *Client) TerraformProviders {
 }
 
 func (t *terraformProviders) GetProviderByID(ctx context.Context, id string) (*models.TerraformProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderByID")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	return t.getProvider(ctx, goqu.Ex{"terraform_providers.id": id})
 }
 
 func (t *terraformProviders) GetProviderByPath(ctx context.Context, path string) (*models.TerraformProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderByPath")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	index := strings.LastIndex(path, "/")
 	return t.getProvider(ctx, goqu.Ex{"terraform_providers.name": path[index+1:], "namespaces.path": path[:index]})
 }
 
 func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvidersInput) (*ProvidersResult, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviders")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	ex := goqu.And()
 
 	if input.Filter != nil {
@@ -190,11 +203,13 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 	)
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to build query")
 		return nil, err
 	}
 
 	rows, err := qBuilder.Execute(ctx, t.dbClient.getConnection(ctx), query)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
@@ -205,6 +220,7 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 	for rows.Next() {
 		item, err := scanTerraformProvider(rows, true)
 		if err != nil {
+			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
 		}
 
@@ -212,6 +228,7 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 	}
 
 	if err := rows.Finalize(&results); err != nil {
+		tracing.RecordError(span, err, "failed to finalize rows")
 		return nil, err
 	}
 
@@ -224,10 +241,15 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 }
 
 func (t *terraformProviders) CreateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.CreateProvider")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -255,6 +277,7 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 		}).
 		Returning(providerFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -262,19 +285,24 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
+				tracing.RecordError(span, nil,
+					"terraform provider with name %s already exists", provider.Name)
 				return nil, errors.New(errors.EConflict, "terraform provider with name %s already exists", provider.Name)
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, provider.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -284,10 +312,15 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 }
 
 func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.UpdateProvider")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return nil, err
 	}
 
@@ -311,6 +344,7 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).Returning(providerFieldList...).ToSQL()
 
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
@@ -318,18 +352,22 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	// Lookup namespace for group
 	namespace, err := getNamespaceByGroupID(ctx, tx, provider.GroupID)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get namespace by group ID")
 		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -339,6 +377,9 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 }
 
 func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *models.TerraformProvider) error {
+	ctx, span := tracer.Start(ctx, "db.DeleteProvider")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
 
 	sql, args, err := dialect.Delete("terraform_providers").
 		Prepared(true).
@@ -349,14 +390,17 @@ func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *model
 			},
 		).Returning(providerFieldList...).ToSQL()
 	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
 	_, err = scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
 		}
+		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}
 
