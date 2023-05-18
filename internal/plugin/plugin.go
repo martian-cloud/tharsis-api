@@ -22,9 +22,10 @@ import (
 
 // Catalog contains the available plugins
 type Catalog struct {
-	ObjectStore    objectstore.ObjectStore
-	JWSProvider    jws.Provider
-	RateLimitStore ratelimitstore.Store
+	ObjectStore           objectstore.ObjectStore
+	JWSProvider           jws.Provider
+	GraphqlRateLimitStore ratelimitstore.Store
+	HTTPRateLimitStore    ratelimitstore.Store
 }
 
 // NewCatalog creates a new Catalog
@@ -39,23 +40,35 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		return nil, err
 	}
 
-	rateLimitStore, err := newRateLimitStore(ctx, logger, cfg)
+	graphqlRateLimitStore, err := newRateLimitStore(ctx, logger,
+		cfg.RateLimitStorePluginType, cfg.RateLimitStorePluginData, cfg.MaxGraphQLComplexity)
+	if err != nil {
+		return nil, err
+	}
+
+	// An authenticated request count as 1 unit; an unauthenticated request generally counts for more than 1 unit.
+	httpRateLimitStore, err := newRateLimitStore(ctx, logger,
+		cfg.RateLimitStorePluginType, cfg.RateLimitStorePluginData, cfg.HTTPRateLimit)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Catalog{
-		ObjectStore:    objectStore,
-		JWSProvider:    jwsProvider,
-		RateLimitStore: rateLimitStore,
+		ObjectStore:           objectStore,
+		JWSProvider:           jwsProvider,
+		GraphqlRateLimitStore: graphqlRateLimitStore,
+		HTTPRateLimitStore:    httpRateLimitStore,
 	}, nil
 }
 
 // newRateLimiterStore takes config and determines the cache type
-func newRateLimitStore(_ context.Context, logger logger.Logger, cfg *config.Config) (ratelimitstore.Store, error) {
-	switch cfg.RateLimitStorePluginType {
+func newRateLimitStore(_ context.Context, logger logger.Logger, pluginType string, pluginData map[string]string,
+	tokenLimit int) (ratelimitstore.Store, error) {
+	tokenLimit64 := uint64(tokenLimit)
+
+	switch pluginType {
 	case "redis":
-		endpoint, ok := cfg.RateLimitStorePluginData["redis_endpoint"]
+		endpoint, ok := pluginData["redis_endpoint"]
 		if !ok {
 			return nil, errors.New(errors.EInternal, "'redis_endpoint' is required when using the redis rate limit store")
 		}
@@ -74,7 +87,7 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, cfg *config.Conf
 		}
 
 		redis, err := redisstore.NewWithPool(&redisstore.Config{
-			Tokens:   uint64(cfg.MaxGraphQLComplexity),
+			Tokens:   uint64(tokenLimit64),
 			Interval: time.Second,
 		}, pool)
 		if err != nil {
@@ -84,7 +97,7 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, cfg *config.Conf
 		return redis, nil
 	case "memory":
 		store := &memorystore.Config{
-			Tokens:   uint64(cfg.MaxGraphQLComplexity),
+			Tokens:   uint64(tokenLimit64),
 			Interval: time.Second,
 		}
 		mem, err := memorystore.New(store)
@@ -97,7 +110,7 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, cfg *config.Conf
 		return nil, errors.New(
 			errors.EInternal,
 			"The specified rate limit store type %s is not currently supported",
-			cfg.RateLimitStorePluginType,
+			pluginType,
 		)
 
 	}

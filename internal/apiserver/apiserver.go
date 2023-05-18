@@ -213,6 +213,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 	routeBuilder := api.NewRouteBuilder(
 		middleware.PrometheusMiddleware,
+		middleware.NewAuthenticationMiddleware(authenticator, logger, respWriter),
+		middleware.HTTPRateLimiterMiddleware(
+			logger,
+			respWriter,
+			pluginCatalog.HTTPRateLimitStore,
+		), // catch all calls, including GraphQL
 	).WithSubRouter("/v1").
 		WithSubRouter(tfeBasePath,
 			middleware.NewCommonHeadersMiddleware(map[string]string{
@@ -274,7 +280,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		)
 	}
 
-	jwtAuthMiddleware := middleware.NewJwtAuthMiddleware(authenticator, logger, respWriter)
+	requireAuthenticatedCallerMiddleware := middleware.NewRequireAuthenticatedCallerMiddleware(logger, respWriter)
 
 	resolverState := resolver.State{
 		Config:                     cfg,
@@ -300,7 +306,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		RunnerService:              runnerService,
 	}
 
-	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.RateLimitStore, cfg.MaxGraphQLComplexity, authenticator)
+	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}
@@ -327,7 +333,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewStateController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		workspaceService,
 		cfg.TharsisAPIURL,
 		tfeBasePath+tfeVersionPath,
@@ -335,7 +341,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewRunController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		pluginCatalog.JWSProvider,
 		runService,
 		cfg.TharsisAPIURL,
@@ -343,14 +349,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewOrgController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		runService,
 		groupService,
 	))
 	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewWorkspaceController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		runService,
 		workspaceService,
 		groupService,
@@ -364,13 +370,13 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	v1RouteBuilder.AddRoutes(controllers.NewRunController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		runService,
 	))
 	v1RouteBuilder.AddRoutes(controllers.NewJobController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		pluginCatalog.JWSProvider,
 		jobService,
 	))
@@ -382,20 +388,20 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	v1RouteBuilder.AddRoutes(controllers.NewProviderRegistryController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		providerRegistryService,
 	))
 	v1RouteBuilder.AddRoutes(controllers.NewModuleRegistryController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		moduleRegistryService,
 		cfg.ModuleRegistryMaxUploadSize,
 	))
 	v1RouteBuilder.AddRoutes(controllers.NewSCIMController(
 		logger,
 		respWriter,
-		jwtAuthMiddleware,
+		requireAuthenticatedCallerMiddleware,
 		userService,
 		teamService,
 		scimService,

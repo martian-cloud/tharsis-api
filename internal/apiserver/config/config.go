@@ -26,6 +26,7 @@ const (
 	defaultAsyncTaskTimeout            = 100              // seconds
 	defaultDBAutoMigrateEnabled        = true
 	defaultOtelTraceEnabled            = false
+	defaultHTTPRateLimit               = 60 // in calls per second
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -112,6 +113,9 @@ type Config struct {
 	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
 	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST"`
 	OtelTraceCollectorPort int    `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT"`
+
+	// HTTP rate limit value
+	HTTPRateLimit int `yaml:"http_rate_limit" env:"HTTP_RATE_LIMIT"`
 }
 
 // Validate validates the application configuration.
@@ -136,6 +140,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		AsyncTaskTimeout:            defaultAsyncTaskTimeout,
 		DBAutoMigrateEnabled:        defaultDBAutoMigrateEnabled,
 		OtelTraceEnabled:            defaultOtelTraceEnabled,
+		HTTPRateLimit:               defaultHTTPRateLimit,
 	}
 
 	// load from YAML config file
