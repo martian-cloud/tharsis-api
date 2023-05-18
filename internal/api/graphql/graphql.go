@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -156,13 +155,7 @@ var (
 )
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	caller, err := h.authenticator.Authenticate(r.Context(), auth.FindToken(r), true)
-	// Do not return an unauthorized error here since the service layer is responsible for determining
-	// if a request requires an authenticated user
-	if err != nil && errors.ErrorCode(err) != errors.EUnauthorized {
-		respond(w, errorJSON(fmt.Sprintf("server error: %v", err)), http.StatusInternalServerError)
-		return
-	}
+	caller := auth.GetCaller(r.Context())
 
 	parentCtx := r.Context()
 	if caller != nil {
@@ -174,18 +167,10 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var subject string
-	if caller != nil {
-		subject = caller.GetSubject()
-	} else {
-		// If this is an unauthenticated request, we will use the callers IP for rate limiting
-		var ip string
-		ip, err = getSourceIP(r)
-		if err != nil {
-			respond(w, errorJSON(fmt.Sprintf("error finding client IP: %v", err)), http.StatusBadRequest)
-			return
-		}
-		subject = fmt.Sprintf("anonymous-%s", ip)
+	subject := auth.GetSubject(r.Context())
+	if subject == nil {
+		respond(w, errorJSON("No subject string in context"), http.StatusInternalServerError)
+		return
 	}
 
 	req, err := parse(r)
@@ -216,7 +201,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var res *graphql.Response
 
 			// Rate limit query
-			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, subject)
+			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, *subject)
 			if qcErr != nil {
 				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
 				err := errors.New(
@@ -305,7 +290,7 @@ func (h *httpHandler) calculateQueryComplexity(ctx context.Context, q query, sub
 	}
 
 	// TakeMany determines if the query needs to be rate limited
-	_, remaining, _, ok, err := h.rateLimitStore.TakeMany(ctx, subject, uint64(complexity))
+	_, remaining, _, ok, err := h.rateLimitStore.TakeMany(ctx, "graphql-"+subject, uint64(complexity))
 	if err != nil {
 		return nil, err
 	}
@@ -349,40 +334,4 @@ func errorJSON(msg string) []byte {
 	buf := bytes.Buffer{}
 	fmt.Fprintf(&buf, `{"error": "%s"}`, msg)
 	return buf.Bytes()
-}
-
-func getSourceIP(req *http.Request) (string, error) {
-	// Check the Forward header
-	forwardedHeader := req.Header.Get("Forwarded")
-	if forwardedHeader != "" {
-		parts := strings.Split(forwardedHeader, ",")
-		firstPart := strings.TrimSpace(parts[0])
-		subParts := strings.Split(firstPart, ";")
-		for _, part := range subParts {
-			normalisedPart := strings.ToLower(strings.TrimSpace(part))
-			if strings.HasPrefix(normalisedPart, "for=") {
-				return normalisedPart[4:], nil
-			}
-		}
-	}
-
-	// Check the X-Forwarded-For header
-	xForwardedForHeader := req.Header.Get("X-Forwarded-For")
-	if xForwardedForHeader != "" {
-		parts := strings.Split(xForwardedForHeader, ",")
-		firstPart := strings.TrimSpace(parts[0])
-		return firstPart, nil
-	}
-
-	// Check on the request
-	host, _, err := net.SplitHostPort(req.RemoteAddr)
-	if err != nil {
-		return "", err
-	}
-
-	if host == "::1" {
-		return "127.0.0.1", nil
-	}
-
-	return host, nil
 }

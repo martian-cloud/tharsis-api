@@ -18,10 +18,32 @@ var errMissingConstraints = goerror.New("missing required permissions or constra
 // Uses the context key pattern
 type contextKey string
 
+// contextKeyCaller accesses the caller object.
 var contextKeyCaller = contextKey("caller")
+
+// contextKeySubject accesses the subject string.
+var contextKeySubject = contextKey("subject")
 
 func (c contextKey) String() string {
 	return "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth " + string(c)
+}
+
+// GetCaller returns a context's caller.  Return nil if no caller was found on the context.
+func GetCaller(ctx context.Context) Caller {
+	caller, ok := ctx.Value(contextKeyCaller).(Caller)
+	if !ok {
+		return nil
+	}
+	return caller
+}
+
+// GetSubject returns a context's subject.  Return nil if no subject was found on the context.
+func GetSubject(ctx context.Context) *string {
+	subject, ok := ctx.Value(contextKeySubject).(string)
+	if !ok {
+		return nil
+	}
+	return &subject
 }
 
 // permissionTypeHandler allows delegating checks based on the permission type.
@@ -178,6 +200,11 @@ type Caller interface {
 // WithCaller adds the caller to the context
 func WithCaller(ctx context.Context, caller Caller) context.Context {
 	return context.WithValue(ctx, contextKeyCaller, caller)
+}
+
+// WithSubject adds the subject string to the context
+func WithSubject(ctx context.Context, subject string) context.Context {
+	return context.WithValue(ctx, contextKeySubject, subject)
 }
 
 // AuthorizeCaller verifies that a caller has been authenticated and returns the caller
