@@ -12,11 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
@@ -139,6 +141,7 @@ type Service interface {
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
+	limitChecker    limits.LimitChecker
 	artifactStore   ArtifactStore
 	eventManager    *events.EventManager
 	cliService      cli.Service
@@ -149,6 +152,7 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	artifactStore ArtifactStore,
 	eventManager *events.EventManager,
 	cliService cli.Service,
@@ -157,6 +161,7 @@ func NewService(
 	return &service{
 		logger,
 		dbClient,
+		limitChecker,
 		artifactStore,
 		eventManager,
 		cliService,
@@ -553,6 +558,24 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 	createdWorkspace, err := s.dbClient.Workspaces.CreateWorkspace(txContext, workspace)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create workspace")
+		return nil, err
+	}
+
+	// Get the number of workspaces in the group to check whether we just violated the limit.
+	newWorkspaces, err := s.dbClient.Workspaces.GetWorkspaces(txContext, &db.GetWorkspacesInput{
+		Filter: &db.WorkspaceFilter{
+			GroupID: &createdWorkspace.GroupID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's workspaces")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitWorkspacesPerGroup, newWorkspaces.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 

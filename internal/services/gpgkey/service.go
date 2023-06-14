@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/aws/smithy-go/ptr"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -49,6 +51,7 @@ type Service interface {
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
+	limitChecker    limits.LimitChecker
 	activityService activityevent.Service
 }
 
@@ -56,11 +59,13 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
 ) Service {
 	return newService(
 		logger,
 		dbClient,
+		limitChecker,
 		activityService,
 	)
 }
@@ -68,11 +73,13 @@ func NewService(
 func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger:          logger,
 		dbClient:        dbClient,
+		limitChecker:    limitChecker,
 		activityService: activityService,
 	}
 }
@@ -334,6 +341,25 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	createdKey, err := s.dbClient.GPGKeys.CreateGPGKey(txContext, toCreate)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to store a GPG key in the DB")
+		return nil, err
+	}
+
+	// Get the number of GPG keys in the group to check whether we just violated the limit.
+	newKeys, err := s.dbClient.GPGKeys.GetGPGKeys(txContext, &db.GetGPGKeysInput{
+		Filter: &db.GPGKeyFilter{
+			NamespacePaths: []string{group.FullPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's GPG keys")
+		return nil, err
+	}
+
+	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitGPGKeysPerGroup, newKeys.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 

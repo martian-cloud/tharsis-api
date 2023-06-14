@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -117,6 +118,7 @@ type Service interface {
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
+	limitChecker    limits.LimitChecker
 	registryStore   RegistryStore
 	activityService activityevent.Service
 }
@@ -125,12 +127,14 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
 	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
+		limitChecker,
 		registryStore,
 		activityService,
 	}
@@ -433,6 +437,25 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 	createdProvider, err := s.dbClient.TerraformProviders.CreateProvider(txContext, providerToCreate)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create provider")
+		return nil, err
+	}
+
+	// Get the number of providers in the group to check whether we just violated the limit.
+	newProviders, err := s.dbClient.TerraformProviders.GetProviders(txContext, &db.GetProvidersInput{
+		Filter: &db.TerraformProviderFilter{
+			GroupID: &createdProvider.GroupID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's Terraform providers")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitTerraformProvidersPerGroup, newProviders.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -795,6 +818,25 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 
 	groupPath := provider.GetGroupPath()
 
+	// Get the number of versions for the provider to check whether we just violated the limit.
+	newVersions, err := s.dbClient.TerraformProviderVersions.GetProviderVersions(txContext, &db.GetProviderVersionsInput{
+		Filter: &db.TerraformProviderVersionFilter{
+			ProviderID: &providerVersion.ProviderID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider's versions")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitVersionsPerTerraformProvider, newVersions.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
 			NamespacePath: &groupPath,
@@ -1066,7 +1108,19 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		return nil, err
 	}
 
-	return s.dbClient.TerraformProviderPlatforms.CreateProviderPlatform(ctx, &models.TerraformProviderPlatform{
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for CreateProviderPlatform: %v", txErr)
+		}
+	}()
+
+	createdPlatform, err := s.dbClient.TerraformProviderPlatforms.CreateProviderPlatform(txContext, &models.TerraformProviderPlatform{
 		ProviderVersionID: input.ProviderVersionID,
 		OperatingSystem:   input.OperatingSystem,
 		Architecture:      input.Architecture,
@@ -1075,6 +1129,36 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		BinaryUploaded:    false,
 		CreatedBy:         caller.GetSubject(),
 	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to create terraform provider platform")
+		return nil, err
+	}
+
+	// Get the number of platforms for this provider version to check whether we just violated the limit.
+	newPlatforms, err := s.dbClient.TerraformProviderPlatforms.GetProviderPlatforms(txContext, &db.GetProviderPlatformsInput{
+		Filter: &db.TerraformProviderPlatformFilter{
+			ProviderVersionID: &createdPlatform.ProviderVersionID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider's platforms")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitPlatformsPerTerraformProviderVersion, newPlatforms.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return nil, err
+	}
+
+	return createdPlatform, nil
 }
 
 func (s *service) DeleteProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) error {

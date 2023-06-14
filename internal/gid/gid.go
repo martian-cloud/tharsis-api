@@ -45,6 +45,7 @@ const (
 	WorkspaceVCSProviderLinkType   Type = "WPL"
 	VCSEventType                   Type = "VE"
 	RoleType                       Type = "RL"
+	ResourceLimitType              Type = "RLM"
 )
 
 // IsValid returns true if this is a valid Type enum
@@ -80,7 +81,8 @@ func (t Type) IsValid() error {
 		VCSProviderType,
 		WorkspaceVCSProviderLinkType,
 		VCSEventType,
-		RoleType:
+		RoleType,
+		ResourceLimitType:
 		return nil
 	}
 	return errors.New(errors.EInvalid, "invalid ID type %s", t)

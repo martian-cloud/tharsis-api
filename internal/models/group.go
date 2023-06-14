@@ -69,3 +69,8 @@ func (g *Group) ExpandPath() []string {
 
 	return paths
 }
+
+// GetDepth returns the depth of the tree from root to this group.  A root group is counted as 1.
+func (g *Group) GetDepth() int {
+	return 1 + strings.Count(g.FullPath, "/")
+}

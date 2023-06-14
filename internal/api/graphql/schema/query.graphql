@@ -127,4 +127,5 @@ type Query {
   ): RoleConnection!
   availableRolePermissions: [String!]!
   authSettings: AuthSettings
+  resourceLimits: [ResourceLimit!]!
 }

@@ -94,6 +94,7 @@ type Client struct {
 	VCSEvents                   VCSEvents
 	Roles                       Roles
 	Runners                     Runners
+	ResourceLimits              ResourceLimits
 }
 
 // NewClient creates a new Client
@@ -187,6 +188,7 @@ func NewClient(
 	dbClient.VCSEvents = NewVCSEvents(dbClient)
 	dbClient.Roles = NewRoles(dbClient)
 	dbClient.Runners = NewRunners(dbClient)
+	dbClient.ResourceLimits = NewResourceLimits(dbClient)
 
 	return dbClient, nil
 }

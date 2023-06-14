@@ -5,9 +5,11 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
@@ -15,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // GetGroupsInput is the input for querying a list of groups
@@ -60,6 +63,7 @@ type Service interface {
 type service struct {
 	logger                     logger.Logger
 	dbClient                   *db.Client
+	limitChecker               limits.LimitChecker
 	namespaceMembershipService namespacemembership.Service
 	activityService            activityevent.Service
 }
@@ -68,12 +72,14 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	namespaceMembershipService namespacemembership.Service,
 	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger:                     logger,
 		dbClient:                   dbClient,
+		limitChecker:               limitChecker,
 		namespaceMembershipService: namespaceMembershipService,
 		activityService:            activityService,
 	}
@@ -404,6 +410,23 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		return nil, err
 	}
 
+	// If a nested group, check limits to see whether we just violated them.
+	if input.ParentID != "" {
+
+		// Check the limit on number of subgroups per parent.
+		err = s.checkParentSubgroupLimit(txContext, span, input.ParentID)
+		if err != nil {
+			// The error has already been recorded to the tracing span.
+			return nil, err
+		}
+
+		// Check the limit on depth of the tree.
+		if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitGroupTreeDepth, int32(group.GetDepth())); err != nil {
+			tracing.RecordError(span, err, "limit check failed")
+			return nil, err
+		}
+	}
+
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
@@ -641,6 +664,30 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		return nil, err
 	}
 
+	// If it will be a nested group, check limits to see whether we just committed a violation.
+	if newParentID != nil {
+
+		// Check the limit on number of subgroups per parent.
+		err = s.checkParentSubgroupLimit(txContext, span, *newParentID)
+		if err != nil {
+			// The error has already been recorded to the tracing span.
+			return nil, err
+		}
+
+		// Check the limit on depth of the tree.
+		childDepth, cErr := s.dbClient.Groups.GetChildDepth(txContext, migratedGroup)
+		if cErr != nil {
+			tracing.RecordError(span, cErr, "failed to get group's depth of descendants")
+			return nil, cErr
+		}
+
+		if err = s.limitChecker.CheckLimit(txContext,
+			limits.ResourceLimitGroupTreeDepth, int32(migratedGroup.GetDepth()+childDepth)); err != nil {
+			tracing.RecordError(span, err, "limit check failed")
+			return nil, err
+		}
+	}
+
 	// For now, generate an activity event on the group that was migrated--but without a custom payload.
 	// The old parent (if any) and the new parent (if any) might have (also) wanted an activity event.
 	if _, err = s.activityService.CreateActivityEvent(txContext,
@@ -663,4 +710,28 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	}
 
 	return migratedGroup, nil
+}
+
+// checkParentSubgroupLimit checks whether the parent subgroup limit has just been violated.
+// This function records any errors on the span.
+func (s *service) checkParentSubgroupLimit(ctx context.Context, span trace.Span, parentID string) error {
+	children, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
+		Filter: &db.GroupFilter{
+			ParentID: &parentID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get parent group's children")
+		return err
+	}
+
+	if err = s.limitChecker.CheckLimit(ctx, limits.ResourceLimitSubgroupsPerParent, children.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return err
+	}
+
+	return nil
 }

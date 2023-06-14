@@ -23,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -146,6 +147,7 @@ type dsseSignature struct {
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
+	limitChecker    limits.LimitChecker
 	registryStore   RegistryStore
 	activityService activityevent.Service
 	taskManager     asynctask.Manager
@@ -156,6 +158,7 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
 	activityService activityevent.Service,
 	taskManager asynctask.Manager,
@@ -163,6 +166,7 @@ func NewService(
 	return newService(
 		logger,
 		dbClient,
+		limitChecker,
 		registryStore,
 		activityService,
 		taskManager,
@@ -173,6 +177,7 @@ func NewService(
 func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	registryStore RegistryStore,
 	activityService activityevent.Service,
 	taskManager asynctask.Manager,
@@ -181,6 +186,7 @@ func newService(
 	return &service{
 		logger,
 		dbClient,
+		limitChecker,
 		registryStore,
 		activityService,
 		taskManager,
@@ -522,9 +528,46 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 		return nil, err
 	}
 
-	createdAttestation, err := s.dbClient.TerraformModuleAttestations.CreateModuleAttestation(ctx, &attestationToCreate)
+	// Need to use a transaction so we can roll it back if resource limits are violated.
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateModuleAttestation: %v", txErr)
+		}
+	}()
+
+	createdAttestation, err := s.dbClient.TerraformModuleAttestations.CreateModuleAttestation(txContext, &attestationToCreate)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create module attestation")
+		return nil, err
+	}
+
+	// Get the number of attestations on this module to check whether we just violated the limit.
+	newAttestations, err := s.dbClient.TerraformModuleAttestations.GetModuleAttestations(txContext, &db.GetModuleAttestationsInput{
+		Filter: &db.TerraformModuleAttestationFilter{
+			ModuleID: &createdAttestation.ModuleID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get module's attestations")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitAttestationsPerTerraformModule, newAttestations.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -764,6 +807,26 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 	createdModule, err := s.dbClient.TerraformModules.CreateModule(txContext, moduleToCreate)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create module")
+		return nil, err
+	}
+
+	// Get the number of modules in this group to check whether we just violated the limit.
+	newModules, err := s.dbClient.TerraformModules.GetModules(txContext, &db.GetModulesInput{
+		Filter: &db.TerraformModuleFilter{
+			GroupID: &createdModule.GroupID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's modules")
+		return nil, err
+	}
+
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitTerraformModulesPerGroup, newModules.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 
@@ -1127,6 +1190,25 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 	}
 
 	groupPath := module.GetGroupPath()
+
+	// Get the number of versions of this module to check whether we just violated the limit.
+	newVersions, err := s.dbClient.TerraformModuleVersions.GetModuleVersions(txContext, &db.GetModuleVersionsInput{
+		Filter: &db.TerraformModuleVersionFilter{
+			ModuleID: &moduleVersion.ModuleID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get module's versions")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitVersionsPerTerraformModule, newVersions.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{

@@ -26,6 +26,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
@@ -38,6 +39,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
@@ -172,32 +174,36 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 	runStateManager := state.NewRunStateManager(dbClient, logger)
 
+	limits := limits.NewLimitChecker(dbClient)
+
 	// Services.
 	var (
 		activityService            = activityevent.NewService(dbClient, logger)
 		userService                = user.NewService(logger, dbClient)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
-		groupService               = group.NewService(logger, dbClient, namespaceMembershipService, activityService)
+		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore)
-		workspaceService           = workspace.NewService(logger, dbClient, artifactStore, eventManager, cliService, activityService)
+		workspaceService           = workspace.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService)
 		jobService                 = job.NewService(logger, dbClient, tharsisIDP, eventManager, runStateManager, logStore)
-		managedIdentityService     = managedidentity.NewService(logger, dbClient, managedIdentityDelegates, workspaceService, jobService, activityService)
-		saService                  = serviceaccount.NewService(logger, dbClient, tharsisIDP, openIDConfigFetcher, activityService)
-		variableService            = variable.NewService(logger, dbClient, activityService)
+		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
+		saService                  = serviceaccount.NewService(logger, dbClient, limits, tharsisIDP, openIDConfigFetcher, activityService)
+		variableService            = variable.NewService(logger, dbClient, limits, activityService)
 		teamService                = team.NewService(logger, dbClient, activityService)
-		providerRegistryService    = providerregistry.NewService(logger, dbClient, providerRegistryStore, activityService)
-		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, moduleRegistryStore, activityService, taskManager)
-		gpgKeyService              = gpgkey.NewService(logger, dbClient, activityService)
+		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore, activityService)
+		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, activityService, taskManager)
+		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
 		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL), runStateManager)
-		runnerService              = runner.NewService(logger, dbClient, activityService)
+		runnerService              = runner.NewService(logger, dbClient, limits, activityService)
 		roleService                = role.NewService(logger, dbClient, activityService)
+		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
 	)
 
 	vcsService, err := vcs.NewService(
 		ctx,
 		logger,
 		dbClient,
+		limits,
 		tharsisIDP,
 		httpClient,
 		activityService,
@@ -304,6 +310,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		ActivityService:            activityService,
 		RoleService:                roleService,
 		RunnerService:              runnerService,
+		ResourceLimitService:       resourceLimitService,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)

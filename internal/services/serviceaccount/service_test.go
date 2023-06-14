@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
@@ -16,17 +17,209 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	terrs "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 type keyPair struct {
 	priv jwk.Key
 	pub  jwk.Key
+}
+
+func TestCreateServiceAccount(t *testing.T) {
+	serviceAccountName := "test-service-account"
+	serviceAccountDescription := "test service account description"
+	groupName := "group-name"
+	groupID := "group123"
+	createdBy := "service-account-created-by"
+	resourcePath := groupName + "/" + serviceAccountName
+	issuer := "http://some/identity/issuer"
+	claimKey := "bound-claim-key"
+	claimVal := "bound-claim-value"
+
+	// Test cases
+	tests := []struct {
+		authError                     error
+		expectCreatedServiceAccount   *models.ServiceAccount
+		name                          string
+		expectErrCode                 string
+		input                         models.ServiceAccount
+		limit                         int
+		injectServiceAccountsPerGroup int32
+		exceedsLimit                  bool
+	}{
+		{
+			name: "create service account",
+			input: models.ServiceAccount{
+				Name:        serviceAccountName,
+				Description: serviceAccountDescription,
+				GroupID:     groupID,
+				CreatedBy:   createdBy,
+				OIDCTrustPolicies: []models.OIDCTrustPolicy{
+					{
+						Issuer:      issuer,
+						BoundClaims: map[string]string{claimKey: claimVal},
+					},
+				},
+			},
+			expectCreatedServiceAccount: &models.ServiceAccount{
+				Metadata:     models.ResourceMetadata{ID: groupID},
+				ResourcePath: resourcePath,
+				Name:         serviceAccountName,
+				Description:  serviceAccountDescription,
+				GroupID:      groupID,
+				CreatedBy:    createdBy,
+				OIDCTrustPolicies: []models.OIDCTrustPolicy{
+					{
+						Issuer:      issuer,
+						BoundClaims: map[string]string{claimKey: claimVal},
+					},
+				},
+			},
+			limit:                         5,
+			injectServiceAccountsPerGroup: 5,
+		},
+		{
+			name: "subject does not have permission",
+			input: models.ServiceAccount{
+				Name:        serviceAccountName,
+				Description: serviceAccountDescription,
+				GroupID:     groupID,
+				CreatedBy:   createdBy,
+				OIDCTrustPolicies: []models.OIDCTrustPolicy{
+					{
+						Issuer:      issuer,
+						BoundClaims: map[string]string{claimKey: claimVal},
+					},
+				},
+			},
+			authError:     terrs.New(terrs.EForbidden, "Unauthorized"),
+			expectErrCode: terrs.EForbidden,
+		},
+		{
+			name: "exceeds limit",
+			input: models.ServiceAccount{
+				Name:        serviceAccountName,
+				Description: serviceAccountDescription,
+				GroupID:     groupID,
+				CreatedBy:   createdBy,
+				OIDCTrustPolicies: []models.OIDCTrustPolicy{
+					{
+						Issuer:      issuer,
+						BoundClaims: map[string]string{claimKey: claimVal},
+					},
+				},
+			},
+			expectCreatedServiceAccount: &models.ServiceAccount{
+				Metadata:     models.ResourceMetadata{ID: groupID},
+				ResourcePath: resourcePath,
+				Name:         serviceAccountName,
+				Description:  serviceAccountDescription,
+				GroupID:      groupID,
+				CreatedBy:    createdBy,
+				OIDCTrustPolicies: []models.OIDCTrustPolicy{
+					{
+						Issuer:      issuer,
+						BoundClaims: map[string]string{claimKey: claimVal},
+					},
+				},
+			},
+			limit:                         5,
+			injectServiceAccountsPerGroup: 6,
+			exceedsLimit:                  true,
+			expectErrCode:                 terrs.EInvalid,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateServiceAccountPermission, mock.Anything).Return(test.authError)
+
+			mockCaller.On("GetSubject").Return("mockSubject")
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockServiceAccounts := db.NewMockServiceAccounts(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
+			if test.authError == nil {
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				if !test.exceedsLimit {
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				}
+			}
+
+			if (test.expectCreatedServiceAccount != nil) || test.exceedsLimit {
+				mockServiceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).
+					Return(test.expectCreatedServiceAccount, nil)
+			}
+
+			dbClient := db.Client{
+				Transactions:    mockTransactions,
+				ServiceAccounts: mockServiceAccounts,
+				ResourceLimits:  mockResourceLimits,
+			}
+
+			mockActivityEvents := activityevent.NewMockService(t)
+
+			if test.authError == nil && !test.exceedsLimit {
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			}
+
+			// Called inside transaction to check resource limits.
+			if test.limit > 0 {
+				mockServiceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.GetServiceAccountsInput{
+					Filter: &db.ServiceAccountFilter{
+						NamespacePaths: []string{groupName},
+					},
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+				}).Return(func(ctx context.Context, input *db.GetServiceAccountsInput) *db.ServiceAccountsResult {
+					_ = ctx
+					_ = input
+
+					return &db.ServiceAccountsResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.injectServiceAccountsPerGroup,
+						},
+					}
+				}, nil)
+
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
+			}
+
+			testLogger, _ := logger.NewForTest()
+
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, mockActivityEvents)
+
+			serviceAccount, err := service.CreateServiceAccount(auth.WithCaller(ctx, &mockCaller), &test.input)
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectCreatedServiceAccount, serviceAccount)
+		})
+	}
 }
 
 func TestCreateToken(t *testing.T) {
@@ -227,8 +420,11 @@ func TestCreateToken(t *testing.T) {
 					privClaims["tharsis_service_account_path"] == sa.ResourcePath
 			})).Return([]byte("signedtoken"), nil)
 
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
 			dbClient := db.Client{
 				ServiceAccounts: &mockServiceAccounts,
+				ResourceLimits:  mockResourceLimits,
 			}
 
 			serviceAccountAuth := auth.NewIdentityProvider(&mockJWSProvider, "https://tharsis.io")
@@ -246,7 +442,7 @@ func TestCreateToken(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := newService(testLogger, &dbClient, serviceAccountAuth, configFetcher, getKeySetFunc, &mockActivityEvents)
+			service := newService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), serviceAccountAuth, configFetcher, getKeySetFunc, &mockActivityEvents)
 
 			resp, err := service.CreateToken(ctx, &CreateTokenInput{ServiceAccount: test.serviceAccount, Token: test.token})
 			if err != nil && test.expectErr == nil {

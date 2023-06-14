@@ -1,0 +1,19 @@
+type UpdateResourceLimitPayload {
+  clientMutationId: String
+  resourceLimit: ResourceLimit
+  problems: [Problem!]!
+}
+
+type ResourceLimit {
+  id: ID!
+  metadata: ResourceMetadata!
+  name: String!
+  value: Int!
+}
+
+input UpdateResourceLimitInput {
+  clientMutationId: String
+  name: String!
+  value: Int!
+  metadata: ResourceMetadataInput
+}
