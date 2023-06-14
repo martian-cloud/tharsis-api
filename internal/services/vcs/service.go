@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -249,6 +251,7 @@ type Service interface {
 type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
+	limitChecker        limits.LimitChecker
 	idp                 *auth.IdentityProvider
 	vcsProviderMap      map[models.VCSProviderType]Provider
 	activityService     activityevent.Service
@@ -265,6 +268,7 @@ func NewService(
 	ctx context.Context,
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	idp *auth.IdentityProvider,
 	httpClient *http.Client,
 	activityService activityevent.Service,
@@ -282,6 +286,7 @@ func NewService(
 	return newService(
 		logger,
 		dbClient,
+		limitChecker,
 		idp,
 		vcsProviderMap,
 		activityService,
@@ -297,6 +302,7 @@ func NewService(
 func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	idp *auth.IdentityProvider,
 	vcsProviderMap map[models.VCSProviderType]Provider,
 	activityService activityevent.Service,
@@ -310,6 +316,7 @@ func newService(
 	return &service{
 		logger,
 		dbClient,
+		limitChecker,
 		idp,
 		vcsProviderMap,
 		activityService,
@@ -529,6 +536,25 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 
 	groupPath := createdProvider.GetGroupPath()
 
+	// Get the number of VCS providers in the group to check whether we just violated the limit.
+	newVCSProviders, err := s.dbClient.VCSProviders.GetProviders(txContext, &db.GetVCSProvidersInput{
+		Filter: &db.VCSProviderFilter{
+			NamespacePaths: []string{groupPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get VCS providers")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitVCSProvidersPerGroup, newVCSProviders.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
 			NamespacePath: &groupPath,
@@ -554,7 +580,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 
 	authorizationURL, err := s.getOAuthAuthorizationURL(ctx, createdProvider)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
+		tracing.RecordError(span, err, "failed to get authorization URL")
 		return nil, err
 	}
 

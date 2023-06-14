@@ -11,6 +11,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
+	"go.opentelemetry.io/otel/trace"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -32,6 +33,8 @@ type Groups interface {
 	CreateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
 	// UpdateGroup updates an existing group
 	UpdateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
+	// GetChildDepth returns the depth of tree containing this group and its descendants.
+	GetChildDepth(ctx context.Context, group *models.Group) (int, error)
 	// MigrateGroup re-parents an existing group
 	MigrateGroup(ctx context.Context, group, newParentGroup *models.Group) (*models.Group, error)
 }
@@ -355,6 +358,52 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 	updatedGroup.FullPath = namespace.path
 
 	return updatedGroup, nil
+}
+
+// GetChildDepth returns the depth of the descendant tree, EXCLUDING this group.
+func (g *groups) GetChildDepth(ctx context.Context, group *models.Group) (int, error) {
+	ctx, span := tracer.Start(ctx, "db.GetChildDepth")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
+	conn := g.dbClient.getConnection(ctx)
+	// Apparently does not need a deferred close.
+
+	depth, err := g.getChildDepth(ctx, conn, span, group.Metadata.ID)
+	// any error has already been recorded to the tracing span
+	if err != nil {
+		return -1, err
+	}
+
+	return depth, nil
+}
+
+// getChildDepth is self-recursive and returns the depth of the descendant tree, EXCLUDING this group.
+func (g *groups) getChildDepth(ctx context.Context, conn connection, span trace.Span, id string) (int, error) {
+	// Scan rows
+	resp, err := g.GetGroups(ctx, &GetGroupsInput{Filter: &GroupFilter{ParentID: &id}})
+	if err != nil {
+		return 0, err
+	}
+
+	if resp.PageInfo.TotalCount == 0 {
+		return 0, nil
+	}
+
+	maxChildDepth := 0
+	for _, child := range resp.Groups {
+		candidate, err := g.getChildDepth(ctx, conn, span, child.Metadata.ID)
+		if err != nil {
+			tracing.RecordError(span, err, "failed to recurse")
+			return 0, err
+		}
+
+		if candidate > maxChildDepth {
+			maxChildDepth = candidate
+		}
+	}
+
+	return maxChildDepth + 1, nil
 }
 
 // MigrateGroup migrates a group.  If moving group to become a root group, newParentGroup must be set to nil.

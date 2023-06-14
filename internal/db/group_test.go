@@ -1934,6 +1934,47 @@ func TestMigrateGroupOther(t *testing.T) {
 	}
 }
 
+func TestGetChildDepth(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
+	require.Nil(t, err)
+
+	type testCase struct {
+		group  *models.Group
+		name   string
+		expect int
+	}
+
+	testCases := []testCase{
+		{
+			name:   "top-level",
+			group:  &createdWarmupGroups[0],
+			expect: 2,
+		},
+		{
+			name:   "second-level",
+			group:  &createdWarmupGroups[4],
+			expect: 1,
+		},
+		{
+			name:   "third-and-leaf-level",
+			group:  &createdWarmupGroups[5],
+			expect: 0,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualDepth, err := testClient.client.Groups.GetChildDepth(ctx, test.group)
+			assert.Nil(t, err)
+			assert.Equal(t, test.expect, actualDepth)
+		})
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
 // Common utility structures and functions:

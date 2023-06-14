@@ -1119,3 +1119,20 @@ func (r RootResolver) UnassignServiceAccountFromRunner(ctx context.Context, args
 	}
 	return response, nil
 }
+
+/* Resource Limits Query and Mutation */
+
+// ResourceLimits returns the current resource limits
+func (r RootResolver) ResourceLimits(ctx context.Context) ([]*ResourceLimitResolver, error) {
+	return resourceLimitsQuery(ctx)
+}
+
+// UpdateResourceLimit creates or updates a resource limit
+func (r RootResolver) UpdateResourceLimit(ctx context.Context,
+	args *struct{ Input *UpdateResourceLimitInput }) (*ResourceLimitMutationPayloadResolver, error) {
+	response, err := updateResourceLimitMutation(ctx, args.Input)
+	if err != nil {
+		return handleResourceLimitMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}

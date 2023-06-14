@@ -54,6 +54,30 @@ func (_m *MockGroups) DeleteGroup(ctx context.Context, group *models.Group) erro
 	return r0
 }
 
+// GetChildDepth provides a mock function with given fields: ctx, group
+func (_m *MockGroups) GetChildDepth(ctx context.Context, group *models.Group) (int, error) {
+	ret := _m.Called(ctx, group)
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Group) (int, error)); ok {
+		return rf(ctx, group)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Group) int); ok {
+		r0 = rf(ctx, group)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Group) error); ok {
+		r1 = rf(ctx, group)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetGroupByFullPath provides a mock function with given fields: ctx, path
 func (_m *MockGroups) GetGroupByFullPath(ctx context.Context, path string) (*models.Group, error) {
 	ret := _m.Called(ctx, path)

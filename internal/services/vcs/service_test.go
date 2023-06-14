@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -102,7 +103,7 @@ func TestGetVCSProviderByID(t *testing.T) {
 				VCSProviders: &mockVCSProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			provider, err := service.GetVCSProviderByID(ctx, test.inputID)
 			if test.expectedErrorCode != "" {
@@ -187,7 +188,7 @@ func TestGetVCSProviders(t *testing.T) {
 				VCSProviders: &mockVCSProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			result, err := service.GetVCSProviders(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -260,7 +261,7 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 				VCSProviders: &mockVCSProviders,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			providerList, err := service.GetVCSProvidersByIDs(ctx, test.inputIDList)
 			if test.expectedErrorCode != "" {
@@ -287,6 +288,9 @@ func TestCreateVCSProvider(t *testing.T) {
 		expectedProvider      *models.VCSProvider
 		name                  string
 		expectedErrorCode     string
+		limit                 int
+		injectProviders       int32
+		exceedsLimit          bool
 	}{
 		{
 			name:   "positive: GitLab provider with URL, manual; expect provider created with values",
@@ -342,6 +346,8 @@ func TestCreateVCSProvider(t *testing.T) {
 				CreatedBy:          "sample@sample-email",
 				AutoCreateWebhooks: false,
 			},
+			limit:           5,
+			injectProviders: 5,
 		},
 		{
 			name:   "positive: GitHub provider, no URL, manual; expect provider created with defaults",
@@ -396,6 +402,8 @@ func TestCreateVCSProvider(t *testing.T) {
 				CreatedBy:          "system",
 				AutoCreateWebhooks: false,
 			},
+			limit:           5,
+			injectProviders: 5,
 		},
 		{
 			name:   "negative: unsupported provider type; expect error EInvalid",
@@ -425,6 +433,65 @@ func TestCreateVCSProvider(t *testing.T) {
 			input:             &CreateVCSProviderInput{},
 			expectedErrorCode: errors.EUnauthorized,
 		},
+		{
+			name:   "negative - exceeds limit",
+			caller: &auth.SystemCaller{},
+			input: &CreateVCSProviderInput{
+				Name:               "a-sample-gitlab-provider",
+				Description:        "",
+				GroupID:            "group-id",
+				OAuthClientID:      "a-sample-client-id",
+				OAuthClientSecret:  "a-sample-client-secret",
+				Type:               models.GitLabProviderType,
+				URL:                ptr.String(sampleProviderURL.String()),
+				AutoCreateWebhooks: false,
+			},
+			buildAuthCodeURLInput: &types.BuildOAuthAuthorizationURLInput{
+				ProviderURL:        sampleProviderURL,
+				OAuthClientID:      "a-sample-client-id",
+				OAuthState:         sampleOAuthState.String(),
+				RedirectURL:        oAuthCallBackEndpoint,
+				UseReadWriteScopes: false,
+			},
+			toCreate: &models.VCSProvider{
+				Name:               "a-sample-gitlab-provider",
+				Description:        "",
+				GroupID:            "group-id",
+				OAuthClientID:      "a-sample-client-id",
+				OAuthClientSecret:  "a-sample-client-secret",
+				OAuthState:         ptr.String(sampleOAuthState.String()),
+				Type:               models.GitLabProviderType,
+				URL:                sampleProviderURL,
+				CreatedBy:          "system",
+				AutoCreateWebhooks: false,
+			},
+			activityInput: &activityevent.CreateActivityEventInput{
+				NamespacePath: ptr.String("a/resource"),
+				Action:        models.ActionCreate,
+				TargetType:    models.TargetVCSProvider,
+				TargetID:      resourceUUID,
+			},
+			expectedProvider: &models.VCSProvider{
+				Metadata: models.ResourceMetadata{
+					ID: resourceUUID,
+				},
+				Name:               "a-sample-gitlab-provider",
+				Description:        "",
+				GroupID:            "group-id",
+				ResourcePath:       "a/resource/path",
+				OAuthClientID:      "a-sample-client-id",
+				OAuthClientSecret:  "a-sample-client-secret",
+				OAuthState:         ptr.String(sampleOAuthState.String()),
+				Type:               models.GitLabProviderType,
+				URL:                sampleProviderURL,
+				CreatedBy:          "sample@sample-email",
+				AutoCreateWebhooks: false,
+			},
+			limit:             5,
+			injectProviders:   6,
+			exceedsLimit:      true,
+			expectedErrorCode: errors.EInvalid,
+		},
 	}
 
 	for _, test := range testCases {
@@ -440,6 +507,7 @@ func TestCreateVCSProvider(t *testing.T) {
 			mockVCSProviders.Test(t)
 			mockTransactions.Test(t)
 			mockActivityEventService.Test(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			mockProviders.On("DefaultURL").Return(sampleProviderURL)
 			mockProviders.On("BuildOAuthAuthorizationURL", mock.Anything).Return("https://redirect-url", nil)
@@ -447,7 +515,7 @@ func TestCreateVCSProvider(t *testing.T) {
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 
-			if test.expectedErrorCode == "" {
+			if (test.expectedErrorCode == "") || test.exceedsLimit {
 				mockVCSProviders.On("CreateProvider", mock.Anything, test.toCreate).Return(test.expectedProvider, nil)
 
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -455,9 +523,34 @@ func TestCreateVCSProvider(t *testing.T) {
 				mockActivityEventService.On("CreateActivityEvent", mock.Anything, test.activityInput).Return(nil, nil)
 			}
 
+			// Called inside transaction to check resource limits.
+			if test.limit > 0 {
+				mockVCSProviders.On("GetProviders", mock.Anything, mock.Anything).Return(&db.GetVCSProvidersInput{
+					Filter: &db.VCSProviderFilter{
+						// empty
+					},
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+				}).Return(func(ctx context.Context, input *db.GetVCSProvidersInput) *db.VCSProvidersResult {
+					_ = ctx
+					_ = input
+
+					return &db.VCSProvidersResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.injectProviders,
+						},
+					}
+				}, nil)
+
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
+			}
+
 			dbClient := &db.Client{
-				VCSProviders: &mockVCSProviders,
-				Transactions: &mockTransactions,
+				VCSProviders:   &mockVCSProviders,
+				Transactions:   &mockTransactions,
+				ResourceLimits: mockResourceLimits,
 			}
 
 			logger, _ := logger.NewForTest()
@@ -472,7 +565,7 @@ func TestCreateVCSProvider(t *testing.T) {
 				return sampleOAuthState, nil
 			}
 
-			service := newService(logger, dbClient, nil, providerMap, &mockActivityEventService, nil, nil, nil, stateGeneratorFunc, "", 0)
+			service := newService(logger, dbClient, limits.NewLimitChecker(dbClient), nil, providerMap, &mockActivityEventService, nil, nil, nil, stateGeneratorFunc, "", 0)
 
 			response, err := service.CreateVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -557,7 +650,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := newService(logger, dbClient, nil, nil, &mockActivityEventService, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, &mockActivityEventService, nil, nil, nil, nil, "", 0)
 
 			provider, err := service.UpdateVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -767,7 +860,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, providerMap, &mockActivityEventService, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, nil, providerMap, &mockActivityEventService, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			err := service.DeleteVCSProvider(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -826,7 +919,7 @@ func TestGetVCSProviderLinkByWorkspaceID(t *testing.T) {
 				WorkspaceVCSProviderLinks: &mockWorkspaceVCSProviderLinks,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.GetWorkspaceVCSProviderLinkByWorkspaceID(ctx, test.workspaceID)
 			if test.expectedErrorCode != "" {
@@ -887,7 +980,7 @@ func TestGetVCSProviderLinkByID(t *testing.T) {
 				WorkspaceVCSProviderLinks: &mockWorkspaceVCSProviderLinks,
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.GetWorkspaceVCSProviderLinkByID(ctx, test.inputID)
 			if test.expectedErrorCode != "" {
@@ -1207,7 +1300,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, identityProvider, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, identityProvider, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			response, err := service.CreateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1293,7 +1386,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, "", 0)
+			service := newService(logger, dbClient, nil, nil, nil, nil, nil, nil, nil, nil, "", 0)
 
 			link, err := service.UpdateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1419,7 +1512,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 0)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 0)
 
 			err := service.DeleteWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1588,7 +1681,7 @@ func TestCreateVCSRun(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, &mockManager, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, &mockManager, oAuthStateGenerator, "", 5000)
 
 			err := service.CreateVCSRun(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1906,7 +1999,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, providerMap, nil, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
 
 			err := service.ProcessWebhookEvent(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -1990,7 +2083,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 5000)
+			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, nil, nil, oAuthStateGenerator, "", 5000)
 
 			response, err := service.ResetVCSProviderOAuthToken(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2193,7 +2286,7 @@ func TestProcessOAuth(t *testing.T) {
 				models.GitHubProviderType: &mockProviders,
 			}
 
-			service := newService(nil, dbClient, nil, providerMap, nil, nil, nil, nil, nil, tharsisURL, 5000)
+			service := newService(nil, dbClient, nil, nil, providerMap, nil, nil, nil, nil, nil, tharsisURL, 5000)
 
 			err := service.ProcessOAuth(ctx, test.input)
 			if test.expectedErrorCode != "" {

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
@@ -97,6 +99,7 @@ type Service interface {
 type service struct {
 	logger           logger.Logger
 	dbClient         *db.Client
+	limitChecker     limits.LimitChecker
 	delegateMap      map[models.ManagedIdentityType]Delegate
 	workspaceService workspace.Service
 	jobService       job.Service
@@ -107,6 +110,7 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	managedIdentityDelegateMap map[models.ManagedIdentityType]Delegate,
 	workspaceService workspace.Service,
 	jobService job.Service,
@@ -115,6 +119,7 @@ func NewService(
 	return &service{
 		logger:           logger,
 		dbClient:         dbClient,
+		limitChecker:     limitChecker,
 		delegateMap:      managedIdentityDelegateMap,
 		workspaceService: workspaceService,
 		jobService:       jobService,
@@ -368,6 +373,18 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return aErr
 	}
 
+	// Get the number of managed identities assigned to a workspace to check whether we just violated the limit.
+	newManagedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentitiesForWorkspace(txContext, workspaceID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace's managed identities")
+		return err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitAssignedManagedIdentitiesPerWorkspace, int32(len(newManagedIdentities))); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return err
+	}
+
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
 			NamespacePath: &workspace.FullPath,
@@ -604,13 +621,51 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		return nil, err
 	}
 
-	createdAlias, err := s.dbClient.ManagedIdentities.CreateManagedIdentity(ctx, toCreate)
+	createdAlias, err := s.dbClient.ManagedIdentities.CreateManagedIdentity(txContext, toCreate)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create managed identity")
 		return nil, err
 	}
 
 	groupPath := createdAlias.GetGroupPath()
+
+	// Get the number of managed identities in the group to check whether we just violated the limit.
+	newManagedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentities(txContext, &db.GetManagedIdentitiesInput{
+		Filter: &db.ManagedIdentityFilter{
+			NamespacePaths: []string{groupPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's managed identities")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitManagedIdentitiesPerGroup, newManagedIdentities.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
+	// Get the number of aliases for the source managed identity to check whether we just violated the limit.
+	newAliases, err := s.dbClient.ManagedIdentities.GetManagedIdentities(txContext, &db.GetManagedIdentitiesInput{
+		Filter: &db.ManagedIdentityFilter{
+			AliasSourceID: createdAlias.AliasSourceID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity's aliases")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitManagedIdentityAliasesPerManagedIdentity, newAliases.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
@@ -794,9 +849,9 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		return nil, err
 	}
 
-	if err = delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); err != nil {
-		tracing.RecordError(span, err, "failed to create managed identity")
-		return nil, errors.Wrap(err, errors.EInvalid, "failed to create managed identity")
+	if err = delegate.SetManagedIdentityData(txContext, managedIdentity, input.Data); err != nil {
+		tracing.RecordError(span, err, "failed to set managed identity data")
+		return nil, errors.Wrap(err, errors.EInvalid, "failed to set managed identity data")
 	}
 
 	managedIdentity, err = s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
@@ -806,6 +861,25 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 	}
 
 	groupPath := managedIdentity.GetGroupPath()
+
+	// Get the number of managed identities in the group to check whether we just violated the limit.
+	newManagedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentities(txContext, &db.GetManagedIdentitiesInput{
+		Filter: &db.ManagedIdentityFilter{
+			NamespacePaths: []string{groupPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's managed identities")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitManagedIdentitiesPerGroup, newManagedIdentities.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
@@ -1151,6 +1225,26 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 	rule, err := s.dbClient.ManagedIdentities.CreateManagedIdentityAccessRule(txContext, input)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create managed identity access rule")
+		return nil, err
+	}
+
+	// Get the number of access rules in the managed identity to check whether we just violated the limit.
+	newAccessRules, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRules(txContext,
+		&db.GetManagedIdentityAccessRulesInput{
+			Filter: &db.ManagedIdentityAccessRuleFilter{
+				ManagedIdentityID: &rule.ManagedIdentityID,
+			},
+			PaginationOptions: &pagination.Options{
+				First: ptr.Int32(0),
+			},
+		})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity's access rules")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitManagedIdentityAccessRulesPerManagedIdentity, newAccessRules.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
 

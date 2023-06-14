@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -52,6 +54,7 @@ type Service interface {
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
+	limitChecker    limits.LimitChecker
 	activityService activityevent.Service
 }
 
@@ -59,11 +62,13 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
 ) Service {
 	return &service{
 		logger:          logger,
 		dbClient:        dbClient,
+		limitChecker:    limitChecker,
 		activityService: activityService,
 	}
 }
@@ -364,6 +369,24 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	}
 
 	groupPath := createdRunner.GetGroupPath()
+
+	// Get the number of runners for the group to check whether we just violated the limit.
+	newRunners, err := s.dbClient.Runners.GetRunners(txContext, &db.GetRunnersInput{
+		Filter: &db.RunnerFilter{
+			NamespacePaths: []string{groupPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's runners")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitRunnerAgentsPerGroup, newRunners.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{

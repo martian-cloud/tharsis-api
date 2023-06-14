@@ -171,4 +171,7 @@ type Mutation {
   unassignServiceAccountFromRunner(
     input: AssignServiceAccountToRunnerInput!
   ): AssignServiceAccountToRunnerPayload!
+  updateResourceLimit(
+    input: UpdateResourceLimitInput!
+  ): UpdateResourceLimitPayload!
 }

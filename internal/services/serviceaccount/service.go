@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
@@ -15,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -83,6 +85,7 @@ type Service interface {
 type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
+	limitChecker        limits.LimitChecker
 	idp                 *auth.IdentityProvider
 	openIDConfigFetcher *auth.OpenIDConfigFetcher
 	getKeySetFunc       func(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error)
@@ -93,6 +96,7 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	idp *auth.IdentityProvider,
 	openIDConfigFetcher *auth.OpenIDConfigFetcher,
 	activityService activityevent.Service,
@@ -100,6 +104,7 @@ func NewService(
 	return newService(
 		logger,
 		dbClient,
+		limitChecker,
 		idp,
 		openIDConfigFetcher,
 		getKeySet,
@@ -110,6 +115,7 @@ func NewService(
 func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
 	idp *auth.IdentityProvider,
 	openIDConfigFetcher *auth.OpenIDConfigFetcher,
 	getKeySetFunc func(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error),
@@ -118,6 +124,7 @@ func newService(
 	return &service{
 		logger:              logger,
 		dbClient:            dbClient,
+		limitChecker:        limitChecker,
 		idp:                 idp,
 		openIDConfigFetcher: openIDConfigFetcher,
 		getKeySetFunc:       getKeySetFunc,
@@ -391,6 +398,25 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 	}
 
 	groupPath := createdServiceAccount.GetGroupPath()
+
+	// Get the number of service accounts in the group to check whether we just violated the limit.
+	newServiceAccounts, err := s.dbClient.ServiceAccounts.GetServiceAccounts(txContext, &db.GetServiceAccountsInput{
+		Filter: &db.ServiceAccountFilter{
+			NamespacePaths: []string{groupPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's service accounts")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitServiceAccountsPerGroup, newServiceAccounts.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{

@@ -4,16 +4,19 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetRunnerByID(t *testing.T) {
@@ -80,7 +83,7 @@ func TestGetRunnerByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil)
+			service := NewService(testLogger, &dbClient, nil, nil)
 
 			runner, err := service.GetRunnerByID(auth.WithCaller(ctx, mockCaller), runnerID)
 
@@ -163,7 +166,7 @@ func TestGetRunnerByPath(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil)
+			service := NewService(testLogger, &dbClient, nil, nil)
 
 			runner, err := service.GetRunnerByPath(auth.WithCaller(ctx, mockCaller), path)
 
@@ -258,7 +261,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil)
+			service := NewService(testLogger, &dbClient, nil, nil)
 
 			runners, err := service.GetRunnersByIDs(auth.WithCaller(ctx, mockCaller), []string{runnerID})
 
@@ -351,7 +354,7 @@ func TestGetRunners(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil)
+			service := NewService(testLogger, &dbClient, nil, nil)
 
 			resp, err := service.GetRunners(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -379,11 +382,14 @@ func TestCreateRunner(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
-		authError           error
-		expectCreatedRunner *models.Runner
-		name                string
-		expectErrCode       string
-		input               CreateRunnerInput
+		authError             error
+		expectCreatedRunner   *models.Runner
+		name                  string
+		expectErrCode         string
+		input                 CreateRunnerInput
+		limit                 int
+		injectRunnersPerGroup int32
+		exceedsLimit          bool
 	}{
 		{
 			name: "create group runner",
@@ -398,6 +404,8 @@ func TestCreateRunner(t *testing.T) {
 				CreatedBy:    "mockSubject",
 				ResourcePath: "group-1/test-runner",
 			},
+			limit:                 5,
+			injectRunnersPerGroup: 5,
 		},
 		{
 			name: "subject does not have owner role",
@@ -407,6 +415,24 @@ func TestCreateRunner(t *testing.T) {
 			},
 			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "exceeds limit",
+			input: CreateRunnerInput{
+				Name:    "test-runner",
+				GroupID: groupID,
+			},
+			expectCreatedRunner: &models.Runner{
+				Type:         models.GroupRunnerType,
+				Name:         "test-runner",
+				GroupID:      &groupID,
+				CreatedBy:    "mockSubject",
+				ResourcePath: "group-1/test-runner",
+			},
+			limit:                 5,
+			injectRunnersPerGroup: 6,
+			exceedsLimit:          true,
+			expectErrCode:         errors.EInvalid,
 		},
 	}
 	for _, test := range tests {
@@ -423,11 +449,14 @@ func TestCreateRunner(t *testing.T) {
 
 			mockTransactions := db.NewMockTransactions(t)
 			mockRunners := db.NewMockRunners(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			if test.authError == nil {
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				if !test.exceedsLimit {
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				}
 			}
 
 			if test.expectCreatedRunner != nil {
@@ -436,19 +465,44 @@ func TestCreateRunner(t *testing.T) {
 			}
 
 			dbClient := db.Client{
-				Transactions: mockTransactions,
-				Runners:      mockRunners,
+				Transactions:   mockTransactions,
+				Runners:        mockRunners,
+				ResourceLimits: mockResourceLimits,
 			}
 
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			if test.authError == nil {
+			if test.authError == nil && !test.exceedsLimit {
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			}
+
+			// Called inside transaction to check resource limits.
+			if test.limit > 0 {
+				mockRunners.On("GetRunners", mock.Anything, mock.Anything).Return(&db.GetRunnersInput{
+					Filter: &db.RunnerFilter{
+						GroupID: &groupID,
+					},
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+				}).Return(func(ctx context.Context, input *db.GetRunnersInput) *db.RunnersResult {
+					_ = ctx
+					_ = input
+
+					return &db.RunnersResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.injectRunnersPerGroup,
+						},
+					}
+				}, nil)
+
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, mockActivityEvents)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), mockActivityEvents)
 
 			runner, err := service.CreateRunner(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -533,7 +587,7 @@ func TestUpdateRunner(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, mockActivityEvents)
+			service := NewService(testLogger, &dbClient, nil, mockActivityEvents)
 
 			runner, err := service.UpdateRunner(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -618,7 +672,7 @@ func TestDeleteRunner(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, mockActivityEvents)
+			service := NewService(testLogger, &dbClient, nil, mockActivityEvents)
 
 			err := service.DeleteRunner(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {

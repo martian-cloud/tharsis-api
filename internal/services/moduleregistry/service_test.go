@@ -15,6 +15,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -87,7 +88,7 @@ func TestGetModuleByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			module, err := service.GetModuleByID(auth.WithCaller(ctx, mockCaller), moduleID)
 
@@ -171,7 +172,7 @@ func TestGetModuleByPath(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			module, err := service.GetModuleByPath(auth.WithCaller(ctx, mockCaller), path)
 
@@ -304,7 +305,7 @@ func TestGetModuleByAddress(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			module, err := service.GetModuleByAddress(auth.WithCaller(ctx, mockCaller), namespace, moduleName, system)
 
@@ -401,7 +402,7 @@ func TestGetModulesByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			modules, err := service.GetModulesByIDs(auth.WithCaller(ctx, mockCaller), []string{moduleID})
 
@@ -572,7 +573,7 @@ func TestGetModules(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := newService(testLogger, &dbClient, nil, nil, nil, test.handleCaller)
+			service := newService(testLogger, &dbClient, nil, nil, nil, nil, test.handleCaller)
 
 			resp, err := service.GetModules(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -600,12 +601,15 @@ func TestCreateModule(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
-		authError           error
-		group               *models.Group
-		expectCreatedModule *models.TerraformModule
-		name                string
-		expectErrCode       string
-		input               CreateModuleInput
+		authError             error
+		group                 *models.Group
+		expectCreatedModule   *models.TerraformModule
+		name                  string
+		expectErrCode         string
+		input                 CreateModuleInput
+		limit                 int
+		injectModulesPerGroup int32
+		exceedsLimit          bool
 	}{
 		{
 			name: "create module in root group",
@@ -626,6 +630,8 @@ func TestCreateModule(t *testing.T) {
 				Private:     true,
 				CreatedBy:   "mockSubject",
 			},
+			limit:                 5,
+			injectModulesPerGroup: 5,
 		},
 		{
 			name: "create module in nested group",
@@ -647,6 +653,8 @@ func TestCreateModule(t *testing.T) {
 				Private:     true,
 				CreatedBy:   "mockSubject",
 			},
+			limit:                 5,
+			injectModulesPerGroup: 5,
 		},
 		{
 			name: "subject does not have deployer role",
@@ -658,6 +666,30 @@ func TestCreateModule(t *testing.T) {
 			},
 			authError:     errors.New(errors.EForbidden, "Unauthorized"),
 			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "exceeds limit",
+			input: CreateModuleInput{
+				Name:    "test-module",
+				System:  "aws",
+				GroupID: groupID,
+				Private: true,
+			},
+			group: &models.Group{
+				ParentID: "",
+			},
+			expectCreatedModule: &models.TerraformModule{
+				Name:        "test-module",
+				System:      "aws",
+				GroupID:     groupID,
+				RootGroupID: groupID,
+				Private:     true,
+				CreatedBy:   "mockSubject",
+			},
+			limit:                 5,
+			injectModulesPerGroup: 6,
+			exceedsLimit:          true,
+			expectErrCode:         errors.EInvalid,
 		},
 	}
 	for _, test := range tests {
@@ -674,11 +706,14 @@ func TestCreateModule(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockModules := db.NewMockTerraformModules(t)
 			mockGroups := db.NewMockGroups(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			if test.authError == nil {
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				if !test.exceedsLimit {
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				}
 			}
 
 			if test.expectCreatedModule != nil {
@@ -700,17 +735,42 @@ func TestCreateModule(t *testing.T) {
 				Transactions:     mockTransactions,
 				TerraformModules: mockModules,
 				Groups:           mockGroups,
+				ResourceLimits:   mockResourceLimits,
+			}
+
+			// Called inside transaction to check resource limits.
+			if test.limit > 0 {
+				mockModules.On("GetModules", mock.Anything, mock.Anything).Return(&db.GetModulesInput{
+					Filter: &db.TerraformModuleFilter{
+						GroupID: &groupID,
+					},
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+				}).Return(func(ctx context.Context, input *db.GetModulesInput) *db.ModulesResult {
+					_ = ctx
+					_ = input
+
+					return &db.ModulesResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.injectModulesPerGroup,
+						},
+					}
+				}, nil)
+
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
 			}
 
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			if test.authError == nil {
+			if (test.authError == nil) && !test.exceedsLimit {
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, mockActivityEvents, asynctask.NewMockManager(t))
 
 			module, err := service.CreateModule(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -794,7 +854,7 @@ func TestUpdateModule(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, nil, nil, mockActivityEvents, asynctask.NewMockManager(t))
 
 			module, err := service.UpdateModule(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -878,7 +938,7 @@ func TestDeleteModule(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, nil, nil, mockActivityEvents, asynctask.NewMockManager(t))
 
 			err := service.DeleteModule(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectErrCode != "" {
@@ -981,7 +1041,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			moduleVersion, err := service.GetModuleVersionByID(auth.WithCaller(ctx, mockCaller), moduleVersionID)
 
@@ -1106,7 +1166,7 @@ func TestGetModuleVersions(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			response, err := service.GetModuleVersions(auth.WithCaller(ctx, mockCaller), &GetModuleVersionsInput{
 				ModuleID: moduleID,
@@ -1245,7 +1305,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			moduleVersions, err := service.GetModuleVersionsByIDs(auth.WithCaller(ctx, mockCaller), []string{moduleVersionID})
 
@@ -1281,6 +1341,9 @@ func TestCreateModuleVersion(t *testing.T) {
 		name                       string
 		expectErrCode              string
 		input                      CreateModuleVersionInput
+		limit                      int
+		injectVersionsPerModule    int32
+		exceedsLimit               bool
 	}{
 		{
 			name: "subject does not have deployer role",
@@ -1309,6 +1372,8 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "0.1.0",
 				Latest:          true,
 			},
+			limit:                   5,
+			injectVersionsPerModule: 5,
 		},
 		{
 			name: "existing latest is not a pre-release and new version is a pre-release",
@@ -1324,6 +1389,8 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "1.0.0-pre",
 				Latest:          false,
 			},
+			limit:                   5,
+			injectVersionsPerModule: 5,
 		},
 		{
 			name: "existing latest is a pre-release and new version is a pre-release",
@@ -1343,6 +1410,8 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
+			limit:                   5,
+			injectVersionsPerModule: 5,
 		},
 		{
 			name: "existing latest is not a pre-release and new version is not a pre-release",
@@ -1362,6 +1431,8 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 			},
+			limit:                   5,
+			injectVersionsPerModule: 5,
 		},
 		{
 			name: "no current latest and new version is not a pre-release",
@@ -1374,6 +1445,8 @@ func TestCreateModuleVersion(t *testing.T) {
 				Latest:          true,
 				Status:          models.TerraformModuleVersionStatusPending,
 			},
+			limit:                   5,
+			injectVersionsPerModule: 5,
 		},
 		{
 			name: "no current latest and new version is a pre-release",
@@ -1385,6 +1458,23 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
+			limit:                   5,
+			injectVersionsPerModule: 5,
+		},
+		{
+			name: "exceeds limit",
+			input: CreateModuleVersionInput{
+				SemanticVersion: "1.0.0-pre",
+				ModuleID:        moduleID,
+			},
+			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				SemanticVersion: "1.0.0-pre",
+				Latest:          true,
+			},
+			limit:                   5,
+			injectVersionsPerModule: 6,
+			exceedsLimit:            true,
+			expectErrCode:           errors.EInvalid,
 		},
 	}
 	for _, test := range tests {
@@ -1410,6 +1500,8 @@ func TestCreateModuleVersion(t *testing.T) {
 			mockGroups := db.MockGroups{}
 			mockGroups.Test(t)
 
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
@@ -1433,7 +1525,9 @@ func TestCreateModuleVersion(t *testing.T) {
 			}
 
 			if test.authError == nil {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+				if !test.exceedsLimit {
+					mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+				}
 
 				mockModuleVersions.On("GetModuleVersions", mock.Anything, &db.GetModuleVersionsInput{
 					PaginationOptions: &pagination.Options{
@@ -1465,16 +1559,41 @@ func TestCreateModuleVersion(t *testing.T) {
 				}, nil)
 			}
 
+			// Called inside transaction to check resource limits.
+			if test.limit > 0 {
+				mockModuleVersions.On("GetModuleVersions", mock.Anything, mock.Anything).Return(&db.GetModuleVersionsInput{
+					Filter: &db.TerraformModuleVersionFilter{
+						ModuleID: &test.input.ModuleID,
+					},
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+				}).Return(func(ctx context.Context, input *db.GetModuleVersionsInput) *db.ModuleVersionsResult {
+					_ = ctx
+					_ = input
+
+					return &db.ModuleVersionsResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.injectVersionsPerModule,
+						},
+					}
+				}, nil)
+
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
+			}
+
 			dbClient := db.Client{
 				Transactions:            &mockTransactions,
 				TerraformModules:        &mockModules,
 				TerraformModuleVersions: &mockModuleVersions,
 				Groups:                  &mockGroups,
+				ResourceLimits:          mockResourceLimits,
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, asynctask.NewMockManager(t))
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, mockActivityEvents, asynctask.NewMockManager(t))
 
 			moduleVersion, err := service.CreateModuleVersion(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -1690,7 +1809,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, &mockActivityEvents, nil)
 
 			err := service.DeleteModuleVersion(auth.WithCaller(ctx, &mockCaller), &test.moduleVersionToDelete)
 			if test.expectErrCode != "" {
@@ -1802,7 +1921,7 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, mockRegistryStore, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, nil, nil)
 
 			details, err := service.GetModuleConfigurationDetails(auth.WithCaller(ctx, mockCaller), test.input, test.path)
 
@@ -1992,7 +2111,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, mockRegistryStore, mockActivityEvents, mockTaskManager)
+			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, mockActivityEvents, mockTaskManager)
 
 			err := service.UploadModuleVersionPackage(auth.WithCaller(ctx, mockCaller), test.input, strings.NewReader(test.data))
 			if test.expectErrCode != "" {
@@ -2101,7 +2220,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, mockRegistryStore, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, mockRegistryStore, nil, nil)
 
 			url, err := service.GetModuleVersionPackageDownloadURL(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -2140,6 +2259,10 @@ func TestCreateModuleAttestation(t *testing.T) {
 		name                           string
 		expectErrCode                  string
 		input                          CreateModuleAttestationInput
+		limit                          int
+		injectAttestationsPerModule    int32
+		shouldDoTx                     bool
+		exceedsLimit                   bool
 	}{
 		{
 			name: "subject does not have deployer role",
@@ -2166,6 +2289,9 @@ func TestCreateModuleAttestation(t *testing.T) {
 				Data:          validAttestationData,
 				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
 			},
+			limit:                       5,
+			injectAttestationsPerModule: 5,
+			shouldDoTx:                  true,
 		},
 		{
 			name: "invalid payload type",
@@ -2183,6 +2309,29 @@ func TestCreateModuleAttestation(t *testing.T) {
 			},
 			expectErrCode: errors.EInvalid,
 		},
+		{
+			name: "exceeds limit",
+			input: CreateModuleAttestationInput{
+				ModuleID:        moduleID,
+				Description:     "test",
+				AttestationData: validAttestationData,
+			},
+			expectCreatedModuleAttestation: &models.TerraformModuleAttestation{
+				CreatedBy:     "mockSubject",
+				ModuleID:      moduleID,
+				Description:   "test",
+				SchemaType:    "https://in-toto.io/Statement/v0.1",
+				PredicateType: "cosign.sigstore.dev/attestation/v1",
+				DataSHASum:    hash.Sum(nil),
+				Data:          validAttestationData,
+				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
+			},
+			limit:                       5,
+			injectAttestationsPerModule: 6,
+			shouldDoTx:                  true,
+			exceedsLimit:                true,
+			expectErrCode:               errors.EInvalid,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -2197,6 +2346,8 @@ func TestCreateModuleAttestation(t *testing.T) {
 
 			mockModules := db.NewMockTerraformModules(t)
 			mockModuleAttestations := db.NewMockTerraformModuleAttestations(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			mockModules.On("GetModuleByID", mock.Anything, moduleID).Return(&models.TerraformModule{
 				Metadata: models.ResourceMetadata{
@@ -2208,19 +2359,53 @@ func TestCreateModuleAttestation(t *testing.T) {
 
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			if test.expectErrCode == "" {
+			if test.expectErrCode == "" || test.exceedsLimit {
 				mockModuleAttestations.On("CreateModuleAttestation", mock.Anything, test.expectCreatedModuleAttestation).
 					Return(test.expectCreatedModuleAttestation, nil)
+			}
+
+			if test.shouldDoTx {
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				if !test.exceedsLimit {
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+				}
+			}
+
+			// Called inside transaction to check resource limits.
+			if test.limit > 0 {
+				mockModuleAttestations.On("GetModuleAttestations", mock.Anything, mock.Anything).Return(&db.GetModuleAttestationsInput{
+					Filter: &db.TerraformModuleAttestationFilter{
+						ModuleID: &test.input.ModuleID,
+					},
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+				}).Return(func(ctx context.Context, input *db.GetModuleAttestationsInput) *db.ModuleAttestationsResult {
+					_ = ctx
+					_ = input
+
+					return &db.ModuleAttestationsResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.injectAttestationsPerModule,
+						},
+					}
+				}, nil)
+
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
 			}
 
 			dbClient := db.Client{
 				TerraformModules:            mockModules,
 				TerraformModuleAttestations: mockModuleAttestations,
+				Transactions:                mockTransactions,
+				ResourceLimits:              mockResourceLimits,
 			}
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, mockActivityEvents, nil)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, mockActivityEvents, nil)
 
 			moduleAttestation, err := service.CreateModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -2322,7 +2507,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			moduleAttestation, err := service.GetModuleAttestationByID(auth.WithCaller(ctx, mockCaller), moduleAttestationID)
 
@@ -2444,7 +2629,7 @@ func TestGetModuleAttestations(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
 
 			response, err := service.GetModuleAttestations(auth.WithCaller(ctx, mockCaller), &GetModuleAttestationsInput{
 				ModuleID: moduleID,
@@ -2536,7 +2721,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, &mockActivityEvents, nil)
 
 			updatedAttestation, err := service.UpdateModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.moduleAttestationToUpdate)
 			if test.expectErrCode != "" {
@@ -2619,7 +2804,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 
 			testLogger, _ := logger.NewForTest()
 
-			service := NewService(testLogger, &dbClient, nil, &mockActivityEvents, nil)
+			service := NewService(testLogger, &dbClient, nil, nil, &mockActivityEvents, nil)
 
 			err := service.DeleteModuleAttestation(auth.WithCaller(ctx, &mockCaller), &test.moduleAttestationToDelete)
 			if test.expectErrCode != "" {

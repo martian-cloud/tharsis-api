@@ -9,33 +9,41 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 type mockDBClient struct {
 	*db.Client
-	MockTransactions *db.MockTransactions
-	MockGroups       *db.MockGroups
+	MockTransactions   *db.MockTransactions
+	MockResourceLimits *db.MockResourceLimits
+	MockGroups         *db.MockGroups
 }
 
 func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockTransactions := db.MockTransactions{}
 	mockTransactions.Test(t)
 
+	mockResourceLimits := db.MockResourceLimits{}
+	mockResourceLimits.Test(t)
+
 	mockGroups := db.MockGroups{}
 	mockGroups.Test(t)
 
 	return &mockDBClient{
 		Client: &db.Client{
-			Transactions: &mockTransactions,
-			Groups:       &mockGroups,
+			Transactions:   &mockTransactions,
+			ResourceLimits: &mockResourceLimits,
+			Groups:         &mockGroups,
 		},
-		MockTransactions: &mockTransactions,
-		MockGroups:       &mockGroups,
+		MockTransactions:   &mockTransactions,
+		MockResourceLimits: &mockResourceLimits,
+		MockGroups:         &mockGroups,
 	}
 }
 
@@ -103,8 +111,10 @@ func TestCreateTopLevelGroup(t *testing.T) {
 				Transactions: mockTransactions,
 			}
 
+			limiter := limits.NewLimitChecker(dbClient)
+
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, mockNamespaceMemberships, mockActivityEvents)
+			service := NewService(logger, dbClient, limiter, mockNamespaceMemberships, mockActivityEvents)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, test.caller), &test.input)
 			if test.expectErrorCode != "" {
@@ -121,12 +131,27 @@ func TestCreateTopLevelGroup(t *testing.T) {
 }
 
 func TestCreateNestedGroup(t *testing.T) {
+	mockGroups := db.NewMockGroups(t)
+	mockTransactions := db.NewMockTransactions(t)
+	mockResourceLimits := db.NewMockResourceLimits(t)
+
+	dbClient := db.Client{
+		Groups:         mockGroups,
+		Transactions:   mockTransactions,
+		ResourceLimits: mockResourceLimits,
+	}
+
+	limiter := limits.NewLimitChecker(&dbClient)
+
 	// Test cases
 	tests := []struct {
 		authError       error
 		name            string
 		expectErrorCode string
 		input           models.Group
+		limit           int // same for both siblings and depth
+		parentChildren  int32
+		exceedsDepth    bool
 	}{
 		{
 			name: "create group",
@@ -134,7 +159,10 @@ func TestCreateNestedGroup(t *testing.T) {
 				Name:     "group1",
 				Metadata: models.ResourceMetadata{ID: "group1"},
 				ParentID: "group0",
+				FullPath: "a/b/c/group0/group1",
 			},
+			limit:          5,
+			parentChildren: 5,
 		},
 		{
 			name: "caller is not authorized to create group",
@@ -142,9 +170,37 @@ func TestCreateNestedGroup(t *testing.T) {
 				Name:     "group1",
 				Metadata: models.ResourceMetadata{ID: "group1"},
 				ParentID: "group0",
+				FullPath: "a/b/c/group0/group1",
 			},
+			limit:           5,
+			parentChildren:  5,
 			authError:       errors.New(errors.EForbidden, "Forbidden"),
 			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "exceeds sibling limit",
+			input: models.Group{
+				Name:     "group1",
+				Metadata: models.ResourceMetadata{ID: "group1"},
+				ParentID: "group0-sibling-limit",
+				FullPath: "a/b/c/group0/group1",
+			},
+			limit:           5,
+			parentChildren:  6,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "exceeds depth limit",
+			input: models.Group{
+				Name:     "group1",
+				Metadata: models.ResourceMetadata{ID: "group1"},
+				ParentID: "group-too-deep",
+				FullPath: "a/b/c/d/group-too-deep/group1",
+			},
+			limit:           5,
+			parentChildren:  4,
+			exceedsDepth:    true,
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
@@ -157,29 +213,43 @@ func TestCreateNestedGroup(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateGroupPermission, mock.Anything).Return(test.authError)
 
-			mockGroups := db.NewMockGroups(t)
-			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
 			if test.authError == nil {
 				mockCaller.On("GetSubject").Return("testsubject")
 
-				mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
+				if !test.exceedsDepth {
+					mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+					mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+					mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-			}
+					if test.expectErrorCode == "" {
+						mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+					}
 
-			dbClient := db.Client{
-				Groups:       mockGroups,
-				Transactions: mockTransactions,
+				}
+
+				// called from inside checkParentSubgroupLimit
+				mockGroups.On("GetGroups", mock.Anything, mock.Anything).
+					Return(func(ctx context.Context, input *db.GetGroupsInput) *db.GroupsResult {
+						_ = ctx
+						_ = input
+
+						return &db.GroupsResult{
+							PageInfo: &pagination.PageInfo{
+								TotalCount: test.parentChildren,
+							},
+						}
+					}, nil)
+
+				// called from inside checkParentSubgroupLimit
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).Return(&models.ResourceLimit{Value: test.limit}, nil)
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, nil, mockActivityEvents)
+			service := NewService(logger, &dbClient, limiter, nil, mockActivityEvents)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -723,6 +793,8 @@ func TestGetGroups(t *testing.T) {
 
 			dbClient := buildDBClientWithMocks(t)
 
+			limiter := limits.NewLimitChecker(dbClient.Client)
+
 			mockAuthorizer := auth.MockAuthorizer{}
 			mockAuthorizer.Test(t)
 
@@ -781,7 +853,7 @@ func TestGetGroups(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			activityService := activityevent.NewService(dbClient.Client, logger)
 			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, activityService)
-			service := NewService(logger, dbClient.Client, namespaceMembershipService, activityService)
+			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, activityService)
 
 			// Call the service function.
 			actualOutput, actualError := service.GetGroups(auth.WithCaller(ctx, testCaller), test.svcInput)
@@ -836,16 +908,22 @@ func TestMigrateGroup(t *testing.T) {
 		name                     string
 		expectErrorCode          string
 		inputGroup               models.Group
+		limit                    int // same for both siblings and depth
+		newParentChildren        int32
+		injectChildDepth         int // set to -1 to NOT do a mock.On GetChildDepth
+		exceedsDepthFromRoot     bool
+		exceedsChildDepth        bool
 		isUserAdmin              bool
 		isGroupOwner             bool
 		isCallerDeployerOfParent bool
 	}{
 		{
-			name:         "successful move to root",
-			inputGroup:   testGroup,
-			newParentID:  nil,
-			isUserAdmin:  true,
-			isGroupOwner: true,
+			name:             "successful move to root",
+			inputGroup:       testGroup,
+			newParentID:      nil,
+			isUserAdmin:      true,
+			isGroupOwner:     true,
+			injectChildDepth: 4,
 			expectGroup: &models.Group{
 				Metadata: models.ResourceMetadata{ID: testGroupID},
 				Name:     testGroupName,
@@ -859,6 +937,9 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			limit:                    5,
+			newParentChildren:        5,
+			injectChildDepth:         2, // new grandparent, new parent, nomad, two levels of descendants
 			expectGroup: &models.Group{
 				Metadata: models.ResourceMetadata{ID: testGroupID},
 				Name:     testGroupName,
@@ -867,11 +948,12 @@ func TestMigrateGroup(t *testing.T) {
 			},
 		},
 		{
-			name:            "caller is not owner of group to be moved",
-			inputGroup:      testGroup,
-			newParentID:     nil,
-			isGroupOwner:    false,
-			expectErrorCode: errors.EForbidden,
+			name:             "caller is not owner of group to be moved",
+			inputGroup:       testGroup,
+			newParentID:      nil,
+			isGroupOwner:     false,
+			injectChildDepth: -1,
+			expectErrorCode:  errors.EForbidden,
 		},
 		{
 			name:                     "new parent group is the same as the group to be moved",
@@ -879,6 +961,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &testGroupID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			injectChildDepth:         -1,
 			expectErrorCode:          errors.EInvalid,
 		},
 		{
@@ -887,6 +970,7 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &loopParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: true,
+			injectChildDepth:         -1,
 			expectErrorCode:          errors.EInvalid,
 		},
 		{
@@ -895,14 +979,67 @@ func TestMigrateGroup(t *testing.T) {
 			newParentID:              &newParentID,
 			isGroupOwner:             true,
 			isCallerDeployerOfParent: false,
+			injectChildDepth:         -1,
 			expectErrorCode:          errors.EForbidden,
 		},
 		{
-			name:            "caller is not admin but tried to move group to root",
-			inputGroup:      testGroup,
-			newParentID:     nil,
-			isGroupOwner:    true,
-			expectErrorCode: errors.EForbidden,
+			name:             "caller is not admin but tried to move group to root",
+			inputGroup:       testGroup,
+			newParentID:      nil,
+			isGroupOwner:     true,
+			injectChildDepth: -1,
+			expectErrorCode:  errors.EForbidden,
+		},
+		{
+			name:                     "exceeds limit on subgroups within direct parent",
+			inputGroup:               testGroup,
+			newParentID:              &newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			limit:                    5,
+			newParentChildren:        6,
+			injectChildDepth:         1,
+			expectGroup: &models.Group{ // to avoid GetDepth seeing a nil group
+				Metadata: models.ResourceMetadata{ID: testGroupID},
+				Name:     testGroupName,
+				ParentID: "",
+				FullPath: testGroupName,
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:                     "exceeds limit on depth due to ancestors",
+			inputGroup:               testGroup,
+			newParentID:              &newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			limit:                    5,
+			newParentChildren:        5,
+			injectChildDepth:         1, // the group and one child level
+			exceedsDepthFromRoot:     true,
+			expectGroup: &models.Group{ // to avoid GetDepth seeing a nil group
+				Metadata: models.ResourceMetadata{ID: testGroupID},
+				Name:     testGroupName,
+				FullPath: "a/b/c/d/e", // just exceeds depth limit: 5 + 2 - 1
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:                     "exceeds limit on depth due to descendants",
+			inputGroup:               testGroup,
+			newParentID:              &newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			limit:                    5,
+			newParentChildren:        5,
+			injectChildDepth:         4, // just exceeds limit: 2 + 4
+			exceedsChildDepth:        true,
+			expectGroup: &models.Group{ // to avoid GetDepth seeing a nil group
+				Metadata: models.ResourceMetadata{ID: testGroupID},
+				Name:     testGroupName,
+				FullPath: "a/b",
+			},
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 	for _, test := range tests {
@@ -921,6 +1058,8 @@ func TestMigrateGroup(t *testing.T) {
 			mockAuthorizer := auth.MockAuthorizer{}
 			mockAuthorizer.Test(t)
 
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
 			perms := []permissions.Permission{permissions.DeleteGroupPermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(groupAccessError)
 
@@ -936,6 +1075,10 @@ func TestMigrateGroup(t *testing.T) {
 			mockGroups.On("GetGroupByID", mock.Anything, newParentID).Return(&testNewParent, nil)
 			mockGroups.On("GetGroupByID", mock.Anything, loopParentID).Return(&loopParent, nil)
 
+			if test.injectChildDepth >= 0 {
+				mockGroups.On("GetChildDepth", mock.Anything, mock.Anything).Return(test.injectChildDepth, nil)
+			}
+
 			var newParent *models.Group
 			if test.newParentID != nil {
 				newParent = &models.Group{
@@ -945,6 +1088,26 @@ func TestMigrateGroup(t *testing.T) {
 					FullPath: newParentPath,
 					Name:     newParentName,
 				}
+
+				// called from inside checkParentSubgroupLimit
+				mockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(
+					&db.GroupsResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: test.newParentChildren,
+						},
+					}, nil)
+
+				if test.limit > 0 {
+					mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+						Return(&models.ResourceLimit{Value: test.limit}, nil)
+				}
+
+				// called from inside getChildDepth
+				mockGroups.On("GetGroups", mock.Anything, &db.GetGroupsInput{
+					Filter: &db.GroupFilter{
+						ParentID: &testGroupID,
+					},
+				}).Return(&db.GroupsResult{Groups: []models.Group{}}, nil)
 			}
 
 			mockGroups.On("MigrateGroup", mock.Anything, &test.inputGroup, newParent).Return(test.expectGroup, nil)
@@ -962,9 +1125,12 @@ func TestMigrateGroup(t *testing.T) {
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
 			dbClient := db.Client{
-				Groups:       &mockGroups,
-				Transactions: &mockTransactions,
+				Groups:         &mockGroups,
+				Transactions:   &mockTransactions,
+				ResourceLimits: mockResourceLimits,
 			}
+
+			limiter := limits.NewLimitChecker(&dbClient)
 
 			testCaller := auth.NewUserCaller(
 				&models.User{
@@ -979,7 +1145,7 @@ func TestMigrateGroup(t *testing.T) {
 			)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, nil, &mockActivityEvents)
+			service := NewService(logger, &dbClient, limiter, nil, &mockActivityEvents)
 
 			migrated, err := service.MigrateGroup(auth.WithCaller(ctx, testCaller),
 				test.inputGroup.Metadata.ID, test.newParentID)

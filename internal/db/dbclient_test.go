@@ -31,9 +31,6 @@ const (
 
 	// Maximum number of DB connections--intended to mirror the CI environment
 	maxConns = 4
-
-	// The table name used to store the current migration schema version
-	migrationSchemaTable = "schema_migrations"
 )
 
 var (
@@ -48,6 +45,12 @@ var (
 	TestDBPass string
 
 	// constants that cannot be constants
+
+	// Map of names of tables that are excluded from being truncated.
+	nonTruncateTables = map[string]interface{}{
+		"schema_migrations": nil,
+		"resource_limits":   nil,
+	}
 
 	// returned for resource version mismatch (or what the DB layer thinks is a version mismatch)
 	resourceVersionMismatch = ptr.String(ErrOptimisticLockError.Error())
@@ -145,7 +148,8 @@ func (tc *testClient) wipeAllTables(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if model.tableName != migrationSchemaTable {
+		// Exclude special tables from being wiped.
+		if _, ok := nonTruncateTables[model.tableName]; !ok {
 			tableNames = append(tableNames, model.tableName)
 		}
 	}
