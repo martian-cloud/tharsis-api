@@ -121,7 +121,6 @@ func (u *UserCaller) requireAdmin(ctx context.Context, _ *permissions.Permission
 func (u *UserCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[permissions.Permission]permissionTypeHandler{
 		permissions.CreateTeamPermission: u.requireAdmin,
-		permissions.UpdateTeamPermission: u.requireAdmin,
 		permissions.DeleteTeamPermission: u.requireAdmin,
 		permissions.CreateUserPermission: u.requireAdmin,
 		permissions.UpdateUserPermission: u.requireAdmin,

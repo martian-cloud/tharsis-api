@@ -44,12 +44,12 @@ func (c cacheKey) getGroupIDKey() string {
 }
 
 type authorizer struct {
-	lock                     sync.RWMutex
 	dbClient                 *db.Client
 	userID                   *string
 	serviceAccountID         *string
 	rolePermissionCache      map[string][]permissions.Permission
 	namespaceMembershipCache map[string]map[string]struct{}
+	lock                     sync.RWMutex
 	useCache                 bool
 }
 

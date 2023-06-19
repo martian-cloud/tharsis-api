@@ -3,6 +3,8 @@ package scim
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -33,12 +35,6 @@ const (
 )
 
 var (
-	// errUnsupportedOperationValue is an error used to indicate an invalid resource modification.
-	errUnsupportedOperationValue = errors.New(
-		errors.EInvalid,
-		"invalid operation value",
-	)
-
 	// supportedSCIMUserOperations contains the list of supported user update operations.
 	supportedSCIMUserOperations = []OP{
 		replaceOPType,
@@ -570,11 +566,27 @@ func (s *service) processSCIMUserOperations(ctx context.Context, operations []Op
 		// Update user fields based on requested attribute name.
 		switch operation.Path {
 		case "emails[type eq \"work\"].value":
-			user.Email = strings.ToLower(operation.Value.(string))
+			email, ok := operation.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected value for user emails field: expected string, got %T", operation.Value)
+			}
+			user.Email = strings.ToLower(email)
 		case "externalId":
-			user.SCIMExternalID = operation.Value.(string)
+			externalID, ok := operation.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected value for user externalId field: expected string, got %T", operation.Value)
+			}
+			user.SCIMExternalID = externalID
 		case "active":
-			user.Active = operation.Value.(bool)
+			active, ok := operation.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected value for user active field: expected string, got %T", operation.Value)
+			}
+
+			user.Active, err = strconv.ParseBool(active)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse active boolean value: %w", err)
+			}
 
 		// More fields can be added here.
 
@@ -635,14 +647,22 @@ func (s *service) processSCIMGroupOperations(ctx context.Context, ops []Operatio
 	for _, operation := range ops {
 		switch operation.Path {
 		case "displayName":
-			team.Name = operation.Value.(string)
+			teamName, ok := operation.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for team displayName: expected string, got %T", operation.Value)
+			}
+			team.Name = teamName
 			team, err = s.dbClient.Teams.UpdateTeam(txContext, team)
 			if err != nil {
 				return nil, err
 			}
 
 		case "externalId":
-			team.SCIMExternalID = operation.Value.(string)
+			externalID, ok := operation.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for team externalId: expected string, got %T", operation.Value)
+			}
+			team.SCIMExternalID = externalID
 			team, err = s.dbClient.Teams.UpdateTeam(txContext, team)
 			if err != nil {
 				return nil, err
@@ -782,12 +802,22 @@ func (s *service) isSCIMGroupUpdateRequired(ctx context.Context, operations []Op
 
 		switch operation.Path {
 		case "displayName":
-			if team.Name != operation.Value.(string) {
+			teamName, ok := operation.Value.(string)
+			if !ok {
+				return false, fmt.Errorf("unexpected type for team displayName: expected string, got %T", operation.Value)
+			}
+
+			if team.Name != teamName {
 				return true, nil
 			}
 
 		case "externalId":
-			if team.SCIMExternalID != operation.Value.(string) {
+			externalID, ok := operation.Value.(string)
+			if !ok {
+				return false, fmt.Errorf("unexpected type for team externalId: expected string, got %T", operation.Value)
+			}
+
+			if team.SCIMExternalID != externalID {
 				return true, nil
 			}
 
@@ -856,19 +886,19 @@ func parseSCIMGroupMemberID(operation *Operation) (string, error) {
 	// Expecting a slice of maps here.
 	valueSlice, ok := operation.Value.([]interface{})
 	if !ok {
-		return "", errUnsupportedOperationValue
+		return "", fmt.Errorf("unexpected value type: expected slice, got %T", operation.Value)
 	}
 
 	// Get the first element from the slice and make sure its a map.
 	firstElement, ok := valueSlice[0].(map[string]interface{})
 	if !ok {
-		return "", errUnsupportedOperationValue
+		return "", fmt.Errorf("unexpected value type: expected map of string, got %T", valueSlice[0])
 	}
 
 	// Get the string userID.
 	userID, ok := firstElement["value"].(string)
 	if !ok {
-		return "", errUnsupportedOperationValue
+		return "", fmt.Errorf("unexpected value type: expected string, got %T", firstElement["value"])
 	}
 
 	return gid.FromGlobalID(userID), nil
