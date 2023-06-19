@@ -82,12 +82,12 @@ func (r *runnerClient) ClaimJob(ctx context.Context, input *rnr.ClaimJobInput) (
 
 // APIServer represents an instance of a server
 type APIServer struct {
-	shutdownOnce  sync.Once
 	logger        logger.Logger
-	dbClient      *db.Client
 	taskManager   asynctask.Manager
+	dbClient      *db.Client
 	srv           *http.Server
 	traceShutdown func(context.Context) error
+	shutdownOnce  sync.Once
 }
 
 // New creates a new APIServer instance
