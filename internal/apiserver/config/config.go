@@ -82,6 +82,10 @@ type Config struct {
 	// AdminUserEmail is optional and will create a system admin user with this email.
 	AdminUserEmail string `yaml:"admin_user_email" env:"ADMIN_USER_EMAIL"`
 
+	// Otel
+	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
+	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST"`
+
 	// The OIDC identity providers
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 
@@ -102,20 +106,17 @@ type Config struct {
 	// VCS repository size limit
 	VCSRepositorySizeLimit int `yaml:"vcs_repository_size_limit" env:"VCS_REPOSITORY_SIZE_LIMIT"`
 
+	// HTTP rate limit value
+	HTTPRateLimit int `yaml:"http_rate_limit" env:"HTTP_RATE_LIMIT"`
+
+	OtelTraceCollectorPort int  `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT"`
+	OtelTraceEnabled       bool `yaml:"otel_trace_enabled" env:"OTEL_TRACE_ENABLED"`
+
 	// Enable TFE
 	TFELoginEnabled bool `yaml:"tfe_login_enabled" env:"TFE_LOGIN_ENABLED"`
 
 	// Whether to auto migrate the database
 	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED"`
-
-	// Host and port for OTel gRPC tracing
-	OtelTraceEnabled       bool   `yaml:"otel_trace_enabled" env:"OTEL_TRACE_ENABLED"`
-	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
-	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST"`
-	OtelTraceCollectorPort int    `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT"`
-
-	// HTTP rate limit value
-	HTTPRateLimit int `yaml:"http_rate_limit" env:"HTTP_RATE_LIMIT"`
 }
 
 // Validate validates the application configuration.
