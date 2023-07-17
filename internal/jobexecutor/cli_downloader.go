@@ -202,6 +202,7 @@ func (c *cliDownloader) Download(ctx context.Context, terraformVersion string) (
 	if err != nil {
 		return "", err
 	}
+	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download Terraform CLI binary response status: %s", response.Status)
@@ -256,24 +257,22 @@ func (c *cliDownloader) downloadTerraformCLIChecksums(version string) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	defer signatureResponse.Body.Close()
 
 	if signatureResponse.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download Terraform CLI release sums signature response status: %s", signatureResponse.Status)
 	}
-
-	defer signatureResponse.Body.Close()
 
 	// Download checksumsResponse.
 	checksumsResponse, err := c.httpClient.Get(checksumURL)
 	if err != nil {
 		return nil, err
 	}
+	defer checksumsResponse.Body.Close()
 
 	if checksumsResponse.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download Terraform CLI release sums response status: %s", checksumsResponse.Status)
 	}
-
-	defer checksumsResponse.Body.Close()
 
 	var (
 		checksumReader io.Reader    // For building checksum map.

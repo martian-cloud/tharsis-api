@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
@@ -383,6 +384,32 @@ func (r *GroupResolver) VCSProviders(ctx context.Context,
 	}
 
 	return NewVCSProviderConnectionResolver(ctx, &input)
+}
+
+// TerraformProviderMirrors resolver
+func (r *GroupResolver) TerraformProviderMirrors(
+	ctx context.Context,
+	args *TerraformProviderVersionMirrorConnectionQueryArgs,
+) (*TerraformProviderVersionMirrorConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := &providermirror.GetProviderVersionMirrorsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		NamespacePath:     r.group.FullPath,
+	}
+
+	if args.Sort != nil {
+		sort := db.TerraformProviderVersionMirrorSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	if args.IncludeInherited != nil && *args.IncludeInherited {
+		input.IncludeInherited = true
+	}
+
+	return NewTerraformProviderVersionMirrorConnectionResolver(ctx, input)
 }
 
 func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {

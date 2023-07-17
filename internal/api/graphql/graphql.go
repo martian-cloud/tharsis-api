@@ -98,6 +98,7 @@ func NewGraphQL(
 	resolver.RegisterVCSEventLoader(loaderCollection)
 	resolver.RegisterRoleLoader(loaderCollection)
 	resolver.RegisterRunnerLoader(loaderCollection)
+	resolver.RegisterTerraformProviderVersionMirrorLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers(),
 		graphql.Tracer(&otel.Tracer{

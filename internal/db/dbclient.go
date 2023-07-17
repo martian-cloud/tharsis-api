@@ -60,41 +60,43 @@ type connection interface {
 
 // Client acts as a facade for the database
 type Client struct {
-	conn                        *pgxpool.Pool
-	logger                      logger.Logger
-	Events                      Events
-	Groups                      Groups
-	Runs                        Runs
-	Jobs                        Jobs
-	Plans                       Plans
-	Applies                     Applies
-	ConfigurationVersions       ConfigurationVersions
-	StateVersionOutputs         StateVersionOutputs
-	Workspaces                  Workspaces
-	StateVersions               StateVersions
-	ManagedIdentities           ManagedIdentities
-	ServiceAccounts             ServiceAccounts
-	Users                       Users
-	NamespaceMemberships        NamespaceMemberships
-	Teams                       Teams
-	TeamMembers                 TeamMembers
-	Transactions                Transactions
-	Variables                   Variables
-	TerraformProviders          TerraformProviders
-	TerraformProviderVersions   TerraformProviderVersions
-	TerraformProviderPlatforms  TerraformProviderPlatforms
-	TerraformModules            TerraformModules
-	TerraformModuleVersions     TerraformModuleVersions
-	TerraformModuleAttestations TerraformModuleAttestations
-	GPGKeys                     GPGKeys
-	SCIMTokens                  SCIMTokens
-	VCSProviders                VCSProviders
-	WorkspaceVCSProviderLinks   WorkspaceVCSProviderLinks
-	ActivityEvents              ActivityEvents
-	VCSEvents                   VCSEvents
-	Roles                       Roles
-	Runners                     Runners
-	ResourceLimits              ResourceLimits
+	conn                             *pgxpool.Pool
+	logger                           logger.Logger
+	Events                           Events
+	Groups                           Groups
+	Runs                             Runs
+	Jobs                             Jobs
+	Plans                            Plans
+	Applies                          Applies
+	ConfigurationVersions            ConfigurationVersions
+	StateVersionOutputs              StateVersionOutputs
+	Workspaces                       Workspaces
+	StateVersions                    StateVersions
+	ManagedIdentities                ManagedIdentities
+	ServiceAccounts                  ServiceAccounts
+	Users                            Users
+	NamespaceMemberships             NamespaceMemberships
+	Teams                            Teams
+	TeamMembers                      TeamMembers
+	Transactions                     Transactions
+	Variables                        Variables
+	TerraformProviders               TerraformProviders
+	TerraformProviderVersions        TerraformProviderVersions
+	TerraformProviderPlatforms       TerraformProviderPlatforms
+	TerraformModules                 TerraformModules
+	TerraformModuleVersions          TerraformModuleVersions
+	TerraformModuleAttestations      TerraformModuleAttestations
+	GPGKeys                          GPGKeys
+	SCIMTokens                       SCIMTokens
+	VCSProviders                     VCSProviders
+	WorkspaceVCSProviderLinks        WorkspaceVCSProviderLinks
+	ActivityEvents                   ActivityEvents
+	VCSEvents                        VCSEvents
+	Roles                            Roles
+	Runners                          Runners
+	ResourceLimits                   ResourceLimits
+	TerraformProviderVersionMirrors  TerraformProviderVersionMirrors
+	TerraformProviderPlatformMirrors TerraformProviderPlatformMirrors
 }
 
 // NewClient creates a new Client
@@ -189,6 +191,8 @@ func NewClient(
 	dbClient.Roles = NewRoles(dbClient)
 	dbClient.Runners = NewRunners(dbClient)
 	dbClient.ResourceLimits = NewResourceLimits(dbClient)
+	dbClient.TerraformProviderVersionMirrors = NewTerraformProviderVersionMirrors(dbClient)
+	dbClient.TerraformProviderPlatformMirrors = NewTerraformProviderPlatformMirrors(dbClient)
 
 	return dbClient, nil
 }

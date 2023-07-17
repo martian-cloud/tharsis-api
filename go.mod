@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/ProtonMail/go-crypto v0.0.0-20230528122434-6f98819771a1
+	github.com/apparentlymart/go-versions v1.0.1
 	github.com/avast/retry-go/v4 v4.3.4
 	github.com/aws/aws-sdk-go-v2 v1.18.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.25

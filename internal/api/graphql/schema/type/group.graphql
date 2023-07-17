@@ -125,6 +125,14 @@ type Group implements Node, Namespace {
     sort: VCSProviderSort
     includeInherited: Boolean
   ): VCSProviderConnection!
+  terraformProviderMirrors(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    includeInherited: Boolean
+    sort: TerraformProviderVersionMirrorSort
+  ): TerraformProviderVersionMirrorConnection!
 }
 
 input CreateGroupInput {

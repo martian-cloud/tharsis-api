@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
@@ -59,6 +60,7 @@ type State struct {
 	RoleService                role.Service
 	RunnerService              runner.Service
 	ResourceLimitService       resourcelimit.Service
+	ProviderMirrorService      providermirror.Service
 }
 
 // Attach is used to attach the resolver state to the context
@@ -167,4 +169,8 @@ func getRoleService(ctx context.Context) role.Service {
 
 func getResourceLimitService(ctx context.Context) resourcelimit.Service {
 	return extract(ctx).ResourceLimitService
+}
+
+func getProviderMirrorService(ctx context.Context) providermirror.Service {
+	return extract(ctx).ProviderMirrorService
 }

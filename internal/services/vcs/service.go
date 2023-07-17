@@ -2021,6 +2021,7 @@ func downloadRepositoryArchive(ctx context.Context, input *downloadRepositoryArc
 	if err != nil {
 		return "", "", err
 	}
+	defer archiveResp.Body.Close()
 
 	// Create the final destination directory where archive will be unpacked.
 	tmpDownloadDir, err := os.MkdirTemp("", "repository")
@@ -2033,12 +2034,7 @@ func downloadRepositoryArchive(ctx context.Context, input *downloadRepositoryArc
 	if err != nil {
 		return tmpDownloadDir, "", fmt.Errorf("failed to create temporary file to download repository: %v", err)
 	}
-
-	// Defer on closing / removing everything.
-	defer func() {
-		archiveResp.Body.Close()
-		os.Remove(destinationFile.Name())
-	}()
+	defer os.Remove(destinationFile.Name())
 
 	// Download the repository in chunks.
 	if err = copyToDestination(destinationFile, archiveResp.Body, int64(input.repositorySizeLimit)); err != nil {

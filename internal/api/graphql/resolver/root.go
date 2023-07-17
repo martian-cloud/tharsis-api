@@ -1136,3 +1136,45 @@ func (r RootResolver) UpdateResourceLimit(ctx context.Context,
 	}
 	return response, nil
 }
+
+/* TerraformProviderVersionMirror Query and Mutations */
+
+// TerraformProviderVersionMirror query returns a terraform provider version mirror by address.
+func (r RootResolver) TerraformProviderVersionMirror(ctx context.Context, args *TerraformProviderVersionMirrorQueryArgs) (*TerraformProviderVersionMirrorResolver, error) {
+	return terraformProviderVersionMirrorQuery(ctx, args)
+}
+
+// CreateTerraformProviderVersionMirror creates a TerraformProviderVersionMirror.
+func (r RootResolver) CreateTerraformProviderVersionMirror(ctx context.Context, args *struct {
+	Input *CreateTerraformProviderVersionMirrorInput
+}) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
+	response, err := createTerraformProviderVersionMirrorMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderVersionMirrorMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// DeleteTerraformProviderVersionMirror deletes a TerraformProviderVersionMirror.
+func (r RootResolver) DeleteTerraformProviderVersionMirror(ctx context.Context, args *struct {
+	Input *DeleteTerraformProviderVersionMirrorInput
+}) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
+	response, err := deleteTerraformProviderVersionMirrorMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderVersionMirrorMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+/* TerraformProviderPlatformMirror Mutations */
+
+// DeleteTerraformProviderPlatformMirror deletes a TerraformProviderPlatformMirror.
+func (r RootResolver) DeleteTerraformProviderPlatformMirror(ctx context.Context, args *struct {
+	Input *DeleteTerraformProviderPlatformMirrorInput
+}) (*TerraformProviderPlatformMirrorMutationPayloadResolver, error) {
+	response, err := deleteTerraformProviderPlatformMirrorMutation(ctx, args.Input)
+	if err != nil {
+		return handleTerraformProviderPlatformMirrorMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}

@@ -128,4 +128,11 @@ type Query {
   availableRolePermissions: [String!]!
   authSettings: AuthSettings
   resourceLimits: [ResourceLimit!]!
+  terraformProviderVersionMirror(
+    registryNamespace: String!
+    registryHostname: String!
+    type: String!
+    version: String!
+    groupPath: String!
+  ): TerraformProviderVersionMirror
 }

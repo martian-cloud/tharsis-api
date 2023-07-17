@@ -175,12 +175,11 @@ func (s *service) downloadTerraformCLIRelease(ctx context.Context, input *Terraf
 	if err != nil {
 		return err
 	}
+	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("download response status: %s", response.Status)
 	}
-
-	defer response.Body.Close()
 
 	// Verify the mime type.
 	mimeType := response.Header.Get("content-type")

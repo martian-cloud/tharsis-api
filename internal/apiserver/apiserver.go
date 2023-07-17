@@ -38,6 +38,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
@@ -166,6 +167,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
+	mirrorStore := providermirror.NewProviderMirrorStore(pluginCatalog.ObjectStore)
 
 	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, cfg, pluginCatalog)
 	if err != nil {
@@ -197,6 +199,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		runnerService              = runner.NewService(logger, dbClient, limits, activityService)
 		roleService                = role.NewService(logger, dbClient, activityService)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
+		providerMirrorService      = providermirror.NewService(logger, dbClient, httpClient, limits, activityService, mirrorStore)
 	)
 
 	vcsService, err := vcs.NewService(
@@ -311,6 +314,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		RoleService:                roleService,
 		RunnerService:              runnerService,
 		ResourceLimitService:       resourceLimitService,
+		ProviderMirrorService:      providerMirrorService,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)
@@ -418,6 +422,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		respWriter,
 		authenticator,
 		vcsService,
+	))
+	v1RouteBuilder.AddRoutes(controllers.NewProviderMirrorController(
+		logger,
+		respWriter,
+		requireAuthenticatedCallerMiddleware,
+		providerMirrorService,
 	))
 
 	for _, r := range cfg.InternalRunners {

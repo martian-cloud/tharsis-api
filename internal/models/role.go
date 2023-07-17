@@ -166,6 +166,9 @@ var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
 		permissions.CreateVCSProviderPermission,
 		permissions.UpdateVCSProviderPermission,
 		permissions.DeleteVCSProviderPermission,
+		permissions.ViewTerraformProviderMirrorPermission,
+		permissions.CreateTerraformProviderMirrorPermission,
+		permissions.DeleteTerraformProviderMirrorPermission,
 	},
 	// Deployer Role.
 	DeployerRoleID: {
@@ -212,6 +215,9 @@ var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
 		permissions.CreateVCSProviderPermission,
 		permissions.UpdateVCSProviderPermission,
 		permissions.DeleteVCSProviderPermission,
+		permissions.ViewTerraformProviderMirrorPermission,
+		permissions.CreateTerraformProviderMirrorPermission,
+		permissions.DeleteTerraformProviderMirrorPermission,
 	},
 	// Viewer Role.
 	ViewerRoleID: {
@@ -230,5 +236,6 @@ var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
 		permissions.ViewServiceAccountPermission,
 		permissions.ViewManagedIdentityPermission,
 		permissions.ViewVCSProviderPermission,
+		permissions.ViewTerraformProviderMirrorPermission,
 	},
 }

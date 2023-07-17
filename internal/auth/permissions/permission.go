@@ -14,125 +14,131 @@ import (
 
 // All possible Permissions.
 var (
-	ViewGPGKeyPermission                 = Permission{ResourceType: GPGKeyResourceType, Action: ViewAction}
-	CreateGPGKeyPermission               = Permission{ResourceType: GPGKeyResourceType, Action: CreateAction}
-	DeleteGPGKeyPermission               = Permission{ResourceType: GPGKeyResourceType, Action: DeleteAction}
-	ViewGroupPermission                  = Permission{ResourceType: GroupResourceType, Action: ViewAction}
-	CreateGroupPermission                = Permission{ResourceType: GroupResourceType, Action: CreateAction}
-	UpdateGroupPermission                = Permission{ResourceType: GroupResourceType, Action: UpdateAction}
-	DeleteGroupPermission                = Permission{ResourceType: GroupResourceType, Action: DeleteAction}
-	ViewNamespaceMembershipPermission    = Permission{ResourceType: NamespaceMembershipResourceType, Action: ViewAction}
-	CreateNamespaceMembershipPermission  = Permission{ResourceType: NamespaceMembershipResourceType, Action: CreateAction}
-	UpdateNamespaceMembershipPermission  = Permission{ResourceType: NamespaceMembershipResourceType, Action: UpdateAction}
-	DeleteNamespaceMembershipPermission  = Permission{ResourceType: NamespaceMembershipResourceType, Action: DeleteAction}
-	ViewWorkspacePermission              = Permission{ResourceType: WorkspaceResourceType, Action: ViewAction}
-	CreateWorkspacePermission            = Permission{ResourceType: WorkspaceResourceType, Action: CreateAction}
-	UpdateWorkspacePermission            = Permission{ResourceType: WorkspaceResourceType, Action: UpdateAction}
-	DeleteWorkspacePermission            = Permission{ResourceType: WorkspaceResourceType, Action: DeleteAction}
-	CreateTeamPermission                 = Permission{ResourceType: TeamResourceType, Action: CreateAction}
-	UpdateTeamPermission                 = Permission{ResourceType: TeamResourceType, Action: UpdateAction}
-	DeleteTeamPermission                 = Permission{ResourceType: TeamResourceType, Action: DeleteAction}
-	ViewRunPermission                    = Permission{ResourceType: RunResourceType, Action: ViewAction}
-	CreateRunPermission                  = Permission{ResourceType: RunResourceType, Action: CreateAction}
-	ViewJobPermission                    = Permission{ResourceType: JobResourceType, Action: ViewAction}
-	ClaimJobPermission                   = Permission{ResourceType: JobResourceType, Action: ClaimAction}    // Specifically for claiming jobs.
-	UpdateJobPermission                  = Permission{ResourceType: JobResourceType, Action: UpdateAction}   // Write job perm.
-	UpdatePlanPermission                 = Permission{ResourceType: PlanResourceType, Action: UpdateAction}  // Write plan perm.
-	UpdateApplyPermission                = Permission{ResourceType: ApplyResourceType, Action: UpdateAction} // Write apply perm.
-	ViewRunnerPermission                 = Permission{ResourceType: RunnerResourceType, Action: ViewAction}
-	CreateRunnerPermission               = Permission{ResourceType: RunnerResourceType, Action: CreateAction}
-	UpdateRunnerPermission               = Permission{ResourceType: RunnerResourceType, Action: UpdateAction}
-	DeleteRunnerPermission               = Permission{ResourceType: RunnerResourceType, Action: DeleteAction}
-	CreateUserPermission                 = Permission{ResourceType: UserResourceType, Action: CreateAction}
-	UpdateUserPermission                 = Permission{ResourceType: UserResourceType, Action: UpdateAction}
-	DeleteUserPermission                 = Permission{ResourceType: UserResourceType, Action: DeleteAction}
-	ViewVariableValuePermission          = Permission{ResourceType: VariableResourceType, Action: ViewValueAction} // Viewing variable values.
-	ViewVariablePermission               = Permission{ResourceType: VariableResourceType, Action: ViewAction}
-	CreateVariablePermission             = Permission{ResourceType: VariableResourceType, Action: CreateAction}
-	UpdateVariablePermission             = Permission{ResourceType: VariableResourceType, Action: UpdateAction}
-	DeleteVariablePermission             = Permission{ResourceType: VariableResourceType, Action: DeleteAction}
-	ViewTerraformProviderPermission      = Permission{ResourceType: TerraformProviderResourceType, Action: ViewAction}
-	CreateTerraformProviderPermission    = Permission{ResourceType: TerraformProviderResourceType, Action: CreateAction}
-	UpdateTerraformProviderPermission    = Permission{ResourceType: TerraformProviderResourceType, Action: UpdateAction}
-	DeleteTerraformProviderPermission    = Permission{ResourceType: TerraformProviderResourceType, Action: DeleteAction}
-	ViewTerraformModulePermission        = Permission{ResourceType: TerraformModuleResourceType, Action: ViewAction}
-	CreateTerraformModulePermission      = Permission{ResourceType: TerraformModuleResourceType, Action: CreateAction}
-	UpdateTerraformModulePermission      = Permission{ResourceType: TerraformModuleResourceType, Action: UpdateAction}
-	DeleteTerraformModulePermission      = Permission{ResourceType: TerraformModuleResourceType, Action: DeleteAction}
-	ViewStateVersionPermission           = Permission{ResourceType: StateVersionResourceType, Action: ViewAction}
-	CreateStateVersionPermission         = Permission{ResourceType: StateVersionResourceType, Action: CreateAction}
-	ViewConfigurationVersionPermission   = Permission{ResourceType: ConfigurationVersionResourceType, Action: ViewAction}
-	CreateConfigurationVersionPermission = Permission{ResourceType: ConfigurationVersionResourceType, Action: CreateAction}
-	UpdateConfigurationVersionPermission = Permission{ResourceType: ConfigurationVersionResourceType, Action: UpdateAction}
-	ViewServiceAccountPermission         = Permission{ResourceType: ServiceAccountResourceType, Action: ViewAction}
-	CreateServiceAccountPermission       = Permission{ResourceType: ServiceAccountResourceType, Action: CreateAction}
-	UpdateServiceAccountPermission       = Permission{ResourceType: ServiceAccountResourceType, Action: UpdateAction}
-	DeleteServiceAccountPermission       = Permission{ResourceType: ServiceAccountResourceType, Action: DeleteAction}
-	ViewManagedIdentityPermission        = Permission{ResourceType: ManagedIdentityResourceType, Action: ViewAction}
-	CreateManagedIdentityPermission      = Permission{ResourceType: ManagedIdentityResourceType, Action: CreateAction}
-	UpdateManagedIdentityPermission      = Permission{ResourceType: ManagedIdentityResourceType, Action: UpdateAction}
-	DeleteManagedIdentityPermission      = Permission{ResourceType: ManagedIdentityResourceType, Action: DeleteAction}
-	ViewVCSProviderPermission            = Permission{ResourceType: VCSProviderResourceType, Action: ViewAction}
-	CreateVCSProviderPermission          = Permission{ResourceType: VCSProviderResourceType, Action: CreateAction}
-	UpdateVCSProviderPermission          = Permission{ResourceType: VCSProviderResourceType, Action: UpdateAction}
-	DeleteVCSProviderPermission          = Permission{ResourceType: VCSProviderResourceType, Action: DeleteAction}
+	ViewGPGKeyPermission                    = Permission{ResourceType: GPGKeyResourceType, Action: ViewAction}
+	CreateGPGKeyPermission                  = Permission{ResourceType: GPGKeyResourceType, Action: CreateAction}
+	DeleteGPGKeyPermission                  = Permission{ResourceType: GPGKeyResourceType, Action: DeleteAction}
+	ViewGroupPermission                     = Permission{ResourceType: GroupResourceType, Action: ViewAction}
+	CreateGroupPermission                   = Permission{ResourceType: GroupResourceType, Action: CreateAction}
+	UpdateGroupPermission                   = Permission{ResourceType: GroupResourceType, Action: UpdateAction}
+	DeleteGroupPermission                   = Permission{ResourceType: GroupResourceType, Action: DeleteAction}
+	ViewNamespaceMembershipPermission       = Permission{ResourceType: NamespaceMembershipResourceType, Action: ViewAction}
+	CreateNamespaceMembershipPermission     = Permission{ResourceType: NamespaceMembershipResourceType, Action: CreateAction}
+	UpdateNamespaceMembershipPermission     = Permission{ResourceType: NamespaceMembershipResourceType, Action: UpdateAction}
+	DeleteNamespaceMembershipPermission     = Permission{ResourceType: NamespaceMembershipResourceType, Action: DeleteAction}
+	ViewWorkspacePermission                 = Permission{ResourceType: WorkspaceResourceType, Action: ViewAction}
+	CreateWorkspacePermission               = Permission{ResourceType: WorkspaceResourceType, Action: CreateAction}
+	UpdateWorkspacePermission               = Permission{ResourceType: WorkspaceResourceType, Action: UpdateAction}
+	DeleteWorkspacePermission               = Permission{ResourceType: WorkspaceResourceType, Action: DeleteAction}
+	CreateTeamPermission                    = Permission{ResourceType: TeamResourceType, Action: CreateAction}
+	UpdateTeamPermission                    = Permission{ResourceType: TeamResourceType, Action: UpdateAction}
+	DeleteTeamPermission                    = Permission{ResourceType: TeamResourceType, Action: DeleteAction}
+	ViewRunPermission                       = Permission{ResourceType: RunResourceType, Action: ViewAction}
+	CreateRunPermission                     = Permission{ResourceType: RunResourceType, Action: CreateAction}
+	ViewJobPermission                       = Permission{ResourceType: JobResourceType, Action: ViewAction}
+	ClaimJobPermission                      = Permission{ResourceType: JobResourceType, Action: ClaimAction}    // Specifically for claiming jobs.
+	UpdateJobPermission                     = Permission{ResourceType: JobResourceType, Action: UpdateAction}   // Write job perm.
+	UpdatePlanPermission                    = Permission{ResourceType: PlanResourceType, Action: UpdateAction}  // Write plan perm.
+	UpdateApplyPermission                   = Permission{ResourceType: ApplyResourceType, Action: UpdateAction} // Write apply perm.
+	ViewRunnerPermission                    = Permission{ResourceType: RunnerResourceType, Action: ViewAction}
+	CreateRunnerPermission                  = Permission{ResourceType: RunnerResourceType, Action: CreateAction}
+	UpdateRunnerPermission                  = Permission{ResourceType: RunnerResourceType, Action: UpdateAction}
+	DeleteRunnerPermission                  = Permission{ResourceType: RunnerResourceType, Action: DeleteAction}
+	CreateUserPermission                    = Permission{ResourceType: UserResourceType, Action: CreateAction}
+	UpdateUserPermission                    = Permission{ResourceType: UserResourceType, Action: UpdateAction}
+	DeleteUserPermission                    = Permission{ResourceType: UserResourceType, Action: DeleteAction}
+	ViewVariableValuePermission             = Permission{ResourceType: VariableResourceType, Action: ViewValueAction} // Viewing variable values.
+	ViewVariablePermission                  = Permission{ResourceType: VariableResourceType, Action: ViewAction}
+	CreateVariablePermission                = Permission{ResourceType: VariableResourceType, Action: CreateAction}
+	UpdateVariablePermission                = Permission{ResourceType: VariableResourceType, Action: UpdateAction}
+	DeleteVariablePermission                = Permission{ResourceType: VariableResourceType, Action: DeleteAction}
+	ViewTerraformProviderPermission         = Permission{ResourceType: TerraformProviderResourceType, Action: ViewAction}
+	CreateTerraformProviderPermission       = Permission{ResourceType: TerraformProviderResourceType, Action: CreateAction}
+	UpdateTerraformProviderPermission       = Permission{ResourceType: TerraformProviderResourceType, Action: UpdateAction}
+	DeleteTerraformProviderPermission       = Permission{ResourceType: TerraformProviderResourceType, Action: DeleteAction}
+	ViewTerraformModulePermission           = Permission{ResourceType: TerraformModuleResourceType, Action: ViewAction}
+	CreateTerraformModulePermission         = Permission{ResourceType: TerraformModuleResourceType, Action: CreateAction}
+	UpdateTerraformModulePermission         = Permission{ResourceType: TerraformModuleResourceType, Action: UpdateAction}
+	DeleteTerraformModulePermission         = Permission{ResourceType: TerraformModuleResourceType, Action: DeleteAction}
+	ViewStateVersionPermission              = Permission{ResourceType: StateVersionResourceType, Action: ViewAction}
+	CreateStateVersionPermission            = Permission{ResourceType: StateVersionResourceType, Action: CreateAction}
+	ViewConfigurationVersionPermission      = Permission{ResourceType: ConfigurationVersionResourceType, Action: ViewAction}
+	CreateConfigurationVersionPermission    = Permission{ResourceType: ConfigurationVersionResourceType, Action: CreateAction}
+	UpdateConfigurationVersionPermission    = Permission{ResourceType: ConfigurationVersionResourceType, Action: UpdateAction}
+	ViewServiceAccountPermission            = Permission{ResourceType: ServiceAccountResourceType, Action: ViewAction}
+	CreateServiceAccountPermission          = Permission{ResourceType: ServiceAccountResourceType, Action: CreateAction}
+	UpdateServiceAccountPermission          = Permission{ResourceType: ServiceAccountResourceType, Action: UpdateAction}
+	DeleteServiceAccountPermission          = Permission{ResourceType: ServiceAccountResourceType, Action: DeleteAction}
+	ViewManagedIdentityPermission           = Permission{ResourceType: ManagedIdentityResourceType, Action: ViewAction}
+	CreateManagedIdentityPermission         = Permission{ResourceType: ManagedIdentityResourceType, Action: CreateAction}
+	UpdateManagedIdentityPermission         = Permission{ResourceType: ManagedIdentityResourceType, Action: UpdateAction}
+	DeleteManagedIdentityPermission         = Permission{ResourceType: ManagedIdentityResourceType, Action: DeleteAction}
+	ViewVCSProviderPermission               = Permission{ResourceType: VCSProviderResourceType, Action: ViewAction}
+	CreateVCSProviderPermission             = Permission{ResourceType: VCSProviderResourceType, Action: CreateAction}
+	UpdateVCSProviderPermission             = Permission{ResourceType: VCSProviderResourceType, Action: UpdateAction}
+	DeleteVCSProviderPermission             = Permission{ResourceType: VCSProviderResourceType, Action: DeleteAction}
+	ViewTerraformProviderMirrorPermission   = Permission{ResourceType: TerraformProviderMirrorResourceType, Action: ViewAction}
+	CreateTerraformProviderMirrorPermission = Permission{ResourceType: TerraformProviderMirrorResourceType, Action: CreateAction}
+	DeleteTerraformProviderMirrorPermission = Permission{ResourceType: TerraformProviderMirrorResourceType, Action: DeleteAction}
 )
 
 // assignablePermissions contains all the permissions that
 // may be assigned to Tharsis roles.
 var assignablePermissions = map[Permission]struct{}{
-	ViewGPGKeyPermission:                 {},
-	CreateGPGKeyPermission:               {},
-	DeleteGPGKeyPermission:               {},
-	ViewGroupPermission:                  {},
-	CreateGroupPermission:                {},
-	UpdateGroupPermission:                {},
-	DeleteGroupPermission:                {},
-	ViewNamespaceMembershipPermission:    {},
-	CreateNamespaceMembershipPermission:  {},
-	UpdateNamespaceMembershipPermission:  {},
-	DeleteNamespaceMembershipPermission:  {},
-	ViewWorkspacePermission:              {},
-	CreateWorkspacePermission:            {},
-	UpdateWorkspacePermission:            {},
-	DeleteWorkspacePermission:            {},
-	ViewRunPermission:                    {},
-	CreateRunPermission:                  {},
-	ViewJobPermission:                    {},
-	ViewRunnerPermission:                 {},
-	CreateUserPermission:                 {},
-	UpdateUserPermission:                 {},
-	DeleteUserPermission:                 {},
-	ViewVariableValuePermission:          {},
-	ViewVariablePermission:               {},
-	CreateVariablePermission:             {},
-	UpdateVariablePermission:             {},
-	DeleteVariablePermission:             {},
-	ViewTerraformProviderPermission:      {},
-	CreateTerraformProviderPermission:    {},
-	UpdateTerraformProviderPermission:    {},
-	DeleteTerraformProviderPermission:    {},
-	ViewTerraformModulePermission:        {},
-	CreateTerraformModulePermission:      {},
-	UpdateTerraformModulePermission:      {},
-	DeleteTerraformModulePermission:      {},
-	ViewStateVersionPermission:           {},
-	CreateStateVersionPermission:         {},
-	ViewConfigurationVersionPermission:   {},
-	CreateConfigurationVersionPermission: {},
-	UpdateConfigurationVersionPermission: {},
-	ViewServiceAccountPermission:         {},
-	CreateServiceAccountPermission:       {},
-	UpdateServiceAccountPermission:       {},
-	DeleteServiceAccountPermission:       {},
-	ViewManagedIdentityPermission:        {},
-	CreateManagedIdentityPermission:      {},
-	UpdateManagedIdentityPermission:      {},
-	DeleteManagedIdentityPermission:      {},
-	ViewVCSProviderPermission:            {},
-	CreateVCSProviderPermission:          {},
-	UpdateVCSProviderPermission:          {},
-	DeleteVCSProviderPermission:          {},
+	ViewGPGKeyPermission:                    {},
+	CreateGPGKeyPermission:                  {},
+	DeleteGPGKeyPermission:                  {},
+	ViewGroupPermission:                     {},
+	CreateGroupPermission:                   {},
+	UpdateGroupPermission:                   {},
+	DeleteGroupPermission:                   {},
+	ViewNamespaceMembershipPermission:       {},
+	CreateNamespaceMembershipPermission:     {},
+	UpdateNamespaceMembershipPermission:     {},
+	DeleteNamespaceMembershipPermission:     {},
+	ViewWorkspacePermission:                 {},
+	CreateWorkspacePermission:               {},
+	UpdateWorkspacePermission:               {},
+	DeleteWorkspacePermission:               {},
+	ViewRunPermission:                       {},
+	CreateRunPermission:                     {},
+	ViewJobPermission:                       {},
+	ViewRunnerPermission:                    {},
+	CreateUserPermission:                    {},
+	UpdateUserPermission:                    {},
+	DeleteUserPermission:                    {},
+	ViewVariableValuePermission:             {},
+	ViewVariablePermission:                  {},
+	CreateVariablePermission:                {},
+	UpdateVariablePermission:                {},
+	DeleteVariablePermission:                {},
+	ViewTerraformProviderPermission:         {},
+	CreateTerraformProviderPermission:       {},
+	UpdateTerraformProviderPermission:       {},
+	DeleteTerraformProviderPermission:       {},
+	ViewTerraformModulePermission:           {},
+	CreateTerraformModulePermission:         {},
+	UpdateTerraformModulePermission:         {},
+	DeleteTerraformModulePermission:         {},
+	ViewStateVersionPermission:              {},
+	CreateStateVersionPermission:            {},
+	ViewConfigurationVersionPermission:      {},
+	CreateConfigurationVersionPermission:    {},
+	UpdateConfigurationVersionPermission:    {},
+	ViewServiceAccountPermission:            {},
+	CreateServiceAccountPermission:          {},
+	UpdateServiceAccountPermission:          {},
+	DeleteServiceAccountPermission:          {},
+	ViewManagedIdentityPermission:           {},
+	CreateManagedIdentityPermission:         {},
+	UpdateManagedIdentityPermission:         {},
+	DeleteManagedIdentityPermission:         {},
+	ViewVCSProviderPermission:               {},
+	CreateVCSProviderPermission:             {},
+	UpdateVCSProviderPermission:             {},
+	DeleteVCSProviderPermission:             {},
+	ViewTerraformProviderMirrorPermission:   {},
+	CreateTerraformProviderMirrorPermission: {},
+	DeleteTerraformProviderMirrorPermission: {},
 }
 
 // Action is an enum representing a CRUD action.

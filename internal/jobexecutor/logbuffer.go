@@ -57,11 +57,10 @@ var errLogLimitExceeded = errors.New("log limit exceeded")
 
 // LogBuffer stores logs in a file and limits the amount of logs written
 type LogBuffer struct {
-	lock sync.RWMutex
-	lw   *limitWriter
-
-	logFile  *os.File
 	checksum hash.Hash32
+	lw       *limitWriter
+	logFile  *os.File
+	lock     sync.RWMutex
 }
 
 // SetLimit sets the limit for log data in bytes
