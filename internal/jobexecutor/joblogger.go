@@ -15,7 +15,6 @@ const (
 )
 
 type jobLogger struct {
-	lock             sync.RWMutex
 	sentTime         time.Time
 	client           Client
 	logger           logger.Logger
@@ -25,6 +24,7 @@ type jobLogger struct {
 	bytesSent        int
 	updateInterval   time.Duration
 	maxBytesPerPatch int
+	lock             sync.RWMutex
 }
 
 func newJobLogger(jobID string, client Client, logger logger.Logger) (*jobLogger, error) {

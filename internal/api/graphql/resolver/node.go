@@ -205,6 +205,18 @@ func (r *NodeResolver) ToRunner() (*RunnerResolver, bool) {
 	return res, ok
 }
 
+// ToTerraformProviderVersionMirror resolver
+func (r *NodeResolver) ToTerraformProviderVersionMirror() (*TerraformProviderVersionMirrorResolver, bool) {
+	res, ok := r.result.(*TerraformProviderVersionMirrorResolver)
+	return res, ok
+}
+
+// ToTerraformProviderPlatformMirror resolver
+func (r *NodeResolver) ToTerraformProviderPlatformMirror() (*TerraformProviderPlatformMirrorResolver, bool) {
+	res, ok := r.result.(*TerraformProviderPlatformMirrorResolver)
+	return res, ok
+}
+
 func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 	parsedGlobalID, err := gid.ParseGlobalID(globalID)
 	if err != nil {
@@ -412,6 +424,20 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &RunnerResolver{runner: runner}
+	case gid.TerraformProviderVersionMirrorType:
+		mirror, err := getProviderMirrorService(ctx).GetProviderVersionMirrorByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &TerraformProviderVersionMirrorResolver{versionMirror: mirror}
+	case gid.TerraformProviderPlatformMirrorType:
+		mirror, err := getProviderMirrorService(ctx).GetProviderPlatformMirrorByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &TerraformProviderPlatformMirrorResolver{platformMirror: mirror}
 	default:
 		return nil, fmt.Errorf("node query doesn't support type %s", parsedGlobalID.Type)
 	}

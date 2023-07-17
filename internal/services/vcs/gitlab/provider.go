@@ -224,17 +224,16 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 	if err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to query for project. Response status: %s", resp.Status)
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			p.logger.Errorf("failed to close response body in GetProject: %v", err)
 		}
 	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to query for project. Response status: %s", resp.Status)
+	}
 
 	// Unmarshal the response.
 	var project getProjectResponse
@@ -280,17 +279,16 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 	if err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get diff. Response status: %s", resp.Status)
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			p.logger.Errorf("failed to close response body in GetDiff: %v", err)
 		}
 	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get diff. Response status: %s", resp.Status)
+	}
 
 	diffResp := []getDiffResponse{}
 	if err = json.NewDecoder(resp.Body).Decode(&diffResp); err != nil {
@@ -339,17 +337,16 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 	if err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get diffs. Response status: %s", resp.Status)
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			p.logger.Errorf("failed to close response body in GetDiffs: %v", err)
 		}
 	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get diffs. Response status: %s", resp.Status)
+	}
 
 	diffResp := getDiffsResponse{}
 	if err = json.NewDecoder(resp.Body).Decode(&diffResp); err != nil {
@@ -398,6 +395,7 @@ func (p *Provider) GetArchive(ctx context.Context, input *types.GetArchiveInput)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
 		return nil, fmt.Errorf("failed to get repository archive. Response status: %s", resp.Status)
 	}
 
@@ -448,17 +446,16 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 	if err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to create access token. Response status: %s", resp.Status)
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			p.logger.Errorf("failed to close response body in CreateAccessToken: %v", err)
 		}
 	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to create access token. Response status: %s", resp.Status)
+	}
 
 	tokenResp := createAccessTokenResponse{}
 	if err = json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
@@ -525,17 +522,16 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	if err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("failed to create webhook. Response status: %s", resp.Status)
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			p.logger.Errorf("failed to close response body in CreateWebhook: %v", err)
 		}
 	}()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create webhook. Response status: %s", resp.Status)
+	}
 
 	var webhookResponse createWebhookResponse
 	if err := json.NewDecoder(resp.Body).Decode(&webhookResponse); err != nil {

@@ -121,6 +121,7 @@ var activityEventFieldList = append(metadataFieldList,
 	"vcs_provider_target_id",
 	"role_target_id",
 	"runner_target_id",
+	"terraform_provider_version_mirror_target_id",
 )
 
 // NewActivityEvents returns an instance of the ActivityEvents interface
@@ -268,24 +269,25 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 
 	// Must use target type to fan out target ID to the various columns.
 	var (
-		gpgKeyTargetID                   *string
-		groupTargetID                    *string
-		managedIdentityTargetID          *string
-		managedIdentityRuleTargetID      *string
-		namespaceMembershipTargetID      *string
-		runTargetID                      *string
-		serviceAccountTargetID           *string
-		stateVersionTargetID             *string
-		teamTargetID                     *string
-		terraformProviderTargetID        *string
-		terraformProviderVersionTargetID *string
-		terraformModuleTargetID          *string
-		terraformModuleVersionTargetID   *string
-		variableTargetID                 *string
-		workspaceTargetID                *string
-		vcsProviderTargetID              *string
-		roleTargetID                     *string
-		runnerTargetID                   *string
+		gpgKeyTargetID                         *string
+		groupTargetID                          *string
+		managedIdentityTargetID                *string
+		managedIdentityRuleTargetID            *string
+		namespaceMembershipTargetID            *string
+		runTargetID                            *string
+		serviceAccountTargetID                 *string
+		stateVersionTargetID                   *string
+		teamTargetID                           *string
+		terraformProviderTargetID              *string
+		terraformProviderVersionTargetID       *string
+		terraformModuleTargetID                *string
+		terraformModuleVersionTargetID         *string
+		variableTargetID                       *string
+		workspaceTargetID                      *string
+		vcsProviderTargetID                    *string
+		roleTargetID                           *string
+		runnerTargetID                         *string
+		terraformProviderVersionMirrorTargetID *string
 	)
 
 	switch input.TargetType {
@@ -325,6 +327,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		roleTargetID = &input.TargetID
 	case models.TargetRunner:
 		runnerTargetID = &input.TargetID
+	case models.TargetTerraformProviderVersionMirror:
+		terraformProviderVersionMirrorTargetID = &input.TargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		tracing.RecordError(span, nil, "invalid target type: %s", input.TargetType)
@@ -366,6 +370,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"vcs_provider_target_id":               vcsProviderTargetID,
 		"role_target_id":                       roleTargetID,
 		"runner_target_id":                     runnerTargetID,
+		"terraform_provider_version_mirror_target_id": terraformProviderVersionMirrorTargetID,
 	}
 
 	sql, args, err := dialect.Insert("activity_events").
@@ -445,6 +450,9 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 				case "fk_activity_events_runner_target_id":
 					tracing.RecordError(span, nil, "runner does not exist")
 					return nil, errors.New(errors.ENotFound, "runner does not exist")
+				case "fk_activity_events_terraform_provider_version_mirror_target_id":
+					tracing.RecordError(span, nil, "terraform provider version mirror does not exist")
+					return nil, errors.New(errors.ENotFound, "terraform provider version mirror does not exist")
 				}
 			}
 		}
@@ -477,24 +485,25 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 
 	// Must use target type to fan out target ID to the various columns.
 	var (
-		gpgKeyTargetID                   *string
-		groupTargetID                    *string
-		managedIdentityTargetID          *string
-		managedIdentityRuleTargetID      *string
-		namespaceMembershipTargetID      *string
-		runTargetID                      *string
-		serviceAccountTargetID           *string
-		stateVersionTargetID             *string
-		teamTargetID                     *string
-		terraformProviderTargetID        *string
-		terraformProviderVersionTargetID *string
-		terraformModuleTargetID          *string
-		terraformModuleVersionTargetID   *string
-		variableTargetID                 *string
-		workspaceTargetID                *string
-		vcsProviderTargetID              *string
-		roleTargetID                     *string
-		runnerTargetID                   *string
+		gpgKeyTargetID                         *string
+		groupTargetID                          *string
+		managedIdentityTargetID                *string
+		managedIdentityRuleTargetID            *string
+		namespaceMembershipTargetID            *string
+		runTargetID                            *string
+		serviceAccountTargetID                 *string
+		stateVersionTargetID                   *string
+		teamTargetID                           *string
+		terraformProviderTargetID              *string
+		terraformProviderVersionTargetID       *string
+		terraformModuleTargetID                *string
+		terraformModuleVersionTargetID         *string
+		variableTargetID                       *string
+		workspaceTargetID                      *string
+		vcsProviderTargetID                    *string
+		roleTargetID                           *string
+		runnerTargetID                         *string
+		terraformProviderVersionMirrorTargetID *string
 	)
 
 	fields := []interface{}{
@@ -525,6 +534,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&vcsProviderTargetID,
 		&roleTargetID,
 		&runnerTargetID,
+		&terraformProviderVersionMirrorTargetID,
 	}
 
 	// Balance the number of selected fields and fields to scan out.
@@ -574,6 +584,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *roleTargetID
 	case models.TargetRunner:
 		activityEvent.TargetID = *runnerTargetID
+	case models.TargetTerraformProviderVersionMirror:
+		activityEvent.TargetID = *terraformProviderVersionMirrorTargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, fmt.Errorf("invalid target type: %s", activityEvent.TargetType)

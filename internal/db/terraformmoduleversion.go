@@ -60,7 +60,7 @@ type TerraformModuleVersionFilter struct {
 	ModuleID         *string
 	Status           *models.TerraformModuleVersionStatus
 	SemanticVersion  *string
-	SHASum           *string
+	SHASum           []byte
 	Latest           *bool
 	ModuleVersionIDs []string
 }
@@ -130,8 +130,8 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 		if input.Filter.Status != nil {
 			ex["terraform_module_versions.status"] = string(*input.Filter.Status)
 		}
-		if input.Filter.SHASum != nil {
-			ex["terraform_module_versions.sha_sum"] = *input.Filter.SHASum
+		if len(input.Filter.SHASum) > 0 {
+			ex["terraform_module_versions.sha_sum"] = input.Filter.SHASum
 		}
 		if input.Filter.SemanticVersion != nil {
 			ex["terraform_module_versions.semantic_version"] = *input.Filter.SemanticVersion

@@ -182,6 +182,8 @@ func (m *moduleResolver) getVersions(_ context.Context, registryURL *url.URL, to
 	if err != nil {
 		return nil, fmt.Errorf("failed to visit versions URL: %s", versionsURLString)
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode == http.StatusUnauthorized {
 		// Since we were able to make the request, we can assume the host is correct
 		envVar, _ := module.BuildTokenEnvVar(registryURL.Host)
@@ -190,7 +192,6 @@ func (m *moduleResolver) getVersions(_ context.Context, registryURL *url.URL, to
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("not-ok status from versions URL: %s: %s", versionsURLString, resp.Status)
 	}
-	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

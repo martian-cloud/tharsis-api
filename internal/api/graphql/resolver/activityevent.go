@@ -436,6 +436,12 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &RunnerResolver{runner: runner}}, nil
+	case models.TargetTerraformProviderVersionMirror:
+		mirror, err := loadTerraformProviderVersionMirror(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &TerraformProviderVersionMirrorResolver{versionMirror: mirror}}, nil
 	default:
 		return nil, errors.New(errors.EInvalid, "valid TargetType must be specified")
 	}

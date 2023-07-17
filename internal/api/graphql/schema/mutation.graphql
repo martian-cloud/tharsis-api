@@ -174,4 +174,13 @@ type Mutation {
   updateResourceLimit(
     input: UpdateResourceLimitInput!
   ): UpdateResourceLimitPayload!
+  createTerraformProviderVersionMirror(
+    input: CreateTerraformProviderVersionMirrorInput!
+  ): CreateTerraformProviderVersionMirrorPayload!
+  deleteTerraformProviderVersionMirror(
+    input: DeleteTerraformProviderVersionMirrorInput!
+  ): DeleteTerraformProviderVersionMirrorPayload!
+  deleteTerraformProviderPlatformMirror(
+    input: DeleteTerraformProviderPlatformMirrorInput!
+  ): DeleteTerraformProviderPlatformMirrorPayload!
 }

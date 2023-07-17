@@ -9,7 +9,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -36,7 +35,7 @@ func NewAuthenticationMiddleware(
 
 				// Do not return an unauthorized error here since the service layer is responsible for determining
 				// if a request requires an authenticated user
-				respWriter.RespondWithError(w, te.Wrap(err, te.EInternal, "Error finding authentication token"))
+				respWriter.RespondWithError(w, errors.Wrap(err, errors.EInternal, "Error finding authentication token"))
 				return
 			} else {
 
@@ -45,7 +44,7 @@ func NewAuthenticationMiddleware(
 				ip, err = getSourceIP(r)
 				if err != nil {
 					logger.Errorf("Error finding client IP: %v", err)
-					respWriter.RespondWithError(w, te.Wrap(err, te.EInvalid, "Error finding client IP"))
+					respWriter.RespondWithError(w, errors.Wrap(err, errors.EInvalid, "Error finding client IP"))
 					return
 				}
 				subject = fmt.Sprintf("anonymous-%s", ip)

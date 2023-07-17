@@ -1,0 +1,55 @@
+enum TerraformProviderVersionMirrorSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+type TerraformProviderVersionMirrorConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [TerraformProviderVersionMirrorEdge]
+}
+
+type TerraformProviderVersionMirrorEdge {
+  cursor: String!
+  node: TerraformProviderVersionMirror
+}
+
+type CreateTerraformProviderVersionMirrorPayload {
+  clientMutationId: String
+  versionMirror: TerraformProviderVersionMirror
+  problems: [Problem!]!
+}
+
+type DeleteTerraformProviderVersionMirrorPayload {
+  clientMutationId: String
+  versionMirror: TerraformProviderVersionMirror
+  problems: [Problem!]!
+}
+
+type TerraformProviderVersionMirror implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  group: Group!
+  version: String!
+  type: String!
+  registryNamespace: String!
+  registryHostname: String!
+  platformMirrors: [TerraformProviderPlatformMirror!]!
+  createdBy: String!
+}
+
+input CreateTerraformProviderVersionMirrorInput {
+  clientMutationId: String
+  groupPath: String!
+  type: String!
+  registryNamespace: String!
+  registryHostname: String!
+  semanticVersion: String!
+}
+
+input DeleteTerraformProviderVersionMirrorInput {
+  clientMutationId: String
+  id: ID!
+  force: Boolean
+  metadata: ResourceMetadataInput
+}

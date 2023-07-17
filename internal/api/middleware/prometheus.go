@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus"
@@ -49,7 +50,9 @@ func PrometheusMiddleware(next http.Handler) http.Handler {
 		path := r.URL.Path
 		statusCode := rw.Status()
 
+		sanitizedPath := strings.ToValidUTF8(path, "<INVALID_UTF_SEQ>")
+
 		responseStatus.WithLabelValues(strconv.Itoa(statusCode)).Inc()
-		totalRequests.WithLabelValues(path).Inc()
+		totalRequests.WithLabelValues(sanitizedPath).Inc()
 	})
 }

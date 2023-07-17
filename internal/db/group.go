@@ -729,6 +729,45 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 		return nil, fmt.Errorf("failed to execute query to update the root group of Terraform modules: %v", err)
 	}
 
+	// For any affected Terraform provider mirrors, find all of them under the new path and update the group_id
+	// wherever it is not equal to the new root group ID.
+	sql, args, err = dialect.Update("terraform_provider_version_mirrors").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":    goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at": timestamp,
+				"group_id":   newRootGroupID,
+			},
+		).
+		Where(
+			goqu.And(
+				goqu.I("terraform_provider_version_mirrors.group_id").In(
+					dialect.From(goqu.T("namespaces")).
+						Select("group_id").
+						Where(
+							// Namespace is a group and is in the tree being migrated.
+							goqu.And(
+								goqu.I("group_id").Neq(nil),
+								goqu.Or(
+									goqu.I("path").Eq(newPath),
+									goqu.I("path").Like(newPath+"/%"),
+								),
+							),
+						)),
+				goqu.I("terraform_provider_version_mirrors.group_id").Neq(newRootGroupID),
+			)).ToSQL()
+	if err != nil {
+		tracing.RecordError(span, err,
+			"failed to prepare SQL to update the root group of Terraform provider version mirrors")
+		return nil, fmt.Errorf("failed to prepare SQL to update the group of Terraform provider version mirrors: %v", err)
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		tracing.RecordError(span, err,
+			"failed to execute query to update the group of Terraform provider version mirrors")
+		return nil, fmt.Errorf("failed to execute query to update the group of Terraform provider version mirrors: %v", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		tracing.RecordError(span, err, "failed to commit group migration transaction")
 		return nil, fmt.Errorf("failed to commit group migration transaction: %v", err)

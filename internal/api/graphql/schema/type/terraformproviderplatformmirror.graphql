@@ -1,0 +1,19 @@
+type DeleteTerraformProviderPlatformMirrorPayload {
+  clientMutationId: String
+  platformMirror: TerraformProviderPlatformMirror
+  problems: [Problem!]!
+}
+
+type TerraformProviderPlatformMirror implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  versionMirror: TerraformProviderVersionMirror!
+  os: String!
+  arch: String!
+}
+
+input DeleteTerraformProviderPlatformMirrorInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}
