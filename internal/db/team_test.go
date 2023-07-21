@@ -6,16 +6,33 @@ import (
 	"context"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// teamNameSlice makes a slice of models.Team sortable by name
-type teamNameSlice []models.Team
+// teamInfo aids convenience in accessing the information TestGetTeams
+// needs about the warmup teams.
+type teamInfo struct {
+	createTime time.Time
+	updateTime time.Time
+	teamID     string
+	name       string
+}
+
+// teamInfoIDSlice makes a slice of teamInfo sortable by ID string
+type teamInfoIDSlice []teamInfo
+
+// teamInfoUpdateSlice makes a slice of teamInfo sortable by last updated time
+type teamInfoUpdateSlice []teamInfo
+
+// teamInfoNameSlice makes a slice of teamInfo sortable by name
+type teamInfoNameSlice []teamInfo
 
 func TestCreateTeams(t *testing.T) {
 	ctx := context.Background()
@@ -149,6 +166,7 @@ func TestGetTeamBySCIMExternalID(t *testing.T) {
 			if test.expectTeam {
 				// the positive case
 				require.NotNil(t, team)
+				require.NotNil(t, team.SCIMExternalID)
 				assert.Equal(t, test.searchID, team.SCIMExternalID)
 			} else {
 				// the negative and defective cases
@@ -166,67 +184,464 @@ func TestGetTeams(t *testing.T) {
 	createdWarmupTeams, _, err := createInitialTeams(ctx, testClient, standardWarmupTeams)
 	require.Nil(t, err)
 
+	allTeamInfos := teamInfoFromTeams(createdWarmupTeams)
+
+	// Sort by ID string for those cases where explicit sorting is not specified.
+	sort.Sort(teamInfoIDSlice(allTeamInfos))
+	allTeamIDs := teamIDsFromTeamInfos(allTeamInfos)
+
+	// Sort by last update times.
+	sort.Sort(teamInfoUpdateSlice(allTeamInfos))
+	allTeamIDsByUpdateTime := teamIDsFromTeamInfos(allTeamInfos)
+	reverseTeamIDsByUpdateTime := reverseStringSlice(allTeamIDsByUpdateTime)
+
+	// Sort by names.
+	sort.Sort(teamInfoNameSlice(allTeamInfos))
+	allTeamIDsByName := teamIDsFromTeamInfos(allTeamInfos)
+	reverseTeamIDsByName := reverseStringSlice(allTeamIDsByName)
+
+	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
+
 	type testCase struct {
-		name        string
-		input       *GetTeamsInput
-		expectMsg   *string
-		expectTeams []models.Team
+		expectStartCursorError      error
+		expectEndCursorError        error
+		expectMsg                   *string
+		input                       *GetTeamsInput
+		name                        string
+		expectPageInfo              pagination.PageInfo
+		expectTeamIDs               []string
+		getBeforeCursorFromPrevious bool
+		getAfterCursorFromPrevious  bool
+		expectHasStartCursor        bool
+		expectHasEndCursor          bool
 	}
 
-	/*
-		template test case:
-
-		{
-		name        string
-		input       *GetTeamsInput
-		expectMsg   *string
-		expectTeams []models.Team
-		}
-	*/
-
-	// TODO: Add more cases:
 	testCases := []testCase{
 		{
-			name: "simple get teams test case",
+			name: "non-nil but mostly empty input",
 			input: &GetTeamsInput{
 				Sort:              nil,
 				PaginationOptions: nil,
 				Filter:            nil,
 			},
-			expectTeams: createdWarmupTeams,
+			expectTeamIDs:        allTeamIDs,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "populated pagination, sort in ascending order of name, nil filter",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(100),
+				},
+				Filter: nil,
+			},
+			expectTeamIDs:        allTeamIDsByName,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "sort in descending order of name",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameDesc),
+			},
+			expectTeamIDs:        reverseTeamIDsByName,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "populated pagination, sort in ascending order of last update time, nil filter",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(100),
+				},
+				Filter: nil,
+			},
+			expectTeamIDs:        allTeamIDsByUpdateTime,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "sort in descending order of last update time",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtDesc),
+			},
+			expectTeamIDs:        reverseTeamIDsByUpdateTime,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "pagination: everything at once",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(100),
+				},
+			},
+			expectTeamIDs:        allTeamIDsByUpdateTime,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "pagination: first two",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(2),
+				},
+			},
+			expectTeamIDs: allTeamIDsByUpdateTime[:2],
+			expectPageInfo: pagination.PageInfo{
+				TotalCount:      int32(len(allTeamIDs)),
+				Cursor:          dummyCursorFunc,
+				HasNextPage:     true,
+				HasPreviousPage: false,
+			},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "pagination: middle two",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(2),
+				},
+			},
+			getAfterCursorFromPrevious: true,
+			expectTeamIDs:              allTeamIDsByUpdateTime[2:4],
+			expectPageInfo: pagination.PageInfo{
+				TotalCount:      int32(len(allTeamIDs)),
+				Cursor:          dummyCursorFunc,
+				HasNextPage:     true,
+				HasPreviousPage: true,
+			},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "pagination: final one",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(100),
+				},
+			},
+			getAfterCursorFromPrevious: true,
+			expectTeamIDs:              allTeamIDsByUpdateTime[4:],
+			expectPageInfo: pagination.PageInfo{
+				TotalCount:      int32(len(allTeamIDs)),
+				Cursor:          dummyCursorFunc,
+				HasNextPage:     false,
+				HasPreviousPage: true,
+			},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		// When Last is supplied, the sort order is intended to be reversed.
+		{
+			name: "pagination: last three",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					Last: ptr.Int32(3),
+				},
+			},
+			expectTeamIDs: reverseTeamIDsByUpdateTime[:3],
+			expectPageInfo: pagination.PageInfo{
+				TotalCount:      int32(len(allTeamIDs)),
+				Cursor:          dummyCursorFunc,
+				HasNextPage:     false,
+				HasPreviousPage: true,
+			},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "pagination, before and after, expect error",
+			input: &GetTeamsInput{
+				Sort:              ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{},
+			},
+			getAfterCursorFromPrevious:  true,
+			getBeforeCursorFromPrevious: true,
+			expectMsg:                   ptr.String("only before or after can be defined, not both"),
+			expectTeamIDs:               []string{},
+			expectPageInfo:              pagination.PageInfo{},
+		},
+
+		{
+			name: "pagination, first one and last two, expect error",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldUpdatedAtAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(1),
+					Last:  ptr.Int32(2),
+				},
+			},
+			expectMsg: ptr.String("only first or last can be defined, not both"),
+			expectPageInfo: pagination.PageInfo{
+				TotalCount:      int32(len(allTeamIDs)),
+				Cursor:          dummyCursorFunc,
+				HasNextPage:     true,
+				HasPreviousPage: false,
+			},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			// If there were more filter fields, this would allow nothing through the filters.
+			name: "fully-populated types, everything allowed through filters",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(100),
+				},
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String(""),
+				},
+			},
+			expectTeamIDs: allTeamIDsByName,
+			expectPageInfo: pagination.PageInfo{
+				TotalCount:      int32(len(allTeamIDs)),
+				Cursor:          dummyCursorFunc,
+				HasNextPage:     false,
+				HasPreviousPage: false,
+			},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, search field, empty string",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String(""),
+				},
+			},
+			expectTeamIDs:        allTeamIDsByName,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allTeamIDs)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, search field, 1",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String("1"),
+				},
+			},
+			expectTeamIDs:        allTeamIDsByName[1:2],
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, search field, 2",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String("2"),
+				},
+			},
+			expectTeamIDs:        allTeamIDsByName[2:3],
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, search field, 5",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String("5"),
+				},
+			},
+			expectTeamIDs:        allTeamIDsByName[3:4],
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, search field, 6",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String("6"),
+				},
+			},
+			expectTeamIDs:        allTeamIDsByName[4:],
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, search field, bogus",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamNamePrefix: ptr.String("bogus"),
+				},
+			},
+			expectTeamIDs:        []string{},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, team IDs, positive",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamIDs: []string{
+						allTeamIDsByName[0], allTeamIDsByName[1], allTeamIDsByName[3]},
+				},
+			},
+			expectTeamIDs: []string{
+				allTeamIDsByName[0], allTeamIDsByName[1], allTeamIDsByName[3],
+			},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, team IDs, non-existent",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamIDs: []string{nonExistentID},
+				},
+			},
+			expectTeamIDs:        []string{},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, team IDs, invalid ID",
+			input: &GetTeamsInput{
+				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
+				Filter: &TeamFilter{
+					TeamIDs: []string{invalidID},
+				},
+			},
+			expectMsg:            invalidUUIDMsg2,
+			expectTeamIDs:        []string{},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
 		},
 	}
 
+	// Combinations of filter conditions are not (yet) tested.
+
+	var (
+		previousEndCursorValue   *string
+		previousStartCursorValue *string
+	)
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			// TODO: Add checks for pagination, cursors, etc.
 
-			gotResult, err := testClient.client.Teams.GetTeams(ctx, test.input)
+			// For some pagination tests, a previous case's cursor value gets piped into the next case.
+			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
+
+				// Make sure there's a place to put it.
+				require.NotNil(t, test.input.PaginationOptions)
+
+				if test.getAfterCursorFromPrevious {
+					// Make sure there's a previous value to use.
+					require.NotNil(t, previousEndCursorValue)
+					test.input.PaginationOptions.After = previousEndCursorValue
+				}
+
+				if test.getBeforeCursorFromPrevious {
+					// Make sure there's a previous value to use.
+					require.NotNil(t, previousStartCursorValue)
+					test.input.PaginationOptions.Before = previousStartCursorValue
+				}
+
+				// Clear the values so they won't be used twice.
+				previousEndCursorValue = nil
+				previousStartCursorValue = nil
+			}
+
+			teamsActual, err := testClient.client.Teams.GetTeams(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
 
-			if test.expectTeams != nil {
-				actualTeams := gotResult.Teams
-				require.NotNil(t, actualTeams)
-				assert.Equal(t, len(test.expectTeams), len(actualTeams))
-				if len(test.expectTeams) == len(actualTeams) {
+			// If there was no error, check the results.
+			if err == nil {
 
-					// TODO: When implementing test cases that do sorting other than ascending order by name,
-					// change this to handle all cases.
+				// Never returns nil if error is nil.
+				require.NotNil(t, teamsActual.PageInfo)
+				assert.NotNil(t, teamsActual.Teams)
+				pageInfo := teamsActual.PageInfo
+				teams := teamsActual.Teams
 
-					// For now, sort both expected and actual by name in order to compare.
-					sort.Sort(teamNameSlice(test.expectTeams))
-					sort.Sort(teamNameSlice(actualTeams))
+				// Check the teams result by comparing a list of the team IDs.
+				actualTeamIDs := []string{}
+				for _, team := range teams {
+					actualTeamIDs = append(actualTeamIDs, team.Metadata.ID)
+				}
 
-					// Compare the slices of teams, now that they should be sorted the same.
-					for ix := 0; ix < len(test.expectTeams); ix++ {
-						compareTeams(t, &test.expectTeams[ix], &actualTeams[ix], true, nil)
-					}
+				// If no sort direction was specified, sort the results here for repeatability.
+				if test.input.Sort == nil {
+					sort.Strings(actualTeamIDs)
+				}
 
+				assert.Equal(t, len(test.expectTeamIDs), len(actualTeamIDs))
+				assert.Equal(t, test.expectTeamIDs, actualTeamIDs)
+
+				assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
+				assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
+				assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
+				assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
+
+				// Compare the cursor function results only if there is at least one team returned.
+				// If there are no teams returned, there is no argument to pass to the cursor function.
+				// Also, don't try to reverse engineer to compare the cursor string values.
+				if len(teams) > 0 {
+					resultStartCursor, resultStartCursorError := pageInfo.Cursor(&teams[0])
+					resultEndCursor, resultEndCursorError := pageInfo.Cursor(&teams[len(teams)-1])
+					assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
+					assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
+					assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
+					assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
+
+					// Capture the ending cursor values for the next case.
+					previousEndCursorValue = resultEndCursor
+					previousStartCursorValue = resultStartCursor
 				}
 			}
-
-			// TODO: Add code for pagination, cursors, etc.
 		})
 	}
 }
@@ -429,23 +844,28 @@ func TestDeleteTeams(t *testing.T) {
 // Standard warmup teams for tests in this module:
 var standardWarmupTeams = []models.Team{
 	{
-		Name:           "team-a",
-		Description:    "team a for team tests",
+		Name:           "0-team-0",
+		Description:    "team 0 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},
 	{
-		Name:           "team-b",
-		Description:    "team b for team tests",
+		Name:           "1-team-1",
+		Description:    "team 1 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},
 	{
-		Name:           "team-c",
-		Description:    "team c for team tests",
+		Name:           "2-team-3",
+		Description:    "team 2 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},
 	{
-		Name:           "team-99",
-		Description:    "team 99 for team tests",
+		Name:           "5-team-4",
+		Description:    "team 4 for testing teams",
+		SCIMExternalID: uuid.New().String(),
+	},
+	{
+		Name:           "6-team-5",
+		Description:    "team 4 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},
 }
@@ -463,16 +883,70 @@ func createWarmupTeams(ctx context.Context, testClient *testClient,
 	return resultTeams, nil
 }
 
-func (tns teamNameSlice) Len() int {
-	return len(tns)
+func ptrTeamSortableField(arg TeamSortableField) *TeamSortableField {
+	return &arg
 }
 
-func (tns teamNameSlice) Swap(i, j int) {
-	tns[i], tns[j] = tns[j], tns[i]
+func (t teamInfoIDSlice) Len() int {
+	return len(t)
 }
 
-func (tns teamNameSlice) Less(i, j int) bool {
-	return tns[i].Name < tns[j].Name
+func (t teamInfoIDSlice) Swap(i, j int) {
+	t[i], t[j] = t[j], t[i]
+}
+
+func (t teamInfoIDSlice) Less(i, j int) bool {
+	return t[i].teamID < t[j].teamID
+}
+
+func (t teamInfoUpdateSlice) Len() int {
+	return len(t)
+}
+
+func (t teamInfoUpdateSlice) Swap(i, j int) {
+	t[i], t[j] = t[j], t[i]
+}
+
+func (t teamInfoUpdateSlice) Less(i, j int) bool {
+	return t[i].updateTime.Before(t[j].updateTime)
+}
+
+func (t teamInfoNameSlice) Len() int {
+	return len(t)
+}
+
+func (t teamInfoNameSlice) Swap(i, j int) {
+	t[i], t[j] = t[j], t[i]
+}
+
+func (t teamInfoNameSlice) Less(i, j int) bool {
+	return t[i].name < t[j].name
+}
+
+// teamInfoFromTeams returns a slice of teamInfo, not necessarily sorted in any order.
+func teamInfoFromTeams(teams []models.Team) []teamInfo {
+	result := []teamInfo{}
+
+	for _, team := range teams {
+		result = append(result, teamInfo{
+			createTime: *team.Metadata.CreationTimestamp,
+			updateTime: *team.Metadata.LastUpdatedTimestamp,
+			teamID:     team.Metadata.ID,
+			name:       team.Name,
+		})
+	}
+
+	return result
+}
+
+// teamIDsFromTeamInfos preserves order
+func teamIDsFromTeamInfos(teamInfos []teamInfo) []string {
+	result := []string{}
+	for _, teamInfo := range teamInfos {
+		result = append(result, teamInfo.teamID)
+	}
+
+	return result
 }
 
 // compareTeams compares two team objects, including bounds for creation and updated times.
