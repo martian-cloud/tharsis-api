@@ -258,10 +258,14 @@ func handleTeamMutationProblem(e error, clientMutationID *string) (*TeamMutation
 }
 
 func createTeamMutation(ctx context.Context, input *CreateTeamInput) (*TeamMutationPayloadResolver, error) {
-	teamCreateOptions := models.Team{Name: input.Name, Description: input.Description}
 	teamService := getTeamService(ctx)
 
-	createdTeam, err := teamService.CreateTeam(ctx, &teamCreateOptions)
+	toCreate := &team.CreateTeamInput{
+		Name:        input.Name,
+		Description: input.Description,
+	}
+
+	createdTeam, err := teamService.CreateTeam(ctx, toCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -273,9 +277,9 @@ func createTeamMutation(ctx context.Context, input *CreateTeamInput) (*TeamMutat
 func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutationPayloadResolver, error) {
 	teamService := getTeamService(ctx)
 
-	team, err := teamService.GetTeamByName(ctx, input.Name)
-	if err != nil {
-		return nil, err
+	toUpdate := &team.UpdateTeamInput{
+		Name:        input.Name,
+		Description: &input.Description,
 	}
 
 	// Check if resource version is specified
@@ -285,13 +289,10 @@ func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutat
 			return nil, cErr
 		}
 
-		team.Metadata.Version = v
+		toUpdate.MetadataVersion = &v
 	}
 
-	// Update fields
-	team.Description = input.Description
-
-	team, err = teamService.UpdateTeam(ctx, team)
+	team, err := teamService.UpdateTeam(ctx, toUpdate)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +304,7 @@ func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutat
 func deleteTeamMutation(ctx context.Context, input *DeleteTeamInput) (*TeamMutationPayloadResolver, error) {
 	teamService := getTeamService(ctx)
 
-	team, err := teamService.GetTeamByName(ctx, input.Name)
+	gotTeam, err := teamService.GetTeamByName(ctx, input.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -315,14 +316,18 @@ func deleteTeamMutation(ctx context.Context, input *DeleteTeamInput) (*TeamMutat
 			return nil, err
 		}
 
-		team.Metadata.Version = v
+		gotTeam.Metadata.Version = v
 	}
 
-	if err := teamService.DeleteTeam(ctx, team); err != nil {
+	toDelete := &team.DeleteTeamInput{
+		Team: gotTeam,
+	}
+
+	if err := teamService.DeleteTeam(ctx, toDelete); err != nil {
 		return nil, err
 	}
 
-	payload := TeamMutationPayload{ClientMutationID: input.ClientMutationID, Team: team, Problems: []Problem{}}
+	payload := TeamMutationPayload{ClientMutationID: input.ClientMutationID, Team: gotTeam, Problems: []Problem{}}
 	return &TeamMutationPayloadResolver{TeamMutationPayload: payload}, nil
 }
 
@@ -563,25 +568,13 @@ func handleTeamMemberMutationProblem(e error, clientMutationID *string) (*TeamMe
 }
 
 func addUserToTeamMutation(ctx context.Context, input *AddUserToTeamInput) (*TeamMemberMutationPayloadResolver, error) {
-	team, err := getTeamService(ctx).GetTeamByName(ctx, input.TeamName)
-	if err != nil {
-		// This catches both access errors and team not found.
-		return nil, err
-	}
-
-	user, err := getUserService(ctx).GetUserByUsername(ctx, input.Username)
-	if err != nil {
-		// This catches both access errors and user not found.
-		return nil, err
-	}
-
-	createOptions := models.TeamMember{
-		UserID:       user.Metadata.ID,
-		TeamID:       team.Metadata.ID,
+	createOptions := &team.AddUserToTeamInput{
+		TeamName:     input.TeamName,
+		Username:     input.Username,
 		IsMaintainer: input.IsMaintainer,
 	}
 
-	teamMember, err := getTeamService(ctx).AddUserToTeam(ctx, &createOptions)
+	teamMember, err := getTeamService(ctx).AddUserToTeam(ctx, createOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -593,9 +586,10 @@ func addUserToTeamMutation(ctx context.Context, input *AddUserToTeamInput) (*Tea
 func updateTeamMemberMutation(ctx context.Context, input *UpdateTeamMemberInput) (*TeamMemberMutationPayloadResolver, error) {
 	service := getTeamService(ctx)
 
-	teamMember, err := service.GetTeamMember(ctx, input.Username, input.TeamName)
-	if err != nil {
-		return nil, err
+	toUpdate := &team.UpdateTeamMemberInput{
+		TeamName:     input.TeamName,
+		Username:     input.Username,
+		IsMaintainer: input.IsMaintainer,
 	}
 
 	// Check if resource version is specified
@@ -605,13 +599,10 @@ func updateTeamMemberMutation(ctx context.Context, input *UpdateTeamMemberInput)
 			return nil, cErr
 		}
 
-		teamMember.Metadata.Version = v
+		toUpdate.MetadataVersion = &v
 	}
 
-	// Update fields
-	teamMember.IsMaintainer = input.IsMaintainer
-
-	teamMember, err = service.UpdateTeamMember(ctx, teamMember)
+	teamMember, err := service.UpdateTeamMember(ctx, toUpdate)
 	if err != nil {
 		return nil, err
 	}
@@ -638,7 +629,11 @@ func removeUserFromTeamMutation(ctx context.Context, input *RemoveUserFromTeamIn
 		teamMember.Metadata.Version = v
 	}
 
-	if err = service.RemoveUserFromTeam(ctx, teamMember); err != nil {
+	toDelete := &team.RemoveUserFromTeamInput{
+		TeamMember: teamMember,
+	}
+
+	if err = service.RemoveUserFromTeam(ctx, toDelete); err != nil {
 		return nil, err
 	}
 
