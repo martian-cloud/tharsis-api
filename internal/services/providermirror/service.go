@@ -823,7 +823,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		return fmt.Errorf("failed to create provider platform mirror: %w", err)
 	}
 
-	packageFile, err := os.Open(f.Name())
+	packageFile, err := os.Open(f.Name()) // nosemgrep: gosec.G304-1
 	if err != nil {
 		tracing.RecordError(span, err, "failed to open provider package file from disk")
 		return fmt.Errorf("failed to open provider package file from disk: %w", err)
