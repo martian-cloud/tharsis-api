@@ -28,6 +28,7 @@ const (
 	clusterNameHeader  = "x-k8s-aws-id"
 	stsExpireParameter = "X-Amz-Expires"
 
+	// nosemgrep: gosec.G101-1
 	tokenPrefix             = "k8s-aws-v1." // #nosec G101 -- This is a false positive
 	tokenExpirationDuration = 14 * time.Minute
 )

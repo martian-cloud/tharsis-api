@@ -91,7 +91,7 @@ type tokenResponse struct {
 
 func invokeCredentialHelper(cmdPath string, args []string) (string, error) {
 	cleanedPath := filepath.Clean(cmdPath)
-	cmd := exec.Command(cleanedPath, args...)
+	cmd := exec.Command(cleanedPath, args...) // nosemgrep: gosec.G204-1
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
