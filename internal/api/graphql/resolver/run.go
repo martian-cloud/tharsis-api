@@ -145,6 +145,16 @@ func (r *RunResolver) IsDestroy() bool {
 	return r.run.IsDestroy
 }
 
+// TargetAddresses resolver
+func (r *RunResolver) TargetAddresses() []string {
+	return r.run.TargetAddresses
+}
+
+// Refresh resolver
+func (r *RunResolver) Refresh() bool {
+	return r.run.Refresh
+}
+
 // Workspace resolver
 func (r *RunResolver) Workspace(ctx context.Context) (*WorkspaceResolver, error) {
 	workspace, err := loadWorkspace(ctx, r.run.WorkspaceID)
@@ -386,6 +396,8 @@ type CreateRunInput struct {
 		Hcl      bool
 	}
 	TerraformVersion *string
+	TargetAddresses  *[]string
+	Refresh          *bool
 	WorkspacePath    string
 }
 
@@ -457,6 +469,15 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 
 	if input.IsDestroy != nil {
 		runOptions.IsDestroy = *input.IsDestroy
+	}
+
+	if input.TargetAddresses != nil {
+		runOptions.TargetAddresses = *input.TargetAddresses
+	}
+
+	runOptions.Refresh = true // default to true unless the option was set
+	if input.Refresh != nil {
+		runOptions.Refresh = *input.Refresh
 	}
 
 	run, err := getRunService(ctx).CreateRun(ctx, runOptions)

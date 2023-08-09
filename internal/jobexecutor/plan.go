@@ -100,12 +100,19 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to create tfvars file: %v", err)
 	}
 
-	hasChanges, err := tf.Plan(
-		p.cancellableCtx,
+	// To avoid compiler type problems, must build up a slice of PlanOptions before calling Plan
+	planOptions := []tfexec.PlanOption{
 		tfexec.Out(planOutputPath),
 		tfexec.Destroy(p.run.IsDestroy),
 		tfexec.VarFile(tfVarsFilePath),
-	)
+		tfexec.Refresh(p.run.Refresh),
+	}
+	for _, target := range p.run.TargetAddresses {
+		planOptions = append(planOptions, tfexec.Target(target))
+	}
+
+	// Run Plan Cmd
+	hasChanges, err := tf.Plan(p.cancellableCtx, planOptions...)
 
 	if isCancellationError(err) {
 		p.jobLogger.Infof("Terraform plan command gracefully exited due to job cancellation")

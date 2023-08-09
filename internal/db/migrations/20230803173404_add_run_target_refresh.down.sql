@@ -1,0 +1,3 @@
+ALTER TABLE runs
+    DROP COLUMN IF EXISTS targets,
+    DROP COLUMN IF EXISTS refresh;
