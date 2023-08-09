@@ -109,9 +109,10 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	options := &run.CreateRunInput{
-		WorkspaceID: gid.FromGlobalID(req.Workspace.ID),
-		Comment:     req.Message,
-		Variables:   variables,
+		WorkspaceID:     gid.FromGlobalID(req.Workspace.ID),
+		Comment:         req.Message,
+		Variables:       variables,
+		TargetAddresses: req.TargetAddrs,
 	}
 	if req.ConfigurationVersion != nil {
 		id := gid.FromGlobalID(req.ConfigurationVersion.ID)
@@ -119,6 +120,9 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.IsDestroy != nil {
 		options.IsDestroy = *req.IsDestroy
+	}
+	if req.Refresh != nil {
+		options.Refresh = *req.Refresh
 	}
 
 	run, err := c.runService.CreateRun(r.Context(), options)

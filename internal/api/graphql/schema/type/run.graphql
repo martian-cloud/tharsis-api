@@ -56,6 +56,8 @@ type Run implements Node {
   forceCancelAvailableAt: Time
   comment: String!
   terraformVersion: String!
+  targetAddresses: [String!]!
+  refresh: Boolean!
 }
 
 type RunEvent {
@@ -91,6 +93,8 @@ input CreateRunInput {
   comment: String
   terraformVersion: String
   variables: [RunVariableInput!]
+  targetAddresses: [String!]
+  refresh: Boolean
 }
 
 input ApplyRunInput {

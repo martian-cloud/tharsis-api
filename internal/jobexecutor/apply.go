@@ -102,12 +102,18 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to download plan cache %v", err)
 	}
 
-	// Run Apply Cmd
-	cmdErr := tf.Apply(
-		a.cancellableCtx,
+	// To avoid compiler type problems, must build up a slice of PlanOptions before calling Plan
+	applyOptions := []tfexec.ApplyOption{
 		tfexec.DirOrPlan(planCachePath),
 		tfexec.StateOut(stateOutputPath),
-	)
+		tfexec.Refresh(a.run.Refresh),
+	}
+	for _, target := range a.run.TargetAddresses {
+		applyOptions = append(applyOptions, tfexec.Target(target))
+	}
+
+	// Run Apply Cmd
+	cmdErr := tf.Apply(a.cancellableCtx, applyOptions...)
 
 	stateFile, err := os.Open(stateOutputPath) // nosemgrep: gosec.G304-1
 	if err != nil {

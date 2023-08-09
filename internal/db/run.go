@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -104,6 +105,8 @@ var runFieldList = append(
 	"comment",
 	"auto_apply",
 	"terraform_version",
+	"targets",
+	"refresh",
 )
 
 // NewRuns returns an instance of the Run interface
@@ -298,6 +301,12 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	timestamp := currentTime()
 
+	targets, err := json.Marshal(run.TargetAddresses)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to marshal target addresses")
+		return nil, err
+	}
+
 	sql, args, err := dialect.Insert("runs").
 		Prepared(true).
 		Rows(goqu.Record{
@@ -322,6 +331,8 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 			"comment":                   run.Comment,
 			"auto_apply":                false,
 			"terraform_version":         run.TerraformVersion,
+			"targets":                   targets,
+			"refresh":                   run.Refresh,
 		}).
 		Returning(runFieldList...).ToSQL()
 
@@ -355,7 +366,6 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 				"version":                   goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at":                timestamp,
 				"status":                    run.Status,
-				"is_destroy":                run.IsDestroy,
 				"has_changes":               run.HasChanges,
 				"plan_id":                   nullableString(run.PlanID),
 				"apply_id":                  nullableString(run.ApplyID),
@@ -403,6 +413,7 @@ func scanRun(row scanner) (*models.Run, error) {
 	var applyID sql.NullString
 
 	run := &models.Run{}
+	run.TargetAddresses = []string{}
 
 	err := row.Scan(
 		&run.Metadata.ID,
@@ -426,6 +437,8 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.Comment,
 		&run.AutoApply,
 		&run.TerraformVersion,
+		&run.TargetAddresses,
+		&run.Refresh,
 	)
 	if err != nil {
 		return nil, err

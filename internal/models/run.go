@@ -28,6 +28,7 @@ type Run struct {
 	ForceCanceledBy        *string
 	ModuleVersion          *string
 	ModuleSource           *string
+	TargetAddresses        []string
 	ModuleDigest           []byte // This is only set for modules stored in the Tharsis module registry
 	CreatedBy              string
 	PlanID                 string
@@ -41,6 +42,7 @@ type Run struct {
 	IsDestroy              bool
 	ForceCanceled          bool
 	AutoApply              bool
+	Refresh                bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination

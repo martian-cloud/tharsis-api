@@ -79,7 +79,9 @@ type CreateRunInput struct {
 	WorkspaceID            string
 	TerraformVersion       string
 	Variables              []Variable
+	TargetAddresses        []string
 	IsDestroy              bool
+	Refresh                bool
 }
 
 // Validate attempts to ensure the CreateRunInput structure is in good form and able to be used.
@@ -505,6 +507,8 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		ModuleDigest:           moduleDigest,
 		PlanID:                 plan.Metadata.ID,
 		TerraformVersion:       terraformVersion,
+		TargetAddresses:        options.TargetAddresses,
+		Refresh:                options.Refresh,
 	}
 
 	if options.Comment != nil {
