@@ -25,7 +25,7 @@ const (
 	// terraformCLIVersionConstraints is a comma-separated list of
 	// constraints used to limit the returned Terraform CLI versions.
 	// TODO: move this to the config so, it can be changed.
-	terraformCLIVersionConstraints = ">= 1.0.0"
+	terraformCLIVersionConstraints = ">= 1.0.0, <= 1.5.5"
 )
 
 // zipContentType represents the allowed mime types when downloading a zip archive.
