@@ -3,6 +3,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -67,7 +68,7 @@ func ErrorCode(err error) string {
 		return ""
 	}
 
-	e, ok := err.(*TharsisError)
+	e, ok := unwrapTharsisError(err)
 	if !ok {
 		return EInternal
 	}
@@ -93,7 +94,7 @@ func ErrorMessage(err error) string {
 		return ""
 	}
 
-	e, ok := err.(*TharsisError)
+	e, ok := unwrapTharsisError(err)
 	if !ok {
 		return "An internal error has occurred."
 	}
@@ -111,4 +112,19 @@ func ErrorMessage(err error) string {
 	}
 
 	return "An internal error has occurred."
+}
+
+func unwrapTharsisError(err error) (*TharsisError, bool) {
+	for {
+		if err == nil {
+			return nil, false
+		}
+
+		tErr, ok := err.(*TharsisError)
+		if ok {
+			return tErr, true
+		}
+
+		err = errors.Unwrap(err)
+	}
 }

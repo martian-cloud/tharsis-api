@@ -48,7 +48,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgproto3/v2 v2.3.2
 	github.com/jackc/pgx/v4 v4.18.1
-	github.com/lestrrat-go/jwx v1.2.25
+	github.com/lestrrat-go/jwx v1.2.26
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc3
 	github.com/prometheus/client_golang v1.15.1
