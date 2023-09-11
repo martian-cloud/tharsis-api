@@ -27,6 +27,7 @@ const (
 	defaultDBAutoMigrateEnabled        = true
 	defaultOtelTraceEnabled            = false
 	defaultHTTPRateLimit               = 60 // in calls per second
+	defaultTerraformCLIVersions        = ">= 1.0.0"
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -86,6 +87,9 @@ type Config struct {
 	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
 	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST"`
 
+	// TerraformCLIVersionConstraint is a comma-separated list of constraints used to limit the returned Terraform CLI versions.
+	TerraformCLIVersionConstraint string `yaml:"terraform_cli_version_constraint" env:"TERRAFORM_CLI_VERSION_CONSTRAINT"`
+
 	// The OIDC identity providers
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 
@@ -133,15 +137,16 @@ func (c Config) Validate() error {
 func Load(file string, logger logger.Logger) (*Config, error) {
 	// default config
 	c := Config{
-		ServerPort:                  defaultServerPort,
-		MaxGraphQLComplexity:        defaultMaxGraphQLComplexity,
-		RateLimitStorePluginType:    defaultRateLimitStorePluginType,
-		ModuleRegistryMaxUploadSize: defaultModuleRegistryMaxUploadSize,
-		VCSRepositorySizeLimit:      defaultVCSRepositorySizeLimit,
-		AsyncTaskTimeout:            defaultAsyncTaskTimeout,
-		DBAutoMigrateEnabled:        defaultDBAutoMigrateEnabled,
-		OtelTraceEnabled:            defaultOtelTraceEnabled,
-		HTTPRateLimit:               defaultHTTPRateLimit,
+		ServerPort:                    defaultServerPort,
+		MaxGraphQLComplexity:          defaultMaxGraphQLComplexity,
+		RateLimitStorePluginType:      defaultRateLimitStorePluginType,
+		ModuleRegistryMaxUploadSize:   defaultModuleRegistryMaxUploadSize,
+		VCSRepositorySizeLimit:        defaultVCSRepositorySizeLimit,
+		AsyncTaskTimeout:              defaultAsyncTaskTimeout,
+		DBAutoMigrateEnabled:          defaultDBAutoMigrateEnabled,
+		OtelTraceEnabled:              defaultOtelTraceEnabled,
+		HTTPRateLimit:                 defaultHTTPRateLimit,
+		TerraformCLIVersionConstraint: defaultTerraformCLIVersions,
 	}
 
 	// load from YAML config file

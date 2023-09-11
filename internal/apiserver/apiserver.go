@@ -184,7 +184,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		userService                = user.NewService(logger, dbClient)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService)
-		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore)
+		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
 		workspaceService           = workspace.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService)
 		jobService                 = job.NewService(logger, dbClient, tharsisIDP, eventManager, runStateManager, logStore)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
