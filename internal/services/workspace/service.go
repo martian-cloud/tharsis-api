@@ -451,7 +451,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteServiceAccount: %v", txErr)
+			s.logger.Errorf("failed to rollback tx for service layer DeleteWorkspace: %v", txErr)
 		}
 	}()
 

@@ -172,7 +172,7 @@ func TestCreateWorkspace(t *testing.T) {
 			}
 
 			testLogger, _ := logger.NewForTest()
-			mockCLIService := cli.NewService(testLogger, nil, nil, mockCLIStore)
+			mockCLIService := cli.NewService(testLogger, nil, nil, mockCLIStore, ">= 1.0.0")
 
 			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, mockCLIService, mockActivityEvents)
 

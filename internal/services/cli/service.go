@@ -21,11 +21,6 @@ import (
 const (
 	// hashicorpReleasesBaseURL is used to download Terraform CLI binary.
 	hashicorpReleasesBaseURL = "https://releases.hashicorp.com"
-
-	// terraformCLIVersionConstraints is a comma-separated list of
-	// constraints used to limit the returned Terraform CLI versions.
-	// TODO: move this to the config so, it can be changed.
-	terraformCLIVersionConstraints = ">= 1.0.0, <= 1.5.5"
 )
 
 // zipContentType represents the allowed mime types when downloading a zip archive.
@@ -67,10 +62,11 @@ type Service interface {
 }
 
 type service struct {
-	logger      logger.Logger
-	httpClient  *http.Client
-	taskManager asynctask.Manager
-	cliStore    TerraformCLIStore
+	logger                        logger.Logger
+	httpClient                    *http.Client
+	taskManager                   asynctask.Manager
+	cliStore                      TerraformCLIStore
+	terraformCLIVersionConstraint string
 }
 
 // NewService creates an instance of Service
@@ -79,12 +75,14 @@ func NewService(
 	httpClient *http.Client,
 	taskManager asynctask.Manager,
 	cliStore TerraformCLIStore,
+	terraformCLIVersionConstraint string,
 ) Service {
 	return &service{
-		logger:      logger,
-		httpClient:  httpClient,
-		taskManager: taskManager,
-		cliStore:    cliStore,
+		logger:                        logger,
+		httpClient:                    httpClient,
+		taskManager:                   taskManager,
+		cliStore:                      cliStore,
+		terraformCLIVersionConstraint: terraformCLIVersionConstraint,
 	}
 }
 
@@ -100,7 +98,7 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 	}
 
 	// Returned versions should adhere to terraformCLIVersionConstraints.
-	constraints, err := version.NewConstraint(terraformCLIVersionConstraints)
+	constraints, err := version.NewConstraint(s.terraformCLIVersionConstraint)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate a Terraform CLI version constraint")
 		return nil, err
