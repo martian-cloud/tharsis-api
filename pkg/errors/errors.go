@@ -104,7 +104,8 @@ func ErrorMessage(err error) string {
 	}
 
 	if e.message != "" {
-		return e.message
+		// e.Error() returns the message and the wrapped error
+		return e.Error()
 	}
 
 	if e.err != nil {
