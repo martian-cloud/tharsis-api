@@ -266,6 +266,7 @@ func TestCreateNestedGroup(t *testing.T) {
 // TestGetGroups verifies that the auth filters are correctly passed to the DB layer for various conditions.
 // This test currently mainly exercises the search feature.
 func TestGetGroups(t *testing.T) {
+	rootNamespaceID := "root-namespace-1"
 	parentGroupID := "this-is-a-fake-parent-group-ID"
 	parentGroup := &models.Group{
 		Metadata: models.ResourceMetadata{
@@ -377,20 +378,6 @@ func TestGetGroups(t *testing.T) {
 			},
 		},
 		{
-			name:       "admin caller, with parent group, search absent/nil, with root-only",
-			callerType: "admin",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					RootOnly: true,
-				},
-			},
-		},
-		{
 			name:       "admin caller, with parent group, search empty, no root-only",
 			callerType: "admin",
 			svcInput: &GetGroupsInput{
@@ -405,22 +392,6 @@ func TestGetGroups(t *testing.T) {
 			},
 		},
 		{
-			name:       "admin caller, with parent group, search empty, with root-only",
-			callerType: "admin",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &emptySearch,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					Search:   &emptySearch,
-					RootOnly: true,
-				},
-			},
-		},
-		{
 			name:       "admin caller, with parent group, search non-empty, no root-only",
 			callerType: "admin",
 			svcInput: &GetGroupsInput{
@@ -431,22 +402,6 @@ func TestGetGroups(t *testing.T) {
 				Filter: &db.GroupFilter{
 					ParentID: &parentGroupID,
 					Search:   &nonEmptySearch,
-				},
-			},
-		},
-		{
-			name:       "admin caller, with parent group, search non-empty, with root-only",
-			callerType: "admin",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &nonEmptySearch,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					Search:   &nonEmptySearch,
-					RootOnly: true,
 				},
 			},
 		},
@@ -470,8 +425,8 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					NamespaceIDs: []string{},
-					RootOnly:     true,
+					NamespaceIDs: []string{rootNamespaceID},
+					RootOnly:     false,
 				},
 			},
 		},
@@ -498,8 +453,8 @@ func TestGetGroups(t *testing.T) {
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
 					Search:       &emptySearch,
-					NamespaceIDs: []string{},
-					RootOnly:     true,
+					NamespaceIDs: []string{rootNamespaceID},
+					RootOnly:     false,
 				},
 			},
 		},
@@ -526,8 +481,8 @@ func TestGetGroups(t *testing.T) {
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
 					Search:       &nonEmptySearch,
-					NamespaceIDs: []string{},
-					RootOnly:     true,
+					NamespaceIDs: []string{rootNamespaceID},
+					RootOnly:     false,
 				},
 			},
 		},
@@ -540,20 +495,6 @@ func TestGetGroups(t *testing.T) {
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
 					ParentID: &parentGroupID,
-				},
-			},
-		},
-		{
-			name:       "user member caller, with parent group, search absent/nil, with root-only",
-			callerType: "user",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					RootOnly: true,
 				},
 			},
 		},
@@ -572,22 +513,6 @@ func TestGetGroups(t *testing.T) {
 			},
 		},
 		{
-			name:       "user member caller, with parent group, search empty, with root-only",
-			callerType: "user",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &emptySearch,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					Search:   &emptySearch,
-					RootOnly: true,
-				},
-			},
-		},
-		{
 			name:       "user member caller, with parent group, search non-empty, no root-only",
 			callerType: "user",
 			svcInput: &GetGroupsInput{
@@ -598,22 +523,6 @@ func TestGetGroups(t *testing.T) {
 				Filter: &db.GroupFilter{
 					ParentID: &parentGroupID,
 					Search:   &nonEmptySearch,
-				},
-			},
-		},
-		{
-			name:       "user member caller, with parent group, search non-empty, with root-only",
-			callerType: "user",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &nonEmptySearch,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					Search:   &nonEmptySearch,
-					RootOnly: true,
 				},
 			},
 		},
@@ -637,8 +546,8 @@ func TestGetGroups(t *testing.T) {
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
-					NamespaceIDs: []string{},
-					RootOnly:     true,
+					NamespaceIDs: []string{rootNamespaceID},
+					RootOnly:     false,
 				},
 			},
 		},
@@ -665,8 +574,8 @@ func TestGetGroups(t *testing.T) {
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
 					Search:       &emptySearch,
-					NamespaceIDs: []string{},
-					RootOnly:     true,
+					NamespaceIDs: []string{rootNamespaceID},
+					RootOnly:     false,
 				},
 			},
 		},
@@ -693,8 +602,8 @@ func TestGetGroups(t *testing.T) {
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
 					Search:       &nonEmptySearch,
-					NamespaceIDs: []string{},
-					RootOnly:     true,
+					NamespaceIDs: []string{rootNamespaceID},
+					RootOnly:     false,
 				},
 			},
 		},
@@ -707,20 +616,6 @@ func TestGetGroups(t *testing.T) {
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
 					ParentID: &parentGroupID,
-				},
-			},
-		},
-		{
-			name:       "service account member caller, with parent group, search absent/nil, with root-only",
-			callerType: "service-account",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					RootOnly: true,
 				},
 			},
 		},
@@ -739,22 +634,6 @@ func TestGetGroups(t *testing.T) {
 			},
 		},
 		{
-			name:       "service account member caller, with parent group, search empty, with root-only",
-			callerType: "service-account",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &emptySearch,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					Search:   &emptySearch,
-					RootOnly: true,
-				},
-			},
-		},
-		{
 			name:       "service account member caller, with parent group, search non-empty, no root-only",
 			callerType: "service-account",
 			svcInput: &GetGroupsInput{
@@ -765,22 +644,6 @@ func TestGetGroups(t *testing.T) {
 				Filter: &db.GroupFilter{
 					ParentID: &parentGroupID,
 					Search:   &nonEmptySearch,
-				},
-			},
-		},
-		{
-			name:       "service account member caller, with parent group, search non-empty, with root-only",
-			callerType: "service-account",
-			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &nonEmptySearch,
-				RootOnly:    true,
-			},
-			dbInput: &db.GetGroupsInput{
-				Filter: &db.GroupFilter{
-					ParentID: &parentGroupID,
-					Search:   &nonEmptySearch,
-					RootOnly: true,
 				},
 			},
 		},
@@ -798,7 +661,9 @@ func TestGetGroups(t *testing.T) {
 			mockAuthorizer := auth.MockAuthorizer{}
 			mockAuthorizer.Test(t)
 
-			mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{}, nil)
+			mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{
+				{ID: rootNamespaceID},
+			}, nil)
 
 			mockAuthorizer.On("RequireAccess", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 

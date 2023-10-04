@@ -130,16 +130,20 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		return nil, err
 	}
 
+	if input.ParentGroup != nil && input.RootOnly {
+		return nil, errors.New(errors.EInternal, "RootOnly cannot be true when ParentGroup is specified")
+	}
+
 	dbInput := db.GetGroupsInput{
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.GroupFilter{
-			Search:   input.Search,
-			RootOnly: input.RootOnly,
+			Search: input.Search,
 		},
 	}
 
 	if input.ParentGroup != nil {
+		// Since parent group is specified we will authorize access based on the parent group
 		err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(input.ParentGroup.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
@@ -154,13 +158,15 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 			return nil, err
 		}
 
-		// Return only groups that the caller has access to.
-		if !policy.AllowAll {
+		if policy.AllowAll {
+			// Policy is set to allow all so no need for additional authorization
+			dbInput.Filter.RootOnly = input.RootOnly
+		} else {
 			if input.RootOnly {
+				// RootOnly is true so filter by root namesapce IDs from the policy
 				dbInput.Filter.NamespaceIDs = policy.RootNamespaceIDs
 			} else {
-
-				// This is not needed if RootOnly is true, because policy.RootNamespaceIDs has already done auth filtering.
+				// RootOnly if false so filter by group memberships
 				if err = auth.HandleCaller(
 					ctx,
 					func(_ context.Context, c *auth.UserCaller) error {
