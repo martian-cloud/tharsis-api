@@ -48,6 +48,8 @@ func NewAuthenticationMiddleware(
 					return
 				}
 				subject = fmt.Sprintf("anonymous-%s", ip)
+
+				logger.Infof("Unauthorized request from subject: %s", subject)
 			}
 
 			ctx = auth.WithSubject(ctx, subject)

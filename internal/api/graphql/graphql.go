@@ -245,14 +245,18 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, response := range responses {
 		for _, e := range response.Errors {
 			if e != nil && e.Err != nil {
-				switch errors.ErrorCode(e.Err) {
-				case
-					errors.EUnauthorized,
-					errors.EForbidden,
-					errors.ETooManyRequests:
-					// Log error message
-					h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
+				if e.Err != context.Canceled {
+					switch errors.ErrorCode(e.Err) {
+					case errors.EUnauthorized,
+						errors.EForbidden,
+						errors.ETooManyRequests:
+						// Explicitly do nothing since these errors should not be logged
+					default:
+						// Log error message
+						h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
+					}
 				}
+
 				e.Extensions = getErrExtensions(e.Err)
 			}
 		}
