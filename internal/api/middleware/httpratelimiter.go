@@ -49,7 +49,7 @@ func HTTPRateLimiterMiddleware(
 			w.Header().Add(headerRateReset, "1") // we always use a 1-second interval
 
 			if !ok {
-				logger.Errorf("HTTP rate limit exceeded")
+				logger.Infof("HTTP rate limit exceeded for subject: %s", *subject)
 				respWriter.RespondWithError(w, errors.New(errors.ETooManyRequests, "request rate limit exceeded"))
 
 				// Tell the requester how long to wait before trying again.
