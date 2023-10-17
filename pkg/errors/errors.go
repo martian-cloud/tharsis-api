@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Error code constants
@@ -31,19 +34,48 @@ type TharsisError struct {
 
 // New returns a new Tharsis error with the code and message fields set
 func New(code string, format string, a ...any) *TharsisError {
-	return &TharsisError{
+	span, a := findSpan(a)
+	resultError := &TharsisError{
 		code:    code,
 		message: fmt.Sprintf(format, a...),
 	}
+	if span != nil {
+		span.RecordError(resultError)
+		span.SetStatus(codes.Error, fmt.Sprintf(format, a...))
+	}
+	return resultError
 }
 
 // Wrap returns a new TharsisError which wraps an existing error
 func Wrap(err error, code string, format string, a ...any) *TharsisError {
+	span, a := findSpan(a)
+	if span != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf(format, a...))
+	}
 	return &TharsisError{
 		code:    code,
 		message: fmt.Sprintf(format, a...),
 		err:     err,
 	}
+}
+
+// findSpan finds and extracts the first span in a list of arguments.
+func findSpan(a []any) (trace.Span, []any) {
+	var foundSpan trace.Span
+	var others []any
+
+	for _, arg := range a {
+		if foundSpan == nil {
+			if candidate, ok := arg.(trace.Span); ok {
+				foundSpan = candidate
+				continue
+			}
+		}
+		others = append(others, arg)
+	}
+
+	return foundSpan, others
 }
 
 // Error implements the error interface by writing out the recursive messages.
