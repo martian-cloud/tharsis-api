@@ -62,7 +62,7 @@ require (
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.29.0
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.29.2
 	go.opentelemetry.io/contrib/propagators/aws v1.17.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0
@@ -184,13 +184,13 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.9.2 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
