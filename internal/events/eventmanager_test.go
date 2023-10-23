@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 func TestGetEvent(t *testing.T) {
@@ -96,7 +97,8 @@ func TestGetEvent(t *testing.T) {
 				Events: mockEvents,
 			}
 
-			manager := NewEventManager(&client)
+			testLogger, _ := logger.NewForTest()
+			manager := NewEventManager(&client, testLogger)
 			manager.Start(ctx)
 
 			subscriber := manager.Subscribe(test.subscriptions)
@@ -136,7 +138,8 @@ func TestUnsubscribe(t *testing.T) {
 		Events: mockEvents,
 	}
 
-	manager := NewEventManager(&client)
+	testLogger, _ := logger.NewForTest()
+	manager := NewEventManager(&client, testLogger)
 	manager.Start(ctx)
 
 	subscriber := manager.Subscribe([]Subscription{
@@ -174,7 +177,8 @@ func TestGetEventOnError(t *testing.T) {
 		Events: mockEvents,
 	}
 
-	manager := NewEventManager(&client)
+	testLogger, _ := logger.NewForTest()
+	manager := NewEventManager(&client, testLogger)
 	manager.Start(ctx)
 
 	subscriber := manager.Subscribe([]Subscription{})
@@ -199,7 +203,8 @@ func TestGetEventContextCancelled(t *testing.T) {
 		Events: mockEvents,
 	}
 
-	manager := NewEventManager(&client)
+	testLogger, _ := logger.NewForTest()
+	manager := NewEventManager(&client, testLogger)
 	manager.Start(ctx)
 
 	subscriber := manager.Subscribe([]Subscription{})

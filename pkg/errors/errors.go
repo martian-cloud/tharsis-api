@@ -3,6 +3,7 @@
 package errors
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -145,6 +146,11 @@ func ErrorMessage(err error) string {
 	}
 
 	return "An internal error has occurred."
+}
+
+// IsContextCanceledError returns true if the error is a context.Canceled error
+func IsContextCanceledError(err error) bool {
+	return errors.Is(err, context.Canceled)
 }
 
 func unwrapTharsisError(err error) (*TharsisError, bool) {

@@ -247,7 +247,10 @@ func (r RootResolver) jobLogEventsSubscription(ctx context.Context, input *JobLo
 
 	go func() {
 		for event := range events {
-			outgoing <- &JobLogEventResolver{event: event}
+			select {
+			case <-ctx.Done():
+			case outgoing <- &JobLogEventResolver{event: event}:
+			}
 		}
 
 		close(outgoing)
@@ -275,7 +278,10 @@ func (r RootResolver) jobCancellationEventSubscription(ctx context.Context, inpu
 
 	go func() {
 		for event := range events {
-			outgoing <- &JobCancellationEventResolver{event: event}
+			select {
+			case <-ctx.Done():
+			case outgoing <- &JobCancellationEventResolver{event: event}:
+			}
 		}
 
 		close(outgoing)

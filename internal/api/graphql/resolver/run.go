@@ -567,7 +567,10 @@ func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input 
 
 	go func() {
 		for event := range events {
-			outgoing <- &RunEventResolver{event: event}
+			select {
+			case <-ctx.Done():
+			case outgoing <- &RunEventResolver{event: event}:
+			}
 		}
 
 		close(outgoing)

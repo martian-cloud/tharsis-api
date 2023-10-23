@@ -208,7 +208,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
-				if err != context.Canceled {
+				if !errors.IsContextCanceledError(err) {
 					s.logger.Errorf("Error occurred while waiting for workspace events: %v", err)
 				}
 				return
@@ -216,6 +216,9 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 
 			ws, err := s.getWorkspaceByID(ctx, event.ID)
 			if err != nil {
+				if errors.IsContextCanceledError(err) {
+					return
+				}
 				s.logger.Errorf("Error occurred while querying for workspace associated with workspace event %s: %v", event.ID, err)
 				continue
 			}
