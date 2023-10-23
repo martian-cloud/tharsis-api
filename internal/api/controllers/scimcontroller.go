@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -466,7 +465,7 @@ func TharsisTeamToSCIMGroup(team *models.Team) *SCIMGroup {
 
 // respondWithSCIMError responds to an http request with a SCIM error message.
 func (c *scimController) respondWithSCIMError(w http.ResponseWriter, err error) {
-	if err != context.Canceled &&
+	if !errors.IsContextCanceledError(err) &&
 		errors.ErrorCode(err) != errors.EUnauthorized &&
 		errors.ErrorCode(err) != errors.EForbidden &&
 		errors.ErrorCode(err) != errors.ENotFound {

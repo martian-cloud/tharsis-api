@@ -19,7 +19,13 @@ func NewRequireAuthenticatedCallerMiddleware(
 
 			caller := auth.GetCaller(r.Context())
 			if caller == nil {
-				logger.Infof("Unauthorized request to %s %s", r.Method, r.URL.Path)
+				subject := auth.GetSubject(r.Context())
+				if subject != nil {
+					logger.Infof("Unauthorized request to %s %s by %s", r.Method, r.URL.Path, *subject)
+				} else {
+					logger.Infof("Unauthorized request to %s %s by unknown subject", r.Method, r.URL.Path)
+				}
+
 				respWriter.RespondWithError(w,
 					// At this point, we no longer had the original error to wrap.
 					errors.New(errors.EUnauthorized, "Unauthorized"))

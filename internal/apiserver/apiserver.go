@@ -159,7 +159,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
 
-	eventManager := events.NewEventManager(dbClient)
+	eventManager := events.NewEventManager(dbClient, logger)
 	eventManager.Start(ctx)
 
 	logStore := job.NewLogStore(pluginCatalog.ObjectStore, dbClient)

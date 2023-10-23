@@ -5,10 +5,19 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+)
+
+const (
+	// sendEventTimeout is the timeout for sending an event to a subscriber
+	sendEventTimeout = time.Minute * 5
+	// subscriberBufferSize is the buffer size for the subscriber channel
+	subscriberBufferSize = 500
 )
 
 // SubscriptionType specifies the type of subscription
@@ -65,16 +74,18 @@ func (s *Subscriber) GetEvent(ctx context.Context) (*db.Event, error) {
 
 // EventManager is used to subscribe to database events
 type EventManager struct {
-	lock        sync.RWMutex
+	logger      logger.Logger
 	dbClient    *db.Client
 	subscribers []Subscriber
+	lock        sync.RWMutex
 }
 
 // NewEventManager creates a new instance of EventManager
-func NewEventManager(dbClient *db.Client) *EventManager {
+func NewEventManager(dbClient *db.Client, logger logger.Logger) *EventManager {
 	return &EventManager{
 		subscribers: []Subscriber{},
 		dbClient:    dbClient,
+		logger:      logger,
 	}
 }
 
@@ -92,9 +103,13 @@ func (e *EventManager) Start(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case event := <-ch:
-					e.notifyEvent(event)
+					e.notifyEvent(ctx, event)
 				case err := <-errorCh:
+					e.logger.Errorf("received error when listening for db event: %v", err)
+
+					// Notify subscribers of error
 					e.notifyError(err)
+
 					// Exit this for loop to setup a new DB listener connection
 					exitLoop = true
 				}
@@ -116,7 +131,7 @@ func (e *EventManager) Subscribe(subscriptions []Subscription) *Subscriber {
 	subscriber := Subscriber{
 		ID:            uuid.New().String(),
 		subscriptions: subscriptions,
-		events:        make(chan db.Event, 100), // Buffer of 100 events per subscriber
+		events:        make(chan db.Event, subscriberBufferSize),
 		errors:        make(chan error, 1),
 		done:          make(chan bool, 1),
 	}
@@ -137,23 +152,47 @@ func (e *EventManager) Unsubscribe(subscriber *Subscriber) {
 	}
 	e.lock.Unlock()
 
-	subscriber.done <- true
+	// Use non-blocking send in case Unsubscribe is called multiple times
+	select {
+	case subscriber.done <- true:
+	default:
+	}
 }
 
-func (e *EventManager) notifyEvent(event db.Event) {
+func (e *EventManager) notifyEvent(ctx context.Context, event db.Event) {
+	matchedSubscribers := []*Subscriber{}
+
 	e.lock.RLock()
-	defer e.lock.RUnlock()
 
 	for _, subscriber := range e.subscribers {
 		sub := subscriber
 		if e.match(event, &sub) {
-			// Send event to subscriber
-			select {
-			case sub.events <- event:
-			case <-sub.done:
-				return
-			}
+			matchedSubscribers = append(matchedSubscribers, &sub)
 		}
+	}
+
+	e.lock.RUnlock()
+
+	// Send events after lock has been released
+	for _, subscriber := range matchedSubscribers {
+		e.sendEventToSubscriber(ctx, subscriber, event)
+	}
+}
+
+func (e *EventManager) sendEventToSubscriber(ctx context.Context, subscriber *Subscriber, event db.Event) {
+	// Add timeout to send event, this should never happen but just in case this will prevent the
+	// event manager from locking up
+	sendContext, cancel := context.WithTimeout(ctx, sendEventTimeout)
+	defer cancel()
+
+	// Send event to subscriber
+	select {
+	case <-sendContext.Done():
+		e.logger.Error("event manager failed to send event to subscriber due to timeout")
+		// unsubscribe subscriber here to prevent further issues
+		e.Unsubscribe(subscriber)
+	case subscriber.events <- event:
+	case <-subscriber.done:
 	}
 }
 

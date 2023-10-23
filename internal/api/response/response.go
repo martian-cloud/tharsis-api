@@ -2,7 +2,6 @@
 package response
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -51,7 +50,8 @@ func NewWriter(logger logger.Logger) Writer {
 
 // RespondWithError responds to an http request with an error response
 func (rh *responseHelper) RespondWithError(w http.ResponseWriter, err error) {
-	if err != context.Canceled && te.ErrorCode(err) != te.EUnauthorized && te.ErrorCode(err) != te.EForbidden && te.ErrorCode(err) != te.ENotFound {
+	if !te.IsContextCanceledError(err) && te.ErrorCode(err) == te.EInternal {
+		// Log error message
 		rh.logger.Errorf("Unexpected error occurred: %s", err.Error())
 	}
 	rh.respondWithError(w, ErrorCodeToStatusCode(te.ErrorCode(err)), te.ErrorMessage(err))

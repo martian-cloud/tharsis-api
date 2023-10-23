@@ -104,6 +104,7 @@ func NewGraphQL(
 		graphql.Tracer(&otel.Tracer{
 			Tracer: tracer,
 		}),
+		graphql.SubscribeResolverTimeout(time.Second*10),
 	)
 
 	httpHandler := httpHandler{
@@ -245,15 +246,12 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, response := range responses {
 		for _, e := range response.Errors {
 			if e != nil && e.Err != nil {
-				if e.Err != context.Canceled {
+				if !errors.IsContextCanceledError(e.Err) {
 					switch errors.ErrorCode(e.Err) {
-					case errors.EUnauthorized,
-						errors.EForbidden,
-						errors.ETooManyRequests:
-						// Explicitly do nothing since these errors should not be logged
-					default:
-						// Log error message
+					case errors.EInternal:
 						h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
+					case errors.EUnauthorized:
+						h.logger.Infof("Unauthorized request from subject: %s", subject)
 					}
 				}
 

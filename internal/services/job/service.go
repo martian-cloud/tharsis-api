@@ -152,7 +152,7 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 		for {
 			event, err := subscriber.GetEvent(innerCtx)
 			if err != nil {
-				if err != context.Canceled {
+				if !errors.IsContextCanceledError(err) {
 					tracing.RecordError(innerSpan, err, "Error occurred while waiting for job log events: %v", err)
 					s.logger.Errorf("Error occurred while waiting for job log events: %v", err)
 				}
@@ -161,9 +161,11 @@ func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, 
 
 			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptor(innerCtx, event.ID)
 			if err != nil {
-				tracing.RecordError(innerSpan, err,
-					"Error occurred while querying for job log descriptor associated with job log event %s", event.ID)
-				s.logger.Errorf("Error occurred while querying for job log descriptor associated with job log event %s: %v", event.ID, err)
+				if !errors.IsContextCanceledError(err) {
+					tracing.RecordError(innerSpan, err,
+						"Error occurred while querying for job log descriptor associated with job log event %s", event.ID)
+					s.logger.Errorf("Error occurred while querying for job log descriptor associated with job log event %s: %v", event.ID, err)
+				}
 				return
 			}
 
@@ -369,7 +371,10 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		}
 
 		if job.CancelRequested {
-			outgoing <- &CancellationEvent{Job: *job}
+			select {
+			case <-innerCtx.Done():
+			case outgoing <- &CancellationEvent{Job: *job}:
+			}
 			return
 		}
 
@@ -377,7 +382,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		for {
 			event, err := subscriber.GetEvent(innerCtx)
 			if err != nil {
-				if err != context.Canceled {
+				if !errors.IsContextCanceledError(err) {
 					tracing.RecordError(innerSpan, err, "Error occurred while waiting for job cancellation events")
 					s.logger.Errorf("Error occurred while waiting for job cancellation events: %v", err)
 				}
@@ -386,6 +391,9 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 
 			job, err := s.GetJob(innerCtx, event.ID)
 			if err != nil {
+				if errors.IsContextCanceledError(err) {
+					return
+				}
 				tracing.RecordError(innerSpan, err,
 					"Error occurred while querying for job associated with cancellation event %s", event.ID)
 				s.logger.Errorf("Error occurred while querying for job associated with cancellation event %s: %v", event.ID, err)
@@ -579,17 +587,24 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 }
 
 func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.Runner) (*models.Job, error) {
+	// Subscribe to job create and update events
 	jobSubscription := events.Subscription{
 		Type:    events.JobSubscription,
-		Actions: []events.SubscriptionAction{},
+		Actions: []events.SubscriptionAction{events.CreateAction, events.UpdateAction},
 	}
+	// Subscribe to runner events because a runner may become available
 	runnerSubscription := events.Subscription{
 		Type:    events.RunnerSubscription,
 		Actions: []events.SubscriptionAction{},
 	}
+	// Subscribe to workspace delete events because deleting a workspace may cause a job in a different workspace to become available
+	workspaceSubscription := events.Subscription{
+		Type:    events.WorkspaceSubscription,
+		Actions: []events.SubscriptionAction{events.DeleteAction},
+	}
 
 	// Subscribe to job and run events
-	subscriber := s.eventManager.Subscribe([]events.Subscription{jobSubscription, runnerSubscription})
+	subscriber := s.eventManager.Subscribe([]events.Subscription{jobSubscription, runnerSubscription, workspaceSubscription})
 	defer s.eventManager.Unsubscribe(subscriber)
 
 	// Wait for next available run
@@ -603,12 +618,10 @@ func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.
 			return job, nil
 		}
 
-		event, err := subscriber.GetEvent(ctx)
+		_, err = subscriber.GetEvent(ctx)
 		if err != nil {
 			return nil, err
 		}
-
-		s.logger.Infof("Received %s:%s notification from db", event.Table, event.Action)
 	}
 }
 
