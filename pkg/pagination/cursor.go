@@ -23,11 +23,11 @@ func newCursor(v string) (*cursor, error) {
 
 	bytes, err := base64.StdEncoding.DecodeString(v)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EInvalid, "invalid cursor")
+		return nil, errors.Wrap(err, "invalid cursor", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if err := json.Unmarshal(bytes, &parts); err != nil {
-		return nil, errors.Wrap(err, errors.EInvalid, "invalid cursor")
+		return nil, errors.Wrap(err, "invalid cursor", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	c := cursor{primary: &cursorField{name: parts[0], value: parts[1]}}

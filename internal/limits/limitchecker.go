@@ -61,11 +61,11 @@ func (c *limitChecker) CheckLimit(ctx context.Context, name ResourceLimitName, t
 		return err
 	}
 	if limit == nil {
-		return errors.New(errors.EInvalid, "invalid resource limit name: %s", name)
+		return errors.New("invalid resource limit name: %s", name, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if int(toCheck) > limit.Value {
-		return errors.New(errors.EInvalid, "for limit %s: value %d exceeds limit of %d", name, toCheck, limit.Value)
+		return errors.New("for limit %s: value %d exceeds limit of %d", name, toCheck, limit.Value, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// A valid limit value was found, and there is no violation.

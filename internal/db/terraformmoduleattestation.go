@@ -216,11 +216,11 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 				case "index_terraform_module_attestations_on_module_and_data_sha_sum":
 					tracing.RecordError(span, nil,
 						"another module attestation with the same data already exists for this module")
-					return nil, errors.New(errors.EConflict, "another module attestation with the same data already exists for this module")
+					return nil, errors.New("another module attestation with the same data already exists for this module", errors.WithErrorCode(errors.EConflict))
 				default:
 					tracing.RecordError(span, nil,
 						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
 				}
 			}
 		}

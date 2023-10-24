@@ -234,14 +234,13 @@ func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error)
 		tracing.RecordError(span, err, "Failed to get job")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get job",
 		)
 	}
 
 	if job == nil {
 		tracing.RecordError(span, nil, "Job with ID %s not found", jobID)
-		return nil, errors.New(errors.ENotFound, "Job with ID %s not found", jobID)
+		return nil, errors.New("Job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
@@ -445,7 +444,7 @@ func (s *service) SaveLogs(ctx context.Context, jobID string, startOffset int, b
 
 	if err := s.logStore.SaveLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, buffer); err != nil {
 		tracing.RecordError(span, err, "Failed to save logs")
-		return errors.Wrap(err, errors.EInvalid, "Failed to save logs")
+		return errors.Wrap(err, "Failed to save logs", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
@@ -464,7 +463,7 @@ func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, li
 
 	if limit < 0 || startOffset < 0 {
 		tracing.RecordError(span, nil, "limit and offset cannot be negative")
-		return nil, errors.New(errors.EInvalid, "limit and offset cannot be negative")
+		return nil, errors.New("limit and offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	job, err := s.GetJob(ctx, jobID)
@@ -510,7 +509,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 		}
 		if group == nil {
 			tracing.RecordError(span, nil, "runner not found")
-			return nil, errors.New(errors.ENotFound, "runner not found")
+			return nil, errors.New("runner not found", errors.WithErrorCode(errors.ENotFound))
 		}
 		getRunnerInput.Filter.GroupID = &group.Metadata.ID
 	}
@@ -523,7 +522,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 
 	if len(runnersResp.Runners) == 0 {
 		tracing.RecordError(span, nil, "runner not found")
-		return nil, errors.New(errors.ENotFound, "runner not found")
+		return nil, errors.New("runner not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	runner := runnersResp.Runners[0]

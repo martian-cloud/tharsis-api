@@ -146,7 +146,7 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 
 	if namespace == nil {
 		tracing.RecordError(span, nil, "Namespace not found")
-		return nil, errors.New(errors.ENotFound, "Namespace not found")
+		return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	timestamp := currentTime()
@@ -184,25 +184,25 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "member already exists")
-				return nil, errors.New(errors.EConflict, "member already exists")
+				return nil, errors.New("member already exists", errors.WithErrorCode(errors.EConflict))
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_memberships_user_id":
 					tracing.RecordError(span, nil, "user does not exist")
-					return nil, errors.New(errors.ENotFound, "user does not exist")
+					return nil, errors.New("user does not exist", errors.WithErrorCode(errors.ENotFound))
 				case "fk_namespace_memberships_service_account_id":
 					tracing.RecordError(span, nil, "service account does not exist")
-					return nil, errors.New(errors.ENotFound, "service account does not exist")
+					return nil, errors.New("service account does not exist", errors.WithErrorCode(errors.ENotFound))
 				case "fk_namespace_memberships_team_id":
 					tracing.RecordError(span, nil, "team does not exist")
-					return nil, errors.New(errors.ENotFound, "team does not exist")
+					return nil, errors.New("team does not exist", errors.WithErrorCode(errors.ENotFound))
 				case "fk_namespace_memberships_namespace_id":
 					tracing.RecordError(span, nil, "namespace does not exist")
-					return nil, errors.New(errors.ENotFound, "namespace does not exist")
+					return nil, errors.New("namespace does not exist", errors.WithErrorCode(errors.ENotFound))
 				case "fk_namespace_memberships_role_id":
 					tracing.RecordError(span, nil, "role does not exist")
-					return nil, errors.New(errors.ENotFound, "role does not exist")
+					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}
@@ -248,13 +248,13 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "member already exists")
-				return nil, errors.New(errors.EConflict, "member already exists")
+				return nil, errors.New("member already exists", errors.WithErrorCode(errors.EConflict))
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_memberships_role_id":
 					tracing.RecordError(span, nil, "role does not exist")
-					return nil, errors.New(errors.ENotFound, "role does not exist")
+					return nil, errors.New("role does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}

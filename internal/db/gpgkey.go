@@ -216,8 +216,8 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 				tracing.RecordError(span, nil,
 					"GPG key with key fingerprint %s already exists in group", gpgKey.Fingerprint)
 				return nil, errors.New(
-					errors.EConflict,
 					"GPG key with key fingerprint %s already exists in group", gpgKey.Fingerprint,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 		}

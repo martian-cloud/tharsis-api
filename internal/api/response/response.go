@@ -31,7 +31,7 @@ type responseHelper struct {
 	logger logger.Logger
 }
 
-var tharsisErrorToStatusCode = map[string]int{
+var tharsisErrorToStatusCode = map[te.CodeType]int{
 	te.EInternal:        http.StatusInternalServerError,
 	te.ENotImplemented:  http.StatusNotImplemented,
 	te.EInvalid:         http.StatusBadRequest,
@@ -154,7 +154,7 @@ func (rh *responseHelper) respondWithError(w http.ResponseWriter, code int, msg 
 
 // ErrorCodeToStatusCode maps a tharsis error code string to a
 // http status code integer.
-func ErrorCodeToStatusCode(code string) int {
+func ErrorCodeToStatusCode(code te.CodeType) int {
 	// Otherwise map internal error codes to HTTP status codes.
 	statusCode, ok := tharsisErrorToStatusCode[code]
 	if ok {

@@ -28,7 +28,7 @@ type TerraformModuleAttestationEdgeResolver struct {
 func (r *TerraformModuleAttestationEdgeResolver) Cursor() (string, error) {
 	moduleAttestation, ok := r.edge.Node.(models.TerraformModuleAttestation)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&moduleAttestation)
 	return *cursor, err
@@ -38,7 +38,7 @@ func (r *TerraformModuleAttestationEdgeResolver) Cursor() (string, error) {
 func (r *TerraformModuleAttestationEdgeResolver) Node() (*TerraformModuleAttestationResolver, error) {
 	moduleAttestation, ok := r.edge.Node.(models.TerraformModuleAttestation)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &TerraformModuleAttestationResolver{moduleAttestation: &moduleAttestation}, nil

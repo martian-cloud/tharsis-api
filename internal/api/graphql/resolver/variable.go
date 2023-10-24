@@ -252,7 +252,7 @@ func loadVariable(ctx context.Context, id string) (*models.Variable, error) {
 
 	namespaceVariable, ok := data.(models.Variable)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &namespaceVariable, nil

@@ -274,7 +274,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		}
 
 		if loginIdp == nil {
-			return nil, errors.New(errors.EInternal, "OIDC Identity Provider not found for TFE login")
+			return nil, errors.New("OIDC Identity Provider not found for TFE login")
 		}
 
 		tfeHandler, sdErr := tfe.BuildTFEServiceDiscoveryHandler(logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL, tfeBasePath)

@@ -39,17 +39,15 @@ func TestGetLogs(t *testing.T) {
 		{
 			name: "logs not found",
 			retErr: errors.New(
-				errors.ENotFound,
 				"Not Found",
-			),
+				errors.WithErrorCode(errors.ENotFound)),
 			expectErr: false,
 		},
 		{
 			name: "unexpected error",
 			retErr: errors.New(
-				errors.EInternal,
 				"",
-			),
+				errors.WithErrorCode(errors.EInternal)),
 			expectErr: true,
 		},
 	}
@@ -151,9 +149,8 @@ func TestSaveLogs(t *testing.T) {
 			mockDownloadResult := func(_ context.Context, _ string, w io.WriterAt, _ *objectstore.DownloadOptions) error {
 				if test.existingLogs == "" {
 					return errors.New(
-						errors.ENotFound,
 						"Not Found",
-					)
+						errors.WithErrorCode(errors.ENotFound))
 				}
 
 				_, _ = w.WriteAt([]byte(test.existingLogs), 0)

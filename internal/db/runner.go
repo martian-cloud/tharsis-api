@@ -244,8 +244,8 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "runner with name %s already exists in group", runner.Name)
 				return nil, errors.New(
-					errors.EConflict,
 					"runner with name %s already exists in group", runner.Name,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 		}

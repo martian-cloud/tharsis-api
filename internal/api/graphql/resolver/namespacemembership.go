@@ -32,7 +32,7 @@ type NamespaceMembershipEdgeResolver struct {
 func (r *NamespaceMembershipEdgeResolver) Cursor() (string, error) {
 	namespaceMembership, ok := r.edge.Node.(models.NamespaceMembership)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&namespaceMembership)
 	return *cursor, err
@@ -42,7 +42,7 @@ func (r *NamespaceMembershipEdgeResolver) Cursor() (string, error) {
 func (r *NamespaceMembershipEdgeResolver) Node() (*NamespaceMembershipResolver, error) {
 	namespaceMembership, ok := r.edge.Node.(models.NamespaceMembership)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &NamespaceMembershipResolver{namespaceMembership: &namespaceMembership}, nil
@@ -192,7 +192,7 @@ func makeMemberResolver(ctx context.Context, userID, serviceAccountID, teamID *s
 		return &MemberResolver{result: &TeamResolver{team: team}}, nil
 	}
 
-	return nil, errors.New(errors.EInvalid, "UserID, ServiceAccountID, or TeamID must be specified")
+	return nil, errors.New("UserID, ServiceAccountID, or TeamID must be specified", errors.WithErrorCode(errors.EInvalid))
 }
 
 // Namespace resolver
@@ -442,7 +442,7 @@ func loadNamespaceMembership(ctx context.Context, id string) (*models.NamespaceM
 
 	namespaceMembership, ok := data.(models.NamespaceMembership)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &namespaceMembership, nil

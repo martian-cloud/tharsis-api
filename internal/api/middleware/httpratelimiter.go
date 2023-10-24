@@ -30,7 +30,7 @@ func HTTPRateLimiterMiddleware(
 			subject := auth.GetSubject(r.Context())
 			if subject == nil {
 				logger.Errorf("No subject string in context")
-				respWriter.RespondWithError(w, errors.New(errors.EInternal, "No subject string in context"))
+				respWriter.RespondWithError(w, errors.New("No subject string in context"))
 
 				return
 			}
@@ -39,7 +39,7 @@ func HTTPRateLimiterMiddleware(
 			tokenLimit, remaining, _, ok, err := store.TakeMany(r.Context(), "http-"+*subject, uint64(1))
 			if err != nil {
 				logger.Errorf("Failed to check HTTP rate limit: %w", err)
-				respWriter.RespondWithError(w, errors.Wrap(err, errors.EInternal, "Failed to check HTTP rate limit"))
+				respWriter.RespondWithError(w, errors.Wrap(err, "Failed to check HTTP rate limit"))
 				return
 			}
 
@@ -50,7 +50,7 @@ func HTTPRateLimiterMiddleware(
 
 			if !ok {
 				logger.Infof("HTTP rate limit exceeded for subject: %s", *subject)
-				respWriter.RespondWithError(w, errors.New(errors.ETooManyRequests, "request rate limit exceeded"))
+				respWriter.RespondWithError(w, errors.New("request rate limit exceeded", errors.WithErrorCode(errors.ETooManyRequests)))
 
 				// Tell the requester how long to wait before trying again.
 				w.Header().Add(headerRetryAfter, "1") // we always use a 1-second interval

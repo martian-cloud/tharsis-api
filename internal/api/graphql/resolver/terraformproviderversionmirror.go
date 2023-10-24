@@ -39,7 +39,7 @@ type TerraformProviderVersionMirrorEdgeResolver struct {
 func (r *TerraformProviderVersionMirrorEdgeResolver) Cursor() (string, error) {
 	versionMirror, ok := r.edge.Node.(models.TerraformProviderVersionMirror)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&versionMirror)
 	return *cursor, err
@@ -49,7 +49,7 @@ func (r *TerraformProviderVersionMirrorEdgeResolver) Cursor() (string, error) {
 func (r *TerraformProviderVersionMirrorEdgeResolver) Node() (*TerraformProviderVersionMirrorResolver, error) {
 	versionMirror, ok := r.edge.Node.(models.TerraformProviderVersionMirror)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &TerraformProviderVersionMirrorResolver{versionMirror: &versionMirror}, nil
@@ -333,7 +333,7 @@ func loadTerraformProviderVersionMirror(ctx context.Context, id string) (*models
 
 	versionMirror, ok := data.(models.TerraformProviderVersionMirror)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &versionMirror, nil

@@ -239,7 +239,7 @@ func TestGetProviderVersionMirrorByID(t *testing.T) {
 		expectMirror    *models.TerraformProviderVersionMirror
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -268,7 +268,7 @@ func TestGetProviderVersionMirrorByID(t *testing.T) {
 				SemanticVersion:   "1.0.0",
 				GroupID:           groupID,
 			},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -323,7 +323,7 @@ func TestGetProviderVersionMirrorByAddress(t *testing.T) {
 		expectMirror    *models.TerraformProviderVersionMirror
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -343,7 +343,7 @@ func TestGetProviderVersionMirrorByAddress(t *testing.T) {
 		},
 		{
 			name:            "subject does not have access to view version mirror",
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -436,7 +436,7 @@ func TestGetProviderVersionMirrorsByIDs(t *testing.T) {
 		expectMirror    *models.TerraformProviderVersionMirror
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -461,7 +461,7 @@ func TestGetProviderVersionMirrorsByIDs(t *testing.T) {
 				SemanticVersion:   "1.0.0",
 				GroupID:           groupID,
 			},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -530,7 +530,7 @@ func TestGetProviderVersionMirrors(t *testing.T) {
 	type testCase struct {
 		expectMirror    *models.TerraformProviderVersionMirror
 		input           *GetProviderVersionMirrorsInput
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		authError       error
 		name            string
 	}
@@ -554,7 +554,7 @@ func TestGetProviderVersionMirrors(t *testing.T) {
 		{
 			name:            "subject does not have viewer access to namespace",
 			input:           &GetProviderVersionMirrorsInput{},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -662,7 +662,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		packageQueryResp      *packageQueryResponse
 		authError             error
 		name                  string
-		expectErrorCode       string
+		expectErrorCode       errors.CodeType
 		limit                 int
 		injectMirrorsPerGroup int32
 	}
@@ -858,7 +858,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 			input: &CreateProviderVersionMirrorInput{
 				GroupPath: namespace,
 			},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1005,7 +1005,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 		authError         error
 		input             *DeleteProviderVersionMirrorInput
 		name              string
-		expectErrorCode   string
+		expectErrorCode   errors.CodeType
 		mirroredPlatforms int32
 	}
 
@@ -1030,7 +1030,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 		{
 			name:            "subject does not have permissions to delete provider version mirror",
 			input:           &DeleteProviderVersionMirrorInput{VersionMirror: sampleVersionMirror},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1118,7 +1118,7 @@ func TestGetProviderPlatformMirrorByID(t *testing.T) {
 		expectMirror    *models.TerraformProviderPlatformMirror
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -1139,7 +1139,7 @@ func TestGetProviderPlatformMirrorByID(t *testing.T) {
 				Metadata:        models.ResourceMetadata{ID: platformMirrorID},
 				VersionMirrorID: versionMirrorID,
 			},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1203,7 +1203,7 @@ func TestGetProviderPlatformMirrors(t *testing.T) {
 		versionMirror   *models.TerraformProviderVersionMirror
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -1223,7 +1223,7 @@ func TestGetProviderPlatformMirrors(t *testing.T) {
 				VersionMirrorID: versionMirrorID,
 			},
 			versionMirror:   sampleVersionMirror,
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -1314,7 +1314,7 @@ func TestDeleteProviderPlatformMirror(t *testing.T) {
 	type testCase struct {
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -1323,7 +1323,7 @@ func TestDeleteProviderPlatformMirror(t *testing.T) {
 		},
 		{
 			name:            "subject does not have permissions to delete provider platform mirror",
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1383,7 +1383,7 @@ func TestUploadInstallationPackage(t *testing.T) {
 		input                   *UploadInstallationPackageInput
 		versionMirror           *models.TerraformProviderVersionMirror
 		authError               error
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 		name                    string
 		platformAlreadyMirrored bool
 	}
@@ -1427,7 +1427,7 @@ func TestUploadInstallationPackage(t *testing.T) {
 			versionMirror: &models.TerraformProviderVersionMirror{
 				GroupID: groupID,
 			},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -1569,7 +1569,7 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 		group           *models.Group
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -1602,7 +1602,7 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 				GroupPath:         namespace,
 			},
 			group:           &models.Group{Metadata: models.ResourceMetadata{ID: groupID}},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -1705,7 +1705,7 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 		group                *models.Group
 		authError            error
 		name                 string
-		expectErrorCode      string
+		expectErrorCode      errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -1752,7 +1752,7 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 				GroupPath: namespace,
 			},
 			group:           &models.Group{Metadata: models.ResourceMetadata{ID: groupID}},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{

@@ -164,7 +164,7 @@ func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Varia
 
 	if variable == nil {
 		tracing.RecordError(span, nil, "variable with id %s not found", id)
-		return nil, errors.New(errors.ENotFound, "variable with id %s not found", id)
+		return nil, errors.New("variable with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
@@ -253,17 +253,17 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 	for _, v := range input.Variables {
 		if input.Category != v.Category {
 			tracing.RecordError(span, nil, "variable category does not match input")
-			return errors.New(errors.EInternal, "variable category does not match input")
+			return errors.New("variable category does not match input")
 		}
 
 		if input.NamespacePath != v.NamespacePath {
 			tracing.RecordError(span, nil, "variable namespace path does not match input")
-			return errors.New(errors.EInternal, "variable namespace path does not match input")
+			return errors.New("variable namespace path does not match input")
 		}
 
 		if input.Category == models.EnvironmentVariableCategory && v.Hcl {
 			tracing.RecordError(span, nil, "HCL variables are not supported for the environment category")
-			return errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
+			return errors.New("HCL variables are not supported for the environment category", errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -313,12 +313,12 @@ func (s *service) CreateVariable(ctx context.Context, input *models.Variable) (*
 
 	if input.Category == models.EnvironmentVariableCategory && input.Hcl {
 		tracing.RecordError(span, nil, "failed to commit DB transaction")
-		return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
+		return nil, errors.New("HCL variables are not supported for the environment category", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if input.Key == "" {
 		tracing.RecordError(span, nil, "Key cannot be empty")
-		return nil, errors.New(errors.EInvalid, "Key cannot be empty")
+		return nil, errors.New("Key cannot be empty", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -401,12 +401,12 @@ func (s *service) UpdateVariable(ctx context.Context, variable *models.Variable)
 
 	if variable.Category == models.EnvironmentVariableCategory && variable.Hcl {
 		tracing.RecordError(span, nil, "HCL variables are not supported for the environment category")
-		return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
+		return nil, errors.New("HCL variables are not supported for the environment category", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if variable.Key == "" {
 		tracing.RecordError(span, nil, "Key cannot be empty")
-		return nil, errors.New(errors.EInvalid, "Key cannot be empty")
+		return nil, errors.New("Key cannot be empty", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)

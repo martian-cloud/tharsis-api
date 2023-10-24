@@ -89,12 +89,12 @@ func (d *Delegate) CreateCredentials(ctx context.Context, identity *models.Manag
 func (d *Delegate) SetManagedIdentityData(_ context.Context, managedIdentity *models.ManagedIdentity, input []byte) error {
 	decodedData, err := base64.StdEncoding.DecodeString(string(input))
 	if err != nil {
-		return te.Wrap(err, te.EInvalid, "failed to decode managed identity data")
+		return te.Wrap(err, "failed to decode managed identity data", te.WithErrorCode(te.EInvalid))
 	}
 
 	inputData := Data{}
 	if err = json.Unmarshal(decodedData, &inputData); err != nil {
-		return te.Wrap(err, te.EInvalid, "invalid managed identity data")
+		return te.Wrap(err, "invalid managed identity data", te.WithErrorCode(te.EInvalid))
 	}
 
 	if inputData.ClientID == "" {

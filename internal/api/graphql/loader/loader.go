@@ -67,7 +67,7 @@ func (ldr loader) loadBatch(ctx context.Context, keys dataloader.Keys) []*datalo
 
 		data, found := batch[id]
 		if !found {
-			results[i].Error = errors.New(errors.ENotFound, "resource with ID %s not found", id)
+			results[i].Error = errors.New("resource with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 		}
 		results[i].Data = data
 	}

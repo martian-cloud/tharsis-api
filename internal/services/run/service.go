@@ -229,7 +229,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	}
 
 	if options.WorkspaceID == nil {
-		return nil, errors.New(errors.EInvalid, "WorkspaceID option is required")
+		return nil, errors.New("WorkspaceID option is required", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
@@ -324,7 +324,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		tracing.RecordError(span, err, "failed to build run variables")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"failed to build run variables",
 		)
 	}
@@ -348,7 +347,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		moduleRegistrySource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *options.ModuleSource)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to parse/resolve module source")
-			return nil, errors.Wrap(err, errors.EInvalid, "failed to resolve module source")
+			return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// registry source will be nil if this is a remote module source that doesn't use the terraform module registry protocol
@@ -357,7 +356,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			resolvedVersion, err = s.moduleResolver.ResolveModuleVersion(ctx, moduleRegistrySource, options.ModuleVersion, runEnvVars)
 			if err != nil {
 				tracing.RecordError(span, err, "failed to resolve module source")
-				return nil, errors.Wrap(err, errors.EInvalid, "failed to resolve module source")
+				return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid))
 			}
 			moduleVersion = &resolvedVersion
 
@@ -379,7 +378,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 				}
 
 				if len(versionsResponse.ModuleVersions) == 0 {
-					return nil, errors.New(errors.EInternal, "unable to find the module package for module %s with semantic version %s", *options.ModuleSource, resolvedVersion)
+					return nil, errors.New("unable to find the module package for module %s with semantic version %s", *options.ModuleSource, resolvedVersion)
 				}
 
 				moduleDigest = versionsResponse.ModuleVersions[0].SHASum
@@ -393,16 +392,14 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		tracing.RecordError(span, err, "Failed to get workspace associated with run")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get workspace associated with run",
 		)
 	}
 
 	if ws == nil {
 		return nil, errors.New(
-			errors.EInternal,
 			"Failed to get workspace associated with run",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	// Check if Terraform version is supported. Use workspace's value by default.
@@ -425,9 +422,8 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	// Enforce the workspace's option to prevent a destroy run.
 	if options.IsDestroy && ws.PreventDestroyPlan {
 		return nil, errors.New(
-			errors.EForbidden,
 			"Workspace does not allow destroy plan",
-		)
+			errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Check if any managed identities are assigned to this workspace
@@ -477,7 +473,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		tracing.RecordError(span, err, "failed to create plan")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create plan",
 		)
 	}
@@ -492,7 +487,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			tracing.RecordError(span, gcvErr, "failed to get configuration version")
 			return nil, errors.Wrap(
 				gcvErr,
-				errors.EInternal,
 				"Failed to get configuration version associated with run",
 			)
 		}
@@ -526,7 +520,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			tracing.RecordError(span, aErr, "failed to create apply")
 			return nil, errors.Wrap(
 				aErr,
-				errors.EInternal,
 				"Failed to create apply",
 			)
 		}
@@ -539,7 +532,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		tracing.RecordError(span, err, "failed to create run")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create run",
 		)
 	}
@@ -575,7 +567,6 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		tracing.RecordError(span, err, "failed to create job")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create job",
 		)
 	}
@@ -685,7 +676,6 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		tracing.RecordError(span, err, "failed to get apply")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get apply resource",
 		)
 	}
@@ -714,7 +704,6 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		tracing.RecordError(span, err, "failed to update apply")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to update apply resource",
 		)
 	}
@@ -739,7 +728,6 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		tracing.RecordError(span, err, "failed to create job")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create job",
 		)
 	}
@@ -792,21 +780,18 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		// only and that plan has finished, the job cannot be canceled, so return a
 		// bad request error aka EInvalid.
 		return nil, errors.New(
-			errors.EInvalid,
 			"run has been planned and finished, so it cannot be canceled",
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	case models.RunApplied:
 		// If a run is in RunApplied state, meaning the run was for apply and that plan has finished,
 		// the job cannot be canceled, so return a bad request error aka EInvalid.
 		return nil, errors.New(
-			errors.EInvalid,
 			"run has been applied, so it cannot be canceled",
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	case models.RunCanceled:
 		return nil, errors.New(
-			errors.EInvalid,
 			"run has already been canceled",
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// If this is a force cancel request, verify graceful cancel was already attempted
@@ -814,17 +799,16 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		// Verify that graceful cancel was already attempted
 		if run.ForceCancelAvailableAt == nil {
 			return nil, errors.New(
-				errors.EInvalid,
 				"run has not already received a graceful request to cancel",
-			)
+				errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Error out with errors.EInvalid if not yet eligible.
 		if time.Now().Before(*run.ForceCancelAvailableAt) {
 			return nil, errors.New(
-				errors.EInvalid,
 				"insufficient time has elapsed since graceful cancel request; force cancel will be available at %s",
 				*run.ForceCancelAvailableAt,
+				errors.WithErrorCode(errors.EInvalid),
 			)
 		}
 	}
@@ -840,7 +824,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 			tracing.RecordError(span, aErr, "failed to get apply")
 			return nil, errors.Wrap(
 				aErr,
-				errors.EInternal,
 				"failed to get the apply object to cancel a planned run",
 			)
 		}
@@ -851,7 +834,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 			tracing.RecordError(span, err, "failed to update apply")
 			return nil, errors.Wrap(
 				err,
-				errors.EInternal,
 				"failed to update the apply to cancel a planned run",
 			)
 		}
@@ -863,7 +845,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 			tracing.RecordError(span, pErr, "failed to get the plan to cancel a queued run")
 			return nil, errors.Wrap(
 				pErr,
-				errors.EInternal,
 				"failed to get the plan to cancel a queued run",
 			)
 		}
@@ -874,7 +855,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 			tracing.RecordError(span, err, "failed to update the plan to cancel a queued run")
 			return nil, errors.Wrap(
 				err,
-				errors.EInternal,
 				"failed to update the plan to cancel a queued run",
 			)
 		}
@@ -888,7 +868,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		tracing.RecordError(span, err, "failed to begin DB transaction to cancel a run")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"failed to create a transaction to cancel a run",
 		)
 	}
@@ -932,7 +911,6 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		tracing.RecordError(span, err, "failed to commit DB transaction to cancel a run")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"failed to commit the transaction to cancel a run",
 		)
 	}
@@ -954,16 +932,14 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get latest job for run",
 		)
 	}
 
 	if job == nil {
 		return nil, errors.New(
-			errors.EInternal,
 			"Run has no job",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	now := time.Now()
@@ -999,16 +975,14 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get latest job for run",
 		)
 	}
 
 	if job == nil {
 		return nil, errors.New(
-			errors.EInternal,
 			"Run has no job",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	// If a forced cancel, update the state of the plan or apply directly
@@ -1022,7 +996,6 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 		if err != nil {
 			return nil, errors.Wrap(
 				err,
-				errors.EInternal,
 				"failed to get the plan object to cancel a run",
 			)
 		}
@@ -1038,7 +1011,6 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 		if err != nil {
 			return nil, errors.Wrap(
 				err,
-				errors.EInternal,
 				"failed to get an apply object to cancel a run",
 			)
 		}
@@ -1115,7 +1087,7 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 			return nil, napErr
 		}
 		if !policy.AllowAll {
-			return nil, errors.New(errors.EInvalid, "either a workspace or group must be specified when querying for runs")
+			return nil, errors.New("either a workspace or group must be specified when querying for runs", errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -1128,7 +1100,6 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 		tracing.RecordError(span, err, "Failed to get runs")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get runs",
 		)
 	}
@@ -1156,7 +1127,6 @@ func (s *service) GetRunsByIDs(ctx context.Context, idList []string) ([]models.R
 		tracing.RecordError(span, err, "Failed to get runs")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get runs",
 		)
 	}
@@ -1192,7 +1162,6 @@ func (s *service) GetPlansByIDs(ctx context.Context, idList []string) ([]models.
 		tracing.RecordError(span, err, "Failed to get plans")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get plans",
 		)
 	}
@@ -1225,13 +1194,12 @@ func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, err
 		tracing.RecordError(span, err, "Failed to get plan")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get plan",
 		)
 	}
 
 	if plan == nil {
-		return nil, errors.New(errors.ENotFound, "plan with ID %s not found", planID)
+		return nil, errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	run, err := s.dbClient.Runs.GetRunByPlanID(ctx, planID)
@@ -1297,7 +1265,6 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 		tracing.RecordError(span, err, "Failed to get plan cache from artifact store")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get plan cache from artifact store",
 		)
 	}
@@ -1321,13 +1288,12 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 		tracing.RecordError(span, err, "Failed to get run")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get run",
 		)
 	}
 
 	if run == nil {
-		return nil, errors.New(errors.ENotFound, "run with ID %s not found", runID)
+		return nil, errors.New("run with ID %s not found", runID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Only include variable values if the caller has UpdateRunPermission or ViewVariableValuePermission on workspace.
@@ -1344,7 +1310,6 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 		tracing.RecordError(span, err, "failed to get run variables from object store")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get run variables from object store",
 		)
 	}
@@ -1410,7 +1375,6 @@ func (s *service) UploadPlan(ctx context.Context, planID string, reader io.Reade
 		tracing.RecordError(span, err, "Failed to write plan cache to object storage")
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to write plan cache to object storage",
 		)
 	}
@@ -1438,7 +1402,6 @@ func (s *service) GetAppliesByIDs(ctx context.Context, idList []string) ([]model
 		tracing.RecordError(span, err, "Failed to list applies")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to list applies",
 		)
 	}
@@ -1471,13 +1434,12 @@ func (s *service) GetApply(ctx context.Context, applyID string) (*models.Apply, 
 		tracing.RecordError(span, err, "Failed to get apply")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get apply",
 		)
 	}
 
 	if apply == nil {
-		return nil, errors.New(errors.ENotFound, "apply with ID %s not found", applyID)
+		return nil, errors.New("apply with ID %s not found", applyID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	run, err := s.dbClient.Runs.GetRunByApplyID(ctx, applyID)
@@ -1628,7 +1590,7 @@ func (s *service) buildRunVariables(ctx context.Context, workspaceID string, run
 	// Add run variables first since they have the highest precedence
 	for _, v := range runVariables {
 		if v.Category == models.EnvironmentVariableCategory && v.Hcl {
-			return nil, errors.New(errors.EInvalid, "HCL variables are not supported for the environment category")
+			return nil, errors.New("HCL variables are not supported for the environment category", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		variableMap[buildMapKey(v.Key, string(v.Category))] = Variable{
@@ -1669,7 +1631,7 @@ func (s *service) getLatestJobByRunAndType(ctx context.Context, runID string, jo
 	}
 
 	if job == nil {
-		return nil, errors.New(errors.ENotFound, "latest %s job for run %s not found", jobType, runID)
+		return nil, errors.New("latest %s job for run %s not found", jobType, runID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return job, nil
@@ -1691,13 +1653,12 @@ func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error)
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get run",
 		)
 	}
 
 	if run == nil {
-		return nil, errors.New(errors.ENotFound, "run with ID %s not found", runID)
+		return nil, errors.New("run with ID %s not found", runID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return run, nil

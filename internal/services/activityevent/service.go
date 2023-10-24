@@ -86,7 +86,7 @@ func (s *service) GetActivityEvents(ctx context.Context,
 			membershipRequirement = &db.ActivityEventNamespaceMembershipRequirement{ServiceAccountID: &c.ServiceAccountID}
 		default:
 			tracing.RecordError(span, nil, "invalid caller type: %T", caller)
-			return nil, errors.New(errors.EUnauthorized, "invalid caller type")
+			return nil, errors.New("invalid caller type", errors.WithErrorCode(errors.EUnauthorized))
 		}
 	}
 

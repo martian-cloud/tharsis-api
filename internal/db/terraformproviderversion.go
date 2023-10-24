@@ -232,7 +232,7 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"terraform provider version %s already exists", providerVersion.SemanticVersion)
-				return nil, errors.New(errors.EConflict, "terraform provider version %s already exists", providerVersion.SemanticVersion)
+				return nil, errors.New("terraform provider version %s already exists", providerVersion.SemanticVersion, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

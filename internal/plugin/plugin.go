@@ -70,7 +70,7 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, pluginType strin
 	case "redis":
 		endpoint, ok := pluginData["redis_endpoint"]
 		if !ok {
-			return nil, errors.New(errors.EInternal, "'redis_endpoint' is required when using the redis rate limit store")
+			return nil, errors.New("'redis_endpoint' is required when using the redis rate limit store")
 		}
 
 		pool := &redis.Pool{
@@ -108,7 +108,6 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, pluginType strin
 		return mem, nil
 	default:
 		return nil, errors.New(
-			errors.EInternal,
 			"The specified rate limit store type %s is not currently supported",
 			pluginType,
 		)
@@ -127,7 +126,6 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 		store, err = aws.New(ctx, logger, cfg.ObjectStorePluginData)
 	default:
 		err = errors.New(
-			errors.EInternal,
 			"The specified object store %s is not currently supported", cfg.ObjectStorePluginType,
 		)
 	}
@@ -148,7 +146,6 @@ func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Conf
 		plugin, err = awskms.New(ctx, cfg.JWSProviderPluginData)
 	default:
 		err = errors.New(
-			errors.EInternal,
 			"The specified JWS Provider plugin %s is not currently supported", cfg.JWSProviderPluginType,
 		)
 	}

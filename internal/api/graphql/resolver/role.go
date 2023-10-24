@@ -37,7 +37,7 @@ type RoleEdgeResolver struct {
 func (r *RoleEdgeResolver) Cursor() (string, error) {
 	role, ok := r.edge.Node.(models.Role)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&role)
 	return *cursor, err
@@ -47,7 +47,7 @@ func (r *RoleEdgeResolver) Cursor() (string, error) {
 func (r *RoleEdgeResolver) Node() (*RoleResolver, error) {
 	role, ok := r.edge.Node.(models.Role)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &RoleResolver{role: &role}, nil
@@ -375,7 +375,7 @@ func loadRole(ctx context.Context, id string) (*models.Role, error) {
 
 	vp, ok := data.(models.Role)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &vp, nil

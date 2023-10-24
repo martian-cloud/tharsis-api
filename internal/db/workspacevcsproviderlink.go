@@ -150,17 +150,17 @@ func (wpl *workspaceVCSProviderLinks) CreateLink(ctx context.Context, link *mode
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"workspace is already linked with a vcs provider")
-				return nil, errors.New(errors.EConflict, "workspace is already linked with a vcs provider")
+				return nil, errors.New("workspace is already linked with a vcs provider", errors.WithErrorCode(errors.EConflict))
 			}
 
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_workspace_id":
 					tracing.RecordError(span, nil, "workspace does not exist")
-					return nil, errors.New(errors.ENotFound, "workspace does not exist")
+					return nil, errors.New("workspace does not exist", errors.WithErrorCode(errors.ENotFound))
 				case "fk_provider_id":
 					tracing.RecordError(span, nil, "vcs provider does not exist")
-					return nil, errors.New(errors.ENotFound, "vcs provider does not exist")
+					return nil, errors.New("vcs provider does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}

@@ -36,7 +36,7 @@ func TestCreateSCIMToken(t *testing.T) {
 		caller          *auth.UserCaller
 		inputToken      *models.SCIMToken
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		existingTokens  []models.SCIMToken
 	}{
 		{
@@ -280,7 +280,7 @@ func TestUpdateSCIMUser(t *testing.T) {
 		existingUser      *models.User // User already in the system.
 		expectedSCIMUser  *models.User // Updates user.
 		name              string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name: "positive: valid 'replace' operation; expect SCIMExternalID to be updated.",
@@ -387,7 +387,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 		input             *DeleteSCIMResourceInput
 		existingUser      *models.User
 		authError         error
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name: "positive: user was created via SCIM; expect no error.",
@@ -413,7 +413,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 				},
 				// None of the other fields matter here.
 			},
-			authError:         errors.New(errors.ENotFound, "Resource not found"),
+			authError:         errors.New("Resource not found", errors.WithErrorCode(errors.ENotFound)),
 			expectedErrorCode: errors.ENotFound,
 		},
 	}
@@ -625,7 +625,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 		existingSCIMGroupMember *models.TeamMember // SCIM Group (team) member already in system.
 		expectedSCIMGroup       *models.Team       // Updated SCIM Group (team).
 		name                    string
-		expectedErrorCode       string
+		expectedErrorCode       errors.CodeType
 		operations              []Operation
 	}{
 		{
@@ -835,7 +835,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 		input             *DeleteSCIMResourceInput
 		existingSCIMGroup *models.Team
 		authError         error
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name: "positive: team was created via SCIM; expect no error.",
@@ -860,7 +860,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 					ID: resourceUUID,
 				},
 			},
-			authError:         errors.New(errors.ENotFound, "Resource not found"),
+			authError:         errors.New("Resource not found", errors.WithErrorCode(errors.ENotFound)),
 			expectedErrorCode: errors.ENotFound,
 		},
 	}

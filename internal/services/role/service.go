@@ -125,7 +125,7 @@ func (s *service) GetRoleByName(ctx context.Context, name string) (*models.Role,
 	}
 
 	if role == nil {
-		return nil, errors.New(errors.ENotFound, "role with name %s not found", name)
+		return nil, errors.New("role with name %s not found", name, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return role, nil
@@ -188,12 +188,12 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return nil, errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to create roles")
+		return nil, errors.New("Unsupported caller type, only users are allowed to create roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Only admins are allowed to create roles
 	if !userCaller.User.Admin {
-		return nil, errors.New(errors.EForbidden, "Only system admins can create roles")
+		return nil, errors.New("Only system admins can create roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	toCreate := &models.Role{
@@ -264,16 +264,16 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return nil, errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to update roles")
+		return nil, errors.New("Unsupported caller type, only users are allowed to update roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Only admins are allowed to update roles
 	if !userCaller.User.Admin {
-		return nil, errors.New(errors.EForbidden, "Only system admins can update roles")
+		return nil, errors.New("Only system admins can update roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	if models.DefaultRoleID(input.Role.Metadata.ID).IsDefaultRole() {
-		return nil, errors.New(errors.EForbidden, "Default roles are read-only")
+		return nil, errors.New("Default roles are read-only", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	if err = input.Role.Validate(); err != nil {
@@ -336,16 +336,16 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
-		return errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to delete roles")
+		return errors.New("Unsupported caller type, only users are allowed to delete roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Only admins are allowed to delete roles
 	if !userCaller.User.Admin {
-		return errors.New(errors.EForbidden, "Only system admins can delete roles")
+		return errors.New("Only system admins can delete roles", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	if models.DefaultRoleID(input.Role.Metadata.ID).IsDefaultRole() {
-		return errors.New(errors.EForbidden, "Default roles are read-only")
+		return errors.New("Default roles are read-only", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Get all the namespace memberships if any for this role.
@@ -361,9 +361,9 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 
 	if !input.Force && len(result.NamespaceMemberships) > 0 {
 		return errors.New(
-			errors.EConflict,
 			"This Role can't be deleted because it's currently associated with %d namespace memberships. "+
 				"Setting force to true will automatically remove all associated namespace memberships.", len(result.NamespaceMemberships),
+			errors.WithErrorCode(errors.EConflict),
 		)
 	}
 
@@ -383,7 +383,7 @@ func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, err
 	}
 
 	if role == nil {
-		return nil, errors.New(errors.ENotFound, "role with id %s not found", id)
+		return nil, errors.New("role with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return role, nil

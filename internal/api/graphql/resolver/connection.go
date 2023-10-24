@@ -19,19 +19,19 @@ type ConnectionQueryArgs struct {
 // Validate query args
 func (c ConnectionQueryArgs) Validate() error {
 	if c.First != nil && c.Last != nil {
-		return errors.New(errors.EInvalid, "invalid args: only first or last can be used")
+		return errors.New("invalid args: only first or last can be used", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if c.First == nil && c.Last == nil {
-		return errors.New(errors.EInvalid, "invalid args: either first or last must be specified")
+		return errors.New("invalid args: either first or last must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if c.First != nil && (*c.First < 0 || *c.First > maxQueryLimit) {
-		return errors.New(errors.EInvalid, "invalid args: first must be between 0-%d", maxQueryLimit)
+		return errors.New("invalid args: first must be between 0-%d", maxQueryLimit, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if c.Last != nil && (*c.Last < 0 || *c.Last > maxQueryLimit) {
-		return errors.New(errors.EInvalid, "invalid args: last must be between 0-%d", maxQueryLimit)
+		return errors.New("invalid args: last must be between 0-%d", maxQueryLimit, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil

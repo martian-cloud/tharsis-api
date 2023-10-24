@@ -31,7 +31,7 @@ func TestCreateVariable(t *testing.T) {
 		authError                   error
 		expectCreatedVariable       *models.Variable
 		name                        string
-		expectErrCode               string
+		expectErrCode               errors.CodeType
 		input                       models.Variable
 		limit                       int
 		injectVariablesPerNamespace int32
@@ -66,7 +66,7 @@ func TestCreateVariable(t *testing.T) {
 				Key:           variableKey,
 				Value:         &variableValue,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{

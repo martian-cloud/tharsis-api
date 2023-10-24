@@ -60,7 +60,6 @@ func (s *service) GetUserByID(ctx context.Context, userID string) (*models.User,
 		tracing.RecordError(span, err, "failed to get user by ID")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get user",
 		)
 	}
@@ -68,9 +67,8 @@ func (s *service) GetUserByID(ctx context.Context, userID string) (*models.User,
 	if user == nil {
 		tracing.RecordError(span, nil, "User with ID %s not found", userID)
 		return nil, errors.New(
-			errors.ENotFound,
 			"User with ID %s not found", userID,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return user, nil
@@ -92,7 +90,6 @@ func (s *service) GetUserByUsername(ctx context.Context, username string) (*mode
 		tracing.RecordError(span, err, "Failed to get user")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get user",
 		)
 	}
@@ -100,9 +97,8 @@ func (s *service) GetUserByUsername(ctx context.Context, username string) (*mode
 	if user == nil {
 		tracing.RecordError(span, nil, "User with username %s not found", username)
 		return nil, errors.New(
-			errors.ENotFound,
 			"User with username %s not found", username,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return user, nil

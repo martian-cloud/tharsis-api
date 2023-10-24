@@ -51,13 +51,13 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 
 	token := chi.URLParam(r, "token")
 	if token == "" {
-		c.respWriter.RespondWithError(w, errors.New(errors.EUnauthorized, "Missing token query parameter in log URL"))
+		c.respWriter.RespondWithError(w, errors.New("Missing token query parameter in log URL", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
 	// Validate token
 	if err := c.verifyJobLogToken(r.Context(), []byte(token), jobID); err != nil {
-		c.respWriter.RespondWithError(w, errors.Wrap(err, errors.EUnauthorized, "invalid token"))
+		c.respWriter.RespondWithError(w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 

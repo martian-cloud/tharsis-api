@@ -299,13 +299,13 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 				tracing.RecordError(span, nil,
 					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID)
 				return nil, errors.New(
-					errors.EConflict,
 					"Service account with name %s already exists in group %s", serviceAccount.Name, serviceAccount.GroupID,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
 				tracing.RecordError(span, nil, "invalid group: the specified group does not exist")
-				return nil, errors.New(errors.EConflict, "invalid group: the specified group does not exist")
+				return nil, errors.New("invalid group: the specified group does not exist", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -428,8 +428,8 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 				tracing.RecordError(span, nil,
 					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name)
 				return errors.New(
-					errors.EConflict,
 					"Service account %s is assigned as a member of a group/workspace", serviceAccount.Name,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 		}
@@ -483,7 +483,7 @@ func (s *serviceAccounts) AssignServiceAccountToRunner(ctx context.Context, serv
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "service account already assigned to runner")
-				return errors.New(errors.EConflict, "service account already assigned to runner")
+				return errors.New("service account already assigned to runner", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

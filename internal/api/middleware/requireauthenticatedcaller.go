@@ -28,7 +28,7 @@ func NewRequireAuthenticatedCallerMiddleware(
 
 				respWriter.RespondWithError(w,
 					// At this point, we no longer had the original error to wrap.
-					errors.New(errors.EUnauthorized, "Unauthorized"))
+					errors.New("Unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
 				return
 			}
 

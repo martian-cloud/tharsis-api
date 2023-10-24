@@ -40,7 +40,7 @@ type ActivityEventEdgeResolver struct {
 func (r *ActivityEventEdgeResolver) Cursor() (string, error) {
 	activityEvent, ok := r.edge.Node.(models.ActivityEvent)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&activityEvent)
 	return *cursor, err
@@ -50,7 +50,7 @@ func (r *ActivityEventEdgeResolver) Cursor() (string, error) {
 func (r *ActivityEventEdgeResolver) Node() (*ActivityEventResolver, error) {
 	activityEvent, ok := r.edge.Node.(models.ActivityEvent)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &ActivityEventResolver{activityEvent: &activityEvent}, nil
@@ -443,7 +443,7 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 		}
 		return &NodeResolver{result: &TerraformProviderVersionMirrorResolver{versionMirror: mirror}}, nil
 	default:
-		return nil, errors.New(errors.EInvalid, "valid TargetType must be specified")
+		return nil, errors.New("valid TargetType must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
 }
 

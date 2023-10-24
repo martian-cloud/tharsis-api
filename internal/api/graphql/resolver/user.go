@@ -31,7 +31,7 @@ type UserEdgeResolver struct {
 func (r *UserEdgeResolver) Cursor() (string, error) {
 	user, ok := r.edge.Node.(models.User)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&user)
 	return *cursor, err
@@ -41,7 +41,7 @@ func (r *UserEdgeResolver) Cursor() (string, error) {
 func (r *UserEdgeResolver) Node() (*UserResolver, error) {
 	user, ok := r.edge.Node.(models.User)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &UserResolver{user: &user}, nil
@@ -232,7 +232,7 @@ func loadUser(ctx context.Context, id string) (*models.User, error) {
 
 	user, ok := data.(models.User)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &user, nil

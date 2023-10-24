@@ -42,12 +42,12 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 	}
 
 	if req.ServiceAccountPath == nil {
-		c.respWriter.RespondWithError(w, errors.New(errors.EInvalid, "ServiceAccountPath field is required"))
+		c.respWriter.RespondWithError(w, errors.New("ServiceAccountPath field is required", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
 	if req.Token == nil {
-		c.respWriter.RespondWithError(w, errors.New(errors.EInvalid, "Token field is required"))
+		c.respWriter.RespondWithError(w, errors.New("Token field is required", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 

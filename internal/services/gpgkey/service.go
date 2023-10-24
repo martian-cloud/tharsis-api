@@ -259,7 +259,7 @@ func (s *service) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey,
 
 	if gpgKey == nil {
 		tracing.RecordError(span, nil, "gpg key with ID %s not found", id)
-		return nil, errors.New(errors.ENotFound, "gpg key with ID %s not found", id)
+		return nil, errors.New("gpg key with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, permissions.GPGKeyResourceType, auth.WithGroupID(gpgKey.GroupID))
@@ -292,12 +292,12 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 	entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(input.ASCIIArmor))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to read ascii key armor")
-		return nil, errors.Wrap(err, errors.EInvalid, "failed to read ascii key armor")
+		return nil, errors.Wrap(err, "failed to read ascii key armor", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if len(entityList) != 1 {
 		tracing.RecordError(span, nil, "invalid number of public keys found, expected 1 but found %d", len(entityList))
-		return nil, errors.New(errors.EInvalid, "invalid number of public keys found, expected 1 but found %d", len(entityList))
+		return nil, errors.New("invalid number of public keys found, expected 1 but found %d", len(entityList), errors.WithErrorCode(errors.EInvalid))
 	}
 
 	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)

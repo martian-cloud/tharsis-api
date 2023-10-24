@@ -236,7 +236,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 	}
 
 	if len(versionsResponse.ProviderVersions) == 0 {
-		c.respWriter.RespondWithError(w, errors.New(errors.ENotFound, "provider version %s not found", version))
+		c.respWriter.RespondWithError(w, errors.New("provider version %s not found", version, errors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 
@@ -257,7 +257,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 	}
 
 	if len(platformsResponse.ProviderPlatforms) == 0 {
-		c.respWriter.RespondWithError(w, errors.New(errors.ENotFound, "provider platform %s_%s not found", os, arch))
+		c.respWriter.RespondWithError(w, errors.New("provider platform %s_%s not found", os, arch, errors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 

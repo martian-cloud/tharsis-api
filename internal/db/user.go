@@ -182,7 +182,7 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"user with external id %s already exists for issuer %s", externalID, issuer)
-				return errors.New(errors.EConflict, "user with external id %s already exists for issuer %s", externalID, issuer)
+				return errors.New("user with external id %s already exists for issuer %s", externalID, issuer, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -304,7 +304,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"user with username %s already exists", user.Username)
-				return nil, errors.New(errors.EConflict, "user with username %s already exists", user.Username)
+				return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -345,7 +345,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "user with username %s already exists", user.Username)
-				return nil, errors.New(errors.EConflict, "user with username %s already exists", user.Username)
+				return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

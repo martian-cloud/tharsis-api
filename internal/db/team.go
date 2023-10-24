@@ -230,7 +230,7 @@ func (t *teams) CreateTeam(ctx context.Context, team *models.Team) (*models.Team
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "team with name %s already exists", team.Name)
-				return nil, errors.New(errors.EConflict, "team with name %s already exists", team.Name)
+				return nil, errors.New("team with name %s already exists", team.Name, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

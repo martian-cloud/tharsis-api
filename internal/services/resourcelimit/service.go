@@ -77,12 +77,12 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
 		tracing.RecordError(span, nil, "Unsupported caller type, only users are allowed to update resource limits")
-		return nil, errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to update resource limits")
+		return nil, errors.New("Unsupported caller type, only users are allowed to update resource limits", errors.WithErrorCode(errors.EForbidden))
 	}
 	// Only admins are allowed to update resource limits.
 	if !userCaller.User.Admin {
 		tracing.RecordError(span, nil, "Only system admins can update resource limits")
-		return nil, errors.New(errors.EForbidden, "Only system admins can update resource limits")
+		return nil, errors.New("Only system admins can update resource limits", errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Validate the limit name/key.
@@ -93,7 +93,7 @@ func (s *service) UpdateResourceLimit(ctx context.Context, input *UpdateResource
 	}
 	if foundLimit == nil {
 		tracing.RecordError(span, err, "Invalid resource limit name")
-		return nil, errors.New(errors.EInvalid, "Invalid resource limit name")
+		return nil, errors.New("Invalid resource limit name", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Do an update DB operation.

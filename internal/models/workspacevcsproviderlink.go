@@ -15,16 +15,16 @@ var (
 	// errInvalidPatternLength indicates when a pattern is either empty
 	// or exceeds maxPatternLength.
 	errInvalidPatternLength = errors.New(
-		errors.EInvalid,
 		"Invalid glob pattern or regex, must be non-empty and no larger than %d characters",
 		maxPatternLength,
+		errors.WithErrorCode(errors.EInvalid),
 	)
 
 	// errInvalidPattern is a generic error indicating either an invalid
 	// glob pattern or regex.
 	errInvalidPattern = errors.New(
-		errors.EInvalid,
 		"Invalid glob pattern or regex",
+		errors.WithErrorCode(errors.EInvalid),
 	)
 )
 

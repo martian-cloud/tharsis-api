@@ -42,7 +42,7 @@ func TestEnforceRules(t *testing.T) {
 		stateVersion    *models.StateVersion
 		stateVersionRun *models.Run
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		rules           []models.ManagedIdentityAccessRule
 		attestations    []models.TerraformModuleAttestation
 		teams           []models.Team

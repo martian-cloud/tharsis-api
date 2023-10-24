@@ -121,7 +121,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		name                 string
-		expectErrorCode      string
+		expectErrorCode      errors.CodeType
 		enforceRulesResponse error
 		managedIdentities    []models.ManagedIdentity
 	}{
@@ -148,7 +148,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 					},
 				},
 			},
-			enforceRulesResponse: errors.New(errors.EForbidden, "rule not satisfied"),
+			enforceRulesResponse: errors.New("rule not satisfied", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:      errors.EForbidden,
 		},
 	}
@@ -252,7 +252,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 		name            string
 		workspace       *models.Workspace
 		runInput        *CreateRunInput
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	/*
@@ -260,7 +260,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 		name            string
 		workspace       *models.Workspace
 		runInput        *CreateRunInput
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	*/
 
 	tests := []testCase{
@@ -435,7 +435,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		name                 string
-		expectErrorCode      string
+		expectErrorCode      errors.CodeType
 		enforceRulesResponse error
 		managedIdentities    []models.ManagedIdentity
 	}{
@@ -462,7 +462,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 					},
 				},
 			},
-			enforceRulesResponse: errors.New(errors.EForbidden, "rule not satisfied"),
+			enforceRulesResponse: errors.New("rule not satisfied", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:      errors.EForbidden,
 		},
 	}

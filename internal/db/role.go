@@ -215,7 +215,7 @@ func (r *roles) CreateRole(ctx context.Context, role *models.Role) (*models.Role
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "role with name %s already exists", role.Name)
-				return nil, errors.New(errors.EConflict, "role with name %s already exists", role.Name)
+				return nil, errors.New("role with name %s already exists", role.Name, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

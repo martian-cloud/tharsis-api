@@ -137,7 +137,7 @@ func (c *vcsController) OAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		// Return a simple EUnauthorized here.
 		c.logger.Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
-		c.respWriter.RespondWithError(w, errors.New(errors.EUnauthorized, "Unauthorized"))
+		c.respWriter.RespondWithError(w, errors.New("Unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
@@ -146,7 +146,7 @@ func (c *vcsController) OAuthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(oAuthCallbackResponseBody)); err != nil {
 		c.logger.Errorf("failed to write callback response body in OAuthHandler: %v", err)
-		c.respWriter.RespondWithError(w, errors.New(errors.EInternal, "Internal error has occurred"))
+		c.respWriter.RespondWithError(w, errors.New("Internal error has occurred"))
 	}
 }
 
@@ -155,14 +155,14 @@ func (c *vcsController) DesignateEventHandler(w http.ResponseWriter, r *http.Req
 	caller, err := c.authenticator.Authenticate(r.Context(), findToken(r), false)
 	if err != nil {
 		c.logger.Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
-		c.respWriter.RespondWithError(w, errors.Wrap(err, errors.EUnauthorized, "unauthorized"))
+		c.respWriter.RespondWithError(w, errors.Wrap(err, "unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
 	// Make sure this is a VCS caller.
 	vcsCaller, ok := caller.(*auth.VCSWorkspaceLinkCaller)
 	if !ok {
-		c.respWriter.RespondWithError(w, errors.New(errors.EForbidden, "Invalid token"))
+		c.respWriter.RespondWithError(w, errors.New("Invalid token", errors.WithErrorCode(errors.EForbidden)))
 		return
 	}
 
@@ -178,7 +178,7 @@ func (c *vcsController) DesignateEventHandler(w http.ResponseWriter, r *http.Req
 
 	default:
 		// Should never happen, but we'll handle it anyway.
-		err = errors.New(errors.EInvalid, "invalid provider type: %s", vcsCaller.Provider.Type)
+		err = errors.New("invalid provider type: %s", vcsCaller.Provider.Type, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if err != nil {

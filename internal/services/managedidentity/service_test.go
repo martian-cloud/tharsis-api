@@ -43,7 +43,7 @@ func TestGetManagedIdentities(t *testing.T) {
 		input           *GetManagedIdentitiesInput
 		dbInput         *db.GetManagedIdentitiesInput
 		expectResult    *db.ManagedIdentitiesResult
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		name            string
 	}
 
@@ -93,7 +93,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			input: &GetManagedIdentitiesInput{
 				NamespacePath: "a-namespace/a-workspace",
 			},
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -157,7 +157,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 	type testCase struct {
 		input                     *DeleteManagedIdentityInput
 		authError                 error
-		expectErrorCode           string
+		expectErrorCode           errors.CodeType
 		name                      string
 		managedIdentityWorkspaces []models.Workspace
 	}
@@ -199,7 +199,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 		},
 		{
 			name:      "negative: subject does not have permissions in group",
-			authError: errors.New(errors.EForbidden, "Forbidden"),
+			authError: errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			input: &DeleteManagedIdentityInput{
 				ManagedIdentity: sampleManagedIdentity,
 			},
@@ -272,7 +272,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	type testCase struct {
 		name            string
 		workspaceID     string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		authError       error
 		expectResult    []models.ManagedIdentity
 	}
@@ -288,7 +288,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 		{
 			name:            "negative: subject does not have viewer access to workspace",
 			workspaceID:     "some-workspace-id",
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -358,7 +358,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 		name                                string
 		managedIdentityID                   string
 		workspaceID                         string
-		expectErrorCode                     string
+		expectErrorCode                     errors.CodeType
 		identitiesInWorkspace               []models.ManagedIdentity
 		limit                               int
 		injectManagedIdentitiesPerWorkspace int32
@@ -407,7 +407,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			name:              "negative: subject does not have permissions for workspace",
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
-			authError:         errors.New(errors.EForbidden, "Forbidden"),
+			authError:         errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:   errors.EForbidden,
 		},
 		{
@@ -541,7 +541,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 		name                    string
 		managedIdentityID       string
 		workspaceID             string
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -561,7 +561,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			name:              "negative: subject does not have permissions for workspace",
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
-			authError:         errors.New(errors.EForbidden, "Forbidden"),
+			authError:         errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:   errors.EForbidden,
 		},
 	}
@@ -635,7 +635,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 		expectManagedIdentity *models.ManagedIdentity
 		name                  string
 		searchID              string
-		expectErrorCode       string
+		expectErrorCode       errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -653,7 +653,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 			name:                  "negative: subject does not have access to resource",
 			searchID:              "some-managed-identity-id",
 			expectManagedIdentity: sampleManagedIdentity,
-			authError:             errors.New(errors.EForbidden, "Forbidden"),
+			authError:             errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:       errors.EForbidden,
 		},
 	}
@@ -708,7 +708,7 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 		expectManagedIdentity *models.ManagedIdentity
 		name                  string
 		searchPath            string
-		expectErrorCode       string
+		expectErrorCode       errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -726,7 +726,7 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 			name:                  "negative: subject does not have access to group resource",
 			searchPath:            "some/resource/path",
 			expectManagedIdentity: sampleManagedIdentity,
-			authError:             errors.New(errors.EForbidden, "Forbidden"),
+			authError:             errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:       errors.EForbidden,
 		},
 	}
@@ -812,7 +812,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 		createInput             *models.ManagedIdentity
 		input                   *CreateManagedIdentityAliasInput
 		name                    string
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 		limit                   int
 		injectAliasesPerGroup   int32
 		injectAliasesPerMI      int32
@@ -920,7 +920,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -932,7 +932,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			},
 			existingManagedIdentity: sampleManagedIdentity,
 			existingGroup:           sampleGroup,
-			authError:               errors.New(errors.EForbidden, "Forbidden"),
+			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
 		},
 		{
@@ -1147,7 +1147,7 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 		authError                 error
 		input                     *DeleteManagedIdentityInput
 		sourceIdentity            *models.ManagedIdentity
-		expectErrorCode           string
+		expectErrorCode           errors.CodeType
 		name                      string
 		managedIdentityWorkspaces []models.Workspace
 	}
@@ -1194,7 +1194,7 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 				ManagedIdentity: sampleManagedIdentityAlias,
 			},
 			sourceIdentity:  sampleSourceIdentity,
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1307,7 +1307,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 		input                  *CreateManagedIdentityInput
 		existingServiceAccount *models.ServiceAccount
 		name                   string
-		expectErrorCode        string
+		expectErrorCode        errors.CodeType
 		limit                  int
 		injectMIPerGroup       int32
 		exceedsLimit           bool
@@ -1428,7 +1428,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Name:    "a-managed-identity",
 				GroupID: "some-group-id",
 			},
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -1569,7 +1569,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 		dbInput         *db.GetManagedIdentitiesInput
 		expectResult    *db.ManagedIdentitiesResult
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		inputIDList     []string
 	}
 
@@ -1597,7 +1597,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 			expectResult: &db.ManagedIdentitiesResult{
 				ManagedIdentities: []models.ManagedIdentity{sampleManagedIdentity},
 			},
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -1662,7 +1662,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 		expectManagedIdentity   *models.ManagedIdentity
 		input                   *UpdateManagedIdentityInput
 		name                    string
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -1725,7 +1725,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				Data:        []byte("this is new data"),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.New(errors.EForbidden, "Forbidden"),
+			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -1824,7 +1824,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 		dbInput           *db.GetManagedIdentityAccessRulesInput
 		dbResult          *db.ManagedIdentityAccessRulesResult
 		name              string
-		expectErrorCode   string
+		expectErrorCode   errors.CodeType
 		expectAccessRules []models.ManagedIdentityAccessRule
 	}
 
@@ -1850,7 +1850,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 					ManagedIdentityID: &sampleManagedIdentity.Metadata.ID,
 				},
 			},
-			authError: errors.New(errors.EForbidden, "Forbidden"),
+			authError: errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			dbResult: &db.ManagedIdentityAccessRulesResult{
 				ManagedIdentityAccessRules: sampleAccessRules,
 			},
@@ -1922,7 +1922,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 	type testCase struct {
 		authError         error
 		name              string
-		expectErrorCode   string
+		expectErrorCode   errors.CodeType
 		inputIDList       []string
 		ruleDBInput       *db.GetManagedIdentityAccessRulesInput
 		identityDBInput   *db.GetManagedIdentitiesInput
@@ -1965,7 +1965,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 			dbResult: &db.ManagedIdentityAccessRulesResult{
 				ManagedIdentityAccessRules: sampleAccessRules,
 			},
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -2029,7 +2029,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 		expectAccessRule *models.ManagedIdentityAccessRule
 		searchID         string
 		name             string
-		expectErrorCode  string
+		expectErrorCode  errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -2047,7 +2047,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 			name:             "negative: subject does not have access to group resource",
 			searchID:         sampleAccessRule.Metadata.ID,
 			expectAccessRule: sampleAccessRule,
-			authError:        errors.New(errors.EForbidden, "Forbidden"),
+			authError:        errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:  errors.EForbidden,
 		},
 	}
@@ -2130,7 +2130,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 		existingManagedIdentity *models.ManagedIdentity
 		input                   *models.ManagedIdentityAccessRule
 		name                    string
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 		limit                   int
 		injectRulesPerMI        int32
 		exceedsLimit            bool
@@ -2181,7 +2181,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			name:                    "negative: subject does not have owner role for group",
 			input:                   sampleAccessRule,
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.New(errors.EForbidden, "Forbidden"),
+			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
 		},
 		{
@@ -2321,7 +2321,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 		existingManagedIdentity *models.ManagedIdentity
 		input                   *models.ManagedIdentityAccessRule
 		name                    string
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -2362,7 +2362,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			name:                    "negative: subject does not have owner role for group",
 			input:                   sampleAccessRule,
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.New(errors.EForbidden, "Forbidden"),
+			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -2460,7 +2460,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 		existingManagedIdentity *models.ManagedIdentity
 		input                   *models.ManagedIdentityAccessRule
 		name                    string
-		expectErrorCode         string
+		expectErrorCode         errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -2486,7 +2486,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			name:                    "negative: subject does not have owner role for group",
 			input:                   sampleAccessRule,
 			existingManagedIdentity: sampleManagedIdentity,
-			authError:               errors.New(errors.EForbidden, "Forbidden"),
+			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
 		},
 	}
@@ -2561,7 +2561,7 @@ func TestCreateCredentials(t *testing.T) {
 		input                     *models.ManagedIdentity
 		existingManagedIdentities []models.ManagedIdentity
 		name                      string
-		expectErrorCode           string
+		expectErrorCode           errors.CodeType
 		expectCredentials         []byte
 	}
 

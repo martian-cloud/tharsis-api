@@ -105,7 +105,7 @@ func (s *scimTokens) CreateToken(ctx context.Context, token *models.SCIMToken) (
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "SCIM token already exists")
-				return nil, errors.New(errors.EConflict, "SCIM token already exists")
+				return nil, errors.New("SCIM token already exists", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

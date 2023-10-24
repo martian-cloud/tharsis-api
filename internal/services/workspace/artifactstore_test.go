@@ -18,13 +18,11 @@ import (
 
 var (
 	errNotFound = errors.New(
-		errors.ENotFound,
 		"not Found",
-	)
+		errors.WithErrorCode(errors.ENotFound))
 	errInternal = errors.New(
-		errors.EInternal,
 		"internal Error",
-	)
+		errors.WithErrorCode(errors.EInternal))
 )
 
 type fakeWriterAt struct {
@@ -42,7 +40,7 @@ func TestDownloadConfigurationVersion(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",
@@ -104,7 +102,7 @@ func TestDownloadStateVersion(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",
@@ -166,7 +164,7 @@ func TestGetStateVersion(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",
@@ -218,7 +216,7 @@ func TestDownloadPlanCache(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",
@@ -280,7 +278,7 @@ func TestUploadConfigurationVersion(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",
@@ -322,7 +320,7 @@ func TestUploadStateVersion(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",
@@ -364,7 +362,7 @@ func TestUploadPlanCache(t *testing.T) {
 		name          string
 		expectContent string
 		retErr        error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name:          "success",

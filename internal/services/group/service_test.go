@@ -52,7 +52,7 @@ func TestCreateTopLevelGroup(t *testing.T) {
 	tests := []struct {
 		caller          *auth.UserCaller
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		input           models.Group
 	}{
 		{
@@ -147,7 +147,7 @@ func TestCreateNestedGroup(t *testing.T) {
 	tests := []struct {
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		input           models.Group
 		limit           int // same for both siblings and depth
 		parentChildren  int32
@@ -174,7 +174,7 @@ func TestCreateNestedGroup(t *testing.T) {
 			},
 			limit:           5,
 			parentChildren:  5,
-			authError:       errors.New(errors.EForbidden, "Forbidden"),
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -771,7 +771,7 @@ func TestMigrateGroup(t *testing.T) {
 		newParentID              *string
 		expectGroup              *models.Group
 		name                     string
-		expectErrorCode          string
+		expectErrorCode          errors.CodeType
 		inputGroup               models.Group
 		limit                    int // same for both siblings and depth
 		newParentChildren        int32
@@ -914,10 +914,10 @@ func TestMigrateGroup(t *testing.T) {
 
 			var groupAccessError, parentAccessError error
 			if !test.isGroupOwner {
-				groupAccessError = errors.New(errors.EForbidden, "test user is not owner of group being moved")
+				groupAccessError = errors.New("test user is not owner of group being moved", errors.WithErrorCode(errors.EForbidden))
 			}
 			if !test.isCallerDeployerOfParent {
-				parentAccessError = errors.New(errors.EForbidden, "test user is not deployer of new parent")
+				parentAccessError = errors.New("test user is not deployer of new parent", errors.WithErrorCode(errors.EForbidden))
 			}
 
 			mockAuthorizer := auth.MockAuthorizer{}

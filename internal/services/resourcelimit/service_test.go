@@ -51,7 +51,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 		injectOldLimit  *models.ResourceLimit
 		injectNewLimit  *models.ResourceLimit
 		expectLimit     *models.ResourceLimit
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	/*
@@ -64,7 +64,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 			injectOldLimit  *models.ResourceLimit
 			injectNewLimit  *models.ResourceLimit
 			expectLimit     *models.ResourceLimit
-			expectErrorCode string
+			expectErrorCode errors.CodeType
 		}
 	*/
 

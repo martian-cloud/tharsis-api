@@ -253,15 +253,15 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 				case "index_terraform_module_versions_on_latest":
 					tracing.RecordError(span, nil,
 						"another terraform module version is already marked as the latest for the same module")
-					return nil, errors.New(errors.EConflict, "another terraform module version is already marked as the latest for the same module")
+					return nil, errors.New("another terraform module version is already marked as the latest for the same module", errors.WithErrorCode(errors.EConflict))
 				case "index_terraform_module_versions_on_semantic_version":
 					tracing.RecordError(span, nil,
 						"terraform module version %s already exists", moduleVersion.SemanticVersion)
-					return nil, errors.New(errors.EConflict, "terraform module version %s already exists", moduleVersion.SemanticVersion)
+					return nil, errors.New("terraform module version %s already exists", moduleVersion.SemanticVersion, errors.WithErrorCode(errors.EConflict))
 				default:
 					tracing.RecordError(span, nil,
 						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
 				}
 			}
 		}
@@ -327,11 +327,11 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 				case "index_terraform_module_versions_on_latest":
 					tracing.RecordError(span, nil,
 						"another terraform module version is already marked as the latest for the same module")
-					return nil, errors.New(errors.EConflict, "another terraform module version is already marked as the latest for the same module")
+					return nil, errors.New("another terraform module version is already marked as the latest for the same module", errors.WithErrorCode(errors.EConflict))
 				default:
 					tracing.RecordError(span, nil,
 						"database constraint violated: %s", pgErr.ConstraintName)
-					return nil, errors.New(errors.EConflict, "database constraint violated: %s", pgErr.ConstraintName)
+					return nil, errors.New("database constraint violated: %s", pgErr.ConstraintName, errors.WithErrorCode(errors.EConflict))
 				}
 			}
 		}

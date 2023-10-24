@@ -132,17 +132,15 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 	userCaller, ok := caller.(*auth.UserCaller)
 	if !ok {
 		return nil, errors.New(
-			errors.EForbidden,
 			"Unsupported caller type, only users are allowed to create SCIM tokens",
-		)
+			errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Only admins are allows to create SCIM tokens.
 	if !userCaller.User.Admin {
 		return nil, errors.New(
-			errors.EForbidden,
 			"Only system admins can create SCIM tokens",
-		)
+			errors.WithErrorCode(errors.EForbidden))
 	}
 
 	// Transaction is used to avoid invalidating previous token if new one fails creation.
@@ -233,7 +231,7 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput)
 		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, input.SCIMExternalID)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to get a SCIM user by scimExternalID")
-			return nil, errors.Wrap(err, errors.ENotFound, "failed to get a SCIM user by scimExternalID")
+			return nil, errors.Wrap(err, "failed to get a SCIM user by scimExternalID", errors.WithErrorCode(errors.ENotFound))
 		}
 
 		// If a user is not found, do not return an error.
@@ -375,9 +373,8 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 
 	if user == nil {
 		return errors.New(
-			errors.ENotFound,
 			"SCIM user with ID %s does not exist", input.ID,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return s.dbClient.Users.DeleteUser(ctx, user)
@@ -401,7 +398,7 @@ func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput
 		team, err := s.dbClient.Teams.GetTeamBySCIMExternalID(ctx, input.SCIMExternalID)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to get a SCIM group by scimExternalID")
-			return nil, errors.Wrap(err, errors.ENotFound, "failed to get a SCIM group by scimExternalID")
+			return nil, errors.Wrap(err, "failed to get a SCIM group by scimExternalID", errors.WithErrorCode(errors.ENotFound))
 		}
 
 		// If a team is not found, do not return an error.
@@ -531,9 +528,8 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 
 	if team == nil {
 		return errors.New(
-			errors.ENotFound,
 			"SCIM group with ID %s not found", input.ID,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return s.dbClient.Teams.DeleteTeam(ctx, team)
@@ -550,9 +546,8 @@ func (s *service) processSCIMUserOperations(ctx context.Context, operations []Op
 
 	if user == nil {
 		return nil, errors.New(
-			errors.EInternal,
 			"Failed to get a SCIM user for processing update operations",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	// Process the update operations.
@@ -592,9 +587,8 @@ func (s *service) processSCIMUserOperations(ctx context.Context, operations []Op
 
 		default:
 			return nil, errors.New(
-				errors.EInvalid,
 				"Unsupported SCIM user operation path: %s", operation.Path,
-			)
+				errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -613,9 +607,8 @@ func (s *service) processSCIMGroupOperations(ctx context.Context, ops []Operatio
 
 	if team == nil {
 		return nil, errors.New(
-			errors.EInternal,
 			"Failed to get SCIM group for processing update operations",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	// Determine if an update is required before beginning the transaction.
@@ -711,9 +704,8 @@ func (s *service) addRemoveSCIMGroupMember(ctx context.Context, operation *Opera
 
 	if user == nil {
 		return errors.New(
-			errors.ENotFound,
 			"scim user with id %s does not exist", userID,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Add a new group (team) member.
@@ -737,10 +729,10 @@ func (s *service) addRemoveSCIMGroupMember(ctx context.Context, operation *Opera
 
 		if teamMember == nil {
 			return errors.New(
-				errors.ENotFound,
 				"scim group member %s in SCIM group %s does not exist",
 				user.Username,
 				team.Name,
+				errors.WithErrorCode(errors.ENotFound),
 			)
 		}
 
@@ -834,9 +826,8 @@ func (s *service) isSCIMGroupUpdateRequired(ctx context.Context, operations []Op
 
 		default:
 			return false, errors.New(
-				errors.EInvalid,
 				"Unsupported SCIM group operation path: %s", operation.Path,
-			)
+				errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -914,9 +905,8 @@ func isSCIMUserOperationSupported(operation OP) error {
 	}
 
 	return errors.New(
-		errors.EInvalid,
 		"Unsupported SCIM user operation: %s", operation,
-	)
+		errors.WithErrorCode(errors.EInvalid))
 }
 
 // isSCIMGroupOperationSupported returns an error if SCIM group
@@ -929,7 +919,6 @@ func isSCIMGroupOperationSupported(operation OP) error {
 	}
 
 	return errors.New(
-		errors.EInvalid,
 		"Unsupported SCIM group operation: %s", operation,
-	)
+		errors.WithErrorCode(errors.EInvalid))
 }

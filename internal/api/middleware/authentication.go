@@ -35,7 +35,7 @@ func NewAuthenticationMiddleware(
 
 				// Do not return an unauthorized error here since the service layer is responsible for determining
 				// if a request requires an authenticated user
-				respWriter.RespondWithError(w, errors.Wrap(err, errors.EInternal, "Error finding authentication token"))
+				respWriter.RespondWithError(w, errors.Wrap(err, "Error finding authentication token"))
 				return
 			} else {
 
@@ -44,7 +44,7 @@ func NewAuthenticationMiddleware(
 				ip, err = getSourceIP(r)
 				if err != nil {
 					logger.Errorf("Error finding client IP: %v", err)
-					respWriter.RespondWithError(w, errors.Wrap(err, errors.EInvalid, "Error finding client IP"))
+					respWriter.RespondWithError(w, errors.Wrap(err, "Error finding client IP", errors.WithErrorCode(errors.EInvalid)))
 					return
 				}
 				subject = fmt.Sprintf("anonymous-%s", ip)

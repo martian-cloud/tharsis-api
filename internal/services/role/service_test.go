@@ -21,7 +21,7 @@ func TestGetAvailablePermissions(t *testing.T) {
 	testCases := []struct {
 		caller          auth.Caller
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		expectPerms     []string
 	}{
 		{
@@ -60,7 +60,7 @@ func TestGetRoleByID(t *testing.T) {
 		name            string
 		search          string
 		expectedRole    *models.Role
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}{
 		{
 			name:         "Role was found",
@@ -116,7 +116,7 @@ func TestGetRoleByName(t *testing.T) {
 		name            string
 		search          string
 		expectedRole    *models.Role
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}{
 		{
 			name:         "Role was found",
@@ -170,7 +170,7 @@ func TestGetRolesByIDs(t *testing.T) {
 	testCases := []struct {
 		caller          auth.Caller
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		input           []string
 		expectResult    []models.Role
 	}{
@@ -225,7 +225,7 @@ func TestGetRoles(t *testing.T) {
 		input           *GetRolesInput
 		expectResult    *db.RolesResult
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}{
 		{
 			name:   "successfully retrieve roles",
@@ -290,7 +290,7 @@ func TestCreateRole(t *testing.T) {
 		caller          auth.Caller
 		input           *CreateRoleInput
 		expectRole      *models.Role
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}{
 		{
 			name: "successfully create a role",
@@ -416,7 +416,7 @@ func TestUpdateRole(t *testing.T) {
 		input           *UpdateRoleInput
 		expectRole      *models.Role
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		updatePerms     []permissions.Permission
 		expectPerms     []permissions.Permission
 	}{
@@ -572,7 +572,7 @@ func TestDeleteRole(t *testing.T) {
 		caller          auth.Caller
 		input           *DeleteRoleInput
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 		memberships     []models.NamespaceMembership
 	}{
 		{

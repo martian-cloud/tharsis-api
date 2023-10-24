@@ -35,7 +35,7 @@ func TestCreateWorkspace(t *testing.T) {
 		authError                error
 		expectCreatedWorkspace   *models.Workspace
 		name                     string
-		expectErrCode            string
+		expectErrCode            errors.CodeType
 		input                    models.Workspace
 		limit                    int
 		injectWorkspacesPerGroup int32
@@ -74,7 +74,7 @@ func TestCreateWorkspace(t *testing.T) {
 				PreventDestroyPlan: true,
 				TerraformVersion:   terraformVersion,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{

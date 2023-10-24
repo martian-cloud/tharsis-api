@@ -133,7 +133,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 
 	if namespace == nil {
 		tracing.RecordError(span, nil, "Namespace not found")
-		return nil, errors.New(errors.ENotFound, "Namespace not found")
+		return nil, errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	timestamp := currentTime()
@@ -168,15 +168,15 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 				tracing.RecordError(span, nil,
 					"Variable with key %s in namespace %s already exists", input.Key, input.NamespacePath)
 				return nil, errors.New(
-					errors.EConflict,
 					"Variable with key %s in namespace %s already exists", input.Key, input.NamespacePath,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_variables_namespace_id":
 					tracing.RecordError(span, nil, "namespace does not exist")
-					return nil, errors.New(errors.ENotFound, "namespace does not exist")
+					return nil, errors.New("namespace does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}
@@ -202,7 +202,7 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 
 	if namespace == nil {
 		tracing.RecordError(span, nil, "Namespace not found")
-		return errors.New(errors.ENotFound, "Namespace not found")
+		return errors.New("Namespace not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	timestamp := currentTime()
@@ -238,15 +238,15 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 				tracing.RecordError(span, nil,
 					"Variable with key already exists in namespace %s", namespacePath)
 				return errors.New(
-					errors.EConflict,
 					"Variable with key already exists in namespace %s", namespacePath,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 			if isForeignKeyViolation(pgErr) {
 				switch pgErr.ConstraintName {
 				case "fk_namespace_variables_namespace_id":
 					tracing.RecordError(span, nil, "namespace does not exist")
-					return errors.New(errors.ENotFound, "namespace does not exist")
+					return errors.New("namespace does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}
@@ -292,8 +292,8 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 				tracing.RecordError(span, nil,
 					"Variable with key %s in namespace %s already exists", variable.Key, variable.NamespacePath)
 				return nil, errors.New(
-					errors.EConflict,
 					"Variable with key %s in namespace %s already exists", variable.Key, variable.NamespacePath,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 		}

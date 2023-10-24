@@ -265,7 +265,7 @@ func (s *service) GetProviderVersionMirrorByAddress(ctx context.Context, input *
 
 	if result.PageInfo.TotalCount == 0 {
 		tracing.RecordError(span, err, "terraform provider version mirror not found")
-		return nil, errors.New(errors.ENotFound, "terraform provider version mirror with FQN %s/%s/%s not found", input.RegistryHostname, input.RegistryNamespace, input.Type)
+		return nil, errors.New("terraform provider version mirror with FQN %s/%s/%s not found", input.RegistryHostname, input.RegistryNamespace, input.Type, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return &result.VersionMirrors[0], nil
@@ -371,7 +371,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	if group.ParentID != "" {
 		tracing.RecordError(span, nil, "terraform provider version mirrors can only be created in a top-level group")
-		return nil, errors.New(errors.EInvalid, "terraform provider version mirrors can only be created in a top-level group")
+		return nil, errors.New("terraform provider version mirrors can only be created in a top-level group", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	provider, err := parseProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
@@ -383,7 +383,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	wantVersion, err := versions.ParseVersion(input.SemanticVersion)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to parse provider version")
-		return nil, errors.Wrap(err, errors.EInvalid, "invalid provider version")
+		return nil, errors.Wrap(err, "invalid provider version", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Discover the provider registry host and get the service URL.
@@ -398,14 +398,14 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	availableVersions, err := s.listAvailableProviderVersions(ctx, serviceURL, provider)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to list available provider versions")
-		return nil, errors.Wrap(err, errors.ENotFound, "Failed to list available provider versions")
+		return nil, errors.Wrap(err, "Failed to list available provider versions", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Find a platform the provider supports. We only need one for our purposes.
 	supportedPlatform, err := findSupportedPlatform(wantVersion, availableVersions)
 	if err != nil {
 		tracing.RecordError(span, err, "Unsupported provider version")
-		return nil, errors.Wrap(err, errors.EInvalid, "Unsupported version %s for provider %s", wantVersion, provider)
+		return nil, errors.Wrap(err, "Unsupported version %s for provider %s", wantVersion, provider, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Now, find the sha sums, signature URLs and the associated GPG key(s) by arbitrarily using
@@ -414,7 +414,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	packageResp, err := s.findProviderPackage(ctx, serviceURL, provider, wantVersion.String(), supportedPlatform)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to find provider package")
-		return nil, errors.Wrap(err, errors.ENotFound, "Could not find package at provider registry API")
+		return nil, errors.Wrap(err, "Could not find package at provider registry API", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Retrieve and verify the checksums from the response.
@@ -537,9 +537,9 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", result.PageInfo.TotalCount,
 			)
 			return errors.New(
-				errors.EConflict,
 				"This provider version mirror can't be deleted because it currently mirrors %d platform(s). "+
 					"Setting force to true will automatically remove all mirrored Terraform provider platform mirrors. ", result.PageInfo.TotalCount,
+				errors.WithErrorCode(errors.EConflict),
 			)
 		}
 	}
@@ -755,7 +755,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 
 	if result.PageInfo.TotalCount > 0 {
 		tracing.RecordError(span, nil, "provider platform package is already mirrored")
-		return errors.New(errors.EConflict, "provider platform package is already mirrored")
+		return errors.New("provider platform package is already mirrored", errors.WithErrorCode(errors.EConflict))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -807,7 +807,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 
 	if !bytes.Equal(expectDigest, calculatedSum) {
 		tracing.RecordError(span, nil, "checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest)
-		return errors.New(errors.EInvalid, "checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest)
+		return errors.New("checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	toCreate := &models.TerraformProviderPlatformMirror{
@@ -891,7 +891,7 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 	// Per Terraform docs, must return a ENotFound when we have no mirrored provider versions.
 	if result.PageInfo.TotalCount == 0 {
 		tracing.RecordError(span, nil, "no versions are currently mirrored for Terraform provider %s", provider)
-		return nil, errors.New(errors.ENotFound, "no versions are currently mirrored for Terraform provider %s", provider)
+		return nil, errors.New("no versions are currently mirrored for Terraform provider %s", provider, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Must convert to a map here as needed by Terraform CLI.
@@ -951,7 +951,7 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 
 	if versionsResult.PageInfo.TotalCount == 0 {
 		tracing.RecordError(span, nil, "version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, provider)
-		return nil, errors.New(errors.ENotFound, "version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, provider)
+		return nil, errors.New("version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, provider, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	versionMirror := versionsResult.VersionMirrors[0]
@@ -968,7 +968,7 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 
 	if result.PageInfo.TotalCount == 0 {
 		tracing.RecordError(span, nil, "no installation packages are currently mirrored for Terraform provider %s", provider)
-		return nil, errors.New(errors.ENotFound, "no installation packages are currently mirrored for Terraform provider %s", provider)
+		return nil, errors.New("no installation packages are currently mirrored for Terraform provider %s", provider, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Build the list of supported packages.
@@ -1207,7 +1207,7 @@ func (s *service) getVersionMirrorByID(ctx context.Context, id string) (*models.
 	}
 
 	if versionMirror == nil {
-		return nil, errors.New(errors.ENotFound, "provider version mirror not found")
+		return nil, errors.New("provider version mirror not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return versionMirror, nil
@@ -1220,7 +1220,7 @@ func (s *service) getPlatformMirrorByID(ctx context.Context, id string) (*models
 	}
 
 	if platformMirror == nil {
-		return nil, errors.New(errors.ENotFound, "terraform provider platform mirror not found")
+		return nil, errors.New("terraform provider platform mirror not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return platformMirror, nil
@@ -1233,7 +1233,7 @@ func (s *service) getGroupByFullPath(ctx context.Context, path string) (*models.
 	}
 
 	if group == nil {
-		return nil, errors.New(errors.ENotFound, "group not found")
+		return nil, errors.New("group not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return group, nil
@@ -1301,17 +1301,17 @@ func parseProvider(hostname, namespace, providerType string) (*tfaddr.Provider, 
 	// Must parse individual parts first to avoid any panics from NewProvider.
 	ns, err := tfaddr.ParseProviderPart(namespace)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EInvalid, "Invalid registry namespace")
+		return nil, errors.Wrap(err, "Invalid registry namespace", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	pType, err := tfaddr.ParseProviderPart(providerType)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EInvalid, "Invalid provider type")
+		return nil, errors.Wrap(err, "Invalid provider type", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	convertedHostname, err := svchost.ForComparison(hostname)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EInvalid, "Invalid registry hostname")
+		return nil, errors.Wrap(err, "Invalid registry hostname", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	provider := tfaddr.NewProvider(convertedHostname, ns, pType)

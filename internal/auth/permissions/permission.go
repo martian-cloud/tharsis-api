@@ -231,7 +231,7 @@ func ParsePermissions(perms []string) ([]Permission, error) {
 		// Make sure there are exactly two parts.
 		pair := strings.Split(p, ":")
 		if len(pair) != 2 {
-			return nil, errors.New(errors.EInvalid, "invalid permission: %s", p)
+			return nil, errors.New("invalid permission: %s", p, errors.WithErrorCode(errors.EInvalid))
 		}
 
 		perm := Permission{

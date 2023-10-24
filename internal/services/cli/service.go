@@ -52,7 +52,7 @@ func (v TerraformCLIVersions) Supported(wantVersion string) error {
 		}
 	}
 
-	return errors.New(errors.EInvalid, "Unsupported Terraform version")
+	return errors.New("Unsupported Terraform version", errors.WithErrorCode(errors.EInvalid))
 }
 
 // Service encapsulates the logic for interacting with the CLI service.
@@ -120,9 +120,8 @@ func (s *service) GetTerraformCLIVersions(ctx context.Context) (TerraformCLIVers
 	if len(versionSources) == 0 {
 		tracing.RecordError(span, nil, "failed to get a list of Terraform CLI versions")
 		return nil, errors.New(
-			errors.EInternal,
 			"failed to get a list of Terraform CLI versions",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	var stringVersions TerraformCLIVersions

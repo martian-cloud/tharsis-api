@@ -121,12 +121,12 @@ func (r *ruleEnforcer) enforceRules(ctx context.Context, managedIdentity *models
 		if i == (len(rules) - 1) {
 			// this is the last rule
 			return terrors.New(
-				terrors.EForbidden,
 				"managed identity rule for %s not satisfied for run stage %s and managed identity %s: %s",
 				rule.Type,
 				rule.RunStage,
 				managedIdentity.ResourcePath,
 				strings.Join(diagnostics, ": "),
+				terrors.WithErrorCode(terrors.EForbidden),
 			)
 		}
 	}

@@ -276,7 +276,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
 				tracing.RecordError(span, nil,
 					"invalid group parent: the specified parent group does not exist")
-				return nil, errors.New(errors.EConflict, "invalid group parent: the specified parent group does not exist")
+				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict))
 			}
 
 			if isInvalidIDViolation(pgErr) {
@@ -799,7 +799,7 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
 				tracing.RecordError(span, nil,
 					"all nested groups and workspaces must be deleted before this group can be deleted")
-				return errors.New(errors.EConflict, "all nested groups and workspaces must be deleted before this group can be deleted")
+				return errors.New("all nested groups and workspaces must be deleted before this group can be deleted", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 

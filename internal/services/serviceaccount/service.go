@@ -33,12 +33,17 @@ const (
 var (
 	serviceAccountLoginDuration = 1 * time.Hour
 
-	errFailedCreateToken = errors.New(errors.EUnauthorized, "Failed to create service account token due to one of the "+
-		"following reasons: the service account does not exist; the JWT token used as input is invalid; the issuer "+
-		"for the token is not a valid issuer.")
+	errFailedCreateToken = errors.New(
+		"Failed to create service account token due to one of the "+
+			"following reasons: the service account does not exist; the JWT token used as input is invalid; the issuer "+
+			"for the token is not a valid issuer.",
+		errors.WithErrorCode(errors.EUnauthorized),
+	)
 
-	errExpiredToken = errors.New(errors.EUnauthorized,
-		"failed to create service account token due to an expired token")
+	errExpiredToken = errors.New(
+		"failed to create service account token due to an expired token",
+		errors.WithErrorCode(errors.EUnauthorized),
+	)
 )
 
 // CreateTokenInput for logging into a service account
@@ -303,7 +308,7 @@ func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*mo
 
 	if serviceAccount == nil {
 		tracing.RecordError(span, nil, "service account with path %s not found", path)
-		return nil, errors.New(errors.ENotFound, "service account with path %s not found", path)
+		return nil, errors.New("service account with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
@@ -335,7 +340,7 @@ func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models
 
 	if serviceAccount == nil {
 		tracing.RecordError(span, nil, "service account with ID %s not found", id)
-		return nil, errors.New(errors.ENotFound, "service account with ID %s not found", id)
+		return nil, errors.New("service account with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
@@ -515,14 +520,14 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	token, err := jwt.Parse(input.Token)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to decode token")
-		return nil, errors.Wrap(err, errors.EUnauthorized, "failed to decode token")
+		return nil, errors.Wrap(err, "failed to decode token", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	// Check if token is from a valid issuer associated with the service account
 	issuer := token.Issuer()
 	if issuer == "" {
 		tracing.RecordError(span, nil, "JWT is missing issuer claim")
-		return nil, errors.New(errors.EUnauthorized, "JWT is missing issuer claim")
+		return nil, errors.New("JWT is missing issuer claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	// Get service account
@@ -603,8 +608,10 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	// We know there was at least one trust policy checked, otherwise we would have returned before the for loop.
 	// To get here, all of the trust policies that were checked must have failed.
 	tracing.RecordError(span, nil, "of the trust policies for issuer, none was satisfied")
-	return nil, errors.New(errors.EUnauthorized,
-		fmt.Sprintf("of the trust policies for issuer %s, none was satisfied", issuer))
+	return nil, errors.New(
+		fmt.Sprintf("of the trust policies for issuer %s, none was satisfied", issuer),
+		errors.WithErrorCode(errors.EUnauthorized),
+	)
 }
 
 // findMatchingTrustPolicies returns a slice of the policies that have a matching issuer.
@@ -632,7 +639,7 @@ func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDCon
 
 	oidcConfig, err := configFetcher.GetOpenIDConfig(fetchCtx, issuer)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EInternal, "failed to get OIDC discovery document for issuer %s", issuer)
+		return nil, errors.Wrap(err, "failed to get OIDC discovery document for issuer %s", issuer)
 	}
 
 	fetchCtx, cancel = context.WithTimeout(ctx, 30*time.Second)
@@ -641,7 +648,7 @@ func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDCon
 	// Get issuer JWK response
 	keySet, err := jwk.Fetch(fetchCtx, oidcConfig.JwksURI)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EInternal, "Failed to query JWK URL %s", oidcConfig.JwksURI)
+		return nil, errors.Wrap(err, "Failed to query JWK URL %s", oidcConfig.JwksURI)
 	}
 
 	return keySet, nil
@@ -680,8 +687,10 @@ func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, t
 
 	// Parse and Verify token
 	if _, err = jwt.Parse(inputToken, options...); err != nil {
-		return errors.New(errors.EUnauthorized,
-			fmt.Sprintf("Failed to verify token %v", err))
+		return errors.New(
+			fmt.Sprintf("Failed to verify token %v", err),
+			errors.WithErrorCode(errors.EUnauthorized),
+		)
 	}
 
 	return nil

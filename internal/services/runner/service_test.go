@@ -27,7 +27,7 @@ func TestGetRunnerByID(t *testing.T) {
 		expectRunner  *models.Runner
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get shared runner",
@@ -54,7 +54,7 @@ func TestGetRunnerByID(t *testing.T) {
 				Name:     "test-runner",
 				Type:     models.GroupRunnerType,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -110,7 +110,7 @@ func TestGetRunnerByPath(t *testing.T) {
 		expectRunner  *models.Runner
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get shared runner",
@@ -137,7 +137,7 @@ func TestGetRunnerByPath(t *testing.T) {
 				Name:     "test-runner",
 				Type:     models.GroupRunnerType,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -192,7 +192,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 		expectRunner  *models.Runner
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get shared runner",
@@ -221,7 +221,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 				ResourcePath: "some-group/test-runner",
 				Type:         models.GroupRunnerType,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -292,7 +292,7 @@ func TestGetRunners(t *testing.T) {
 		expectRunner  *models.Runner
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "filter runners by group and allow access",
@@ -311,7 +311,7 @@ func TestGetRunners(t *testing.T) {
 			input: &GetRunnersInput{
 				NamespacePath: "group-1",
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -385,7 +385,7 @@ func TestCreateRunner(t *testing.T) {
 		authError             error
 		expectCreatedRunner   *models.Runner
 		name                  string
-		expectErrCode         string
+		expectErrCode         errors.CodeType
 		input                 CreateRunnerInput
 		limit                 int
 		injectRunnersPerGroup int32
@@ -413,7 +413,7 @@ func TestCreateRunner(t *testing.T) {
 				Name:    "test-runner",
 				GroupID: groupID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -527,7 +527,7 @@ func TestUpdateRunner(t *testing.T) {
 		authError     error
 		input         *models.Runner
 		name          string
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "update runner",
@@ -546,7 +546,7 @@ func TestUpdateRunner(t *testing.T) {
 				GroupID:      &groupID,
 				ResourcePath: "group123/test-runner",
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -612,7 +612,7 @@ func TestDeleteRunner(t *testing.T) {
 		authError     error
 		input         *models.Runner
 		name          string
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "delete runner",
@@ -631,7 +631,7 @@ func TestDeleteRunner(t *testing.T) {
 				GroupID:      &groupID,
 				ResourcePath: "group123/test-runner",
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 	}
