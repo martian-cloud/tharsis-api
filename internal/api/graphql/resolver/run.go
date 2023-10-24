@@ -41,7 +41,7 @@ type RunEdgeResolver struct {
 func (r *RunEdgeResolver) Cursor() (string, error) {
 	run, ok := r.edge.Node.(models.Run)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&run)
 	return *cursor, err
@@ -51,7 +51,7 @@ func (r *RunEdgeResolver) Cursor() (string, error) {
 func (r *RunEdgeResolver) Node() (*RunResolver, error) {
 	run, ok := r.edge.Node.(models.Run)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &RunResolver{run: &run}, nil
@@ -601,7 +601,7 @@ func loadRun(ctx context.Context, id string) (*models.Run, error) {
 
 	sv, ok := data.(models.Run)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &sv, nil

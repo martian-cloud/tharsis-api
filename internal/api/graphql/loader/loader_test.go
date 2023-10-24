@@ -16,7 +16,7 @@ func TestLoaderBatchFunc(t *testing.T) {
 		batchErr      error
 		batchResponse DataBatch
 		name          string
-		expectErrCode string
+		expectErrCode errors.CodeType
 		keys          []string
 		expectResults []dataloader.Result
 	}{
@@ -30,7 +30,7 @@ func TestLoaderBatchFunc(t *testing.T) {
 			name:          "load batch with missing data",
 			keys:          []string{"key1", "key2"},
 			batchResponse: DataBatch{"key1": "r1"},
-			expectResults: []dataloader.Result{{Data: "r1"}, {Error: errors.New(errors.ENotFound, "resource with ID key2 not found")}},
+			expectResults: []dataloader.Result{{Data: "r1"}, {Error: errors.New("resource with ID key2 not found", errors.WithErrorCode(errors.ENotFound))}},
 		},
 		{
 			name:          "load batch with single key",
@@ -42,8 +42,8 @@ func TestLoaderBatchFunc(t *testing.T) {
 			name:          "load batch with error response",
 			keys:          []string{"key1"},
 			batchResponse: DataBatch{"key1": "r1"},
-			batchErr:      errors.New(errors.ENotFound, "Failed to execute batch function"),
-			expectResults: []dataloader.Result{{Error: errors.New(errors.ENotFound, "Failed to execute batch function")}},
+			batchErr:      errors.New("Failed to execute batch function", errors.WithErrorCode(errors.ENotFound)),
+			expectResults: []dataloader.Result{{Error: errors.New("Failed to execute batch function", errors.WithErrorCode(errors.ENotFound))}},
 		},
 	}
 

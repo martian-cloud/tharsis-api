@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -83,7 +84,7 @@ func (c *moduleRegistryController) UploadModuleVersionPackage(w http.ResponseWri
 
 	if err := c.moduleRegistryService.UploadModuleVersionPackage(r.Context(), moduleVersion, limitReader); err != nil {
 		if strings.Contains(err.Error(), "read multipart upload data failed, http: request body too large") {
-			c.respWriter.RespondWithError(w, terrors.New(terrors.ETooLarge, "upload failed, module size exceeds maximum size of %d bytes", c.moduleRegistryMaxUploadSize))
+			c.respWriter.RespondWithError(w, terrors.New("upload failed, module size exceeds maximum size of %d bytes", c.moduleRegistryMaxUploadSize, terrors.WithErrorCode(errors.ETooLarge)))
 		} else {
 			c.respWriter.RespondWithError(w, err)
 		}
@@ -158,7 +159,7 @@ func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWri
 	}
 
 	if len(versionsResponse.ModuleVersions) == 0 {
-		c.respWriter.RespondWithError(w, terrors.New(terrors.ENotFound, "module version %s not found", version))
+		c.respWriter.RespondWithError(w, terrors.New("module version %s not found", version, terrors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 

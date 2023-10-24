@@ -287,7 +287,7 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"terraform provider with name %s already exists", provider.Name)
-				return nil, errors.New(errors.EConflict, "terraform provider with name %s already exists", provider.Name)
+				return nil, errors.New("terraform provider with name %s already exists", provider.Name, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

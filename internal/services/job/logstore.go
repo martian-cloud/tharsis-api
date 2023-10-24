@@ -36,7 +36,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create temporary directory for run logs",
 		)
 	}
@@ -49,7 +48,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create temporary file for run logs",
 		)
 	}
@@ -60,7 +58,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err = ls.objectStore.DownloadObject(ctx, key, logFile, nil); err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to download log file from object storage",
 		)
 	}
@@ -69,7 +66,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to open log file for writing",
 		)
 	}
@@ -79,22 +75,19 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get file stats for log file",
 		)
 	}
 
 	if int64(startOffset) > fileInfo.Size() {
 		return errors.New(
-			errors.EInvalid,
 			"Start offset of %d is past the end of the file", startOffset,
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if _, err = writer.WriteAt(buffer, int64(startOffset)); err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to append logs to log file",
 		)
 	}
@@ -102,7 +95,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err = writer.Truncate(int64(startOffset + len(buffer))); err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to truncate log file",
 		)
 	}
@@ -110,7 +102,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if _, err = writer.Seek(0, io.SeekStart); err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to seek to start of log file",
 		)
 	}
@@ -118,7 +109,6 @@ func (ls *logStore) SaveLogs(ctx context.Context, workspaceID string, runID stri
 	if err = ls.objectStore.UploadObject(ctx, key, writer); err != nil {
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to upload log file to object storage",
 		)
 	}
@@ -153,7 +143,6 @@ func (ls *logStore) GetLogs(ctx context.Context, workspaceID string, runID strin
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create temporary directory for run logs",
 		)
 	}
@@ -168,7 +157,6 @@ func (ls *logStore) GetLogs(ctx context.Context, workspaceID string, runID strin
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to create temporary file for run logs",
 		)
 	}
@@ -192,7 +180,6 @@ func (ls *logStore) GetLogs(ctx context.Context, workspaceID string, runID strin
 		}
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to download log file from object store",
 		)
 	}

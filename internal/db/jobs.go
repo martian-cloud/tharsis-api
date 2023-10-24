@@ -124,7 +124,7 @@ func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType mod
 		})
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get job")
-		return nil, errors.Wrap(err, errors.EInternal, "failed to get job")
+		return nil, errors.Wrap(err, "failed to get job")
 	}
 
 	if len(jobResult.Jobs) == 0 {

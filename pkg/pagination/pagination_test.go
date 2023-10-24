@@ -40,7 +40,7 @@ func TestExecute(t *testing.T) {
 		sortDirection       SortDirection
 		expectSQL           string
 		expectCountSQL      string
-		expectErrCode       string
+		expectErrCode       errors.CodeType
 		expectArguments     []interface{}
 		resultCount         int
 		expectedResultCount int

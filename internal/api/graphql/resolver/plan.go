@@ -166,7 +166,7 @@ func loadPlan(ctx context.Context, id string) (*models.Plan, error) {
 
 	ws, ok := data.(models.Plan)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &ws, nil

@@ -235,7 +235,7 @@ func (t *terraformProviderVersionMirrors) CreateVersionMirror(ctx context.Contex
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "terraform provider version is already mirrored")
-				return nil, errors.New(errors.EConflict, "terraform provider version is already mirrored")
+				return nil, errors.New("terraform provider version is already mirrored", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

@@ -314,7 +314,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
 				tracing.RecordError(span, nil,
 					"invalid group parent: the specified parent group does not exist")
-				return nil, errors.New(errors.EConflict, "invalid group parent: the specified parent group does not exist")
+				return nil, errors.New("invalid group parent: the specified parent group does not exist", errors.WithErrorCode(errors.EConflict))
 			}
 
 			if isInvalidIDViolation(pgErr) {

@@ -133,7 +133,7 @@ func (c *workspaceController) GetWorkspaceVariables(w http.ResponseWriter, r *ht
 		vCopy := v
 
 		if vCopy.Value == nil {
-			c.respWriter.RespondWithError(w, errors.New(errors.EForbidden, "Subject does not have the required access level to view variable values"))
+			c.respWriter.RespondWithError(w, errors.New("Subject does not have the required access level to view variable values", errors.WithErrorCode(errors.EForbidden)))
 			return
 		}
 

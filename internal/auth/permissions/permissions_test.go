@@ -84,7 +84,7 @@ func TestGetAssignablePermissions(t *testing.T) {
 func TestParsePermissions(t *testing.T) {
 	testCases := []struct {
 		name              string
-		expectErrorCode   string
+		expectErrorCode   errors.CodeType
 		input             []string
 		expectPermissions []Permission
 	}{

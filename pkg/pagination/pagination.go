@@ -233,7 +233,7 @@ func NewPaginatedQueryBuilder(
 		((cur.secondary != nil && sortBy == nil) ||
 			(cur.secondary == nil && sortBy != nil) ||
 			(cur.secondary != nil && sortBy != nil && sortBy.Key != cur.secondary.name)) {
-		return nil, te.New(te.EInvalid, "sort by argument does not match cursor")
+		return nil, te.New("sort by argument does not match cursor", te.WithErrorCode(te.EInvalid))
 	}
 
 	return &PaginatedQueryBuilder{

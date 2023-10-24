@@ -210,7 +210,7 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 				switch pgErr.ConstraintName {
 				case "fk_workspace_id":
 					tracing.RecordError(span, nil, "workspace does not exist")
-					return nil, errors.New(errors.ENotFound, "workspace does not exist")
+					return nil, errors.New("workspace does not exist", errors.WithErrorCode(errors.ENotFound))
 				}
 			}
 		}

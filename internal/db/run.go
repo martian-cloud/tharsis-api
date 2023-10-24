@@ -160,13 +160,12 @@ func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, 
 	})
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get run for plan")
-		return nil, errors.Wrap(err, errors.EInternal, "failed to get run for plan")
+		return nil, errors.Wrap(err, "failed to get run for plan")
 	}
 
 	if len(result.Runs) == 0 {
 		tracing.RecordError(span, nil, "Failed to get run for plan")
 		return nil, errors.New(
-			errors.EInternal,
 			"Failed to get run for plan",
 		)
 	}
@@ -191,13 +190,12 @@ func (r *runs) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run
 	})
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get run for apply")
-		return nil, errors.Wrap(err, errors.EInternal, "failed to get run for apply")
+		return nil, errors.Wrap(err, "failed to get run for apply")
 	}
 
 	if len(result.Runs) == 0 {
 		tracing.RecordError(span, nil, "Failed to get run for apply")
 		return nil, errors.New(
-			errors.EInternal,
 			"Failed to get run for apply",
 		)
 	}

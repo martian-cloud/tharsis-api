@@ -29,7 +29,7 @@ type VCSProviderEdgeResolver struct {
 func (r *VCSProviderEdgeResolver) Cursor() (string, error) {
 	vcsProvider, ok := r.edge.Node.(models.VCSProvider)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&vcsProvider)
 	return *cursor, err
@@ -39,7 +39,7 @@ func (r *VCSProviderEdgeResolver) Cursor() (string, error) {
 func (r *VCSProviderEdgeResolver) Node() (*VCSProviderResolver, error) {
 	vcsProvider, ok := r.edge.Node.(models.VCSProvider)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &VCSProviderResolver{vcsProvider: &vcsProvider}, nil
@@ -435,7 +435,7 @@ func loadVCSProvider(ctx context.Context, id string) (*models.VCSProvider, error
 
 	vp, ok := data.(models.VCSProvider)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &vp, nil

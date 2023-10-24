@@ -50,7 +50,7 @@ func TestCreateServiceAccount(t *testing.T) {
 		authError                     error
 		expectCreatedServiceAccount   *models.ServiceAccount
 		name                          string
-		expectErrCode                 string
+		expectErrCode                 terrs.CodeType
 		input                         models.ServiceAccount
 		limit                         int
 		injectServiceAccountsPerGroup int32
@@ -101,7 +101,7 @@ func TestCreateServiceAccount(t *testing.T) {
 					},
 				},
 			},
-			authError:     terrs.New(terrs.EForbidden, "Unauthorized"),
+			authError:     terrs.New("Unauthorized", terrs.WithErrorCode(terrs.EForbidden)),
 			expectErrCode: terrs.EForbidden,
 		},
 		{

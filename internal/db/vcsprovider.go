@@ -289,12 +289,12 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "vcs provider already exists in the specified group")
-				return nil, errors.New(errors.EConflict, "vcs provider already exists in the specified group")
+				return nil, errors.New("vcs provider already exists in the specified group", errors.WithErrorCode(errors.EConflict))
 			}
 
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_group_id" {
 				tracing.RecordError(span, nil, "invalid group: the specified group does not exist")
-				return nil, errors.New(errors.EConflict, "invalid group: the specified group does not exist")
+				return nil, errors.New("invalid group: the specified group does not exist", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -416,8 +416,8 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 				tracing.RecordError(span, nil,
 					"VCS provider %s has workspace configurations", provider.Name)
 				return errors.New(
-					errors.EConflict,
 					"VCS provider %s has workspace configurations", provider.Name,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 		}

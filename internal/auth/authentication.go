@@ -51,19 +51,19 @@ func NewAuthenticator(userAuth *UserAuth, idp *IdentityProvider, dbClient *db.Cl
 // Authenticate verifies the token and returns a Caller
 func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
 	if tokenString == "" {
-		return nil, errors.New(errors.EUnauthorized, "Authentication token is missing")
+		return nil, errors.New("Authentication token is missing", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	decodedToken, err := jwt.Parse([]byte(tokenString))
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EUnauthorized, "failed to decode token")
+		return nil, errors.Wrap(err, "failed to decode token", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	if decodedToken.Issuer() == a.issuerURL {
 		// This is a service account token
 		output, vtErr := a.idp.VerifyToken(ctx, tokenString)
 		if vtErr != nil {
-			return nil, errors.New(errors.EUnauthorized, errorReason(vtErr))
+			return nil, errors.New(errorReason(vtErr), errors.WithErrorCode(errors.EUnauthorized))
 		}
 
 		tokenType, ok := output.PrivateClaims["type"]
@@ -90,24 +90,24 @@ func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, us
 		case SCIMTokenType:
 			scimCaller, sErr := a.verifySCIMTokenClaim(ctx, output.Token)
 			if sErr != nil {
-				return nil, errors.New(errors.EUnauthorized, errorReason(sErr))
+				return nil, errors.New(errorReason(sErr), errors.WithErrorCode(errors.EUnauthorized))
 			}
 			return scimCaller, nil
 		case VCSWorkspaceLinkTokenType:
 			vcsCaller, sErr := a.verifyVCSToken(ctx, output)
 			if sErr != nil {
-				return nil, errors.New(errors.EUnauthorized, errorReason(sErr))
+				return nil, errors.New(errorReason(sErr), errors.WithErrorCode(errors.EUnauthorized))
 			}
 			return vcsCaller, nil
 		default:
-			return nil, errors.New(errors.EInternal, "Unsupported token type received")
+			return nil, errors.New("Unsupported token type received")
 		}
 	}
 
 	// This is a user token
 	caller, err := a.userAuth.Authenticate(ctx, tokenString, useCache)
 	if err != nil {
-		return nil, errors.New(errors.EUnauthorized, errorReason(err))
+		return nil, errors.New(errorReason(err), errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	return caller, nil

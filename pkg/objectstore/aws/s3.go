@@ -128,12 +128,12 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return te.New(te.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
+			return te.New("Key %s not found in bucket %s", key, s.bucket, te.WithErrorCode(te.ENotFound))
 		}
 
 		var ae smithy.APIError
 		if errors.As(err, &ae) && ae.ErrorCode() == "InvalidRange" {
-			return te.New(te.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
+			return te.New("Range %s not found in %s", *options.ContentRange, key, te.WithErrorCode(te.ENotFound))
 		}
 
 		s.logger.Errorf("Failed to download file from key %s %v", key, err)
@@ -158,12 +158,12 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			return nil, te.New(te.ENotFound, "Key %s not found in bucket %s", key, s.bucket)
+			return nil, te.New("Key %s not found in bucket %s", key, s.bucket, te.WithErrorCode(te.ENotFound))
 		}
 
 		var ae smithy.APIError
 		if errors.As(err, &ae) && ae.ErrorCode() == "InvalidRange" {
-			return nil, te.New(te.ENotFound, "Range %s not found in %s", *options.ContentRange, key)
+			return nil, te.New("Range %s not found in %s", *options.ContentRange, key, te.WithErrorCode(te.ENotFound))
 		}
 
 		s.logger.Errorf("Failed to get file from key %s %v", key, err)
@@ -205,7 +205,7 @@ func (s *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 
 	presignedReq, err := presignClient.PresignGetObject(ctx, input)
 	if err != nil {
-		return "", te.Wrap(err, te.EInternal, "failed to create presigned URL")
+		return "", te.Wrap(err, "failed to create presigned URL", te.WithErrorCode(te.EInternal))
 	}
 
 	return presignedReq.URL, nil

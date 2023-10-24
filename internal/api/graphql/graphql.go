@@ -207,8 +207,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if qcErr != nil {
 				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
 				err := errors.New(
-					errors.EInvalid,
 					"invalid graphql query: "+strings.TrimPrefix(qcErr.Error(), "graphql: syntax error: "),
+					errors.WithErrorCode(errors.EInvalid),
 				)
 				responses[i] = &graphql.Response{Errors: []*grapherrors.QueryError{{Err: err, Message: errors.ErrorMessage(err)}}}
 				return
@@ -222,8 +222,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			} else {
 				rateLimitExceededCount.Inc()
 				err := errors.New(
-					errors.ETooManyRequests,
 					"max query complexity exceeded",
+					errors.WithErrorCode(errors.ETooManyRequests),
 				)
 				res = &graphql.Response{Errors: []*grapherrors.QueryError{{Err: err, Message: errors.ErrorMessage(err)}}}
 			}

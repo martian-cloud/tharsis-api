@@ -151,7 +151,7 @@ func loadApply(ctx context.Context, id string) (*models.Apply, error) {
 
 	ws, ok := data.(models.Apply)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &ws, nil

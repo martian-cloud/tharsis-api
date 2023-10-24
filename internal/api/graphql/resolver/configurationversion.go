@@ -170,7 +170,7 @@ func loadConfigurationVersion(ctx context.Context, id string) (*models.Configura
 
 	configurationVersion, ok := data.(models.ConfigurationVersion)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &configurationVersion, nil

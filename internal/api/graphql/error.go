@@ -6,7 +6,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
-var tharsisErrorToStatusCode = map[string]string{
+var tharsisErrorToStatusCode = map[errors.CodeType]string{
 	errors.EInternal:        "INTERNAL_SERVER_ERROR",
 	errors.ETooLarge:        "INTERNAL_SERVER_ERROR",
 	errors.EInvalid:         "BAD_REQUEST",

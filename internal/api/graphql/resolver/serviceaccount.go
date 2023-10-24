@@ -52,7 +52,7 @@ type ServiceAccountEdgeResolver struct {
 func (r *ServiceAccountEdgeResolver) Cursor() (string, error) {
 	serviceAccount, ok := r.edge.Node.(models.ServiceAccount)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&serviceAccount)
 	return *cursor, err
@@ -62,7 +62,7 @@ func (r *ServiceAccountEdgeResolver) Cursor() (string, error) {
 func (r *ServiceAccountEdgeResolver) Node() (*ServiceAccountResolver, error) {
 	serviceAccount, ok := r.edge.Node.(models.ServiceAccount)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &ServiceAccountResolver{serviceAccount: &serviceAccount}, nil
@@ -415,8 +415,8 @@ func convertOIDCTrustPolicies(src []OIDCTrustPolicy) ([]models.OIDCTrustPolicy, 
 			if _, ok := policy.BoundClaims[claim.Name]; ok {
 				return nil,
 					errors.New(
-						errors.EInvalid,
 						"Claim with name %s can only be defined once for each trust policy", claim.Name,
+						errors.WithErrorCode(errors.EInvalid),
 					)
 			}
 			policy.BoundClaims[claim.Name] = claim.Value
@@ -449,7 +449,7 @@ func loadServiceAccount(ctx context.Context, id string) (*models.ServiceAccount,
 
 	serviceAccount, ok := data.(models.ServiceAccount)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &serviceAccount, nil

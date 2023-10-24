@@ -229,8 +229,7 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 
 				tracing.RecordError(span, nil,
 					"team member of user %s in team %s already exists", username, teamName)
-				return nil, errors.New(errors.EConflict,
-					fmt.Sprintf("team member of user %s in team %s already exists", username, teamName))
+				return nil, errors.New(fmt.Sprintf("team member of user %s in team %s already exists", username, teamName), errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

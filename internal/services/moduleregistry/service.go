@@ -240,7 +240,7 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 	}
 
 	if module == nil {
-		return nil, errors.New(errors.ENotFound, "module with path %s not found", path)
+		return nil, errors.New("module with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if module.Private {
@@ -272,7 +272,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	}
 
 	if rootGroup == nil {
-		return nil, errors.New(errors.ENotFound, "namespace %s not found", namespace)
+		return nil, errors.New("namespace %s not found", namespace, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	moduleResult, err := s.dbClient.TerraformModules.GetModules(ctx, &db.GetModulesInput{
@@ -289,7 +289,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	}
 
 	if len(moduleResult.Modules) == 0 {
-		return nil, errors.New(errors.ENotFound, "module with name %s and system %s not found in namespace %s", name, system, namespace)
+		return nil, errors.New("module with name %s and system %s not found in namespace %s", name, system, namespace, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	module := moduleResult.Modules[0]
@@ -454,36 +454,36 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 
 	// Verify the module attestation data is below the size limit
 	if size > MaxModuleAttestationSize {
-		return nil, errors.New(errors.EInvalid, "module attestation of size %d exceeds max size limit of %d bytes", size, MaxModuleAttestationSize)
+		return nil, errors.New("module attestation of size %d exceeds max size limit of %d bytes", size, MaxModuleAttestationSize, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	decodedSig, err := base64.StdEncoding.DecodeString(input.AttestationData)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to decode base64 string")
-		return nil, errors.Wrap(err, errors.EInvalid, "failed to decode attestation data")
+		return nil, errors.Wrap(err, "failed to decode attestation data", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Decode DSSE Envelope
 	env := dsseEnvelope{}
 	if err = json.Unmarshal(decodedSig, &env); err != nil {
 		tracing.RecordError(span, err, "failed to unmarshal DSEE attestation data")
-		return nil, errors.Wrap(err, errors.EInvalid, "attestation data is not in dsse format")
+		return nil, errors.Wrap(err, "attestation data is not in dsse format", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if env.PayloadType != IntotoPayloadType {
-		return nil, errors.New(errors.EInvalid, "invalid payloadType %s on envelope; expected %s", env.PayloadType, IntotoPayloadType)
+		return nil, errors.New("invalid payloadType %s on envelope; expected %s", env.PayloadType, IntotoPayloadType, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Get the expected digest from the attestation
 	decodedPredicate, err := base64.StdEncoding.DecodeString(env.Payload)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to decode base64 string")
-		return nil, errors.Wrap(err, errors.EInvalid, "decoding dsse envelope payload")
+		return nil, errors.Wrap(err, "decoding dsse envelope payload", errors.WithErrorCode(errors.EInvalid))
 	}
 	var statement in_toto.Statement
 	if err = json.Unmarshal(decodedPredicate, &statement); err != nil {
 		tracing.RecordError(span, err, "failed to unmarshal the in-toto statement")
-		return nil, errors.Wrap(err, errors.EInvalid, "decoding predicate")
+		return nil, errors.Wrap(err, "decoding predicate", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	foundSupportedType := false
@@ -495,19 +495,24 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	}
 
 	if !foundSupportedType {
-		return nil, errors.New(errors.EInvalid, "in-toto statement type %s not supported; expected one of %s", statement.Type, strings.Join(SupportedIntotoStatementTypes, ", "))
+		return nil, errors.New(
+			"in-toto statement type %s not supported; expected one of %s",
+			statement.Type,
+			strings.Join(SupportedIntotoStatementTypes, ", "),
+			errors.WithErrorCode(errors.EInvalid),
+		)
 	}
 
 	// Compare the actual and expected
 	if statement.Subject == nil || len(statement.Subject) == 0 {
-		return nil, errors.New(errors.EInvalid, "in-toto statement is missing subject")
+		return nil, errors.New("in-toto statement is missing subject", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	digests := []string{}
 	for _, subject := range statement.Subject {
 		digest, ok := subject.Digest["sha256"]
 		if !ok {
-			return nil, errors.New(errors.EInvalid, "subject %s is missing sha256 digest", subject.Name)
+			return nil, errors.New("subject %s is missing sha256 digest", subject.Name, errors.WithErrorCode(errors.EInvalid))
 		}
 		digests = append(digests, digest)
 	}
@@ -638,7 +643,7 @@ func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*mod
 	}
 
 	if moduleAttestation == nil {
-		return nil, errors.New(errors.ENotFound, "module with id %s not found", id)
+		return nil, errors.New("module with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	module, err := s.getModuleByID(ctx, moduleAttestation.ModuleID)
@@ -1124,7 +1129,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 	semVersion, err := version.NewSemver(input.SemanticVersion)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to verify semantic version")
-		return nil, errors.Wrap(err, errors.EInvalid, "invalid semantic version")
+		return nil, errors.Wrap(err, "invalid semantic version", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Check if this version is greater than the previous latest
@@ -1371,11 +1376,11 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 	}
 
 	if moduleVersion.Status == models.TerraformModuleVersionStatusUploadInProgress {
-		return errors.New(errors.EConflict, "module package upload is already in progress")
+		return errors.New("module package upload is already in progress", errors.WithErrorCode(errors.EConflict))
 	}
 
 	if moduleVersion.Status == models.TerraformModuleVersionStatusUploaded || moduleVersion.Status == models.TerraformModuleVersionStatusErrored {
-		return errors.New(errors.EConflict, "module package already uploaded")
+		return errors.New("module package already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -1480,7 +1485,7 @@ func (s *service) getModuleByID(ctx context.Context, id string) (*models.Terrafo
 	}
 
 	if module == nil {
-		return nil, errors.New(errors.ENotFound, "module with id %s not found", id)
+		return nil, errors.New("module with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return module, nil
@@ -1493,7 +1498,7 @@ func (s *service) getModuleVersionByID(ctx context.Context, id string) (*models.
 	}
 
 	if version == nil {
-		return nil, errors.New(errors.ENotFound, "module version with id %s not found", id)
+		return nil, errors.New("module version with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return version, nil

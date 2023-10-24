@@ -30,7 +30,7 @@ type StateVersionEdgeResolver struct {
 func (r *StateVersionEdgeResolver) Cursor() (string, error) {
 	stateVersion, ok := r.edge.Node.(models.StateVersion)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&stateVersion)
 	return *cursor, err
@@ -40,7 +40,7 @@ func (r *StateVersionEdgeResolver) Cursor() (string, error) {
 func (r *StateVersionEdgeResolver) Node() (*StateVersionResolver, error) {
 	stateVersion, ok := r.edge.Node.(models.StateVersion)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &StateVersionResolver{stateVersion: &stateVersion}, nil
@@ -333,7 +333,7 @@ func loadStateVersion(ctx context.Context, id string) (*models.StateVersion, err
 
 	sv, ok := data.(models.StateVersion)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &sv, nil

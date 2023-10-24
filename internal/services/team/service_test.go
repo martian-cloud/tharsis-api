@@ -23,7 +23,7 @@ func TestGetTeamByID(t *testing.T) {
 	type testCase struct {
 		expectTeam      *models.Team
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -79,7 +79,7 @@ func TestGetTeamByName(t *testing.T) {
 	type testCase struct {
 		expectTeam      *models.Team
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -237,7 +237,7 @@ func TestCreateTeam(t *testing.T) {
 		expectTeam      *models.Team
 		name            string
 		authError       error
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -263,7 +263,7 @@ func TestCreateTeam(t *testing.T) {
 		{
 			name:            "subject does not have permission to create team",
 			input:           &CreateTeamInput{},
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -334,7 +334,7 @@ func TestUpdateTeam(t *testing.T) {
 		expectTeam      *models.Team
 		name            string
 		authError       error
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -366,7 +366,7 @@ func TestUpdateTeam(t *testing.T) {
 				Name: "team",
 			},
 			existingTeam:    sampleTeam,
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -440,7 +440,7 @@ func TestDeleteTeam(t *testing.T) {
 	type testCase struct {
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -449,7 +449,7 @@ func TestDeleteTeam(t *testing.T) {
 		},
 		{
 			name:            "subject does not have permission to delete team",
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -511,7 +511,7 @@ func TestGetTeamMember(t *testing.T) {
 		existingTeam    *models.Team
 		expectMember    *models.TeamMember
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -664,7 +664,7 @@ func TestAddUserToTeam(t *testing.T) {
 		expectAdded     *models.TeamMember
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -691,7 +691,7 @@ func TestAddUserToTeam(t *testing.T) {
 			name:            "subject does not have permission to add team members",
 			existingUser:    sampleUser,
 			existingTeam:    sampleTeam,
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -797,7 +797,7 @@ func TestUpdateTeamMember(t *testing.T) {
 		expectUpdated   *models.TeamMember
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -825,7 +825,7 @@ func TestUpdateTeamMember(t *testing.T) {
 			name:            "subject does not have permission to update team members",
 			existingUser:    sampleUser,
 			existingTeam:    sampleTeam,
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
@@ -918,7 +918,7 @@ func TestDeleteTeamMember(t *testing.T) {
 	type testCase struct {
 		authError       error
 		name            string
-		expectErrorCode string
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
@@ -927,7 +927,7 @@ func TestDeleteTeamMember(t *testing.T) {
 		},
 		{
 			name:            "subject does not have permission to delete team member",
-			authError:       errors.New(errors.EForbidden, "Unauthorized"),
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 	}

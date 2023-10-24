@@ -131,7 +131,7 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 	}
 
 	if input.ParentGroup != nil && input.RootOnly {
-		return nil, errors.New(errors.EInternal, "RootOnly cannot be true when ParentGroup is specified")
+		return nil, errors.New("RootOnly cannot be true when ParentGroup is specified")
 	}
 
 	dbInput := db.GetGroupsInput{
@@ -207,9 +207,8 @@ func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, e
 	if group == nil {
 		tracing.RecordError(span, nil, "Group with id %s not found", id)
 		return nil, errors.New(
-			errors.ENotFound,
 			"Group with id %s not found", id,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
@@ -241,9 +240,8 @@ func (s *service) GetGroupByFullPath(ctx context.Context, path string) (*models.
 	if group == nil {
 		tracing.RecordError(span, nil, "Group with path %s not found", path)
 		return nil, errors.New(
-			errors.ENotFound,
 			"Group with path %s not found", path,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
@@ -292,9 +290,9 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 				"This group can't be deleted because it contains subgroups, "+
 					"use the force option to automatically delete all subgroups.")
 			return errors.New(
-				errors.EConflict,
 				"This group can't be deleted because it contains subgroups, "+
 					"use the force option to automatically delete all subgroups.",
+				errors.WithErrorCode(errors.EConflict),
 			)
 		}
 
@@ -309,9 +307,9 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 				"This group can't be deleted because it contains workspaces, "+
 					"use the force option to automatically delete all workspaces in this group.")
 			return errors.New(
-				errors.EConflict,
 				"This group can't be deleted because it contains workspaces, "+
 					"use the force option to automatically delete all workspaces in this group.",
+				errors.WithErrorCode(errors.EConflict),
 			)
 		}
 	}
@@ -381,12 +379,12 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok {
 			tracing.RecordError(span, nil, "Unsupported caller type, only users are allowed to create top-level groups")
-			return nil, errors.New(errors.EForbidden, "Unsupported caller type, only users are allowed to create top-level groups")
+			return nil, errors.New("Unsupported caller type, only users are allowed to create top-level groups", errors.WithErrorCode(errors.EForbidden))
 		}
 		// Only admins are allowed to create top level groups
 		if !userCaller.User.Admin {
 			tracing.RecordError(span, nil, "Only system admins can create top-level groups")
-			return nil, errors.New(errors.EForbidden, "Only system admins can create top-level groups")
+			return nil, errors.New("Only system admins can create top-level groups", errors.WithErrorCode(errors.EForbidden))
 		}
 	}
 
@@ -560,9 +558,8 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	if group == nil {
 		tracing.RecordError(span, nil, "Group with id %s not found", groupID)
 		return nil, errors.New(
-			errors.ENotFound,
 			"Group with id %s not found", groupID,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Caller must have UpdateGroupPermission in the group being moved.
@@ -585,9 +582,8 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		if newParent == nil {
 			tracing.RecordError(span, nil, "Group with id %s not found", *newParentID)
 			return nil, errors.New(
-				errors.ENotFound,
 				"Group with id %s not found", *newParentID,
-			)
+				errors.WithErrorCode(errors.ENotFound))
 		}
 
 		// In case a user gets confused or otherwise tries to do a no-op move, detect and bail out.
@@ -595,19 +591,19 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		if group.ParentID == newParent.Metadata.ID {
 			// Return BadRequest.
 			tracing.RecordError(span, nil, "group already has the specified parent")
-			return nil, errors.New(errors.EInvalid, "group already has the specified parent")
+			return nil, errors.New("group already has the specified parent", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Make sure the group to be moved and the new parent group aren't exactly the same group.
 		if newParent.FullPath == group.FullPath {
 			tracing.RecordError(span, nil, "cannot move a group to be its own parent")
-			return nil, errors.New(errors.EInvalid, "cannot move a group to be its own parent")
+			return nil, errors.New("cannot move a group to be its own parent", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Make sure the group to be moved and the new parent group aren't respective ancestor and descendant.
 		if strings.HasPrefix(newParent.FullPath, (group.FullPath + "/")) {
 			tracing.RecordError(span, nil, "cannot move a group under one of its descendants")
-			return nil, errors.New(errors.EInvalid, "cannot move a group under one of its descendants")
+			return nil, errors.New("cannot move a group under one of its descendants", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// If there is a new parent, the caller must have CreateGroupPermission in the new parent.
@@ -624,19 +620,21 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		if group.ParentID == "" {
 			// Return BadRequest.
 			tracing.RecordError(span, nil, "group is already a top-level group")
-			return nil, errors.New(errors.EInvalid, "group is already a top-level group")
+			return nil, errors.New("group is already a top-level group", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// If moving to root, the caller must be admin, because only admins are allowed to create new root groups.
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok {
 			tracing.RecordError(span, nil, "Unsupported caller type, only users are allowed to move groups to top-level")
-			return nil, errors.New(errors.EForbidden,
-				"Unsupported caller type, only users are allowed to move groups to top-level")
+			return nil, errors.New(
+				"Unsupported caller type, only users are allowed to move groups to top-level",
+				errors.WithErrorCode(errors.EForbidden),
+			)
 		}
 		if !userCaller.User.Admin {
 			tracing.RecordError(span, nil, "Only system admins can move groups to top-level")
-			return nil, errors.New(errors.EForbidden, "Only system admins can move groups to top-level")
+			return nil, errors.New("Only system admins can move groups to top-level", errors.WithErrorCode(errors.EForbidden))
 		}
 		// Leave newParentPath empty for the log message.
 	}

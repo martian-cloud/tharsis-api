@@ -186,7 +186,7 @@ func (s *service) GetProviderByPath(ctx context.Context, path string) (*models.T
 	}
 
 	if provider == nil {
-		return nil, errors.New(errors.ENotFound, "provider with path %s not found", path)
+		return nil, errors.New("provider with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if provider.Private {
@@ -218,7 +218,7 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 	}
 
 	if rootGroup == nil {
-		return nil, errors.New(errors.ENotFound, "namespace %s not found", namespace)
+		return nil, errors.New("namespace %s not found", namespace, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	providerResult, err := s.dbClient.TerraformProviders.GetProviders(ctx, &db.GetProvidersInput{
@@ -234,7 +234,7 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 	}
 
 	if len(providerResult.Providers) == 0 {
-		return nil, errors.New(errors.ENotFound, "provider with name %s not found in namespace %s", name, namespace)
+		return nil, errors.New("provider with name %s not found in namespace %s", name, namespace, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	provider := providerResult.Providers[0]
@@ -752,7 +752,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 	semVersion, err := version.NewSemver(input.SemanticVersion)
 	if err != nil {
 		tracing.RecordError(span, err, "invalid semantic version")
-		return nil, errors.Wrap(err, errors.EInvalid, "invalid semantic version")
+		return nil, errors.Wrap(err, "invalid semantic version", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Check if this version is greater than the previous latest
@@ -1028,7 +1028,7 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 
 	// Verify at least one filter is set
 	if input.ProviderID == nil && input.ProviderVersionID == nil {
-		return nil, errors.New(errors.EInternal, "the provider id or provider version id filter must be set when querying for provider platforms")
+		return nil, errors.New("the provider id or provider version id filter must be set when querying for provider platforms")
 	}
 
 	var provider *models.TerraformProvider
@@ -1229,7 +1229,7 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 	}
 
 	if providerPlatform.BinaryUploaded {
-		return errors.New(errors.EConflict, "binary already uploaded")
+		return errors.New("binary already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -1289,7 +1289,7 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 	}
 
 	if providerVersion.ReadmeUploaded {
-		return errors.New(errors.EConflict, "README file already uploaded")
+		return errors.New("README file already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -1349,7 +1349,7 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 	}
 
 	if providerVersion.SHASumsUploaded {
-		return errors.New(errors.EConflict, "shasums file already uploaded")
+		return errors.New("shasums file already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -1409,7 +1409,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 	}
 
 	if providerVersion.SHASumsSignatureUploaded {
-		return errors.New(errors.EConflict, "shasums signature file already uploaded")
+		return errors.New("shasums signature file already uploaded", errors.WithErrorCode(errors.EConflict))
 	}
 
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -1432,12 +1432,12 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 	pkt, err := packetReader.Next()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to read gpg signature")
-		return errors.Wrap(err, errors.EInvalid, "failed to read gpg signature")
+		return errors.Wrap(err, "failed to read gpg signature", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	key, ok := pkt.(*packet.Signature)
 	if !ok {
-		return errors.Wrap(err, errors.EInvalid, "gpg signature is not in valid format")
+		return errors.Wrap(err, "gpg signature is not in valid format", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// GPG key id is used to lookup the trusted GPG public key
@@ -1465,7 +1465,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 		}})
 
 	if searchKeyResult.PageInfo.TotalCount == 0 {
-		return errors.Wrap(err, errors.EInvalid, "a trusted gpg key for key id %d does not exist", gpgKeyID)
+		return errors.Wrap(err, "a trusted gpg key for key id %d does not exist", gpgKeyID, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	gpgKey := searchKeyResult.GPGKeys[0]
@@ -1550,7 +1550,7 @@ func (s *service) getProviderPlatformByID(ctx context.Context, id string) (*mode
 	}
 
 	if platform == nil {
-		return nil, errors.New(errors.ENotFound, "provider platform with id %s not found", id)
+		return nil, errors.New("provider platform with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return platform, nil
@@ -1563,7 +1563,7 @@ func (s *service) getProviderByID(ctx context.Context, id string) (*models.Terra
 	}
 
 	if provider == nil {
-		return nil, errors.New(errors.ENotFound, "provider with id %s not found", id)
+		return nil, errors.New("provider with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return provider, nil
@@ -1576,7 +1576,7 @@ func (s *service) getProviderVersionByID(ctx context.Context, id string) (*model
 	}
 
 	if version == nil {
-		return nil, errors.New(errors.ENotFound, "provider version with id %s not found", id)
+		return nil, errors.New("provider version with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return version, nil

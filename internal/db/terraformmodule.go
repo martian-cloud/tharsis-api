@@ -110,7 +110,7 @@ func (t *terraformModules) GetModuleByPath(ctx context.Context, path string) (*m
 
 	if len(pathParts) < 3 {
 		tracing.RecordError(span, nil, "Invalid resource path for module")
-		return nil, errors.New(errors.EInvalid, "Invalid resource path for module")
+		return nil, errors.New("Invalid resource path for module", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	moduleName := pathParts[len(pathParts)-2]
@@ -302,7 +302,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"terraform module with name %s and system %s already exists", module.Name, module.System)
-				return nil, errors.New(errors.EConflict, "terraform module with name %s and system %s already exists", module.Name, module.System)
+				return nil, errors.New("terraform module with name %s and system %s already exists", module.Name, module.System, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -375,7 +375,7 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil,
 					"terraform module with name %s and system %s already exists", module.Name, module.System)
-				return nil, errors.New(errors.EConflict, "terraform module with name %s and system %s already exists", module.Name, module.System)
+				return nil, errors.New("terraform module with name %s and system %s already exists", module.Name, module.System, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

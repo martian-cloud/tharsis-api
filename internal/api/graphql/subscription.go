@@ -57,16 +57,16 @@ var graphqlSubscriptionCount = metric.NewCounter("graphql_subscription_count", "
 func (g *graphqlSubscriptions) Subscribe(ctx context.Context, document string, operationName string, variableValues map[string]interface{}) (payloads <-chan interface{}, err error) {
 	msg, ok := ctx.Value("Header").(json.RawMessage)
 	if !ok {
-		return nil, errors.New(errors.EUnauthorized, "Missing Authorization header")
+		return nil, errors.New("Missing Authorization header", errors.WithErrorCode(errors.EUnauthorized))
 	}
 	var params connectionParams
 	if err = json.Unmarshal(msg, &params); err != nil {
-		return nil, errors.New(errors.EInvalid, "Failed to decode connection params")
+		return nil, errors.New("Failed to decode connection params", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	caller, err := g.authenticator.Authenticate(ctx, params.findToken(), false)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.EUnauthorized, "unauthorized")
+		return nil, errors.Wrap(err, "unauthorized", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	graphqlSubscriptionCount.Inc()

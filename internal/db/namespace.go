@@ -102,7 +102,7 @@ func createNamespace(ctx context.Context, conn connection, namespace *namespaceR
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "namespace %s already exists", namespace.path)
-				return nil, errors.New(errors.EConflict, "namespace %s already exists", namespace.path)
+				return nil, errors.New("namespace %s already exists", namespace.path, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

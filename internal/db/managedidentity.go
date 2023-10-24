@@ -358,7 +358,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "rule for run stage %s already exists", rule.RunStage)
-				return nil, errors.New(errors.EConflict, "rule for run stage %s already exists", rule.RunStage)
+				return nil, errors.New("rule for run stage %s already exists", rule.RunStage, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -491,7 +491,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "rule for run stage %s already exists", rule.RunStage)
-				return nil, errors.New(errors.EConflict, "rule for run stage %s already exists", rule.RunStage)
+				return nil, errors.New("rule for run stage %s already exists", rule.RunStage, errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -715,7 +715,7 @@ func (m *managedIdentities) AddManagedIdentityToWorkspace(ctx context.Context, m
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "managed identity already assigned to workspace")
-				return errors.New(errors.EConflict, "managed identity already assigned to workspace")
+				return errors.New("managed identity already assigned to workspace", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute DB query")
@@ -980,7 +980,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "managed identity already exists in the specified group")
-				return nil, errors.New(errors.EConflict, "managed identity already exists in the specified group")
+				return nil, errors.New("managed identity already exists in the specified group", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute DB query")
@@ -1114,7 +1114,7 @@ func (m *managedIdentities) DeleteManagedIdentity(ctx context.Context, managedId
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) {
 				tracing.RecordError(span, nil, "managed identity is still assigned to a workspace")
-				return errors.New(errors.EConflict, "managed identity is still assigned to a workspace")
+				return errors.New("managed identity is still assigned to a workspace", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 

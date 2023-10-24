@@ -45,13 +45,13 @@ const (
 // These error messages must be translated to TFE equivalent by caller.
 var (
 	// Error returned when workspace is already locked.
-	ErrWorkspaceLocked = errors.New(errors.EConflict, "workspace locked")
+	ErrWorkspaceLocked = errors.New("workspace locked", errors.WithErrorCode(errors.EConflict))
 
 	// Error returned when workspace is already unlocked.
-	ErrWorkspaceUnlocked = errors.New(errors.EConflict, "workspace unlocked")
+	ErrWorkspaceUnlocked = errors.New("workspace unlocked", errors.WithErrorCode(errors.EConflict))
 
 	// Error returned when a workspace unlock is attempted but it's locked by a run.
-	ErrWorkspaceLockedByRun = errors.New(errors.EConflict, "workspace locked by run")
+	ErrWorkspaceLockedByRun = errors.New("workspace locked by run", errors.WithErrorCode(errors.EConflict))
 )
 
 // Event represents a workspace event
@@ -354,9 +354,8 @@ func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*mod
 	if workspace == nil {
 		tracing.RecordError(span, nil, "Workspace with path %s not found", path)
 		return nil, errors.New(
-			errors.ENotFound,
 			"Workspace with path %s not found", path,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return workspace, nil
@@ -416,8 +415,9 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		if sv.RunID == nil {
 			tracing.RecordError(span, nil, "current state version was not created by a destroy run")
 			return errors.New(
-				errors.EConflict,
-				"current state version was not created by a destroy run")
+				"current state version was not created by a destroy run",
+				errors.WithErrorCode(errors.EConflict),
+			)
 		}
 
 		run, rErr := s.dbClient.Runs.GetRun(ctx, *sv.RunID)
@@ -428,15 +428,13 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 		if run == nil {
 			tracing.RecordError(span, nil, "run with ID %s not found", *sv.RunID)
-			return errors.New(errors.ENotFound, "run with ID %s not found", *sv.RunID)
+			return errors.New("run with ID %s not found", *sv.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
 		// Check to keep from accidentally deleting a workspace when resources are still deployed.
 		if !run.IsDestroy {
 			tracing.RecordError(span, nil, "run associated with the current state version was not a destroy run")
-			return errors.New(
-				errors.EConflict,
-				"run associated with the current state version was not a destroy run")
+			return errors.New("run associated with the current state version was not a destroy run", errors.WithErrorCode(errors.EConflict))
 		}
 	}
 
@@ -1115,7 +1113,6 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		tracing.RecordError(span, err, "failed to upload state version")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to write state version to object storage",
 		)
 	}
@@ -1162,14 +1159,13 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 		tracing.RecordError(span, err, "Failed to query state version from the database")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to query state version from the database",
 		)
 	}
 
 	if sv == nil {
 		tracing.RecordError(span, nil, "state version with ID %s not found", stateVersionID)
-		return nil, errors.New(errors.ENotFound, "state version with ID %s not found", stateVersionID)
+		return nil, errors.New("state version with ID %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
@@ -1224,7 +1220,6 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 		tracing.RecordError(span, err, "Failed to get state version from artifact store")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get state version from artifact store",
 		)
 	}
@@ -1253,7 +1248,6 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 		tracing.RecordError(span, err, "Failed to get state versions")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get state versions",
 		)
 	}
@@ -1284,7 +1278,6 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 		tracing.RecordError(span, err, "Failed to get configuration version from artifact store")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get configuration version from artifact store",
 		)
 	}
@@ -1347,7 +1340,6 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 		tracing.RecordError(span, err, "Failed to get configuration version")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get configuration version",
 		)
 	}
@@ -1355,9 +1347,8 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 	if cv == nil {
 		tracing.RecordError(span, nil, "Configuration version with ID %s not found", configurationVersionID)
 		return nil, errors.New(
-			errors.ENotFound,
 			"Configuration version with ID %s not found", configurationVersionID,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
@@ -1389,7 +1380,6 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 		tracing.RecordError(span, err, "Failed to get configuration versions")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to get configuration versions",
 		)
 	}
@@ -1433,7 +1423,6 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		tracing.RecordError(span, err, "Failed to write configuration version to object storage")
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to write configuration version to object storage",
 		)
 	}
@@ -1444,7 +1433,6 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		tracing.RecordError(span, err, "Failed to to update configuration version")
 		return errors.Wrap(
 			err,
-			errors.EInternal,
 			"Failed to to update configuration version",
 		)
 	}
@@ -1469,14 +1457,13 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 		tracing.RecordError(span, err, "failed to query state version from the database")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"failed to query state version from the database",
 		)
 	}
 
 	if sv == nil {
 		tracing.RecordError(span, nil, "state version with id %s not found", stateVersionID)
-		return nil, errors.New(errors.ENotFound, "state version with id %s not found", stateVersionID)
+		return nil, errors.New("state version with id %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
@@ -1490,7 +1477,6 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 		tracing.RecordError(span, err, "failed to list state version outputs")
 		return nil, errors.Wrap(
 			err,
-			errors.EInternal,
 			"failed to list state version outputs",
 		)
 	}
@@ -1506,9 +1492,8 @@ func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Work
 
 	if workspace == nil {
 		return nil, errors.New(
-			errors.ENotFound,
 			"Workspace with id %s not found", id,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return workspace, nil
@@ -1517,10 +1502,11 @@ func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Work
 // validateMaxJobDuration validates if duration is within MaxJobDuration limits.
 func validateMaxJobDuration(duration int32) error {
 	if duration < int32(lowerLimitMaxJobDuration.Minutes()) || duration > int32(upperLimitMaxJobDuration.Minutes()) {
-		return errors.New(errors.EInvalid,
+		return errors.New(
 			"invalid maxJobDuration. Must be between %d and %d",
 			int32(lowerLimitMaxJobDuration.Minutes()),
 			int32(upperLimitMaxJobDuration.Minutes()),
+			errors.WithErrorCode(errors.EInvalid),
 		)
 	}
 

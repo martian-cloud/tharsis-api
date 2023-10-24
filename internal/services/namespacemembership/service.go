@@ -153,7 +153,7 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 	case input.UserID != nil:
 		userCaller, ok := caller.(*auth.UserCaller)
 		if !ok || (!userCaller.User.Admin && userCaller.User.Metadata.ID != *input.UserID) {
-			return nil, errors.New(errors.EForbidden, "User %s is not authorized to query namespace memberships for %s", userCaller.User.Username, *input.UserID)
+			return nil, errors.New("User %s is not authorized to query namespace memberships for %s", userCaller.User.Username, *input.UserID, errors.WithErrorCode(errors.EForbidden))
 		}
 	case input.ServiceAccount != nil:
 		// Verify caller has access to the group this service account is in.
@@ -163,7 +163,7 @@ func (s *service) GetNamespaceMembershipsForSubject(ctx context.Context,
 			return nil, err
 		}
 	default:
-		return nil, errors.New(errors.EInvalid, "input is missing required fields")
+		return nil, errors.New("input is missing required fields", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	dbInput := &db.GetNamespaceMembershipsInput{
@@ -199,7 +199,7 @@ func (s *service) GetNamespaceMembershipByID(ctx context.Context, id string) (*m
 	}
 
 	if namespaceMembership == nil {
-		return nil, errors.New(errors.ENotFound, "namespace membership with id %s not found", id)
+		return nil, errors.New("namespace membership with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewNamespaceMembershipPermission, auth.WithNamespacePath(namespaceMembership.Namespace.Path))
@@ -275,7 +275,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		count++
 	}
 	if count != 1 {
-		return nil, errors.New(errors.EInvalid, "Exactly one of User, ServiceAccount, team field must be defined")
+		return nil, errors.New("Exactly one of User, ServiceAccount, team field must be defined", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// If this is a service account, we need to verify that it's being added to the group that it is associated with
@@ -287,9 +287,9 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 
 		if serviceAccountNamespace != input.NamespacePath && !strings.HasPrefix(input.NamespacePath, serviceAccountNamespace+"/") {
 			return nil, errors.New(
-				errors.EInvalid,
 				"Service account cannot be added as a member to group %s because it doesn't exist in the group or a parent group",
 				input.NamespacePath,
+				errors.WithErrorCode(errors.EInvalid),
 			)
 		}
 	}
@@ -385,7 +385,7 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 	}
 
 	if currentMembership == nil {
-		return nil, errors.New(errors.ENotFound, "namespace membership with ID %s not found", namespaceMembership.Metadata.ID)
+		return nil, errors.New("namespace membership with ID %s not found", namespaceMembership.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if currentMembership.RoleID == namespaceMembership.RoleID {
@@ -535,7 +535,7 @@ func (s *service) verifyNotOnlyOwner(ctx context.Context, namespaceMembership *m
 	}
 
 	if !otherOwnerFound {
-		return errors.New(errors.EInvalid, "namespace membership cannot be deleted because it's the only owner of group %s", namespaceMembership.Namespace.Path)
+		return errors.New("namespace membership cannot be deleted because it's the only owner of group %s", namespaceMembership.Namespace.Path, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
@@ -557,7 +557,7 @@ func (s *service) getRoleByID(ctx context.Context, id string) (*models.Role, err
 	}
 
 	if role == nil {
-		return nil, errors.New(errors.ENotFound, "role with id %s not found", id)
+		return nil, errors.New("role with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return role, nil

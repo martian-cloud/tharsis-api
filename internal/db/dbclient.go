@@ -35,13 +35,13 @@ const (
 var (
 	// ErrOptimisticLockError is used for optimistic lock exceptions
 	ErrOptimisticLockError = te.New(
-		te.EOptimisticLock,
 		"resource version does not match specified version",
+		te.WithErrorCode(te.EOptimisticLock),
 	)
 	// ErrInvalidID is used for invalid resource UUIDs
 	ErrInvalidID = te.New(
-		te.EInvalid,
 		"invalid id: the id must be a valid uuid",
+		te.WithErrorCode(te.EInvalid),
 	)
 )
 

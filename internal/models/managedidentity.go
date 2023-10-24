@@ -56,27 +56,27 @@ func (m *ManagedIdentityAccessRule) Validate() error {
 	switch m.Type {
 	case ManagedIdentityAccessRuleEligiblePrincipals:
 		if len(m.ModuleAttestationPolicies) > 0 {
-			return errors.New(errors.EInvalid, "eligible principals rule type does not support module attestation policies")
+			return errors.New("eligible principals rule type does not support module attestation policies", errors.WithErrorCode(errors.EInvalid))
 		}
 	case ManagedIdentityAccessRuleModuleAttestation:
 		if len(m.ModuleAttestationPolicies) == 0 {
-			return errors.New(errors.EInvalid, "a minimum of one module attestation policy is required for rule type module_attestation")
+			return errors.New("a minimum of one module attestation policy is required for rule type module_attestation", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		for _, policy := range m.ModuleAttestationPolicies {
 			if _, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(policy.PublicKey)); err != nil {
-				return errors.Wrap(err, errors.EInvalid, "invalid public key")
+				return errors.Wrap(err, "invalid public key", errors.WithErrorCode(errors.EInvalid))
 			}
 			if policy.PredicateType != nil && *policy.PredicateType == "" {
-				return errors.New(errors.EInvalid, "predicate type cannot be an empty string")
+				return errors.New("predicate type cannot be an empty string", errors.WithErrorCode(errors.EInvalid))
 			}
 		}
 
 		if len(m.AllowedServiceAccountIDs) > 0 || len(m.AllowedUserIDs) > 0 || len(m.AllowedTeamIDs) > 0 {
-			return errors.New(errors.EInvalid, "module attestation rule type does not support allowed users, service accounts, or teams")
+			return errors.New("module attestation rule type does not support allowed users, service accounts, or teams", errors.WithErrorCode(errors.EInvalid))
 		}
 	default:
-		return errors.New(errors.EInvalid, "rule type %s is not supported", m.Type)
+		return errors.New("rule type %s is not supported", m.Type, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil

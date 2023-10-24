@@ -348,7 +348,7 @@ func (s *service) GetVCSProviderByID(ctx context.Context, id string) (*models.VC
 
 	if provider == nil {
 		tracing.RecordError(span, nil, "VCS provider with ID %s not found", id)
-		return nil, errors.New(errors.ENotFound, "VCS provider with ID %s not found", id)
+		return nil, errors.New("VCS provider with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
@@ -480,7 +480,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		parsedURL, uErr := url.Parse(*input.URL)
 		if uErr != nil || (parsedURL.Scheme == "") || (parsedURL.Host == "") {
 			tracing.RecordError(span, nil, "Invalid provider URL")
-			return nil, errors.New(errors.EInvalid, "Invalid provider URL")
+			return nil, errors.New("Invalid provider URL", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Remove any trailing backslash.
@@ -687,9 +687,9 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 			"This VCS provider can't be deleted because it's currently linked to %d workspaces. "+
 				"Setting force to true will automatically remove all associated links for this provider.", len(links))
 		return errors.New(
-			errors.EConflict,
 			"This VCS provider can't be deleted because it's currently linked to %d workspaces. "+
 				"Setting force to true will automatically remove all associated links for this provider.", len(links),
+			errors.WithErrorCode(errors.EConflict),
 		)
 	}
 
@@ -792,7 +792,7 @@ func (s *service) GetWorkspaceVCSProviderLinkByWorkspaceID(ctx context.Context, 
 
 	if link == nil {
 		tracing.RecordError(span, nil, "failed to commit DB transaction")
-		return nil, errors.New(errors.ENotFound, "workspace vcs provider link for workspace ID %s not found", workspaceID)
+		return nil, errors.New("workspace vcs provider link for workspace ID %s not found", workspaceID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return link, nil
@@ -817,7 +817,7 @@ func (s *service) GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string
 
 	if link == nil {
 		tracing.RecordError(span, nil, "workspace vcs provider link with ID %s not found", id)
-		return nil, errors.New(errors.ENotFound, "workspace vcs provider link with ID %s not found", id)
+		return nil, errors.New("workspace vcs provider link with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
@@ -855,7 +855,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	if vp == nil {
 		tracing.RecordError(span, nil, "failed to get provider by ID")
-		return nil, errors.New(errors.EInvalid, "vcs provider with id %s not found", input.ProviderID)
+		return nil, errors.New("vcs provider with id %s not found", input.ProviderID, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Get the group path.
@@ -865,7 +865,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	if !strings.HasPrefix(input.Workspace.FullPath, groupPath) {
 		tracing.RecordError(span, nil,
 			"VCS provider %s is not available to workspace %s", vp.ResourcePath, input.Workspace.FullPath)
-		return nil, errors.New(errors.EInvalid, "VCS provider %s is not available to workspace %s", vp.ResourcePath, input.Workspace.FullPath)
+		return nil, errors.New("VCS provider %s is not available to workspace %s", vp.ResourcePath, input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Make sure the token is there, otherwise user forgot to complete
@@ -877,10 +877,10 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 				"or request another one",
 		)
 		return nil, errors.New(
-			errors.EInvalid,
 			"OAuth flow must be completed before linking a workspace to a VCS provider. "+
 				"Either use the original authorization URL when VCS provider was created "+
 				"or request another one",
+			errors.WithErrorCode(errors.EInvalid),
 		)
 	}
 
@@ -1093,7 +1093,7 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 
 	if vp == nil {
 		tracing.RecordError(span, nil, "failed to get provider by ID")
-		return errors.New(errors.EInternal, "vcs provider with id %s not found", input.Link.ProviderID)
+		return errors.New("vcs provider with id %s not found", input.Link.ProviderID)
 	}
 
 	// If the provider was automatically configured, delete the webhook
@@ -1156,7 +1156,7 @@ func (s *service) GetVCSEventByID(ctx context.Context, id string) (*models.VCSEv
 
 	if event == nil {
 		tracing.RecordError(span, nil, "vcs event with id %s not found", id)
-		return nil, errors.New(errors.ENotFound, "vcs event with id %s not found", id)
+		return nil, errors.New("vcs event with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
@@ -1255,7 +1255,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 	if link == nil {
 		tracing.RecordError(span, nil,
 			"Workspace %s is not linked to a VCS provider", input.Workspace.FullPath)
-		return errors.New(errors.EInvalid, "Workspace %s is not linked to a VCS provider", input.Workspace.FullPath)
+		return errors.New("Workspace %s is not linked to a VCS provider", input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Get the provider associated with the link.
@@ -1268,7 +1268,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 	// Shouldn't happen.
 	if vp == nil {
 		tracing.RecordError(span, nil, "failed to get provider by ID")
-		return errors.New(errors.EInternal, "VCS provider associated with link ID %s not found", link.Metadata.ID)
+		return errors.New("VCS provider associated with link ID %s not found", link.Metadata.ID)
 	}
 
 	// Get the appropriate provider from the map, so we can download from it.
@@ -1388,7 +1388,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	vcsCaller, ok := caller.(*auth.VCSWorkspaceLinkCaller)
 	if !ok {
 		tracing.RecordError(span, nil, "Invalid caller; only version control systems can invoke webhook")
-		return errors.New(errors.EInvalid, "Invalid caller; only version control systems can invoke webhook")
+		return errors.New("Invalid caller; only version control systems can invoke webhook", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Require permission for creating plan runs.
@@ -1583,7 +1583,7 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 func (s *service) getOAuthAuthorizationURL(ctx context.Context, vcsProvider *models.VCSProvider) (string, error) {
 	// Check if a valid state value is available.
 	if vcsProvider.OAuthState == nil {
-		return "", errors.New(errors.EInternal, "oauth state is not set")
+		return "", errors.New("oauth state is not set")
 	}
 
 	redirectURL, err := s.getOAuthCallBackURL(ctx)
@@ -1636,7 +1636,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 
 	if vp == nil {
 		tracing.RecordError(span, nil, "VCS provider not found")
-		return errors.New(errors.ENotFound, "VCS provider not found")
+		return errors.New("VCS provider not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Require UpdateVCSProviderPermission since we're updating the provider's values.
@@ -1719,9 +1719,8 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 		// OAuthAccessToken could be nil if OAuth token has been reset, but
 		// OAuth flow hasn't been completed yet.
 		return "", errors.New(
-			errors.EInternal,
 			"No available access token, please complete OAuth flow first",
-		)
+			errors.WithErrorCode(errors.EInternal))
 	}
 
 	if vp.OAuthRefreshToken == nil {
@@ -1769,7 +1768,7 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 func (s *service) getVCSProvider(providerType models.VCSProviderType) (Provider, error) {
 	provider, ok := s.vcsProviderMap[providerType]
 	if !ok {
-		return nil, errors.New(errors.EInvalid, "VCS provider with type %s is not supported", providerType)
+		return nil, errors.New("VCS provider with type %s is not supported", providerType, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return provider, nil

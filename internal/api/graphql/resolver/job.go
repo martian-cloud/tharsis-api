@@ -390,7 +390,7 @@ func loadJob(ctx context.Context, id string) (*models.Job, error) {
 
 	job, ok := data.(models.Job)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &job, nil

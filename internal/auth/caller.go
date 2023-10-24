@@ -211,7 +211,7 @@ func WithSubject(ctx context.Context, subject string) context.Context {
 func AuthorizeCaller(ctx context.Context) (Caller, error) {
 	caller, ok := ctx.Value(contextKeyCaller).(Caller)
 	if !ok {
-		return nil, errors.New(errors.EUnauthorized, "Authentication is required")
+		return nil, errors.New("Authentication is required", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	return caller, nil
@@ -234,7 +234,7 @@ func HandleCaller(
 	case *ServiceAccountCaller:
 		return serviceAccountHandler(ctx, c)
 	default:
-		return errors.New(errors.EForbidden, "Invalid caller type")
+		return errors.New("Invalid caller type", errors.WithErrorCode(errors.EForbidden))
 	}
 }
 

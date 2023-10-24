@@ -324,8 +324,8 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 	// If user is not active (disabled via SCIM), return EUnauthorized.
 	if !userModel.Active {
 		return nil, terrors.New(
-			terrors.EUnauthorized,
 			"User has been disabled",
+			terrors.WithErrorCode(terrors.EUnauthorized),
 		)
 	}
 
@@ -339,7 +339,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 func (u *UserAuth) getUserWithExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error) {
 	user, err := u.dbClient.Users.GetUserByExternalID(ctx, issuer, externalID)
 	if err != nil {
-		return nil, terrors.Wrap(err, terrors.EInternal, "failed to get user by external identity")
+		return nil, terrors.Wrap(err, "failed to get user by external identity")
 	}
 	return user, nil
 }
@@ -364,7 +364,6 @@ func (u *UserAuth) createUser(ctx context.Context, identity *externalIdentity) (
 			if err != nil && terrors.ErrorCode(err) != terrors.EConflict {
 				return nil, terrors.Wrap(
 					err,
-					terrors.EInternal,
 					"failed to link user with external identity")
 			}
 		} else {

@@ -43,7 +43,7 @@ type WorkspaceEdgeResolver struct {
 func (r *WorkspaceEdgeResolver) Cursor() (string, error) {
 	workspace, ok := r.edge.Node.(models.Workspace)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&workspace)
 	return *cursor, err
@@ -53,7 +53,7 @@ func (r *WorkspaceEdgeResolver) Cursor() (string, error) {
 func (r *WorkspaceEdgeResolver) Node() (*WorkspaceResolver, error) {
 	workspace, ok := r.edge.Node.(models.Workspace)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &WorkspaceResolver{workspace: &workspace}, nil
@@ -726,7 +726,7 @@ func loadWorkspace(ctx context.Context, id string) (*models.Workspace, error) {
 
 	ws, ok := data.(models.Workspace)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &ws, nil

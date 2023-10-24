@@ -215,8 +215,8 @@ func (t *terraformProviderPlatforms) CreateProviderPlatform(ctx context.Context,
 				tracing.RecordError(span, nil,
 					"terraform provider platform %s_%s already exists", providerPlatform.OperatingSystem, providerPlatform.Architecture)
 				return nil, errors.New(
-					errors.EConflict,
 					"terraform provider platform %s_%s already exists", providerPlatform.OperatingSystem, providerPlatform.Architecture,
+					errors.WithErrorCode(errors.EConflict),
 				)
 			}
 		}

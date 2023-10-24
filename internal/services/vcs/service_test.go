@@ -68,7 +68,7 @@ func TestGetVCSProviderByID(t *testing.T) {
 		expectedProvider  *models.VCSProvider
 		name              string
 		inputID           string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:             "positive: with caller; expect a vcs provider",
@@ -141,7 +141,7 @@ func TestGetVCSProviders(t *testing.T) {
 		dbInput           *db.GetVCSProvidersInput
 		expectedResult    *db.VCSProvidersResult
 		caller            auth.Caller
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:  "positive: nearly empty input and with caller; expect result object",
@@ -226,7 +226,7 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 		caller               auth.Caller
 		dbInput              *db.GetVCSProvidersInput
 		name                 string
-		expectedErrorCode    string
+		expectedErrorCode    errors.CodeType
 		expectedProviderList []models.VCSProvider
 		inputIDList          []string
 	}{
@@ -287,7 +287,7 @@ func TestCreateVCSProvider(t *testing.T) {
 		activityInput         *activityevent.CreateActivityEventInput
 		expectedProvider      *models.VCSProvider
 		name                  string
-		expectedErrorCode     string
+		expectedErrorCode     errors.CodeType
 		limit                 int
 		injectProviders       int32
 		exceedsLimit          bool
@@ -586,7 +586,7 @@ func TestUpdateVCSProvider(t *testing.T) {
 		input             *UpdateVCSProviderInput
 		activityInput     *activityevent.CreateActivityEventInput
 		name              string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:   "positive: update description; expect updated provider",
@@ -709,7 +709,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 		activityInput      *activityevent.CreateActivityEventInput
 		deleteWebhookInput *types.DeleteWebhookInput
 		name               string
-		expectedErrorCode  string
+		expectedErrorCode  errors.CodeType
 		links              []models.WorkspaceVCSProviderLink
 	}{
 		{
@@ -884,7 +884,7 @@ func TestGetVCSProviderLinkByWorkspaceID(t *testing.T) {
 		expectedLink      *models.WorkspaceVCSProviderLink
 		name              string
 		workspaceID       string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:         "positive: with caller; expect a vcs provider",
@@ -945,7 +945,7 @@ func TestGetVCSProviderLinkByID(t *testing.T) {
 		expectedLink      *models.WorkspaceVCSProviderLink
 		name              string
 		inputID           string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:         "positive: with caller; expect a vcs provider",
@@ -1022,7 +1022,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 		expectedResponse   *CreateWorkspaceVCSProviderLinkResponse
 		existingProvider   *models.VCSProvider
 		name               string
-		expectedErrorCode  string
+		expectedErrorCode  errors.CodeType
 	}{
 		{
 			name: "positive: AutoCreateWebhooks is true; expect Tharsis configures webhook, no url in response",
@@ -1321,7 +1321,7 @@ func TestUpdateWorkspaceVCSProviderLink(t *testing.T) {
 		input             *UpdateWorkspaceVCSProviderLinkInput
 		existingLink      *models.WorkspaceVCSProviderLink
 		expectedLink      *models.WorkspaceVCSProviderLink
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:   "positive: valid update input; expect no errors",
@@ -1410,7 +1410,7 @@ func TestDeleteWorkspaceVCSProviderLink(t *testing.T) {
 		input              *DeleteWorkspaceVCSProviderLinkInput
 		deleteWebhookInput *types.DeleteWebhookInput
 		existingProvider   *models.VCSProvider
-		expectedErrorCode  string
+		expectedErrorCode  errors.CodeType
 	}{
 		{
 			name:   "positive: valid input, manually configured provider; expect no errors",
@@ -1562,7 +1562,7 @@ func TestCreateVCSRun(t *testing.T) {
 		input             *CreateVCSRunInput
 		existingLink      *models.WorkspaceVCSProviderLink
 		name              string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:   "positive: no referenceName, not destroy; expect no errors",
@@ -1730,7 +1730,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 		createEventInput    *models.VCSEvent
 		equivalentEventType models.VCSEventType
 		name                string
-		expectedErrorCode   string
+		expectedErrorCode   errors.CodeType
 	}{
 		{
 			name: "positive: valid branch push event, mostly empty link and provider setup; expect no errors",
@@ -2028,7 +2028,7 @@ func TestResetVCSProviderOAuthToken(t *testing.T) {
 		input             *ResetVCSProviderOAuthTokenInput
 		caller            auth.Caller
 		name              string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:   "positive: with caller; expect no errors",
@@ -2103,7 +2103,7 @@ func TestGetOAuthAuthorizationURL(t *testing.T) {
 		input             *models.VCSProvider
 		expectedURL       string
 		name              string
-		expectedErrorCode string
+		expectedErrorCode errors.CodeType
 	}{
 		{
 			name:   "positive: vcs provider has a non-nil state value; expect no errors",
@@ -2179,7 +2179,7 @@ func TestProcessOAuth(t *testing.T) {
 		createAccessTokenPayload *types.AccessTokenPayload
 		toUpdateInput            *models.VCSProvider
 		name                     string
-		expectedErrorCode        string
+		expectedErrorCode        errors.CodeType
 	}{
 		{
 			name:   "positive: provider returns both access and refresh token; expect both stored",

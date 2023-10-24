@@ -197,7 +197,7 @@ func (t *terraformProviderPlatformMirrors) CreatePlatformMirror(ctx context.Cont
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
 				tracing.RecordError(span, nil, "terraform provider platform is already mirrored")
-				return nil, errors.New(errors.EConflict, "terraform provider platform is already mirrored")
+				return nil, errors.New("terraform provider platform is already mirrored", errors.WithErrorCode(errors.EConflict))
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")

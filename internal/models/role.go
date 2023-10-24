@@ -59,8 +59,8 @@ func (r *Role) Validate() error {
 		// Make sure the permission can be assigned.
 		if !perm.IsAssignable() {
 			return errors.New(
-				errors.EInvalid,
 				"Permission '%s' cannot be assigned to a role", perm,
+				errors.WithErrorCode(errors.EInvalid),
 			)
 		}
 

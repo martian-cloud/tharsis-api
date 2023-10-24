@@ -46,7 +46,7 @@ type ManagedIdentityCredentials struct {
 func (r *ManagedIdentityEdgeResolver) Cursor() (string, error) {
 	managedIdentity, ok := r.edge.Node.(models.ManagedIdentity)
 	if !ok {
-		return "", errors.New(errors.EInternal, "Failed to convert node type")
+		return "", errors.New("Failed to convert node type")
 	}
 	cursor, err := r.edge.CursorFunc(&managedIdentity)
 	return *cursor, err
@@ -56,7 +56,7 @@ func (r *ManagedIdentityEdgeResolver) Cursor() (string, error) {
 func (r *ManagedIdentityEdgeResolver) Node() (*ManagedIdentityResolver, error) {
 	managedIdentity, ok := r.edge.Node.(models.ManagedIdentity)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Failed to convert node type")
+		return nil, errors.New("Failed to convert node type")
 	}
 
 	return &ManagedIdentityResolver{managedIdentity: &managedIdentity}, nil
@@ -609,7 +609,7 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 			moduleAttestationPolicies = *input.ModuleAttestationPolicies
 		}
 	default:
-		return nil, errors.New(errors.EInvalid, "invalid managed identity rule type: %s", input.Type)
+		return nil, errors.New("invalid managed identity rule type: %s", input.Type, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	rule := models.ManagedIdentityAccessRule{
@@ -726,7 +726,7 @@ func createManagedIdentityAliasMutation(ctx context.Context, input *CreateManage
 
 		identityID = id
 	} else {
-		return nil, errors.New(errors.EInvalid, "Either aliasSourceId or aliasSourcePath is required")
+		return nil, errors.New("Either aliasSourceId or aliasSourcePath is required", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	createOptions := &managedidentity.CreateManagedIdentityAliasInput{
@@ -839,7 +839,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 					moduleAttestationPolicies = *r.ModuleAttestationPolicies
 				}
 			default:
-				return nil, errors.New(errors.EInvalid, "invalid managed identity rule type: %s", input.Type)
+				return nil, errors.New("invalid managed identity rule type: %s", input.Type, errors.WithErrorCode(errors.EInvalid))
 			}
 
 			managedIdentityCreateOptions.AccessRules = append(
@@ -943,7 +943,7 @@ func assignManagedIdentityMutation(ctx context.Context, input *AssignManagedIden
 
 		identityID = id
 	} else {
-		return nil, errors.New(errors.EInvalid, "Either managedIdentityId or managedIdentityPath is required")
+		return nil, errors.New("Either managedIdentityId or managedIdentityPath is required", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if err := managedIdentityService.AddManagedIdentityToWorkspace(ctx, identityID, workspace.Metadata.ID); err != nil {
@@ -974,7 +974,7 @@ func unassignManagedIdentityMutation(ctx context.Context, input *AssignManagedId
 
 		identityID = id
 	} else {
-		return nil, errors.New(errors.EInvalid, "Either managedIdentityId or managedIdentityPath is required")
+		return nil, errors.New("Either managedIdentityId or managedIdentityPath is required", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if err := managedIdentityService.RemoveManagedIdentityFromWorkspace(ctx, identityID, workspace.Metadata.ID); err != nil {
@@ -1086,7 +1086,7 @@ func loadManagedIdentity(ctx context.Context, id string) (*models.ManagedIdentit
 
 	managedIdentity, ok := data.(models.ManagedIdentity)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &managedIdentity, nil
@@ -1129,7 +1129,7 @@ func loadManagedIdentityAccessRule(ctx context.Context, id string) (*models.Mana
 
 	managedIdentityAccessRule, ok := data.(models.ManagedIdentityAccessRule)
 	if !ok {
-		return nil, errors.New(errors.EInternal, "Wrong type")
+		return nil, errors.New("Wrong type")
 	}
 
 	return &managedIdentityAccessRule, nil

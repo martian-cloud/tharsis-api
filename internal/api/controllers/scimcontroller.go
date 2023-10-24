@@ -123,20 +123,20 @@ const (
 var (
 	// errInvalidStartIndex indicates an invalid start index for pagination
 	errInvalidStartIndex = errors.New(
-		errors.EInvalid,
 		"invalid startIndex. Must be less than totalResults",
+		errors.WithErrorCode(errors.EInvalid),
 	)
 
 	// errInvalidCount indicates an invalid count for pagination.
 	errInvalidCount = errors.New(
-		errors.EInvalid,
 		"invalid count. Must be zero or greater",
+		errors.WithErrorCode(errors.EInvalid),
 	)
 
 	// errUnsupportedFilter is an error used to indicate an invalid filter.
 	errUnsupportedFilter = errors.New(
-		errors.EInvalid,
 		"supplied filter is invalid or not supported",
+		errors.WithErrorCode(errors.EInvalid),
 	)
 )
 

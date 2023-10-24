@@ -14,7 +14,7 @@ const (
 	// Unauthorized ProblemType = "UNAUTHORIZED" // This error shouldn't be mapped, instead should bubble up
 )
 
-var tharsisErrorToProblemType = map[string]ProblemType{
+var tharsisErrorToProblemType = map[errors.CodeType]ProblemType{
 	errors.EInvalid:   BadRequest,
 	errors.EConflict:  Conflict,
 	errors.ENotFound:  NotFound,

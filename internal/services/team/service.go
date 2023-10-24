@@ -132,9 +132,8 @@ func (s *service) GetTeamByID(ctx context.Context, id string) (*models.Team, err
 	if team == nil {
 		tracing.RecordError(span, nil, "team not found")
 		return nil, errors.New(
-			errors.ENotFound,
 			"Team with id %s not found", id,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return team, nil
@@ -393,9 +392,8 @@ func (s *service) GetTeamMember(ctx context.Context, username, teamName string) 
 
 	if teamMember == nil {
 		return nil, errors.New(
-			errors.ENotFound,
 			"Team member with username %s and team name %s not found", username, teamName,
-		)
+			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return teamMember, nil
@@ -535,7 +533,7 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *UpdateTeamMemberI
 
 	if teamMember == nil {
 		tracing.RecordError(span, nil, "team member does not exist")
-		return nil, errors.New(errors.ENotFound, "user %s is not a member of team %s", user.Username, team.Name)
+		return nil, errors.New("user %s is not a member of team %s", user.Username, team.Name, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if input.MetadataVersion != nil {
@@ -662,7 +660,7 @@ func (s *service) getTeamByName(ctx context.Context, span trace.Span, name strin
 
 	if team == nil {
 		tracing.RecordError(span, nil, "team not found")
-		return nil, errors.New(errors.ENotFound, "team with name %s not found", name)
+		return nil, errors.New("team with name %s not found", name, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return team, nil
@@ -677,7 +675,7 @@ func (s *service) getUserByUsername(ctx context.Context, span trace.Span, userna
 
 	if user == nil {
 		tracing.RecordError(span, nil, "user not found")
-		return nil, errors.New(errors.ENotFound, "user with username %s not found", username)
+		return nil, errors.New("user with username %s not found", username, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return user, nil

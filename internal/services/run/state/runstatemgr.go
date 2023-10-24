@@ -166,7 +166,7 @@ func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 	}
 
 	if oldRun == nil {
-		return nil, errors.New(errors.ENotFound, "run with ID %s not found", run.Metadata.ID)
+		return nil, errors.New("run with ID %s not found", run.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if rErr := checkRunStatusChange(oldRun.Status, run.Status); rErr != nil {
@@ -423,7 +423,7 @@ func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *mo
 		}
 
 		if run == nil {
-			return errors.New(errors.ENotFound, "run with ID %s not found", newJob.RunID)
+			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
 		plan, err := p.manager.dbClient.Plans.GetPlan(ctx, run.PlanID)
@@ -463,7 +463,7 @@ func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *m
 		}
 
 		if run == nil {
-			return errors.New(errors.ENotFound, "run with ID %s not found", newJob.RunID)
+			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
 		apply, err := a.manager.dbClient.Applies.GetApply(ctx, run.ApplyID)
@@ -629,7 +629,7 @@ func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJo
 
 		if newJob.Status == models.JobPending {
 			if ws.Locked {
-				return errors.New(errors.EConflict, "runner cannot claim job %s because workspace is locked", newJob.Metadata.ID)
+				return errors.New("runner cannot claim job %s because workspace is locked", newJob.Metadata.ID, errors.WithErrorCode(errors.EConflict))
 			}
 			ws.Locked = true
 			ws.CurrentJobID = newJob.Metadata.ID
@@ -672,9 +672,8 @@ func checkPlanStatusChange(old, new models.PlanStatus) error {
 	// If an error was found, turn it into an error.
 	if !transitionValid {
 		return errors.New(
-			errors.EInvalid,
 			"plan status is not allowed to transition from %s to %s", old, new,
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
@@ -712,9 +711,8 @@ func checkApplyStatusChange(old, new models.ApplyStatus) error {
 	// If an error was found, turn it into an error.
 	if !transitionValid {
 		return errors.New(
-			errors.EInvalid,
 			"apply status is not allowed to transition from %s to %s", old, new,
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
@@ -750,9 +748,8 @@ func checkRunStatusChange(old, new models.RunStatus) error {
 
 	if !transitionValid {
 		return errors.New(
-			errors.EInvalid,
 			"run status is not allowed to transition from %s to %s", old, new,
-		)
+			errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil

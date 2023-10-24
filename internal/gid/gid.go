@@ -89,7 +89,7 @@ func (t Type) IsValid() error {
 		TerraformProviderPlatformMirrorType:
 		return nil
 	}
-	return errors.New(errors.EInvalid, "invalid ID type %s", t)
+	return errors.New("invalid ID type %s", t, errors.WithErrorCode(errors.EInvalid))
 }
 
 // GlobalID is a model ID with type information
@@ -119,7 +119,7 @@ func ParseGlobalID(globalID string) (*GlobalID, error) {
 
 	index := strings.Index(decodedGlobalID, "_")
 	if index == -1 {
-		return nil, errors.New(errors.EInvalid, "Invalid ID")
+		return nil, errors.New("Invalid ID", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	t := Type(decodedGlobalID[:index])

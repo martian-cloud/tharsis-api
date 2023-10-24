@@ -28,7 +28,7 @@ func TestCreateProvider(t *testing.T) {
 		group                   *models.Group
 		expectCreatedProvider   *models.TerraformProvider
 		name                    string
-		expectErrCode           string
+		expectErrCode           errors.CodeType
 		input                   CreateProviderInput
 		limit                   int
 		injectProvidersPerGroup int32
@@ -87,7 +87,7 @@ func TestCreateProvider(t *testing.T) {
 				GroupID:       groupID,
 				Private:       true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -220,7 +220,7 @@ func TestCreateProviderVersion(t *testing.T) {
 		expectUpdatedProviderVersion *models.TerraformProviderVersion
 		expectCreatedProviderVersion *models.TerraformProviderVersion
 		name                         string
-		expectErrorCode              string
+		expectErrorCode              errors.CodeType
 		input                        CreateProviderVersionInput
 		limit                        int
 		injectVersionsPerProvider    int32
@@ -674,7 +674,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 		authError                     error
 		expectCreatedProviderPlatform *models.TerraformProviderPlatform
 		name                          string
-		expectErrCode                 string
+		expectErrCode                 errors.CodeType
 		input                         CreateProviderPlatformInput
 		limit                         int
 		injectPlatformsPerProvider    int32
@@ -686,7 +686,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 			input: CreateProviderPlatformInput{
 				ProviderVersionID: providerID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{

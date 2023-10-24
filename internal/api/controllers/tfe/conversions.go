@@ -141,11 +141,11 @@ func TharsisErrorToTfeError(err error) error {
 
 	switch err {
 	case workspace.ErrWorkspaceLocked:
-		tfeError = errors.New(errors.EConflict, gotfe.ErrWorkspaceLocked.Error())
+		tfeError = errors.New(gotfe.ErrWorkspaceLocked.Error(), errors.WithErrorCode(errors.EConflict))
 	case workspace.ErrWorkspaceUnlocked:
-		tfeError = errors.New(errors.EConflict, gotfe.ErrWorkspaceNotLocked.Error())
+		tfeError = errors.New(gotfe.ErrWorkspaceNotLocked.Error(), errors.WithErrorCode(errors.EConflict))
 	case workspace.ErrWorkspaceLockedByRun:
-		tfeError = errors.New(errors.EConflict, gotfe.ErrWorkspaceLockedByRun.Error())
+		tfeError = errors.New(gotfe.ErrWorkspaceLockedByRun.Error(), errors.WithErrorCode(errors.EConflict))
 	default:
 		tfeError = err
 	}

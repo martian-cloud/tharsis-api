@@ -31,7 +31,7 @@ func TestGetModuleByID(t *testing.T) {
 		expectModule  *models.TerraformModule
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get private module by ID",
@@ -59,7 +59,7 @@ func TestGetModuleByID(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -115,7 +115,7 @@ func TestGetModuleByPath(t *testing.T) {
 		expectModule  *models.TerraformModule
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get private module by ID",
@@ -143,7 +143,7 @@ func TestGetModuleByPath(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -202,7 +202,7 @@ func TestGetModuleByAddress(t *testing.T) {
 		rootGroup     *models.Group
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get private module by ID",
@@ -245,7 +245,7 @@ func TestGetModuleByAddress(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -331,7 +331,7 @@ func TestGetModulesByIDs(t *testing.T) {
 		expectModule  *models.TerraformModule
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get private module by ID",
@@ -362,7 +362,7 @@ func TestGetModulesByIDs(t *testing.T) {
 				ResourcePath: "some-group/test-module",
 				Private:      true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -437,7 +437,7 @@ func TestGetModules(t *testing.T) {
 		handleCaller          handleCallerFunc
 		name                  string
 		authError             error
-		expectErrCode         string
+		expectErrCode         errors.CodeType
 	}{
 		{
 			name: "filter modules by group and allow access",
@@ -462,7 +462,7 @@ func TestGetModules(t *testing.T) {
 					FullPath: "group-1",
 				},
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -605,7 +605,7 @@ func TestCreateModule(t *testing.T) {
 		group                 *models.Group
 		expectCreatedModule   *models.TerraformModule
 		name                  string
-		expectErrCode         string
+		expectErrCode         errors.CodeType
 		input                 CreateModuleInput
 		limit                 int
 		injectModulesPerGroup int32
@@ -664,7 +664,7 @@ func TestCreateModule(t *testing.T) {
 				GroupID: groupID,
 				Private: true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -795,7 +795,7 @@ func TestUpdateModule(t *testing.T) {
 		authError     error
 		input         *models.TerraformModule
 		name          string
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "update module",
@@ -814,7 +814,7 @@ func TestUpdateModule(t *testing.T) {
 				GroupID:      groupID,
 				ResourcePath: "group123/test-module/aws",
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -879,7 +879,7 @@ func TestDeleteModule(t *testing.T) {
 		authError     error
 		input         *models.TerraformModule
 		name          string
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "delete module",
@@ -898,7 +898,7 @@ func TestDeleteModule(t *testing.T) {
 				GroupID:      groupID,
 				ResourcePath: "group123/test-module/aws",
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 	}
@@ -963,7 +963,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 		expectModule        *models.TerraformModule
 		name                string
 		authError           error
-		expectErrCode       string
+		expectErrCode       errors.CodeType
 	}{
 		{
 			name: "get private module version by ID",
@@ -1006,7 +1006,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1069,7 +1069,7 @@ func TestGetModuleVersions(t *testing.T) {
 		expectModule        *models.TerraformModule
 		name                string
 		authError           error
-		expectErrCode       string
+		expectErrCode       errors.CodeType
 	}{
 		{
 			name: "get versions for private module",
@@ -1112,7 +1112,7 @@ func TestGetModuleVersions(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1201,7 +1201,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 		expectModule        *models.TerraformModule
 		name                string
 		authError           error
-		expectErrCode       string
+		expectErrCode       errors.CodeType
 	}{
 		{
 			name: "get module version by ID for private module",
@@ -1247,7 +1247,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1339,7 +1339,7 @@ func TestCreateModuleVersion(t *testing.T) {
 		expectUpdatedModuleVersion *models.TerraformModuleVersion
 		expectCreatedModuleVersion *models.TerraformModuleVersion
 		name                       string
-		expectErrCode              string
+		expectErrCode              errors.CodeType
 		input                      CreateModuleVersionInput
 		limit                      int
 		injectVersionsPerModule    int32
@@ -1351,7 +1351,7 @@ func TestCreateModuleVersion(t *testing.T) {
 				SemanticVersion: "0.1.0",
 				ModuleID:        moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1620,7 +1620,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 		authError                  error
 		expectUpdatedModuleVersion *models.TerraformModuleVersion
 		name                       string
-		expectErrCode              string
+		expectErrCode              errors.CodeType
 		existingModuleVersions     []models.TerraformModuleVersion
 		moduleVersionToDelete      models.TerraformModuleVersion
 	}{
@@ -1632,7 +1632,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 			},
-			authError:     errors.New(errors.EForbidden, "Forbidden"),
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1836,7 +1836,7 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 		path          string
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get config details for private module",
@@ -1880,7 +1880,7 @@ func TestGetModuleConfigurationDetails(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -1954,7 +1954,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 		data          string
 		name          string
 		expectStatus  models.TerraformModuleVersionStatus
-		expectErrCode string
+		expectErrCode errors.CodeType
 		shaSum        []byte
 	}{
 		{
@@ -1964,7 +1964,7 @@ func TestUploadModuleVersionPackage(t *testing.T) {
 				ModuleID: moduleID,
 				Status:   models.TerraformModuleVersionStatusPending,
 			},
-			authError:     errors.New(errors.EForbidden, "Forbidden"),
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2137,7 +2137,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 		expectURL     string
 		name          string
 		authError     error
-		expectErrCode string
+		expectErrCode errors.CodeType
 	}{
 		{
 			name: "get download url for private module",
@@ -2179,7 +2179,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 				Name:     "test-module",
 				Private:  true,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2257,7 +2257,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 		authError                      error
 		expectCreatedModuleAttestation *models.TerraformModuleAttestation
 		name                           string
-		expectErrCode                  string
+		expectErrCode                  errors.CodeType
 		input                          CreateModuleAttestationInput
 		limit                          int
 		injectAttestationsPerModule    int32
@@ -2269,7 +2269,7 @@ func TestCreateModuleAttestation(t *testing.T) {
 			input: CreateModuleAttestationInput{
 				ModuleID: moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2432,7 +2432,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 		expectModule            *models.TerraformModule
 		name                    string
 		authError               error
-		expectErrCode           string
+		expectErrCode           errors.CodeType
 	}{
 		{
 			name: "get attestation for private module",
@@ -2472,7 +2472,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
 				ModuleID: moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2535,7 +2535,7 @@ func TestGetModuleAttestations(t *testing.T) {
 		expectModule            *models.TerraformModule
 		name                    string
 		authError               error
-		expectErrCode           string
+		expectErrCode           errors.CodeType
 	}{
 		{
 			name: "get attestations for private module",
@@ -2575,7 +2575,7 @@ func TestGetModuleAttestations(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: moduleAttestationID},
 				ModuleID: moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Unauthorized"),
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2662,7 +2662,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 	tests := []struct {
 		authError                 error
 		name                      string
-		expectErrCode             string
+		expectErrCode             errors.CodeType
 		moduleAttestationToUpdate models.TerraformModuleAttestation
 	}{
 		{
@@ -2671,7 +2671,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "1"},
 				ModuleID: moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Forbidden"),
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{
@@ -2746,7 +2746,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 	tests := []struct {
 		authError                 error
 		name                      string
-		expectErrCode             string
+		expectErrCode             errors.CodeType
 		moduleAttestationToDelete models.TerraformModuleAttestation
 	}{
 		{
@@ -2755,7 +2755,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: "1"},
 				ModuleID: moduleID,
 			},
-			authError:     errors.New(errors.EForbidden, "Forbidden"),
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
 		},
 		{

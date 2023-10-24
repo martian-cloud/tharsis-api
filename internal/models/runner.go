@@ -43,15 +43,15 @@ func (r *Runner) Validate() error {
 	}
 
 	if r.Type == "" {
-		return errors.New(errors.EInvalid, "runner type must be specified")
+		return errors.New("runner type must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if r.Type == SharedRunnerType && r.GroupID != nil {
-		return errors.New(errors.EInvalid, "shared runner should not have a group specified")
+		return errors.New("shared runner should not have a group specified", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	if r.Type == GroupRunnerType && r.GroupID == nil {
-		return errors.New(errors.EInvalid, "group runner must specify a group")
+		return errors.New("group runner must specify a group", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil

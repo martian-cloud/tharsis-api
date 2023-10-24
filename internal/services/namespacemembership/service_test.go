@@ -22,7 +22,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 		expectNamespaceMembership *models.NamespaceMembership
 		input                     CreateNamespaceMembershipInput
 		name                      string
-		expectErrorCode           string
+		expectErrorCode           errors.CodeType
 		hasOwnerRole              bool
 	}{
 		{
@@ -153,7 +153,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 
 			var authError error
 			if !test.hasOwnerRole {
-				authError = errors.New(errors.EForbidden, "not authorized")
+				authError = errors.New("not authorized", errors.WithErrorCode(errors.EForbidden))
 			}
 			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateNamespaceMembershipPermission, mock.Anything).Return(authError)
 
@@ -235,7 +235,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 		input                *models.NamespaceMembership
 		current              *models.NamespaceMembership
 		name                 string
-		expectErrorCode      string
+		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 		hasOwnerRole         bool
 	}{
@@ -351,7 +351,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 
 			var authError error
 			if !test.hasOwnerRole {
-				authError = errors.New(errors.EForbidden, "not authorized")
+				authError = errors.New("not authorized", errors.WithErrorCode(errors.EForbidden))
 			}
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateNamespaceMembershipPermission, mock.Anything).Return(authError)
@@ -422,7 +422,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 	tests := []struct {
 		input                *models.NamespaceMembership
 		name                 string
-		expectErrorCode      string
+		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 		hasOwnerRole         bool
 	}{
@@ -502,7 +502,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 			var authError error
 			if !test.hasOwnerRole {
-				authError = errors.New(errors.EForbidden, "not authorized")
+				authError = errors.New("not authorized", errors.WithErrorCode(errors.EForbidden))
 			}
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteNamespaceMembershipPermission, mock.Anything).Return(authError)
