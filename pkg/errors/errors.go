@@ -120,6 +120,11 @@ func (e *TharsisError) Error() string {
 	return fmt.Sprintf("<%s>", e.code)
 }
 
+// Unwrap returns the wrapped error, if any.
+func (e *TharsisError) Unwrap() error {
+	return e.err
+}
+
 // ErrorCode returns the code of the root error, if available; otherwise returns EINTERNAL.
 func ErrorCode(err error) CodeType {
 	if err == nil {
