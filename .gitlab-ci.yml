@@ -4,11 +4,8 @@ include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/SAST-IaC.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
-  - template: Code-Quality.gitlab-ci.yml
   - template: DAST-API.gitlab-ci.yml
   - template: API-Fuzzing.gitlab-ci.yml
-  # Commented out as we are using our own tool for license scanning
-  # - template: Jobs/License-Scanning.gitlab-ci.yml
 
 stages:
   - test
@@ -326,7 +323,7 @@ lint:
 build_aio_container_image:
   stage: trigger
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   needs:
     - publish api docker
   trigger:
@@ -369,15 +366,6 @@ kics-iac-sast:
 secret_detection:
   rules:
     - !reference [.on_merge_request_and_merged_events, rules]
-
-code_quality:
-  tags:
-    - oss
-    - docker
-  artifacts:
-    paths: [gl-code-quality-report.json]
-  rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
 
 license_scanning:
   stage: test
@@ -442,7 +430,7 @@ dast_api:
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 apifuzzer_fuzz:
   services:
@@ -474,4 +462,4 @@ apifuzzer_fuzz:
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
