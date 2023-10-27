@@ -535,6 +535,13 @@ type CreateManagedIdentityAliasInput struct {
 	GroupPath        string
 }
 
+// MoveManagedIdentityInput is the input for moving a managed identity to another parent group.
+type MoveManagedIdentityInput struct {
+	ClientMutationID  *string
+	ManagedIdentityID string
+	NewParentPath     string
+}
+
 func handleManagedIdentityAccessRuleMutationProblem(e error, clientMutationID *string) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -1007,6 +1014,32 @@ func createManagedIdentityCredentialsMutation(ctx context.Context,
 	}
 
 	return &ManagedIdentityCredentialsMutationPayloadResolver{ManagedIdentityCredentialsMutationPayload: payload}, nil
+}
+
+func moveManagedIdentityMutation(ctx context.Context, input *MoveManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
+	groupService := getGroupService(ctx)
+	managedIdentityService := getManagedIdentityService(ctx)
+
+	// Get the new parent group.
+	newParent, iErr := groupService.GetGroupByFullPath(ctx, input.NewParentPath)
+	if iErr != nil {
+		return nil, iErr
+	}
+
+	managedIdentity, err := managedIdentityService.MoveManagedIdentity(ctx, &managedidentity.MoveManagedIdentityInput{
+		ManagedIdentityID: gid.FromGlobalID(input.ManagedIdentityID),
+		NewGroupID:        newParent.Metadata.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := ManagedIdentityMutationPayload{
+		ClientMutationID: input.ClientMutationID,
+		ManagedIdentity:  managedIdentity,
+		Problems:         []Problem{},
+	}
+	return &ManagedIdentityMutationPayloadResolver{ManagedIdentityMutationPayload: payload}, nil
 }
 
 func getManagedIdentityIDByPath(ctx context.Context, path string) (string, error) {

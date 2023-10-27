@@ -922,7 +922,7 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 
 	// Update run's ForceCancelAvailableAt.
 	if run.ForceCancelAvailableAt == nil {
-		now := time.Now()
+		now := time.Now().UTC()
 		whenForceCancelAllowed := now.Add(forceCancelWait)
 		run.ForceCancelAvailableAt = &whenForceCancelAllowed
 	}
@@ -942,7 +942,7 @@ func (s *service) gracefullyCancelRun(ctx context.Context, run *models.Run) (*mo
 			errors.WithErrorCode(errors.EInternal))
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	job.CancelRequested = true
 	job.CancelRequestedTimestamp = &now
 

@@ -73,6 +73,12 @@ type CreateManagedIdentityAliasInput struct {
 	AliasSourceID string
 }
 
+// MoveManagedIdentityInput is the input for moving a managed identity to a new group.
+type MoveManagedIdentityInput struct {
+	ManagedIdentityID string
+	NewGroupID        string
+}
+
 // Service implements managed identity functionality
 type Service interface {
 	GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error)
@@ -94,6 +100,7 @@ type Service interface {
 	DeleteManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) error
 	CreateManagedIdentityAlias(ctx context.Context, input *CreateManagedIdentityAliasInput) (*models.ManagedIdentity, error)
 	DeleteManagedIdentityAlias(ctx context.Context, input *DeleteManagedIdentityInput) error
+	MoveManagedIdentity(ctx context.Context, input *MoveManagedIdentityInput) (*models.ManagedIdentity, error)
 }
 
 type service struct {
@@ -383,6 +390,16 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		limits.ResourceLimitAssignedManagedIdentitiesPerWorkspace, int32(len(newManagedIdentities))); err != nil {
 		tracing.RecordError(span, err, "limit check failed")
 		return err
+	}
+
+	// Must check the group ID of the managed identity to make sure the managed identity did not get moved.
+	newManagedIdentity, err := s.dbClient.ManagedIdentities.GetManagedIdentityByID(ctx, managedIdentityID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get updated managed identity")
+		return err
+	}
+	if newManagedIdentity.GroupID != identity.GroupID {
+		return errors.New("managed identity was moved while adding to workspace", errors.WithErrorCode(errors.EConflict))
 	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
@@ -1471,6 +1488,194 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 	)
 
 	return delegate.CreateCredentials(ctx, identity, job)
+}
+
+func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIdentityInput) (*models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "svc.MoveManagedIdentity")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	managedIdentity, err := s.getManagedIdentityByID(ctx, input.ManagedIdentityID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity")
+		return nil, err
+	}
+
+	// Caller must be an owner of both the old group and the new group.
+	err = caller.RequirePermission(ctx, permissions.DeleteManagedIdentityPermission,
+		auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission,
+		auth.WithGroupID(input.NewGroupID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	// Only non-aliases are allowed to be moved.
+	if managedIdentity.IsAlias() {
+		return nil, errors.New("Only a source managed identity can be moved, not an alias", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	newGroup, err := s.dbClient.Groups.GetGroupByID(ctx, input.NewGroupID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get old group")
+		return nil, err
+	}
+
+	// Check to ensure there are no aliases of the managed identity in the new group or certain related groups.
+	// This is to prevent a situation where a managed identity is moved to a group that contains an alias of itself.
+	err = s.checkDisallowedAliases(ctx, managedIdentity, newGroup)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check to ensure there are no assignments of any relevant managed identity to a workspace.
+	// If there are any, list the workspaces in the error message.
+	err = s.checkWorkspaceAssignments(ctx, managedIdentity, newGroup)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Infow("Requested to move a managed identity.",
+		"caller", caller.GetSubject(),
+		"managedIdentityName", managedIdentity.Name,
+		"groupPath", newGroup.FullPath,
+	)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for MoveManagedIdentity: %v", txErr)
+		}
+	}()
+
+	// Record the move in the DB.
+	managedIdentity.GroupID = input.NewGroupID
+	managedIdentity, err = s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to move managed identity")
+		return nil, err
+	}
+
+	groupPath := managedIdentity.GetGroupPath()
+
+	// Get the number of managed identities now in the new group to check whether we just violated the limit.
+	newManagedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentities(txContext, &db.GetManagedIdentitiesInput{
+		Filter: &db.ManagedIdentityFilter{
+			NamespacePaths: []string{groupPath},
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group's managed identities")
+		return nil, err
+	}
+
+	// Check the resource limit.
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitManagedIdentitiesPerGroup, newManagedIdentities.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &groupPath,
+			Action:        models.ActionMigrate,
+			TargetType:    models.TargetManagedIdentity,
+			TargetID:      managedIdentity.Metadata.ID,
+		}); err != nil {
+		tracing.RecordError(span, err, "failed to create activity event")
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return nil, err
+	}
+
+	return managedIdentity, nil
+}
+
+// Check to ensure there are no aliases of the managed identity in the new group or certain related groups.
+// Related groups include descendants of the target group and all ancestors of the target group.
+// This is to prevent a situation where a managed identity is moved to a group that contains an alias of itself.
+func (s *service) checkDisallowedAliases(ctx context.Context,
+	managedIdentity *models.ManagedIdentity, targetGroup *models.Group) error {
+
+	aliases, err := s.dbClient.ManagedIdentities.GetManagedIdentities(ctx, &db.GetManagedIdentitiesInput{
+		Filter: &db.ManagedIdentityFilter{
+			AliasSourceID: &managedIdentity.Metadata.ID,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, alias := range aliases.ManagedIdentities {
+
+		// If the alias is in the target group, then it's a problem.
+		if alias.GroupID == targetGroup.Metadata.ID {
+			return errors.New("managed identity %s is an alias of managed identity %s, which is in the target group %s",
+				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+		}
+
+		// If the alias is in a descendant of the target group, then it's a problem.
+		if strings.HasPrefix(alias.GetGroupPath(), targetGroup.FullPath+"/") {
+			return errors.New("managed identity %s is an alias of managed identity %s, which is in a descendant group of the target group %s",
+				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+		}
+
+		// If the alias is in an ancestor of the target group, then it's a problem.
+		if strings.HasPrefix(targetGroup.FullPath, alias.GetGroupPath()+"/") {
+			return errors.New("managed identity %s is an alias of managed identity %s, which is in an ancestor group of the target group %s",
+				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
+	// If nothing was found, then we're good.
+	return nil
+}
+
+func (s *service) checkWorkspaceAssignments(ctx context.Context,
+	managedIdentity *models.ManagedIdentity, newGroup *models.Group) error {
+
+	workspaces, err := s.dbClient.Workspaces.GetWorkspacesForManagedIdentity(ctx, managedIdentity.Metadata.ID)
+	if err != nil {
+		return err
+	}
+
+	checkPrefix := newGroup.FullPath + "/"
+	badPaths := []string{}
+
+	for _, workspace := range workspaces {
+		if !strings.HasPrefix(workspace.FullPath, checkPrefix) {
+			badPaths = append(badPaths, workspace.FullPath)
+		}
+	}
+
+	if len(badPaths) > 0 {
+		return errors.New("managed identity %s is assigned to workspaces %s, which are outside the target group %s",
+			managedIdentity.ResourcePath, strings.Join(badPaths, ", "), newGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return nil
 }
 
 func (s *service) getDelegate(delegateType models.ManagedIdentityType) (Delegate, error) {

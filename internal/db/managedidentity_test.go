@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -694,12 +695,12 @@ func TestUpdateManagedIdentity(t *testing.T) {
 		})
 	require.Nil(t, err)
 	createdHigh := currentTime()
-	warmupGroup := warmupItems.groups[0]
+	otherGroup := warmupItems.groups[1]
 
 	type testCase struct {
 		toUpdate              *models.ManagedIdentity
 		expectManagedIdentity *models.ManagedIdentity
-		expectMsg             *string
+		expectErrorCode       errors.CodeType
 		name                  string
 	}
 
@@ -717,6 +718,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				Description: "updated description",
 				Type:        positiveManagedIdentity.Type,
 				Data:        []byte("updated data"),
+				GroupID:     otherGroup.Metadata.ID,
 			},
 			expectManagedIdentity: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
@@ -725,12 +727,12 @@ func TestUpdateManagedIdentity(t *testing.T) {
 					CreationTimestamp:    positiveManagedIdentity.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				ResourcePath: warmupGroup.FullPath + "/" + positiveManagedIdentity.Name,
+				ResourcePath: otherGroup.FullPath + "/" + positiveManagedIdentity.Name,
 				Name:         "1-managed-identity-0",
 				Description:  "updated description",
-				GroupID:      warmupGroup.Metadata.ID,
 				Type:         positiveManagedIdentity.Type,
 				Data:         []byte("updated data"),
+				GroupID:      otherGroup.Metadata.ID, // to move the managed identity to another group
 				CreatedBy:    positiveManagedIdentity.CreatedBy,
 			},
 		},
@@ -742,7 +744,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 					Version: positiveManagedIdentity.Metadata.Version,
 				},
 			},
-			expectMsg: resourceVersionMismatch,
+			expectErrorCode: errors.EInternal,
 		},
 		{
 			name: "defective-id",
@@ -752,7 +754,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 					Version: positiveManagedIdentity.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
@@ -760,7 +762,13 @@ func TestUpdateManagedIdentity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actualManagedIdentity, err := testClient.client.ManagedIdentities.UpdateManagedIdentity(ctx, test.toUpdate)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode == "" {
+				assert.Nil(t, err)
+			} else {
+				// Uses require rather than assert to avoid a nil pointer dereference.
+				require.NotNil(t, err)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			}
 
 			now := currentTime()
 			if test.expectManagedIdentity != nil {

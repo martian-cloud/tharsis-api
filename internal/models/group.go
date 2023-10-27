@@ -51,14 +51,30 @@ func (g *Group) GetParentPath() string {
 	if g.ParentID == "" {
 		return ""
 	}
-	pathParts := strings.Split(g.FullPath, "/")
-	return strings.Join(pathParts[:len(pathParts)-1], "/")
+	return GetGroupParentPath(g.FullPath)
 }
 
 // ExpandPath returns the expanded path list for the group. The expanded path
 // list includes the full path for the group in addition to all parent paths
 func (g *Group) ExpandPath() []string {
-	pathParts := strings.Split(g.FullPath, "/")
+	return ExpandGroupPath(g.FullPath)
+}
+
+// GetDepth returns the depth of the tree from root to this group.  A root group is counted as 1.
+func (g *Group) GetDepth() int {
+	return 1 + strings.Count(g.FullPath, "/")
+}
+
+// GetGroupParentPath returns the path for a group's parent based only on the current path.
+func GetGroupParentPath(currentPath string) string {
+	pathParts := strings.Split(currentPath, "/")
+	return strings.Join(pathParts[:len(pathParts)-1], "/")
+}
+
+// ExpandGroupPath returns the expanded path list for a group's path. The expanded path
+// list includes the full path for the group in addition to all parent paths
+func ExpandGroupPath(currentPath string) []string {
+	pathParts := strings.Split(currentPath, "/")
 
 	paths := []string{}
 	for len(pathParts) > 0 {
@@ -68,9 +84,4 @@ func (g *Group) ExpandPath() []string {
 	}
 
 	return paths
-}
-
-// GetDepth returns the depth of the tree from root to this group.  A root group is counted as 1.
-func (g *Group) GetDepth() int {
-	return 1 + strings.Count(g.FullPath, "/")
 }

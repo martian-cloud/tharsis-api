@@ -67,6 +67,12 @@ type CreateManagedIdentityCredentialsPayload {
   problems: [Problem!]!
 }
 
+type MoveManagedIdentityPayload {
+  clientMutationId: String
+  managedIdentity: ManagedIdentity
+  problems: [Problem!]!
+}
+
 type ManagedIdentityAccessRuleModuleAttestationPolicy {
   publicKey: String!
   predicateType: String
@@ -206,4 +212,10 @@ input AssignManagedIdentityInput {
 input CreateManagedIdentityCredentialsInput {
   clientMutationId: String
   id: ID!
+}
+
+input MoveManagedIdentityInput {
+  clientMutationId: String
+  managedIdentityId: ID!
+  newParentPath: String!
 }

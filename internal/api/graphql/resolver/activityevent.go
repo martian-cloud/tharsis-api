@@ -262,6 +262,12 @@ func (r *ActivityEventPayloadResolver) ToActivityEventMigrateGroupPayload() (*Ac
 	return res, ok
 }
 
+// ToActivityEventMoveManagedIdentityPayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventMoveManagedIdentityPayload() (*ActivityEventMoveManagedIdentityPayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventMoveManagedIdentityPayloadResolver)
+	return res, ok
+}
+
 // ActivityEventResolver resolves an activity event resource
 type ActivityEventResolver struct {
 	activityEvent *models.ActivityEvent
@@ -521,6 +527,13 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 				return nil, err
 			}
 			return &ActivityEventPayloadResolver{result: &ActivityEventMigrateGroupPayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionMigrate) &&
+			(r.activityEvent.TargetType == models.TargetManagedIdentity):
+			var payload models.ActivityEventMoveManagedIdentityPayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventMoveManagedIdentityPayloadResolver{payload: &payload}}, nil
 		default:
 			return nil, fmt.Errorf("payload supplied without a supported target type and action")
 
@@ -597,6 +610,17 @@ type ActivityEventMigrateGroupPayloadResolver struct {
 
 // PreviousGroupPath resolver
 func (r *ActivityEventMigrateGroupPayloadResolver) PreviousGroupPath() string {
+	return r.payload.PreviousGroupPath
+}
+
+// ActivityEventMoveManagedIdentityPayloadResolver resolves an activity event
+// move managed identity payload resource
+type ActivityEventMoveManagedIdentityPayloadResolver struct {
+	payload *models.ActivityEventMoveManagedIdentityPayload
+}
+
+// PreviousGroupPath resolver
+func (r *ActivityEventMoveManagedIdentityPayloadResolver) PreviousGroupPath() string {
 	return r.payload.PreviousGroupPath
 }
 
