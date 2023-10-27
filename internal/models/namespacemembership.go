@@ -15,6 +15,11 @@ func (m MembershipNamespace) IsTopLevel() bool {
 	return !strings.Contains(m.Path, "/")
 }
 
+// IsDescendantOfGroup returns true if the namespace is a descendant of the specified ancestor group path.
+func (m *MembershipNamespace) IsDescendantOfGroup(groupPath string) bool {
+	return IsDescendantOfPath(m.Path, groupPath)
+}
+
 // NamespaceMembership represents an association between a member and a namespace
 type NamespaceMembership struct {
 	UserID           *string
@@ -38,4 +43,9 @@ func (nm *NamespaceMembership) ResolveMetadata(key string) (string, error) {
 	}
 
 	return val, nil
+}
+
+// IsDescendantOfPath returns true if the namespace is a descendant of the specified (ancestor group) path.
+func IsDescendantOfPath(descendantPath, ancestorPath string) bool {
+	return strings.HasPrefix(descendantPath, ancestorPath+"/")
 }

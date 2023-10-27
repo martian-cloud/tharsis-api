@@ -64,3 +64,8 @@ func (w *Workspace) ExpandPath() []string {
 
 	return paths
 }
+
+// IsDescendantOfGroup returns true if the workspace is a descendant of the specified ancestor group path.
+func (w *Workspace) IsDescendantOfGroup(groupPath string) bool {
+	return IsDescendantOfPath(w.FullPath, groupPath)
+}
