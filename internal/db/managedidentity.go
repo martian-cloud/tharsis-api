@@ -1023,8 +1023,10 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	return createdManagedIdentity, nil
 }
 
-// UpdateManagedIdentity updates an existing managedIdentity by name
-func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error) {
+// UpdateManagedIdentity updates an existing managedIdentity by ID.
+// It updates the description, the data, and the group ID (to move a managed identity to another group).
+func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context,
+	managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error) {
 	ctx, span := tracer.Start(ctx, "db.UpdateManagedIdentity")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -1053,6 +1055,7 @@ func (m *managedIdentities) UpdateManagedIdentity(ctx context.Context, managedId
 				"updated_at":  timestamp,
 				"description": managedIdentity.Description,
 				"data":        managedIdentity.Data,
+				"group_id":    managedIdentity.GroupID,
 			},
 		).Where(goqu.Ex{"id": managedIdentity.Metadata.ID, "version": managedIdentity.Metadata.Version}).Returning(managedIdentityFieldList...).ToSQL()
 	if err != nil {

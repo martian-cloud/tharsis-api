@@ -343,6 +343,19 @@ func (r RootResolver) CreateManagedIdentityCredentials(ctx context.Context, args
 	return response, nil
 }
 
+// MoveManagedIdentity moves a managed identity to another group
+func (r RootResolver) MoveManagedIdentity(ctx context.Context, args *struct {
+	Input *MoveManagedIdentityInput
+},
+) (*ManagedIdentityMutationPayloadResolver, error) {
+	response, err := moveManagedIdentityMutation(ctx, args.Input)
+	if err != nil {
+		return handleManagedIdentityMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Service Account Queries and Mutations */
 
 // ServiceAccount query returns a service account

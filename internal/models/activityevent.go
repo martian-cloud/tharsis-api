@@ -105,6 +105,11 @@ type ActivityEventMigrateGroupPayload struct {
 	PreviousGroupPath string `json:"previousGroupPath"`
 }
 
+// ActivityEventMoveManagedIdentityPayload is the custom payload for moving a managed identity to another group.
+type ActivityEventMoveManagedIdentityPayload struct {
+	PreviousGroupPath string `json:"previousGroupPath"`
+}
+
 // ActivityEvent resource
 type ActivityEvent struct {
 	UserID           *string

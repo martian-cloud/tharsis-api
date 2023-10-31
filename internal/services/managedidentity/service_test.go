@@ -2645,3 +2645,336 @@ func TestCreateCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestMoveManagedIdentity(t *testing.T) {
+
+	oldParentGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "old-group-id",
+		},
+	}
+
+	candidateParentGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "target-group-id",
+		},
+	}
+
+	sampleManagedIdentity := &models.ManagedIdentity{
+		Metadata: models.ResourceMetadata{
+			ID: "some-managed-identity-id",
+		},
+		Name:         "a-managed-identity",
+		ResourcePath: "some/resource/path",
+		Description:  "some-description",
+		GroupID:      oldParentGroup.Metadata.ID,
+		Data:         []byte("this is some data"),
+		Type:         models.ManagedIdentityAWSFederated,
+	}
+
+	type testCase struct {
+		name                       string
+		authError                  error
+		targetGroupID              string
+		targetGroup                *models.Group
+		mover                      *models.ManagedIdentity
+		injectMoved                *models.ManagedIdentity
+		injectGetManagedIdentities *db.ManagedIdentitiesResult
+		injectWorkspacesForMI      []models.Workspace
+		limitError                 error
+		injectMoveError            error
+		expectErrorCode            errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "positive, successfully move a managed identity, no problematic aliases",
+			targetGroupID: "target-group-id",
+			targetGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "target-group-id",
+				},
+				FullPath: "target/group/path",
+			},
+			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "mover-id",
+				},
+				GroupID:      "old-group-id",
+				ResourcePath: "old-group-path/mover-name",
+			},
+			injectWorkspacesForMI: []models.Workspace{
+				{
+					Metadata: models.ResourceMetadata{
+						ID: "workspace-id",
+					},
+					FullPath: "target/group/path/workspace/path",
+				},
+			},
+			injectMoved: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "moved-id",
+				},
+				ResourcePath: "target-group-id/moved-id",
+			},
+			// For the positive test case, GetManagedIdentities is hit when checking the resource limit and for aliases.
+			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
+				PageInfo: &pagination.PageInfo{
+					TotalCount: 0,
+				},
+			},
+		},
+		{
+			name:          "negative: violates limit in new group",
+			targetGroupID: "target-group-id",
+			targetGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "target-group-id",
+				},
+			},
+			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "mover-id",
+				},
+				GroupID:      "old-group-id",
+				ResourcePath: "old-group-path/mover-name",
+			},
+			injectMoved: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "moved-id",
+				},
+				ResourcePath: "target-group-id/moved-id",
+			},
+			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
+				PageInfo: &pagination.PageInfo{
+					TotalCount: 0,
+				},
+			},
+			expectErrorCode: errors.EInvalid,
+			limitError:      errors.New("limit exceeded", errors.WithErrorCode(errors.EInvalid)),
+		},
+		{
+			name:          "negative: managed identity being moved doesn't exist",
+			targetGroup:   candidateParentGroup,
+			targetGroupID: "target-group-id",
+			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "mover-id",
+				},
+				GroupID:      "old-group-id",
+				ResourcePath: "old-group-path/mover-name",
+			},
+			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
+				PageInfo: &pagination.PageInfo{
+					TotalCount: 0,
+				},
+			},
+			injectMoveError: errors.New("Not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:        "negative: attempting to move a managed identity alias",
+			targetGroup: candidateParentGroup,
+			mover: &models.ManagedIdentity{
+				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
+				ResourcePath:  "some/resource/path",
+			},
+			injectMoved: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "moved-id",
+				},
+				ResourcePath: "target-group-id/moved-id",
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "negative: subject does not have access to the old group",
+			targetGroup:     candidateParentGroup,
+			targetGroupID:   "target-group-id",
+			mover:           sampleManagedIdentity,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "negative: subject does not have access to the new group",
+			targetGroup:     candidateParentGroup,
+			targetGroupID:   "target-group-id",
+			mover:           sampleManagedIdentity,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:          "a problematic alias in a descendant group",
+			targetGroupID: "target-group-id",
+			targetGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "target-group-id",
+				},
+				FullPath: "target-parent-path/target-group-name",
+			},
+			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "mover-id",
+				},
+				GroupID:      "old-group-id",
+				ResourcePath: "old-group-path/mover-name",
+			},
+			// For negative test cases, GetManagedIdentities is hit when checking for aliases.
+			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
+				ManagedIdentities: []models.ManagedIdentity{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: "alias in a descendant group",
+						},
+						AliasSourceID: ptr.String("mover-id"),
+						ResourcePath:  "target-parent-path/target-group-name/descendant-name/alias-name",
+						GroupID:       "alias-group-id",
+					},
+				},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:          "a problematic alias in an ancestor group",
+			targetGroupID: "target-group-id",
+			targetGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "target-group-id",
+				},
+				ParentID: "ancestor-group-id",
+				FullPath: "ancestor-path/target-group-name",
+			},
+			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "mover-id",
+				},
+				GroupID:      "old-group-id",
+				ResourcePath: "old-group-path/mover-name",
+			},
+			// For negative test cases, GetManagedIdentities is hit when checking for aliases.
+			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
+				ManagedIdentities: []models.ManagedIdentity{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: "alias in an ancestor group",
+						},
+						AliasSourceID: ptr.String("mover-id"),
+						ResourcePath:  "ancestor-path/alias-name",
+						GroupID:       "alias-group-id",
+					},
+				},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:          "a problematic assignment outside the target group",
+			targetGroupID: "target-group-id",
+			targetGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "target-group-id",
+				},
+				ParentID: "ancestor-group-id",
+				FullPath: "ancestor-path/old-group-name",
+			},
+			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "mover-id",
+				},
+				GroupID:      "old-group-id",
+				ResourcePath: "old-group-path/mover-name",
+			},
+			injectWorkspacesForMI: []models.Workspace{
+				{
+					Metadata: models.ResourceMetadata{
+						ID: "workspace-id",
+					},
+					FullPath: "workspace/outside/target/group",
+				},
+			},
+			// For negative test cases, GetManagedIdentities is hit when checking for aliases.
+			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
+				ManagedIdentities: []models.ManagedIdentity{},
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockManagedIdentities := db.NewMockManagedIdentities(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockCaller := auth.NewMockCaller(t)
+			mockLimitChecker := limits.NewMockLimitChecker(t)
+			mockGroups := db.NewMockGroups(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockActivityEvents := activityevent.NewMockService(t)
+
+			mockGroups.On("GetGroupByID", mock.Anything, test.targetGroupID).Return(test.targetGroup, nil).Maybe()
+
+			mockWorkspaces.On("GetWorkspacesForManagedIdentity", mock.Anything, mock.Anything).
+				Return(test.injectWorkspacesForMI, nil).Maybe()
+
+			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
+			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).
+				Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).
+				Return(test.authError).Maybe()
+
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+
+			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, mock.Anything).
+				Return(test.mover, nil).Maybe()
+
+			mockManagedIdentities.On("UpdateManagedIdentity", mock.Anything, mock.Anything).
+				Return(
+					func(_ context.Context, managedIdentity *models.ManagedIdentity) (*models.ManagedIdentity, error) {
+
+						// Check that the correct group ID is being passed in.
+						if managedIdentity.GroupID != test.targetGroupID {
+							return nil, errors.New("incorrect group id")
+						}
+
+						return test.injectMoved, test.injectMoveError
+					},
+				).Maybe()
+
+			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, mock.Anything).
+				Return(test.injectGetManagedIdentities, nil).Maybe()
+
+			mockLimitChecker.On("CheckLimit", mock.Anything, limits.ResourceLimitManagedIdentitiesPerGroup, int32(0)).
+				Return(test.limitError).Maybe()
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+				Return(&models.ActivityEvent{}, nil).Maybe()
+
+			dbClient := &db.Client{
+				ManagedIdentities: mockManagedIdentities,
+				Groups:            mockGroups,
+				Workspaces:        mockWorkspaces,
+				Transactions:      mockTransactions,
+			}
+
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, dbClient, mockLimitChecker, nil, nil, nil, mockActivityEvents)
+
+			_, err := service.MoveManagedIdentity(auth.WithCaller(ctx, mockCaller), &MoveManagedIdentityInput{
+				ManagedIdentityID: test.mover.Metadata.ID,
+				NewGroupID:        test.targetGroup.Metadata.ID,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

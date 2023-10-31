@@ -101,6 +101,10 @@ type ActivityEventUpdateTeamMemberPayload {
   maintainer: Boolean!
 }
 
+type ActivityEventMoveManagedIdentityPayload {
+  previousGroupPath: String!
+}
+
 union ActivityEventPayload =
     ActivityEventCreateNamespaceMembershipPayload
   | ActivityEventUpdateNamespaceMembershipPayload
@@ -110,6 +114,7 @@ union ActivityEventPayload =
   | ActivityEventRemoveTeamMemberPayload
   | ActivityEventUpdateTeamMemberPayload
   | ActivityEventMigrateGroupPayload
+  | ActivityEventMoveManagedIdentityPayload
 
 type ActivityEvent implements Node {
   id: ID!
