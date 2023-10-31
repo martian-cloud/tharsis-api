@@ -28,7 +28,7 @@ USER nonroot
 HEALTHCHECK NONE
 CMD ["./runner"]
 
-FROM alpine:latest AS job-executor
+FROM alpine:3.17 AS job-executor
 WORKDIR /app/
 COPY --from=builder /app/job .
 RUN apk add --no-cache git curl python3 py3-pip jq && \
