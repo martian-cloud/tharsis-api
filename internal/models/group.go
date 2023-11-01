@@ -65,6 +65,11 @@ func (g *Group) GetDepth() int {
 	return 1 + strings.Count(g.FullPath, "/")
 }
 
+// IsDescendantOfGroup returns true if the group is a descendant of the specified (other/ancestor group) path.
+func (g *Group) IsDescendantOfGroup(otherGroupPath string) bool {
+	return IsDescendantOfPath(g.FullPath, otherGroupPath)
+}
+
 // GetGroupParentPath returns the path for a group's parent based only on the current path.
 func GetGroupParentPath(currentPath string) string {
 	pathParts := strings.Split(currentPath, "/")

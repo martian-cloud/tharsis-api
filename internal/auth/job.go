@@ -75,7 +75,7 @@ func (j *JobCaller) requireAccessToInheritedGroupResource(ctx context.Context, g
 		return authorizationError(ctx, false)
 	}
 
-	if !strings.HasPrefix(workspace.FullPath, group.FullPath+"/") {
+	if !workspace.IsDescendantOfGroup(group.FullPath) {
 		return authorizationError(ctx, false)
 	}
 
@@ -94,7 +94,7 @@ func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Contex
 	}
 
 	for _, ns := range namespacePaths {
-		if !strings.HasPrefix(workspace.FullPath, ns+"/") {
+		if !workspace.IsDescendantOfGroup(ns) {
 			return authorizationError(ctx, false)
 		}
 	}

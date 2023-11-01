@@ -285,7 +285,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		parts := strings.Split(input.ServiceAccount.ResourcePath, "/")
 		serviceAccountNamespace := strings.Join(parts[:len(parts)-1], "/")
 
-		if serviceAccountNamespace != input.NamespacePath && !strings.HasPrefix(input.NamespacePath, serviceAccountNamespace+"/") {
+		if serviceAccountNamespace != input.NamespacePath && !models.IsDescendantOfPath(input.NamespacePath, serviceAccountNamespace) {
 			return nil, errors.New(
 				"Service account cannot be added as a member to group %s because it doesn't exist in the group or a parent group",
 				input.NamespacePath,

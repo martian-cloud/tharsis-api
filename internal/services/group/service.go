@@ -3,7 +3,6 @@ package group
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -601,7 +600,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		}
 
 		// Make sure the group to be moved and the new parent group aren't respective ancestor and descendant.
-		if strings.HasPrefix(newParent.FullPath, (group.FullPath + "/")) {
+		if newParent.IsDescendantOfGroup(group.FullPath) {
 			tracing.RecordError(span, nil, "cannot move a group under one of its descendants")
 			return nil, errors.New("cannot move a group under one of its descendants", errors.WithErrorCode(errors.EInvalid))
 		}

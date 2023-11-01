@@ -287,7 +287,7 @@ func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Conte
 	memberships := []models.NamespaceMembership{}
 	for _, nm := range resp.NamespaceMemberships {
 		_, ok := expandedPaths[nm.Namespace.Path]
-		if ok || strings.HasPrefix(nm.Namespace.Path, namespace+"/") {
+		if ok || nm.Namespace.IsDescendantOfGroup(namespace) {
 			// Only add parent or child namespaces of requested namespace.
 			memberships = append(memberships, nm)
 		}

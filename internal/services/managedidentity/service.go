@@ -2,7 +2,6 @@ package managedidentity
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
@@ -345,7 +344,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 	groupPath := strings.Join(resourcePathParts[:len(resourcePathParts)-1], "/")
 
 	// Verify that the managed identity's group is in the group hierarchy of the workspace
-	if !strings.HasPrefix(workspace.FullPath, fmt.Sprintf("%s/", groupPath)) {
+	if !workspace.IsDescendantOfGroup(groupPath) {
 		return errors.New("managed identity %s is not available to workspace %s", managedIdentityID, workspaceID, errors.WithErrorCode(errors.EInvalid))
 	}
 
@@ -610,7 +609,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 	}
 
 	// Verify managed identity isn't being aliased within same namespace it's already available in.
-	if strings.HasPrefix(input.Group.FullPath, sourceGroup.FullPath+"/") || input.Group.FullPath == sourceGroup.FullPath {
+	if input.Group.IsDescendantOfGroup(sourceGroup.FullPath) || input.Group.FullPath == sourceGroup.FullPath {
 		return nil, errors.New("source managed identity %s is already available within namespace", aliasSourceIdentity.Name, errors.WithErrorCode(errors.EInvalid))
 	}
 
@@ -1637,13 +1636,13 @@ func (s *service) checkDisallowedAliases(ctx context.Context,
 		}
 
 		// If the alias is in a descendant of the target group, then it's a problem.
-		if strings.HasPrefix(alias.GetGroupPath(), targetGroup.FullPath+"/") {
+		if models.IsDescendantOfPath(alias.GetGroupPath(), targetGroup.FullPath) {
 			return errors.New("managed identity %s is an alias of managed identity %s, which is in a descendant group of the target group %s",
 				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// If the alias is in an ancestor of the target group, then it's a problem.
-		if strings.HasPrefix(targetGroup.FullPath, alias.GetGroupPath()+"/") {
+		if targetGroup.IsDescendantOfGroup(alias.GetGroupPath()) {
 			return errors.New("managed identity %s is an alias of managed identity %s, which is in an ancestor group of the target group %s",
 				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 		}
@@ -1661,11 +1660,10 @@ func (s *service) checkWorkspaceAssignments(ctx context.Context,
 		return err
 	}
 
-	checkPrefix := newGroup.FullPath + "/"
 	badPaths := []string{}
 
 	for _, workspace := range workspaces {
-		if !strings.HasPrefix(workspace.FullPath, checkPrefix) {
+		if !workspace.IsDescendantOfGroup(newGroup.FullPath) {
 			badPaths = append(badPaths, workspace.FullPath)
 		}
 	}
@@ -1699,7 +1697,7 @@ func (s *service) verifyServiceAccountAccessForGroup(ctx context.Context, servic
 
 		saGroupPath := sa.GetGroupPath()
 
-		if groupPath != saGroupPath && !strings.HasPrefix(groupPath, saGroupPath+"/") {
+		if groupPath != saGroupPath && !models.IsDescendantOfPath(groupPath, saGroupPath) {
 			return errors.New("service account %s is outside the scope of group %s", sa.ResourcePath, groupPath, errors.WithErrorCode(errors.EInvalid))
 		}
 	}
