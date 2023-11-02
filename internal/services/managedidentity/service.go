@@ -1526,8 +1526,12 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 
 	newGroup, err := s.dbClient.Groups.GetGroupByID(ctx, input.NewGroupID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get old group")
+		tracing.RecordError(span, err, "failed to get new group")
 		return nil, err
+	}
+
+	if newGroup == nil {
+		return nil, errors.New("group with id %s not found", input.NewGroupID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Check to ensure there are no aliases of the managed identity in the new group or certain related groups.
@@ -1562,6 +1566,8 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 		}
 	}()
 
+	oldGroupPath := managedIdentity.GetGroupPath()
+
 	// Record the move in the DB.
 	managedIdentity.GroupID = input.NewGroupID
 	managedIdentity, err = s.dbClient.ManagedIdentities.UpdateManagedIdentity(txContext, managedIdentity)
@@ -1570,12 +1576,10 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 		return nil, err
 	}
 
-	groupPath := managedIdentity.GetGroupPath()
-
 	// Get the number of managed identities now in the new group to check whether we just violated the limit.
 	newManagedIdentities, err := s.dbClient.ManagedIdentities.GetManagedIdentities(txContext, &db.GetManagedIdentitiesInput{
 		Filter: &db.ManagedIdentityFilter{
-			NamespacePaths: []string{groupPath},
+			NamespacePaths: []string{newGroup.FullPath},
 		},
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(0),
@@ -1595,10 +1599,13 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
-			NamespacePath: &groupPath,
+			NamespacePath: &newGroup.FullPath,
 			Action:        models.ActionMigrate,
 			TargetType:    models.TargetManagedIdentity,
 			TargetID:      managedIdentity.Metadata.ID,
+			Payload: &models.ActivityEventMoveManagedIdentityPayload{
+				PreviousGroupPath: oldGroupPath,
+			},
 		}); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
