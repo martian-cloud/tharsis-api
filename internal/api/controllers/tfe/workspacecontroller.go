@@ -1,17 +1,21 @@
 package tfe
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	gotfe "github.com/hashicorp/go-tfe"
 	"github.com/hashicorp/jsonapi"
+	"github.com/lestrrat-go/jwx/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -20,17 +24,18 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 type workspaceController struct {
 	respWriter             response.Writer
-	jwtAuthMiddleware      middleware.Handler
 	logger                 logger.Logger
 	runService             run.Service
 	workspaceService       workspace.Service
 	groupService           group.Service
 	managedIdentityService managedidentity.Service
+	jwsProvider            jws.Provider
 	variableService        variable.Service
 	tharsisAPIURL          string
 	tfeVersionedPath       string
@@ -40,23 +45,23 @@ type workspaceController struct {
 func NewWorkspaceController(
 	logger logger.Logger,
 	respWriter response.Writer,
-	jwtAuthMiddleware middleware.Handler,
 	runService run.Service,
 	workspaceService workspace.Service,
 	groupService group.Service,
 	managedIdentityService managedidentity.Service,
+	jwsProvider jws.Provider,
 	variableService variable.Service,
 	tharsisAPIURL string,
 	tfeVersionedPath string,
 ) controllers.Controller {
 	return &workspaceController{
 		respWriter,
-		jwtAuthMiddleware,
 		logger,
 		runService,
 		workspaceService,
 		groupService,
 		managedIdentityService,
+		jwsProvider,
 		variableService,
 		tharsisAPIURL,
 		tfeVersionedPath,
@@ -65,9 +70,6 @@ func NewWorkspaceController(
 
 // RegisterRoutes adds routes to the router.
 func (c *workspaceController) RegisterRoutes(router chi.Router) {
-	// Require JWT authentication
-	router.Use(c.jwtAuthMiddleware)
-
 	router.Get("/workspaces/{workspaceId}", c.GetWorkspaceByID)
 	router.Get("/workspaces/{workspace}/runs", c.GetWorkspaceRuns)
 	router.Get("/workspaces/{workspaceId}/vars", c.GetWorkspaceVariables)
@@ -77,7 +79,7 @@ func (c *workspaceController) RegisterRoutes(router chi.Router) {
 
 	router.Get("/configuration-versions/{configurationVersionId}/content", c.DownloadConfigurationVersion)
 
-	router.Put("/workspaces/{workspaceId}/configuration-versions/{configurationVersionId}/upload", c.UploadConfigurationVersion)
+	router.Put("/workspaces/{workspaceId}/configuration-versions/{token}/upload", c.UploadConfigurationVersion)
 
 	router.Post("/workspaces/{workspaceId}/state-versions", c.CreateStateVersion)
 	router.Post("/organizations/{organization}/workspaces", c.CreateWorkspace)
@@ -262,6 +264,21 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if req.State == nil {
+		// This specific error is expected by the tfe library
+		errorPayload := jsonapi.ErrorsPayload{
+			Errors: []*jsonapi.ErrorObject{
+				{
+					ID:     "1",
+					Title:  "Invalid request",
+					Detail: "param is missing or the value is empty: state",
+				},
+			},
+		}
+		c.respWriter.RespondWithJSON(w, &errorPayload, http.StatusBadRequest)
+		return
+	}
+
 	options := models.StateVersion{WorkspaceID: workspaceID}
 
 	sv, err := c.workspaceService.CreateStateVersion(r.Context(), &options, req.State)
@@ -315,7 +332,21 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusCreated)
+	token, err := c.createUploadToken(r.Context(), gid.ToGlobalID(gid.ConfigurationVersionType, cv.Metadata.ID))
+	if err != nil {
+		c.respWriter.RespondWithError(w, err)
+		return
+	}
+
+	uploadURL := fmt.Sprintf(
+		"%s%s/workspaces/%s/configuration-versions/%s/upload",
+		c.tharsisAPIURL,
+		c.tfeVersionedPath,
+		gid.ToGlobalID(gid.WorkspaceType, cv.WorkspaceID),
+		token,
+	)
+
+	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, uploadURL), http.StatusCreated)
 }
 
 func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -327,19 +358,112 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
+	uploadURL := ""
+
+	caller := auth.GetCaller(r.Context())
+	// Only return upload URL if the caller has the required permission
+	if caller != nil && caller.RequirePermission(r.Context(), permissions.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID)) == nil {
+		token, err := c.createUploadToken(r.Context(), gid.ToGlobalID(gid.ConfigurationVersionType, cv.Metadata.ID))
+		if err != nil {
+			c.respWriter.RespondWithError(w, err)
+			return
+		}
+
+		uploadURL = fmt.Sprintf(
+			"%s%s/workspaces/%s/configuration-versions/%s/upload",
+			c.tharsisAPIURL,
+			c.tfeVersionedPath,
+			gid.ToGlobalID(gid.WorkspaceType, cv.WorkspaceID),
+			token,
+		)
+	}
+
+	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, uploadURL), http.StatusOK)
 }
 
 func (c *workspaceController) UploadConfigurationVersion(w http.ResponseWriter, r *http.Request) {
-	configurationVersionID := gid.FromGlobalID(chi.URLParam(r, "configurationVersionId"))
+	var configurationVersionID string
+	var ctx context.Context
 
 	defer r.Body.Close()
 
-	err := c.workspaceService.UploadConfigurationVersion(r.Context(), configurationVersionID, r.Body)
-	if err != nil {
+	caller := auth.GetCaller(r.Context())
+	// Check if caller is defined, this is here for backward compatibility and can be removed after the
+	// Tharsis SDK has been updated
+	if caller != nil {
+		token := chi.URLParam(r, "token")
+
+		// Validate token
+		sub, err := c.verifyUploadToken(r.Context(), []byte(token))
+		if err != nil {
+			// If token validation fails then this the token is the configuration version ID
+			configurationVersionID = token
+		} else {
+			configurationVersionID = sub
+		}
+
+		ctx = r.Context()
+	} else {
+		token := chi.URLParam(r, "token")
+
+		// Validate token
+		sub, err := c.verifyUploadToken(r.Context(), []byte(token))
+		if err != nil {
+			c.respWriter.RespondWithError(w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
+			return
+		}
+
+		configurationVersionID = sub
+
+		// Use system caller to invoke service since the authentication token has already been checked
+		ctx = auth.WithCaller(r.Context(), &auth.SystemCaller{})
+	}
+
+	if err := c.workspaceService.UploadConfigurationVersion(ctx, gid.FromGlobalID(configurationVersionID), r.Body); err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
 	}
 
 	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+}
+
+func (c *workspaceController) createUploadToken(ctx context.Context, subjectClaim string) ([]byte, error) {
+	currentTimestamp := time.Now().Unix()
+
+	token := jwt.New()
+
+	if err := token.Set(jwt.ExpirationKey, time.Now().Add(5*time.Minute).Unix()); err != nil {
+		return nil, err
+	}
+	if err := token.Set(jwt.NotBeforeKey, currentTimestamp); err != nil {
+		return nil, err
+	}
+	if err := token.Set(jwt.IssuedAtKey, currentTimestamp); err != nil {
+		return nil, err
+	}
+	if err := token.Set(jwt.SubjectKey, subjectClaim); err != nil {
+		return nil, err
+	}
+
+	payload, err := jwt.NewSerializer().Serialize(token)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.jwsProvider.Sign(ctx, payload)
+}
+
+func (c *workspaceController) verifyUploadToken(ctx context.Context, token []byte) (string, error) {
+	// Validate token
+	if err := c.jwsProvider.Verify(ctx, token); err != nil {
+		return "", err
+	}
+
+	// Parse and validate jwt
+	parsedToken, err := jwt.Parse(token, jwt.WithValidate(true))
+	if err != nil {
+		return "", fmt.Errorf("failed to decode token %w", err)
+	}
+
+	return parsedToken.Subject(), nil
 }
