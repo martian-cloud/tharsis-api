@@ -367,11 +367,11 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewWorkspaceController(
 		logger,
 		respWriter,
-		requireAuthenticatedCallerMiddleware,
 		runService,
 		workspaceService,
 		groupService,
 		managedIdentityService,
+		pluginCatalog.JWSProvider,
 		variableService,
 		cfg.TharsisAPIURL,
 		tfeBasePath+tfeVersionPath,

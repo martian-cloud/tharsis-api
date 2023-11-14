@@ -101,20 +101,14 @@ func TharsisRunToRun(run *models.Run) *Run {
 }
 
 // TharsisCVToCV converts a tharsis configuration version to a TFE configuration version
-func TharsisCVToCV(cv *models.ConfigurationVersion, tharsisAPIURL, tfeWorkspacesVersionedPath string) *gotfe.ConfigurationVersion {
+func TharsisCVToCV(cv *models.ConfigurationVersion, uploadURL string) *gotfe.ConfigurationVersion {
 	cvGID := gid.ToGlobalID(gid.ConfigurationVersionType, cv.Metadata.ID)
 	return &gotfe.ConfigurationVersion{
 		ID:            cvGID,
 		Status:        gotfe.ConfigurationStatus(cv.Status),
 		Speculative:   cv.Speculative,
 		AutoQueueRuns: false,
-		UploadURL: fmt.Sprintf(
-			"%s%s/workspaces/%s/configuration-versions/%s/upload",
-			tharsisAPIURL,
-			tfeWorkspacesVersionedPath,
-			gid.ToGlobalID(gid.WorkspaceType, cv.WorkspaceID),
-			cvGID,
-		),
+		UploadURL:     uploadURL,
 	}
 }
 
