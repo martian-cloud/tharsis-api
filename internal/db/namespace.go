@@ -126,7 +126,7 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 			goqu.Record{
 				"version":    goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at": timestamp,
-				"path":       goqu.L("REPLACE(?, ?, ?)", goqu.C("path"), oldPath, newPath),
+				"path":       goqu.L("REGEXP_REPLACE(?, ?, ?)", goqu.C("path"), oldPath, newPath),
 			},
 		).Where(goqu.Or(
 		goqu.I("path").Eq(oldPath),
