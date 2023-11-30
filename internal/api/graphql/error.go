@@ -7,16 +7,17 @@ import (
 )
 
 var tharsisErrorToStatusCode = map[errors.CodeType]string{
-	errors.EInternal:        "INTERNAL_SERVER_ERROR",
-	errors.ETooLarge:        "INTERNAL_SERVER_ERROR",
-	errors.EInvalid:         "BAD_REQUEST",
-	errors.ENotImplemented:  "NOT_IMPLEMENTED",
-	errors.EConflict:        "CONFLICT",
-	errors.EOptimisticLock:  "OPTIMISTIC_LOCK",
-	errors.ENotFound:        "NOT_FOUND",
-	errors.EForbidden:       "FORBIDDEN",
-	errors.ETooManyRequests: "RATE_LIMIT_EXCEEDED",
-	errors.EUnauthorized:    "UNAUTHENTICATED",
+	errors.EInternal:           "INTERNAL_SERVER_ERROR",
+	errors.ETooLarge:           "INTERNAL_SERVER_ERROR",
+	errors.EInvalid:            "BAD_REQUEST",
+	errors.ENotImplemented:     "NOT_IMPLEMENTED",
+	errors.EConflict:           "CONFLICT",
+	errors.EOptimisticLock:     "OPTIMISTIC_LOCK",
+	errors.ENotFound:           "NOT_FOUND",
+	errors.EForbidden:          "FORBIDDEN",
+	errors.ETooManyRequests:    "RATE_LIMIT_EXCEEDED",
+	errors.EUnauthorized:       "UNAUTHENTICATED",
+	errors.EServiceUnavailable: "SERVICE_UNAVAILABLE",
 }
 
 func getErrExtensions(err error) map[string]interface{} {

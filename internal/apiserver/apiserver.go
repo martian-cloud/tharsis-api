@@ -27,6 +27,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
@@ -35,6 +36,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
+	maint "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
@@ -151,16 +153,19 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 	httpClient := tharsishttp.NewHTTPClient()
 
+	eventManager := events.NewEventManager(dbClient, logger)
+	eventManager.Start(ctx)
+
+	maintenanceMonitor := maintenance.NewMonitor(logger, dbClient, eventManager)
+	maintenanceMonitor.Start(ctx)
+
 	tharsisIDP := auth.NewIdentityProvider(pluginCatalog.JWSProvider, cfg.ServiceAccountIssuerURL)
-	userAuth := auth.NewUserAuth(ctx, oauthProviders, logger, dbClient)
-	authenticator := auth.NewAuthenticator(userAuth, tharsisIDP, dbClient, cfg.ServiceAccountIssuerURL)
+	userAuth := auth.NewUserAuth(ctx, oauthProviders, logger, dbClient, maintenanceMonitor)
+	authenticator := auth.NewAuthenticator(userAuth, tharsisIDP, dbClient, maintenanceMonitor, cfg.ServiceAccountIssuerURL)
 
 	respWriter := response.NewWriter(logger)
 
 	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
-
-	eventManager := events.NewEventManager(dbClient, logger)
-	eventManager.Start(ctx)
 
 	logStore := job.NewLogStore(pluginCatalog.ObjectStore, dbClient)
 	artifactStore := workspace.NewArtifactStore(pluginCatalog.ObjectStore)
@@ -200,6 +205,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		roleService                = role.NewService(logger, dbClient, activityService)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
 		providerMirrorService      = providermirror.NewService(logger, dbClient, httpClient, limits, activityService, mirrorStore)
+		maintenanceModeService     = maint.NewService(logger, dbClient)
 	)
 
 	vcsService, err := vcs.NewService(
@@ -315,6 +321,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		RunnerService:              runnerService,
 		ResourceLimitService:       resourceLimitService,
 		ProviderMirrorService:      providerMirrorService,
+		MaintenanceModeService:     maintenanceModeService,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)

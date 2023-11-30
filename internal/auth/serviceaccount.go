@@ -5,24 +5,43 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 )
 
 // ServiceAccountCaller represents a service account subject
 type ServiceAccountCaller struct {
 	authorizer         Authorizer
 	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
 	ServiceAccountPath string
 	ServiceAccountID   string
 }
 
 // NewServiceAccountCaller returns a new ServiceAccountCaller
-func NewServiceAccountCaller(id string, path string, authorizer Authorizer, dbClient *db.Client) *ServiceAccountCaller {
-	return &ServiceAccountCaller{ServiceAccountID: id, ServiceAccountPath: path, authorizer: authorizer, dbClient: dbClient}
+func NewServiceAccountCaller(
+	id,
+	path string,
+	authorizer Authorizer,
+	dbClient *db.Client,
+	maintenanceMonitor maintenance.Monitor,
+) *ServiceAccountCaller {
+	return &ServiceAccountCaller{
+		ServiceAccountID:   id,
+		ServiceAccountPath: path,
+		authorizer:         authorizer,
+		dbClient:           dbClient,
+		maintenanceMonitor: maintenanceMonitor,
+	}
 }
 
 // GetSubject returns the subject identifier for this caller
 func (s *ServiceAccountCaller) GetSubject() string {
 	return s.ServiceAccountPath
+}
+
+// IsAdmin returns true if the caller is an admin
+func (s *ServiceAccountCaller) IsAdmin() bool {
+	return false
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
@@ -42,6 +61,16 @@ func (s *ServiceAccountCaller) GetNamespaceAccessPolicy(ctx context.Context) (*N
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
 func (s *ServiceAccountCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	inMaintenance, err := s.maintenanceMonitor.InMaintenanceMode(ctx)
+	if err != nil {
+		return err
+	}
+
+	if inMaintenance && perm.Action != permissions.ViewAction && perm.Action != permissions.ViewValueAction {
+		// Server is in maintenance mode, only allow view permissions
+		return errInMaintenanceMode
+	}
+
 	if handlerFunc, ok := s.getPermissionHandler(perm); ok {
 		return handlerFunc(ctx, &perm, getConstraints(checks...))
 	}

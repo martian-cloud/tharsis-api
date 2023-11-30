@@ -32,15 +32,16 @@ type responseHelper struct {
 }
 
 var tharsisErrorToStatusCode = map[te.CodeType]int{
-	te.EInternal:        http.StatusInternalServerError,
-	te.ENotImplemented:  http.StatusNotImplemented,
-	te.EInvalid:         http.StatusBadRequest,
-	te.EConflict:        http.StatusConflict,
-	te.ENotFound:        http.StatusNotFound,
-	te.EForbidden:       http.StatusForbidden,
-	te.ETooManyRequests: http.StatusTooManyRequests,
-	te.EUnauthorized:    http.StatusUnauthorized,
-	te.ETooLarge:        http.StatusRequestEntityTooLarge,
+	te.EInternal:           http.StatusInternalServerError,
+	te.ENotImplemented:     http.StatusNotImplemented,
+	te.EInvalid:            http.StatusBadRequest,
+	te.EConflict:           http.StatusConflict,
+	te.ENotFound:           http.StatusNotFound,
+	te.EForbidden:          http.StatusForbidden,
+	te.ETooManyRequests:    http.StatusTooManyRequests,
+	te.EUnauthorized:       http.StatusUnauthorized,
+	te.ETooLarge:           http.StatusRequestEntityTooLarge,
+	te.EServiceUnavailable: http.StatusServiceUnavailable,
 }
 
 // NewWriter creates an instance of Writer

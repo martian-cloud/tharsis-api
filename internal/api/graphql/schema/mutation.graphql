@@ -40,7 +40,9 @@ type Mutation {
   deleteManagedIdentityAlias(
     input: DeleteManagedIdentityAliasInput!
   ): DeleteManagedIdentityAliasPayload!
-  moveManagedIdentity(input: MoveManagedIdentityInput!): MoveManagedIdentityPayload!
+  moveManagedIdentity(
+    input: MoveManagedIdentityInput!
+  ): MoveManagedIdentityPayload!
   createServiceAccount(
     input: CreateServiceAccountInput!
   ): CreateServiceAccountPayload!
@@ -184,4 +186,10 @@ type Mutation {
   deleteTerraformProviderPlatformMirror(
     input: DeleteTerraformProviderPlatformMirrorInput!
   ): DeleteTerraformProviderPlatformMirrorPayload!
+  enableMaintenanceMode(
+    input: EnableMaintenanceModeInput!
+  ): EnableMaintenanceModePayload!
+  disableMaintenanceMode(
+    input: DisableMaintenanceModeInput!
+  ): DisableMaintenanceModePayload!
 }

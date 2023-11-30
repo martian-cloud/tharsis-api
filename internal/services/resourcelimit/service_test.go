@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -125,6 +126,10 @@ func TestUpdateResourceLimit(t *testing.T) {
 				mockResourceLimits.On("UpdateResourceLimit", mock.Anything, mock.Anything).Return(test.injectNewLimit, nil)
 			}
 
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+
 			dbClient := &db.Client{
 				Transactions:   mockTransactions,
 				ResourceLimits: mockResourceLimits,
@@ -143,6 +148,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 					},
 					&mockAuthorizer,
 					dbClient,
+					mockMaintenanceMonitor,
 				)
 			case "user":
 				testCaller = auth.NewUserCaller(
@@ -155,6 +161,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 					},
 					&mockAuthorizer,
 					dbClient,
+					mockMaintenanceMonitor,
 				)
 			case "service-account":
 				testCaller = auth.NewServiceAccountCaller(
@@ -162,6 +169,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 					serviceAccountPath,
 					&mockAuthorizer,
 					dbClient,
+					mockMaintenanceMonitor,
 				)
 			default:
 				assert.Fail(t, "invalid caller type in test")

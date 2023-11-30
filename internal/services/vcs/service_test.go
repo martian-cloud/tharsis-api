@@ -20,6 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -1725,7 +1726,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 	}
 
 	testCases := []struct {
-		caller              auth.Caller
+		link                *models.WorkspaceVCSProviderLink
 		input               *ProcessWebhookEventInput
 		createEventInput    *models.VCSEvent
 		equivalentEventType models.VCSEventType
@@ -1734,14 +1735,11 @@ func TestProcessWebhookEvent(t *testing.T) {
 	}{
 		{
 			name: "positive: valid branch push event, mostly empty link and provider setup; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					RepositoryPath:      "owner/repository",
-					WorkspaceID:         "workspace-id",
-					Branch:              "main", // Only allow events for main branch.
-					AutoSpeculativePlan: false,
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main", // Only allow events for main branch.
+				AutoSpeculativePlan: false,
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader: "push",                     // Corresponds to a GitHub push event.
@@ -1761,14 +1759,11 @@ func TestProcessWebhookEvent(t *testing.T) {
 		},
 		{
 			name: "positive: valid branch push event, mostly empty link and provider setup; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					RepositoryPath:      "owner/repository",
-					WorkspaceID:         "workspace-id",
-					Branch:              "main", // Only allow events for main branch.
-					AutoSpeculativePlan: false,
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main", // Only allow events for main branch.
+				AutoSpeculativePlan: false,
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader: "push", // Corresponds to a GitHub push event.
@@ -1788,15 +1783,12 @@ func TestProcessWebhookEvent(t *testing.T) {
 		},
 		{
 			name: "positive: valid tag event, no tag regex defined on link; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					RepositoryPath:      "owner/repository",
-					WorkspaceID:         "workspace-id",
-					Branch:              "main",
-					AutoSpeculativePlan: false,
-					// No tag regex, meaning no run.
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main",
+				AutoSpeculativePlan: false,
+				// No tag regex, meaning no run.
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader: "push", // Corresponds to a GitHub push event.
@@ -1815,15 +1807,12 @@ func TestProcessWebhookEvent(t *testing.T) {
 		},
 		{
 			name: "positive: valid tag event, with tag regex defined on link; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					RepositoryPath:      "owner/repository",
-					WorkspaceID:         "workspace-id",
-					Branch:              "main",
-					AutoSpeculativePlan: false,
-					TagRegex:            &sampleTagRegex,
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main",
+				AutoSpeculativePlan: false,
+				TagRegex:            &sampleTagRegex,
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader: "push", // Corresponds to a GitHub push event.
@@ -1842,15 +1831,12 @@ func TestProcessWebhookEvent(t *testing.T) {
 		},
 		{
 			name: "positive: valid PR event, auto-speculative is false on link; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					RepositoryPath:      "owner/repository",
-					WorkspaceID:         "workspace-id",
-					Branch:              "main",
-					AutoSpeculativePlan: false, // No PR's allowed here.
-					TagRegex:            &sampleTagRegex,
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main",
+				AutoSpeculativePlan: false, // No PR's allowed here.
+				TagRegex:            &sampleTagRegex,
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader:      "pull_request", // Corresponds to a GitHub PR event.
@@ -1872,15 +1858,12 @@ func TestProcessWebhookEvent(t *testing.T) {
 		},
 		{
 			name: "positive: valid PR event, auto-speculative is true on link; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					RepositoryPath:      "owner/repository",
-					WorkspaceID:         "workspace-id",
-					Branch:              "main",
-					AutoSpeculativePlan: true, // PR's allowed here.
-					TagRegex:            &sampleTagRegex,
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				RepositoryPath:      "owner/repository",
+				WorkspaceID:         "workspace-id",
+				Branch:              "main",
+				AutoSpeculativePlan: true, // PR's allowed here.
+				TagRegex:            &sampleTagRegex,
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader:      "pull_request", // Corresponds to a GitHub PR event.
@@ -1902,56 +1885,39 @@ func TestProcessWebhookEvent(t *testing.T) {
 		},
 		{
 			name: "positive: webhook is disabled on the link; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					WorkspaceID:     "workspace-id",
-					WebhookDisabled: true, // Webhook is disabled.
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				WorkspaceID:     "workspace-id",
+				WebhookDisabled: true, // Webhook is disabled.
 			},
 			input: &ProcessWebhookEventInput{},
 		},
 		{
 			name: "negative: invalid webhook event; expect no errors",
-			caller: &auth.VCSWorkspaceLinkCaller{
-				Provider: sampleVCSProvider,
-				Link: &models.WorkspaceVCSProviderLink{
-					WorkspaceID: "workspace-id",
-				},
+			link: &models.WorkspaceVCSProviderLink{
+				WorkspaceID: "workspace-id",
 			},
 			input: &ProcessWebhookEventInput{
 				EventHeader: "unknown", // An event not supported.
 			},
 			// Expect error to be nil.
 		},
-		{
-			name:              "negative: not a VCSWorkspaceLinkCaller; expect error EInvalid",
-			caller:            &auth.SystemCaller{},
-			input:             &ProcessWebhookEventInput{},
-			expectedErrorCode: errors.EInvalid,
-		},
-		{
-			name:              "negative: without caller; expect error EUnauthorized",
-			input:             &ProcessWebhookEventInput{},
-			expectedErrorCode: errors.EUnauthorized,
-		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := auth.WithCaller(context.Background(), test.caller)
-
 			mockProviders := MockProvider{}
 			mockVCSProviders := db.MockVCSProviders{}
 			mockVCSEvents := db.MockVCSEvents{}
 			mockManager := asynctask.MockManager{}
 			mockWorkspaceService := workspace.MockService{}
+			mockMaintenanceMonitor := maintenance.MockMonitor{}
 
 			mockProviders.Test(t)
 			mockVCSProviders.Test(t)
 			mockVCSEvents.Test(t)
 			mockWorkspaceService.Test(t)
 			mockManager.Test(t)
+			mockMaintenanceMonitor.Test(t)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
 				ProviderURL:  sampleVCSProvider.URL,
@@ -1982,12 +1948,16 @@ func TestProcessWebhookEvent(t *testing.T) {
 			mockWorkspaceService.On("GetWorkspaceByID", mock.Anything, mock.Anything).Return(sampleWorkspace, nil)
 			mockVCSEvents.On("CreateEvent", mock.Anything, test.createEventInput).Return(&models.VCSEvent{}, nil)
 
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+
 			mockManager.On("StartTask", mock.Anything)
 
 			dbClient := &db.Client{
 				VCSEvents:    &mockVCSEvents,
 				VCSProviders: &mockVCSProviders,
 			}
+
+			caller := auth.NewVCSWorkspaceLinkCaller(sampleVCSProvider, test.link, dbClient, &mockMaintenanceMonitor)
 
 			providerMap := map[models.VCSProviderType]Provider{
 				models.GitLabProviderType: &mockProviders,
@@ -2001,7 +1971,7 @@ func TestProcessWebhookEvent(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			service := newService(logger, dbClient, nil, nil, providerMap, nil, nil, &mockWorkspaceService, &mockManager, oAuthStateGenerator, "", 5000)
 
-			err := service.ProcessWebhookEvent(ctx, test.input)
+			err := service.ProcessWebhookEvent(auth.WithCaller(context.Background(), caller), test.input)
 			if test.expectedErrorCode != "" {
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
 			} else if err != nil {

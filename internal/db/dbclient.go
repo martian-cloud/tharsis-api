@@ -97,6 +97,7 @@ type Client struct {
 	ResourceLimits                   ResourceLimits
 	TerraformProviderVersionMirrors  TerraformProviderVersionMirrors
 	TerraformProviderPlatformMirrors TerraformProviderPlatformMirrors
+	MaintenanceModes                 MaintenanceModes
 }
 
 // NewClient creates a new Client
@@ -193,6 +194,7 @@ func NewClient(
 	dbClient.ResourceLimits = NewResourceLimits(dbClient)
 	dbClient.TerraformProviderVersionMirrors = NewTerraformProviderVersionMirrors(dbClient)
 	dbClient.TerraformProviderPlatformMirrors = NewTerraformProviderPlatformMirrors(dbClient)
+	dbClient.MaintenanceModes = NewMaintenanceModes(dbClient)
 
 	return dbClient, nil
 }

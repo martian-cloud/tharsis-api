@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
@@ -85,6 +87,32 @@ func (_m *MockService) GetJobLogDescriptor(ctx context.Context, job *models.Job)
 
 	if rf, ok := ret.Get(1).(func(context.Context, *models.Job) error); ok {
 		r1 = rf(ctx, job)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetJobs provides a mock function with given fields: ctx, input
+func (_m *MockService) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error) {
+	ret := _m.Called(ctx, input)
+
+	var r0 *db.JobsResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *GetJobsInput) (*db.JobsResult, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *GetJobsInput) *db.JobsResult); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*db.JobsResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *GetJobsInput) error); ok {
+		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}

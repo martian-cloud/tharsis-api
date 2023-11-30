@@ -5,21 +5,28 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 )
 
 // SCIMCaller represents a SCIM subject.
 type SCIMCaller struct {
-	dbClient *db.Client
+	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
 }
 
 // NewSCIMCaller returns a new SCIM caller.
-func NewSCIMCaller(dbClient *db.Client) *SCIMCaller {
-	return &SCIMCaller{dbClient}
+func NewSCIMCaller(dbClient *db.Client, maintenanceMonitor maintenance.Monitor) *SCIMCaller {
+	return &SCIMCaller{dbClient, maintenanceMonitor}
 }
 
 // GetSubject returns the subject identifier for this caller.
 func (s *SCIMCaller) GetSubject() string {
 	return "scim"
+}
+
+// IsAdmin returns true if the caller is an admin.
+func (s *SCIMCaller) IsAdmin() bool {
+	return false
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller.
@@ -33,6 +40,16 @@ func (s *SCIMCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcce
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions.
 func (s *SCIMCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	inMaintenance, err := s.maintenanceMonitor.InMaintenanceMode(ctx)
+	if err != nil {
+		return err
+	}
+
+	if inMaintenance && perm.Action != permissions.ViewAction {
+		// Server is in maintenance mode, only allow view permissions
+		return errInMaintenanceMode
+	}
+
 	handlerFunc, ok := s.getPermissionHandler(perm)
 	if !ok {
 		return authorizationError(ctx, false)

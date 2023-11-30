@@ -462,6 +462,11 @@ func (r RootResolver) Job(ctx context.Context, args *JobQueryArgs) (*JobResolver
 	return jobQuery(ctx, args)
 }
 
+// Jobs query returns a job connection
+func (r RootResolver) Jobs(ctx context.Context, args *JobConnectionQueryArgs) (*JobConnectionResolver, error) {
+	return jobsQuery(ctx, args)
+}
+
 // JobLogEvents sets up a subscription for job log events
 func (r RootResolver) JobLogEvents(ctx context.Context, args *struct{ Input *JobLogSubscriptionInput }) (<-chan *JobLogEventResolver, error) {
 	return r.jobLogEventsSubscription(ctx, args.Input)
@@ -1188,6 +1193,33 @@ func (r RootResolver) DeleteTerraformProviderPlatformMirror(ctx context.Context,
 	response, err := deleteTerraformProviderPlatformMirrorMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderPlatformMirrorMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+/* MaintenanceMode Queries and Mutations */
+
+// MaintenanceMode returns the current maintenance mode
+func (r RootResolver) MaintenanceMode(ctx context.Context) (*MaintenanceModeResolver, error) {
+	return maintenanceModeQuery(ctx)
+}
+
+// EnableMaintenanceMode enables maintenance mode
+func (r RootResolver) EnableMaintenanceMode(ctx context.Context,
+	args *struct{ Input *EnableMaintenanceModeInput }) (*MaintenanceModeMutationPayloadResolver, error) {
+	response, err := enableMaintenanceModeMutation(ctx, args.Input)
+	if err != nil {
+		return handleMaintenanceModeMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// DisableMaintenanceMode disables maintenance mode
+func (r RootResolver) DisableMaintenanceMode(ctx context.Context,
+	args *struct{ Input *DisableMaintenanceModeInput }) (*MaintenanceModeMutationPayloadResolver, error) {
+	response, err := disableMaintenanceModeMutation(ctx, args.Input)
+	if err != nil {
+		return handleMaintenanceModeMutationProblem(err, args.Input.ClientMutationID)
 	}
 	return response, nil
 }

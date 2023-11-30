@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
@@ -661,6 +662,10 @@ func TestGetGroups(t *testing.T) {
 			mockAuthorizer := auth.MockAuthorizer{}
 			mockAuthorizer.Test(t)
 
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+
 			mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{
 				{ID: rootNamespaceID},
 			}, nil)
@@ -680,6 +685,7 @@ func TestGetGroups(t *testing.T) {
 					},
 					&mockAuthorizer,
 					dbClient.Client,
+					mockMaintenanceMonitor,
 				)
 			case "user":
 				testCaller = auth.NewUserCaller(
@@ -692,6 +698,7 @@ func TestGetGroups(t *testing.T) {
 					},
 					&mockAuthorizer,
 					dbClient.Client,
+					mockMaintenanceMonitor,
 				)
 			case "service-account":
 				testCaller = auth.NewServiceAccountCaller(
@@ -699,6 +706,7 @@ func TestGetGroups(t *testing.T) {
 					serviceAccountPath,
 					&mockAuthorizer,
 					dbClient.Client,
+					mockMaintenanceMonitor,
 				)
 			default:
 				assert.Fail(t, "invalid caller type in test")
@@ -989,6 +997,10 @@ func TestMigrateGroup(t *testing.T) {
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+
 			dbClient := db.Client{
 				Groups:         &mockGroups,
 				Transactions:   &mockTransactions,
@@ -1007,6 +1019,7 @@ func TestMigrateGroup(t *testing.T) {
 				},
 				&mockAuthorizer,
 				&dbClient,
+				mockMaintenanceMonitor,
 			)
 
 			logger, _ := logger.NewForTest()

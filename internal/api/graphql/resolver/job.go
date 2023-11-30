@@ -7,13 +7,23 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 /* Job Query Resolvers */
+
+// JobConnectionQueryArgs are used to query a list of jobs
+type JobConnectionQueryArgs struct {
+	ConnectionQueryArgs
+	WorkspacePath *string
+	JobStatus     *models.JobStatus
+	JobType       *models.JobType
+}
 
 // JobQueryArgs are used to query a single job
 type JobQueryArgs struct {
@@ -24,6 +34,99 @@ type JobQueryArgs struct {
 type JobLogsQueryArgs struct {
 	StartOffset int32
 	Limit       int32
+}
+
+// JobEdgeResolver resolves a job edge
+type JobEdgeResolver struct {
+	edge Edge
+}
+
+// Cursor returns an opaque cursor
+func (r *JobEdgeResolver) Cursor() (string, error) {
+	job, ok := r.edge.Node.(models.Job)
+	if !ok {
+		return "", errors.New("Failed to convert node type")
+	}
+	cursor, err := r.edge.CursorFunc(&job)
+	return *cursor, err
+}
+
+// Node returns a job node
+func (r *JobEdgeResolver) Node() (*JobResolver, error) {
+	job, ok := r.edge.Node.(models.Job)
+	if !ok {
+		return nil, errors.New("Failed to convert node type")
+	}
+
+	return &JobResolver{job: &job}, nil
+}
+
+// JobConnectionResolver resolves a job connection
+type JobConnectionResolver struct {
+	connection Connection
+}
+
+// NewJobConnectionResolver creates a new JobConnectionResolver
+func NewJobConnectionResolver(ctx context.Context, input *job.GetJobsInput) (*JobConnectionResolver, error) {
+	jobService := getJobService(ctx)
+
+	result, err := jobService.GetJobs(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	jobs := result.Jobs
+
+	// Create edges
+	edges := make([]Edge, len(jobs))
+	for i, job := range jobs {
+		edges[i] = Edge{CursorFunc: result.PageInfo.Cursor, Node: job}
+	}
+
+	pageInfo := PageInfo{
+		HasNextPage:     result.PageInfo.HasNextPage,
+		HasPreviousPage: result.PageInfo.HasPreviousPage,
+	}
+
+	if len(jobs) > 0 {
+		var err error
+		pageInfo.StartCursor, err = result.PageInfo.Cursor(&jobs[0])
+		if err != nil {
+			return nil, err
+		}
+
+		pageInfo.EndCursor, err = result.PageInfo.Cursor(&jobs[len(edges)-1])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	connection := Connection{
+		TotalCount: result.PageInfo.TotalCount,
+		PageInfo:   pageInfo,
+		Edges:      edges,
+	}
+
+	return &JobConnectionResolver{connection: connection}, nil
+}
+
+// TotalCount returns the total result count for the connection
+func (r *JobConnectionResolver) TotalCount() int32 {
+	return r.connection.TotalCount
+}
+
+// PageInfo returns the connection page information
+func (r *JobConnectionResolver) PageInfo() *PageInfoResolver {
+	return &PageInfoResolver{pageInfo: r.connection.PageInfo}
+}
+
+// Edges returns the connection edges
+func (r *JobConnectionResolver) Edges() *[]*JobEdgeResolver {
+	resolvers := make([]*JobEdgeResolver, len(r.connection.Edges))
+	for i, edge := range r.connection.Edges {
+		resolvers[i] = &JobEdgeResolver{edge: edge}
+	}
+	return &resolvers
 }
 
 // JobTimestampsResolver resolves a job's timestamps
@@ -74,8 +177,8 @@ func (r *JobResolver) ID() graphql.ID {
 }
 
 // Status resolver
-func (r *JobResolver) Status() string {
-	return string(r.job.Status)
+func (r *JobResolver) Status() models.JobStatus {
+	return r.job.Status
 }
 
 // Type resolver
@@ -207,6 +310,34 @@ func jobQuery(ctx context.Context, args *JobQueryArgs) (*JobResolver, error) {
 	}
 
 	return &JobResolver{job: job}, nil
+}
+
+func jobsQuery(ctx context.Context, args *JobConnectionQueryArgs) (*JobConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := &job.GetJobsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		Status:            args.JobStatus,
+		Type:              args.JobType,
+	}
+
+	if args.WorkspacePath != nil {
+		workspace, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, *args.WorkspacePath)
+		if err != nil {
+			return nil, err
+		}
+
+		input.WorkspaceID = &workspace.Metadata.ID
+	}
+
+	if args.Sort != nil {
+		sort := db.JobSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewJobConnectionResolver(ctx, input)
 }
 
 // JobCancellationEventResolver resolves a job cancellation event

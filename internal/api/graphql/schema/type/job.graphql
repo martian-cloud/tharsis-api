@@ -1,6 +1,30 @@
+enum JobSort {
+  CREATED_AT_ASC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+enum JobStatus {
+  queued
+  pending
+  running
+  finished
+}
+
 enum JobType {
   plan
   apply
+}
+
+type JobConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [JobEdge]
+}
+
+type JobEdge {
+  cursor: String!
+  node: Job
 }
 
 type JobTimestamps {
@@ -25,7 +49,7 @@ type ClaimJobPayload {
 type Job implements Node {
   id: ID!
   metadata: ResourceMetadata!
-  status: String!
+  status: JobStatus!
   type: JobType!
   run: Run!
   workspace: Workspace!

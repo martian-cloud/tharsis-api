@@ -7,8 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -221,6 +224,101 @@ func TestGetNextAvailableJob(t *testing.T) {
 				require.NotNil(t, job)
 				assert.Equal(t, test.expectJobID, job.Metadata.ID)
 			}
+		})
+	}
+}
+
+func TestGetJobs(t *testing.T) {
+	workspaceID := "ws1"
+
+	sampleJob := models.Job{
+		Metadata: models.ResourceMetadata{
+			ID: "job1",
+		},
+		WorkspaceID: workspaceID,
+	}
+
+	type testCase struct {
+		authError       error
+		workspaceID     *string
+		name            string
+		expectErrorCode errors.CodeType
+		expectJob       bool
+		isAdmin         bool
+	}
+
+	tests := []testCase{
+		{
+			name:        "non admin should be able to get jobs for a workspace",
+			workspaceID: &workspaceID,
+			expectJob:   true,
+		},
+		{
+			name:      "admin should be able to get jobs for any workspace",
+			expectJob: true,
+			isAdmin:   true,
+		},
+		{
+			name:            "non admin does not have access to workspace",
+			workspaceID:     &workspaceID,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "only admin can get jobs for any workspace",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockJobs := db.NewMockJobs(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			if test.workspaceID != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			} else {
+				mockCaller.On("IsAdmin").Return(test.isAdmin)
+			}
+
+			if test.authError == nil {
+				dbInput := &db.GetJobsInput{
+					Filter: &db.JobFilter{
+						WorkspaceID: test.workspaceID,
+					},
+				}
+
+				dbResult := &db.JobsResult{Jobs: []models.Job{}}
+
+				if test.expectJob {
+					dbResult.Jobs = append(dbResult.Jobs, sampleJob)
+				}
+
+				mockJobs.On("GetJobs", mock.Anything, dbInput).Return(dbResult, nil)
+			}
+
+			dbClient := &db.Client{
+				Jobs: mockJobs,
+			}
+
+			jobService := service{
+				dbClient: dbClient,
+			}
+
+			jobsResult, err := jobService.GetJobs(auth.WithCaller(ctx, mockCaller), &GetJobsInput{WorkspaceID: test.workspaceID})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, jobsResult)
+			assert.Equal(t, []models.Job{sampleJob}, jobsResult.Jobs)
 		})
 	}
 }

@@ -19,12 +19,27 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
 	// Number of concurrent jobs a given runner can execute.
 	runnerJobsLimit int = 100
 )
+
+// GetJobsInput includes options for getting jobs
+type GetJobsInput struct {
+	// Sort specifies the field to sort on and direction
+	Sort *db.JobSortableField
+	// PaginationOptions supports cursor based pagination
+	PaginationOptions *pagination.Options
+	// Status is the job status to filter on
+	Status *models.JobStatus
+	// Type is the job type to filter on
+	Type *models.JobType
+	// WorkspaceID is the workspace ID to filter on
+	WorkspaceID *string
+}
 
 // ClaimJobResponse is returned when a runner claims a Job
 type ClaimJobResponse struct {
@@ -59,6 +74,7 @@ type Service interface {
 	ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error)
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
 	GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error)
+	GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
 	SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error)
 	SaveLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error
@@ -279,6 +295,46 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 	}
 
 	return resp.Jobs, nil
+}
+
+func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetJobs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	if input.WorkspaceID != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
+		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
+			return nil, err
+		}
+	} else if !caller.IsAdmin() {
+		tracing.RecordError(span, nil, "only system admins can view jobs across all workspaces")
+		return nil, errors.New("only system admins can view jobs across all workspaces", errors.WithErrorCode(errors.EForbidden))
+	}
+
+	dbInput := &db.GetJobsInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.JobFilter{
+			JobStatus:   input.Status,
+			JobType:     input.Type,
+			WorkspaceID: input.WorkspaceID,
+		},
+	}
+
+	jobsResult, err := s.dbClient.Jobs.GetJobs(ctx, dbInput)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get jobs")
+		return nil, err
+	}
+
+	return jobsResult, nil
 }
 
 func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error) {
