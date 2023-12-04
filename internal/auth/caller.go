@@ -15,6 +15,9 @@ import (
 // errMissingConstraints is the error returned when required constraints or permissions are missing.
 var errMissingConstraints = goerror.New("missing required permissions or constraints")
 
+// errInMaintenanceMode is the error returned when the system is in maintenance mode.
+var errInMaintenanceMode = errors.New("System is currently in maintenance mode, only read operations are supported", errors.WithErrorCode(errors.EServiceUnavailable))
+
 // Uses the context key pattern
 type contextKey string
 
@@ -164,6 +167,12 @@ func (s *SystemCaller) GetSubject() string {
 	return "system"
 }
 
+// IsAdmin returns true if the caller is an admin
+func (s *SystemCaller) IsAdmin() bool {
+	// System caller is always an admin
+	return true
+}
+
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
 func (s *SystemCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
 	return &NamespaceAccessPolicy{AllowAll: true}, nil
@@ -192,6 +201,7 @@ type NamespaceAccessPolicy struct {
 // Caller represents a subject performing an API request
 type Caller interface {
 	GetSubject() string
+	IsAdmin() bool
 	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
 	RequirePermission(ctx context.Context, perms permissions.Permission, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error

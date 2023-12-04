@@ -620,11 +620,13 @@ func TestEnforceRules(t *testing.T) {
 					},
 					nil,
 					&dbClient,
+					nil,
 				)
 			case "serviceAccount":
 				testCaller = auth.NewServiceAccountCaller(
 					"sa1",
 					"groupA/sa1",
+					nil,
 					nil,
 					nil,
 				)

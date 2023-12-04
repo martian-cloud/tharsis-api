@@ -1,0 +1,27 @@
+type EnableMaintenanceModePayload {
+  clientMutationId: String
+  maintenanceMode: MaintenanceMode
+  problems: [Problem!]!
+}
+
+type DisableMaintenanceModePayload {
+  clientMutationId: String
+  maintenanceMode: MaintenanceMode
+  problems: [Problem!]!
+}
+
+type MaintenanceMode {
+  id: ID!
+  metadata: ResourceMetadata!
+  createdBy: String!
+  message: String!
+}
+
+input EnableMaintenanceModeInput {
+  clientMutationId: String
+  message: String!
+}
+
+input DisableMaintenanceModeInput {
+  clientMutationId: String
+}

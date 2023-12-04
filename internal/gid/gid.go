@@ -48,6 +48,7 @@ const (
 	ResourceLimitType                   Type = "RLM"
 	TerraformProviderVersionMirrorType  Type = "TVM"
 	TerraformProviderPlatformMirrorType Type = "TPM"
+	MaintenanceModeType                 Type = "MM"
 )
 
 // IsValid returns true if this is a valid Type enum
@@ -86,7 +87,8 @@ func (t Type) IsValid() error {
 		RoleType,
 		ResourceLimitType,
 		TerraformProviderVersionMirrorType,
-		TerraformProviderPlatformMirrorType:
+		TerraformProviderPlatformMirrorType,
+		MaintenanceModeType:
 		return nil
 	}
 	return errors.New("invalid ID type %s", t, errors.WithErrorCode(errors.EInvalid))

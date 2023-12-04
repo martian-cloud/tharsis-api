@@ -3,6 +3,7 @@ enum ProblemType {
   BAD_REQUEST
   NOT_FOUND
   FORBIDDEN
+  SERVICE_UNAVAILABLE
 }
 
 type Problem {

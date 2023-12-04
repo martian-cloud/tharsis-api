@@ -22,6 +22,11 @@ func (j *JobCaller) GetSubject() string {
 	return j.JobID
 }
 
+// IsAdmin returns true if the caller is an admin
+func (j *JobCaller) IsAdmin() bool {
+	return false
+}
+
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
 func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
 	return &NamespaceAccessPolicy{

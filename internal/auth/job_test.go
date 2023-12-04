@@ -16,6 +16,11 @@ func TestJobCaller_GetSubject(t *testing.T) {
 	assert.Equal(t, "job1", caller.GetSubject())
 }
 
+func TestJobCaller_IsAdmin(t *testing.T) {
+	caller := JobCaller{}
+	assert.False(t, caller.IsAdmin())
+}
+
 func TestJobCaller_GetNamespaceAccessPolicy(t *testing.T) {
 	caller := JobCaller{}
 	policy, err := caller.GetNamespaceAccessPolicy(context.Background())

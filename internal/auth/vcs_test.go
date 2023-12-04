@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -15,6 +17,11 @@ func TestVCSWorkspaceLinkCaller_GetSubject(t *testing.T) {
 		ResourcePath: "rs1",
 	}}
 	assert.Equal(t, "rs1", caller.GetSubject())
+}
+
+func TestVCSWorkspaceLinkCaller_IsAdmin(t *testing.T) {
+	caller := VCSWorkspaceLinkCaller{}
+	assert.False(t, caller.IsAdmin())
 }
 
 func TestVCSWorkspaceLinkCaller_GetNamespaceAccessPolicy(t *testing.T) {
@@ -46,11 +53,12 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		expect      error
-		name        string
-		workspace   *models.Workspace
-		perm        permissions.Permission
-		constraints []func(*constraints)
+		expect            error
+		name              string
+		workspace         *models.Workspace
+		perm              permissions.Permission
+		constraints       []func(*constraints)
+		inMaintenanceMode bool
 	}{
 		{
 			name:        "link belongs to requested workspace",
@@ -84,10 +92,33 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 			perm:   permissions.CreateGroupPermission,
 			expect: authorizationError(ctx, false),
 		},
+		{
+			name: "cannot have write permission when system is in maintenance mode",
+			perm: permissions.CreateRunPermission,
+			constraints: []func(*constraints){
+				WithWorkspaceID(ws.Metadata.ID),
+			},
+			expect:            errInMaintenanceMode,
+			inMaintenanceMode: true,
+		},
+		{
+			name: "can have read permission when system is in maintenance mode",
+			perm: permissions.ViewWorkspacePermission,
+			constraints: []func(*constraints){
+				WithWorkspaceID(ws.Metadata.ID),
+			},
+			inMaintenanceMode: true,
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
+
+			caller.maintenanceMonitor = mockMaintenanceMonitor
+
 			assert.Equal(t, test.expect, caller.RequirePermission(ctx, test.perm, test.constraints...))
 		})
 	}

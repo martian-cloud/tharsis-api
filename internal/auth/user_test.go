@@ -8,12 +8,21 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
 func TestUserCaller_GetSubject(t *testing.T) {
 	caller := UserCaller{User: &models.User{Email: "user@email"}}
 	assert.Equal(t, "user@email", caller.GetSubject())
+}
+
+func TestUserCaller_IsAdmin(t *testing.T) {
+	caller := UserCaller{User: &models.User{}}
+	assert.False(t, caller.IsAdmin())
+
+	caller.User.Admin = true
+	assert.True(t, caller.IsAdmin())
 }
 
 func TestUserCaller_GetNamespaceAccessPolicy(t *testing.T) {
@@ -45,13 +54,14 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		name           string
-		expect         error
-		teamMember     *models.TeamMember
-		perm           permissions.Permission
-		constraints    []func(*constraints)
-		isAdmin        bool
-		withAuthorizer bool
+		name              string
+		expect            error
+		teamMember        *models.TeamMember
+		perm              permissions.Permission
+		constraints       []func(*constraints)
+		isAdmin           bool
+		withAuthorizer    bool
+		inMaintenanceMode bool
 	}{
 		{
 			name:           "access is granted by the authorizer",
@@ -109,12 +119,28 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 			expect:         errMissingConstraints,
 			withAuthorizer: true,
 		},
+		{
+			name:              "cannot have write permission when system is in maintenance mode",
+			perm:              permissions.CreateWorkspacePermission,
+			expect:            errInMaintenanceMode,
+			inMaintenanceMode: true,
+		},
+		{
+			name:              "can have read permission when system is in maintenance mode",
+			perm:              permissions.ViewWorkspacePermission,
+			constraints:       []func(*constraints){WithWorkspaceID("ws-1")},
+			withAuthorizer:    true,
+			inMaintenanceMode: true,
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			mockAuthorizer := NewMockAuthorizer(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
 
 			if test.perm == permissions.UpdateTeamPermission && !test.isAdmin {
 				mockTeamMembers.On("GetTeamMember", mock.Anything, caller.User.Metadata.ID, teamID).Return(test.teamMember, nil)
@@ -126,6 +152,7 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 
 			caller.User.Admin = test.isAdmin
 			caller.authorizer = mockAuthorizer
+			caller.maintenanceMonitor = mockMaintenanceMonitor
 			caller.dbClient = &db.Client{TeamMembers: mockTeamMembers}
 
 			assert.Equal(t, test.expect, caller.RequirePermission(ctx, test.perm, test.constraints...))

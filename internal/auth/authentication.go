@@ -8,6 +8,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -32,19 +33,27 @@ const (
 
 // Authenticator is used to authenticate JWT tokens
 type Authenticator struct {
-	userAuth  *UserAuth
-	idp       *IdentityProvider
-	dbClient  *db.Client
-	issuerURL string
+	userAuth           *UserAuth
+	idp                *IdentityProvider
+	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
+	issuerURL          string
 }
 
 // NewAuthenticator creates a new Authenticator instance
-func NewAuthenticator(userAuth *UserAuth, idp *IdentityProvider, dbClient *db.Client, issuerURL string) *Authenticator {
+func NewAuthenticator(
+	userAuth *UserAuth,
+	idp *IdentityProvider,
+	dbClient *db.Client,
+	maintenanceMonitor maintenance.Monitor,
+	issuerURL string,
+) *Authenticator {
 	return &Authenticator{
-		userAuth:  userAuth,
-		idp:       idp,
-		dbClient:  dbClient,
-		issuerURL: issuerURL,
+		userAuth:           userAuth,
+		idp:                idp,
+		dbClient:           dbClient,
+		maintenanceMonitor: maintenanceMonitor,
+		issuerURL:          issuerURL,
 	}
 }
 
@@ -79,6 +88,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, us
 				output.PrivateClaims["service_account_path"],
 				newNamespaceMembershipAuthorizer(a.dbClient, nil, &serviceAccountID, useCache),
 				a.dbClient,
+				a.maintenanceMonitor,
 			), nil
 		case JobTokenType:
 			return &JobCaller{
@@ -125,7 +135,7 @@ func (a *Authenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Toke
 		return nil, fmt.Errorf("scim token has an invalid jti claim")
 	}
 
-	return NewSCIMCaller(a.dbClient), nil
+	return NewSCIMCaller(a.dbClient, a.maintenanceMonitor), nil
 }
 
 // verifyVCSToken verifies a VCS token is known.
@@ -161,6 +171,7 @@ func (a *Authenticator) verifyVCSToken(ctx context.Context, output *VerifyTokenO
 		provider,
 		link,
 		a.dbClient,
+		a.maintenanceMonitor,
 	), nil
 }
 

@@ -19,16 +19,17 @@ type CodeType string
 
 // Error code constants
 const (
-	EInternal        CodeType = "internal error"
-	ENotImplemented  CodeType = "not implemented"
-	ENotFound        CodeType = "not found"
-	EConflict        CodeType = "conflict"
-	EOptimisticLock  CodeType = "optimistic lock"
-	EInvalid         CodeType = "invalid"
-	EForbidden       CodeType = "forbidden"
-	ETooManyRequests CodeType = "too many requests"
-	EUnauthorized    CodeType = "unauthorized"
-	ETooLarge        CodeType = "request too large"
+	EInternal           CodeType = "internal error"
+	ENotImplemented     CodeType = "not implemented"
+	ENotFound           CodeType = "not found"
+	EConflict           CodeType = "conflict"
+	EOptimisticLock     CodeType = "optimistic lock"
+	EInvalid            CodeType = "invalid"
+	EForbidden          CodeType = "forbidden"
+	ETooManyRequests    CodeType = "too many requests"
+	EUnauthorized       CodeType = "unauthorized"
+	ETooLarge           CodeType = "request too large"
+	EServiceUnavailable CodeType = "service unavailable"
 )
 
 type config struct {

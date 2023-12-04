@@ -79,6 +79,16 @@ type Query {
     sort: RunSort
   ): RunConnection!
   job(id: String!): Job
+  jobs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    workspacePath: String
+    jobType: JobType
+    jobStatus: JobStatus
+    sort: JobSort
+  ): JobConnection!
   managedIdentity(id: String!): ManagedIdentity
   serviceAccount(id: String!): ServiceAccount
   users(
@@ -135,4 +145,5 @@ type Query {
     version: String!
     groupPath: String!
   ): TerraformProviderVersionMirror
+  maintenanceMode: MaintenanceMode
 }

@@ -8,6 +8,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -15,6 +16,11 @@ import (
 func TestSCIMCaller_GetSubject(t *testing.T) {
 	caller := SCIMCaller{}
 	assert.Equal(t, "scim", caller.GetSubject())
+}
+
+func TestSCIMCaller_IsAdmin(t *testing.T) {
+	caller := SCIMCaller{}
+	assert.False(t, caller.IsAdmin())
 }
 
 func TestSCIMCaller_GetNamespaceAccessPolicy(t *testing.T) {
@@ -38,12 +44,13 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		expect      error
-		team        *models.Team
-		user        *models.User
-		name        string
-		perms       []permissions.Permission
-		constraints []func(*constraints)
+		expect            error
+		team              *models.Team
+		user              *models.User
+		name              string
+		perms             []permissions.Permission
+		constraints       []func(*constraints)
+		inMaintenanceMode bool
 	}{
 		{
 			name: "viewing, creating, updating a team or a user; grant access",
@@ -98,13 +105,15 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 			expect: errMissingConstraints,
 		},
 		{
-			name:   "access denied because no permissions specified",
-			expect: errMissingConstraints,
-		},
-		{
 			name:   "access denied because permission is never available to caller",
 			perms:  []permissions.Permission{permissions.CreateGroupPermission},
 			expect: authorizationError(ctx, false),
+		},
+		{
+			name:              "cannot have write permission when server in maintenance mode",
+			perms:             []permissions.Permission{permissions.CreateTeamPermission},
+			expect:            errInMaintenanceMode,
+			inMaintenanceMode: true,
 		},
 	}
 
@@ -112,6 +121,9 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockTeams := db.NewMockTeams(t)
 			mockUsers := db.NewMockUsers(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
 
 			constraints := getConstraints(test.constraints...)
 
@@ -123,6 +135,7 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 				mockUsers.On("GetUserByID", mock.Anything, mock.Anything).Return(test.user, nil)
 			}
 
+			caller.maintenanceMonitor = mockMaintenanceMonitor
 			caller.dbClient = &db.Client{Teams: mockTeams, Users: mockUsers}
 
 			for _, perm := range test.perms {

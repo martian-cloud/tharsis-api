@@ -7,12 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
 func TestServiceAccountCaller_GetSubject(t *testing.T) {
 	caller := ServiceAccountCaller{ServiceAccountPath: "group/service-account"}
 	assert.Equal(t, "group/service-account", caller.GetSubject())
+}
+
+func TestServiceAccountCaller_IsAdmin(t *testing.T) {
+	caller := ServiceAccountCaller{}
+	assert.False(t, caller.IsAdmin())
 }
 
 func TestServiceAccountCaller_GetNamespaceAccessPolicy(t *testing.T) {
@@ -32,11 +38,12 @@ func TestServiceAccountCaller_RequirePermissions(t *testing.T) {
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		name           string
-		expect         error
-		perm           permissions.Permission
-		constraints    []func(*constraints)
-		withAuthorizer bool
+		name              string
+		expect            error
+		perm              permissions.Permission
+		constraints       []func(*constraints)
+		withAuthorizer    bool
+		inMaintenanceMode bool
 	}{
 		{
 			name:           "access is granted by the authorizer",
@@ -57,17 +64,34 @@ func TestServiceAccountCaller_RequirePermissions(t *testing.T) {
 			expect:         errMissingConstraints,
 			withAuthorizer: true,
 		},
+		{
+			name:              "cannot have write permission when system is in maintenance mode",
+			perm:              permissions.CreateWorkspacePermission,
+			expect:            errInMaintenanceMode,
+			inMaintenanceMode: true,
+		},
+		{
+			name:              "can have read permission when system is in maintenance mode",
+			perm:              permissions.ViewWorkspacePermission,
+			constraints:       []func(*constraints){WithWorkspaceID("ws-1")},
+			withAuthorizer:    true,
+			inMaintenanceMode: true,
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			mockAuthorizer := NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
 
 			if test.withAuthorizer {
 				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{test.perm}, mock.Anything).Return(requireAccessAuthorizerFunc)
 			}
 
 			caller.authorizer = mockAuthorizer
+			caller.maintenanceMonitor = mockMaintenanceMonitor
 
 			assert.Equal(t, test.expect, caller.RequirePermission(ctx, test.perm, test.constraints...))
 		})

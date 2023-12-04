@@ -195,8 +195,6 @@ func TestGetSCIMUsers(t *testing.T) {
 }
 
 func TestCreateSCIMUser(t *testing.T) {
-	ctx := auth.WithCaller(context.Background(), &auth.SCIMCaller{})
-
 	sampleUser := &models.User{
 		Username:       "input-user",
 		Email:          "input-user@example.com",
@@ -240,8 +238,16 @@ func TestCreateSCIMUser(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			mockUsers := db.MockUsers{}
+			mockCaller := auth.MockCaller{}
+
 			mockUsers.Test(t)
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateUserPermission).Return(nil)
 
 			mockUsers.On("GetUserByEmail", mock.Anything, test.input.Email).Return(test.existingSCIMUser, nil)
 			mockUsers.On("UpdateUser", mock.Anything, test.existingSCIMUser).Return(test.returnedSCIMUser, nil)
@@ -253,7 +259,7 @@ func TestCreateSCIMUser(t *testing.T) {
 
 			service := NewService(nil, dbClient, nil)
 
-			user, err := service.CreateSCIMUser(ctx, test.input)
+			user, err := service.CreateSCIMUser(auth.WithCaller(ctx, &mockCaller), test.input)
 			if err != nil {
 				t.Fatal(err)
 			} else {
@@ -264,8 +270,6 @@ func TestCreateSCIMUser(t *testing.T) {
 }
 
 func TestUpdateSCIMUser(t *testing.T) {
-	ctx := auth.WithCaller(context.Background(), &auth.SCIMCaller{})
-
 	// sampleUser is the model for several user inputs.
 	sampleUser := &models.User{
 		Metadata: models.ResourceMetadata{
@@ -345,11 +349,19 @@ func TestUpdateSCIMUser(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			mockUsers := db.MockUsers{}
 			mockUsers.Test(t)
 
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateUserPermission, mock.Anything).Return(nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -367,7 +379,7 @@ func TestUpdateSCIMUser(t *testing.T) {
 
 			service := NewService(nil, dbClient, nil)
 
-			user, err := service.UpdateSCIMUser(ctx, test.input)
+			user, err := service.UpdateSCIMUser(auth.WithCaller(ctx, &mockCaller), test.input)
 			if test.expectedErrorCode != "" {
 				// Negative cases.
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
@@ -532,8 +544,6 @@ func TestGetSCIMGroups(t *testing.T) {
 }
 
 func TestCreateSCIMGroup(t *testing.T) {
-	ctx := auth.WithCaller(context.Background(), &auth.SCIMCaller{})
-
 	sampleSCIMGroup := &models.Team{
 		Name:           "input-team",
 		SCIMExternalID: externalID,
@@ -568,8 +578,16 @@ func TestCreateSCIMGroup(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			mockTeams := db.MockTeams{}
 			mockTeams.Test(t)
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTeamPermission).Return(nil)
 
 			mockTeams.On("GetTeamByName", mock.Anything, test.input.Name).Return(test.existingSCIMGroup, nil)
 			mockTeams.On("UpdateTeam", mock.Anything, test.existingSCIMGroup).Return(test.returnedSCIMGroup, nil)
@@ -581,7 +599,7 @@ func TestCreateSCIMGroup(t *testing.T) {
 
 			service := NewService(nil, dbClient, nil)
 
-			group, err := service.CreateSCIMGroup(ctx, test.input)
+			group, err := service.CreateSCIMGroup(auth.WithCaller(ctx, &mockCaller), test.input)
 			if err != nil {
 				t.Fatal(err)
 			} else {
@@ -592,8 +610,6 @@ func TestCreateSCIMGroup(t *testing.T) {
 }
 
 func TestUpdateSCIMGroup(t *testing.T) {
-	ctx := auth.WithCaller(context.Background(), &auth.SCIMCaller{})
-
 	scimGroupID := "663a2ffa-5e95-41fa-9119-c7bcad3d775e"
 
 	// sampleSCIMGroup is the model for several user inputs.
@@ -754,6 +770,9 @@ func TestUpdateSCIMGroup(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			mockTeams := db.MockTeams{}
 			mockTeams.Test(t)
 
@@ -765,6 +784,11 @@ func TestUpdateSCIMGroup(t *testing.T) {
 
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTeamPermission, mock.Anything).Return(nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -817,7 +841,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 				Operations: test.operations,
 			}
 
-			group, err := service.UpdateSCIMGroup(ctx, input)
+			group, err := service.UpdateSCIMGroup(auth.WithCaller(ctx, &mockCaller), input)
 			if test.expectedErrorCode != "" {
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
 			} else if err != nil {

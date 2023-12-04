@@ -13,6 +13,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -20,24 +21,36 @@ import (
 
 // UserCaller represents a user subject
 type UserCaller struct {
-	User          *models.User
-	authorizer    Authorizer
-	dbClient      *db.Client
-	teamListCache []models.Team // lazy init
+	User               *models.User
+	authorizer         Authorizer
+	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
+	teamListCache      []models.Team // lazy init
 }
 
 // NewUserCaller returns a new UserCaller
-func NewUserCaller(user *models.User, authorizer Authorizer, dbClient *db.Client) *UserCaller {
+func NewUserCaller(
+	user *models.User,
+	authorizer Authorizer,
+	dbClient *db.Client,
+	maintenanceMonitor maintenance.Monitor,
+) *UserCaller {
 	return &UserCaller{
-		User:       user,
-		authorizer: authorizer,
-		dbClient:   dbClient,
+		User:               user,
+		authorizer:         authorizer,
+		dbClient:           dbClient,
+		maintenanceMonitor: maintenanceMonitor,
 	}
 }
 
 // GetSubject returns the subject identifier for this caller
 func (u *UserCaller) GetSubject() string {
 	return u.User.Email
+}
+
+// IsAdmin returns true if the caller is an admin
+func (u *UserCaller) IsAdmin() bool {
+	return u.User.Admin
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
@@ -61,6 +74,16 @@ func (u *UserCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAc
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
 func (u *UserCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	inMaintenance, err := u.maintenanceMonitor.InMaintenanceMode(ctx)
+	if err != nil {
+		return err
+	}
+
+	if inMaintenance && perm.Action != permissions.ViewAction && perm.Action != permissions.ViewValueAction {
+		// Server is in maintenance mode, only allow view permissions
+		return errInMaintenanceMode
+	}
+
 	if perm.IsAssignable() && u.User.Admin {
 		// User is an admin, so assignable permission can be granted.
 		return nil
@@ -172,10 +195,11 @@ type externalIdentity struct {
 
 // UserAuth implements JWT authentication
 type UserAuth struct {
-	idpMap      map[string]IdentityProviderConfig
-	jwkRegistry *jwk.AutoRefresh
-	logger      logger.Logger
-	dbClient    *db.Client
+	idpMap             map[string]IdentityProviderConfig
+	jwkRegistry        *jwk.AutoRefresh
+	logger             logger.Logger
+	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
 }
 
 const (
@@ -189,6 +213,7 @@ func NewUserAuth(
 	identityProviders []IdentityProviderConfig,
 	logger logger.Logger,
 	dbClient *db.Client,
+	maintenanceMonitor maintenance.Monitor,
 ) *UserAuth {
 	idpMap := make(map[string]IdentityProviderConfig)
 
@@ -205,7 +230,7 @@ func NewUserAuth(
 		}
 	}
 
-	return &UserAuth{idpMap, jwkRegistry, logger, dbClient}
+	return &UserAuth{idpMap, jwkRegistry, logger, dbClient, maintenanceMonitor}
 }
 
 func (u *UserAuth) getKey(ctx context.Context, kid string, idp IdentityProviderConfig) (jwk.Key, error) {
@@ -333,6 +358,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 		userModel,
 		newNamespaceMembershipAuthorizer(u.dbClient, &userModel.Metadata.ID, nil, useCache),
 		u.dbClient,
+		u.maintenanceMonitor,
 	), nil
 }
 

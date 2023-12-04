@@ -5,28 +5,41 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
 
 // VCSWorkspaceLinkCaller represents a VCS provider subject.
 type VCSWorkspaceLinkCaller struct {
-	Provider *models.VCSProvider
-	Link     *models.WorkspaceVCSProviderLink
-	dbClient *db.Client
+	Provider           *models.VCSProvider
+	Link               *models.WorkspaceVCSProviderLink
+	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
 }
 
 // NewVCSWorkspaceLinkCaller returns a new VCS caller.
-func NewVCSWorkspaceLinkCaller(provider *models.VCSProvider, link *models.WorkspaceVCSProviderLink, dbClient *db.Client) *VCSWorkspaceLinkCaller {
+func NewVCSWorkspaceLinkCaller(
+	provider *models.VCSProvider,
+	link *models.WorkspaceVCSProviderLink,
+	dbClient *db.Client,
+	maintenanceMonitor maintenance.Monitor,
+) *VCSWorkspaceLinkCaller {
 	return &VCSWorkspaceLinkCaller{
-		Provider: provider,
-		Link:     link,
-		dbClient: dbClient,
+		Provider:           provider,
+		Link:               link,
+		dbClient:           dbClient,
+		maintenanceMonitor: maintenanceMonitor,
 	}
 }
 
 // GetSubject returns the subject identifier for this caller.
 func (v *VCSWorkspaceLinkCaller) GetSubject() string {
 	return v.Provider.ResourcePath
+}
+
+// IsAdmin returns true if the caller is an admin.
+func (v *VCSWorkspaceLinkCaller) IsAdmin() bool {
+	return false
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller.
@@ -40,6 +53,16 @@ func (v *VCSWorkspaceLinkCaller) GetNamespaceAccessPolicy(_ context.Context) (*N
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions.
 func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+	inMaintenance, err := v.maintenanceMonitor.InMaintenanceMode(ctx)
+	if err != nil {
+		return err
+	}
+
+	if inMaintenance && perm.Action != permissions.ViewAction {
+		// Server is in maintenance mode, only allow view permissions
+		return errInMaintenanceMode
+	}
+
 	handlerFunc, ok := v.getPermissionHandler(perm)
 	if !ok {
 		return authorizationError(ctx, false)
