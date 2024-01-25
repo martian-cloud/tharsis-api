@@ -75,24 +75,20 @@ func (a *authorizer) GetRootNamespaces(ctx context.Context) ([]models.Membership
 
 	namespaces := map[string]models.MembershipNamespace{}
 	for _, m := range resp.NamespaceMemberships {
-		pathParts := strings.Split(m.Namespace.Path, "/")
-		// Subtract 1 since we will always add root namespaces
-		lastIndex := len(pathParts) - 1
-		// Check each parent path to determine the top level namespace
+		expandedNamespaces := expandNamespaceDescOrder(m.Namespace.Path)
+
 		found := false
-		if lastIndex > 0 {
-			// This check excludes the last path since we're only checking parent paths
-			for _, part := range pathParts[:lastIndex] {
-				if _, ok := namespaces[part]; ok {
-					// part is already in namespace map
-					found = true
-					break
-				}
+		// Iterate over expanded namespaces skipping the first element
+		for _, ns := range expandedNamespaces[1:] {
+			// Check if any parent of this namespace has already been added
+			if _, ok := namespaces[ns]; ok {
+				found = true
+				break
 			}
 		}
 		// Add namespace if it hasn't already been added
 		if !found {
-			namespaces[pathParts[lastIndex]] = m.Namespace
+			namespaces[m.Namespace.Path] = m.Namespace
 		}
 	}
 

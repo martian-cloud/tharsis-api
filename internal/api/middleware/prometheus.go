@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -47,10 +48,14 @@ func PrometheusMiddleware(next http.Handler) http.Handler {
 		rw := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		next.ServeHTTP(rw, r)
 
-		path := r.URL.Path
 		statusCode := rw.Status()
 
-		sanitizedPath := strings.ToValidUTF8(path, "<INVALID_UTF_SEQ>")
+		routePattern := chi.RouteContext(r.Context()).RoutePattern()
+		if routePattern == "" {
+			routePattern = "<invalid_path>"
+		}
+
+		sanitizedPath := strings.ToValidUTF8(routePattern, "<INVALID_UTF_SEQ>")
 
 		responseStatus.WithLabelValues(strconv.Itoa(statusCode)).Inc()
 		totalRequests.WithLabelValues(sanitizedPath).Inc()
