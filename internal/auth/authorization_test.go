@@ -30,12 +30,14 @@ func TestGetRootNamespaces(t *testing.T) {
 			name: "multiple top level namespaces",
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{ID: "ns1", Path: "ns1"}},
+				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{ID: "ns11", Path: "ns11"}},
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{ID: "ns1/ns11", Path: "ns1/ns11"}},
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{ID: "ns2/ns22/ns222", Path: "ns2/ns22/ns222"}},
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{ID: "ns3", Path: "ns3"}},
 			},
 			expectedRootNamespaces: []models.MembershipNamespace{
 				{ID: "ns1", Path: "ns1"},
+				{ID: "ns11", Path: "ns11"},
 				{ID: "ns2/ns22/ns222", Path: "ns2/ns22/ns222"},
 				{ID: "ns3", Path: "ns3"},
 			},
