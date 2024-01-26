@@ -42,6 +42,7 @@ func (sf StateVersionSortableField) getSortDirection() pagination.SortDirection 
 // StateVersionFilter contains the supported fields for filtering StateVersion resources
 type StateVersionFilter struct {
 	WorkspaceID     *string
+	RunIDs          []string
 	StateVersionIDs []string
 }
 
@@ -66,8 +67,6 @@ type StateVersions interface {
 	GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*StateVersionsResult, error)
 	// GetStateVersion returns a stateVersion by ID
 	GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error)
-	// GetStateVersionByRunID returns the state version associated with the specified run
-	GetStateVersionByRunID(ctx context.Context, runID string) (*models.StateVersion, error)
 	// CreateStateVersion will create a new stateVersion
 	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error)
 }
@@ -97,6 +96,9 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 		}
 		if input.Filter.WorkspaceID != nil {
 			ex["state_versions.workspace_id"] = *input.Filter.WorkspaceID
+		}
+		if len(input.Filter.RunIDs) > 0 {
+			ex["state_versions.run_id"] = input.Filter.RunIDs
 		}
 	}
 
@@ -155,34 +157,6 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	}
 
 	return &result, nil
-}
-
-func (s *stateVersions) GetStateVersionByRunID(ctx context.Context, runID string) (*models.StateVersion, error) {
-	ctx, span := tracer.Start(ctx, "db.GetStateVersionByRunID")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	sql, args, err := dialect.From("state_versions").
-		Prepared(true).
-		Select(stateVersionFieldList...).
-		Where(goqu.Ex{"run_id": runID}).
-		ToSQL()
-
-	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
-	}
-
-	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-	return stateVersion, nil
 }
 
 func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error) {

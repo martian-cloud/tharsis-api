@@ -145,6 +145,7 @@ type Service interface {
 	GetLatestJobForPlan(ctx context.Context, planID string) (*models.Job, error)
 	GetLatestJobForApply(ctx context.Context, applyID string) (*models.Job, error)
 	SubscribeToRunEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error)
+	GetStateVersionsByRunIDs(ctx context.Context, idList []string) ([]models.StateVersion, error)
 }
 
 type service struct {
@@ -1571,6 +1572,47 @@ func (s *service) GetLatestJobForApply(ctx context.Context, applyID string) (*mo
 	}
 
 	return job, nil
+}
+
+func (s *service) GetStateVersionsByRunIDs(ctx context.Context, runIDs []string) ([]models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionsByRunIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	runsResult, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
+		Filter: &db.RunFilter{
+			RunIDs: runIDs,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get runs", errors.WithSpan(span))
+	}
+
+	for _, run := range runsResult.Runs {
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if runsResult.PageInfo.TotalCount > 0 {
+		result, err := s.dbClient.StateVersions.GetStateVersions(ctx, &db.GetStateVersionsInput{
+			Filter: &db.StateVersionFilter{
+				RunIDs: runIDs,
+			},
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to get state versions", errors.WithSpan(span))
+		}
+
+		return result.StateVersions, nil
+	}
+
+	return []models.StateVersion{}, nil
 }
 
 func (s *service) buildRunVariables(ctx context.Context, workspaceID string, runVariables []Variable) ([]Variable, error) {
