@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/docker"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/ecs"
@@ -31,22 +32,6 @@ var (
 	jobDispatchTime  = metric.NewHistogram("job_dispatch_time", "Amount of time a job took to dispatch.", 1, 2, 8)
 )
 
-// ClaimJobInput is the input for claiming the next availble job
-type ClaimJobInput struct {
-	RunnerPath string
-}
-
-// ClaimJobResponse is the response when claiming a job
-type ClaimJobResponse struct {
-	JobID string
-	Token string
-}
-
-// Client interface for claiming a job
-type Client interface {
-	ClaimJob(ctx context.Context, input *ClaimJobInput) (*ClaimJobResponse, error)
-}
-
 // JobDispatcherSettings defines the job dispatcher that'll be used for this runner
 type JobDispatcherSettings struct {
 	PluginData           map[string]string
@@ -63,6 +48,7 @@ type Runner struct {
 }
 
 // NewRunner creates a new Runner
+// In Tharsis, this takes a runner path, not a runner ID.
 func NewRunner(
 	ctx context.Context,
 	runnerPath string,
@@ -80,6 +66,29 @@ func NewRunner(
 
 // Start will start the runner so it can begin picking up jobs
 func (r *Runner) Start(ctx context.Context) {
+
+	defer r.logger.Info("Runner session has ended")
+
+	r.logger.Info("Creating new runner session")
+
+	sessionID, err := r.client.CreateRunnerSession(ctx, &CreateRunnerSessionInput{
+		RunnerPath: r.runnerPath,
+	})
+	if err != nil {
+		r.logger.Errorf("Failed to create runner session %v", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	// Send keep alive
+	go func() {
+		if err := r.sendRunnerSessionHeartbeat(ctx, sessionID); err != nil {
+			r.logger.Errorf("failed to send heartbeat: %v", err)
+			cancel()
+		}
+	}()
+
 	for {
 		r.logger.Info("Waiting for next available run")
 
@@ -94,7 +103,7 @@ func (r *Runner) Start(ctx context.Context) {
 				return
 			}
 			claimJobFails.Inc()
-			r.logger.Errorf("Failed to request next available job %v", err)
+			r.handleError(ctx, sessionID, fmt.Errorf("failed to request next available job %v", err))
 
 			select {
 			case <-ctx.Done():
@@ -105,7 +114,7 @@ func (r *Runner) Start(ctx context.Context) {
 
 			if err := r.launchJob(ctx, resp.JobID, resp.Token); err != nil {
 				launchJobFails.Inc()
-				r.logger.Errorf("Failed to launch job %v", err)
+				r.handleError(ctx, sessionID, fmt.Errorf("failed to launch job %v", err))
 			}
 
 			select {
@@ -113,6 +122,13 @@ func (r *Runner) Start(ctx context.Context) {
 			case <-time.After(checkRunsInterval):
 			}
 		}
+	}
+}
+
+func (r *Runner) handleError(ctx context.Context, sessionID string, err error) {
+	r.logger.Error(err)
+	if sErr := r.client.CreateRunnerSessionError(ctx, sessionID, err); sErr != nil {
+		r.logger.Errorf("failed to send error %v", sErr)
 	}
 }
 
@@ -130,6 +146,20 @@ func (r *Runner) launchJob(ctx context.Context, jobID string, token string) erro
 	r.logger.Infof("Job %s running in executor %s", jobID, executorID)
 
 	return nil
+}
+
+func (r *Runner) sendRunnerSessionHeartbeat(ctx context.Context, sessionID string) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(models.RunnerSessionHeartbeatInterval):
+			// Send heartbeat
+			if err := r.client.SendRunnerSessionHeartbeat(ctx, sessionID); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, settings *JobDispatcherSettings) (jobdispatcher.JobDispatcher, error) {

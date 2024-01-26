@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func isCancellationError(err error) bool {
-	return err != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))
+	return err != nil && (te.IsContextCanceledError(err) || errors.Is(err, context.DeadlineExceeded))
 }
 
 func sanitizedArchivePath(destination, filePath string) (string, error) {

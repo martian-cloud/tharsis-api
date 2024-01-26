@@ -563,11 +563,23 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	}
 
 	// Create Job
-	if _, err = s.dbClient.Jobs.CreateJob(txContext, &job); err != nil {
+	createdJob, err := s.dbClient.Jobs.CreateJob(txContext, &job)
+	if err != nil {
 		tracing.RecordError(span, err, "failed to create job")
 		return nil, errors.Wrap(
 			err,
 			"Failed to create job",
+		)
+	}
+
+	_, err = s.dbClient.LogStreams.CreateLogStream(txContext, &models.LogStream{
+		JobID: &createdJob.Metadata.ID,
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to create log stream for plan job")
+		return nil, errors.Wrap(
+			err,
+			"Failed to create log stream for plan job",
 		)
 	}
 
@@ -724,11 +736,23 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 	}
 
 	// Create Job
-	if _, err := s.dbClient.Jobs.CreateJob(txContext, &job); err != nil {
+	createdJob, err := s.dbClient.Jobs.CreateJob(txContext, &job)
+	if err != nil {
 		tracing.RecordError(span, err, "failed to create job")
 		return nil, errors.Wrap(
 			err,
 			"Failed to create job",
+		)
+	}
+
+	_, err = s.dbClient.LogStreams.CreateLogStream(txContext, &models.LogStream{
+		JobID: &createdJob.Metadata.ID,
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to create log stream for apply job")
+		return nil, errors.Wrap(
+			err,
+			"Failed to create log stream for apply job",
 		)
 	}
 

@@ -324,7 +324,7 @@ func (r *GroupResolver) Runners(ctx context.Context, args *RunnersConnectionQuer
 
 	input := runner.GetRunnersInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
-		NamespacePath:     r.group.FullPath,
+		NamespacePath:     &r.group.FullPath,
 	}
 
 	if args.Sort != nil {

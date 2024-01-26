@@ -5,8 +5,10 @@ package job
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	logstream "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
+
+	mock "github.com/stretchr/testify/mock"
 
 	models "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 )
@@ -61,32 +63,6 @@ func (_m *MockService) GetJob(ctx context.Context, jobID string) (*models.Job, e
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, jobID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetJobLogDescriptor provides a mock function with given fields: ctx, job
-func (_m *MockService) GetJobLogDescriptor(ctx context.Context, job *models.Job) (*models.JobLogDescriptor, error) {
-	ret := _m.Called(ctx, job)
-
-	var r0 *models.JobLogDescriptor
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Job) (*models.JobLogDescriptor, error)); ok {
-		return rf(ctx, job)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Job) *models.JobLogDescriptor); ok {
-		r0 = rf(ctx, job)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.JobLogDescriptor)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *models.Job) error); ok {
-		r1 = rf(ctx, job)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -172,8 +148,34 @@ func (_m *MockService) GetLatestJobForRun(ctx context.Context, run *models.Run) 
 	return r0, r1
 }
 
-// GetLogs provides a mock function with given fields: ctx, jobID, startOffset, limit
-func (_m *MockService) GetLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
+// GetLogStreamsByJobIDs provides a mock function with given fields: ctx, idList
+func (_m *MockService) GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([]models.LogStream, error) {
+	ret := _m.Called(ctx, idList)
+
+	var r0 []models.LogStream
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]models.LogStream, error)); ok {
+		return rf(ctx, idList)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []models.LogStream); ok {
+		r0 = rf(ctx, idList)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.LogStream)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, idList)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReadLogs provides a mock function with given fields: ctx, jobID, startOffset, limit
+func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
 	ret := _m.Called(ctx, jobID, startOffset, limit)
 
 	var r0 []byte
@@ -196,20 +198,6 @@ func (_m *MockService) GetLogs(ctx context.Context, jobID string, startOffset in
 	}
 
 	return r0, r1
-}
-
-// SaveLogs provides a mock function with given fields: ctx, jobID, startOffset, buffer
-func (_m *MockService) SaveLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error {
-	ret := _m.Called(ctx, jobID, startOffset, buffer)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) error); ok {
-		r0 = rf(ctx, jobID, startOffset, buffer)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // SubscribeToCancellationEvent provides a mock function with given fields: ctx, options
@@ -238,25 +226,75 @@ func (_m *MockService) SubscribeToCancellationEvent(ctx context.Context, options
 	return r0, r1
 }
 
-// SubscribeToJobLogEvents provides a mock function with given fields: ctx, job, options
-func (_m *MockService) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, options *LogEventSubscriptionOptions) (<-chan *LogEvent, error) {
-	ret := _m.Called(ctx, job, options)
+// SubscribeToJobs provides a mock function with given fields: ctx, options
+func (_m *MockService) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsInput) (<-chan *Event, error) {
+	ret := _m.Called(ctx, options)
 
-	var r0 <-chan *LogEvent
+	var r0 <-chan *Event
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Job, *LogEventSubscriptionOptions) (<-chan *LogEvent, error)); ok {
-		return rf(ctx, job, options)
+	if rf, ok := ret.Get(0).(func(context.Context, *SubscribeToJobsInput) (<-chan *Event, error)); ok {
+		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Job, *LogEventSubscriptionOptions) <-chan *LogEvent); ok {
-		r0 = rf(ctx, job, options)
+	if rf, ok := ret.Get(0).(func(context.Context, *SubscribeToJobsInput) <-chan *Event); ok {
+		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan *LogEvent)
+			r0 = ret.Get(0).(<-chan *Event)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.Job, *LogEventSubscriptionOptions) error); ok {
-		r1 = rf(ctx, job, options)
+	if rf, ok := ret.Get(1).(func(context.Context, *SubscribeToJobsInput) error); ok {
+		r1 = rf(ctx, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeToLogStreamEvents provides a mock function with given fields: ctx, options
+func (_m *MockService) SubscribeToLogStreamEvents(ctx context.Context, options *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error) {
+	ret := _m.Called(ctx, options)
+
+	var r0 <-chan *logstream.LogEvent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error)); ok {
+		return rf(ctx, options)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *LogStreamEventSubscriptionOptions) <-chan *logstream.LogEvent); ok {
+		r0 = rf(ctx, options)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan *logstream.LogEvent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *LogStreamEventSubscriptionOptions) error); ok {
+		r1 = rf(ctx, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WriteLogs provides a mock function with given fields: ctx, jobID, startOffset, logs
+func (_m *MockService) WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error) {
+	ret := _m.Called(ctx, jobID, startOffset, logs)
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) (int, error)); ok {
+		return rf(ctx, jobID, startOffset, logs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, []byte) int); ok {
+		r0 = rf(ctx, jobID, startOffset, logs)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, []byte) error); ok {
+		r1 = rf(ctx, jobID, startOffset, logs)
 	} else {
 		r1 = ret.Error(1)
 	}

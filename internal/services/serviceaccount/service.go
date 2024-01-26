@@ -621,7 +621,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 func (s *service) findMatchingTrustPolicies(issuer string, policies []models.OIDCTrustPolicy) []models.OIDCTrustPolicy {
 	result := []models.OIDCTrustPolicy{}
 	normalizedIssuer := issuer
-	if !strings.HasPrefix(issuer, "https://") {
+	if !strings.HasPrefix(issuer, "http://") && !strings.HasPrefix(issuer, "https://") {
 		normalizedIssuer = fmt.Sprintf("https://%s", issuer)
 	}
 	normalizedIssuer = strings.TrimSuffix(normalizedIssuer, "/")

@@ -24,9 +24,9 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
@@ -67,21 +67,6 @@ var (
 	tfeBasePath    = "/tfe"
 	tfeVersionPath = "/v2"
 )
-
-type runnerClient struct {
-	jobService job.Service
-}
-
-func (r *runnerClient) ClaimJob(ctx context.Context, input *rnr.ClaimJobInput) (*rnr.ClaimJobResponse, error) {
-	resp, err := r.jobService.ClaimJob(ctx, input.RunnerPath)
-	if err != nil {
-		return nil, err
-	}
-	return &rnr.ClaimJobResponse{
-		JobID: gid.ToGlobalID(gid.JobType, resp.JobID),
-		Token: resp.Token,
-	}, nil
-}
 
 // APIServer represents an instance of a server
 type APIServer struct {
@@ -167,12 +152,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
 
-	logStore := job.NewLogStore(pluginCatalog.ObjectStore, dbClient)
 	artifactStore := workspace.NewArtifactStore(pluginCatalog.ObjectStore)
 	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
 	mirrorStore := providermirror.NewProviderMirrorStore(pluginCatalog.ObjectStore)
+
+	logStreamStore := logstream.NewLogStore(pluginCatalog.ObjectStore, dbClient)
+	logStreamManager := logstream.New(logStreamStore, dbClient, eventManager, logger)
 
 	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, cfg, pluginCatalog)
 	if err != nil {
@@ -191,7 +178,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
 		workspaceService           = workspace.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService)
-		jobService                 = job.NewService(logger, dbClient, tharsisIDP, eventManager, runStateManager, logStore)
+		jobService                 = job.NewService(logger, dbClient, tharsisIDP, logStreamManager, eventManager, runStateManager)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
 		saService                  = serviceaccount.NewService(logger, dbClient, limits, tharsisIDP, openIDConfigFetcher, activityService)
 		variableService            = variable.NewService(logger, dbClient, limits, activityService)
@@ -201,7 +188,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
 		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL), runStateManager)
-		runnerService              = runner.NewService(logger, dbClient, limits, activityService)
+		runnerService              = runner.NewService(logger, dbClient, limits, activityService, logStreamManager, eventManager)
 		roleService                = role.NewService(logger, dbClient, activityService)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
 		providerMirrorService      = providermirror.NewService(logger, dbClient, httpClient, limits, activityService, mirrorStore)
@@ -437,11 +424,14 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		providerMirrorService,
 	))
 
+	runnerClient := rnr.NewInternalClient(runnerService, jobService)
+
 	for _, r := range cfg.InternalRunners {
 		// Create DB entry for runner
 		_, err := dbClient.Runners.CreateRunner(ctx, &models.Runner{
-			Type: models.SharedRunnerType,
-			Name: r.Name,
+			Type:      models.SharedRunnerType,
+			Name:      r.Name,
+			CreatedBy: "system",
 		})
 		if err != nil {
 			if errors.ErrorCode(err) != errors.EConflict {
@@ -451,7 +441,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 		logger.Infof("starting internal runner %s", r.Name)
 
-		runner, err := rnr.NewRunner(ctx, r.Name, logger, &runnerClient{jobService: jobService}, &rnr.JobDispatcherSettings{
+		runner, err := rnr.NewRunner(ctx, r.Name, logger, runnerClient, &rnr.JobDispatcherSettings{
 			DispatcherType:       r.JobDispatcherType,
 			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
 			PluginData:           r.JobDispatcherData,

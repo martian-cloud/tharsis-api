@@ -1,0 +1,87 @@
+enum RunnerSessionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  LAST_CONTACTED_AT_ASC
+  LAST_CONTACTED_AT_DESC
+}
+
+type RunnerSessionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [RunnerSessionEdge]
+}
+
+type RunnerSessionEdge {
+  cursor: String!
+  node: RunnerSession
+}
+
+type RunnerSessionErrorLog {
+  lastUpdatedAt: Time
+  size: Int!
+  data(startOffset: Int!, limit: Int!): String!
+}
+
+type CreateRunnerSessionPayload {
+  clientMutationId: String
+  runnerSession: RunnerSession
+  problems: [Problem!]!
+}
+
+type RunnerSessionHeartbeatPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+}
+
+type CreateRunnerSessionErrorPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+}
+
+type RunnerSession implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  runner: Runner!
+  lastContacted: Time!
+  active: Boolean!
+  internal: Boolean!
+  errorCount: Int!
+  errorLog: RunnerSessionErrorLog
+}
+
+input CreateRunnerSessionInput {
+  clientMutationId: String
+  runnerPath: String!
+}
+
+input RunnerSessionHeartbeatInput {
+  clientMutationId: String
+  runnerSessionId: String!
+}
+
+input CreateRunnerSessionErrorInput {
+  clientMutationId: String
+  runnerSessionId: String!
+  errorMessage: String!
+}
+
+type RunnerSessionEvent {
+  action: String!
+  runnerSession: RunnerSession!
+}
+
+input RunnerSessionEventSubscriptionInput {
+  runnerId: String
+  groupId: String
+  runnerType: RunnerType
+}
+
+input RunnerSessionErrorLogSubscriptionInput {
+  runnerSessionId: String!
+  lastSeenLogSize: Int
+}
+
+type RunnerSessionErrorLogEvent {
+  completed: Boolean!
+  size: Int!
+}

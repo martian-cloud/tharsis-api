@@ -18,13 +18,14 @@ const (
 	ConfigurationVersionType            Type = "C"
 	GroupType                           Type = "G"
 	JobType                             Type = "J"
-	JobLogDescriptorType                Type = "JL"
+	LogStreamType                       Type = "LS"
 	ManagedIdentityType                 Type = "M"
 	ManagedIdentityAccessRuleType       Type = "MR"
 	NamespaceMembershipType             Type = "NM"
 	PlanType                            Type = "P"
 	RunType                             Type = "R"
 	RunnerType                          Type = "RNR"
+	RunnerSessionType                   Type = "RS"
 	ServiceAccountType                  Type = "SA"
 	StateVersionType                    Type = "SV"
 	StateVersionOutputType              Type = "SO"
@@ -58,13 +59,14 @@ func (t Type) IsValid() error {
 		ConfigurationVersionType,
 		GroupType,
 		JobType,
-		JobLogDescriptorType,
+		LogStreamType,
 		ManagedIdentityType,
 		ManagedIdentityAccessRuleType,
 		NamespaceMembershipType,
 		PlanType,
 		RunType,
 		RunnerType,
+		RunnerSessionType,
 		ServiceAccountType,
 		StateVersionType,
 		StateVersionOutputType,

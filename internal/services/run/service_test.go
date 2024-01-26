@@ -33,6 +33,7 @@ type mockDBClient struct {
 	MockJobs                  *db.MockJobs
 	MockTeams                 *db.MockTeams
 	MockTeamMembers           *db.MockTeamMembers
+	MockLogStreams            *db.MockLogStreams
 }
 
 func buildDBClientWithMocks(t *testing.T) *mockDBClient {
@@ -70,6 +71,9 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockTeamMembers := db.MockTeamMembers{}
 	mockTeamMembers.Test(t)
 
+	mockLogStreams := db.MockLogStreams{}
+	mockLogStreams.Test(t)
+
 	return &mockDBClient{
 		Client: &db.Client{
 			Transactions:          &mockTransactions,
@@ -83,6 +87,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			Jobs:                  &mockJobs,
 			Teams:                 &mockTeams,
 			TeamMembers:           &mockTeamMembers,
+			LogStreams:            &mockLogStreams,
 		},
 		MockTransactions:          &mockTransactions,
 		MockManagedIdentities:     &mockManagedIdentities,
@@ -95,6 +100,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockJobs:                  &mockJobs,
 		MockTeams:                 &mockTeams,
 		MockTeamMembers:           &mockTeamMembers,
+		MockLogStreams:            &mockLogStreams,
 	}
 }
 
@@ -118,15 +124,25 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 		Status:                 models.RunPending,
 	}
 
+	injectJob := models.Job{
+		Metadata: models.ResourceMetadata{
+			ID: "job1",
+		},
+		WorkspaceID: ws.Metadata.ID,
+		RunID:       run.Metadata.ID,
+	}
+
 	// Test cases
 	tests := []struct {
 		name                 string
+		injectJob            *models.Job
 		expectErrorCode      errors.CodeType
 		enforceRulesResponse error
 		managedIdentities    []models.ManagedIdentity
 	}{
 		{
-			name: "run is created because all managed identity rules are satisfied",
+			name:      "run is created because all managed identity rules are satisfied",
+			injectJob: &injectJob,
 			managedIdentities: []models.ManagedIdentity{
 				{
 					Metadata: models.ResourceMetadata{
@@ -137,6 +153,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 		},
 		{
 			name:              "run is created because there are no managed identities",
+			injectJob:         &injectJob,
 			managedIdentities: []models.ManagedIdentity{},
 		},
 		{
@@ -194,7 +211,9 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 					ID: "apply1",
 				},
 			}, nil)
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(nil, nil)
+			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
+
+			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
 
 			mockArtifactStore := workspace.MockArtifactStore{}
 			mockArtifactStore.Test(t)
@@ -247,12 +266,19 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 	configurationVersionID := "cv1"
 	var duration int32 = 720
 
+	injectJob := models.Job{
+		Metadata: models.ResourceMetadata{
+			ID: "job1",
+		},
+	}
+
 	// Test cases
 	type testCase struct {
 		name            string
 		workspace       *models.Workspace
 		runInput        *CreateRunInput
 		expectErrorCode errors.CodeType
+		injectJob       *models.Job
 	}
 
 	/*
@@ -261,6 +287,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 		workspace       *models.Workspace
 		runInput        *CreateRunInput
 		expectErrorCode errors.CodeType
+		injectJob       *models.Job
 	*/
 
 	tests := []testCase{
@@ -279,6 +306,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				ConfigurationVersionID: &configurationVersionID,
 				IsDestroy:              false,
 			},
+			injectJob: &injectJob,
 		},
 
 		{
@@ -295,6 +323,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				ConfigurationVersionID: &configurationVersionID,
 				IsDestroy:              true,
 			},
+			injectJob: &injectJob,
 		},
 
 		{
@@ -311,6 +340,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				ConfigurationVersionID: &configurationVersionID,
 				IsDestroy:              false,
 			},
+			injectJob: &injectJob,
 		},
 
 		{
@@ -383,7 +413,9 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 					ID: "apply1",
 				},
 			}, nil)
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(nil, nil)
+			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
+
+			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
 
 			mockArtifactStore := workspace.MockArtifactStore{}
 			mockArtifactStore.Test(t)
@@ -432,11 +464,20 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 		},
 	}
 
+	injectJob := models.Job{
+		Metadata: models.ResourceMetadata{
+			ID: "job1",
+		},
+		WorkspaceID: ws.Metadata.ID,
+		RunID:       run.Metadata.ID,
+	}
+
 	// Test cases
 	tests := []struct {
+		enforceRulesResponse error
+		injectJob            *models.Job
 		name                 string
 		expectErrorCode      errors.CodeType
-		enforceRulesResponse error
 		managedIdentities    []models.ManagedIdentity
 	}{
 		{
@@ -448,10 +489,12 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 					},
 				},
 			},
+			injectJob: &injectJob,
 		},
 		{
 			name:              "apply is created because there are no managed identities",
 			managedIdentities: []models.ManagedIdentity{},
+			injectJob:         &injectJob,
 		},
 		{
 			name: "apply is not created because a managed identity rule is not satisfied",
@@ -493,7 +536,8 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			dbClient.MockApplies.On("GetApply", mock.Anything, mock.Anything).Return(&apply, nil)
 			dbClient.MockApplies.On("UpdateApply", mock.Anything, mock.Anything).Return(&apply, nil)
-			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(nil, nil)
+			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
+			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, run.WorkspaceID).Return(ws, nil)
 
 			mockActivityEvents := activityevent.MockService{}

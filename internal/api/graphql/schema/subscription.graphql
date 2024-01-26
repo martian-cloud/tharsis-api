@@ -1,6 +1,11 @@
 type Subscription {
+  jobLogStreamEvents(input: JobLogStreamSubscriptionInput!): JobLogStreamEvent!
+  jobEvents(
+    input: JobSubscriptionInput!
+  ): JobEvent!
   workspaceRunEvents(input: RunSubscriptionInput!): RunEvent!
   workspaceEvents(input: WorkspaceSubscriptionInput!): WorkspaceEvent!
-  jobLogEvents(input: JobLogSubscriptionInput!): JobLogEvent!
   jobCancellationEvent(input: JobCancellationEventSubscriptionInput!): JobCancellationEvent!
+  runnerSessionEvents(input: RunnerSessionEventSubscriptionInput!): RunnerSessionEvent!
+  runnerSessionErrorLogEvents(input: RunnerSessionErrorLogSubscriptionInput!): RunnerSessionErrorLogEvent!
 }

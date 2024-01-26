@@ -26,11 +26,12 @@ type SubscriptionType string
 // SubscriptionType constants
 const (
 	JobSubscription             SubscriptionType = "jobs"
-	JobLogSubscription          SubscriptionType = "job_log_descriptors"
+	LogStreamSubscription       SubscriptionType = "log_streams"
 	RunSubscription             SubscriptionType = "runs"
 	WorkspaceSubscription       SubscriptionType = "workspaces"
 	RunnerSubscription          SubscriptionType = "runners"
 	MaintenanceModeSubscription SubscriptionType = "maintenance_mode"
+	RunnerSessionSubscription   SubscriptionType = "runner_sessions"
 )
 
 // SubscriptionAction type represents the available actions that can be subscribed type

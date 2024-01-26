@@ -1,4 +1,4 @@
-package job
+package logstream
 
 import (
 	"context"
@@ -16,39 +16,63 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
 
-func TestGetLogs(t *testing.T) {
+func TestReadLogsFromStore(t *testing.T) {
+	logStreamID := "logstream-1"
+
 	// Test cases
 	tests := []struct {
 		retErr       error
 		name         string
 		expectedLogs string
 		startOffset  int
+		logStream    *models.LogStream
 		expectErr    bool
 	}{
 		{
 			name:         "get all logs",
 			expectedLogs: "this is a test",
 			expectErr:    false,
+			logStream: &models.LogStream{
+				Metadata: models.ResourceMetadata{
+					ID: logStreamID,
+				},
+			},
 		},
 		{
 			name:         "get partial logs",
 			startOffset:  5,
 			expectedLogs: "is a test",
 			expectErr:    false,
+			logStream: &models.LogStream{
+				Metadata: models.ResourceMetadata{
+					ID: logStreamID,
+				},
+			},
 		},
 		{
 			name: "logs not found",
 			retErr: errors.New(
 				"Not Found",
-				errors.WithErrorCode(errors.ENotFound)),
+				errors.WithErrorCode(errors.ENotFound),
+			),
 			expectErr: false,
+			logStream: &models.LogStream{
+				Metadata: models.ResourceMetadata{
+					ID: logStreamID,
+				},
+			},
 		},
 		{
 			name: "unexpected error",
 			retErr: errors.New(
-				"",
-				errors.WithErrorCode(errors.EInternal)),
+				"internal error",
+			),
 			expectErr: true,
+			logStream: &models.LogStream{
+				Metadata: models.ResourceMetadata{
+					ID: logStreamID,
+				},
+			},
 		},
 	}
 
@@ -81,13 +105,25 @@ func TestGetLogs(t *testing.T) {
 			mockObjectStore := objectstore.MockObjectStore{}
 			mockObjectStore.On("DownloadObject", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(mockResult)
 
-			logStore := NewLogStore(&mockObjectStore, nil)
+			mockLogStreams := db.NewMockLogStreams(t)
+			mockJobs := db.NewMockJobs(t)
 
-			logs, err := logStore.GetLogs(ctx, "workspace-1", "run-1", "plan-1", test.startOffset, 100)
+			mockLogStreams.On("GetLogStreamByID", mock.Anything, test.logStream.Metadata.ID).Return(test.logStream, nil).Maybe()
+
+			mockDBClient := db.Client{
+				LogStreams: mockLogStreams,
+				Jobs:       mockJobs,
+			}
+
+			logStore := NewLogStore(&mockObjectStore, &mockDBClient)
+
+			logs, err := logStore.ReadLogs(ctx, test.logStream.Metadata.ID, test.startOffset, 100)
 			if err != nil {
-				assert.True(t, test.expectErr, "Error was not expected")
+				assert.True(t, test.expectErr, "Error was not expected: %v", err)
 				return
 			}
+
+			assert.False(t, test.expectErr, "An error was expected")
 
 			mockObjectStore.AssertExpectations(t)
 
@@ -96,9 +132,7 @@ func TestGetLogs(t *testing.T) {
 	}
 }
 
-func TestSaveLogs(t *testing.T) {
-	jobID := "job1"
-
+func TestWriteLogsToStore(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		retErr         error
@@ -137,7 +171,7 @@ func TestSaveLogs(t *testing.T) {
 			logsToUpload:   " is a test",
 			expectedUpload: "this is a test",
 			startOffset:    len("this"),
-			expectErr:      true,
+			expectErr:      false,
 		},
 	}
 
@@ -150,7 +184,8 @@ func TestSaveLogs(t *testing.T) {
 				if test.existingLogs == "" {
 					return errors.New(
 						"Not Found",
-						errors.WithErrorCode(errors.ENotFound))
+						errors.WithErrorCode(errors.ENotFound),
+					)
 				}
 
 				_, _ = w.WriteAt([]byte(test.existingLogs), 0)
@@ -169,42 +204,17 @@ func TestSaveLogs(t *testing.T) {
 
 			mockObjectStore.On("UploadObject", mock.Anything, mock.Anything, bodyMatcher).Return(test.retErr)
 
-			mockJobs := db.MockJobs{}
-			mockJobs.Test(t)
+			logStore := NewLogStore(&mockObjectStore, nil)
 
-			mockJobs.On("GetJobLogDescriptorByJobID", mock.Anything, jobID).Return(func(_ context.Context, jobID string) *models.JobLogDescriptor {
-				if len(test.existingLogs) > 0 {
-					return &models.JobLogDescriptor{JobID: jobID}
-				}
-				return nil
-			}, nil)
-
-			if len(test.existingLogs) > 0 {
-				mockJobs.On("UpdateJobLogDescriptor", mock.Anything, &models.JobLogDescriptor{
-					JobID: jobID,
-					Size:  test.startOffset + len(test.logsToUpload),
-				}).Return(nil, nil)
-			} else {
-				mockJobs.On("CreateJobLogDescriptor", mock.Anything, &models.JobLogDescriptor{
-					JobID: jobID,
-					Size:  test.startOffset + len(test.logsToUpload),
-				}).Return(nil, nil)
-			}
-
-			dbClient := db.Client{
-				Jobs: &mockJobs,
-			}
-
-			logStore := NewLogStore(&mockObjectStore, &dbClient)
-
-			err := logStore.SaveLogs(ctx, "workspace-1", "run-1", jobID, test.startOffset, []byte(test.logsToUpload))
+			err := logStore.WriteLogs(ctx, "stream-123", test.startOffset, []byte(test.logsToUpload))
 			if err != nil {
-				assert.True(t, test.expectErr, "Error was not expected")
+				assert.True(t, test.expectErr, "Error was not expected %v", err)
 				return
 			}
 
+			assert.False(t, test.expectErr, "An error was expected")
+
 			mockObjectStore.AssertExpectations(t)
-			mockJobs.AssertExpectations(t)
 		})
 	}
 }

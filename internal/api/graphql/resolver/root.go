@@ -467,9 +467,19 @@ func (r RootResolver) Jobs(ctx context.Context, args *JobConnectionQueryArgs) (*
 	return jobsQuery(ctx, args)
 }
 
-// JobLogEvents sets up a subscription for job log events
-func (r RootResolver) JobLogEvents(ctx context.Context, args *struct{ Input *JobLogSubscriptionInput }) (<-chan *JobLogEventResolver, error) {
-	return r.jobLogEventsSubscription(ctx, args.Input)
+// JobEvents subscribes to job events
+func (r RootResolver) JobEvents(ctx context.Context, args *struct {
+	Input *JobEventSubscriptionInput
+}) (<-chan *JobEventResolver, error) {
+	return r.jobEventsSubscription(ctx, args.Input)
+}
+
+// JobLogStreamEvents sets up a subscription for job log events
+func (r RootResolver) JobLogStreamEvents(ctx context.Context,
+	args *struct {
+		Input *JobLogStreamSubscriptionInput
+	}) (<-chan *JobLogStreamEventResolver, error) {
+	return r.jobLogStreamEventsSubscription(ctx, args.Input)
 }
 
 // JobCancellationEvent sets up a subscription for job cancellation event
@@ -1089,6 +1099,11 @@ func (r RootResolver) AuthSettings(ctx context.Context) *AuthSettingsResolver {
 
 /* Runner Queries and Mutations */
 
+// SharedRunners query returns a shared runners connection
+func (r RootResolver) SharedRunners(ctx context.Context, args *ConnectionQueryArgs) (*RunnerConnectionResolver, error) {
+	return sharedRunnersQuery(ctx, args)
+}
+
 // CreateRunner creates a new runner
 func (r RootResolver) CreateRunner(ctx context.Context, args *struct{ Input *CreateRunnerInput }) (*RunnerMutationPayloadResolver, error) {
 	response, err := createRunnerMutation(ctx, args.Input)
@@ -1134,6 +1149,55 @@ func (r RootResolver) UnassignServiceAccountFromRunner(ctx context.Context, args
 	response, err := unassignServiceAccountFromRunnerMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+/* Runner Session Subscriptions */
+
+// RunnerSessionEvents subscribes to runner session events
+func (r RootResolver) RunnerSessionEvents(ctx context.Context, args *struct {
+	Input *RunnerSessionEventSubscriptionInput
+}) (<-chan *RunnerSessionEventResolver, error) {
+	return r.runnerSessionEventsSubscription(ctx, args.Input)
+}
+
+// RunnerSessionErrorLogEvents subscribes to runner session error log events
+func (r RootResolver) RunnerSessionErrorLogEvents(ctx context.Context, args *struct {
+	Input *RunnerSessionErrorLogSubscriptionInput
+}) (<-chan *RunnerSessionErrorLogEventResolver, error) {
+	return r.runnerSessionErrorLogSubscription(ctx, args.Input)
+}
+
+// CreateRunnerSession creates a new runner session.
+func (r RootResolver) CreateRunnerSession(ctx context.Context, args *struct {
+	Input *CreateRunnerSessionInput
+}) (*CreateRunnerSessionMutationPayloadResolver, error) {
+	response, err := createRunnerSessionMutation(ctx, args.Input)
+	if err != nil {
+		return handleCreateRunnerSessionMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// RunnerSessionHeartbeat sends a runner session heartbeat to the runner session.
+func (r RootResolver) RunnerSessionHeartbeat(ctx context.Context, args *struct {
+	Input *RunnerSessionHeartbeatInput
+}) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
+	response, err := runnerSessionHeartbeatMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerSessionHeartbeatErrorMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// CreateRunnerSessionError sends a runner session error to the runner session.
+func (r RootResolver) CreateRunnerSessionError(ctx context.Context, args *struct {
+	Input *CreateRunnerSessionErrorInput
+}) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
+	response, err := createRunnerSessionErrorMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunnerSessionHeartbeatErrorMutationProblem(err, args.Input.ClientMutationID)
 	}
 	return response, nil
 }

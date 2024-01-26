@@ -110,6 +110,13 @@ type Query {
     sort: TeamSort
   ): TeamConnection!
   terraformCLIVersions: TerraformCLIVersions
+  sharedRunners(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: ServiceAccountSort
+  ): RunnerConnection!
   # There is no query for an activity event by ID.
   activityEvents(
     after: String

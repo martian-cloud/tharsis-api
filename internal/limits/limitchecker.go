@@ -34,6 +34,7 @@ const (
 	ResourceLimitPlatformsPerTerraformProviderVersion         ResourceLimitName = "ResourceLimitPlatformsPerTerraformProviderVersion"
 	ResourceLimitVCSProvidersPerGroup                         ResourceLimitName = "ResourceLimitVCSProvidersPerGroup"
 	ResourceLimitTerraformProviderVersionMirrorsPerGroup      ResourceLimitName = "ResourceLimitTerraformProviderVersionMirrorsPerGroup"
+	ResourceLimitRunnerSessionsPerRunner                      ResourceLimitName = "ResourceLimitRunnerSessionsPerRunner"
 )
 
 // LimitChecker implements functionality related to resource limits.

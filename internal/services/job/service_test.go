@@ -3,13 +3,16 @@ package job
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -185,6 +188,8 @@ func TestGetNextAvailableJob(t *testing.T) {
 			mockWorkspace := db.NewMockWorkspaces(t)
 			mockRunners := db.NewMockRunners(t)
 
+			mockRunners.On("GetRunnerByID", mock.Anything, mock.Anything).Return(test.runner, nil)
+
 			mockJobs.On("GetJobs", ctx, mock.Anything).Return(&db.JobsResult{
 				Jobs: test.queuedJobs,
 			}, nil)
@@ -213,7 +218,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 				},
 			}
 
-			job, err := jobService.getNextAvailableJob(ctx, test.runner)
+			job, err := jobService.getNextAvailableJob(ctx, test.runner.Metadata.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -228,23 +233,280 @@ func TestGetNextAvailableJob(t *testing.T) {
 	}
 }
 
+func TestSubscribeToJobs(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		authError      error
+		input          *SubscribeToJobsInput
+		name           string
+		expectErrCode  errors.CodeType
+		runner         *models.Runner
+		sendEvents     []Event
+		expectedEvents []Event
+		isAdmin        bool
+	}{
+		{
+			name: "subscribe to job events for a workspace",
+			input: &SubscribeToJobsInput{
+				WorkspaceID: ptr.String("workspace1"),
+			},
+			sendEvents: []Event{
+				{
+					Job: &models.Job{
+						Metadata:    models.ResourceMetadata{ID: "job1"},
+						WorkspaceID: "workspace1",
+					},
+				},
+				{
+					Job: &models.Job{
+						Metadata:    models.ResourceMetadata{ID: "job2"},
+						WorkspaceID: "workspace2",
+					},
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Job: &models.Job{
+						Metadata:    models.ResourceMetadata{ID: "job1"},
+						WorkspaceID: "workspace1",
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
+		{
+			name: "not authorized to subscribe to job events for a workspace",
+			input: &SubscribeToJobsInput{
+				WorkspaceID: ptr.String("workspace1"),
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "subscribe to job events for an group runner",
+			input: &SubscribeToJobsInput{
+				RunnerID: ptr.String("runner1"),
+			},
+			sendEvents: []Event{
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job1"},
+						RunnerID: ptr.String("runner1"),
+					},
+				},
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job2"},
+						RunnerID: ptr.String("runner2"),
+					},
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job1"},
+						RunnerID: ptr.String("runner1"),
+					},
+					Action: "UPDATE",
+				},
+			},
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: "runner1"},
+				Type:     models.GroupRunnerType,
+				GroupID:  ptr.String("group1"),
+			},
+		},
+		{
+			name: "not authorized to subscribe to job events for an group runner",
+			input: &SubscribeToJobsInput{
+				RunnerID: ptr.String("runner1"),
+			},
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: "runner1"},
+				Type:     models.GroupRunnerType,
+				GroupID:  ptr.String("group1"),
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "subscribe to job events for a shared runner",
+			input: &SubscribeToJobsInput{
+				RunnerID: ptr.String("runner1"),
+			},
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: "runner1"},
+				Type:     models.SharedRunnerType,
+			},
+			isAdmin: true,
+		},
+		{
+			name: "not authorized to subscribe to job events for a shared runner",
+			input: &SubscribeToJobsInput{
+				RunnerID: ptr.String("runner1"),
+			},
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: "runner1"},
+				Type:     models.SharedRunnerType,
+			},
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:    "subscribe to all job events",
+			input:   &SubscribeToJobsInput{},
+			isAdmin: true,
+			sendEvents: []Event{
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job1"},
+						RunnerID: ptr.String("runner1"),
+					},
+				},
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job2"},
+						RunnerID: ptr.String("runner2"),
+					},
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job1"},
+						RunnerID: ptr.String("runner1"),
+					},
+					Action: "UPDATE",
+				},
+				{
+					Job: &models.Job{
+						Metadata: models.ResourceMetadata{ID: "job2"},
+						RunnerID: ptr.String("runner2"),
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
+		{
+			name:          "not authorized to subscribe to all job events",
+			input:         &SubscribeToJobsInput{},
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRunners := db.NewMockRunners(t)
+			mockJobs := db.NewMockJobs(t)
+			mockEvents := db.NewMockEvents(t)
+
+			mockEventChannel := make(chan db.Event, 1)
+			var roEventChan <-chan db.Event = mockEventChannel
+			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+
+			if test.input.RunnerID != nil {
+				mockRunners.On("GetRunnerByID", mock.Anything, *test.input.RunnerID).Return(test.runner, nil)
+			}
+
+			if test.input.WorkspaceID != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).
+					Return(test.authError)
+			} else if test.input.RunnerID != nil {
+				mockCaller.On("RequireAccessToInheritableResource",
+					mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(test.authError).Maybe()
+				mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
+			} else {
+				mockCaller.On("IsAdmin").Return(test.isAdmin)
+			}
+
+			for _, e := range test.sendEvents {
+				mockJobs.On("GetJobByID", mock.Anything, e.Job.Metadata.ID).Return(e.Job, nil).Maybe()
+			}
+
+			dbClient := db.Client{
+				Runners: mockRunners,
+				Jobs:    mockJobs,
+				Events:  mockEvents,
+			}
+
+			logger, _ := logger.NewForTest()
+			eventManager := events.NewEventManager(&dbClient, logger)
+			eventManager.Start(ctx)
+
+			service := &service{
+				dbClient:     &dbClient,
+				eventManager: eventManager,
+				logger:       logger,
+			}
+
+			events, err := service.SubscribeToJobs(auth.WithCaller(ctx, mockCaller), test.input)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			receivedEvents := []*Event{}
+
+			go func() {
+				for _, e := range test.sendEvents {
+					mockEventChannel <- db.Event{
+						Table:  "jobs",
+						Action: "UPDATE",
+						ID:     e.Job.Metadata.ID,
+					}
+				}
+			}()
+
+			if len(test.expectedEvents) > 0 {
+				for e := range events {
+					eCopy := e
+					receivedEvents = append(receivedEvents, eCopy)
+
+					if len(receivedEvents) == len(test.expectedEvents) {
+						break
+					}
+				}
+			}
+
+			require.Equal(t, len(test.expectedEvents), len(receivedEvents))
+			for i, e := range test.expectedEvents {
+				assert.Equal(t, e, *receivedEvents[i])
+			}
+		})
+	}
+}
+
 func TestGetJobs(t *testing.T) {
 	workspaceID := "ws1"
+	runnerID := "r1"
+	groupID := "g1"
 
 	sampleJob := models.Job{
 		Metadata: models.ResourceMetadata{
 			ID: "job1",
 		},
 		WorkspaceID: workspaceID,
+		RunnerID:    &runnerID,
 	}
 
 	type testCase struct {
-		authError       error
-		workspaceID     *string
-		name            string
-		expectErrorCode errors.CodeType
-		expectJob       bool
-		isAdmin         bool
+		authError             error
+		workspaceID           *string
+		runnerID              *string
+		name                  string
+		injectRunner          *models.Runner
+		injectRunnerPermError error
+		expectErrorCode       errors.CodeType
+		expectJob             bool
+		isAdmin               bool
 	}
 
 	tests := []testCase{
@@ -254,7 +516,7 @@ func TestGetJobs(t *testing.T) {
 			expectJob:   true,
 		},
 		{
-			name:      "admin should be able to get jobs for any workspace",
+			name:      "admin should be able to get jobs for any workspace/runner",
 			expectJob: true,
 			isAdmin:   true,
 		},
@@ -265,9 +527,33 @@ func TestGetJobs(t *testing.T) {
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:            "only admin can get jobs for any workspace",
+			name:            "only admin can get jobs for any workspace/runner",
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:     "non admin should be able to get jobs for a runner",
+			runnerID: &runnerID,
+			injectRunner: &models.Runner{
+				Type:    models.GroupRunnerType,
+				GroupID: &groupID,
+			},
+			expectJob: true,
+		},
+		{
+			name:            "non admin should be able to get jobs for a runner except that the runner does not exist",
+			runnerID:        &runnerID,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:     "non admin does not have access to runner",
+			runnerID: &runnerID,
+			injectRunner: &models.Runner{
+				Type:    models.GroupRunnerType,
+				GroupID: &groupID,
+			},
+			injectRunnerPermError: errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:       errors.EForbidden,
 		},
 	}
 
@@ -278,17 +564,26 @@ func TestGetJobs(t *testing.T) {
 
 			mockJobs := db.NewMockJobs(t)
 			mockCaller := auth.NewMockCaller(t)
+			mockRunners := db.NewMockRunners(t)
 
 			if test.workspaceID != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
-			} else {
-				mockCaller.On("IsAdmin").Return(test.isAdmin)
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).
+					Return(test.authError)
 			}
+			if test.runnerID != nil {
+				mockRunners.On("GetRunnerByID", mock.Anything, mock.Anything).
+					Return(test.injectRunner, nil)
+				mockCaller.On("RequireAccessToInheritableResource",
+					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+					Return(test.injectRunnerPermError).Maybe()
+			}
+			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
 			if test.authError == nil {
 				dbInput := &db.GetJobsInput{
 					Filter: &db.JobFilter{
 						WorkspaceID: test.workspaceID,
+						RunnerID:    test.runnerID,
 					},
 				}
 
@@ -298,18 +593,23 @@ func TestGetJobs(t *testing.T) {
 					dbResult.Jobs = append(dbResult.Jobs, sampleJob)
 				}
 
-				mockJobs.On("GetJobs", mock.Anything, dbInput).Return(dbResult, nil)
+				mockJobs.On("GetJobs", mock.Anything, dbInput).Return(dbResult, nil).Maybe()
 			}
 
 			dbClient := &db.Client{
-				Jobs: mockJobs,
+				Jobs:    mockJobs,
+				Runners: mockRunners,
 			}
 
 			jobService := service{
 				dbClient: dbClient,
 			}
 
-			jobsResult, err := jobService.GetJobs(auth.WithCaller(ctx, mockCaller), &GetJobsInput{WorkspaceID: test.workspaceID})
+			jobsResult, err := jobService.GetJobs(auth.WithCaller(ctx, mockCaller),
+				&GetJobsInput{
+					WorkspaceID: test.workspaceID,
+					RunnerID:    test.runnerID,
+				})
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

@@ -79,22 +79,36 @@ func (s *ServiceAccountCaller) RequirePermission(ctx context.Context, perm permi
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
-func (s *ServiceAccountCaller) RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error {
-	return s.authorizer.RequireAccessToInheritableResource(ctx, []permissions.ResourceType{resourceType}, checks...)
+func (s *ServiceAccountCaller) RequireAccessToInheritableResource(ctx context.Context,
+	resourceType permissions.ResourceType, checks ...func(*constraints)) error {
+
+	// If the check is for a runner resource,
+	// and if the service account is assigned to the runner,
+	// that needs to count as the service account having viewer permission for the runner.
+	if resourceType == permissions.RunnerResourceType {
+		if c := getConstraints(checks...); c.runnerID != nil {
+			return s.requireRunnerAccess(ctx, &permissions.ViewRunnerPermission, c)
+		}
+	}
+
+	return s.authorizer.RequireAccessToInheritableResource(ctx,
+		[]permissions.ResourceType{resourceType}, checks...)
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (s *ServiceAccountCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.ClaimJobPermission: s.handleClaimJobPermission,
+		permissions.ClaimJobPermission:            s.requireRunnerAccess,
+		permissions.CreateRunnerSessionPermission: s.requireRunnerAccess,
+		permissions.UpdateRunnerSessionPermission: s.requireRunnerAccess,
 	}
 
 	handler, ok := handlerMap[perm]
 	return handler, ok
 }
 
-// handleClaimJobPermission will return an error if the caller is not allowed to claim a job as the specified runner
-func (s *ServiceAccountCaller) handleClaimJobPermission(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+// requireRunnerAccess verifies that the service account is assigned to the specified runner
+func (s *ServiceAccountCaller) requireRunnerAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
 	if checks.runnerID == nil {
 		return errMissingConstraints
 	}

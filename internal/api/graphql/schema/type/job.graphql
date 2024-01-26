@@ -1,5 +1,6 @@
 enum JobSort {
   CREATED_AT_ASC
+  CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
 }
@@ -63,8 +64,13 @@ type Job implements Node {
   runnerPath: String
 }
 
-type JobLogEvent {
-  action: String!
+input JobLogStreamSubscriptionInput {
+  jobId: String!
+  lastSeenLogSize: Int
+}
+
+type JobLogStreamEvent {
+  completed: Boolean!
   size: Int!
 }
 
@@ -72,13 +78,18 @@ type JobCancellationEvent {
   job: Job!
 }
 
-input JobLogSubscriptionInput {
-  jobId: String!
-  lastSeenLogSize: Int
-}
-
 input JobCancellationEventSubscriptionInput {
   jobId: String!
+}
+
+type JobEvent {
+  action: String!
+  job: Job!
+}
+
+input JobSubscriptionInput {
+  runnerId: String
+  workspaceId: String
 }
 
 input ClaimJobInput {

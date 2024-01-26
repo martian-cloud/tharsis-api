@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -42,9 +41,9 @@ func TestGetJobByID(t *testing.T) {
 	// Because we cannot create a job with a specific ID without going into the really
 	// low-level stuff, create the warmup job(s) then find the relevant ID.
 	createdLow := currentTime()
-	_, _, createdWarmupJobs, err := createWarmupJobs(ctx, testClient,
+	_, _, _, createdWarmupJobs, err := createWarmupJobs(ctx, testClient,
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
+		standardWarmupRunsForJobs, standardWarmupRunnersForJobs,
 		standardWarmupJobs)
 	require.Nil(t, err)
 	createdHigh := currentTime()
@@ -102,9 +101,9 @@ func TestGetJobs(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupWorkspaces, warmupRuns, warmupJobs, err := createWarmupJobs(ctx, testClient,
+	warmupWorkspaces, warmupRuns, _, warmupJobs, err := createWarmupJobs(ctx, testClient,
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
+		standardWarmupRunsForJobs, standardWarmupRunnersForJobs,
 		standardWarmupJobs)
 	require.Nil(t, err)
 	allJobInfos := jobInfoFromJobs(warmupJobs)
@@ -707,9 +706,9 @@ func TestCreateJob(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupWorkspaces, warmupRuns, _, err := createWarmupJobs(ctx, testClient,
+	warmupWorkspaces, warmupRuns, warmupRunners, _, err := createWarmupJobs(ctx, testClient,
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
+		standardWarmupRunsForJobs, standardWarmupRunnersForJobs,
 		standardWarmupJobs)
 	require.Nil(t, err)
 	warmupWorkspaceID := warmupWorkspaces[0].Metadata.ID
@@ -733,7 +732,7 @@ func TestCreateJob(t *testing.T) {
 			toCreate: &models.Job{
 				WorkspaceID: warmupWorkspaceID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    &standardWarmupRunnerIDForJobs,
+				RunnerID:    &warmupRunners[0].Metadata.ID,
 			},
 			expectCreated: &models.Job{
 				Metadata: models.ResourceMetadata{
@@ -742,7 +741,7 @@ func TestCreateJob(t *testing.T) {
 				},
 				WorkspaceID: warmupWorkspaceID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    &standardWarmupRunnerIDForJobs,
+				RunnerID:    &warmupRunners[0].Metadata.ID,
 			},
 		},
 
@@ -753,7 +752,7 @@ func TestCreateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    warmupRuns[0].Metadata.ID,
-				RunnerID:                 &standardWarmupRunnerIDForJobs,
+				RunnerID:                 &warmupRunners[0].Metadata.ID,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -773,7 +772,7 @@ func TestCreateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    warmupRuns[0].Metadata.ID,
-				RunnerID:                 &standardWarmupRunnerIDForJobs,
+				RunnerID:                 &warmupRunners[0].Metadata.ID,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -794,7 +793,7 @@ func TestCreateJob(t *testing.T) {
 			toCreate: &models.Job{
 				WorkspaceID: nonExistentID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    &standardWarmupRunnerIDForJobs,
+				RunnerID:    &warmupRunners[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"jobs\" violates foreign key constraint \"fk_workspace_id\" (SQLSTATE 23503)"),
 		},
@@ -804,7 +803,7 @@ func TestCreateJob(t *testing.T) {
 			toCreate: &models.Job{
 				WorkspaceID: invalidID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    &standardWarmupRunnerIDForJobs,
+				RunnerID:    &warmupRunners[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -847,9 +846,9 @@ func TestUpdateJob(t *testing.T) {
 	// Because we cannot create a job with a specific ID without going into the really
 	// low-level stuff, create the warmup job(s) and then find the relevant ID.
 	createdLow := currentTime()
-	warmupWorkspaces, warmupRuns, warmupJobs, err := createWarmupJobs(ctx, testClient,
+	warmupWorkspaces, warmupRuns, warmupRunners, warmupJobs, err := createWarmupJobs(ctx, testClient,
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
+		standardWarmupRunsForJobs, standardWarmupRunnersForJobs,
 		standardWarmupJobs)
 	require.Nil(t, err)
 	createdHigh := currentTime()
@@ -871,7 +870,8 @@ func TestUpdateJob(t *testing.T) {
 	nowMinusE := now.Add(-23 * time.Minute)
 	positiveJob := warmupJobs[0]
 	newRunID := warmupRuns[1].Metadata.ID
-	newRunnerID := uuid.New().String()
+	mainRunnerID := warmupRunners[0].Metadata.ID
+	otherRunnerID := warmupRunners[1].Metadata.ID
 	testCases := []testCase{
 		{
 			name: "positive",
@@ -884,7 +884,7 @@ func TestUpdateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    newRunID,
-				RunnerID:                 &newRunnerID,
+				RunnerID:                 &otherRunnerID,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -906,7 +906,7 @@ func TestUpdateJob(t *testing.T) {
 				Type:                     models.JobApplyType,
 				WorkspaceID:              warmupWorkspaceID,
 				RunID:                    newRunID,
-				RunnerID:                 &newRunnerID,
+				RunnerID:                 &otherRunnerID,
 				CancelRequested:          true,
 				CancelRequestedTimestamp: ptr.Time(nowMinusA),
 				Timestamps: models.JobTimestamps{
@@ -927,7 +927,7 @@ func TestUpdateJob(t *testing.T) {
 				},
 				WorkspaceID: warmupWorkspaceID,
 				RunID:       warmupRuns[0].Metadata.ID,
-				RunnerID:    &standardWarmupRunnerIDForJobs,
+				RunnerID:    &mainRunnerID,
 			},
 			expectMsg: resourceVersionMismatch,
 		},
@@ -939,7 +939,7 @@ func TestUpdateJob(t *testing.T) {
 					Version: positiveJob.Metadata.Version,
 				},
 				RunID:    warmupRuns[0].Metadata.ID,
-				RunnerID: &standardWarmupRunnerIDForJobs,
+				RunnerID: &mainRunnerID,
 			},
 			expectMsg: invalidUUIDMsg4,
 		},
@@ -975,9 +975,9 @@ func TestGetLatestJobByType(t *testing.T) {
 	// Because we cannot create a job with a specific ID without going into the really
 	// low-level stuff, create the warmup job(s) then find the relevant ID.
 	createdLow := currentTime()
-	_, warmupRuns, createdWarmupJobs, err := createWarmupJobs(ctx, testClient,
+	_, warmupRuns, _, createdWarmupJobs, err := createWarmupJobs(ctx, testClient,
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
+		standardWarmupRunsForJobs, standardWarmupRunnersForJobs,
 		standardWarmupJobs)
 	require.Nil(t, err)
 	createdHigh := currentTime()
@@ -1050,330 +1050,6 @@ func TestGetLatestJobByType(t *testing.T) {
 	}
 }
 
-func TestGetJobLogDescriptor(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a job with a specific ID without going into the really
-	// low-level stuff, create the warmup job(s) then find the relevant ID.
-	createdLow := currentTime()
-	_, _, createdWarmupJobs, err := createWarmupJobs(ctx, testClient,
-		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
-		standardWarmupJobs)
-	require.Nil(t, err)
-	// Create job log descriptors
-	createdWarmupJobLogDescriptors, err := createWarmupJobLogDescriptors(ctx, testClient,
-		createdWarmupJobs, standardWarmupJobLogDescriptorsForJobs)
-	if err != nil {
-		// No point if warmup job log descriptors weren't all created.
-		return
-	}
-	createdHigh := currentTime()
-
-	type testCase struct {
-		expectDescriptor *models.JobLogDescriptor
-		expectMsg        *string
-		name             string
-		searchID         string
-	}
-
-	testCases := []testCase{
-		{
-			name:             "positive",
-			searchID:         createdWarmupJobLogDescriptors[0].Metadata.ID,
-			expectDescriptor: &createdWarmupJobLogDescriptors[0],
-		},
-		{
-			name:     "negative, non-existent descriptor ID",
-			searchID: nonExistentID,
-			// expect descriptor and error to be nil
-		},
-		{
-			name:      "defective descriptor id",
-			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			job, err := testClient.client.Jobs.GetJobLogDescriptor(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectDescriptor != nil {
-				require.NotNil(t, job)
-				compareJobLogDescriptors(t, test.expectDescriptor, job, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, job)
-			}
-		})
-	}
-}
-
-func TestGetJobLogDescriptorByJobID(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a job with a specific ID without going into the really
-	// low-level stuff, create the warmup job(s) then find the relevant ID.
-	createdLow := currentTime()
-	_, _, createdWarmupJobs, err := createWarmupJobs(ctx, testClient,
-		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
-		standardWarmupJobs)
-	require.Nil(t, err)
-	// Create job log descriptors
-	createdWarmupJobLogDescriptors, err := createWarmupJobLogDescriptors(ctx, testClient,
-		createdWarmupJobs, standardWarmupJobLogDescriptorsForJobs)
-	if err != nil {
-		// No point if warmup job log descriptors weren't all created.
-		return
-	}
-	createdHigh := currentTime()
-
-	type testCase struct {
-		expectDescriptor *models.JobLogDescriptor
-		expectMsg        *string
-		name             string
-		searchID         string
-	}
-
-	testCases := []testCase{
-		{
-			name:             "positive",
-			searchID:         createdWarmupJobs[0].Metadata.ID,
-			expectDescriptor: &createdWarmupJobLogDescriptors[0],
-		},
-		{
-			name:     "negative, non-existent descriptor ID",
-			searchID: nonExistentID,
-			// expect descriptor and error to be nil
-		},
-		{
-			name:      "defective descriptor id",
-			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			job, err := testClient.client.Jobs.GetJobLogDescriptorByJobID(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectDescriptor != nil {
-				require.NotNil(t, job)
-				compareJobLogDescriptors(t, test.expectDescriptor, job, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, job)
-			}
-		})
-	}
-}
-
-func TestCreateJobLogDescriptor(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	_, _, warmupJobs, err := createWarmupJobs(ctx, testClient,
-		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
-		standardWarmupJobs)
-	require.Nil(t, err)
-	warmupJobID := warmupJobs[0].Metadata.ID
-
-	type testCase struct {
-		toCreate      *models.JobLogDescriptor
-		expectCreated *models.JobLogDescriptor
-		expectMsg     *string
-		name          string
-	}
-
-	now := currentTime()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toCreate: &models.JobLogDescriptor{
-				JobID: warmupJobID,
-				Size:  12345,
-			},
-			expectCreated: &models.JobLogDescriptor{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				JobID: warmupJobID,
-				Size:  12345,
-			},
-		},
-
-		// It does not make sense to try to create a duplicate job log descriptor,
-		// because there is no unique name field to trigger an error.
-
-		{
-			name: "non-existent job ID",
-			toCreate: &models.JobLogDescriptor{
-				JobID: nonExistentID,
-				Size:  4567,
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"job_log_descriptors\" violates foreign key constraint \"fk_job_id\" (SQLSTATE 23503)"),
-		},
-
-		{
-			name: "defective job ID",
-			toCreate: &models.JobLogDescriptor{
-				JobID: invalidID,
-				Size:  789,
-			},
-			expectMsg: invalidUUIDMsg1,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.Jobs.CreateJobLogDescriptor(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareJobLogDescriptors(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
-			}
-		})
-	}
-}
-
-func TestUpdateJobLogDescriptor(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a job with a specific ID without going into the really
-	// low-level stuff, create the warmup job(s) and then find the relevant ID.
-	createdLow := currentTime()
-	_, _, warmupJobs, err := createWarmupJobs(ctx, testClient,
-		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
-		standardWarmupJobs)
-	require.Nil(t, err)
-	// Create job log descriptors
-	createdWarmupJobLogDescriptors, err := createWarmupJobLogDescriptors(ctx, testClient,
-		warmupJobs, standardWarmupJobLogDescriptorsForJobs)
-	if err != nil {
-		// No point if warmup job log descriptors weren't all created.
-		return
-	}
-	createdHigh := currentTime()
-	toUpdate := createdWarmupJobLogDescriptors[0]
-
-	type testCase struct {
-		toUpdate  *models.JobLogDescriptor
-		expectJob *models.JobLogDescriptor
-		expectMsg *string
-		name      string
-	}
-
-	// Do only one positive test case, because the logic is theoretically the same for all job log descriptors.
-	now := currentTime()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toUpdate: &models.JobLogDescriptor{
-				Metadata: models.ResourceMetadata{
-					ID:      toUpdate.Metadata.ID,
-					Version: toUpdate.Metadata.Version,
-				},
-				Size: 7654,
-				// Size is the only field that can be updated.
-			},
-			expectJob: &models.JobLogDescriptor{
-				Metadata: models.ResourceMetadata{
-					ID:                   toUpdate.Metadata.ID,
-					Version:              toUpdate.Metadata.Version + 1,
-					CreationTimestamp:    toUpdate.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				JobID: toUpdate.JobID,
-				Size:  7654,
-			},
-		},
-		{
-			name: "negative, non-existent ID",
-			toUpdate: &models.JobLogDescriptor{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: toUpdate.Metadata.Version,
-				},
-				Size: 876,
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-		{
-			name: "defective-id",
-			toUpdate: &models.JobLogDescriptor{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: toUpdate.Metadata.Version,
-				},
-				Size: 876,
-			},
-			expectMsg: invalidUUIDMsg1,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			descriptor, err := testClient.client.Jobs.UpdateJobLogDescriptor(ctx, test.toUpdate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectJob != nil {
-				require.NotNil(t, descriptor)
-				now := currentTime()
-				compareJobLogDescriptors(t, test.expectJob, descriptor, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  test.expectJob.Metadata.LastUpdatedTimestamp,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, descriptor)
-			}
-		})
-	}
-}
-
 func TestGetJobCountForRunner(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
@@ -1381,9 +1057,9 @@ func TestGetJobCountForRunner(t *testing.T) {
 
 	// Because we cannot create a job with a specific ID without going into the really
 	// low-level stuff, create the warmup job(s) and then find the relevant ID.
-	_, _, _, err := createWarmupJobs(ctx, testClient,
+	_, _, warmupRunners, _, err := createWarmupJobs(ctx, testClient,
 		standardWarmupGroupsForJobs, standardWarmupWorkspacesForJobs,
-		standardWarmupRunsForJobs, standardWarmupRunnerIDForJobs,
+		standardWarmupRunsForJobs, standardWarmupRunnersForJobs,
 		standardWarmupJobs)
 	require.Nil(t, err)
 
@@ -1394,11 +1070,11 @@ func TestGetJobCountForRunner(t *testing.T) {
 		expectCount int
 	}
 
-	// Do only one positive test case, because the logic is theoretically the same for all job log descriptors.
+	// Do only one positive test case, because the logic is theoretically the same for all log streams.
 	testCases := []testCase{
 		{
 			name:        "positive",
-			runnerID:    standardWarmupRunnerIDForJobs,
+			runnerID:    warmupRunners[0].Metadata.ID,
 			expectCount: 2, // jobs are counted only if in pending or running state
 		},
 		{
@@ -1459,8 +1135,17 @@ var standardWarmupRunsForJobs = []models.Run{
 }
 
 // Standard warmup runner(s) for tests in this module:
-// In the job object, the RunnerID field is allowed to be nil, but make up an ID here.
-var standardWarmupRunnerIDForJobs = uuid.New().String()
+// In the job object, the RunnerID field can be null, but if not null it has to match a runner row.
+var standardWarmupRunnersForJobs = []models.Runner{
+	{
+		Name:        "runner-1",
+		Description: "runner 1",
+	},
+	{
+		Name:        "runner-other",
+		Description: "the other runner",
+	},
+}
 
 // Standard warmup job(s) for tests in this module:
 var standardWarmupJobs = []models.Job{
@@ -1531,28 +1216,17 @@ var standardWarmupJobs = []models.Job{
 	},
 }
 
-// Standard warmup job log descriptor(s) for tests in this module:
-// In the job log descriptor object, the JobID field must not be nil and must match a valid Job object.
-// The function that creates the descriptors will set the JobID field.
-var standardWarmupJobLogDescriptorsForJobs = []models.JobLogDescriptor{
-	{
-		Size: 2468,
-	},
-	{
-		Size: 1357,
-	},
-}
-
 // createWarmupJobs creates some warmup jobs for a test
 // The warmup jobs to create can be standard or otherwise.
 func createWarmupJobs(ctx context.Context, testClient *testClient,
 	newGroups []models.Group,
 	newWorkspaces []models.Workspace,
 	newRuns []models.Run,
-	newRunnerID string,
+	newRunners []models.Runner,
 	newJobs []models.Job) (
 	[]models.Workspace,
 	[]models.Run,
+	[]models.Runner,
 	[]models.Job,
 	error,
 ) {
@@ -1561,50 +1235,32 @@ func createWarmupJobs(ctx context.Context, testClient *testClient,
 
 	_, parentPath2ID, err := createInitialGroups(ctx, testClient, newGroups)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, parentPath2ID, newWorkspaces)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	workspaceID := resultWorkspaces[0].Metadata.ID
 
 	resultRuns, err := createInitialRuns(ctx, testClient, newRuns, workspaceID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+
+	resultRunners, _, err := createInitialRunners(ctx, testClient, newRunners, parentPath2ID)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	resultJobs, err := createInitialJobs(ctx, testClient, newJobs,
-		workspaceID, resultRuns[0].Metadata.ID, newRunnerID)
+		workspaceID, resultRuns[0].Metadata.ID, resultRunners[0].Metadata.ID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return resultWorkspaces, resultRuns, resultJobs, nil
-}
-
-// createWarmupJobLogDescriptors creates some warmup job log descriptors for a test
-// The warmup jobs to create can be standard or otherwise.
-func createWarmupJobLogDescriptors(ctx context.Context, testClient *testClient,
-	linkToJobs []models.Job, newDescriptors []models.JobLogDescriptor,
-) ([]models.JobLogDescriptor, error) {
-	result := []models.JobLogDescriptor{}
-
-	for ix, d := range newDescriptors {
-
-		// This assumes there are at least as many jobs as job log descriptors to create.
-		d.JobID = linkToJobs[ix].Metadata.ID
-
-		created, err := testClient.client.Jobs.CreateJobLogDescriptor(ctx, &d)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, *created)
-	}
-
-	return result, nil
+	return resultWorkspaces, resultRuns, resultRunners, resultJobs, nil
 }
 
 func ptrJobSortableField(arg JobSortableField) *JobSortableField {
@@ -1688,30 +1344,6 @@ func compareJobs(t *testing.T, expected, actual *models.Job,
 	assert.Equal(t, expected.Timestamps.RunningTimestamp, actual.Timestamps.RunningTimestamp)
 	assert.Equal(t, expected.Timestamps.FinishedTimestamp, actual.Timestamps.FinishedTimestamp)
 	assert.Equal(t, expected.MaxJobDuration, actual.MaxJobDuration)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
-	}
-}
-
-// compareJobLogDescriptors compares two job log descriptor objects,
-// including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareJobLogDescriptors(t *testing.T, expected, actual *models.JobLogDescriptor,
-	checkID bool, times *timeBounds,
-) {
-	assert.Equal(t, expected.JobID, actual.JobID)
-	assert.Equal(t, expected.Size, actual.Size)
 
 	if checkID {
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)

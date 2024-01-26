@@ -5,8 +5,10 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -152,6 +154,11 @@ func (r *RunnerResolver) Type() string {
 	return string(r.runner.Type)
 }
 
+// Disabled resolver
+func (r *RunnerResolver) Disabled() bool {
+	return r.runner.Disabled
+}
+
 // Metadata resolver
 func (r *RunnerResolver) Metadata() *MetadataResolver {
 	return &MetadataResolver{metadata: &r.runner.Metadata}
@@ -169,6 +176,44 @@ func (r *RunnerResolver) Group(ctx context.Context) (*GroupResolver, error) {
 	}
 
 	return &GroupResolver{group: group}, nil
+}
+
+// Sessions resolver
+func (r *RunnerResolver) Sessions(ctx context.Context, args *ConnectionQueryArgs) (*RunnerSessionConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := runner.GetRunnerSessionsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		RunnerID:          r.runner.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.RunnerSessionSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewRunnerSessionConnectionResolver(ctx, &input)
+}
+
+// Jobs resolver
+func (r *RunnerResolver) Jobs(ctx context.Context, args *ConnectionQueryArgs) (*JobConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := job.GetJobsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		RunnerID:          &r.runner.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.JobSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewJobConnectionResolver(ctx, &input)
 }
 
 // AssignedServiceAccounts resolver
@@ -197,12 +242,32 @@ func (r *RunnerResolver) CreatedBy() string {
 	return r.runner.CreatedBy
 }
 
+func sharedRunnersQuery(ctx context.Context, args *ConnectionQueryArgs) (*RunnerConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	sharedRunnerType := models.SharedRunnerType
+	input := runner.GetRunnersInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		RunnerType:        &sharedRunnerType,
+	}
+
+	if args.Sort != nil {
+		sort := db.RunnerSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewRunnerConnectionResolver(ctx, &input)
+}
+
 /* Runner Mutation Resolvers */
 
 // RunnerMutationPayload is the response payload for a runner mutation
 type RunnerMutationPayload struct {
 	ClientMutationID *string
 	Runner           *models.Runner
+	ServiceAccount   *models.ServiceAccount
 	Problems         []Problem
 }
 
@@ -219,12 +284,22 @@ func (r *RunnerMutationPayloadResolver) Runner() *RunnerResolver {
 	return &RunnerResolver{runner: r.RunnerMutationPayload.Runner}
 }
 
+// ServiceAccount field resolver
+func (r *RunnerMutationPayloadResolver) ServiceAccount() *ServiceAccountResolver {
+	if r.RunnerMutationPayload.ServiceAccount == nil {
+		return nil
+	}
+
+	return &ServiceAccountResolver{serviceAccount: r.RunnerMutationPayload.ServiceAccount}
+}
+
 // CreateRunnerInput contains the input for creating a new runner
 type CreateRunnerInput struct {
 	ClientMutationID *string
+	GroupPath        string
+	Disabled         *bool
 	Name             string
 	Description      string
-	GroupPath        string
 }
 
 // UpdateRunnerInput contains the input for updating a runner
@@ -232,6 +307,7 @@ type UpdateRunnerInput struct {
 	ClientMutationID *string
 	ID               string
 	Metadata         *MetadataInput
+	Disabled         *bool
 	Description      string
 }
 
@@ -265,12 +341,11 @@ func createRunnerMutation(ctx context.Context, input *CreateRunnerInput) (*Runne
 		return nil, err
 	}
 
-	service := getRunnerService(ctx)
-
-	createdRunner, err := service.CreateRunner(ctx, &runner.CreateRunnerInput{
+	createdRunner, err := getRunnerService(ctx).CreateRunner(ctx, &runner.CreateRunnerInput{
 		Name:        input.Name,
 		Description: input.Description,
 		GroupID:     group.Metadata.ID,
+		Disabled:    input.Disabled,
 	})
 	if err != nil {
 		return nil, err
@@ -300,6 +375,9 @@ func updateRunnerMutation(ctx context.Context, input *UpdateRunnerInput) (*Runne
 
 	// Update fields
 	runner.Description = input.Description
+	if input.Disabled != nil {
+		runner.Disabled = *input.Disabled
+	}
 
 	runner, err = service.UpdateRunner(ctx, runner)
 	if err != nil {
@@ -354,7 +432,7 @@ func assignServiceAccountToRunnerMutation(ctx context.Context, input *AssignServ
 		return nil, err
 	}
 
-	payload := RunnerMutationPayload{ClientMutationID: input.ClientMutationID, Runner: runner, Problems: []Problem{}}
+	payload := RunnerMutationPayload{ClientMutationID: input.ClientMutationID, Runner: runner, ServiceAccount: serviceAccount, Problems: []Problem{}}
 	return &RunnerMutationPayloadResolver{RunnerMutationPayload: payload}, nil
 }
 
@@ -376,7 +454,7 @@ func unassignServiceAccountFromRunnerMutation(ctx context.Context, input *Assign
 		return nil, err
 	}
 
-	payload := RunnerMutationPayload{ClientMutationID: input.ClientMutationID, Runner: runner, Problems: []Problem{}}
+	payload := RunnerMutationPayload{ClientMutationID: input.ClientMutationID, Runner: runner, ServiceAccount: serviceAccount, Problems: []Problem{}}
 	return &RunnerMutationPayloadResolver{RunnerMutationPayload: payload}, nil
 }
 

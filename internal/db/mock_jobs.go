@@ -40,32 +40,6 @@ func (_m *MockJobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job
 	return r0, r1
 }
 
-// CreateJobLogDescriptor provides a mock function with given fields: ctx, descriptor
-func (_m *MockJobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
-	ret := _m.Called(ctx, descriptor)
-
-	var r0 *models.JobLogDescriptor
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.JobLogDescriptor) (*models.JobLogDescriptor, error)); ok {
-		return rf(ctx, descriptor)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.JobLogDescriptor) *models.JobLogDescriptor); ok {
-		r0 = rf(ctx, descriptor)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.JobLogDescriptor)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *models.JobLogDescriptor) error); ok {
-		r1 = rf(ctx, descriptor)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetJobByID provides a mock function with given fields: ctx, id
 func (_m *MockJobs) GetJobByID(ctx context.Context, id string) (*models.Job, error) {
 	ret := _m.Called(ctx, id)
@@ -109,58 +83,6 @@ func (_m *MockJobs) GetJobCountForRunner(ctx context.Context, runnerID string) (
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, runnerID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetJobLogDescriptor provides a mock function with given fields: ctx, id
-func (_m *MockJobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobLogDescriptor, error) {
-	ret := _m.Called(ctx, id)
-
-	var r0 *models.JobLogDescriptor
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.JobLogDescriptor, error)); ok {
-		return rf(ctx, id)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.JobLogDescriptor); ok {
-		r0 = rf(ctx, id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.JobLogDescriptor)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetJobLogDescriptorByJobID provides a mock function with given fields: ctx, jobID
-func (_m *MockJobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*models.JobLogDescriptor, error) {
-	ret := _m.Called(ctx, jobID)
-
-	var r0 *models.JobLogDescriptor
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.JobLogDescriptor, error)); ok {
-		return rf(ctx, jobID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.JobLogDescriptor); ok {
-		r0 = rf(ctx, jobID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.JobLogDescriptor)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, jobID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -239,32 +161,6 @@ func (_m *MockJobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job
 
 	if rf, ok := ret.Get(1).(func(context.Context, *models.Job) error); ok {
 		r1 = rf(ctx, job)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// UpdateJobLogDescriptor provides a mock function with given fields: ctx, descriptor
-func (_m *MockJobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
-	ret := _m.Called(ctx, descriptor)
-
-	var r0 *models.JobLogDescriptor
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.JobLogDescriptor) (*models.JobLogDescriptor, error)); ok {
-		return rf(ctx, descriptor)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.JobLogDescriptor) *models.JobLogDescriptor); ok {
-		r0 = rf(ctx, descriptor)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.JobLogDescriptor)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *models.JobLogDescriptor) error); ok {
-		r1 = rf(ctx, descriptor)
 	} else {
 		r1 = ret.Error(1)
 	}

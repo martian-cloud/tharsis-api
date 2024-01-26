@@ -51,7 +51,11 @@ func (r *NodeResolver) ToJob() (*JobResolver, bool) {
 	return res, ok
 }
 
-// TODO: ToJobLogDescriptor resolver
+// ToRunnerSession resolver
+func (r *NodeResolver) ToRunnerSession() (*RunnerSessionResolver, bool) {
+	res, ok := r.result.(*RunnerSessionResolver)
+	return res, ok
+}
 
 // ToManagedIdentity resolver
 func (r *NodeResolver) ToManagedIdentity() (*ManagedIdentityResolver, bool) {
@@ -82,8 +86,6 @@ func (r *NodeResolver) ToRun() (*RunResolver, bool) {
 	res, ok := r.result.(*RunResolver)
 	return res, ok
 }
-
-// TODO: ToRunner resolver
 
 // ToServiceAccount resolver
 func (r *NodeResolver) ToServiceAccount() (*ServiceAccountResolver, bool) {
@@ -255,7 +257,13 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &JobResolver{job: job}
-	// TODO: JobLogDescriptorType
+	case gid.RunnerSessionType:
+		session, err := getRunnerService(ctx).GetRunnerSessionByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &RunnerSessionResolver{session: session}
 	case gid.ManagedIdentityType:
 		managedIdentity, err := getManagedIdentityService(ctx).GetManagedIdentityByID(ctx, parsedGlobalID.ID)
 		if err != nil {

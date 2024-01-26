@@ -210,6 +210,10 @@ func TestGetRunners(t *testing.T) {
 	allRunnerIDsByTime := runnerIDsFromRunnerInfos(allRunnerInfos)
 	reverseRunnerIDsByTime := reverseStringSlice(allRunnerIDsByTime)
 
+	// Allow a pointer to a constant.
+	localSharedRunnerType := models.SharedRunnerType
+	localGroupRunnerType := models.GroupRunnerType
+
 	type testCase struct {
 		input           *GetRunnersInput
 		expectMsg       *string
@@ -339,6 +343,28 @@ func TestGetRunners(t *testing.T) {
 			expectMsg:       invalidUUIDMsg2,
 			expectRunnerIDs: []string{},
 		},
+
+		{
+			name: "filter, get shared runners",
+			input: &GetRunnersInput{
+				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+				Filter: &RunnerFilter{
+					RunnerType: &localSharedRunnerType,
+				},
+			},
+			expectRunnerIDs: allRunnerIDsByTime[5:],
+		},
+
+		{
+			name: "filter, get group runners",
+			input: &GetRunnersInput{
+				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+				Filter: &RunnerFilter{
+					RunnerType: &localGroupRunnerType,
+				},
+			},
+			expectRunnerIDs: allRunnerIDsByTime[:5],
+		},
 	}
 
 	for _, test := range testCases {
@@ -393,7 +419,7 @@ func TestCreateRunner(t *testing.T) {
 	now := time.Now()
 	testCases := []testCase{
 		{
-			name: "positive",
+			name: "positive, group runner",
 			toCreate: &models.Runner{
 				Type:      models.GroupRunnerType,
 				Name:      "runner-create-test",
@@ -409,6 +435,25 @@ func TestCreateRunner(t *testing.T) {
 				Name:         "runner-create-test",
 				ResourcePath: warmupItems.groups[0].FullPath + "/runner-create-test",
 				GroupID:      &warmupItems.groups[0].Metadata.ID,
+				CreatedBy:    "TestCreateRunner",
+			},
+		},
+
+		{
+			name: "positive, shared runner",
+			toCreate: &models.Runner{
+				Type:      models.SharedRunnerType,
+				Name:      "runner-create-test",
+				CreatedBy: "TestCreateRunner",
+			},
+			expectCreated: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					Version:           initialResourceVersion,
+					CreationTimestamp: &now,
+				},
+				Type:         models.SharedRunnerType,
+				Name:         "runner-create-test",
+				ResourcePath: "runner-create-test",
 				CreatedBy:    "TestCreateRunner",
 			},
 		},
@@ -840,6 +885,7 @@ func compareRunners(t *testing.T, expected, actual *models.Runner,
 	assert.Equal(t, expected.GroupID, actual.GroupID)
 	assert.Equal(t, expected.Description, actual.Description)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
+	assert.Equal(t, expected.Disabled, actual.Disabled)
 
 	if checkID {
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)

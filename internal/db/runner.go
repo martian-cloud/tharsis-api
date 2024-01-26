@@ -56,6 +56,8 @@ type RunnerFilter struct {
 	GroupID        *string
 	RunnerName     *string
 	RunnerID       *string
+	Enabled        *bool
+	RunnerType     *models.RunnerType
 	RunnerIDs      []string
 	NamespacePaths []string
 }
@@ -80,7 +82,7 @@ type terraformRunners struct {
 	dbClient *Client
 }
 
-var runnerFieldList = append(metadataFieldList, "type", "name", "description", "group_id", "created_by")
+var runnerFieldList = append(metadataFieldList, "type", "name", "description", "group_id", "created_by", "disabled")
 
 // NewRunners returns an instance of the Runners interface
 func NewRunners(dbClient *Client) Runners {
@@ -137,6 +139,14 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 
 		if input.Filter.GroupID != nil {
 			ex = ex.Append(goqu.I("runners.group_id").Eq(*input.Filter.GroupID))
+		}
+
+		if input.Filter.Enabled != nil {
+			ex = ex.Append(goqu.I("runners.disabled").Eq(!(*input.Filter.Enabled)))
+		}
+
+		if input.Filter.RunnerType != nil {
+			ex = ex.Append(goqu.I("runners.type").Eq(*input.Filter.RunnerType))
 		}
 	}
 
@@ -231,6 +241,7 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 			"name":        runner.Name,
 			"description": runner.Description,
 			"created_by":  runner.CreatedBy,
+			"disabled":    runner.Disabled,
 		}).
 		Returning(runnerFieldList...).ToSQL()
 	if err != nil {
@@ -300,6 +311,7 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 			"version":     goqu.L("? + ?", goqu.C("version"), 1),
 			"updated_at":  timestamp,
 			"description": runner.Description,
+			"disabled":    runner.Disabled,
 		}).
 		Where(goqu.Ex{"id": runner.Metadata.ID, "version": runner.Metadata.Version}).
 		Returning(runnerFieldList...).ToSQL()
@@ -426,6 +438,7 @@ func scanRunner(row scanner, withResourcePath bool) (*models.Runner, error) {
 		&runner.Description,
 		&runner.GroupID,
 		&runner.CreatedBy,
+		&runner.Disabled,
 	}
 	var path sql.NullString
 	if withResourcePath {
