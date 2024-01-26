@@ -8,6 +8,7 @@ import (
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
+	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
@@ -215,7 +216,7 @@ func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger *j
 
 func (j *JobExecutor) waitForJobCancellation(ctx context.Context) (bool, error) {
 	eventChannel, err := j.client.SubscribeToJobCancellationEvent(ctx, j.cfg.JobID)
-	if err == context.DeadlineExceeded || err == context.Canceled {
+	if err == context.DeadlineExceeded || te.IsContextCanceledError(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err

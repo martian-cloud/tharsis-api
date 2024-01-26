@@ -15,6 +15,11 @@ const (
 	SharedRunnerType RunnerType = "shared"
 )
 
+// Equals returns true if the runner type is equal to the other runner type
+func (r RunnerType) Equals(other RunnerType) bool {
+	return r == other
+}
+
 // Runner resource
 type Runner struct {
 	Type         RunnerType
@@ -24,6 +29,7 @@ type Runner struct {
 	ResourcePath string
 	CreatedBy    string
 	Metadata     ResourceMetadata
+	Disabled     bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination

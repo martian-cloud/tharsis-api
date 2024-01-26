@@ -9,34 +9,14 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-/* Job Query Resolvers */
-
-// JobConnectionQueryArgs are used to query a list of jobs
-type JobConnectionQueryArgs struct {
-	ConnectionQueryArgs
-	WorkspacePath *string
-	JobStatus     *models.JobStatus
-	JobType       *models.JobType
-}
-
-// JobQueryArgs are used to query a single job
-type JobQueryArgs struct {
-	ID string
-}
-
-// JobLogsQueryArgs contains the options for querying job logs
-type JobLogsQueryArgs struct {
-	StartOffset int32
-	Limit       int32
-}
-
-// JobEdgeResolver resolves a job edge
+// JobEdgeResolver resolves job edges
 type JobEdgeResolver struct {
 	edge Edge
 }
@@ -127,6 +107,27 @@ func (r *JobConnectionResolver) Edges() *[]*JobEdgeResolver {
 		resolvers[i] = &JobEdgeResolver{edge: edge}
 	}
 	return &resolvers
+}
+
+/* Job Query Resolvers */
+
+// JobConnectionQueryArgs are used to query a list of jobs
+type JobConnectionQueryArgs struct {
+	ConnectionQueryArgs
+	WorkspacePath *string
+	JobStatus     *models.JobStatus
+	JobType       *models.JobType
+}
+
+// JobQueryArgs are used to query a single job
+type JobQueryArgs struct {
+	ID string
+}
+
+// JobLogsQueryArgs contains the options for querying job logs
+type JobLogsQueryArgs struct {
+	StartOffset int32
+	Limit       int32
 }
 
 // JobTimestampsResolver resolves a job's timestamps
@@ -245,14 +246,14 @@ func (r *JobResolver) Timestamps() *JobTimestampsResolver {
 
 // LogLastUpdatedAt resolver
 func (r *JobResolver) LogLastUpdatedAt(ctx context.Context) (*graphql.Time, error) {
-	descriptor, err := getJobService(ctx).GetJobLogDescriptor(ctx, r.job)
+	logStream, err := loadJobLogStream(ctx, r.job.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
-	if descriptor == nil {
-		return nil, nil
-	}
-	return &graphql.Time{Time: *descriptor.Metadata.LastUpdatedTimestamp}, nil
+
+	// Service layer guarantees logStream will not be nil.
+
+	return &graphql.Time{Time: *logStream.Metadata.LastUpdatedTimestamp}, nil
 }
 
 // MaxJobDuration resolver
@@ -262,19 +263,19 @@ func (r *JobResolver) MaxJobDuration() int32 {
 
 // LogSize resolver
 func (r *JobResolver) LogSize(ctx context.Context) (int32, error) {
-	descriptor, err := getJobService(ctx).GetJobLogDescriptor(ctx, r.job)
+	logStream, err := loadJobLogStream(ctx, r.job.Metadata.ID)
 	if err != nil {
 		return 0, err
 	}
-	if descriptor == nil {
-		return 0, nil
-	}
-	return int32(descriptor.Size), nil
+
+	// Service layer guarantees logStream will not be nil.
+
+	return int32(logStream.Size), nil
 }
 
 // Logs resolver
 func (r *JobResolver) Logs(ctx context.Context, args *JobLogsQueryArgs) (string, error) {
-	buffer, err := getJobService(ctx).GetLogs(ctx, r.job.Metadata.ID, int(args.StartOffset), int(args.Limit))
+	buffer, err := getJobService(ctx).ReadLogs(ctx, r.job.Metadata.ID, int(args.StartOffset), int(args.Limit))
 	if err != nil {
 		return "", err
 	}
@@ -283,18 +284,18 @@ func (r *JobResolver) Logs(ctx context.Context, args *JobLogsQueryArgs) (string,
 
 /* Job Subscriptions */
 
-// JobLogEventResolver resolves a job log event
-type JobLogEventResolver struct {
-	event *job.LogEvent
+// JobLogStreamEventResolver resolves a job log stream event
+type JobLogStreamEventResolver struct {
+	event *logstream.LogEvent
 }
 
-// Action resolver
-func (j *JobLogEventResolver) Action() string {
-	return j.event.Action
+// Completed resolver
+func (j *JobLogStreamEventResolver) Completed() bool {
+	return j.event.Completed
 }
 
 // Size resolver
-func (j *JobLogEventResolver) Size() int32 {
+func (j *JobLogStreamEventResolver) Size() int32 {
 	return int32(j.event.Size)
 }
 
@@ -350,37 +351,93 @@ func (r *JobCancellationEventResolver) Job() *JobResolver {
 	return &JobResolver{job: &r.event.Job}
 }
 
-// JobLogSubscriptionInput is the input for subscribing to job log events
-type JobLogSubscriptionInput struct {
-	LastSeenLogSize *int32
-	JobID           string
+// JobEventResolver resolves a job event
+type JobEventResolver struct {
+	event *job.Event
 }
 
-func (r RootResolver) jobLogEventsSubscription(ctx context.Context, input *JobLogSubscriptionInput) (<-chan *JobLogEventResolver, error) {
-	service := getJobService(ctx)
+// Action resolves the event action
+func (r *JobEventResolver) Action() string {
+	return r.event.Action
+}
 
-	j, err := service.GetJob(ctx, gid.FromGlobalID(input.JobID))
+// Job resolves the job
+func (r *JobEventResolver) Job() *JobResolver {
+	return &JobResolver{job: r.event.Job}
+}
+
+// JobEventSubscriptionInput is the input for subscribing to jobs
+type JobEventSubscriptionInput struct {
+	WorkspaceID *string
+	RunnerID    *string
+}
+
+func (r RootResolver) jobEventsSubscription(ctx context.Context, input *JobEventSubscriptionInput) (<-chan *JobEventResolver, error) {
+	jobService := getJobService(ctx)
+
+	var wsID, runnerID *string
+
+	if input.WorkspaceID != nil {
+		wsID = ptr.String(gid.FromGlobalID(*input.WorkspaceID))
+	}
+
+	if input.RunnerID != nil {
+		runnerID = ptr.String(gid.FromGlobalID(*input.RunnerID))
+	}
+
+	events, err := jobService.SubscribeToJobs(ctx, &job.SubscribeToJobsInput{
+		WorkspaceID: wsID,
+		RunnerID:    runnerID,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	options := &job.LogEventSubscriptionOptions{}
-	if input.LastSeenLogSize != nil {
-		options.LastSeenLogSize = ptr.Int(int(*input.LastSeenLogSize))
-	}
-
-	events, err := service.SubscribeToJobLogEvents(ctx, j, options)
-	if err != nil {
-		return nil, err
-	}
-
-	outgoing := make(chan *JobLogEventResolver)
+	outgoing := make(chan *JobEventResolver)
 
 	go func() {
 		for event := range events {
 			select {
 			case <-ctx.Done():
-			case outgoing <- &JobLogEventResolver{event: event}:
+			case outgoing <- &JobEventResolver{event: event}:
+			}
+		}
+
+		close(outgoing)
+	}()
+
+	return outgoing, nil
+}
+
+// JobLogStreamSubscriptionInput is the input for subscribing to job log events
+type JobLogStreamSubscriptionInput struct {
+	LastSeenLogSize *int32
+	JobID           string
+}
+
+func (r RootResolver) jobLogStreamEventsSubscription(ctx context.Context,
+	input *JobLogStreamSubscriptionInput) (<-chan *JobLogStreamEventResolver, error) {
+	service := getJobService(ctx)
+
+	options := &job.LogStreamEventSubscriptionOptions{
+		JobID: gid.FromGlobalID(input.JobID),
+	}
+	if input.LastSeenLogSize != nil {
+		options.LastSeenLogSize = ptr.Int(int(*input.LastSeenLogSize))
+	}
+
+	events, err := service.SubscribeToLogStreamEvents(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	outgoing := make(chan *JobLogStreamEventResolver)
+
+	go func() {
+		for event := range events {
+			select {
+			case <-ctx.Done():
+			case outgoing <- &JobLogStreamEventResolver{event: event}:
 			}
 		}
 
@@ -395,7 +452,8 @@ type JobCancellationEventSubscriptionInput struct {
 	JobID string
 }
 
-func (r RootResolver) jobCancellationEventSubscription(ctx context.Context, input *JobCancellationEventSubscriptionInput) (<-chan *JobCancellationEventResolver, error) {
+func (r RootResolver) jobCancellationEventSubscription(ctx context.Context,
+	input *JobCancellationEventSubscriptionInput) (<-chan *JobCancellationEventResolver, error) {
 	service := getJobService(ctx)
 
 	events, err := service.SubscribeToCancellationEvent(ctx, &job.CancellationSubscriptionsOptions{
@@ -490,8 +548,9 @@ func claimJobMutation(ctx context.Context, input *ClaimJobInput) (*ClaimJobMutat
 func saveJobLogsMutation(ctx context.Context, input *SaveJobLogsInput) (*SaveJobLogsPayload, error) {
 	jobService := getJobService(ctx)
 	logs := []byte(input.Logs)
+	jobID := gid.FromGlobalID(input.JobID)
 
-	err := jobService.SaveLogs(ctx, gid.FromGlobalID(input.JobID), int(input.StartOffset), logs)
+	_, err := jobService.WriteLogs(ctx, jobID, int(input.StartOffset), logs)
 	if err != nil {
 		return nil, err
 	}
@@ -537,6 +596,51 @@ func jobBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
 	batch := loader.DataBatch{}
 	for _, result := range groups {
 		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
+}
+
+/* JobLogStream loader */
+
+const jobLogStreamLoaderKey = "jobLogStream"
+
+// RegisterJobLogStreamLoader registers a jobLogStream loader function
+func RegisterJobLogStreamLoader(collection *loader.Collection) {
+	collection.Register(jobLogStreamLoaderKey, jobLogStreamBatchFunc)
+}
+
+func loadJobLogStream(ctx context.Context, id string) (*models.LogStream, error) {
+	ldr, err := loader.Extract(ctx, jobLogStreamLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	jobLogStream, ok := data.(models.LogStream)
+	if !ok {
+		return nil, errors.New("Wrong type")
+	}
+
+	return &jobLogStream, nil
+}
+
+func jobLogStreamBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+	jobLogStreams, err := getJobService(ctx).GetLogStreamsByJobIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range jobLogStreams {
+		// Use job ID as the key since that is the ID which was
+		// used to query the data
+		batch[*result.JobID] = result
 	}
 
 	return batch, nil

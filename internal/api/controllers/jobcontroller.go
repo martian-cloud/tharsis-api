@@ -71,7 +71,7 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
 	// TODO: Remove when log endpoint token authentication is added
-	logs, err := c.jobService.GetLogs(auth.WithCaller(r.Context(), &auth.SystemCaller{}), jobID, offset, limit)
+	logs, err := c.jobService.ReadLogs(auth.WithCaller(r.Context(), &auth.SystemCaller{}), jobID, offset, limit)
 	if err != nil {
 		c.logger.Infof("Failed to get logs: %v", err)
 		c.respWriter.RespondWithError(w, err)

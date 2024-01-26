@@ -49,10 +49,3 @@ type Job struct {
 func (j *Job) ResolveMetadata(key string) (string, error) {
 	return j.Metadata.resolveFieldValue(key)
 }
-
-// JobLogDescriptor contains metadata for job logs
-type JobLogDescriptor struct {
-	JobID    string
-	Metadata ResourceMetadata
-	Size     int
-}

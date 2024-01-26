@@ -43,6 +43,8 @@ var (
 	CreateRunnerPermission                  = Permission{ResourceType: RunnerResourceType, Action: CreateAction}
 	UpdateRunnerPermission                  = Permission{ResourceType: RunnerResourceType, Action: UpdateAction}
 	DeleteRunnerPermission                  = Permission{ResourceType: RunnerResourceType, Action: DeleteAction}
+	CreateRunnerSessionPermission           = Permission{ResourceType: RunnerSessionResourceType, Action: CreateAction}
+	UpdateRunnerSessionPermission           = Permission{ResourceType: RunnerSessionResourceType, Action: UpdateAction}
 	CreateUserPermission                    = Permission{ResourceType: UserResourceType, Action: CreateAction}
 	UpdateUserPermission                    = Permission{ResourceType: UserResourceType, Action: UpdateAction}
 	DeleteUserPermission                    = Permission{ResourceType: UserResourceType, Action: DeleteAction}
@@ -103,6 +105,9 @@ var assignablePermissions = map[Permission]struct{}{
 	CreateRunPermission:                     {},
 	ViewJobPermission:                       {},
 	ViewRunnerPermission:                    {},
+	CreateRunnerPermission:                  {},
+	UpdateRunnerPermission:                  {},
+	DeleteRunnerPermission:                  {},
 	CreateUserPermission:                    {},
 	UpdateUserPermission:                    {},
 	DeleteUserPermission:                    {},

@@ -1,3 +1,4 @@
+// Package job package
 package job
 
 //go:generate mockery --name Service --inpackage --case underscore
@@ -14,12 +15,15 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
+	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -39,12 +43,20 @@ type GetJobsInput struct {
 	Type *models.JobType
 	// WorkspaceID is the workspace ID to filter on
 	WorkspaceID *string
+	// RunnerID filters the jobs by the specified runner ID
+	RunnerID *string
 }
 
 // ClaimJobResponse is returned when a runner claims a Job
 type ClaimJobResponse struct {
 	JobID string
 	Token string
+}
+
+// LogStreamEventSubscriptionOptions includes options for setting up a log event subscription
+type LogStreamEventSubscriptionOptions struct {
+	LastSeenLogSize *int
+	JobID           string
 }
 
 // LogEvent represents a run event
@@ -59,14 +71,21 @@ type CancellationEvent struct {
 	Job models.Job
 }
 
-// LogEventSubscriptionOptions includes options for setting up a log event subscription
-type LogEventSubscriptionOptions struct {
-	LastSeenLogSize *int
-}
-
 // CancellationSubscriptionsOptions includes options for setting up a cancellation event subscription
 type CancellationSubscriptionsOptions struct {
 	JobID string
+}
+
+// SubscribeToJobsInput is the input for subscribing to jobs
+type SubscribeToJobsInput struct {
+	WorkspaceID *string
+	RunnerID    *string
+}
+
+// Event is a job event
+type Event struct {
+	Job    *models.Job
+	Action string
 }
 
 // Service implements all job related functionality
@@ -77,19 +96,20 @@ type Service interface {
 	GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
 	SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error)
-	SaveLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error
-	GetLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error)
-	GetJobLogDescriptor(ctx context.Context, job *models.Job) (*models.JobLogDescriptor, error)
-	SubscribeToJobLogEvents(ctx context.Context, job *models.Job, options *LogEventSubscriptionOptions) (<-chan *LogEvent, error)
+	WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error)
+	ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error)
+	SubscribeToLogStreamEvents(ctx context.Context, options *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error)
+	GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([]models.LogStream, error)
+	SubscribeToJobs(ctx context.Context, options *SubscribeToJobsInput) (<-chan *Event, error)
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	idp             *auth.IdentityProvider
-	eventManager    *events.EventManager
-	runStateManager *state.RunStateManager
-	logStore        LogStore
+	logger           logger.Logger
+	dbClient         *db.Client
+	idp              *auth.IdentityProvider
+	logStreamManager logstream.Manager
+	eventManager     *events.EventManager
+	runStateManager  *state.RunStateManager
 }
 
 // NewService creates an instance of Service
@@ -97,141 +117,11 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	idp *auth.IdentityProvider,
+	logStreamManager logstream.Manager,
 	eventManager *events.EventManager,
 	runStateManager *state.RunStateManager,
-	logStore LogStore,
 ) Service {
-	return &service{logger, dbClient, idp, eventManager, runStateManager, logStore}
-}
-
-func (s *service) SubscribeToJobLogEvents(ctx context.Context, job *models.Job, options *LogEventSubscriptionOptions) (<-chan *LogEvent, error) {
-	outerCtx := ctx // for goroutine
-	ctx, span := tracer.Start(ctx, "svc.SubscribeToJobLogEvents")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
-		return nil, err
-	}
-
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
-	}
-
-	outgoing := make(chan *LogEvent)
-
-	go func() {
-		// Defer close of outgoing channel
-		defer close(outgoing)
-
-		// A new span not nested inside that of the parent function.
-		innerCtx, innerSpan := tracer.Start(outerCtx, "svc.SubscribeToJobLogEvents.goroutine")
-		defer innerSpan.End()
-
-		subscription := events.Subscription{
-			Type: events.JobLogSubscription,
-			Actions: []events.SubscriptionAction{
-				events.CreateAction,
-				events.UpdateAction,
-			},
-		}
-		subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
-
-		defer s.eventManager.Unsubscribe(subscriber)
-
-		if options.LastSeenLogSize != nil {
-			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptorByJobID(innerCtx, job.Metadata.ID)
-			if err != nil {
-				tracing.RecordError(innerSpan, err, "failed to get job log descriptor by job ID")
-				return
-			}
-
-			var size int
-			if descriptor != nil {
-				size = descriptor.Size
-			}
-
-			if size != *options.LastSeenLogSize {
-				select {
-				case <-innerCtx.Done():
-					return
-				case outgoing <- &LogEvent{Action: string(events.UpdateAction), JobID: job.Metadata.ID, Size: size}:
-				}
-			}
-		}
-
-		// Wait for job updates
-		for {
-			event, err := subscriber.GetEvent(innerCtx)
-			if err != nil {
-				if !errors.IsContextCanceledError(err) {
-					tracing.RecordError(innerSpan, err, "Error occurred while waiting for job log events: %v", err)
-					s.logger.Errorf("Error occurred while waiting for job log events: %v", err)
-				}
-				return
-			}
-
-			descriptor, err := s.dbClient.Jobs.GetJobLogDescriptor(innerCtx, event.ID)
-			if err != nil {
-				if !errors.IsContextCanceledError(err) {
-					tracing.RecordError(innerSpan, err,
-						"Error occurred while querying for job log descriptor associated with job log event %s", event.ID)
-					s.logger.Errorf("Error occurred while querying for job log descriptor associated with job log event %s: %v", event.ID, err)
-				}
-				return
-			}
-
-			if descriptor == nil {
-				tracing.RecordError(innerSpan, nil,
-					"Error occurred while querying for job log descriptor associated with job log event %s: descriptor not found", event.ID)
-				s.logger.Errorf("Error occurred while querying for job log descriptor associated with job log event %s: descriptor not found", event.ID)
-				continue
-			}
-
-			// Only return events for job log descriptors that match the job ID
-			if descriptor.JobID != job.Metadata.ID {
-				continue
-			}
-
-			select {
-			case <-innerCtx.Done():
-				return
-			case outgoing <- &LogEvent{Action: event.Action, JobID: descriptor.JobID, Size: descriptor.Size}:
-			}
-		}
-	}()
-
-	return outgoing, nil
-}
-
-func (s *service) GetJobLogDescriptor(ctx context.Context, job *models.Job) (*models.JobLogDescriptor, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetJobLogDescriptor")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
-		return nil, err
-	}
-
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
-	}
-
-	descriptor, err := s.dbClient.Jobs.GetJobLogDescriptorByJobID(ctx, job.Metadata.ID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get job log descriptor by job ID")
-		return nil, err
-	}
-
-	return descriptor, nil
+	return &service{logger, dbClient, idp, logStreamManager, eventManager, runStateManager}
 }
 
 func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error) {
@@ -308,14 +198,26 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 	}
 
 	if input.WorkspaceID != nil {
-		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
+		err := caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
+	} else if input.RunnerID != nil {
+		runner, rErr := s.dbClient.Runners.GetRunnerByID(ctx, *input.RunnerID)
+		if rErr != nil {
+			return nil, rErr
+		}
+		if runner == nil {
+			return nil, errors.New("runner not found with ID: %s", *input.RunnerID, errors.WithErrorCode(errors.ENotFound))
+		}
+		if rErr = rnr.RequireViewerAccessToRunner(ctx, runner); rErr != nil {
+			return nil, rErr
+		}
 	} else if !caller.IsAdmin() {
-		tracing.RecordError(span, nil, "only system admins can view jobs across all workspaces")
-		return nil, errors.New("only system admins can view jobs across all workspaces", errors.WithErrorCode(errors.EForbidden))
+		return nil, errors.New(
+			"Only system admins can subscribe to all job events without filters",
+			errors.WithErrorCode(errors.EForbidden),
+		)
 	}
 
 	dbInput := &db.GetJobsInput{
@@ -325,6 +227,7 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 			JobStatus:   input.Status,
 			JobType:     input.Type,
 			WorkspaceID: input.WorkspaceID,
+			RunnerID:    input.RunnerID,
 		},
 	}
 
@@ -371,6 +274,95 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 	}
 
 	return &jobsResult.Jobs[0], nil
+}
+
+func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsInput) (<-chan *Event, error) {
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToJobs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if options.WorkspaceID != nil {
+		err := caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*options.WorkspaceID))
+		if err != nil {
+			return nil, err
+		}
+	} else if options.RunnerID != nil {
+		runner, rErr := s.dbClient.Runners.GetRunnerByID(ctx, *options.RunnerID)
+		if rErr != nil {
+			return nil, rErr
+		}
+		if runner == nil {
+			return nil, errors.New("runner not found with ID: %s", *options.RunnerID, errors.WithErrorCode(errors.ENotFound))
+		}
+		if rErr = rnr.RequireViewerAccessToRunner(ctx, runner); rErr != nil {
+			return nil, rErr
+		}
+	} else if !caller.IsAdmin() {
+		return nil, errors.New(
+			"Only system admins can subscribe to all job events without filters",
+			errors.WithErrorCode(errors.EForbidden),
+		)
+	}
+
+	subscription := events.Subscription{
+		Type: events.JobSubscription,
+		Actions: []events.SubscriptionAction{
+			events.CreateAction,
+			events.UpdateAction,
+		},
+	}
+
+	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
+
+	outgoing := make(chan *Event)
+	go func() {
+		// Defer close of outgoing channel
+		defer close(outgoing)
+		defer s.eventManager.Unsubscribe(subscriber)
+
+		// Wait for runner session updates
+		for {
+			event, err := subscriber.GetEvent(ctx)
+			if err != nil {
+				if !errors.IsContextCanceledError(err) {
+					s.logger.Errorf("Error occurred while waiting for job events: %v", err)
+				}
+				return
+			}
+
+			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
+			if err != nil {
+				s.logger.Errorf("Error querying for job in subscription goroutine: %v", err)
+				continue
+			}
+			if job == nil {
+				s.logger.Errorf("Received event for job that does not exist %s", event.ID)
+				continue
+			}
+
+			// Check if this event is for the runner we're interested in
+			if options.RunnerID != nil && (job.RunnerID == nil || *job.RunnerID != *options.RunnerID) {
+				continue
+			}
+
+			// Check if this event is for the project we're interested in
+			if options.WorkspaceID != nil && job.WorkspaceID != *options.WorkspaceID {
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case outgoing <- &Event{Job: job, Action: event.Action}:
+			}
+		}
+	}()
+
+	return outgoing, nil
 }
 
 func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *CancellationSubscriptionsOptions) (<-chan *CancellationEvent, error) {
@@ -475,68 +467,6 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 	return outgoing, nil
 }
 
-func (s *service) SaveLogs(ctx context.Context, jobID string, startOffset int, buffer []byte) error {
-	ctx, span := tracer.Start(ctx, "svc.SaveLogs")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
-		return err
-	}
-
-	job, err := s.GetJob(ctx, jobID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get job")
-		return err
-	}
-
-	err = caller.RequirePermission(ctx, permissions.UpdateJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return err
-	}
-
-	if err := s.logStore.SaveLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, buffer); err != nil {
-		tracing.RecordError(span, err, "Failed to save logs")
-		return errors.Wrap(err, "Failed to save logs", errors.WithErrorCode(errors.EInvalid))
-	}
-
-	return nil
-}
-
-func (s *service) GetLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetLogs")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	caller, err := auth.AuthorizeCaller(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
-		return nil, err
-	}
-
-	if limit < 0 || startOffset < 0 {
-		tracing.RecordError(span, nil, "limit and offset cannot be negative")
-		return nil, errors.New("limit and offset cannot be negative", errors.WithErrorCode(errors.EInvalid))
-	}
-
-	job, err := s.GetJob(ctx, jobID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get job")
-		return nil, err
-	}
-
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
-	}
-
-	return s.logStore.GetLogs(ctx, job.WorkspaceID, job.RunID, jobID, startOffset, limit)
-}
-
 func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error) {
 	ctx, span := tracer.Start(ctx, "svc.ClaimJob")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -590,7 +520,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 	}
 
 	for {
-		job, err := s.getNextAvailableQueuedJob(ctx, &runner)
+		job, err := s.getNextAvailableQueuedJob(ctx, runner.Metadata.ID)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to get next available queued job")
 			return nil, err
@@ -641,7 +571,175 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 	}
 }
 
-func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.Runner) (*models.Job, error) {
+func (s *service) SubscribeToLogStreamEvents(ctx context.Context, options *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error) {
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToLogStreamEvents")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := s.getJobByID(ctx, options.JobID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get job by ID")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID),
+		auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		return nil, err
+	}
+
+	logStream, err := s.dbClient.LogStreams.GetLogStreamByJobID(ctx, job.Metadata.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get log stream by job ID", errors.WithSpan(span))
+	}
+
+	if logStream == nil {
+		return nil, fmt.Errorf("log stream not found for job %s", job.Metadata.ID)
+	}
+
+	return s.logStreamManager.Subscribe(ctx, &logstream.SubscriptionOptions{
+		LastSeenLogSize: options.LastSeenLogSize,
+		LogStreamID:     logStream.Metadata.ID,
+	})
+}
+
+func (s *service) WriteLogs(ctx context.Context, jobID string, startOffset int, logs []byte) (int, error) {
+	ctx, span := tracer.Start(ctx, "svc.WriteLogs")
+	span.SetAttributes(attribute.String("job_id", jobID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	job, err := s.getJobByID(ctx, jobID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get job by ID")
+		return 0, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.UpdateJobPermission, auth.WithJobID(jobID),
+		auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		return 0, err
+	}
+
+	stream, err := s.dbClient.LogStreams.GetLogStreamByJobID(ctx, jobID)
+	if err != nil {
+		return 0, err
+	}
+
+	if stream == nil {
+		return 0, errors.New("log stream not found for job %s", jobID)
+	}
+
+	// Write logs to store
+	updatedStream, err := s.logStreamManager.WriteLogs(ctx, stream.Metadata.ID, startOffset, logs)
+	if err != nil {
+		return 0, err
+	}
+
+	return updatedStream.Size, nil
+}
+
+func (s *service) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
+	ctx, span := tracer.Start(ctx, "svc.ReadLogs")
+	span.SetAttributes(attribute.String("job_id", jobID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := s.getJobByID(ctx, jobID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get job by ID")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID),
+		auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Find log stream associated with job
+	stream, err := s.dbClient.LogStreams.GetLogStreamByJobID(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	if stream == nil {
+		return nil, errors.New("log stream not found %s", jobID)
+	}
+
+	return s.logStreamManager.ReadLogs(ctx, stream.Metadata.ID, startOffset, limit)
+}
+
+// getJobByID returns a non-nil job.
+func (s *service) getJobByID(ctx context.Context, jobID string) (*models.Job, error) {
+
+	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
+	if err != nil {
+		return nil, errors.Wrap(
+			err,
+			"Failed to get job",
+			errors.WithErrorCode(errors.EInternal),
+		)
+	}
+
+	if job == nil {
+		return nil, errors.New("Job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return job, nil
+}
+
+func (s *service) GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([]models.LogStream, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetLogStreamsByJobIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.dbClient.Jobs.GetJobs(ctx, &db.GetJobsInput{Filter: &db.JobFilter{JobIDs: idList}})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get jobs", errors.WithSpan(span))
+	}
+
+	// Verify user has access to all returned jobs
+	for _, job := range resp.Jobs {
+		err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID),
+			auth.WithWorkspaceID(job.WorkspaceID))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(resp.Jobs) > 0 {
+		result, err := s.dbClient.LogStreams.GetLogStreams(ctx, &db.GetLogStreamsInput{
+			Filter: &db.LogStreamFilter{
+				JobIDs: idList,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return result.LogStreams, nil
+	}
+
+	return []models.LogStream{}, nil
+}
+
+func (s *service) getNextAvailableQueuedJob(ctx context.Context, runnerID string) (*models.Job, error) {
 	// Subscribe to job create and update events
 	jobSubscription := events.Subscription{
 		Type:    events.JobSubscription,
@@ -664,7 +762,7 @@ func (s *service) getNextAvailableQueuedJob(ctx context.Context, runner *models.
 
 	// Wait for next available run
 	for {
-		job, err := s.getNextAvailableJob(ctx, runner)
+		job, err := s.getNextAvailableJob(ctx, runnerID)
 		if err != nil {
 			return nil, err
 		}
@@ -691,7 +789,21 @@ func (s *service) isRunnerBelowJobsLimit(ctx context.Context, runner *models.Run
 
 // getNextAvailableJob returns a new job when workspace doesn't have an active job
 // and the runner is not full.
-func (s *service) getNextAvailableJob(ctx context.Context, runner *models.Runner) (*models.Job, error) {
+func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*models.Job, error) {
+	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if runner == nil {
+		return nil, errors.New("runner was deleted", errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if runner.Disabled {
+		// Return nil since runner is disabled
+		return nil, nil
+	}
+
 	// Request next available Job
 	queuedStatus := models.JobQueued
 	sortBy := db.JobSortableFieldCreatedAtAsc

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres" // Register Postgres dialect
 	"github.com/golang-migrate/migrate/v4"
@@ -98,6 +99,8 @@ type Client struct {
 	TerraformProviderVersionMirrors  TerraformProviderVersionMirrors
 	TerraformProviderPlatformMirrors TerraformProviderPlatformMirrors
 	MaintenanceModes                 MaintenanceModes
+	LogStreams                       LogStreams
+	RunnerSessions                   RunnerSessions
 }
 
 // NewClient creates a new Client
@@ -195,6 +198,8 @@ func NewClient(
 	dbClient.TerraformProviderVersionMirrors = NewTerraformProviderVersionMirrors(dbClient)
 	dbClient.TerraformProviderPlatformMirrors = NewTerraformProviderPlatformMirrors(dbClient)
 	dbClient.MaintenanceModes = NewMaintenanceModes(dbClient)
+	dbClient.LogStreams = NewLogStreams(dbClient)
+	dbClient.RunnerSessions = NewRunnerSessions(dbClient)
 
 	return dbClient, nil
 }
@@ -212,6 +217,30 @@ func (db *Client) getConnection(ctx context.Context) connection {
 	}
 	// Return transaction if it exists on the context
 	return trx
+}
+
+// RetryOnOLE will retry the given function if an optimistic lock error occurs
+func (db *Client) RetryOnOLE(ctx context.Context, fn func() error) error {
+	return retry.Do(
+		func() error {
+			return fn()
+		},
+		retry.Attempts(1000),
+		retry.DelayType(retry.FixedDelay),
+		retry.Delay(10*time.Millisecond),
+		retry.RetryIf(func(err error) bool {
+			// Only retry on optimistic lock errors
+			return te.ErrorCode(err) == te.EOptimisticLock
+		}),
+		retry.OnRetry(func(n uint, _ error) {
+			// Explicitly do nothing
+			if n > 100 {
+				db.logger.Errorf("Warning, OLE retry function has reached %d attempts", n)
+			}
+		}),
+		retry.LastErrorOnly(true),
+		retry.Context(ctx),
+	)
 }
 
 type scanner interface {

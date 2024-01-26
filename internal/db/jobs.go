@@ -24,10 +24,6 @@ type Jobs interface {
 	GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, error)
 	UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error)
 	CreateJob(ctx context.Context, job *models.Job) (*models.Job, error)
-	GetJobLogDescriptor(ctx context.Context, id string) (*models.JobLogDescriptor, error)
-	GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*models.JobLogDescriptor, error)
-	CreateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error)
-	UpdateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error)
 	GetJobCountForRunner(ctx context.Context, runnerID string) (int, error)
 }
 
@@ -37,13 +33,14 @@ type JobSortableField string
 // GroupSortableField constants
 const (
 	JobSortableFieldCreatedAtAsc  JobSortableField = "CREATED_AT_ASC"
+	JobSortableFieldCreatedAtDesc JobSortableField = "CREATED_AT_DESC"
 	JobSortableFieldUpdatedAtAsc  JobSortableField = "UPDATED_AT_ASC"
 	JobSortableFieldUpdatedAtDesc JobSortableField = "UPDATED_AT_DESC"
 )
 
 func (js JobSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch js {
-	case JobSortableFieldCreatedAtAsc:
+	case JobSortableFieldCreatedAtAsc, JobSortableFieldCreatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "created_at", Table: "jobs", Col: "created_at"}
 	case JobSortableFieldUpdatedAtAsc, JobSortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "jobs", Col: "updated_at"}
@@ -63,6 +60,7 @@ func (js JobSortableField) getSortDirection() pagination.SortDirection {
 type JobFilter struct {
 	RunID       *string
 	WorkspaceID *string
+	RunnerID    *string
 	JobType     *models.JobType
 	JobStatus   *models.JobStatus
 	JobIDs      []string
@@ -88,13 +86,9 @@ type jobs struct {
 	dbClient *Client
 }
 
-var (
-	jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
-		"cancel_requested", "cancel_requested_at",
-		"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration")
-
-	jobLogDescriptorFieldList = append(metadataFieldList, "job_id", "size")
-)
+var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
+	"cancel_requested", "cancel_requested_at",
+	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration")
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -148,6 +142,10 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 
 		if input.Filter.WorkspaceID != nil {
 			ex["jobs.workspace_id"] = *input.Filter.WorkspaceID
+		}
+
+		if input.Filter.RunnerID != nil {
+			ex["jobs.runner_id"] = *input.Filter.RunnerID
 		}
 
 		if input.Filter.JobType != nil {
@@ -312,136 +310,6 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 	return createdJob, nil
 }
 
-func (j *jobs) GetJobLogDescriptorByJobID(ctx context.Context, jobID string) (*models.JobLogDescriptor, error) {
-	ctx, span := tracer.Start(ctx, "db.GetJobLogDescriptorByJobID")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	query := dialect.From(goqu.T("job_log_descriptors")).
-		Prepared(true).
-		Select(jobLogDescriptorFieldList...).
-		Where(goqu.Ex{"job_id": jobID})
-
-	sql, args, err := query.ToSQL()
-	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
-	}
-
-	descriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	return descriptor, nil
-}
-
-func (j *jobs) GetJobLogDescriptor(ctx context.Context, id string) (*models.JobLogDescriptor, error) {
-	ctx, span := tracer.Start(ctx, "db.GetJobLogDescriptor")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	query := dialect.From(goqu.T("job_log_descriptors")).
-		Prepared(true).
-		Select(jobLogDescriptorFieldList...).
-		Where(goqu.Ex{"id": id})
-
-	sql, args, err := query.ToSQL()
-	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
-	}
-
-	descriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	return descriptor, nil
-}
-
-func (j *jobs) CreateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
-	ctx, span := tracer.Start(ctx, "db.CreateJobLogDescriptor")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	timestamp := currentTime()
-
-	sql, args, err := dialect.Insert("job_log_descriptors").
-		Prepared(true).
-		Rows(goqu.Record{
-			"id":         newResourceID(),
-			"version":    initialResourceVersion,
-			"created_at": timestamp,
-			"updated_at": timestamp,
-			"job_id":     descriptor.JobID,
-			"size":       descriptor.Size,
-		}).
-		Returning(jobLogDescriptorFieldList...).ToSQL()
-
-	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
-	}
-
-	createdDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	return createdDescriptor, nil
-}
-
-func (j *jobs) UpdateJobLogDescriptor(ctx context.Context, descriptor *models.JobLogDescriptor) (*models.JobLogDescriptor, error) {
-	ctx, span := tracer.Start(ctx, "db.UpdateJobLogDescriptor")
-	// TODO: Consider setting trace/span attributes for the input.
-	defer span.End()
-
-	timestamp := currentTime()
-
-	sql, args, err := dialect.Update("job_log_descriptors").
-		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"size":       descriptor.Size,
-			},
-		).
-		Where(goqu.Ex{"id": descriptor.Metadata.ID, "version": descriptor.Metadata.Version}).
-		Returning(jobLogDescriptorFieldList...).ToSQL()
-
-	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
-	}
-
-	updatedDescriptor, err := scanJobLogDescriptor(j.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			tracing.RecordError(span, err, "optimistic lock error")
-			return nil, ErrOptimisticLockError
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	return updatedDescriptor, nil
-}
-
 func (j *jobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, error) {
 	ctx, span := tracer.Start(ctx, "db.GetJobCountForRunner")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -554,25 +422,4 @@ func scanJob(row scanner) (*models.Job, error) {
 	}
 
 	return job, nil
-}
-
-func scanJobLogDescriptor(row scanner) (*models.JobLogDescriptor, error) {
-	descriptor := &models.JobLogDescriptor{}
-
-	fields := []interface{}{
-		&descriptor.Metadata.ID,
-		&descriptor.Metadata.CreationTimestamp,
-		&descriptor.Metadata.LastUpdatedTimestamp,
-		&descriptor.Metadata.Version,
-		&descriptor.JobID,
-		&descriptor.Size,
-	}
-
-	err := row.Scan(fields...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return descriptor, nil
 }

@@ -57,6 +57,33 @@ func NewClient(apiURL string, serviceAccountPath string, credentialHelperPath st
 	return &Client{tharsisClient: client}, nil
 }
 
+// CreateRunnerSession creates a new runner session.
+func (c *Client) CreateRunnerSession(ctx context.Context, input *runner.CreateRunnerSessionInput) (string, error) {
+	runnerSession, err := c.tharsisClient.RunnerSession.CreateRunnerSession(ctx, &types.CreateRunnerSessionInput{
+		RunnerPath: input.RunnerPath,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return runnerSession.Metadata.ID, nil
+}
+
+// SendRunnerSessionHeartbeat sends a runner session heartbeat for the specified runner session.
+func (c *Client) SendRunnerSessionHeartbeat(ctx context.Context, runnerSessionID string) error {
+	return c.tharsisClient.RunnerSession.SendRunnerSessionHeartbeat(ctx, &types.RunnerSessionHeartbeatInput{
+		RunnerSessionID: runnerSessionID,
+	})
+}
+
+// CreateRunnerSessionError creates a runner session error for the specified runner session.
+func (c *Client) CreateRunnerSessionError(ctx context.Context, runnerSessionID string, err error) error {
+	return c.tharsisClient.RunnerSession.CreateRunnerSessionError(ctx, &types.CreateRunnerSessionErrorInput{
+		RunnerSessionID: runnerSessionID,
+		ErrorMessage:    err.Error(),
+	})
+}
+
 // ClaimJob claims the next available job for the specified runner
 func (c *Client) ClaimJob(ctx context.Context, input *runner.ClaimJobInput) (*runner.ClaimJobResponse, error) {
 	for {

@@ -99,6 +99,8 @@ func NewGraphQL(
 	resolver.RegisterRoleLoader(loaderCollection)
 	resolver.RegisterRunnerLoader(loaderCollection)
 	resolver.RegisterTerraformProviderVersionMirrorLoader(loaderCollection)
+	resolver.RegisterRunnerSessionLogStreamLoader(loaderCollection)
+	resolver.RegisterJobLogStreamLoader(loaderCollection)
 
 	schema := graphql.MustParseSchema(schemaStr, resolver.NewRootResolver(), graphql.UseFieldResolvers(),
 		graphql.Tracer(&otel.Tracer{
@@ -251,7 +253,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					case errors.EInternal:
 						h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
 					case errors.EUnauthorized:
-						h.logger.Infof("Unauthorized request from subject: %s", subject)
+						h.logger.Infof("Unauthorized request from subject: %s", *subject)
 					}
 				}
 

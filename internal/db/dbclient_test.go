@@ -3,8 +3,10 @@
 package db
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 const (
@@ -172,6 +175,127 @@ func (tc *testClient) wipeAllTables(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+type sortableField interface {
+	getFieldDescriptor() *pagination.FieldDescriptor
+	getSortDirection() pagination.SortDirection
+	getValue() string
+}
+
+func testResourcePaginationAndSorting(
+	ctx context.Context,
+	t *testing.T,
+	totalCount int,
+	sortableFields []sortableField,
+	getResourcesFunc func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error),
+) {
+	/* Test pagination in forward direction */
+	defaultSortBy := sortableFields[0]
+
+	middleIndex := totalCount / 2
+	pageInfo, resources, err := getResourcesFunc(ctx, defaultSortBy, &pagination.Options{
+		First: ptr.Int32(int32(middleIndex)),
+	})
+	require.Nil(t, err)
+
+	assert.Equal(t, middleIndex, len(resources))
+	assert.True(t, pageInfo.HasNextPage)
+	assert.False(t, pageInfo.HasPreviousPage)
+
+	cursor, err := pageInfo.Cursor(resources[len(resources)-1])
+	require.Nil(t, err)
+
+	remaining := totalCount - middleIndex
+	pageInfo, resources, err = getResourcesFunc(ctx, defaultSortBy, &pagination.Options{
+		First: ptr.Int32(int32(remaining)),
+		After: cursor,
+	})
+	require.Nil(t, err)
+
+	assert.Equal(t, remaining, len(resources))
+	assert.True(t, pageInfo.HasPreviousPage)
+	assert.False(t, pageInfo.HasNextPage)
+
+	/* Test pagination in reverse direction */
+
+	pageInfo, resources, err = getResourcesFunc(ctx, defaultSortBy, &pagination.Options{
+		Last: ptr.Int32(int32(middleIndex)),
+	})
+	require.Nil(t, err)
+
+	assert.Equal(t, middleIndex, len(resources))
+	assert.False(t, pageInfo.HasNextPage)
+	assert.True(t, pageInfo.HasPreviousPage)
+
+	cursor, err = pageInfo.Cursor(resources[len(resources)-1])
+	require.Nil(t, err)
+
+	remaining = totalCount - middleIndex
+	pageInfo, resources, err = getResourcesFunc(ctx, defaultSortBy, &pagination.Options{
+		Last:   ptr.Int32(int32(remaining)),
+		Before: cursor,
+	})
+	require.Nil(t, err)
+
+	assert.Equal(t, remaining, len(resources))
+	assert.False(t, pageInfo.HasPreviousPage)
+	assert.True(t, pageInfo.HasNextPage)
+
+	/* Test sorting */
+	for _, sortByField := range sortableFields {
+		_, resources, err = getResourcesFunc(ctx, sortByField, &pagination.Options{})
+		require.Nil(t, err)
+
+		values := []string{}
+		for _, resource := range resources {
+			value, err := resource.ResolveMetadata(sortByField.getFieldDescriptor().Key)
+			require.Nil(t, err)
+			values = append(values, value)
+		}
+
+		// Must detect whether values are iso8601 timestamps, which are similar enough to RFC 3339 to use that layout.
+		// If they are, must convert them and sort as time.Time rather than as strings.
+		// That is because truncated trailing zeros cause string comparison to be different vs. time value comparison.
+		areAllTimestamps := true
+		timeValues := []time.Time{}
+		for _, value := range values {
+			tv, err := time.Parse(time.RFC3339, value)
+			if err != nil {
+				areAllTimestamps = false
+				break
+			}
+			timeValues = append(timeValues, tv)
+		}
+
+		if areAllTimestamps {
+			// Time value sort/comparison.
+			expectedTimes := []time.Time{}
+			expectedTimes = append(expectedTimes, timeValues...)
+
+			slices.SortFunc(expectedTimes, func(a, b time.Time) int {
+				if sortByField.getSortDirection() == pagination.AscSort {
+					return int(a.Sub(b)) // positive if a is later/greater than g
+				}
+				return int(b.Sub(a)) // positive if b is later/greater than a
+			})
+
+			assert.Equal(t, expectedTimes, timeValues, "resources are not sorted correctly when using sort by %s", sortByField.getValue())
+		} else {
+			// Ordinary string sort/comparison.
+			expectedValues := []string{}
+			expectedValues = append(expectedValues, values...)
+
+			slices.SortFunc(expectedValues, func(a, b string) int {
+				if sortByField.getSortDirection() == pagination.AscSort {
+					return cmp.Compare(a, b)
+				}
+				return cmp.Compare(b, a)
+			})
+
+			assert.Equal(t, expectedValues, values, "resources are not sorted correctly when using sort by %s", sortByField.getValue())
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////

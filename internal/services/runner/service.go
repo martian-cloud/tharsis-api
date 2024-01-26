@@ -5,19 +5,29 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/fatih/color"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
+
+const runnerErrorLogsBytesLimit = 2 * 1024 * 1024 // 2MiB
+
+var runnerLogsTimestampColor = color.New(color.FgGreen)
 
 // GetRunnersInput is the input for querying a list of runners
 type GetRunnersInput struct {
@@ -26,16 +36,54 @@ type GetRunnersInput struct {
 	// PaginationOptions supports cursor based pagination
 	PaginationOptions *pagination.Options
 	// NamespacePath is the namespace to return runners for
-	NamespacePath string
+	NamespacePath *string
+	// RunnerType is the type of runner to return
+	RunnerType *models.RunnerType
 	// IncludeInherited includes inherited runners in the result
 	IncludeInherited bool
 }
 
+// GetRunnerSessionsInput is the input for querying a list of runner sessions
+type GetRunnerSessionsInput struct {
+	// Sort specifies the field to sort on and direction
+	Sort *db.RunnerSessionSortableField
+	// PaginationOptions supports cursor based pagination
+	PaginationOptions *pagination.Options
+	// RunnerID is the runner to return sessions for
+	RunnerID string
+}
+
 // CreateRunnerInput is the input for creating a new runner
 type CreateRunnerInput struct {
+	GroupID     string
+	Disabled    *bool
 	Name        string
 	Description string
-	GroupID     string
+}
+
+// CreateRunnerSessionInput is the input for creating a new runner session.
+type CreateRunnerSessionInput struct {
+	RunnerPath string
+	Internal   bool
+}
+
+// SubscribeToRunnerSessionErrorLogInput includes options for setting up a log event subscription
+type SubscribeToRunnerSessionErrorLogInput struct {
+	LastSeenLogSize *int
+	RunnerSessionID string
+}
+
+// SubscribeToRunnerSessionsInput is the input for subscribing to runner sessions
+type SubscribeToRunnerSessionsInput struct {
+	GroupID    *string
+	RunnerID   *string
+	RunnerType *models.RunnerType
+}
+
+// SessionEvent is a runner session event
+type SessionEvent struct {
+	RunnerSession *models.RunnerSession
+	Action        string
 }
 
 // Service implements all runner related functionality
@@ -49,13 +97,24 @@ type Service interface {
 	DeleteRunner(ctx context.Context, runner *models.Runner) error
 	AssignServiceAccountToRunner(ctx context.Context, serviceAccountID string, runnerID string) error
 	UnassignServiceAccountFromRunner(ctx context.Context, serviceAccountID string, runnerID string) error
+	CreateRunnerSession(ctx context.Context, input *CreateRunnerSessionInput) (*models.RunnerSession, error)
+	GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*db.RunnerSessionsResult, error)
+	GetRunnerSessionByID(ctx context.Context, id string) (*models.RunnerSession, error)
+	AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID string) error
+	CreateRunnerSessionError(ctx context.Context, runnerSessionID string, message string) error
+	ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) ([]byte, error)
+	SubscribeToRunnerSessionErrorLog(ctx context.Context, options *SubscribeToRunnerSessionErrorLogInput) (<-chan *logstream.LogEvent, error)
+	GetLogStreamsByRunnerSessionIDs(ctx context.Context, idList []string) ([]models.LogStream, error)
+	SubscribeToRunnerSessions(ctx context.Context, options *SubscribeToRunnerSessionsInput) (<-chan *SessionEvent, error)
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	limitChecker    limits.LimitChecker
-	activityService activityevent.Service
+	logger           logger.Logger
+	dbClient         *db.Client
+	limitChecker     limits.LimitChecker
+	activityService  activityevent.Service
+	logStreamManager logstream.Manager
+	eventManager     *events.EventManager
 }
 
 // NewService creates an instance of Service
@@ -64,12 +123,19 @@ func NewService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
+	logStreamManager logstream.Manager,
+	eventManager *events.EventManager,
 ) Service {
+	// Enable timestamp color output
+	runnerLogsTimestampColor.EnableColor()
+
 	return &service{
-		logger:          logger,
-		dbClient:        dbClient,
-		limitChecker:    limitChecker,
-		activityService: activityService,
+		logger:           logger,
+		dbClient:         dbClient,
+		limitChecker:     limitChecker,
+		activityService:  activityService,
+		logStreamManager: logStreamManager,
+		eventManager:     eventManager,
 	}
 }
 
@@ -84,16 +150,25 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunnerPermission, auth.WithNamespacePath(input.NamespacePath))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
+	if input.NamespacePath != nil {
+		err = caller.RequirePermission(ctx, permissions.ViewRunnerPermission, auth.WithNamespacePath(*input.NamespacePath))
+		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
+			return nil, err
+		}
+	} else if !caller.IsAdmin() {
+		return nil, errors.New(
+			"Only system admins can access shared runners",
+			errors.WithErrorCode(errors.EForbidden),
+		)
 	}
 
-	filter := &db.RunnerFilter{}
+	filter := &db.RunnerFilter{
+		RunnerType: input.RunnerType,
+	}
 
-	if input.IncludeInherited {
-		pathParts := strings.Split(input.NamespacePath, "/")
+	if input.IncludeInherited && input.NamespacePath != nil {
+		pathParts := strings.Split(*input.NamespacePath, "/")
 
 		paths := []string{""}
 		for len(pathParts) > 0 {
@@ -103,10 +178,10 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 		}
 
 		filter.NamespacePaths = paths
-	} else {
+	} else if input.NamespacePath != nil {
 		// This will return an empty result for workspace namespaces because workspaces
 		// don't have runners directly associated (i.e. only group namespaces do)
-		filter.NamespacePaths = []string{input.NamespacePath}
+		filter.NamespacePaths = []string{*input.NamespacePath}
 	}
 
 	result, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
@@ -118,6 +193,7 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 		tracing.RecordError(span, err, "failed to get runners")
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -126,7 +202,7 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
@@ -142,17 +218,8 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 		return nil, err
 	}
 
-	namespacePaths := []string{}
-	for _, r := range result.Runners {
-		if r.GroupID != nil {
-			namespacePaths = append(namespacePaths, r.GetGroupPath())
-		}
-	}
-
-	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithNamespacePaths(namespacePaths))
-		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
+	for ix := range result.Runners {
+		if err := RequireViewerAccessToRunner(ctx, &result.Runners[ix]); err != nil {
 			return nil, err
 		}
 	}
@@ -240,12 +307,215 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
+func (s *service) GetRunnerSessionByID(ctx context.Context, id string) (*models.RunnerSession, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerSessionByID")
+	span.SetAttributes(attribute.String("runnerSessionID", id))
+	defer span.End()
+
+	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		return nil, err
+	}
+
+	session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner session by ID", errors.WithSpan(span))
+	}
+
+	if session == nil {
+		return nil, errors.New("runner session with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	runner, err := s.getRunnerByID(ctx, span, session.RunnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := RequireViewerAccessToRunner(ctx, runner); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (s *service) GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*db.RunnerSessionsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerSessions")
+	span.SetAttributes(attribute.String("runnerID", input.RunnerID))
+	defer span.End()
+
+	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		return nil, err
+	}
+
+	runner, err := s.getRunnerByID(ctx, span, input.RunnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+		return nil, err
+	}
+
+	result, err := s.dbClient.RunnerSessions.GetRunnerSessions(ctx, &db.GetRunnerSessionsInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.RunnerSessionFilter{
+			RunnerID: &input.RunnerID,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner sessions", errors.WithSpan(span))
+	}
+
+	return result, nil
+}
+
+func (s *service) AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID string) error {
+	ctx, span := tracer.Start(ctx, "svc.AcceptRunnerSessionHeartbeat")
+	span.SetAttributes(attribute.String("sessionID", sessionID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	return s.dbClient.RetryOnOLE(ctx, func() error {
+		session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, sessionID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get runner session by ID", errors.WithSpan(span))
+		}
+
+		if session == nil {
+			return errors.New("runner session not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+		}
+
+		err = caller.RequirePermission(ctx, permissions.UpdateRunnerSessionPermission, auth.WithRunnerID(session.RunnerID))
+		if err != nil {
+			return err
+		}
+
+		session.LastContactTimestamp = time.Now().UTC()
+
+		_, err = s.dbClient.RunnerSessions.UpdateRunnerSession(ctx, session)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSessionInput) (*models.RunnerSession, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateRunnerSession")
+	span.SetAttributes(attribute.String("runnerPath", input.RunnerPath))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	runner, err := s.getRunnerByPath(ctx, span, input.RunnerPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.CreateRunnerSessionPermission, auth.WithRunnerID(runner.Metadata.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer CreateRunnerSession: %v", txErr)
+		}
+	}()
+
+	// Execute create first to ensure that no other runner sessions can be created while the transaction is in progress
+	session, err := s.dbClient.RunnerSessions.CreateRunnerSession(txContext, &models.RunnerSession{
+		RunnerID:             runner.Metadata.ID,
+		LastContactTimestamp: time.Now().UTC(),
+		Internal:             input.Internal,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Create log stream for session
+	_, err = s.dbClient.LogStreams.CreateLogStream(txContext, &models.LogStream{
+		RunnerSessionID: &session.Metadata.ID,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create log stream", errors.WithSpan(span))
+	}
+
+	// Check how many sessions are currently active for the runner.
+	activeSessionsResponse, err := s.dbClient.RunnerSessions.GetRunnerSessions(txContext, &db.GetRunnerSessionsInput{
+		Filter: &db.RunnerSessionFilter{
+			RunnerID: &runner.Metadata.ID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner sessions", errors.WithSpan(span))
+	}
+
+	// Check if the sessions per runner limit has been exceeded
+	if err := s.limitChecker.CheckLimit(ctx, limits.ResourceLimitRunnerSessionsPerRunner, activeSessionsResponse.PageInfo.TotalCount); err != nil {
+		if errors.ErrorCode(err) != errors.EInvalid {
+			return nil, errors.Wrap(err, "failed to check limit", errors.WithSpan(span))
+		}
+
+		// Remove the oldest session
+		sortBy := db.RunnerSessionSortableFieldLastContactedAtAsc
+		oldestSessionResponse, err := s.dbClient.RunnerSessions.GetRunnerSessions(txContext, &db.GetRunnerSessionsInput{
+			Sort: &sortBy,
+			Filter: &db.RunnerSessionFilter{
+				RunnerID: &runner.Metadata.ID,
+			},
+			PaginationOptions: &pagination.Options{
+				First: ptr.Int32(1),
+			},
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get runner sessions", errors.WithSpan(span))
+		}
+
+		if len(oldestSessionResponse.RunnerSessions) > 0 {
+			oldestSession := oldestSessionResponse.RunnerSessions[0]
+
+			// If the oldest session is still active then no more sessions can be created until it's
+			// not active anymore
+			if oldestSession.Active() {
+				return nil, errors.New("too many active sessions", errors.WithSpan(span), errors.WithErrorCode(errors.ETooManyRequests))
+			}
+
+			if err = s.dbClient.RunnerSessions.DeleteRunnerSession(txContext, &oldestSession); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
+	}
+
+	return session, nil
+}
+
 func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetRunnerByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
@@ -262,12 +532,8 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 		return nil, errors.New("runner with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	if runner.GroupID != nil {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*runner.GroupID))
-		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
-			return nil, err
-		}
+	if err := RequireViewerAccessToRunner(ctx, runner); err != nil {
+		return nil, err
 	}
 
 	return runner, nil
@@ -278,7 +544,7 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
@@ -295,12 +561,8 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 		return nil, errors.New("runner with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	if runner.GroupID != nil {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*runner.GroupID))
-		if err != nil {
-			tracing.RecordError(span, err, "inheritable resource access check failed")
-			return nil, err
-		}
+	if err := RequireViewerAccessToRunner(ctx, runner); err != nil {
+		return nil, err
 	}
 
 	return runner, nil
@@ -405,6 +667,8 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	return createdRunner, nil
 }
 
+// UpdateRunner updates a runner.
+// In Tharsis, the model passed as an argument already has the 'Disabled' field set to the desired value.
 func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*models.Runner, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdateRunner")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -578,4 +842,365 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 	}
 
 	return s.dbClient.ServiceAccounts.UnassignServiceAccountFromRunner(ctx, serviceAccountID, runnerID)
+}
+
+func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID string, message string) error {
+	ctx, span := tracer.Start(ctx, "svc.CreateRunnerSessionError")
+	span.SetAttributes(attribute.String("runner_session_id", runnerSessionID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	return s.dbClient.RetryOnOLE(ctx, func() error {
+		session, err := s.getRunnerSessionByID(ctx, span, runnerSessionID)
+		if err != nil {
+			return err
+		}
+
+		err = caller.RequirePermission(ctx, permissions.UpdateRunnerSessionPermission, auth.WithRunnerID(session.RunnerID))
+		if err != nil {
+			return err
+		}
+
+		// Find log stream associated with runner session
+		stream, err := s.dbClient.LogStreams.GetLogStreamByRunnerSessionID(ctx, runnerSessionID)
+		if err != nil {
+			return err
+		}
+		if stream == nil {
+			return errors.New("log stream not found for runner session: %s", runnerSessionID)
+		}
+
+		timestamp := runnerLogsTimestampColor.Sprintf("%s:", time.Now().UTC().Format(time.RFC3339Nano))
+
+		buf := []byte(fmt.Sprintf("%s %s\n", timestamp, message))
+
+		// Check if the new logs will exceed the limit
+		if (stream.Size + len(buf)) > runnerErrorLogsBytesLimit {
+			return errors.New("runner session error log size limit exceeded", errors.WithErrorCode(errors.ETooLarge))
+		}
+
+		txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+				s.logger.Errorf("failed to rollback tx: %v", txErr)
+			}
+		}()
+
+		// Update session error count
+		session.ErrorCount++
+		_, err = s.dbClient.RunnerSessions.UpdateRunnerSession(txContext, session)
+		if err != nil {
+			return err
+		}
+
+		// Write logs to store
+		_, err = s.logStreamManager.WriteLogs(txContext, stream.Metadata.ID, stream.Size, buf)
+		if err != nil {
+			return err
+		}
+
+		return s.dbClient.Transactions.CommitTx(txContext)
+	})
+}
+
+func (s *service) ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) ([]byte, error) {
+	ctx, span := tracer.Start(ctx, "svc.ReadRunnerSessionErrorLog")
+	span.SetAttributes(attribute.String("runner_session_id", runnerSessionID))
+	defer span.End()
+
+	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		return nil, err
+	}
+
+	session, err := s.getRunnerSessionByID(ctx, span, runnerSessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	runner, err := s.getRunnerByID(ctx, span, session.RunnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+		return nil, err
+	}
+
+	// Find log stream associated with runner session
+	stream, err := s.dbClient.LogStreams.GetLogStreamByRunnerSessionID(ctx, runnerSessionID)
+	if err != nil {
+		return nil, err
+	}
+	if stream == nil {
+		return nil, errors.New("log stream not found for runner session: %s", runnerSessionID)
+	}
+
+	return s.logStreamManager.ReadLogs(ctx, stream.Metadata.ID, startOffset, limit)
+}
+
+func (s *service) SubscribeToRunnerSessionErrorLog(ctx context.Context, options *SubscribeToRunnerSessionErrorLogInput) (<-chan *logstream.LogEvent, error) {
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToRunnerSessionErrorLog")
+	defer span.End()
+
+	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		return nil, err
+	}
+
+	session, err := s.getRunnerSessionByID(ctx, span, options.RunnerSessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	runner, err := s.getRunnerByID(ctx, span, session.RunnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+		return nil, err
+	}
+
+	logStream, err := s.dbClient.LogStreams.GetLogStreamByRunnerSessionID(ctx, session.Metadata.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get log stream by runner session ID", errors.WithSpan(span))
+	}
+
+	if logStream == nil {
+		return nil, fmt.Errorf("log stream not found for runner session %s", session.Metadata.ID)
+	}
+
+	return s.logStreamManager.Subscribe(ctx, &logstream.SubscriptionOptions{
+		LastSeenLogSize: options.LastSeenLogSize,
+		LogStreamID:     logStream.Metadata.ID,
+	})
+}
+
+func (s *service) GetLogStreamsByRunnerSessionIDs(ctx context.Context, idList []string) ([]models.LogStream, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetLogStreamsByRunnerSessionIDs")
+	defer span.End()
+
+	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		return nil, err
+	}
+
+	if len(idList) == 0 {
+		return []models.LogStream{}, nil
+	}
+
+	runnerSessionsResp, err := s.dbClient.RunnerSessions.GetRunnerSessions(ctx, &db.GetRunnerSessionsInput{
+		Filter: &db.RunnerSessionFilter{
+			RunnerSessionIDs: idList,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	runnerIDMap := map[string]struct{}{}
+	for _, session := range runnerSessionsResp.RunnerSessions {
+		runnerIDMap[session.RunnerID] = struct{}{}
+	}
+
+	runnerIDs := make([]string, 0, len(runnerIDMap))
+	for runnerID := range runnerIDMap {
+		runnerIDs = append(runnerIDs, runnerID)
+	}
+
+	runnersResp, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
+		Filter: &db.RunnerFilter{
+			RunnerIDs: runnerIDs,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify caller has access to all runners.
+	for ix := range runnersResp.Runners {
+		if err = RequireViewerAccessToRunner(ctx, &runnersResp.Runners[ix]); err != nil {
+			return nil, err
+		}
+	}
+
+	result, err := s.dbClient.LogStreams.GetLogStreams(ctx, &db.GetLogStreamsInput{
+		Filter: &db.LogStreamFilter{
+			RunnerSessionIDs: idList,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result.LogStreams, nil
+}
+
+func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *SubscribeToRunnerSessionsInput) (<-chan *SessionEvent, error) {
+	ctx, span := tracer.Start(ctx, "svc.SubscribeToRunnerSessions")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if options.GroupID != nil {
+		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*options.GroupID))
+		if err != nil {
+			return nil, err
+		}
+	} else if options.RunnerID != nil {
+		runner, err := s.getRunnerByID(ctx, span, *options.RunnerID)
+		if err != nil {
+			return nil, err
+		}
+		if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+			return nil, err
+		}
+	} else if !caller.IsAdmin() {
+		return nil, errors.New(
+			"Only system admins can subscribe to all runner sessions",
+			errors.WithErrorCode(errors.EForbidden),
+		)
+	}
+
+	subscription := events.Subscription{
+		Type: events.RunnerSessionSubscription,
+		Actions: []events.SubscriptionAction{
+			events.CreateAction,
+			events.UpdateAction,
+		},
+	}
+
+	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
+
+	outgoing := make(chan *SessionEvent)
+	go func() {
+		// Defer close of outgoing channel
+		defer close(outgoing)
+		defer s.eventManager.Unsubscribe(subscriber)
+
+		// Wait for runner session updates
+		for {
+			event, err := subscriber.GetEvent(ctx)
+			if err != nil {
+				if !errors.IsContextCanceledError(err) {
+					s.logger.Errorf("Error occurred while waiting for runner session events: %v", err)
+				}
+				return
+			}
+
+			session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, event.ID)
+			if err != nil {
+				s.logger.Errorf("Error querying for runner session in subscription goroutine: %v", err)
+				continue
+			}
+			if session == nil {
+				s.logger.Errorf("Received event for runner session that does not exist %s", event.ID)
+				continue
+			}
+
+			// Check if this event is for the runner we're interested in
+			if options.RunnerID != nil && *options.RunnerID != session.RunnerID {
+				continue
+			}
+
+			if options.GroupID != nil || options.RunnerID != nil {
+				// We need to query the runner to check if it belongs to the organization
+				runner, err := s.getRunnerByID(ctx, span, session.RunnerID)
+				if err != nil {
+					s.logger.Errorf("Error querying for runner in subscription goroutine: %v", err)
+					continue
+				}
+				if options.GroupID != nil && *runner.GroupID != *options.GroupID {
+					continue
+				}
+				if options.RunnerType != nil && runner.Type != *options.RunnerType {
+					continue
+				}
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case outgoing <- &SessionEvent{RunnerSession: session, Action: event.Action}:
+			}
+		}
+	}()
+
+	return outgoing, nil
+}
+
+func (s *service) getRunnerByPath(ctx context.Context, span trace.Span, path string) (*models.Runner, error) {
+	runner, err := s.dbClient.Runners.GetRunnerByPath(ctx, path)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner by path", errors.WithSpan(span))
+	}
+
+	if runner == nil {
+		return nil, errors.New("runner with path %s not found", path, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	return runner, nil
+}
+
+func (s *service) getRunnerByID(ctx context.Context, span trace.Span, id string) (*models.Runner, error) {
+	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner by ID", errors.WithSpan(span))
+	}
+
+	if runner == nil {
+		return nil, errors.New("runner with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	return runner, nil
+}
+
+func (s *service) getRunnerSessionByID(ctx context.Context, span trace.Span, id string) (*models.RunnerSession, error) {
+	session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner session by ID", errors.WithSpan(span))
+	}
+
+	if session == nil {
+		return nil, errors.New("runner session with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	return session, nil
+}
+
+// RequireViewerAccessToRunner checks if the caller has viewer access to the runner.
+func RequireViewerAccessToRunner(ctx context.Context, runner *models.Runner) error {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return err
+	}
+
+	switch runner.Type {
+	case models.GroupRunnerType:
+		err := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+			auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
+		if err != nil {
+			return err
+		}
+	case models.SharedRunnerType:
+		if !caller.IsAdmin() {
+			return errors.New(
+				"Only system admins can access shared runners",
+				errors.WithErrorCode(errors.EForbidden),
+			)
+		}
+	default:
+		return errors.New("unknown runner type %s", runner.Type)
+	}
+
+	return nil
 }

@@ -3,6 +3,12 @@ enum RunnerSort {
   UPDATED_AT_DESC
 }
 
+# The case of the values must match the model.
+enum RunnerType {
+  group
+  shared
+}
+
 type RunnerConnection {
   totalCount: Int!
   pageInfo: PageInfo!
@@ -17,6 +23,7 @@ type RunnerEdge {
 type AssignServiceAccountToRunnerPayload {
   clientMutationId: String
   runner: Runner
+  serviceAccount: ServiceAccount
   problems: [Problem!]!
 }
 
@@ -47,7 +54,22 @@ type Runner implements Node {
   description: String!
   group: Group!
   createdBy: String!
-  type: String!
+  type: RunnerType!
+  disabled: Boolean!
+  sessions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: RunnerSessionSort
+  ): RunnerSessionConnection!
+  jobs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: JobSort
+  ): JobConnection!
   assignedServiceAccounts(
     after: String
     before: String
@@ -67,6 +89,7 @@ input CreateRunnerInput {
   name: String!
   description: String!
   groupPath: String!
+  disabled: Boolean
 }
 
 input UpdateRunnerInput {
@@ -74,6 +97,7 @@ input UpdateRunnerInput {
   id: ID!
   metadata: ResourceMetadataInput
   description: String!
+  disabled: Boolean
 }
 
 input DeleteRunnerInput {

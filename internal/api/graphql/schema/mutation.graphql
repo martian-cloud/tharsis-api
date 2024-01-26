@@ -192,4 +192,13 @@ type Mutation {
   disableMaintenanceMode(
     input: DisableMaintenanceModeInput!
   ): DisableMaintenanceModePayload!
+  createRunnerSession(
+    input: CreateRunnerSessionInput!
+  ): CreateRunnerSessionPayload!
+  runnerSessionHeartbeat(
+    input: RunnerSessionHeartbeatInput!
+  ): RunnerSessionHeartbeatPayload!
+  createRunnerSessionError(
+    input: CreateRunnerSessionErrorInput!
+  ): CreateRunnerSessionErrorPayload!
 }

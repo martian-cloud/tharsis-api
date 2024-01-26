@@ -15,6 +15,7 @@ const (
 	PlanResourceType                    ResourceType = "plan"
 	ApplyResourceType                   ResourceType = "apply"
 	RunnerResourceType                  ResourceType = "runner"
+	RunnerSessionResourceType           ResourceType = "runner_session"
 	UserResourceType                    ResourceType = "user"
 	VariableResourceType                ResourceType = "variable"
 	TerraformProviderResourceType       ResourceType = "terraform_provider"
