@@ -278,6 +278,20 @@ func (r *RunResolver) TerraformVersion() string {
 	return r.run.TerraformVersion
 }
 
+// StateVersion resolver
+func (r *RunResolver) StateVersion(ctx context.Context) (*StateVersionResolver, error) {
+	sv, err := loadRunStateVersion(ctx, r.run.Metadata.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &StateVersionResolver{stateVersion: sv}, nil
+}
+
 // RunVariableResolver resolves a variable resource
 type RunVariableResolver struct {
 	variable *run.Variable
@@ -619,6 +633,51 @@ func runBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
 	batch := loader.DataBatch{}
 	for _, result := range runs {
 		batch[result.Metadata.ID] = result
+	}
+
+	return batch, nil
+}
+
+/* Run state version loader */
+
+const runStateVersionLoaderKey = "runStateVersion"
+
+// RegisterRunStateVersionLoader registers a run state version loader function
+func RegisterRunStateVersionLoader(collection *loader.Collection) {
+	collection.Register(runStateVersionLoaderKey, runStateVersionBatchFunc)
+}
+
+func loadRunStateVersion(ctx context.Context, id string) (*models.StateVersion, error) {
+	ldr, err := loader.Extract(ctx, runStateVersionLoaderKey)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ldr.Load(ctx, dataloader.StringKey(id))()
+	if err != nil {
+		return nil, err
+	}
+
+	sv, ok := data.(models.StateVersion)
+	if !ok {
+		return nil, errors.New("Wrong type")
+	}
+
+	return &sv, nil
+}
+
+func runStateVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
+	stateVersions, err := getRunService(ctx).GetStateVersionsByRunIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of results
+	batch := loader.DataBatch{}
+	for _, result := range stateVersions {
+		// Use run ID as the key since that is the ID which was
+		// used to query the data
+		batch[*result.RunID] = result
 	}
 
 	return batch, nil

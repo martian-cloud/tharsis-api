@@ -48,6 +48,7 @@ type Run implements Node {
   plan: Plan!
   apply: Apply
   variables: [RunVariable!]!
+  stateVersion: StateVersion
   moduleSource: String
   moduleVersion: String
   moduleDigest: String

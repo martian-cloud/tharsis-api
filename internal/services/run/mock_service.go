@@ -382,6 +382,32 @@ func (_m *MockService) GetRunsByIDs(ctx context.Context, idList []string) ([]mod
 	return r0, r1
 }
 
+// GetStateVersionsByRunIDs provides a mock function with given fields: ctx, idList
+func (_m *MockService) GetStateVersionsByRunIDs(ctx context.Context, idList []string) ([]models.StateVersion, error) {
+	ret := _m.Called(ctx, idList)
+
+	var r0 []models.StateVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]models.StateVersion, error)); ok {
+		return rf(ctx, idList)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []models.StateVersion); ok {
+		r0 = rf(ctx, idList)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.StateVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, idList)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SubscribeToRunEvents provides a mock function with given fields: ctx, options
 func (_m *MockService) SubscribeToRunEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error) {
 	ret := _m.Called(ctx, options)

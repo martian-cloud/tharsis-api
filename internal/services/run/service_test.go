@@ -2,11 +2,13 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -18,6 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 type mockDBClient struct {
@@ -274,11 +277,11 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 	// Test cases
 	type testCase struct {
-		name            string
 		workspace       *models.Workspace
 		runInput        *CreateRunInput
-		expectErrorCode errors.CodeType
 		injectJob       *models.Job
+		name            string
+		expectErrorCode errors.CodeType
 	}
 
 	/*
@@ -575,6 +578,120 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			} else if err != nil {
 				t.Fatal(err)
 			}
+		})
+	}
+}
+
+func TestGetStateVersionsByRunIDs(t *testing.T) {
+	workspaceID := "ws1"
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+		runIDs          []string
+	}
+
+	testCases := []testCase{
+		{
+			name:   "get state versions by run ids",
+			runIDs: []string{"run1", "run2"},
+		},
+		{
+			name: "no run ids",
+		},
+		{
+			name:            "subject does not have permission to view run",
+			runIDs:          []string{"run1"},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockStateVersions := db.NewMockStateVersions(t)
+
+			runsCount := len(test.runIDs)
+
+			mockRuns.On("GetRuns", mock.Anything, &db.GetRunsInput{
+				Filter: &db.RunFilter{
+					RunIDs: test.runIDs,
+				},
+			}).Return(func(_ context.Context, _ *db.GetRunsInput) (*db.RunsResult, error) {
+				// Create runs
+				runs := make([]models.Run, runsCount)
+				for i := 0; i < runsCount; i++ {
+					runs[i] = models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: test.runIDs[i],
+						},
+						WorkspaceID: workspaceID,
+					}
+				}
+
+				return &db.RunsResult{
+					Runs: runs,
+					PageInfo: &pagination.PageInfo{
+						TotalCount: int32(runsCount),
+					},
+				}, nil
+			})
+
+			if runsCount > 0 {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError).Times(runsCount)
+
+				if test.authError == nil {
+					mockStateVersions.On("GetStateVersions", mock.Anything, &db.GetStateVersionsInput{
+						Filter: &db.StateVersionFilter{
+							RunIDs: test.runIDs,
+						},
+					}).Return(func(_ context.Context, _ *db.GetStateVersionsInput) (*db.StateVersionsResult, error) {
+						// Create state versions
+						stateVersions := make([]models.StateVersion, runsCount)
+						for i := 0; i < runsCount; i++ {
+							stateVersions[i] = models.StateVersion{
+								Metadata: models.ResourceMetadata{
+									ID: fmt.Sprintf("sv%d", i),
+								},
+								WorkspaceID: workspaceID,
+								RunID:       &test.runIDs[i],
+							}
+						}
+
+						return &db.StateVersionsResult{
+							StateVersions: stateVersions,
+							PageInfo: &pagination.PageInfo{
+								TotalCount: int32(runsCount),
+							},
+						}, nil
+					})
+				}
+			}
+
+			dbClient := &db.Client{
+				Runs:          mockRuns,
+				StateVersions: mockStateVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			result, err := service.GetStateVersionsByRunIDs(auth.WithCaller(ctx, mockCaller), test.runIDs)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result, runsCount)
 		})
 	}
 }

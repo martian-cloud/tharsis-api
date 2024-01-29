@@ -66,32 +66,6 @@ func (_m *MockStateVersions) GetStateVersion(ctx context.Context, id string) (*m
 	return r0, r1
 }
 
-// GetStateVersionByRunID provides a mock function with given fields: ctx, runID
-func (_m *MockStateVersions) GetStateVersionByRunID(ctx context.Context, runID string) (*models.StateVersion, error) {
-	ret := _m.Called(ctx, runID)
-
-	var r0 *models.StateVersion
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.StateVersion, error)); ok {
-		return rf(ctx, runID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.StateVersion); ok {
-		r0 = rf(ctx, runID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.StateVersion)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, runID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetStateVersions provides a mock function with given fields: ctx, input
 func (_m *MockStateVersions) GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*StateVersionsResult, error) {
 	ret := _m.Called(ctx, input)
