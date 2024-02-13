@@ -313,7 +313,7 @@ lint:
   before_script:
     - export PATH=$PATH:$GOPATH/bin
     - apk add git bash openssh ca-certificates
-    - go install github.com/mgechev/revive@latest
+    - go install github.com/mgechev/revive@$GO_LINTER_VERSION
   script:
     - go mod download
     - revive -set_exit_status ./...

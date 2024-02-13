@@ -18,8 +18,7 @@ import (
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
 
-// managedIdentityInfo aids convenience in accessing the information TestGetManagedIdentities
-// needs about the warmup managed identities.
+// managedIdentityInfo aids convenience in accessing the information TestGetManagedIdentities about the created resources.
 type managedIdentityInfo struct {
 	createTime        time.Time
 	updateTime        time.Time
@@ -39,40 +38,37 @@ type managedIdentityInfoUpdateSlice []managedIdentityInfo
 // managedIdentityInfoNameSlice makes a slice of managedIdentityInfo sortable by name
 type managedIdentityInfoNameSlice []managedIdentityInfo
 
-// warmupManagedIdentities holds the inputs to and outputs from createWarmupManagedIdentities.
-type warmupManagedIdentities struct {
-	groups            []models.Group
-	workspaces        []models.Workspace
-	teams             []models.Team
-	users             []models.User
-	serviceAccounts   []models.ServiceAccount
-	managedIdentities []models.ManagedIdentity
-	rules             []models.ManagedIdentityAccessRule
-}
-
 func TestGetManagedIdentityByID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
 
-	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
 	require.Nil(t, err)
-	assert.NotNil(t, createdAlias)
+
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       group1.Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &managedIdentity1.Metadata.ID,
+	})
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -84,12 +80,11 @@ func TestGetManagedIdentityByID(t *testing.T) {
 	}
 
 	// Do only one positive test case, because the logic is theoretically the same for all managed identities.
-	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
 		{
 			name:                  "positive",
-			searchID:              positiveManagedIdentity.Metadata.ID,
-			expectManagedIdentity: &positiveManagedIdentity,
+			searchID:              managedIdentity1.Metadata.ID,
+			expectManagedIdentity: managedIdentity1,
 		},
 		{
 			name:                  "positive: successfully retrieve a managed identity alias",
@@ -134,24 +129,32 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
 
-	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
 	require.Nil(t, err)
-	assert.NotNil(t, createdAlias)
+
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       group1.Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &managedIdentity1.Metadata.ID,
+	})
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -163,12 +166,11 @@ func TestGetManagedIdentityByPath(t *testing.T) {
 	}
 
 	// Do only one positive test case, because the logic is theoretically the same for all managed identities.
-	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
 		{
 			name:                  "positive",
-			searchID:              positiveManagedIdentity.ResourcePath,
-			expectManagedIdentity: &positiveManagedIdentity,
+			searchID:              managedIdentity1.ResourcePath,
+			expectManagedIdentity: managedIdentity1,
 		},
 		{
 			name:                  "positive: successfully retrieve a managed identity alias",
@@ -208,24 +210,42 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
 
-	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	maxJobDuration := int32((time.Hour * 12).Minutes())
+	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Description:    "workspace 0 for testing managed identity functions",
+		FullPath:       "top-level-group-0-for-managed-identities/workspace-0-for-managed-identities",
+		GroupID:        group1.Metadata.ID,
+		CreatedBy:      "someone-w0",
+		MaxJobDuration: &maxJobDuration,
+	})
 	require.Nil(t, err)
-	assert.NotNil(t, createdAlias)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       group1.Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &managedIdentity1.Metadata.ID,
+	})
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -238,18 +258,17 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	}
 
 	// Do the not-added-to-workspace test case first.
-	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
 		{
 			name:                    "not added to workspace",
-			workspaceID:             warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:             workspace1.Metadata.ID,
 			expectManagedIdentities: []models.ManagedIdentity{},
 		},
 		{
 			name:                    "positive",
-			workspaceID:             warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:             workspace1.Metadata.ID,
 			addToWorkspace:          true,
-			expectManagedIdentities: []models.ManagedIdentity{positiveManagedIdentity, *createdAlias},
+			expectManagedIdentities: []models.ManagedIdentity{*managedIdentity1, *createdAlias},
 		},
 		{
 			name:                    "negative, non-existent ID",
@@ -265,7 +284,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 			if test.addToWorkspace {
 				for _, identity := range test.expectManagedIdentities {
 					err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
-						identity.Metadata.ID, warmupItems.workspaces[0].Metadata.ID)
+						identity.Metadata.ID, workspace1.Metadata.ID)
 					require.Nil(t, err)
 				}
 			}
@@ -298,20 +317,35 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
+
+	maxJobDuration := int32((time.Hour * 12).Minutes())
+	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Description:    "workspace 0 for testing managed identity functions",
+		FullPath:       "top-level-group-0-for-managed-identities/workspace-0-for-managed-identities",
+		GroupID:        group1.Metadata.ID,
+		CreatedBy:      "someone-w0",
+		MaxJobDuration: &maxJobDuration,
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -325,22 +359,21 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 	}
 
 	// Do the not-added-to-workspace test case first.
-	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
 		{
 			name:                    "not added to workspace",
-			workspaceID:             warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:             workspace1.Metadata.ID,
 			expectManagedIdentities: []models.ManagedIdentity{},
 		},
 		{
 			name:                    "positive",
-			workspaceID:             warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:             workspace1.Metadata.ID,
 			addToWorkspace:          true,
-			expectManagedIdentities: []models.ManagedIdentity{positiveManagedIdentity},
+			expectManagedIdentities: []models.ManagedIdentity{*managedIdentity1},
 		},
 		{
 			name:           "already-added",
-			workspaceID:    warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:    workspace1.Metadata.ID,
 			addToWorkspace: true,
 			expectAddFail:  ptr.String("managed identity already assigned to workspace"),
 		},
@@ -376,7 +409,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			// If specified, add the managed identity to the workspace.
 			if test.addToWorkspace {
 
-				managedIdentityID := warmupItems.managedIdentities[0].Metadata.ID
+				managedIdentityID := managedIdentity1.Metadata.ID
 				if test.overrideManagedIdentityID != nil {
 					managedIdentityID = *test.overrideManagedIdentityID
 				}
@@ -422,18 +455,31 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
+	require.Nil(t, err)
+
+	maxJobDuration := int32((time.Hour * 12).Minutes())
+	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Description:    "workspace 0 for testing managed identity functions",
+		FullPath:       "top-level-group-0-for-managed-identities/workspace-0-for-managed-identities",
+		GroupID:        group1.Metadata.ID,
+		CreatedBy:      "someone-w0",
+		MaxJobDuration: &maxJobDuration,
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
 	require.Nil(t, err)
 
 	type testCase struct {
@@ -447,12 +493,12 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:           "positive",
-			workspaceID:    warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:    workspace1.Metadata.ID,
 			addToWorkspace: true,
 		},
 		{
 			name:           "not added, so cannot remove, but no error",
-			workspaceID:    warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:    workspace1.Metadata.ID,
 			addToWorkspace: false,
 		},
 		{
@@ -465,12 +511,12 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 		},
 		{
 			name:                      "non-existent managed identity ID, but no error",
-			workspaceID:               warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:               workspace1.Metadata.ID,
 			overrideManagedIdentityID: ptr.String(nonExistentID),
 		},
 		{
 			name:                      "invalid managed identity ID",
-			workspaceID:               warmupItems.workspaces[0].Metadata.ID,
+			workspaceID:               workspace1.Metadata.ID,
 			overrideManagedIdentityID: ptr.String(invalidID),
 			expectMsg:                 invalidUUIDMsg1,
 		},
@@ -481,18 +527,18 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			// If specified add the managed identity to the workspace.
 			if test.addToWorkspace {
 				err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
-					warmupItems.managedIdentities[0].Metadata.ID, test.workspaceID)
+					managedIdentity1.Metadata.ID, test.workspaceID)
 				assert.Nil(t, err)
 			}
 
 			// Conditionally override the managed identity ID used for the removal attempt.
-			managedIdentityID := warmupItems.managedIdentities[0].Metadata.ID
+			managedIdentityID := managedIdentity1.Metadata.ID
 			if test.overrideManagedIdentityID != nil {
 				managedIdentityID = *test.overrideManagedIdentityID
 			}
 
 			err = testClient.client.ManagedIdentities.RemoveManagedIdentityFromWorkspace(ctx,
-				managedIdentityID, warmupItems.workspaces[0].Metadata.ID)
+				managedIdentityID, workspace1.Metadata.ID)
 
 			checkError(t, test.expectMsg, err)
 		})
@@ -504,29 +550,28 @@ func TestCreateManagedIdentity(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			[]models.ManagedIdentity{},
-			[]models.ManagedIdentityAccessRule{},
-		})
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		Name:        "top-level-group-0-for-managed-identities",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
-	warmupGroup := warmupItems.groups[0]
-	warmupGroupID := warmupGroup.Metadata.ID
 
-	aliasGroup := warmupItems.groups[1]
-	aliasGroupID := aliasGroup.Metadata.ID
+	aliasGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 1 for testing managed identity aliases",
+		Name:        "top-level-group-1-for-managed-identity-aliases",
+		FullPath:    "top-level-group-1-for-managed-identity-aliases",
+		CreatedBy:   "someone-g1",
+	})
+	require.Nil(t, err)
 
 	// Create a managed identity prior to running tests so an alias can use it.
 	aliasSourceIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
 		Type:        models.ManagedIdentityAWSFederated,
 		Name:        "a-managed-identity-for-testing-aliases",
 		Description: "A description for this managed identity",
-		GroupID:     warmupGroupID,
+		GroupID:     group1.Metadata.ID,
 		CreatedBy:   "creator-of-managed-identities",
 		Data:        []byte("some-data-for-the-source-managed-identity"),
 	})
@@ -546,7 +591,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			name: "positive, nearly empty",
 			toCreate: &models.ManagedIdentity{
 				Name:    "positive-create-managed-identity-nearly-empty",
-				GroupID: warmupGroupID,
+				GroupID: group1.Metadata.ID,
 				Type:    models.ManagedIdentityAWSFederated,
 				Data:    []byte("some-data"),
 				// Resource path is not used when creating the object, but it is returned.
@@ -557,8 +602,8 @@ func TestCreateManagedIdentity(t *testing.T) {
 					CreationTimestamp: &now,
 				},
 				Name:         "positive-create-managed-identity-nearly-empty",
-				GroupID:      warmupGroupID,
-				ResourcePath: warmupGroup.FullPath + "/positive-create-managed-identity-nearly-empty",
+				GroupID:      group1.Metadata.ID,
+				ResourcePath: group1.FullPath + "/positive-create-managed-identity-nearly-empty",
 				Type:         models.ManagedIdentityAWSFederated,
 				Data:         []byte("some-data"),
 			},
@@ -570,7 +615,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Type:        models.ManagedIdentityAWSFederated,
 				Name:        "positive-create-managed-identity-full",
 				Description: "positive create managed identity",
-				GroupID:     warmupGroupID,
+				GroupID:     group1.Metadata.ID,
 				Data:        []byte("this is a test of a full managed identity"),
 				CreatedBy:   "creator-of-managed-identities",
 				// Resource path is not used when creating the object, but it is returned.
@@ -581,10 +626,10 @@ func TestCreateManagedIdentity(t *testing.T) {
 					CreationTimestamp: &now,
 				},
 				Type:         models.ManagedIdentityAWSFederated,
-				ResourcePath: warmupGroup.FullPath + "/positive-create-managed-identity-full",
+				ResourcePath: group1.FullPath + "/positive-create-managed-identity-full",
 				Name:         "positive-create-managed-identity-full",
 				Description:  "positive create managed identity",
-				GroupID:      warmupGroupID,
+				GroupID:      group1.Metadata.ID,
 				Data:         []byte("this is a test of a full managed identity"),
 				CreatedBy:    "creator-of-managed-identities",
 			},
@@ -594,7 +639,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			name: "create a managed identity alias",
 			toCreate: &models.ManagedIdentity{
 				Name:          "positive-create-managed-identity-alias",
-				GroupID:       aliasGroupID,
+				GroupID:       aliasGroup.Metadata.ID,
 				AliasSourceID: &aliasSourceIdentity.Metadata.ID,
 				CreatedBy:     "creator-of-managed-identities",
 			},
@@ -607,7 +652,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				ResourcePath:  aliasGroup.FullPath + "/positive-create-managed-identity-alias",
 				Name:          "positive-create-managed-identity-alias",
 				Description:   aliasSourceIdentity.Description,
-				GroupID:       aliasGroupID,
+				GroupID:       aliasGroup.Metadata.ID,
 				Data:          aliasSourceIdentity.Data,
 				CreatedBy:     "creator-of-managed-identities",
 				AliasSourceID: &aliasSourceIdentity.Metadata.ID,
@@ -618,7 +663,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			name: "duplicate name in same group",
 			toCreate: &models.ManagedIdentity{
 				Name:    "positive-create-managed-identity-nearly-empty",
-				GroupID: warmupGroupID,
+				GroupID: group1.Metadata.ID,
 				Type:    models.ManagedIdentityAWSFederated,
 				Data:    []byte("some-data"),
 				// Resource path is not used when creating the object, but it is returned.
@@ -680,22 +725,34 @@ func TestUpdateManagedIdentity(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
+
+	otherGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 1 for testing managed identity aliases",
+		Name:        "top-level-group-1-for-managed-identity-aliases",
+		FullPath:    "top-level-group-1-for-managed-identity-aliases",
+		CreatedBy:   "someone-g1",
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
 	createdHigh := currentTime()
-	otherGroup := warmupItems.groups[1]
 
 	type testCase struct {
 		toUpdate              *models.ManagedIdentity
@@ -706,34 +763,33 @@ func TestUpdateManagedIdentity(t *testing.T) {
 
 	// Do only one positive test case, because the logic is theoretically the same for all managed identities.
 	now := currentTime()
-	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
 		{
 			name: "positive",
 			toUpdate: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID:      positiveManagedIdentity.Metadata.ID,
-					Version: positiveManagedIdentity.Metadata.Version,
+					ID:      managedIdentity1.Metadata.ID,
+					Version: managedIdentity1.Metadata.Version,
 				},
 				Description: "updated description",
-				Type:        positiveManagedIdentity.Type,
+				Type:        managedIdentity1.Type,
 				Data:        []byte("updated data"),
 				GroupID:     otherGroup.Metadata.ID,
 			},
 			expectManagedIdentity: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID:                   positiveManagedIdentity.Metadata.ID,
-					Version:              positiveManagedIdentity.Metadata.Version + 1,
-					CreationTimestamp:    positiveManagedIdentity.Metadata.CreationTimestamp,
+					ID:                   managedIdentity1.Metadata.ID,
+					Version:              managedIdentity1.Metadata.Version + 1,
+					CreationTimestamp:    managedIdentity1.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				ResourcePath: otherGroup.FullPath + "/" + positiveManagedIdentity.Name,
+				ResourcePath: otherGroup.FullPath + "/" + managedIdentity1.Name,
 				Name:         "1-managed-identity-0",
 				Description:  "updated description",
-				Type:         positiveManagedIdentity.Type,
+				Type:         managedIdentity1.Type,
 				Data:         []byte("updated data"),
 				GroupID:      otherGroup.Metadata.ID, // to move the managed identity to another group
-				CreatedBy:    positiveManagedIdentity.CreatedBy,
+				CreatedBy:    managedIdentity1.CreatedBy,
 			},
 		},
 		{
@@ -741,7 +797,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			toUpdate: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:      nonExistentID,
-					Version: positiveManagedIdentity.Metadata.Version,
+					Version: managedIdentity1.Metadata.Version,
 				},
 			},
 			expectErrorCode: errors.EInternal,
@@ -751,7 +807,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			toUpdate: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID:      invalidID,
-					Version: positiveManagedIdentity.Metadata.Version,
+					Version: managedIdentity1.Metadata.Version,
 				},
 			},
 			expectErrorCode: errors.EInternal,
@@ -786,32 +842,190 @@ func TestUpdateManagedIdentity(t *testing.T) {
 	}
 }
 
+func TestGetManagedIdentitiesWithPagination(t *testing.T) {
+
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group0, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		Name:        "top-level-group-0-for-managed-identities",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
+	require.Nil(t, err)
+
+	managedIdentity0, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-1",
+		Description: "managed identity 1 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa1",
+		Type:        models.ManagedIdentityAzureFederated,
+		Data:        []byte("managed-identity-1-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity2, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "2-managed-identity-2",
+		Description: "managed identity 2 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa2",
+		Type:        models.ManagedIdentityTharsisFederated,
+		Data:        []byte("managed-identity-2-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity3, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "2-managed-identity-3",
+		Description: "managed identity 3 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa3",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-3-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity4, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "5-managed-identity-4",
+		Description: "managed identity 4 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa4",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-4-data"),
+	})
+	require.Nil(t, err)
+
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       group0.Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &managedIdentity1.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	allManagedIdentities := []models.ManagedIdentity{
+		*managedIdentity0, *managedIdentity1, *managedIdentity2,
+		*managedIdentity3, *managedIdentity4, *createdAlias,
+	}
+
+	// Query for first page
+	middleIndex := len(allManagedIdentities) / 2
+	page1, err := testClient.client.ManagedIdentities.GetManagedIdentities(ctx, &GetManagedIdentitiesInput{
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(int32(middleIndex)),
+		},
+	})
+	require.Nil(t, err)
+
+	assert.Equal(t, middleIndex, len(page1.ManagedIdentities))
+	assert.True(t, page1.PageInfo.HasNextPage)
+	assert.False(t, page1.PageInfo.HasPreviousPage)
+
+	cursor, err := page1.PageInfo.Cursor(&page1.ManagedIdentities[len(page1.ManagedIdentities)-1])
+	require.Nil(t, err)
+
+	remaining := len(allManagedIdentities) - middleIndex
+	page2, err := testClient.client.ManagedIdentities.GetManagedIdentities(ctx, &GetManagedIdentitiesInput{
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(int32(remaining)),
+			After: cursor,
+		},
+	})
+	require.Nil(t, err)
+
+	assert.Equal(t, remaining, len(page2.ManagedIdentities))
+	assert.True(t, page2.PageInfo.HasPreviousPage)
+	assert.False(t, page2.PageInfo.HasNextPage)
+}
+
 func TestGetManagedIdentities(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+	group0, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		Name:        "top-level-group-0-for-managed-identities",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
 
-	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	managedIdentity0, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
 	require.Nil(t, err)
-	assert.NotNil(t, createdAlias)
 
-	// Append the slice to the created alias.
-	warmupItems.managedIdentities = append(warmupItems.managedIdentities, *createdAlias)
-	allManagedIdentityInfos := managedIdentityInfoFromManagedIdentities(warmupItems.managedIdentities)
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-1",
+		Description: "managed identity 1 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa1",
+		Type:        models.ManagedIdentityAzureFederated,
+		Data:        []byte("managed-identity-1-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity2, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "2-managed-identity-2",
+		Description: "managed identity 2 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa2",
+		Type:        models.ManagedIdentityTharsisFederated,
+		Data:        []byte("managed-identity-2-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity3, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "2-managed-identity-3",
+		Description: "managed identity 3 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa3",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-3-data"),
+	})
+	require.Nil(t, err)
+
+	managedIdentity4, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "5-managed-identity-4",
+		Description: "managed identity 4 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa4",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-4-data"),
+	})
+	require.Nil(t, err)
+
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       group0.Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &managedIdentity1.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	allManagedIdentities := []models.ManagedIdentity{
+		*managedIdentity0, *managedIdentity1, *managedIdentity2,
+		*managedIdentity3, *managedIdentity4, *createdAlias,
+	}
+
+	allManagedIdentityInfos := managedIdentityInfoFromManagedIdentities(allManagedIdentities)
 
 	// Sort by ID string for those cases where explicit sorting is not specified.
 	sort.Sort(managedIdentityInfoIDSlice(allManagedIdentityInfos))
@@ -1294,18 +1508,21 @@ func TestDeleteManagedIdentity(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
 	require.Nil(t, err)
 
 	type testCase struct {
@@ -1319,8 +1536,8 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			name: "positive",
 			toDelete: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID:      warmupItems.managedIdentities[0].Metadata.ID,
-					Version: warmupItems.managedIdentities[0].Metadata.Version,
+					ID:      managedIdentity1.Metadata.ID,
+					Version: managedIdentity1.Metadata.Version,
 				},
 			},
 		},
@@ -1362,24 +1579,65 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity access rule with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
 
-	createdAlias, err := createWarmupManagedIdentityAlias(ctx, testClient, warmupItems)
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
 	require.Nil(t, err)
-	assert.NotNil(t, createdAlias)
+
+	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:          "an-alias-created-for-testing",
+		GroupID:       group1.Metadata.ID,
+		CreatedBy:     "someone-ma1",
+		AliasSourceID: &managedIdentity1.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	user1, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "user-0",
+		Email:    "user-0@example.invalid",
+		Admin:    false,
+	})
+	require.Nil(t, err)
+
+	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		ResourcePath:      "sa-resource-path-0",
+		Name:              "service-account-0",
+		Description:       "service account 0 for testing managed identities",
+		GroupID:           group1.Metadata.ID,
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	})
+	require.Nil(t, err)
+
+	team1, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "team-a",
+		Description: "team a for managed identity tests",
+	})
+	require.Nil(t, err)
+
+	createdRule, err := testClient.client.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, &models.ManagedIdentityAccessRule{
+		RunStage:                 models.JobPlanType,
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
+		ManagedIdentityID:        managedIdentity1.Metadata.ID,
+		AllowedUserIDs:           []string{user1.Metadata.ID},
+		AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+		AllowedTeamIDs:           []string{team1.Metadata.ID},
+	})
+	require.Nil(t, err)
 
 	createdHigh := currentTime()
 
@@ -1397,13 +1655,13 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:                             "positive",
-			searchID:                         warmupItems.managedIdentities[0].Metadata.ID,
-			expectManagedIdentityAccessRules: warmupItems.rules[0:1],
+			searchID:                         managedIdentity1.Metadata.ID,
+			expectManagedIdentityAccessRules: []models.ManagedIdentityAccessRule{*createdRule},
 		},
 		{
 			name:                             "positive: successfully retrieve access rules for a managed identity alias",
 			searchID:                         createdAlias.Metadata.ID,
-			expectManagedIdentityAccessRules: warmupItems.rules[0:1],
+			expectManagedIdentityAccessRules: []models.ManagedIdentityAccessRule{*createdRule},
 		},
 		{
 			name:                             "negative, non-existent ID",
@@ -1454,20 +1712,58 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity access rule with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
+	user1, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "user-0",
+		Email:    "user-0@example.invalid",
+		Admin:    false,
+	})
+	require.Nil(t, err)
+
+	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		ResourcePath:      "sa-resource-path-0",
+		Name:              "service-account-0",
+		Description:       "service account 0 for testing managed identities",
+		GroupID:           group1.Metadata.ID,
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	})
+	require.Nil(t, err)
+
+	team1, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "team-a",
+		Description: "team a for managed identity tests",
+	})
+	require.Nil(t, err)
+
+	createdRule, err := testClient.client.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, &models.ManagedIdentityAccessRule{
+		RunStage:                 models.JobPlanType,
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
+		ManagedIdentityID:        managedIdentity1.Metadata.ID,
+		AllowedUserIDs:           []string{user1.Metadata.ID},
+		AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+		AllowedTeamIDs:           []string{team1.Metadata.ID},
+	})
+	require.Nil(t, err)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -1482,8 +1778,8 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:                            "positive",
-			searchID:                        warmupItems.rules[0].Metadata.ID,
-			expectManagedIdentityAccessRule: &warmupItems.rules[0],
+			searchID:                        createdRule.Metadata.ID,
+			expectManagedIdentityAccessRule: createdRule,
 		},
 		{
 			name:     "negative, non-existent ID",
@@ -1525,18 +1821,44 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity access rule with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
+	user1, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "user-0",
+		Email:    "user-0@example.invalid",
+		Admin:    false,
+	})
+	require.Nil(t, err)
+
+	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		ResourcePath:      "sa-resource-path-0",
+		Name:              "service-account-0",
+		Description:       "service account 0 for testing managed identities",
+		GroupID:           group1.Metadata.ID,
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	})
+	require.Nil(t, err)
+
+	team1, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "team-a",
+		Description: "team a for managed identity tests",
+	})
 	require.Nil(t, err)
 
 	type testCase struct {
@@ -1547,19 +1869,18 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	}
 
 	now := currentTime()
-	positiveManagedIdentity := warmupItems.managedIdentities[0]
 	testCases := []testCase{
 		{
 			name: "positive, nearly empty",
 			toCreate: &models.ManagedIdentityAccessRule{
-				ManagedIdentityID: positiveManagedIdentity.Metadata.ID,
+				ManagedIdentityID: managedIdentity1.Metadata.ID,
 			},
 			expectCreated: &models.ManagedIdentityAccessRule{
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
 				},
-				ManagedIdentityID: positiveManagedIdentity.Metadata.ID,
+				ManagedIdentityID: managedIdentity1.Metadata.ID,
 			},
 		},
 
@@ -1567,10 +1888,11 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			name: "positive full",
 			toCreate: &models.ManagedIdentityAccessRule{
 				RunStage:                 models.JobApplyType,
-				ManagedIdentityID:        positiveManagedIdentity.Metadata.ID,
-				AllowedUserIDs:           []string{warmupItems.users[0].Metadata.ID},
-				AllowedServiceAccountIDs: []string{warmupItems.serviceAccounts[0].Metadata.ID},
-				AllowedTeamIDs:           []string{warmupItems.teams[0].Metadata.ID},
+				ManagedIdentityID:        managedIdentity1.Metadata.ID,
+				AllowedUserIDs:           []string{user1.Metadata.ID},
+				AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+				AllowedTeamIDs:           []string{team1.Metadata.ID},
+				VerifyStateLineage:       true,
 			},
 			expectCreated: &models.ManagedIdentityAccessRule{
 				Metadata: models.ResourceMetadata{
@@ -1578,10 +1900,11 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 					CreationTimestamp: &now,
 				},
 				RunStage:                 models.JobApplyType,
-				ManagedIdentityID:        positiveManagedIdentity.Metadata.ID,
-				AllowedUserIDs:           []string{warmupItems.users[0].Metadata.ID},
-				AllowedServiceAccountIDs: []string{warmupItems.serviceAccounts[0].Metadata.ID},
-				AllowedTeamIDs:           []string{warmupItems.teams[0].Metadata.ID},
+				ManagedIdentityID:        managedIdentity1.Metadata.ID,
+				AllowedUserIDs:           []string{user1.Metadata.ID},
+				AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+				AllowedTeamIDs:           []string{team1.Metadata.ID},
+				VerifyStateLineage:       true,
 			},
 		},
 
@@ -1636,20 +1959,81 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity access rule with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
 	createdLow := currentTime()
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+
+	group0, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
 	require.Nil(t, err)
+
+	managedIdentity0, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group0.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
+	user0, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "user-0",
+		Email:    "user-0@example.invalid",
+		Admin:    false,
+	})
+	require.Nil(t, err)
+
+	user1, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "user-1",
+		Email:    "user-1@example.invalid",
+		Admin:    false,
+	})
+	require.Nil(t, err)
+
+	serviceAccount0, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		ResourcePath:      "sa-resource-path-0",
+		Name:              "service-account-0",
+		Description:       "service account 0 for testing managed identities",
+		GroupID:           group0.Metadata.ID,
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	})
+	require.Nil(t, err)
+
+	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		ResourcePath:      "sa-resource-path-1",
+		Name:              "service-account-1",
+		Description:       "service account 1 for testing managed identities",
+		GroupID:           group0.Metadata.ID,
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	})
+	require.Nil(t, err)
+
+	team0, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "team-a",
+		Description: "team a for managed identity tests",
+	})
+	require.Nil(t, err)
+
+	team1, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "team-b",
+		Description: "team b for managed identity tests",
+	})
+	require.Nil(t, err)
+
+	createdRule, err := testClient.client.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, &models.ManagedIdentityAccessRule{
+		RunStage:                 models.JobPlanType,
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
+		ManagedIdentityID:        managedIdentity0.Metadata.ID,
+		AllowedUserIDs:           []string{user0.Metadata.ID},
+		AllowedServiceAccountIDs: []string{serviceAccount0.Metadata.ID},
+		AllowedTeamIDs:           []string{team0.Metadata.ID},
+	})
+	require.Nil(t, err)
+
 	createdHigh := currentTime()
 
 	type testCase struct {
@@ -1662,7 +2046,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	// Do only one positive test case,
 	// because the logic is theoretically the same for all managed identity access rules.
 	now := currentTime()
-	positiveRule := warmupItems.rules[0]
+	positiveRule := createdRule
 	testCases := []testCase{
 		{
 			name: "positive",
@@ -1672,9 +2056,10 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 					Version: positiveRule.Metadata.Version,
 				},
 				RunStage:                 models.JobApplyType,
-				AllowedUserIDs:           []string{warmupItems.users[1].Metadata.ID},
-				AllowedServiceAccountIDs: []string{warmupItems.serviceAccounts[1].Metadata.ID},
-				AllowedTeamIDs:           []string{warmupItems.teams[1].Metadata.ID},
+				AllowedUserIDs:           []string{user1.Metadata.ID},
+				AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+				AllowedTeamIDs:           []string{team1.Metadata.ID},
+				VerifyStateLineage:       true,
 			},
 			expectManagedIdentity: &models.ManagedIdentityAccessRule{
 				Metadata: models.ResourceMetadata{
@@ -1684,10 +2069,11 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 					LastUpdatedTimestamp: &now,
 				},
 				RunStage:                 models.JobApplyType,
-				ManagedIdentityID:        warmupItems.managedIdentities[0].Metadata.ID,
-				AllowedUserIDs:           []string{warmupItems.users[1].Metadata.ID},
-				AllowedServiceAccountIDs: []string{warmupItems.serviceAccounts[1].Metadata.ID},
-				AllowedTeamIDs:           []string{warmupItems.teams[1].Metadata.ID},
+				ManagedIdentityID:        managedIdentity0.Metadata.ID,
+				AllowedUserIDs:           []string{user1.Metadata.ID},
+				AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+				AllowedTeamIDs:           []string{team1.Metadata.ID},
+				VerifyStateLineage:       true,
 			},
 		},
 		{
@@ -1740,18 +2126,54 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a managed identity access rule with a specific ID without going into the really
-	// low-level stuff, create the warmup managed identities and then find the relevant ID.
-	warmupItems, err := createWarmupManagedIdentities(ctx, testClient,
-		warmupManagedIdentities{
-			standardWarmupGroupsForManagedIdentities,
-			standardWarmupWorkspacesForManagedIdentities,
-			standardWarmupTeamsForManagedIdentities,
-			standardWarmupUsersForManagedIdentities,
-			standardWarmupServiceAccountsForManagedIdentities,
-			standardWarmupManagedIdentities,
-			standardWarmupManagedIdentityAccessRules,
-		})
+	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "top level group 0 for testing managed identity functions",
+		FullPath:    "top-level-group-0-for-managed-identities",
+		CreatedBy:   "someone-g0",
+	})
+	require.Nil(t, err)
+
+	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:        "1-managed-identity-0",
+		Description: "managed identity 0 for testing managed identities",
+		GroupID:     group1.Metadata.ID,
+		CreatedBy:   "someone-sa0",
+		Type:        models.ManagedIdentityAWSFederated,
+		Data:        []byte("managed-identity-0-data"),
+	})
+	require.Nil(t, err)
+
+	user1, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "user-0",
+		Email:    "user-0@example.invalid",
+		Admin:    false,
+	})
+	require.Nil(t, err)
+
+	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		ResourcePath:      "sa-resource-path-0",
+		Name:              "service-account-0",
+		Description:       "service account 0 for testing managed identities",
+		GroupID:           group1.Metadata.ID,
+		CreatedBy:         "someone-sa0",
+		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
+	})
+	require.Nil(t, err)
+
+	team1, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "team-a",
+		Description: "team a for managed identity tests",
+	})
+	require.Nil(t, err)
+
+	createdRule, err := testClient.client.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, &models.ManagedIdentityAccessRule{
+		RunStage:                 models.JobPlanType,
+		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
+		ManagedIdentityID:        managedIdentity1.Metadata.ID,
+		AllowedUserIDs:           []string{user1.Metadata.ID},
+		AllowedServiceAccountIDs: []string{serviceAccount1.Metadata.ID},
+		AllowedTeamIDs:           []string{team1.Metadata.ID},
+	})
 	require.Nil(t, err)
 
 	type testCase struct {
@@ -1760,14 +2182,13 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 		name      string
 	}
 
-	positiveRule := warmupItems.rules[0]
 	testCases := []testCase{
 		{
 			name: "positive",
 			toDelete: &models.ManagedIdentityAccessRule{
 				Metadata: models.ResourceMetadata{
-					ID:      positiveRule.Metadata.ID,
-					Version: positiveRule.Metadata.Version,
+					ID:      createdRule.Metadata.ID,
+					Version: createdRule.Metadata.Version,
 				},
 			},
 		},
@@ -1776,7 +2197,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			toDelete: &models.ManagedIdentityAccessRule{
 				Metadata: models.ResourceMetadata{
 					ID:      nonExistentID,
-					Version: positiveRule.Metadata.Version,
+					Version: createdRule.Metadata.Version,
 				},
 			},
 			expectMsg: resourceVersionMismatch,
@@ -1786,7 +2207,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			toDelete: &models.ManagedIdentityAccessRule{
 				Metadata: models.ResourceMetadata{
 					ID:      invalidID,
-					Version: positiveRule.Metadata.Version,
+					Version: createdRule.Metadata.Version,
 				},
 			},
 			expectMsg: invalidUUIDMsg1,
@@ -1805,200 +2226,6 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 //////////////////////////////////////////////////////////////////////////////
 
 // Common utility structures and functions:
-
-// Standard warmup group(s) for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForManagedIdentities = []models.Group{
-	{
-		Description: "top level group 0 for testing managed identity functions",
-		FullPath:    "top-level-group-0-for-managed-identities",
-		CreatedBy:   "someone-g0",
-	},
-	{
-		Description: "top level group 1 for testing managed identity aliases",
-		FullPath:    "top-level-group-1-for-managed-identity-aliases",
-		CreatedBy:   "someone-g1",
-	},
-}
-
-// Standard warmup workspace(s) for tests in this module:
-var standardWarmupWorkspacesForManagedIdentities = []models.Workspace{
-	{
-		Description: "workspace 0 for testing managed identity functions",
-		FullPath:    "top-level-group-0-for-managed-identities/workspace-0-for-managed-identities",
-		CreatedBy:   "someone-w0",
-	},
-}
-
-// Standard warmup team(s) for test in this module:
-var standardWarmupTeamsForManagedIdentities = []models.Team{
-	{
-		Name:        "team-a",
-		Description: "team a for managed identity tests",
-	},
-	{
-		Name:        "team-b",
-		Description: "team b for managed identity tests",
-	},
-}
-
-// Standard warmup user(s) for tests in this module:
-var standardWarmupUsersForManagedIdentities = []models.User{
-	{
-		Username: "user-0",
-		Email:    "user-0@example.invalid",
-		Admin:    false,
-	},
-	{
-		Username: "user-1",
-		Email:    "user-1@example.invalid",
-		Admin:    true,
-	},
-}
-
-// Standard service account(s) for tests in this module:
-var standardWarmupServiceAccountsForManagedIdentities = []models.ServiceAccount{
-	{
-		ResourcePath:      "sa-resource-path-0",
-		Name:              "service-account-0",
-		Description:       "service account 0 for testing managed identities",
-		GroupID:           "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:         "someone-sa0",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-	{
-		ResourcePath:      "sa-resource-path-1",
-		Name:              "service-account-1",
-		Description:       "service account 1 for testing managed identities",
-		GroupID:           "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:         "someone-sa1",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-}
-
-// Standard managed identities for tests in this module:
-// The leading digit is to enable search filter testing.
-var standardWarmupManagedIdentities = []models.ManagedIdentity{
-	{
-		Name:        "1-managed-identity-0",
-		Description: "managed identity 0 for testing managed identities",
-		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:   "someone-sa0",
-		Type:        models.ManagedIdentityAWSFederated,
-		Data:        []byte("managed-identity-0-data"),
-		// Resource path is not used when creating the object, but it is returned.
-	},
-	{
-		Name:        "1-managed-identity-1",
-		Description: "managed identity 1 for testing managed identities",
-		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:   "someone-sa1",
-		Type:        models.ManagedIdentityAzureFederated,
-		Data:        []byte("managed-identity-1-data"),
-		// Resource path is not used when creating the object, but it is returned.
-	},
-	{
-		Name:        "2-managed-identity-2",
-		Description: "managed identity 2 for testing managed identities",
-		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:   "someone-sa2",
-		Type:        models.ManagedIdentityTharsisFederated,
-		Data:        []byte("managed-identity-2-data"),
-		// Resource path is not used when creating the object, but it is returned.
-	},
-	{
-		Name:        "2-managed-identity-3",
-		Description: "managed identity 3 for testing managed identities",
-		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:   "someone-sa3",
-		Type:        models.ManagedIdentityAWSFederated,
-		Data:        []byte("managed-identity-3-data"),
-		// Resource path is not used when creating the object, but it is returned.
-	},
-	{
-		Name:        "5-managed-identity-4",
-		Description: "managed identity 4 for testing managed identities",
-		GroupID:     "top-level-group-0-for-managed-identities", // will be fixed later
-		CreatedBy:   "someone-sa4",
-		Type:        models.ManagedIdentityAWSFederated,
-		Data:        []byte("managed-identity-4-data"),
-		// Resource path is not used when creating the object, but it is returned.
-	},
-}
-
-// Standard managed identity access rules for tests in this module:
-var standardWarmupManagedIdentityAccessRules = []models.ManagedIdentityAccessRule{
-	{
-		RunStage:                 models.JobPlanType,
-		Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
-		ManagedIdentityID:        "1-managed-identity-0",        // will be fixed later
-		AllowedUserIDs:           []string{"user-0"},            // will be fixed later
-		AllowedServiceAccountIDs: []string{"service-account-0"}, // will be fixed later
-		AllowedTeamIDs:           []string{"team-a"},            // will be fixed later
-	},
-}
-
-// createWarmupManagedIdentities creates some warmup managed identities for a test
-// The warmup managed identities to create can be standard or otherwise.
-func createWarmupManagedIdentities(ctx context.Context, testClient *testClient,
-	input warmupManagedIdentities,
-) (*warmupManagedIdentities, error) {
-	// It is necessary to create at least one group and workspace
-	// in order to provide the necessary IDs for the managed identities.
-
-	resultGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
-	}
-
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, groupPath2ID, input.workspaces)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTeams, teamName2ID, err := createInitialTeams(ctx, testClient, input.teams)
-	if err != nil {
-		return nil, err
-	}
-
-	resultUsers, username2ID, err := createInitialUsers(ctx, testClient, input.users)
-	if err != nil {
-		return nil, err
-	}
-
-	resultServiceAccounts, serviceAccountName2ID, err := createInitialServiceAccounts(ctx, testClient,
-		groupPath2ID, input.serviceAccounts)
-	if err != nil {
-		return nil, err
-	}
-
-	resultManagedIdentities, err := createInitialManagedIdentities(ctx, testClient,
-		groupPath2ID, input.managedIdentities)
-	if err != nil {
-		return nil, err
-	}
-
-	managedIdentityName2ID := make(map[string]string)
-	for _, mi := range resultManagedIdentities {
-		managedIdentityName2ID[mi.Name] = mi.Metadata.ID
-	}
-
-	resultManagedIdentityAccessRules, err := createInitialManagedIdentityAccessRules(ctx, testClient,
-		managedIdentityName2ID, username2ID, serviceAccountName2ID, teamName2ID, input.rules)
-	if err != nil {
-		return nil, err
-	}
-
-	return &warmupManagedIdentities{
-		groups:            resultGroups,
-		workspaces:        resultWorkspaces,
-		teams:             resultTeams,
-		users:             resultUsers,
-		serviceAccounts:   resultServiceAccounts,
-		managedIdentities: resultManagedIdentities,
-		rules:             resultManagedIdentityAccessRules,
-	}, nil
-}
 
 func ptrManagedIdentitySortableField(arg ManagedIdentitySortableField) *ManagedIdentitySortableField {
 	return &arg
@@ -2075,22 +2302,6 @@ func managedIdentityIDsFromManagedIdentityInfos(managedIdentityInfos []managedId
 		result = append(result, managedIdentityInfo.managedIdentityID)
 	}
 	return result
-}
-
-// createWarmupManagedIdentityAlias creates an managed identity alias. An alias must be created after
-// the identity being aliased already exists.
-func createWarmupManagedIdentityAlias(ctx context.Context, testClient *testClient, warmupItems *warmupManagedIdentities) (*models.ManagedIdentity, error) {
-	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
-		Name:          "an-alias-created-for-testing",
-		GroupID:       warmupItems.groups[0].Metadata.ID,
-		CreatedBy:     "someone-ma1",
-		AliasSourceID: &warmupItems.managedIdentities[0].Metadata.ID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return createdAlias, nil
 }
 
 // compareManagedIdentities compares two managed identity objects, including bounds for creation and updated times.

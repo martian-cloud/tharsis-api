@@ -99,7 +99,7 @@ func TestGetActivityEvents(t *testing.T) {
 			}
 
 			dbClient.MockActivityEvents.On("GetActivityEvents", mock.Anything, mock.Anything).
-				Return(func(_ context.Context, input *db.GetActivityEventsInput) *db.ActivityEventsResult {
+				Return(func(_ context.Context, _ *db.GetActivityEventsInput) *db.ActivityEventsResult {
 					return &db.ActivityEventsResult{
 						ActivityEvents: []models.ActivityEvent{},
 					}

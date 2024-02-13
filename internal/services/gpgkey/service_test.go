@@ -198,7 +198,7 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 
 			dbClient.MockGPGKeys.On("CreateGPGKey", mock.Anything, mock.Anything).
 				Return(
-					func(ctx context.Context, input *models.GPGKey) *models.GPGKey {
+					func(_ context.Context, _ *models.GPGKey) *models.GPGKey {
 						return test.expectOutput
 					},
 					nil,
@@ -216,7 +216,7 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 							},
 						}
 					},
-					func(ctx context.Context, input *db.GetGPGKeysInput) error {
+					func(_ context.Context, _ *db.GetGPGKeysInput) error {
 						return nil
 					},
 				)

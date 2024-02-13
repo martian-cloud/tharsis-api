@@ -49,3 +49,8 @@ type Run struct {
 func (r *Run) ResolveMetadata(key string) (string, error) {
 	return r.Metadata.resolveFieldValue(key)
 }
+
+// Speculative returns whether this run is speculative.
+func (r *Run) Speculative() bool {
+	return r.ApplyID == ""
+}

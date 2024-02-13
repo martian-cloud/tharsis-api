@@ -313,13 +313,13 @@ type runHandlers struct {
 
 func registerRunHandlers(manager *RunStateManager) {
 	handlers := &runHandlers{manager: manager}
-	manager.registerHandler(runEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(runEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
 	})
-	manager.registerHandler(planEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(planEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
 	})
-	manager.registerHandler(applyEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(applyEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleApplyStateChangeEvent(ctx, old.(*models.Apply), new.(*models.Apply))
 	})
 }
@@ -409,7 +409,7 @@ type planHandlers struct {
 
 func registerPlanHandlers(manager *RunStateManager) {
 	handlers := &planHandlers{manager: manager}
-	manager.registerHandler(jobEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(jobEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
 	})
 }
@@ -449,7 +449,7 @@ type applyHandlers struct {
 
 func registerApplyHandlers(manager *RunStateManager) {
 	handlers := &applyHandlers{manager: manager}
-	manager.registerHandler(jobEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(jobEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
 	})
 }
@@ -489,10 +489,10 @@ type jobHandlers struct {
 
 func registerJobHandlers(manager *RunStateManager) {
 	handlers := &jobHandlers{manager: manager}
-	manager.registerHandler(planEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(planEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
 	})
-	manager.registerHandler(applyEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(applyEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleApplyStateChangeEvent(ctx, old.(*models.Apply), new.(*models.Apply))
 	})
 }
@@ -595,10 +595,10 @@ type workspaceHandlers struct {
 
 func registerWorkspaceHandlers(manager *RunStateManager) {
 	handlers := &workspaceHandlers{manager: manager}
-	manager.registerHandler(runEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(runEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
 	})
-	manager.registerHandler(jobEventType, func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+	manager.registerHandler(jobEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
 	})
 }

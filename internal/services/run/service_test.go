@@ -444,6 +444,282 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 	}
 }
 
+func TestCreateRunWithSpeculativeOption(t *testing.T) {
+	configurationVersionID := "configuration-version-id-1"
+	moduleSource := "module-source-1"
+	moduleVersion := "1.2.3"
+	createdBySubject := "mock-caller"
+	planID := "plan1"
+	applyID := "apply1"
+	isTrue := true
+	isFalse := false
+
+	ws := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "ws1",
+		},
+		FullPath:       "groupA/ws1",
+		MaxJobDuration: ptr.Int32(60),
+	}
+
+	// Test cases
+	tests := []struct {
+		name                    string
+		input                   *CreateRunInput
+		injectConfigVersionSpec bool
+		expectCreateRun         *models.Run // to check the Speculative field in mock.On of DB-layer CreateRun
+		expectErrorCode         errors.CodeType
+	}{
+		{
+			name: "module source, speculative not specified; expect false",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				Speculative:   nil,
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       applyID,
+				Status:        models.RunPlanQueued,
+			},
+		},
+		{
+			name: "module source, speculative specified true; expect true",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				Speculative:   &isTrue,
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       "",
+				Status:        models.RunPlanQueued,
+			},
+		},
+		{
+			name: "module source, speculative specified false; expect false",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				Speculative:   &isFalse,
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       applyID,
+				Status:        models.RunPlanQueued,
+			},
+		},
+		{
+			name: "configuration version spec=false, options spec=nil; expect false",
+			input: &CreateRunInput{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Speculative:            nil,
+			},
+			injectConfigVersionSpec: false,
+			expectCreateRun: &models.Run{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				CreatedBy:              createdBySubject,
+				PlanID:                 planID,
+				ApplyID:                applyID,
+				Status:                 models.RunPlanQueued,
+			},
+		},
+		{
+			name: "configuration version spec=false, options spec=true; expect true",
+			input: &CreateRunInput{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Speculative:            &isTrue,
+			},
+			injectConfigVersionSpec: false,
+			expectCreateRun: &models.Run{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				CreatedBy:              createdBySubject,
+				PlanID:                 planID,
+				ApplyID:                "",
+				Status:                 models.RunPlanQueued,
+			},
+		},
+		{
+			name: "configuration version spec=false, options spec=false; expect false",
+			input: &CreateRunInput{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Speculative:            &isFalse,
+			},
+			injectConfigVersionSpec: false,
+			expectCreateRun: &models.Run{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				CreatedBy:              createdBySubject,
+				PlanID:                 planID,
+				ApplyID:                applyID,
+				Status:                 models.RunPlanQueued,
+			},
+		},
+		{
+			name: "configuration version spec=true, options spec=nil; expect true",
+			input: &CreateRunInput{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Speculative:            nil,
+			},
+			injectConfigVersionSpec: true,
+			expectCreateRun: &models.Run{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				CreatedBy:              createdBySubject,
+				PlanID:                 planID,
+				ApplyID:                "",
+				Status:                 models.RunPlanQueued,
+			},
+		},
+		{
+			name: "configuration version spec=true, options spec=true; expect true",
+			input: &CreateRunInput{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Speculative:            &isTrue,
+			},
+			injectConfigVersionSpec: true,
+			expectCreateRun: &models.Run{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				CreatedBy:              createdBySubject,
+				PlanID:                 planID,
+				ApplyID:                "",
+				Status:                 models.RunPlanQueued,
+			},
+		},
+		{
+			name: "configuration version spec=true, options spec=false; expect error",
+			input: &CreateRunInput{
+				WorkspaceID:            ws.Metadata.ID,
+				ConfigurationVersionID: &configurationVersionID,
+				Speculative:            &isFalse,
+			},
+			injectConfigVersionSpec: true,
+			expectErrorCode:         errors.EInvalid,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dbClient := buildDBClientWithMocks(t)
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
+				Return([]models.ManagedIdentity{}, nil)
+
+			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
+
+			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+				Variables: []models.Variable{},
+			}, nil)
+
+			dbClient.MockRuns.On("CreateRun", mock.Anything, test.expectCreateRun).Return(test.expectCreateRun, nil)
+			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
+
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).
+				Return(&models.ConfigurationVersion{
+					Speculative: test.injectConfigVersionSpec,
+				}, nil)
+
+			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
+				Metadata: models.ResourceMetadata{
+					ID: planID,
+				},
+			}, nil)
+
+			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
+				Metadata: models.ResourceMetadata{
+					ID: applyID,
+				},
+			}, nil)
+			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
+				Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
+					return &models.Job{
+						Metadata: models.ResourceMetadata{
+							ID: "job1",
+						},
+						WorkspaceID: ws.Metadata.ID,
+					}, nil
+				}, nil)
+
+			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
+
+			mockArtifactStore := workspace.MockArtifactStore{}
+			mockArtifactStore.Test(t)
+
+			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+			mockModuleService := moduleregistry.NewMockService(t)
+			mockModuleResolver := NewMockModuleResolver(t)
+
+			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
+				Return(&ModuleRegistrySource{}, nil).Maybe()
+
+			mockModuleResolver.On("ResolveModuleVersion", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(moduleVersion, nil).Maybe()
+
+			logger, _ := logger.NewForTest()
+			service := newService(
+				logger,
+				dbClient.Client,
+				&mockArtifactStore,
+				nil,
+				nil,
+				nil,
+				&mockActivityEvents,
+				mockModuleService,
+				mockModuleResolver,
+				nil,
+				nil,
+			)
+
+			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 	var duration int32 = 1
 	ws := &models.Workspace{

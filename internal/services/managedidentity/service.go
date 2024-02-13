@@ -55,6 +55,7 @@ type CreateManagedIdentityInput struct {
 		AllowedUserIDs            []string
 		AllowedServiceAccountIDs  []string
 		AllowedTeamIDs            []string
+		VerifyStateLineage        bool
 	}
 }
 
@@ -924,6 +925,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 				AllowedUserIDs:            rule.AllowedUserIDs,
 				AllowedServiceAccountIDs:  rule.AllowedServiceAccountIDs,
 				AllowedTeamIDs:            rule.AllowedTeamIDs,
+				VerifyStateLineage:        rule.VerifyStateLineage,
 			}
 
 			if err = ruleToCreate.Validate(); err != nil {

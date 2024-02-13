@@ -76,6 +76,7 @@ type CreateRunInput struct {
 	Comment                *string
 	ModuleSource           *string
 	ModuleVersion          *string
+	Speculative            *bool // optional field, default depends on module source vs. configuration version
 	WorkspaceID            string
 	TerraformVersion       string
 	Variables              []Variable
@@ -478,8 +479,11 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		)
 	}
 
-	// If there is a module source, make the plan job _not_ speculative.
+	// If there is a module source, default speculative to false unless the option is specified.
 	isSpeculative := false
+	if (options.ModuleSource != nil) && (options.Speculative != nil) {
+		isSpeculative = *options.Speculative
+	}
 
 	// If there is a configuration version, get it and let it decide whether the run is speculative.
 	if options.ConfigurationVersionID != nil {
@@ -491,7 +495,19 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 				"Failed to get configuration version associated with run",
 			)
 		}
+
+		// Do not allow the options to set speculative to false if the configuration version has it set to true.
+		if configVersion.Speculative && (options.Speculative != nil) && !*options.Speculative {
+			return nil, errors.New(
+				"Speculative configuration version does not allow non-speculative runs",
+				errors.WithErrorCode(errors.EInvalid))
+		}
+
+		// Otherwise, the speculative option can override the configuration version.
 		isSpeculative = configVersion.Speculative
+		if options.Speculative != nil {
+			isSpeculative = *options.Speculative
+		}
 	}
 
 	createRunOptions := models.Run{

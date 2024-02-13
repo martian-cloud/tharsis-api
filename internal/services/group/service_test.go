@@ -716,7 +716,7 @@ func TestGetGroups(t *testing.T) {
 			// mocking of the function from taking effect.  Because the mock state is cleared between test
 			// cases, an earlier .On(...) won't mask an error by the service layer.
 			dbClient.MockGroups.On("GetGroups", mock.Anything, test.dbInput).
-				Return(func(_ context.Context, input *db.GetGroupsInput) *db.GroupsResult {
+				Return(func(_ context.Context, _ *db.GetGroupsInput) *db.GroupsResult {
 					return &db.GroupsResult{
 						Groups: []models.Group{},
 					}

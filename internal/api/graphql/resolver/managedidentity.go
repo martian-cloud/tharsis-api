@@ -29,7 +29,8 @@ type ManagedIdentityConnectionQueryArgs struct {
 
 // ManagedIdentityQueryArgs are used to query a single managedIdentity
 type ManagedIdentityQueryArgs struct {
-	ID string
+	ID   *string
+	Path *string
 }
 
 // ManagedIdentityEdgeResolver resolves managedIdentity edges
@@ -217,6 +218,11 @@ func (r *ManagedIdentityAccessRuleResolver) AllowedTeams(ctx context.Context) (*
 	return &resolvers, nil
 }
 
+// VerifyStateLineage resolver
+func (r *ManagedIdentityAccessRuleResolver) VerifyStateLineage() bool {
+	return r.rule.VerifyStateLineage
+}
+
 // ManagedIdentityResolver resolves a managedIdentity resource
 type ManagedIdentityResolver struct {
 	managedIdentity *models.ManagedIdentity
@@ -354,8 +360,17 @@ func (r *ManagedIdentityCredentialsResolver) Data() string {
 
 func managedIdentityQuery(ctx context.Context, args *ManagedIdentityQueryArgs) (*ManagedIdentityResolver, error) {
 	managedIdentityService := getManagedIdentityService(ctx)
+	var managedIdentity *models.ManagedIdentity
+	var err error
 
-	managedIdentity, err := managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(args.ID))
+	switch {
+	case args.ID != nil:
+		managedIdentity, err = managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(*args.ID))
+	case args.Path != nil:
+		managedIdentity, err = managedIdentityService.GetManagedIdentityByPath(ctx, *args.Path)
+	default:
+		return nil, errors.New("Either id or path is required", errors.WithErrorCode(errors.EInvalid))
+	}
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -455,6 +470,7 @@ type CreateManagedIdentityAccessRuleInput struct {
 	ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
 	AllowedUsers              *[]string
 	AllowedServiceAccounts    *[]string
+	VerifyStateLineage        *bool
 	Type                      models.ManagedIdentityAccessRuleType
 	RunStage                  models.JobType
 	ManagedIdentityID         string
@@ -467,6 +483,7 @@ type UpdateManagedIdentityAccessRuleInput struct {
 	AllowedUsers              *[]string
 	AllowedServiceAccounts    *[]string
 	AllowedTeams              *[]string
+	VerifyStateLineage        *bool
 	ID                        string
 	RunStage                  models.JobType
 }
@@ -485,6 +502,7 @@ type CreateManagedIdentityInput struct {
 		AllowedUsers              *[]string
 		AllowedServiceAccounts    *[]string
 		AllowedTeams              *[]string
+		VerifyStateLineage        *bool
 		Type                      models.ManagedIdentityAccessRuleType
 		RunStage                  models.JobType
 	}
@@ -619,6 +637,11 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 		return nil, errors.New("invalid managed identity rule type: %s", input.Type, errors.WithErrorCode(errors.EInvalid))
 	}
 
+	var verifyStateLineage bool
+	if input.VerifyStateLineage != nil {
+		verifyStateLineage = *input.VerifyStateLineage
+	}
+
 	rule := models.ManagedIdentityAccessRule{
 		ManagedIdentityID:         gid.FromGlobalID(input.ManagedIdentityID),
 		Type:                      input.Type,
@@ -627,6 +650,7 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 		AllowedUserIDs:            allowedUserIDs,
 		AllowedServiceAccountIDs:  allowedServiceAccountIDs,
 		AllowedTeamIDs:            allowedTeamIDs,
+		VerifyStateLineage:        verifyStateLineage,
 	}
 
 	createdRule, err := getManagedIdentityService(ctx).CreateManagedIdentityAccessRule(ctx, &rule)
@@ -689,6 +713,12 @@ func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateM
 	rule.AllowedUserIDs = allowedUserIDs
 	rule.AllowedServiceAccountIDs = allowedServiceAccountIDs
 	rule.AllowedTeamIDs = allowedTeamIDs
+
+	verifyStateLineage := rule.VerifyStateLineage
+	if input.VerifyStateLineage != nil {
+		verifyStateLineage = *input.VerifyStateLineage
+	}
+	rule.VerifyStateLineage = verifyStateLineage
 
 	updatedRule, err := getManagedIdentityService(ctx).UpdateManagedIdentityAccessRule(ctx, rule)
 	if err != nil {
@@ -805,6 +835,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 			AllowedUserIDs            []string
 			AllowedServiceAccountIDs  []string
 			AllowedTeamIDs            []string
+			VerifyStateLineage        bool
 		}{},
 	}
 
@@ -849,6 +880,11 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 				return nil, errors.New("invalid managed identity rule type: %s", input.Type, errors.WithErrorCode(errors.EInvalid))
 			}
 
+			var verifyStateLineage bool
+			if r.VerifyStateLineage != nil {
+				verifyStateLineage = *r.VerifyStateLineage
+			}
+
 			managedIdentityCreateOptions.AccessRules = append(
 				managedIdentityCreateOptions.AccessRules,
 				struct {
@@ -858,6 +894,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 					AllowedUserIDs            []string
 					AllowedServiceAccountIDs  []string
 					AllowedTeamIDs            []string
+					VerifyStateLineage        bool
 				}{
 					Type:                      r.Type,
 					RunStage:                  r.RunStage,
@@ -865,6 +902,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 					AllowedUserIDs:            allowedUserIDs,
 					AllowedServiceAccountIDs:  allowedServiceAccountIDs,
 					AllowedTeamIDs:            allowedTeamIDs,
+					VerifyStateLineage:        verifyStateLineage,
 				})
 		}
 	}
