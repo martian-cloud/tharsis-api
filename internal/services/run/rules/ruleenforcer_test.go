@@ -482,8 +482,38 @@ func TestEnforceRules(t *testing.T) {
 					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
 						{PublicKey: pubKey},
 					},
+					VerifyStateLineage: true,
 				},
 			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				// RunID field being empty means it was created manually.
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "workspace's current state version was created manually but with state lineage verification disabled",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+					VerifyStateLineage: false,
+				},
+			},
+			attestations: []models.TerraformModuleAttestation{},
 			stateVersion: &models.StateVersion{
 				Metadata: models.ResourceMetadata{
 					ID: currentStateVersionID,
@@ -509,8 +539,44 @@ func TestEnforceRules(t *testing.T) {
 					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
 						{PublicKey: pubKey},
 					},
+					VerifyStateLineage: true,
 				},
 			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				RunID: &runID,
+			},
+			stateVersionRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				// ModuleSource field being nil means there was no module being used.
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "workspace's current state version was created without a module source, but state lineage verification is disabled",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+					VerifyStateLineage: false,
+				},
+			},
+			attestations: []models.TerraformModuleAttestation{},
 			stateVersion: &models.StateVersion{
 				Metadata: models.ResourceMetadata{
 					ID: currentStateVersionID,
@@ -543,8 +609,45 @@ func TestEnforceRules(t *testing.T) {
 					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
 						{PublicKey: pubKey},
 					},
+					VerifyStateLineage: true,
 				},
 			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				RunID: &runID,
+			},
+			stateVersionRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				ModuleSource: ptr.String("some-other-module-source"),
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "workspace's current state version was created by another module than expected, but state lineage verification is disabled",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+				ModuleSource:          ptr.String("some-module-source"),
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+					VerifyStateLineage: false,
+				},
+			},
+			attestations: []models.TerraformModuleAttestation{},
 			stateVersion: &models.StateVersion{
 				Metadata: models.ResourceMetadata{
 					ID: currentStateVersionID,
@@ -576,6 +679,49 @@ func TestEnforceRules(t *testing.T) {
 					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
 						{PublicKey: pubKey},
 					},
+					VerifyStateLineage: true,
+				},
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: currentStateVersionID,
+				},
+				RunID: &runID,
+			},
+			stateVersionRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				IsDestroy: true,
+			},
+			attestations: []models.TerraformModuleAttestation{
+				{
+					ModuleID:      moduleID,
+					SchemaType:    "https://in-toto.io/Statement/v0.1",
+					PredicateType: "cosign.sigstore.dev/attestation/v1",
+					Digests:       []string{validModuleDigestHex},
+					Data:          validAttestation,
+				},
+			},
+		},
+		{
+			name:       "run associated with workspace's current state version was a destroy type, but state lineage verification is disabled",
+			callerType: "user",
+			runDetails: &RunDetails{
+				CurrentStateVersionID: &currentStateVersionID,
+				RunStage:              models.JobPlanType,
+				ModuleID:              &moduleID,
+				ModuleDigest:          validModuleDigest,
+			},
+			rules: []models.ManagedIdentityAccessRule{
+				{
+					Type:              models.ManagedIdentityAccessRuleModuleAttestation,
+					RunStage:          models.JobPlanType,
+					ManagedIdentityID: managedIdentity.Metadata.ID,
+					ModuleAttestationPolicies: []models.ManagedIdentityAccessRuleModuleAttestationPolicy{
+						{PublicKey: pubKey},
+					},
+					VerifyStateLineage: false,
 				},
 			},
 			stateVersion: &models.StateVersion{
@@ -671,10 +817,11 @@ func TestEnforceRules(t *testing.T) {
 			}
 
 			if test.stateVersion != nil {
-				mockStateVersions.On("GetStateVersion", mock.Anything, currentStateVersionID).Return(test.stateVersion, nil)
+				mockStateVersions.On("GetStateVersion", mock.Anything, currentStateVersionID).
+					Return(test.stateVersion, nil).Maybe()
 
 				if test.stateVersionRun != nil {
-					mockRuns.On("GetRun", mock.Anything, runID).Return(test.stateVersionRun, nil)
+					mockRuns.On("GetRun", mock.Anything, runID).Return(test.stateVersionRun, nil).Maybe()
 				}
 			}
 

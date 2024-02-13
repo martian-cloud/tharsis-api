@@ -201,7 +201,7 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 
 	// Perform some additional checks with the state version to ensure it hasn't been altered
 	// except with a run created from the same module source.
-	if input.CurrentStateVersionID != nil {
+	if rule.VerifyStateLineage && input.CurrentStateVersionID != nil {
 		stateVersion, err := dbClient.StateVersions.GetStateVersion(ctx, *input.CurrentStateVersionID)
 		if err != nil {
 			return "", err
@@ -212,7 +212,7 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 		}
 
 		if stateVersion.RunID == nil {
-			return "workspace's current state version was modified manually which is not permitted when using module attestation rules", nil
+			return "workspace's current state version was modified manually which is not permitted when using a module attestation rule with the verify state lineage setting set to true", nil
 		}
 
 		run, err := dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
@@ -225,7 +225,7 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 		}
 
 		if !run.IsDestroy && (run.ModuleSource == nil || *run.ModuleSource != *input.ModuleSource) {
-			return "workspace's current state version was either not created by a module source or a different module source than expected", nil
+			return "workspace's current state version was either not created by a module source or a different module source than expected, and the verify state lineage setting is set to true", nil
 		}
 	}
 

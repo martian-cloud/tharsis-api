@@ -89,7 +89,10 @@ type Query {
     jobStatus: JobStatus
     sort: JobSort
   ): JobConnection!
-  managedIdentity(id: String!): ManagedIdentity
+  managedIdentity(
+    id: String
+    path: String
+  ): ManagedIdentity
   serviceAccount(id: String!): ServiceAccount
   users(
     after: String

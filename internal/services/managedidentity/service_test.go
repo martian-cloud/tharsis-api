@@ -24,7 +24,7 @@ import (
 func TestGetManagedIdentities(t *testing.T) {
 	sampleResult := &db.ManagedIdentitiesResult{
 		PageInfo: &pagination.PageInfo{
-			Cursor: func(cp pagination.CursorPaginatable) (*string, error) {
+			Cursor: func(_ pagination.CursorPaginatable) (*string, error) {
 				return nil, nil
 			},
 			TotalCount:      1,
@@ -1329,6 +1329,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 					AllowedUserIDs            []string
 					AllowedServiceAccountIDs  []string
 					AllowedTeamIDs            []string
+					VerifyStateLineage        bool
 				}{
 					{
 						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
@@ -1358,6 +1359,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 					AllowedUserIDs            []string
 					AllowedServiceAccountIDs  []string
 					AllowedTeamIDs            []string
+					VerifyStateLineage        bool
 				}{
 					{
 						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
@@ -1387,6 +1389,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 					AllowedUserIDs            []string
 					AllowedServiceAccountIDs  []string
 					AllowedTeamIDs            []string
+					VerifyStateLineage        bool
 				}{
 					{
 						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,
@@ -1446,6 +1449,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 					AllowedUserIDs            []string
 					AllowedServiceAccountIDs  []string
 					AllowedTeamIDs            []string
+					VerifyStateLineage        bool
 				}{
 					{
 						Type:                     models.ManagedIdentityAccessRuleEligiblePrincipals,

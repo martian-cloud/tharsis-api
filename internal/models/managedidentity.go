@@ -44,6 +44,7 @@ type ManagedIdentityAccessRule struct {
 	AllowedUserIDs            []string
 	AllowedServiceAccountIDs  []string
 	AllowedTeamIDs            []string
+	VerifyStateLineage        bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination

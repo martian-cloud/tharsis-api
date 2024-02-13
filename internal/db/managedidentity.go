@@ -132,8 +132,10 @@ type managedIdentities struct {
 }
 
 var (
-	managedIdentityFieldList     = append(metadataFieldList, "name", "description", "type", "group_id", "data", "created_by", "alias_source_id")
-	managedIdentityRuleFieldList = append(metadataFieldList, "run_stage", "managed_identity_id", "type", "module_attestation_policies")
+	managedIdentityFieldList = append(metadataFieldList,
+		"name", "description", "type", "group_id", "data", "created_by", "alias_source_id")
+	managedIdentityRuleFieldList = append(metadataFieldList,
+		"run_stage", "managed_identity_id", "type", "module_attestation_policies", "verify_state_lineage")
 )
 
 // Table aliases used with several queries.
@@ -346,6 +348,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 			"managed_identity_id":         rule.ManagedIdentityID,
 			"run_stage":                   rule.RunStage,
 			"module_attestation_policies": moduleAttestationPolicies,
+			"verify_state_lineage":        rule.VerifyStateLineage,
 		}).
 		Returning(managedIdentityRuleFieldList...).ToSQL()
 	if err != nil {
@@ -475,6 +478,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 				"updated_at":                  timestamp,
 				"run_stage":                   rule.RunStage,
 				"module_attestation_policies": moduleAttestationPolicies,
+				"verify_state_lineage":        rule.VerifyStateLineage,
 			},
 		).Where(goqu.Ex{"id": rule.Metadata.ID, "version": rule.Metadata.Version}).Returning(managedIdentityRuleFieldList...).ToSQL()
 	if err != nil {
@@ -1310,6 +1314,7 @@ func scanManagedIdentityRule(row scanner) (*models.ManagedIdentityAccessRule, er
 		&rule.ManagedIdentityID,
 		&rule.Type,
 		&rule.ModuleAttestationPolicies,
+		&rule.VerifyStateLineage,
 	}
 
 	err := row.Scan(fields...)

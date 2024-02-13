@@ -39,7 +39,7 @@ func TestNewPlugin(t *testing.T) {
 		PublicKey: pubKey,
 	}, nil)
 
-	clientBuilder := func(ctx context.Context, region string) (client, error) {
+	clientBuilder := func(_ context.Context, _ string) (client, error) {
 		return &c, nil
 	}
 
@@ -136,7 +136,7 @@ func TestSignWithValidKey(t *testing.T) {
 		Signature: signature,
 	}, nil)
 
-	mockClientBuilder := func(ctx context.Context, region string) (client, error) {
+	mockClientBuilder := func(_ context.Context, _ string) (client, error) {
 		return &c, nil
 	}
 
@@ -246,7 +246,7 @@ func TestVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			mockClientBuilder := func(ctx context.Context, region string) (client, error) {
+			mockClientBuilder := func(_ context.Context, _ string) (client, error) {
 				return &c, nil
 			}
 

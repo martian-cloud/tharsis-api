@@ -88,6 +88,7 @@ type ManagedIdentityAccessRule implements Node {
   allowedServiceAccounts: [ServiceAccount!]
   allowedTeams: [Team!]
   managedIdentity: ManagedIdentity!
+  verifyStateLineage: Boolean!
 }
 
 type ManagedIdentity implements Node {
@@ -127,6 +128,7 @@ input CreateManagedIdentityAccessRuleInput {
   allowedServiceAccounts: [String!]
   allowedUsers: [String!]
   allowedTeams: [String!]
+  verifyStateLineage: Boolean
 }
 
 input UpdateManagedIdentityAccessRuleInput {
@@ -137,6 +139,7 @@ input UpdateManagedIdentityAccessRuleInput {
   allowedServiceAccounts: [String!]
   allowedUsers: [String!]
   allowedTeams: [String!]
+  verifyStateLineage: Boolean
 }
 
 input DeleteManagedIdentityAccessRuleInput {
@@ -156,6 +159,7 @@ input ManagedIdentityAccessRuleInput {
   allowedServiceAccounts: [String!]
   allowedUsers: [String!]
   allowedTeams: [String!]
+  verifyStateLineage: Boolean
 }
 
 type ManagedIdentityCredentials {

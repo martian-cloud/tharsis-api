@@ -52,7 +52,7 @@ func TestLoaderBatchFunc(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			batchFunc := newLoader(func(ctx context.Context, ids []string) (DataBatch, error) {
+			batchFunc := newLoader(func(_ context.Context, _ []string) (DataBatch, error) {
 				return test.batchResponse, test.batchErr
 			})
 

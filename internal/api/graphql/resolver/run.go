@@ -155,6 +155,11 @@ func (r *RunResolver) Refresh() bool {
 	return r.run.Refresh
 }
 
+// Speculative resolver
+func (r *RunResolver) Speculative() bool {
+	return r.run.Speculative()
+}
+
 // Workspace resolver
 func (r *RunResolver) Workspace(ctx context.Context) (*WorkspaceResolver, error) {
 	workspace, err := loadWorkspace(ctx, r.run.WorkspaceID)
@@ -412,6 +417,7 @@ type CreateRunInput struct {
 	TerraformVersion *string
 	TargetAddresses  *[]string
 	Refresh          *bool
+	Speculative      *bool
 	WorkspacePath    string
 }
 
@@ -463,6 +469,7 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 		ModuleVersion:          input.ModuleVersion,
 		Comment:                input.Comment,
 		TerraformVersion:       terraformVersion,
+		Speculative:            input.Speculative,
 	}
 
 	if input.Variables != nil {
