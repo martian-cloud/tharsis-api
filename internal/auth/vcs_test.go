@@ -46,6 +46,9 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 	}
 
 	caller := VCSWorkspaceLinkCaller{
+		Provider: &models.VCSProvider{
+			ResourcePath: "group1/vcs-provider",
+		},
 		Link: &models.WorkspaceVCSProviderLink{
 			WorkspaceID: ws.Metadata.ID,
 		},
@@ -125,7 +128,11 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 }
 
 func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
-	caller := VCSWorkspaceLinkCaller{}
+	caller := VCSWorkspaceLinkCaller{
+		Provider: &models.VCSProvider{
+			ResourcePath: "group1/vcs-provider",
+		},
+	}
 	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), permissions.ApplyResourceType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }

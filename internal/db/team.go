@@ -160,8 +160,7 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "teams", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

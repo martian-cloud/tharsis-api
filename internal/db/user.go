@@ -229,8 +229,7 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "users", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

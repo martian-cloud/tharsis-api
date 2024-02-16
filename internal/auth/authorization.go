@@ -21,10 +21,6 @@ type Authorizer interface {
 	RequireAccessToInheritableResource(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error
 }
 
-const (
-	resourceNotFoundErrorMsg = "Resource not found"
-)
-
 type cacheKey struct {
 	path        *string
 	workspaceID *string
@@ -479,11 +475,21 @@ func authorizationError(ctx context.Context, hasViewerAccessLevel bool) error {
 	if err != nil {
 		return err
 	}
+
 	// If subject has at least viewer permissions then return 403, if not, return 404
 	if hasViewerAccessLevel {
-		return errors.New("%s is not authorized to perform the requested operation", caller.GetSubject(), errors.WithErrorCode(errors.EForbidden))
+		return errors.New(
+			"%s is not authorized to perform the requested operation: ensure that the user or service account has been added as a member to the group/workspace with the role required to perform the requested operation",
+			caller.GetSubject(),
+			errors.WithErrorCode(errors.EForbidden),
+		)
 	}
-	return errors.New(resourceNotFoundErrorMsg, errors.WithErrorCode(errors.ENotFound))
+
+	return errors.New(
+		"either the requested resource does not exist or the caller %s is not authorized to perform the requested operation: ensure that the user or service account has been added as a member to the group/workspace with the role required to perform the requested operation",
+		caller.GetSubject(),
+		errors.WithErrorCode(errors.ENotFound),
+	)
 }
 
 func expandNamespaceDescOrder(path string) []string {

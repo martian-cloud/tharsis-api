@@ -25,6 +25,9 @@ const (
 	desc = "DESC"
 )
 
+// SortTransformFunc is a function for transforming the sort by field used in the query
+type SortTransformFunc func(string) string
+
 // SortDirection indicates the direction for sorting results
 type SortDirection string
 
@@ -181,23 +184,52 @@ func (c *cursorPaginatedRows) GetPageInfo() *PageInfo {
 	return &pageInfo
 }
 
+type extraOptions struct {
+	sortBy            *FieldDescriptor
+	sortTransformFunc SortTransformFunc
+	sortDirection     SortDirection
+}
+
+// ExtraOptionFunc is a function to set extra options
+type ExtraOptionFunc func(*extraOptions)
+
+// WithSortByField sets the sort by field and direction
+func WithSortByField(field *FieldDescriptor, direction SortDirection) ExtraOptionFunc {
+	return func(o *extraOptions) {
+		o.sortBy = field
+		o.sortDirection = direction
+	}
+}
+
+// WithSortByTransform sets the optional sort by transform function
+func WithSortByTransform(f SortTransformFunc) ExtraOptionFunc {
+	return func(o *extraOptions) {
+		o.sortTransformFunc = f
+	}
+}
+
 // PaginatedQueryBuilder represents a paginated DB query
 type PaginatedQueryBuilder struct {
-	options       *Options
-	primaryKey    *FieldDescriptor
-	sortBy        *FieldDescriptor
-	limit         *int32
-	cur           *cursor
-	sortDirection SortDirection
+	options           *Options
+	primaryKey        *FieldDescriptor
+	sortBy            *FieldDescriptor
+	limit             *int32
+	cur               *cursor
+	sortDirection     SortDirection
+	sortTransformFunc SortTransformFunc
 }
 
 // NewPaginatedQueryBuilder returns a PaginatedQueryBuilder
 func NewPaginatedQueryBuilder(
 	options *Options,
 	primaryKey *FieldDescriptor,
-	sortBy *FieldDescriptor,
-	sortDirection SortDirection,
+	extraOpts ...ExtraOptionFunc,
 ) (*PaginatedQueryBuilder, error) {
+	extra := &extraOptions{}
+	for _, o := range extraOpts {
+		o(extra)
+	}
+
 	if options == nil {
 		options = &Options{}
 	}
@@ -230,19 +262,20 @@ func NewPaginatedQueryBuilder(
 
 	// Verify sortBy matches cursor
 	if cur != nil &&
-		((cur.secondary != nil && sortBy == nil) ||
-			(cur.secondary == nil && sortBy != nil) ||
-			(cur.secondary != nil && sortBy != nil && sortBy.Key != cur.secondary.name)) {
+		((cur.secondary != nil && extra.sortBy == nil) ||
+			(cur.secondary == nil && extra.sortBy != nil) ||
+			(cur.secondary != nil && extra.sortBy != nil && extra.sortBy.Key != cur.secondary.name)) {
 		return nil, te.New("sort by argument does not match cursor", te.WithErrorCode(te.EInvalid))
 	}
 
 	return &PaginatedQueryBuilder{
-		options:       options,
-		primaryKey:    primaryKey,
-		sortBy:        sortBy,
-		sortDirection: sortDirection,
-		limit:         limit,
-		cur:           cur,
+		options:           options,
+		primaryKey:        primaryKey,
+		sortBy:            extra.sortBy,
+		sortDirection:     extra.sortDirection,
+		sortTransformFunc: extra.sortTransformFunc,
+		limit:             limit,
+		cur:               cur,
 	}, nil
 }
 
@@ -375,7 +408,7 @@ func (p *PaginatedQueryBuilder) buildOrderBy() []exp.OrderedExpression {
 	}
 
 	if p.sortBy != nil {
-		expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.sortBy.getFullColName()), direction))
+		expressions = append(expressions, p.buildOrderByExpression(p.buildSortByExpr(p.sortBy.getFullColName()), direction))
 	}
 	expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.primaryKey.getFullColName()), direction))
 
@@ -386,16 +419,23 @@ func (p *PaginatedQueryBuilder) buildOuterReverseOrderBy() []exp.OrderedExpressi
 	expressions := []exp.OrderedExpression{}
 
 	if p.sortBy != nil {
-		expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.sortBy.Col), asc))
+		expressions = append(expressions, p.buildOrderByExpression(p.buildSortByExpr(p.sortBy.Col), asc))
 	}
 	expressions = append(expressions, p.buildOrderByExpression(goqu.I(p.primaryKey.Col), asc))
 
 	return expressions
 }
 
-func (p *PaginatedQueryBuilder) buildOrderByExpression(ex exp.IdentifierExpression, direction string) exp.OrderedExpression {
+func (p *PaginatedQueryBuilder) buildOrderByExpression(ex exp.Orderable, direction string) exp.OrderedExpression {
 	if direction == desc {
 		return ex.Desc()
 	}
 	return ex.Asc()
+}
+
+func (p *PaginatedQueryBuilder) buildSortByExpr(field string) exp.Orderable {
+	if p.sortTransformFunc != nil {
+		return goqu.L(p.sortTransformFunc(field))
+	}
+	return goqu.I(field)
 }

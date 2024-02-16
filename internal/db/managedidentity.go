@@ -40,10 +40,12 @@ type ManagedIdentitySortableField string
 
 // ManagedIdentitySortableField constants
 const (
-	ManagedIdentitySortableFieldCreatedAtAsc  ManagedIdentitySortableField = "CREATED_AT_ASC"
-	ManagedIdentitySortableFieldCreatedAtDesc ManagedIdentitySortableField = "CREATED_AT_DESC"
-	ManagedIdentitySortableFieldUpdatedAtAsc  ManagedIdentitySortableField = "UPDATED_AT_ASC"
-	ManagedIdentitySortableFieldUpdatedAtDesc ManagedIdentitySortableField = "UPDATED_AT_DESC"
+	ManagedIdentitySortableFieldCreatedAtAsc   ManagedIdentitySortableField = "CREATED_AT_ASC"
+	ManagedIdentitySortableFieldCreatedAtDesc  ManagedIdentitySortableField = "CREATED_AT_DESC"
+	ManagedIdentitySortableFieldUpdatedAtAsc   ManagedIdentitySortableField = "UPDATED_AT_ASC"
+	ManagedIdentitySortableFieldUpdatedAtDesc  ManagedIdentitySortableField = "UPDATED_AT_DESC"
+	ManagedIdentitySortableFieldGroupLevelAsc  ManagedIdentitySortableField = "GROUP_LEVEL_ASC"
+	ManagedIdentitySortableFieldGroupLevelDesc ManagedIdentitySortableField = "GROUP_LEVEL_DESC"
 )
 
 func (sf ManagedIdentitySortableField) getFieldDescriptor() *pagination.FieldDescriptor {
@@ -52,6 +54,8 @@ func (sf ManagedIdentitySortableField) getFieldDescriptor() *pagination.FieldDes
 		return &pagination.FieldDescriptor{Key: "created_at", Table: "t1", Col: "created_at"}
 	case ManagedIdentitySortableFieldUpdatedAtAsc, ManagedIdentitySortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "t1", Col: "updated_at"}
+	case ManagedIdentitySortableFieldGroupLevelAsc, ManagedIdentitySortableFieldGroupLevelDesc:
+		return &pagination.FieldDescriptor{Key: "group_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
@@ -62,6 +66,17 @@ func (sf ManagedIdentitySortableField) getSortDirection() pagination.SortDirecti
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+func (sf ManagedIdentitySortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch sf {
+	case ManagedIdentitySortableFieldGroupLevelAsc, ManagedIdentitySortableFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
 }
 
 // ManagedIdentityAccessRuleSortableField represents the fields that a managed identity access rule can be sorted by
@@ -196,8 +211,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "managed_identity_rules", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")
@@ -888,16 +902,18 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "t1", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

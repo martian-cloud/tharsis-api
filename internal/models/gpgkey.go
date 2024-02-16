@@ -18,7 +18,17 @@ type GPGKey struct {
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (g *GPGKey) ResolveMetadata(key string) (string, error) {
-	return g.Metadata.resolveFieldValue(key)
+	val, err := g.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "group_path":
+			val = g.GetGroupPath()
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
 }
 
 // GetHexGPGKeyID returns the GPG key ID in hex format

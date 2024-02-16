@@ -133,8 +133,7 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "vcs_events", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

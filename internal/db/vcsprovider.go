@@ -36,6 +36,8 @@ const (
 	VCSProviderSortableFieldCreatedAtDesc VCSProviderSortableField = "CREATED_AT_DESC"
 	VCSProviderSortableFieldUpdatedAtAsc  VCSProviderSortableField = "UPDATED_AT_ASC"
 	VCSProviderSortableFieldUpdatedAtDesc VCSProviderSortableField = "UPDATED_AT_DESC"
+	VCSProviderSortableFieldGroupLevelAsc  VCSProviderSortableField = "GROUP_LEVEL_ASC"
+	VCSProviderSortableFieldGroupLevelDesc VCSProviderSortableField = "GROUP_LEVEL_DESC"
 )
 
 func (sf VCSProviderSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
@@ -44,6 +46,8 @@ func (sf VCSProviderSortableField) getFieldDescriptor() *pagination.FieldDescrip
 		return &pagination.FieldDescriptor{Key: "created_at", Table: "vcs_providers", Col: "created_at"}
 	case VCSProviderSortableFieldUpdatedAtAsc, VCSProviderSortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "vcs_providers", Col: "updated_at"}
+	case VCSProviderSortableFieldGroupLevelAsc, VCSProviderSortableFieldGroupLevelDesc:
+		return &pagination.FieldDescriptor{Key: "group_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
@@ -54,6 +58,17 @@ func (sf VCSProviderSortableField) getSortDirection() pagination.SortDirection {
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+func (sf VCSProviderSortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch sf {
+	case VCSProviderSortableFieldGroupLevelAsc, VCSProviderSortableFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
 }
 
 // VCSProviderFilter contains the supported fields for filtering VCSProvider resources.
@@ -187,16 +202,18 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "vcs_providers", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

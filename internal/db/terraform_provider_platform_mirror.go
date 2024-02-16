@@ -129,8 +129,7 @@ func (t *terraformProviderPlatformMirrors) GetPlatformMirrors(ctx context.Contex
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_provider_platform_mirrors", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

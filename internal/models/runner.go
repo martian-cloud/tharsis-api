@@ -34,7 +34,17 @@ type Runner struct {
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (r *Runner) ResolveMetadata(key string) (string, error) {
-	return r.Metadata.resolveFieldValue(key)
+	val, err := r.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "group_path":
+			val = r.GetGroupPath()
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
 }
 
 // Validate returns an error if the model is not valid

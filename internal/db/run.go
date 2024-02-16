@@ -249,8 +249,7 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "runs", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

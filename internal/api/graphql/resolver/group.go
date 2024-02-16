@@ -249,6 +249,11 @@ func (r *GroupResolver) GPGKeys(ctx context.Context, args *GPGKeysConnectionQuer
 		NamespacePath: r.group.FullPath,
 	}
 
+	if args.Sort != nil {
+		sort := db.GPGKeySortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
 	if args.IncludeInherited != nil && *args.IncludeInherited {
 		input.IncludeInherited = true
 	}
@@ -283,6 +288,11 @@ func (r *GroupResolver) ServiceAccounts(ctx context.Context, args *ServiceAccoun
 		},
 		Search:        args.Search,
 		NamespacePath: r.group.FullPath,
+	}
+
+	if args.Sort != nil {
+		sort := db.ServiceAccountSortableField(*args.Sort)
+		input.Sort = &sort
 	}
 
 	if args.IncludeInherited != nil && *args.IncludeInherited {

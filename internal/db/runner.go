@@ -33,12 +33,16 @@ type RunnerSortableField string
 const (
 	RunnerSortableFieldUpdatedAtAsc  RunnerSortableField = "UPDATED_AT_ASC"
 	RunnerSortableFieldUpdatedAtDesc RunnerSortableField = "UPDATED_AT_DESC"
+	RunnerSortableFieldGroupLevelAsc  RunnerSortableField = "GROUP_LEVEL_ASC"
+	RunnerSortableFieldGroupLevelDesc RunnerSortableField = "GROUP_LEVEL_DESC"
 )
 
 func (ts RunnerSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch ts {
 	case RunnerSortableFieldUpdatedAtAsc, RunnerSortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "runners", Col: "updated_at"}
+	case RunnerSortableFieldGroupLevelAsc, RunnerSortableFieldGroupLevelDesc:
+		return &pagination.FieldDescriptor{Key: "group_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
@@ -49,6 +53,17 @@ func (ts RunnerSortableField) getSortDirection() pagination.SortDirection {
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+func (ts RunnerSortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch ts {
+	case RunnerSortableFieldGroupLevelAsc, RunnerSortableFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
 }
 
 // RunnerFilter contains the supported fields for filtering Runner resources
@@ -158,16 +173,18 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "runners", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 
 	if err != nil {
