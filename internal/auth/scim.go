@@ -6,6 +6,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // SCIMCaller represents a SCIM subject.
@@ -27,6 +28,25 @@ func (s *SCIMCaller) GetSubject() string {
 // IsAdmin returns true if the caller is an admin.
 func (s *SCIMCaller) IsAdmin() bool {
 	return false
+}
+
+// UnauthorizedError returns the unauthorized error for this specific caller type
+func (s *SCIMCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) error {
+	forbiddedMsg := "SCIM caller is not authorized to perform the requested operation"
+
+	// If subject has at least viewer permissions then return 403, if not, return 404
+	if hasViewerAccess {
+		return terrors.New(
+			forbiddedMsg,
+			terrors.WithErrorCode(terrors.EForbidden),
+		)
+	}
+
+	return terrors.New(
+		"either the requested resource does not exist or the %s",
+		forbiddedMsg,
+		terrors.WithErrorCode(terrors.ENotFound),
+	)
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller.
@@ -52,7 +72,7 @@ func (s *SCIMCaller) RequirePermission(ctx context.Context, perm permissions.Per
 
 	handlerFunc, ok := s.getPermissionHandler(perm)
 	if !ok {
-		return authorizationError(ctx, false)
+		return s.UnauthorizedError(ctx, false)
 	}
 
 	return handlerFunc(ctx, &perm, getConstraints(checks...))
@@ -61,7 +81,7 @@ func (s *SCIMCaller) RequirePermission(ctx context.Context, perm permissions.Per
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type.
 func (s *SCIMCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
 	// Return an authorization error since SCIM does not need any access to inherited resources.
-	return authorizationError(ctx, false)
+	return s.UnauthorizedError(ctx, false)
 }
 
 // requireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
@@ -80,7 +100,7 @@ func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *permissions
 		return nil
 	}
 
-	return authorizationError(ctx, false)
+	return s.UnauthorizedError(ctx, false)
 }
 
 // requireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
@@ -99,7 +119,7 @@ func (s *SCIMCaller) requireUserDeleteAccess(ctx context.Context, _ *permissions
 		return nil
 	}
 
-	return authorizationError(ctx, false)
+	return s.UnauthorizedError(ctx, false)
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.

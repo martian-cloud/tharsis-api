@@ -6,6 +6,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // ServiceAccountCaller represents a service account subject
@@ -42,6 +43,24 @@ func (s *ServiceAccountCaller) GetSubject() string {
 // IsAdmin returns true if the caller is an admin
 func (s *ServiceAccountCaller) IsAdmin() bool {
 	return false
+}
+
+// UnauthorizedError returns the unauthorized error for this specific caller type
+func (s *ServiceAccountCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) error {
+	// If subject has at least viewer permissions then return 403, if not, return 404
+	if hasViewerAccess {
+		return terrors.New(
+			"service account %s is not authorized to perform the requested operation: ensure that the service account has been added as a member to the group/workspace with the role required to perform the requested operation",
+			s.GetSubject(),
+			terrors.WithErrorCode(terrors.EForbidden),
+		)
+	}
+
+	return terrors.New(
+		"either the requested resource does not exist or the service account %s is not authorized to perform the requested operation: ensure that the service account has been added as a member to the group/workspace with the role required to perform the requested operation",
+		s.GetSubject(),
+		terrors.WithErrorCode(terrors.ENotFound),
+	)
 }
 
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
@@ -128,5 +147,5 @@ func (s *ServiceAccountCaller) requireRunnerAccess(ctx context.Context, _ *permi
 		return nil
 	}
 
-	return authorizationError(ctx, true)
+	return s.UnauthorizedError(ctx, true)
 }

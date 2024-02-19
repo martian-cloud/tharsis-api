@@ -21,7 +21,7 @@ build-runner:  ## build the binaries
 
 .PHONY: lint
 lint: ## run golint on all Go package
-	@golint -set_exit_status $(PACKAGES)
+	@revive -set_exit_status $(PACKAGES)
 
 .PHONY: vet
 vet: ## run golint on all Go package

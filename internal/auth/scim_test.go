@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -44,7 +45,7 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		expect            error
+		expectErrorCode   errors.CodeType
 		team              *models.Team
 		user              *models.User
 		name              string
@@ -68,17 +69,17 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 			constraints: []func(*constraints){WithTeamID(teamID)},
 		},
 		{
-			name:        "access denied because deleting a team not created by SCIM",
-			team:        &models.Team{},
-			perms:       []permissions.Permission{permissions.DeleteTeamPermission},
-			constraints: []func(*constraints){WithTeamID(teamID)},
-			expect:      authorizationError(ctx, false),
+			name:            "access denied because deleting a team not created by SCIM",
+			team:            &models.Team{},
+			perms:           []permissions.Permission{permissions.DeleteTeamPermission},
+			constraints:     []func(*constraints){WithTeamID(teamID)},
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:        "access denied because deleting a team that doesn't exist",
-			perms:       []permissions.Permission{permissions.DeleteTeamPermission},
-			constraints: []func(*constraints){WithTeamID(invalid)},
-			expect:      authorizationError(ctx, false),
+			name:            "access denied because deleting a team that doesn't exist",
+			perms:           []permissions.Permission{permissions.DeleteTeamPermission},
+			constraints:     []func(*constraints){WithTeamID(invalid)},
+			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:        "deleting a user created by SCIM",
@@ -87,32 +88,32 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 			constraints: []func(*constraints){WithUserID(userID)},
 		},
 		{
-			name:        "access denied because deleting a user not created by SCIM",
-			user:        &models.User{},
-			perms:       []permissions.Permission{permissions.DeleteUserPermission},
-			constraints: []func(*constraints){WithUserID(userID)},
-			expect:      authorizationError(ctx, false),
+			name:            "access denied because deleting a user not created by SCIM",
+			user:            &models.User{},
+			perms:           []permissions.Permission{permissions.DeleteUserPermission},
+			constraints:     []func(*constraints){WithUserID(userID)},
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:        "access denied because deleting a user that doesn't exist",
-			perms:       []permissions.Permission{permissions.DeleteUserPermission},
-			constraints: []func(*constraints){WithUserID(invalid)},
-			expect:      authorizationError(ctx, false),
+			name:            "access denied because deleting a user that doesn't exist",
+			perms:           []permissions.Permission{permissions.DeleteUserPermission},
+			constraints:     []func(*constraints){WithUserID(invalid)},
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:   "access denied because required constraints not provided",
-			perms:  []permissions.Permission{permissions.DeleteTeamPermission, permissions.DeleteUserPermission},
-			expect: errMissingConstraints,
+			name:            "access denied because required constraints not provided",
+			perms:           []permissions.Permission{permissions.DeleteTeamPermission, permissions.DeleteUserPermission},
+			expectErrorCode: errors.EInternal,
 		},
 		{
-			name:   "access denied because permission is never available to caller",
-			perms:  []permissions.Permission{permissions.CreateGroupPermission},
-			expect: authorizationError(ctx, false),
+			name:            "access denied because permission is never available to caller",
+			perms:           []permissions.Permission{permissions.CreateGroupPermission},
+			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:              "cannot have write permission when server in maintenance mode",
 			perms:             []permissions.Permission{permissions.CreateTeamPermission},
-			expect:            errInMaintenanceMode,
+			expectErrorCode:   errors.EServiceUnavailable,
 			inMaintenanceMode: true,
 		},
 	}
@@ -139,7 +140,13 @@ func TestSCIMCaller_RequirePermissions(t *testing.T) {
 			caller.dbClient = &db.Client{Teams: mockTeams, Users: mockUsers}
 
 			for _, perm := range test.perms {
-				assert.Equal(t, test.expect, caller.RequirePermission(ctx, perm, test.constraints...))
+				err := caller.RequirePermission(ctx, perm, test.constraints...)
+				if test.expectErrorCode != "" {
+					require.NotNil(t, err)
+					assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+					return
+				}
+				require.Nil(t, err)
 			}
 		})
 	}

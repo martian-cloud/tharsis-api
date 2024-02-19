@@ -179,6 +179,12 @@ func TestRequireAccess(t *testing.T) {
 			mockWorkspaces := db.NewMockWorkspaces(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			checks := getConstraints(test.constraints...)
 
@@ -333,6 +339,12 @@ func TestRequireInheritedAccess(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			checks := getConstraints(test.constraints...)
 
@@ -593,6 +605,12 @@ func TestRequireAccessToGroup(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			if test.group != nil {
 				sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
@@ -754,6 +772,12 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			if test.workspace != nil {
 				sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
@@ -934,6 +958,12 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			for _, nm := range test.namespaceMemberships {
 				if nm.RoleID == customRoleID {
@@ -1052,6 +1082,12 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			for _, nm := range test.namespaceMemberships {
 				if nm.RoleID == customRoleID {
@@ -1224,6 +1260,12 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			for _, nm := range test.namespaceMemberships {
 				if nm.RoleID == customRoleID {

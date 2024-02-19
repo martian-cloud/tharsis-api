@@ -110,6 +110,20 @@ func (_m *MockCaller) RequirePermission(ctx context.Context, perms permissions.P
 	return r0
 }
 
+// UnauthorizedError provides a mock function with given fields: ctx, hasViewerAccess
+func (_m *MockCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool) error {
+	ret := _m.Called(ctx, hasViewerAccess)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, bool) error); ok {
+		r0 = rf(ctx, hasViewerAccess)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewMockCaller interface {
 	mock.TestingT
 	Cleanup(func())

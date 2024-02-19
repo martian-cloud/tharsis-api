@@ -11,7 +11,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Authorizer is used to authorize access to namespaces
@@ -163,7 +162,7 @@ func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, p
 	}
 
 	if group == nil {
-		return authorizationError(ctx, false)
+		return a.authorizationError(ctx, false)
 	}
 
 	return a.requireAccessToNamespace(ctx, group.FullPath, perm)
@@ -181,7 +180,7 @@ func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID s
 	}
 
 	if ws == nil {
-		return authorizationError(ctx, false)
+		return a.authorizationError(ctx, false)
 	}
 
 	return a.requireAccessToNamespace(ctx, ws.FullPath, perm)
@@ -244,7 +243,7 @@ func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, 
 	}
 
 	if group == nil {
-		return authorizationError(ctx, false)
+		return a.authorizationError(ctx, false)
 	}
 
 	return a.requireAccessToInheritedNamespaceResource(ctx, group.FullPath, perm)
@@ -267,7 +266,7 @@ func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Conte
 	}
 
 	if len(resp.NamespaceMemberships) == 0 {
-		return authorizationError(ctx, false)
+		return a.authorizationError(ctx, false)
 	}
 
 	// Build a map of namespaces in descending order.
@@ -422,7 +421,7 @@ func (a *authorizer) getPermissionsFromMembership(ctx context.Context, membershi
 	}
 
 	if role == nil {
-		return nil, authorizationError(ctx, false)
+		return nil, a.authorizationError(ctx, false)
 	}
 
 	perms := role.GetPermissions()
@@ -460,7 +459,7 @@ func (a *authorizer) requirePermission(
 		}
 	}
 
-	return authorizationError(ctx, hasViewerAccess)
+	return a.authorizationError(ctx, hasViewerAccess)
 }
 
 // hasConstraints returns true if at least one of the required constraints are specified.
@@ -470,26 +469,13 @@ func (*authorizer) hasConstraints(checks *constraints, checkWorkspace bool) bool
 		(checkWorkspace && checks.workspaceID != nil)
 }
 
-func authorizationError(ctx context.Context, hasViewerAccessLevel bool) error {
+func (*authorizer) authorizationError(ctx context.Context, hasViewerAccessLevel bool) error {
 	caller, err := AuthorizeCaller(ctx)
 	if err != nil {
 		return err
 	}
 
-	// If subject has at least viewer permissions then return 403, if not, return 404
-	if hasViewerAccessLevel {
-		return errors.New(
-			"%s is not authorized to perform the requested operation: ensure that the user or service account has been added as a member to the group/workspace with the role required to perform the requested operation",
-			caller.GetSubject(),
-			errors.WithErrorCode(errors.EForbidden),
-		)
-	}
-
-	return errors.New(
-		"either the requested resource does not exist or the caller %s is not authorized to perform the requested operation: ensure that the user or service account has been added as a member to the group/workspace with the role required to perform the requested operation",
-		caller.GetSubject(),
-		errors.WithErrorCode(errors.ENotFound),
-	)
+	return caller.UnauthorizedError(ctx, hasViewerAccessLevel)
 }
 
 func expandNamespaceDescOrder(path string) []string {
