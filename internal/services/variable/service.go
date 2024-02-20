@@ -203,11 +203,25 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 		namespacePaths = append(namespacePaths, variable.NamespacePath)
 	}
 
-	if len(namespacePaths) > 0 {
-		err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePaths(namespacePaths))
+	namespacesAllowedToViewValue := map[string]struct{}{}
+
+	for _, namespacePath := range namespacePaths {
+		err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath))
 		if err != nil {
-			tracing.RecordError(span, err, "permission check failed")
-			return nil, err
+			err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithNamespacePath(namespacePath))
+			if err != nil {
+				tracing.RecordError(span, err, "permission check failed")
+				return nil, err
+			}
+		} else {
+			namespacesAllowedToViewValue[namespacePath] = struct{}{}
+		}
+	}
+
+	// Filter out variable values that the caller is not allowed to view
+	for i := range resp.Variables {
+		if _, ok := namespacesAllowedToViewValue[resp.Variables[i].NamespacePath]; !ok {
+			resp.Variables[i].Value = nil
 		}
 	}
 

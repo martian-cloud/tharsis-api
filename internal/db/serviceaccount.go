@@ -34,10 +34,12 @@ type ServiceAccountSortableField string
 
 // ServiceAccountSortableField constants
 const (
-	ServiceAccountSortableFieldCreatedAtAsc  ServiceAccountSortableField = "CREATED_AT_ASC"
-	ServiceAccountSortableFieldCreatedAtDesc ServiceAccountSortableField = "CREATED_AT_DESC"
-	ServiceAccountSortableFieldUpdatedAtAsc  ServiceAccountSortableField = "UPDATED_AT_ASC"
-	ServiceAccountSortableFieldUpdatedAtDesc ServiceAccountSortableField = "UPDATED_AT_DESC"
+	ServiceAccountSortableFieldCreatedAtAsc        ServiceAccountSortableField = "CREATED_AT_ASC"
+	ServiceAccountSortableFieldCreatedAtDesc       ServiceAccountSortableField = "CREATED_AT_DESC"
+	ServiceAccountSortableFieldUpdatedAtAsc        ServiceAccountSortableField = "UPDATED_AT_ASC"
+	ServiceAccountSortableFieldUpdatedAtDesc       ServiceAccountSortableField = "UPDATED_AT_DESC"
+	ServiceAccountSortableFieldFieldGroupLevelAsc  ServiceAccountSortableField = "GROUP_LEVEL_ASC"
+	ServiceAccountSortableFieldFieldGroupLevelDesc ServiceAccountSortableField = "GROUP_LEVEL_DESC"
 )
 
 func (sf ServiceAccountSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
@@ -46,6 +48,8 @@ func (sf ServiceAccountSortableField) getFieldDescriptor() *pagination.FieldDesc
 		return &pagination.FieldDescriptor{Key: "created_at", Table: "service_accounts", Col: "created_at"}
 	case ServiceAccountSortableFieldUpdatedAtAsc, ServiceAccountSortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "service_accounts", Col: "updated_at"}
+	case ServiceAccountSortableFieldFieldGroupLevelAsc, ServiceAccountSortableFieldFieldGroupLevelDesc:
+		return &pagination.FieldDescriptor{Key: "group_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
@@ -56,6 +60,17 @@ func (sf ServiceAccountSortableField) getSortDirection() pagination.SortDirectio
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+func (sf ServiceAccountSortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch sf {
+	case ServiceAccountSortableFieldFieldGroupLevelAsc, ServiceAccountSortableFieldFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
 }
 
 // ServiceAccountFilter contains the supported fields for filtering ServiceAccount resources
@@ -196,16 +211,18 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "service_accounts", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

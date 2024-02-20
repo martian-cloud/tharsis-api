@@ -156,8 +156,7 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_module_versions", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

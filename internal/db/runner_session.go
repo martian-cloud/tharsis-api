@@ -128,8 +128,7 @@ func (a *sessions) GetRunnerSessions(ctx context.Context, input *GetRunnerSessio
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "runner_sessions", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

@@ -167,8 +167,7 @@ func TestExecute(t *testing.T) {
 			qBuilder, err := NewPaginatedQueryBuilder(
 				&test.paginationOptions,
 				&FieldDescriptor{Key: "id", Table: "tests", Col: "id"},
-				test.sortByField,
-				test.sortDirection,
+				WithSortByField(test.sortByField, test.sortDirection),
 			)
 			if err != nil {
 				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))

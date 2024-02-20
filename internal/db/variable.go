@@ -399,8 +399,7 @@ func (m *variables) GetVariables(ctx context.Context, input *GetVariablesInput) 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "namespace_variables", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

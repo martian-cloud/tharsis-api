@@ -1,6 +1,8 @@
 enum GroupSort {
   FULL_PATH_ASC
   FULL_PATH_DESC
+  GROUP_LEVEL_ASC
+  GROUP_LEVEL_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
 }
@@ -54,6 +56,7 @@ type Group implements Node, Namespace {
     first: Int
     last: Int
     includeInherited: Boolean
+    sort: GPGKeySort
   ): GPGKeyConnection!
   descendentGroups(
     after: String
@@ -76,6 +79,7 @@ type Group implements Node, Namespace {
     last: Int
     includeInherited: Boolean
     search: String
+    sort: ServiceAccountSort
   ): ServiceAccountConnection!
   managedIdentities(
     after: String
@@ -99,6 +103,7 @@ type Group implements Node, Namespace {
     first: Int
     last: Int
     includeInherited: Boolean
+    sort: RunnerSort
   ): RunnerConnection!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!

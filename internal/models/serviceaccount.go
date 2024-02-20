@@ -31,7 +31,17 @@ type ServiceAccount struct {
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (s *ServiceAccount) ResolveMetadata(key string) (string, error) {
-	return s.Metadata.resolveFieldValue(key)
+	val, err := s.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "group_path":
+			val = s.GetGroupPath()
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
 }
 
 // Validate returns an error if the model is not valid

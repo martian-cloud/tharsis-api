@@ -137,8 +137,7 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "roles", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

@@ -157,8 +157,7 @@ func (t *terraformProviderVersionMirrors) GetVersionMirrors(ctx context.Context,
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_provider_version_mirrors", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

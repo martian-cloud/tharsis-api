@@ -55,13 +55,17 @@ type GroupSortableField string
 
 // GroupSortableField constants
 const (
-	GroupSortableFieldFullPathAsc  GroupSortableField = "FULL_PATH_ASC"
-	GroupSortableFieldFullPathDesc GroupSortableField = "FULL_PATH_DESC"
+	GroupSortableFieldFullPathAsc    GroupSortableField = "FULL_PATH_ASC"
+	GroupSortableFieldFullPathDesc   GroupSortableField = "FULL_PATH_DESC"
+	GroupSortableFieldGroupLevelAsc  GroupSortableField = "GROUP_LEVEL_ASC"
+	GroupSortableFieldGroupLevelDesc GroupSortableField = "GROUP_LEVEL_DESC"
 )
 
 func (gs GroupSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch gs {
 	case GroupSortableFieldFullPathAsc, GroupSortableFieldFullPathDesc:
+		return &pagination.FieldDescriptor{Key: "full_path", Table: "namespaces", Col: "path"}
+	case GroupSortableFieldGroupLevelAsc, GroupSortableFieldGroupLevelDesc:
 		return &pagination.FieldDescriptor{Key: "full_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
@@ -73,6 +77,17 @@ func (gs GroupSortableField) getSortDirection() pagination.SortDirection {
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+func (gs GroupSortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch gs {
+	case GroupSortableFieldGroupLevelAsc, GroupSortableFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
 }
 
 // GetGroupsInput is the input for listing groups
@@ -181,16 +196,18 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "groups", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

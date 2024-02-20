@@ -11,9 +11,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
-
-const forbiddenErrorMsg = "testsubject is not authorized to perform the requested operation"
 
 func TestGetRootNamespaces(t *testing.T) {
 	userID := "user1"
@@ -22,7 +21,7 @@ func TestGetRootNamespaces(t *testing.T) {
 	tests := []struct {
 		userID                 *string
 		name                   string
-		expectErrorMsg         string
+		expectErrorCode        errors.CodeType
 		namespaceMemberships   []models.NamespaceMembership
 		expectedRootNamespaces []models.MembershipNamespace
 	}{
@@ -79,8 +78,8 @@ func TestGetRootNamespaces(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, test.userID, nil, false)
 
 			namespaces, err := authorizer.GetRootNamespaces(ctx)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -99,7 +98,7 @@ func TestRequireAccess(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		perms                []permissions.Permission
 		customRolePerms      []permissions.Permission
 		group                *models.Group
@@ -155,16 +154,16 @@ func TestRequireAccess(t *testing.T) {
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
-			expectErrorMsg: forbiddenErrorMsg,
+			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:           "access denied because no permissions are specified",
-			expectErrorMsg: errMissingConstraints.Error(),
+			name:            "access denied because no permissions are specified",
+			expectErrorCode: errors.EInternal,
 		},
 		{
-			name:           "access denied because required constraints are missing",
-			perms:          []permissions.Permission{permissions.ViewWorkspacePermission},
-			expectErrorMsg: errMissingConstraints.Error(),
+			name:            "access denied because required constraints are missing",
+			perms:           []permissions.Permission{permissions.ViewWorkspacePermission},
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
@@ -179,9 +178,13 @@ func TestRequireAccess(t *testing.T) {
 			mockRoles := db.NewMockRoles(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			checks := getConstraints(test.constraints...)
 
@@ -240,8 +243,8 @@ func TestRequireAccess(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
 			err := authorizer.RequireAccess(WithCaller(ctx, mockCaller), test.perms, test.constraints...)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -256,7 +259,7 @@ func TestRequireInheritedAccess(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		resourceTypes        []permissions.ResourceType
 		customRolePerms      []permissions.Permission
 		group                *models.Group
@@ -312,16 +315,16 @@ func TestRequireInheritedAccess(t *testing.T) {
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
-			expectErrorMsg: resourceNotFoundErrorMsg,
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:           "access denied because no permissions are specified",
-			expectErrorMsg: errMissingConstraints.Error(),
+			name:            "access denied because no permissions are specified",
+			expectErrorCode: errors.EInternal,
 		},
 		{
-			name:           "access denied because required constraints are missing",
-			resourceTypes:  []permissions.ResourceType{permissions.ServiceAccountResourceType},
-			expectErrorMsg: errMissingConstraints.Error(),
+			name:            "access denied because required constraints are missing",
+			resourceTypes:   []permissions.ResourceType{permissions.ServiceAccountResourceType},
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
@@ -335,9 +338,13 @@ func TestRequireInheritedAccess(t *testing.T) {
 			mockCaller := NewMockCaller(t)
 			mockRoles := db.NewMockRoles(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			checks := getConstraints(test.constraints...)
 
@@ -390,8 +397,8 @@ func TestRequireInheritedAccess(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
 			err := authorizer.RequireAccessToInheritableResource(WithCaller(ctx, mockCaller), test.resourceTypes, test.constraints...)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -410,7 +417,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 		group                *models.Group
 		name                 string
 		requiredPermission   *permissions.Permission
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 	}{
 		{
@@ -434,7 +441,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "group does not exist",
@@ -442,7 +449,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name: "user with custom role has viewer permission available through a greater permission action",
@@ -482,7 +489,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				permissions.CreateRunPermission,
 			},
 			requiredPermission: &permissions.CreateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "custom role does not exist",
@@ -494,7 +501,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.ViewGPGKeyPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name: "need CreateGPGKeyPermission, have dov: multiple namespaces, ensure lowest namespace membership wins",
@@ -508,7 +515,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns2/ns11",
 			},
 			requiredPermission: &permissions.CreateGPGKeyPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "need CreateManagedIdentityPermission, have do: multiple namespaces, ensure lowest membership wins",
@@ -521,7 +528,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "need UpdateManagedIdentityPermission, have od: multiple namespaces, ensure lowest membership wins",
@@ -558,7 +565,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.UpdateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "negative: need CreateGroupPermission, have viewer",
@@ -570,7 +577,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		// Ensure higher permission can't be granted if they only have View action.
 		{
@@ -583,7 +590,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 	}
 
@@ -597,9 +604,13 @@ func TestRequireAccessToGroup(t *testing.T) {
 			mockCaller := NewMockCaller(t)
 			mockRoles := db.NewMockRoles(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			if test.group != nil {
 				sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
@@ -637,8 +648,8 @@ func TestRequireAccessToGroup(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
 			err := authorizer.requireAccessToGroup(WithCaller(ctx, mockCaller), groupID, test.requiredPermission)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -657,7 +668,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 		name                 string
 		customRolePerms      []permissions.Permission
 		requiredPermission   *permissions.Permission
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 	}{
 		{
@@ -681,7 +692,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "user with custom role has required permissions",
@@ -712,7 +723,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				permissions.CreateManagedIdentityPermission,
 			},
 			requiredPermission: &permissions.UpdateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "user with custom role has viewer access from a greater action",
@@ -738,7 +749,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.UpdateManagedIdentityPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name: "workspace does not exist",
@@ -746,7 +757,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			requiredPermission: &permissions.ViewWorkspacePermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 	}
 
@@ -760,9 +771,13 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 			mockCaller := NewMockCaller(t)
 			mockRoles := db.NewMockRoles(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			if test.workspace != nil {
 				sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
@@ -800,8 +815,8 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
 			err := authorizer.requireAccessToWorkspace(WithCaller(ctx, mockCaller), workspaceID, test.requiredPermission)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -820,7 +835,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 		serviceAccountID     *string
 		name                 string
 		requiredNamespace    string
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		customRolePerms      []permissions.Permission
 		requiredPermission   *permissions.Permission
 		namespaceMemberships []models.NamespaceMembership
@@ -882,7 +897,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			requiredNamespace:  "ns1/ns2/ns3",
 			customRolePerms:    []permissions.Permission{permissions.ViewGroupPermission},
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "service account has required permission in namespace",
@@ -899,7 +914,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			userID:               &userID,
 			requiredNamespace:    "ns1",
 			requiredPermission:   &permissions.ViewGroupPermission,
-			expectErrorMsg:       resourceNotFoundErrorMsg,
+			expectErrorCode:      errors.ENotFound,
 		},
 		{
 			name: "user has lower access level than required",
@@ -909,7 +924,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			userID:             &userID,
 			requiredNamespace:  "ns1",
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "user has lower access level than required in nested group",
@@ -919,7 +934,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",
 			requiredPermission: &permissions.CreateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "custom role does not exist",
@@ -929,7 +944,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			userID:             &userID,
 			requiredNamespace:  "ns1",
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 	}
 
@@ -942,9 +957,13 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			mockCaller := NewMockCaller(t)
 			mockRoles := db.NewMockRoles(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			for _, nm := range test.namespaceMemberships {
 				if nm.RoleID == customRoleID {
@@ -978,8 +997,8 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, test.userID, test.serviceAccountID, false)
 
 			err := authorizer.requireAccessToNamespace(WithCaller(ctx, mockCaller), test.requiredNamespace, test.requiredPermission)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -994,7 +1013,7 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		name                 string
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 		customRolePerms      []permissions.Permission
 		requiredPermission   *permissions.Permission
@@ -1017,7 +1036,7 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 			},
 			requiredNamespaces: []string{"ns1", "ns1/ns11", "ns2/ns22/ns222", "ns2"},
 			requiredPermission: &permissions.CreateManagedIdentityPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "user with custom role has permissions for namespaces",
@@ -1044,12 +1063,12 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 				permissions.ViewWorkspacePermission,
 			},
 			requiredPermission: &permissions.CreateManagedIdentityPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name:               "user does not have access to any namespaces",
 			requiredNamespaces: []string{"ns3"},
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 	}
 
@@ -1062,9 +1081,13 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 			mockCaller := NewMockCaller(t)
 			mockRoles := db.NewMockRoles(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			for _, nm := range test.namespaceMemberships {
 				if nm.RoleID == customRoleID {
@@ -1105,8 +1128,8 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
 			err := authorizer.requireAccessToNamespaces(WithCaller(ctx, mockCaller), test.requiredNamespaces, test.requiredPermission)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -1123,7 +1146,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 	tests := []struct {
 		group                *models.Group
 		name                 string
-		expectErrorMsg       string
+		expectErrorCode      errors.CodeType
 		customRolePerms      []permissions.Permission
 		requiredPermission   *permissions.Permission
 		namespaceMemberships []models.NamespaceMembership
@@ -1157,7 +1180,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			expectErrorMsg: resourceNotFoundErrorMsg,
+			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "user does not have a membership in requested namespace",
@@ -1168,7 +1191,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns20",
 			},
-			expectErrorMsg: resourceNotFoundErrorMsg,
+			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "user does not have required permission",
@@ -1180,7 +1203,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateGroupPermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "user with custom role has required permission",
@@ -1205,7 +1228,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 			},
 			customRolePerms:    []permissions.Permission{permissions.UpdateTerraformModulePermission},
 			requiredPermission: &permissions.CreateTerraformModulePermission,
-			expectErrorMsg:     forbiddenErrorMsg,
+			expectErrorCode:    errors.EForbidden,
 		},
 		{
 			name: "custom role does not exist",
@@ -1217,12 +1240,12 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				FullPath: "ns1/ns11",
 			},
 			requiredPermission: &permissions.CreateServiceAccountPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name:               "group does not exist",
 			requiredPermission: &permissions.CreateServiceAccountPermission,
-			expectErrorMsg:     resourceNotFoundErrorMsg,
+			expectErrorCode:    errors.ENotFound,
 		},
 	}
 
@@ -1236,9 +1259,13 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 			mockCaller := NewMockCaller(t)
 			mockRoles := db.NewMockRoles(t)
 
-			if test.expectErrorMsg == forbiddenErrorMsg {
-				mockCaller.On("GetSubject").Return("testsubject")
-			}
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
 
 			for _, nm := range test.namespaceMemberships {
 				if nm.RoleID == customRoleID {
@@ -1274,8 +1301,8 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
 			err := authorizer.requireAccessToInheritedGroupResource(WithCaller(ctx, mockCaller), groupID, test.requiredPermission)
-			if test.expectErrorMsg != "" {
-				assert.EqualError(t, err, test.expectErrorMsg)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
 				t.Fatal(err)
 			}

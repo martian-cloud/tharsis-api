@@ -138,8 +138,7 @@ func (t *terraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, i
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_provider_platforms", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

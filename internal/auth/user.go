@@ -53,6 +53,24 @@ func (u *UserCaller) IsAdmin() bool {
 	return u.User.Admin
 }
 
+// UnauthorizedError returns the unauthorized error for this specific caller type
+func (u *UserCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) error {
+	// If subject has at least viewer permissions then return 403, if not, return 404
+	if hasViewerAccess {
+		return terrors.New(
+			"user %s is not authorized to perform the requested operation: ensure that the user has been added as a member to the group/workspace with the role required to perform the requested operation",
+			u.GetSubject(),
+			terrors.WithErrorCode(terrors.EForbidden),
+		)
+	}
+
+	return terrors.New(
+		"either the requested resource does not exist or the user %s is not authorized to perform the requested operation: ensure that the user has been added as a member to the group/workspace with the role required to perform the requested operation",
+		u.GetSubject(),
+		terrors.WithErrorCode(terrors.ENotFound),
+	)
+}
+
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
 func (u *UserCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error) {
 	if u.User.Admin {
@@ -129,7 +147,7 @@ func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *permissions
 	}
 
 	// All others are denied. Viewer access is available to everyone.
-	return authorizationError(ctx, true)
+	return u.UnauthorizedError(ctx, true)
 }
 
 func (u *UserCaller) requireAdmin(ctx context.Context, _ *permissions.Permission, _ *constraints) error {
@@ -137,7 +155,7 @@ func (u *UserCaller) requireAdmin(ctx context.Context, _ *permissions.Permission
 		return nil
 	}
 
-	return authorizationError(ctx, false)
+	return u.UnauthorizedError(ctx, false)
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.

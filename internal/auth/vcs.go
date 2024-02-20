@@ -2,11 +2,13 @@ package auth
 
 import (
 	"context"
+	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // VCSWorkspaceLinkCaller represents a VCS provider subject.
@@ -42,6 +44,25 @@ func (v *VCSWorkspaceLinkCaller) IsAdmin() bool {
 	return false
 }
 
+// UnauthorizedError returns the unauthorized error for this specific caller type
+func (v *VCSWorkspaceLinkCaller) UnauthorizedError(_ context.Context, hasViewerAccess bool) error {
+	forbiddedMsg := fmt.Sprintf("VCS workspace link %s is not authorized to perform the requested operation", v.GetSubject())
+
+	// If subject has at least viewer permissions then return 403, if not, return 404
+	if hasViewerAccess {
+		return terrors.New(
+			forbiddedMsg,
+			terrors.WithErrorCode(terrors.EForbidden),
+		)
+	}
+
+	return terrors.New(
+		"either the requested resource does not exist or the %s",
+		forbiddedMsg,
+		terrors.WithErrorCode(terrors.ENotFound),
+	)
+}
+
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller.
 func (v *VCSWorkspaceLinkCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
 	return &NamespaceAccessPolicy{
@@ -65,7 +86,7 @@ func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm per
 
 	handlerFunc, ok := v.getPermissionHandler(perm)
 	if !ok {
-		return authorizationError(ctx, false)
+		return v.UnauthorizedError(ctx, false)
 	}
 
 	return handlerFunc(ctx, &perm, getConstraints(checks...))
@@ -74,7 +95,7 @@ func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm per
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
 func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
 	// Return an authorization error since VCS does not need any access to inherited resources.
-	return authorizationError(ctx, false)
+	return v.UnauthorizedError(ctx, false)
 }
 
 // requireAccessToWorkspace will return an error if the caller doesn't have permission to view the specified workspace.
@@ -90,7 +111,7 @@ func (v *VCSWorkspaceLinkCaller) requireAccessToWorkspace(ctx context.Context, _
 	}
 
 	// Deny all others.
-	return authorizationError(ctx, false)
+	return v.UnauthorizedError(ctx, false)
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.

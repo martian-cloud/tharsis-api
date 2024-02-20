@@ -98,7 +98,17 @@ type ManagedIdentity struct {
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (m *ManagedIdentity) ResolveMetadata(key string) (string, error) {
-	return m.Metadata.resolveFieldValue(key)
+	val, err := m.Metadata.resolveFieldValue(key)
+	if err != nil {
+		switch key {
+		case "group_path":
+			val = m.GetGroupPath()
+		default:
+			return "", err
+		}
+	}
+
+	return val, nil
 }
 
 // Validate returns an error if the model is not valid

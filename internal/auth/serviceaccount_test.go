@@ -6,9 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestServiceAccountCaller_GetSubject(t *testing.T) {
@@ -39,7 +41,7 @@ func TestServiceAccountCaller_RequirePermissions(t *testing.T) {
 
 	testCases := []struct {
 		name              string
-		expect            error
+		expectErrorCode   errors.CodeType
 		perm              permissions.Permission
 		constraints       []func(*constraints)
 		withAuthorizer    bool
@@ -52,22 +54,22 @@ func TestServiceAccountCaller_RequirePermissions(t *testing.T) {
 			withAuthorizer: true,
 		},
 		{
-			name:           "access is denied by the authorizer",
-			perm:           permissions.CreateWorkspacePermission,
-			constraints:    []func(*constraints){WithWorkspaceID("ws-1")},
-			expect:         authorizationError(ctx, false),
-			withAuthorizer: true,
+			name:            "access is denied by the authorizer",
+			perm:            permissions.CreateWorkspacePermission,
+			constraints:     []func(*constraints){WithWorkspaceID("ws-1")},
+			expectErrorCode: errors.ENotFound,
+			withAuthorizer:  true,
 		},
 		{
-			name:           "access denied because required constraints are not specified",
-			perm:           permissions.ViewWorkspacePermission,
-			expect:         errMissingConstraints,
-			withAuthorizer: true,
+			name:            "access denied because required constraints are not specified",
+			perm:            permissions.ViewWorkspacePermission,
+			expectErrorCode: errors.EInternal,
+			withAuthorizer:  true,
 		},
 		{
 			name:              "cannot have write permission when system is in maintenance mode",
 			perm:              permissions.CreateWorkspacePermission,
-			expect:            errInMaintenanceMode,
+			expectErrorCode:   errors.EServiceUnavailable,
 			inMaintenanceMode: true,
 		},
 		{
@@ -93,7 +95,13 @@ func TestServiceAccountCaller_RequirePermissions(t *testing.T) {
 			caller.authorizer = mockAuthorizer
 			caller.maintenanceMonitor = mockMaintenanceMonitor
 
-			assert.Equal(t, test.expect, caller.RequirePermission(ctx, test.perm, test.constraints...))
+			err := caller.RequirePermission(ctx, test.perm, test.constraints...)
+			if test.expectErrorCode != "" {
+				require.NotNil(t, err)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			require.Nil(t, err)
 		})
 	}
 }
@@ -103,11 +111,11 @@ func TestServiceAccountCaller_RequireInheritedAccess(t *testing.T) {
 	ctx := WithCaller(context.Background(), &caller)
 
 	testCases := []struct {
-		name           string
-		expect         error
-		resourceType   permissions.ResourceType
-		constraints    []func(*constraints)
-		withAuthorizer bool
+		name            string
+		expectErrorCode errors.CodeType
+		resourceType    permissions.ResourceType
+		constraints     []func(*constraints)
+		withAuthorizer  bool
 	}{
 		{
 			name:           "access is granted by the authorizer",
@@ -116,17 +124,17 @@ func TestServiceAccountCaller_RequireInheritedAccess(t *testing.T) {
 			withAuthorizer: true,
 		},
 		{
-			name:           "access is denied by the authorizer",
-			resourceType:   permissions.ApplyResourceType,
-			constraints:    []func(*constraints){WithGroupID("group-1")},
-			expect:         authorizationError(ctx, false),
-			withAuthorizer: true,
+			name:            "access is denied by the authorizer",
+			resourceType:    permissions.ApplyResourceType,
+			constraints:     []func(*constraints){WithGroupID("group-1")},
+			expectErrorCode: errors.ENotFound,
+			withAuthorizer:  true,
 		},
 		{
-			name:           "access denied because required constraints are not specified",
-			resourceType:   permissions.RunnerResourceType,
-			expect:         errMissingConstraints,
-			withAuthorizer: true,
+			name:            "access denied because required constraints are not specified",
+			resourceType:    permissions.RunnerResourceType,
+			expectErrorCode: errors.EInternal,
+			withAuthorizer:  true,
 		},
 	}
 
@@ -140,13 +148,19 @@ func TestServiceAccountCaller_RequireInheritedAccess(t *testing.T) {
 
 			caller.authorizer = mockAuthorizer
 
-			assert.Equal(t, test.expect, caller.RequireAccessToInheritableResource(ctx, test.resourceType, test.constraints...))
+			err := caller.RequireAccessToInheritableResource(ctx, test.resourceType, test.constraints...)
+			if test.expectErrorCode != "" {
+				require.NotNil(t, err)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			require.Nil(t, err)
 		})
 	}
 }
 
 // requireAccessAuthorizerFunc is a helper function to mock the results returned from the Authorizer interface.
-func requireAccessAuthorizerFunc(ctx context.Context, perms []permissions.Permission, checks ...func(*constraints)) error {
+func requireAccessAuthorizerFunc(_ context.Context, perms []permissions.Permission, checks ...func(*constraints)) error {
 	if len(perms) == 0 || len(checks) == 0 {
 		return errMissingConstraints
 	}
@@ -154,7 +168,7 @@ func requireAccessAuthorizerFunc(ctx context.Context, perms []permissions.Permis
 	for _, perm := range perms {
 		if perm.Action != permissions.ViewAction {
 			// Only grant viewer permissions for the sake of making testing easier.
-			return authorizationError(ctx, false)
+			return errors.New("unauthorized", errors.WithErrorCode(errors.ENotFound))
 		}
 	}
 
@@ -162,7 +176,7 @@ func requireAccessAuthorizerFunc(ctx context.Context, perms []permissions.Permis
 }
 
 // requireInheritedAccessAuthorizerFunc is a helper function to mock the results returned from the Authorizer interface.
-func requireInheritedAccessAuthorizerFunc(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error {
+func requireInheritedAccessAuthorizerFunc(_ context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error {
 	if len(resourceTypes) == 0 || len(checks) == 0 {
 		return errMissingConstraints
 	}
@@ -170,7 +184,7 @@ func requireInheritedAccessAuthorizerFunc(ctx context.Context, resourceTypes []p
 	for _, rt := range resourceTypes {
 		if rt == permissions.ApplyResourceType {
 			// Don't allow access to apply resource for sake of making testing easier.
-			return authorizationError(ctx, false)
+			return errors.New("unauthorized", errors.WithErrorCode(errors.ENotFound))
 		}
 	}
 

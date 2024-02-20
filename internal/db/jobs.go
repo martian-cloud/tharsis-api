@@ -176,8 +176,7 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "jobs", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 
 	if err != nil {

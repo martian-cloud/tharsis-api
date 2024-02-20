@@ -28,24 +28,39 @@ type GPGKeySortableField string
 
 // GPGKeySortableField constants
 const (
-	GPGKeySortableFieldUpdatedAtAsc  GPGKeySortableField = "UPDATED_AT_ASC"
-	GPGKeySortableFieldUpdatedAtDesc GPGKeySortableField = "UPDATED_AT_DESC"
+	GPGKeySortableFieldUpdatedAtAsc   GPGKeySortableField = "UPDATED_AT_ASC"
+	GPGKeySortableFieldUpdatedAtDesc  GPGKeySortableField = "UPDATED_AT_DESC"
+	GPGKeySortableFieldGroupLevelAsc  GPGKeySortableField = "GROUP_LEVEL_ASC"
+	GPGKeySortableFieldGroupLevelDesc GPGKeySortableField = "GROUP_LEVEL_DESC"
 )
 
-func (ts GPGKeySortableField) getFieldDescriptor() *pagination.FieldDescriptor {
-	switch ts {
+func (sf GPGKeySortableField) getFieldDescriptor() *pagination.FieldDescriptor {
+	switch sf {
 	case GPGKeySortableFieldUpdatedAtAsc, GPGKeySortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "gpg_keys", Col: "updated_at"}
+	case GPGKeySortableFieldGroupLevelAsc, GPGKeySortableFieldGroupLevelDesc:
+		return &pagination.FieldDescriptor{Key: "group_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
 }
 
-func (ts GPGKeySortableField) getSortDirection() pagination.SortDirection {
-	if strings.HasSuffix(string(ts), "_DESC") {
+func (sf GPGKeySortableField) getSortDirection() pagination.SortDirection {
+	if strings.HasSuffix(string(sf), "_DESC") {
 		return pagination.DescSort
 	}
 	return pagination.AscSort
+}
+
+func (sf GPGKeySortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch sf {
+	case GPGKeySortableFieldGroupLevelAsc, GPGKeySortableFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
 }
 
 // GPGKeyFilter contains the supported fields for filtering GPGKey resources
@@ -119,16 +134,18 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "gpg_keys", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 
 	if err != nil {

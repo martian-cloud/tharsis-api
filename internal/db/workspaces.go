@@ -171,8 +171,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "workspaces", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

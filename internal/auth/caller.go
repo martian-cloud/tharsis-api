@@ -190,6 +190,14 @@ func (s *SystemCaller) RequireAccessToInheritableResource(_ context.Context, _ p
 	return nil
 }
 
+// UnauthorizedError returns the unauthorized error for this specific caller type
+func (s *SystemCaller) UnauthorizedError(_ context.Context, _ bool) error {
+	return errors.New(
+		"system caller is not authorized to perform this action",
+		errors.WithErrorCode(errors.EForbidden),
+	)
+}
+
 // NamespaceAccessPolicy specifies the namespaces that a caller has access to
 type NamespaceAccessPolicy struct {
 	// RootNamespaceIDs restricts the caller to the specified root namespaces
@@ -205,6 +213,7 @@ type Caller interface {
 	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
 	RequirePermission(ctx context.Context, perms permissions.Permission, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error
+	UnauthorizedError(ctx context.Context, hasViewerAccess bool) error
 }
 
 // WithCaller adds the caller to the context

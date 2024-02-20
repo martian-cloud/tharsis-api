@@ -2,11 +2,13 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // JobCaller represents a job subject
@@ -27,6 +29,39 @@ func (j *JobCaller) IsAdmin() bool {
 	return false
 }
 
+// UnauthorizedError returns the unauthorized error for this specific caller type
+func (j *JobCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool) error {
+	// Get workspace path
+	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	if err != nil {
+		return err
+	}
+
+	workspacePath := "unknown workspace"
+	if workspace != nil {
+		workspacePath = workspace.FullPath
+	}
+
+	forbiddedMsg := fmt.Sprintf(
+		"job in workspace %s is not authorized to perform the requested operation: a job only has read access to resources in its group, a Tharsis Managed Identity must be assigned to the workspace to peform write operations.",
+		workspacePath,
+	)
+
+	// If subject has at least viewer permissions then return 403, if not, return 404
+	if hasViewerAccess {
+		return terrors.New(
+			forbiddedMsg,
+			terrors.WithErrorCode(terrors.EForbidden),
+		)
+	}
+
+	return terrors.New(
+		"either the requested resource does not exist or the %s",
+		forbiddedMsg,
+		terrors.WithErrorCode(terrors.ENotFound),
+	)
+}
+
 // GetNamespaceAccessPolicy returns the namespace access policy for this caller
 func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAccessPolicy, error) {
 	return &NamespaceAccessPolicy{
@@ -40,7 +75,7 @@ func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcces
 func (j *JobCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
 	handlerFunc, ok := j.getPermissionHandler(perm)
 	if !ok {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	return handlerFunc(ctx, &perm, getConstraints(checks...))
@@ -67,7 +102,7 @@ func (j *JobCaller) requireAccessToInheritedGroupResource(ctx context.Context, g
 	}
 
 	if workspace == nil {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	// Job has access to view all parent group inherited resources
@@ -77,11 +112,11 @@ func (j *JobCaller) requireAccessToInheritedGroupResource(ctx context.Context, g
 	}
 
 	if group == nil {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	if !workspace.IsDescendantOfGroup(group.FullPath) {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	return nil
@@ -95,12 +130,12 @@ func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Contex
 	}
 
 	if workspace == nil {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	for _, ns := range namespacePaths {
 		if !workspace.IsDescendantOfGroup(ns) {
-			return authorizationError(ctx, false)
+			return j.UnauthorizedError(ctx, false)
 		}
 	}
 
@@ -128,7 +163,7 @@ func (j *JobCaller) requireAccessToWorkspace(ctx context.Context, workspaceID st
 
 	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil || workspace == nil {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	// we need to check if they have the same root namespace
@@ -163,7 +198,7 @@ func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *permissions.P
 	}
 
 	if run == nil || run.PlanID != *checks.planID {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	// Get latest job associated with plan
@@ -173,7 +208,7 @@ func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *permissions.P
 	}
 
 	if job == nil || job.Metadata.ID != j.JobID {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	return nil
@@ -191,7 +226,7 @@ func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *permissions.
 	}
 
 	if run == nil || run.ApplyID != *checks.applyID {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	// Get latest job associated with plan
@@ -201,7 +236,7 @@ func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *permissions.
 	}
 
 	if job == nil || job.Metadata.ID != j.JobID {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	return nil
@@ -217,7 +252,7 @@ func (j *JobCaller) requireJobAccess(ctx context.Context, _ *permissions.Permiss
 		return nil
 	}
 
-	return authorizationError(ctx, false)
+	return j.UnauthorizedError(ctx, false)
 }
 
 func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePaths []string) error {
@@ -227,7 +262,7 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 	}
 
 	if workspace == nil {
-		return authorizationError(ctx, false)
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	// a workspace must belong under at least one group, so it is safe to assume
@@ -238,7 +273,7 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 		// TODO Advanced controls will need to eventually be added.
 		// Currently, a job will have access to anything under the same root namespace
 		if !strings.HasPrefix(namespacePath, rootNamespace) {
-			return authorizationError(ctx, false)
+			return j.UnauthorizedError(ctx, false)
 		}
 	}
 

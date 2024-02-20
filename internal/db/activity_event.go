@@ -204,8 +204,7 @@ func (m *activityEvents) GetActivityEvents(ctx context.Context,
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "activity_events", Col: "id"},
-		sortBy,
-		sortDirection,
+		pagination.WithSortByField(sortBy, sortDirection),
 	)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build query")

@@ -1,6 +1,8 @@
 enum RunnerSort {
   UPDATED_AT_ASC
   UPDATED_AT_DESC
+  GROUP_LEVEL_ASC
+  GROUP_LEVEL_DESC
 }
 
 # The case of the values must match the model.
