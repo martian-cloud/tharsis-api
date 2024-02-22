@@ -966,13 +966,7 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 	response := []StateVersionDependency{}
 
 	for _, r := range state.Resources {
-		if r.ProviderConfig == tharsisTerraformProviderConfig && r.Type == tharsisWorkspaceOutputsDatasourceName {
-			if len(r.Instances) != 1 {
-				tracing.RecordError(span, nil,
-					"expected one instance for %s but found %d", r.Type, len(r.Instances))
-				return nil, fmt.Errorf("expected one instance for %s but found %d", r.Type, len(r.Instances))
-			}
-
+		if r.ProviderConfig == tharsisTerraformProviderConfig && r.Type == tharsisWorkspaceOutputsDatasourceName && len(r.Instances) > 0 {
 			attributes := map[string]interface{}{}
 			if err := json.Unmarshal(r.Instances[0].AttributesRaw, &attributes); err != nil {
 				tracing.RecordError(span, nil,
