@@ -38,6 +38,13 @@ func TestJobCaller_GetNamespaceAccessPolicy(t *testing.T) {
 func TestJobCaller_RequirePermissions(t *testing.T) {
 	invalid := "invalid"
 
+	jobGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "group-ID",
+		},
+		FullPath: "a",
+	}
+
 	jobWorkspace := &models.Workspace{
 		Metadata: models.ResourceMetadata{
 			ID: "ws1",
@@ -176,6 +183,33 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			perms:           permissions.CreateWorkspacePermission,
 			expectErrorCode: errors.ENotFound,
 		},
+		{
+			name:            "delete variable access denied, no constraints, not found",
+			workspace:       &models.Workspace{FullPath: "a/ws1"},
+			perms:           permissions.DeleteVariablePermission,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "delete variable access denied, matching workspace ID, found but forbidden",
+			workspace:       &models.Workspace{FullPath: "a/ws1"},
+			perms:           permissions.DeleteVariablePermission,
+			constraints:     []func(*constraints){WithWorkspaceID("ws1")},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "delete variable access denied, matching group, found but forbidden",
+			workspace:       &models.Workspace{FullPath: "a/ws1"},
+			perms:           permissions.DeleteVariablePermission,
+			constraints:     []func(*constraints){WithGroupID("group-ID")},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "delete variable access denied, matching namespace path, found but forbidden",
+			workspace:       &models.Workspace{FullPath: "a/ws1"},
+			perms:           permissions.DeleteVariablePermission,
+			constraints:     []func(*constraints){WithNamespacePath("a")},
+			expectErrorCode: errors.EForbidden,
+		},
 	}
 
 	for _, test := range testCases {
@@ -183,6 +217,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			mockRuns := db.NewMockRuns(t)
 			mockJobs := db.NewMockJobs(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockGroups := db.NewMockGroups(t)
 
 			constraints := getConstraints(test.constraints...)
 
@@ -201,16 +236,19 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 
 			if len(constraints.namespacePaths) > 0 {
 				for _, p := range constraints.namespacePaths {
-					mockWorkspaces.On("GetWorkspaceByFullPath", mock.Anything, p).Return(test.workspace, nil)
+					mockWorkspaces.On("GetWorkspaceByFullPath", mock.Anything, p).Return(test.workspace, nil).Maybe()
 				}
 			}
 
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, caller.WorkspaceID).Return(jobWorkspace, nil).Maybe()
 
+			mockGroups.On("GetGroupByID", mock.Anything, "group-ID").Return(jobGroup, nil).Maybe()
+
 			caller.dbClient = &db.Client{
 				Runs:       mockRuns,
 				Jobs:       mockJobs,
 				Workspaces: mockWorkspaces,
+				Groups:     mockGroups,
 			}
 
 			err := caller.RequirePermission(ctx, test.perms, test.constraints...)

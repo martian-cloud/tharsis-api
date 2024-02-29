@@ -31,8 +31,8 @@ type RunnerSortableField string
 
 // RunnerSortableField constants
 const (
-	RunnerSortableFieldUpdatedAtAsc  RunnerSortableField = "UPDATED_AT_ASC"
-	RunnerSortableFieldUpdatedAtDesc RunnerSortableField = "UPDATED_AT_DESC"
+	RunnerSortableFieldUpdatedAtAsc   RunnerSortableField = "UPDATED_AT_ASC"
+	RunnerSortableFieldUpdatedAtDesc  RunnerSortableField = "UPDATED_AT_DESC"
 	RunnerSortableFieldGroupLevelAsc  RunnerSortableField = "GROUP_LEVEL_ASC"
 	RunnerSortableFieldGroupLevelDesc RunnerSortableField = "GROUP_LEVEL_DESC"
 )
