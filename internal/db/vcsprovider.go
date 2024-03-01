@@ -32,10 +32,10 @@ type VCSProviderSortableField string
 
 // VCSProviderSortableField constants
 const (
-	VCSProviderSortableFieldCreatedAtAsc  VCSProviderSortableField = "CREATED_AT_ASC"
-	VCSProviderSortableFieldCreatedAtDesc VCSProviderSortableField = "CREATED_AT_DESC"
-	VCSProviderSortableFieldUpdatedAtAsc  VCSProviderSortableField = "UPDATED_AT_ASC"
-	VCSProviderSortableFieldUpdatedAtDesc VCSProviderSortableField = "UPDATED_AT_DESC"
+	VCSProviderSortableFieldCreatedAtAsc   VCSProviderSortableField = "CREATED_AT_ASC"
+	VCSProviderSortableFieldCreatedAtDesc  VCSProviderSortableField = "CREATED_AT_DESC"
+	VCSProviderSortableFieldUpdatedAtAsc   VCSProviderSortableField = "UPDATED_AT_ASC"
+	VCSProviderSortableFieldUpdatedAtDesc  VCSProviderSortableField = "UPDATED_AT_DESC"
 	VCSProviderSortableFieldGroupLevelAsc  VCSProviderSortableField = "GROUP_LEVEL_ASC"
 	VCSProviderSortableFieldGroupLevelDesc VCSProviderSortableField = "GROUP_LEVEL_DESC"
 )

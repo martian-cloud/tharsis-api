@@ -75,7 +75,35 @@ func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcces
 func (j *JobCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
 	handlerFunc, ok := j.getPermissionHandler(perm)
 	if !ok {
-		return j.UnauthorizedError(ctx, false)
+		// Handler not found so we need to check if the job has viewer access to determine which error to return
+		c := getConstraints(checks...)
+
+		// If no constraints are provided, we can't determine if the job has viewer access
+		if c.workspaceID == nil && c.groupID == nil && len(c.namespacePaths) == 0 {
+			return j.UnauthorizedError(ctx, false)
+		}
+
+		hasViewerAccess := true
+
+		if c.workspaceID != nil && j.WorkspaceID != *c.workspaceID {
+			// Job doesn't have access to the workspace
+			hasViewerAccess = false
+		}
+
+		if c.groupID != nil {
+			if err := j.requireAccessToInheritedGroupResource(ctx, *c.groupID); err != nil {
+				// Job doesn't have access to the group
+				hasViewerAccess = false
+			}
+		}
+		if len(c.namespacePaths) > 0 {
+			if err := j.requireAccessToInheritedNamespaceResource(ctx, c.namespacePaths); err != nil {
+				// Job doesn't have access to one of the namespaces
+				hasViewerAccess = false
+			}
+		}
+
+		return j.UnauthorizedError(ctx, hasViewerAccess)
 	}
 
 	return handlerFunc(ctx, &perm, getConstraints(checks...))
