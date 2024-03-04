@@ -81,6 +81,19 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			constraints: []func(*constraints){WithWorkspaceID("ws2")},
 		},
 		{
+			name:        "job can view state data because it's for the workspace that contains the job",
+			workspace:   &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}},
+			perms:       permissions.ViewStateVersionDataPermission,
+			constraints: []func(*constraints){WithWorkspaceID("ws1")},
+		},
+		{
+			name:            "access denied because job cannot view state data for another workspace",
+			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
+			perms:           permissions.ViewStateVersionDataPermission,
+			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
 			name:            "access denied because workspace is not under same root namespace",
 			workspace:       &models.Workspace{FullPath: "b/ws-2"},
 			perms:           permissions.ViewWorkspacePermission,
@@ -229,9 +242,8 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			mockRuns.On("GetRun", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
 
 			mockJobs.On("GetLatestJobByType", mock.Anything, caller.RunID, stage).Return(test.job, nil).Maybe()
-
-			if constraints.workspaceID != nil && caller.WorkspaceID != *constraints.workspaceID {
-				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, *constraints.workspaceID).Return(test.workspace, nil)
+			if constraints.workspaceID != nil {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, *constraints.workspaceID).Return(test.workspace, nil).Maybe()
 			}
 
 			if len(constraints.namespacePaths) > 0 {

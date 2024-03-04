@@ -170,8 +170,8 @@ func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Contex
 	return nil
 }
 
-// requireAccessToWorkspaces delegates the appropriate workspace check based on the Constraints.
-func (j *JobCaller) requireAccessToWorkspaces(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+// requireAccessToWorkspacesInGroupHierarchy delegates the appropriate workspace check based on the Constraints.
+func (j *JobCaller) requireAccessToWorkspacesInGroupHierarchy(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
 	if checks.workspaceID != nil {
 		return j.requireAccessToWorkspace(ctx, *checks.workspaceID)
 	}
@@ -198,6 +198,19 @@ func (j *JobCaller) requireAccessToWorkspace(ctx context.Context, workspaceID st
 	return j.requireRootNamespaceAccess(ctx, []string{workspace.FullPath})
 }
 
+// requireAccessToJobWorkspace will return an error if the job caller isn't in the requested workspace
+func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+	if checks.workspaceID == nil {
+		return errMissingConstraints
+	}
+
+	if *checks.workspaceID != j.WorkspaceID {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	return nil
+}
+
 // requireRunAccess will return an error if the caller doesn't have permission to the run
 func (j *JobCaller) requireRunAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
 	if checks.runID == nil && checks.workspaceID == nil {
@@ -211,7 +224,7 @@ func (j *JobCaller) requireRunAccess(ctx context.Context, _ *permissions.Permiss
 
 	// TODO: revert to previous behavior (only compare workspaceIDs) after SDK has been
 	// updated to not query for Run when only the current state version outputs are needed.
-	return j.requireAccessToWorkspaces(ctx, nil, checks)
+	return j.requireAccessToWorkspacesInGroupHierarchy(ctx, nil, checks)
 }
 
 // requirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
@@ -311,13 +324,14 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.ViewWorkspacePermission:            j.requireAccessToWorkspaces,
-		permissions.ViewConfigurationVersionPermission: j.requireAccessToWorkspaces,
-		permissions.ViewStateVersionPermission:         j.requireAccessToWorkspaces,
-		permissions.CreateStateVersionPermission:       j.requireAccessToWorkspaces,
-		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspaces,
-		permissions.ViewVariablePermission:             j.requireAccessToWorkspaces,
-		permissions.ViewVariableValuePermission:        j.requireAccessToWorkspaces,
+		permissions.ViewWorkspacePermission:            j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewConfigurationVersionPermission: j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewStateVersionPermission:         j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewVariablePermission:             j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewStateVersionDataPermission:     j.requireAccessToJobWorkspace,
+		permissions.CreateStateVersionPermission:       j.requireAccessToJobWorkspace,
+		permissions.ViewVariableValuePermission:        j.requireAccessToJobWorkspace,
 		permissions.ViewRunPermission:                  j.requireRunAccess, // View is automatically granted if action != View.
 		permissions.ViewJobPermission:                  j.requireJobAccess, // View is automatically granted if action != View.
 		permissions.UpdateJobPermission:                j.requireJobAccess,
