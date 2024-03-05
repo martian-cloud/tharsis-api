@@ -62,6 +62,7 @@ var (
 	UpdateTerraformModulePermission         = Permission{ResourceType: TerraformModuleResourceType, Action: UpdateAction}
 	DeleteTerraformModulePermission         = Permission{ResourceType: TerraformModuleResourceType, Action: DeleteAction}
 	ViewStateVersionPermission              = Permission{ResourceType: StateVersionResourceType, Action: ViewAction}
+	ViewStateVersionDataPermission          = Permission{ResourceType: StateVersionResourceType, Action: ViewValueAction}
 	CreateStateVersionPermission            = Permission{ResourceType: StateVersionResourceType, Action: CreateAction}
 	ViewConfigurationVersionPermission      = Permission{ResourceType: ConfigurationVersionResourceType, Action: ViewAction}
 	CreateConfigurationVersionPermission    = Permission{ResourceType: ConfigurationVersionResourceType, Action: CreateAction}
@@ -125,6 +126,7 @@ var assignablePermissions = map[Permission]struct{}{
 	UpdateTerraformModulePermission:         {},
 	DeleteTerraformModulePermission:         {},
 	ViewStateVersionPermission:              {},
+	ViewStateVersionDataPermission:          {},
 	CreateStateVersionPermission:            {},
 	ViewConfigurationVersionPermission:      {},
 	CreateConfigurationVersionPermission:    {},

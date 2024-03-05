@@ -1128,9 +1128,11 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
-	s.logger.Infow("Created a state version with ID",
+	s.logger.Infow("Created a new state version",
 		"caller", caller.GetSubject(),
 		"stateVersionID", createdStateVersion.Metadata.ID,
+		"workspaceID", createdStateVersion.WorkspaceID,
+		"workspaceFullPath", workspace.FullPath,
 	)
 
 	return createdStateVersion, nil
@@ -1203,9 +1205,29 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sv, err := s.GetStateVersion(ctx, stateVersionID)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get state version")
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
+	if err != nil {
+		tracing.RecordError(span, err, "Failed to query state version from the database")
+		return nil, errors.Wrap(
+			err,
+			"Failed to query state version from the database",
+		)
+	}
+
+	if sv == nil {
+		tracing.RecordError(span, nil, "state version with ID %s not found", stateVersionID)
+		return nil, errors.New("state version with ID %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewStateVersionDataPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
