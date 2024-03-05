@@ -329,7 +329,7 @@ func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissio
 		permissions.ViewStateVersionPermission:         j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.ViewVariablePermission:             j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewStateVersionDataPermission:     j.requireAccessToJobWorkspace,
+		permissions.ViewStateVersionDataPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.CreateStateVersionPermission:       j.requireAccessToJobWorkspace,
 		permissions.ViewVariableValuePermission:        j.requireAccessToJobWorkspace,
 		permissions.ViewRunPermission:                  j.requireRunAccess, // View is automatically granted if action != View.

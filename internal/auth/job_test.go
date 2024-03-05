@@ -83,13 +83,13 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		{
 			name:        "job can view state data because it's for the workspace that contains the job",
 			workspace:   &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}},
-			perms:       permissions.ViewStateVersionDataPermission,
+			perms:       permissions.CreateStateVersionPermission,
 			constraints: []func(*constraints){WithWorkspaceID("ws1")},
 		},
 		{
 			name:            "access denied because job cannot view state data for another workspace",
 			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
-			perms:           permissions.ViewStateVersionDataPermission,
+			perms:           permissions.CreateStateVersionPermission,
 			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
 			expectErrorCode: errors.ENotFound,
 		},
