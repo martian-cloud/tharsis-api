@@ -28,6 +28,7 @@ type NamespaceMembershipEdge {
 type NamespaceMembershipMutationPayload {
   clientMutationId: String
   namespace: Namespace
+  membership: NamespaceMembership
   problems: [Problem!]!
 }
 

@@ -153,7 +153,8 @@ func (r *NamespaceMembershipResolver) ID() graphql.ID {
 
 // ResourcePath resolver
 func (r *NamespaceMembershipResolver) ResourcePath() string {
-	return fmt.Sprintf("%s/%s", r.namespaceMembership.Namespace.Path, r.namespaceMembership.Metadata.ID)
+	return fmt.Sprintf("%s/%s", r.namespaceMembership.Namespace.Path,
+		graphql.ID(gid.ToGlobalID(gid.NamespaceMembershipType, r.namespaceMembership.Metadata.ID)))
 }
 
 // Member resolver
@@ -260,6 +261,15 @@ func (r *NamespaceMembershipMutationPayloadResolver) Namespace(ctx context.Conte
 		return nil, err
 	}
 	return &NamespaceResolver{result: &WorkspaceResolver{workspace: ws}}, nil
+}
+
+// Membership field resolver
+func (r *NamespaceMembershipMutationPayloadResolver) Membership() (*NamespaceMembershipResolver, error) {
+	if r.NamespaceMembershipMutationPayload.NamespaceMembership == nil {
+		return nil, nil
+	}
+
+	return &NamespaceMembershipResolver{namespaceMembership: r.NamespaceMembershipMutationPayload.NamespaceMembership}, nil
 }
 
 // CreateNamespaceMembershipInput is the input for creating a new namespace membership
