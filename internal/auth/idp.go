@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
@@ -97,7 +97,7 @@ func (s *IdentityProvider) VerifyToken(ctx context.Context, token string) (*Veri
 	}
 
 	// Parse and validate jwt
-	decodedToken, err := jwt.Parse(tokenBytes, jwt.WithValidate(true), jwt.WithIssuer(s.issuerURL))
+	decodedToken, err := jwt.Parse(tokenBytes, jwt.WithVerify(false), jwt.WithValidate(true), jwt.WithIssuer(s.issuerURL))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode token %w", err)
 	}

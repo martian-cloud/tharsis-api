@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -63,7 +63,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, us
 		return nil, errors.New("Authentication token is missing", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	decodedToken, err := jwt.Parse([]byte(tokenString))
+	decodedToken, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode token", errors.WithErrorCode(errors.EUnauthorized))
 	}

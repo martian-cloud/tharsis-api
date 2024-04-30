@@ -32,6 +32,7 @@ FROM alpine:3.17 AS job-executor
 WORKDIR /app/
 COPY --from=builder /app/job .
 RUN apk add --no-cache git curl python3 py3-pip jq && \
+    apk --no-cache upgrade && \
     adduser tharsis -D && \
     chown tharsis:tharsis /app
 USER tharsis

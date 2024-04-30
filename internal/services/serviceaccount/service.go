@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	failedToVerifyJWSSignature = "failed to verify jws signature"
+	failedToVerifyJWSSignature = "Failed to verify token could not verify message using any of the signatures or keys"
 	expiredTokenDetector       = "Failed to verify token exp not satisfied"
 )
 
@@ -517,7 +517,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	defer span.End()
 
 	// Parse token
-	token, err := jwt.Parse(input.Token)
+	token, err := jwt.Parse(input.Token, jwt.WithVerify(false))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to decode token")
 		return nil, errors.Wrap(err, "failed to decode token", errors.WithErrorCode(errors.EUnauthorized))
@@ -665,7 +665,7 @@ func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, t
 	}
 
 	// Set default key to RS256 if it's not specified in JWK set
-	iter := keySet.Iterate(ctx)
+	iter := keySet.Keys(ctx)
 	for iter.Next(ctx) {
 		key := iter.Pair().Value.(jwk.Key)
 		if err = key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
@@ -674,6 +674,7 @@ func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, t
 	}
 
 	options := []jwt.ParseOption{
+		jwt.WithVerify(true),
 		jwt.WithKeySet(keySet),
 		jwt.WithValidate(true),
 	}

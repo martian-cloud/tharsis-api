@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -214,7 +214,7 @@ type externalIdentity struct {
 // UserAuth implements JWT authentication
 type UserAuth struct {
 	idpMap             map[string]IdentityProviderConfig
-	jwkRegistry        *jwk.AutoRefresh
+	jwkRegistry        *jwk.Cache
 	logger             logger.Logger
 	dbClient           *db.Client
 	maintenanceMonitor maintenance.Monitor
@@ -235,12 +235,12 @@ func NewUserAuth(
 ) *UserAuth {
 	idpMap := make(map[string]IdentityProviderConfig)
 
-	jwkRegistry := jwk.NewAutoRefresh(ctx)
+	jwkRegistry := jwk.NewCache(ctx)
 
 	for _, idp := range identityProviders {
 		idpMap[idp.Issuer] = idp
 
-		jwkRegistry.Configure(idp.JwksURI, jwk.WithMinRefreshInterval(jwtRefreshIntervalInMinutes*time.Minute))
+		jwkRegistry.Register(idp.JwksURI, jwk.WithMinRefreshInterval(jwtRefreshIntervalInMinutes*time.Minute))
 
 		_, err := jwkRegistry.Refresh(ctx, idp.JwksURI)
 		if err != nil {
@@ -252,7 +252,7 @@ func NewUserAuth(
 }
 
 func (u *UserAuth) getKey(ctx context.Context, kid string, idp IdentityProviderConfig) (jwk.Key, error) {
-	keyset, err := u.jwkRegistry.Fetch(ctx, idp.JwksURI)
+	keyset, err := u.jwkRegistry.Get(ctx, idp.JwksURI)
 	if err != nil {
 		return nil, errors.New("Failed to load key set for identity provider " + idp.Issuer)
 	}
@@ -307,7 +307,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 	}
 
 	// Parse jwt
-	decodedToken, err := jwt.Parse(tokenBytes)
+	decodedToken, err := jwt.Parse(tokenBytes, jwt.WithVerify(false))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode token %w", err)
 	}
@@ -320,13 +320,22 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 		return nil, err
 	}
 
-	alg := jwa.SignatureAlgorithm(key.Algorithm())
-	if alg == "" {
+	alg := key.Algorithm()
+	if alg.String() == "" {
 		alg = defaultKeyAlgorithm
 	}
 
+	if err = key.Set(jwk.AlgorithmKey, alg); err != nil {
+		return nil, err
+	}
+
+	keySet := jwk.NewSet()
+	if err = keySet.AddKey(key); err != nil {
+		return nil, err
+	}
+
 	// Verify Token Signature
-	if _, vErr := jws.Verify(tokenBytes, alg, key); vErr != nil {
+	if _, vErr := jws.Verify(tokenBytes, jws.WithKeySet(keySet)); vErr != nil {
 		return nil, vErr
 	}
 

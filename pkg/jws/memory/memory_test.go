@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +59,7 @@ func TestSign(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	pubKey, err := jwk.New(jwsProvider.privKey.PublicKey)
+	pubKey, err := jwk.FromRaw(jwsProvider.privKey.PublicKey)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -69,7 +69,7 @@ func TestSign(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	_, err = jws.Verify(signedToken, jwa.RS256, pubKey)
+	_, err = jws.Verify(signedToken, jws.WithKey(jwa.RS256, pubKey))
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -89,7 +89,7 @@ func TestVerify(t *testing.T) {
 		{
 			name:      "Invalid signature",
 			privKey:   "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcFFJQkFBS0NBUUVBNTBFYzE0b1ZKUFlIdDg2dzcrblhsdHlRNXQ5dUo3M2piNHZnUndVVlNLUFYweWtlCmZqakpIRyt4Q2c0U3FJWFlxajNMSnpOMjY2QVBzbUFUQ2JMQmI3a0FGME85V3hWYjV2bXdjUHh1RW44TXZzNjMKQWR6dFlXcUpSSUVTdndBU1c0eUlaSU9LeGNUS0ZpNjZJV2RaeUh4eWV4SkNMT0Y3eDU3N2w1ME82RzhQdzFSOQoyWFZkUGIrQmNQSDBHN0x4a0xEVVNDOENKYkVQVGZXRHJoaXVSRkh5UEdsTGdLY010R0VaeldaQjdPa2FneHVqCnBCTWl5Qy9PTC8rQklDeDV3Wm1UbTROTWZSbDBoMUhjaWlGTkh1TWFmRTFQdVF5MUp6MVZQcmVNOWFLYkRMa0UKUUZMWmN2MWp0K1k5UzUrdW9IVDBwUGRpRkorUDh6RjIxOElXUFFJREFRQUJBb0lCQVFDK1MxVlpoRFg4RVR5dQpvelgwWmovUzA3T2xXQXlFUlh5bktMb29sdVU1dmgvUlFFL29YQUFhRjByZTFFL0VQMGZZWnpzS0NnNTh2RnpPClVzSzN3MUhzQnBjdGpiOSsrU2VEL01tVllCT1B3dDZSRVBlRlgvQXlyb0ZBVHRwSE05N25XTkJQcmZMKzVQM0sKblM3ckYrbkkwYWMrNFBwMWhpTGVWRlFDSWVySGxqUTNMelpBNG1ROHl3K3ZvQnovZWh6cHBjQW03OGZ1YnpJcgpIRnNOL0U1TWxNaEhtd2JBTkdPV2NnR2hWeGljemV0eUlTaHYzeVMwWERrenErcDhwM2NqVVBOWWZXQ1ZvNGIwCnZLS2dBT0ZlSmloTlZBN3doaDQrTEI3STRWcWM2czljMkRvNWp4Z0QzT0EzQkRJc1JJT3N3MEgxSHFZY0F3Y3oKdlNNNEtlTmhBb0dCQVBTd1J3SWEzLzJvcmJ4bWdYWUt3d2tTQllwMnVsYk83Slp2bDBEUHVGUjR2bkFGVXZzWgp5Y1hDeWd2aGl6NWVQNlIwQ205WmN5QVA4REZOQnVNbXUzejF0cTVLbll6cndLMEM4SmhyK2wrR0xQK2JTT1A4Cm5TbmgrdXVFV2ErWHZQazBrazZMZlY1NkdYTnczVVpWVEtOVjRlcWc4SHFnMytLUExTdVRMMDVGQW9HQkFQSHgKMmFuS0xDekhleDgzUjhaTmpRTXdMeUNTdVlVb2JudUJxWEtucC94eVJCN3J0Q0ZyZWs3clg1bUs2eS9sQWMwagpJNnJXZHJDdUUzZk52Zm9Uem1zbndrekNtVFpkbStFL3pwWmRueDYwTkJCai9WS2xRRTJjVVQ0bWxBVk1ENEk5CmxqQUYyODlqVlIyaXFnQWJnUlhhSG1Ja1EvM3ZlbW0vVHlLWUk0T1pBb0dCQUpBejN2VTNuM0FmVzV4ZmtNWmYKVzBmYUxoZkhGdFFZQ01nenBhRVZpZDJHZHowUGRqTHpwTHorcWhKTWJzSm55dndCUXpFU04wM2E5c1FuVC9ySQpsYy8wQXlBK2F4RmswdDFqa1NWUzVYQXNaQktUa21hQ05xRTdRNlJQRUlmeVZmVkw3VG1LN1d5amFxSmxEcExuCnJFM0tUR1Q1U2lBSzlVYlErRjdvMUFVOUFvR0FHZlhSWFI2TVR1RzRuRWphTXJUdmhJQVBEbmV2NEZIT1NRSkkKcER6SkVaVlJLZUF3bThWa2drTlBKcko1T2RKZ3R4b21JWmFSZGJPMzh3cm9iNFRnaVM3aThrbVBGdjVFVTQ3OQpJN1UzOVp0d1dySGY1SlpHcUEwMXltMXBSSWc4d2NUSjhLMHdRTGh2MFpZNmwzaGNDWFExL21IVnlkR0FXUWhsCi9WaEZ0MEVDZ1lFQTdtK0RsR1YxZnRDUGd2V1ZEV3NjQk5DdWhET0dRaGhCdkdwWEw2ZXZhamQrSm9WcEFFM3kKbEJOZ2FKeW1lQzVBVlgrdWZKNmUxMFhTSkFPYUdyd2UyWHdmV1NuNER2OWpWWGlCWVcrUlA1OUxMc0Y2ZXE5RQpvNE1Wbks0THRadER6cWFwRm1ZbGF2dC9PS0k1emNjL2liYjlpa2RBQkZZcFlXclBlQkMvR2dNPQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=",
-			expectErr: "failed to verify message: crypto/rsa: verification error",
+			expectErr: "could not verify message using any of the signatures or keys",
 		},
 	}
 
@@ -127,7 +127,7 @@ func TestVerify(t *testing.T) {
 				t.Fatalf("Unexpected error %v", err)
 			}
 
-			jwkKey, err := jwk.New(parsedKey)
+			jwkKey, err := jwk.FromRaw(parsedKey)
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
@@ -138,7 +138,7 @@ func TestVerify(t *testing.T) {
 				t.Fatalf("Unexpected error %v", err)
 			}
 
-			signedToken, err := jws.Sign(payload, jwa.RS256, jwkKey, jws.WithHeaders(hdrs))
+			signedToken, err := jws.Sign(payload, jws.WithKey(jwa.RS256, jwkKey, jws.WithProtectedHeaders(hdrs)))
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}

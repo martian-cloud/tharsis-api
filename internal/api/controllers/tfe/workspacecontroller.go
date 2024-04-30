@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	gotfe "github.com/hashicorp/go-tfe"
 	"github.com/hashicorp/jsonapi"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
@@ -460,7 +460,7 @@ func (c *workspaceController) verifyUploadToken(ctx context.Context, token []byt
 	}
 
 	// Parse and validate jwt
-	parsedToken, err := jwt.Parse(token, jwt.WithValidate(true))
+	parsedToken, err := jwt.Parse(token, jwt.WithVerify(false), jwt.WithValidate(true))
 	if err != nil {
 		return "", fmt.Errorf("failed to decode token %w", err)
 	}
