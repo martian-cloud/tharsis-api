@@ -8,11 +8,10 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/kms"
-	"github.com/lestrrat-go/jwx/jwa"
-
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -89,7 +88,7 @@ func TestSignWithValidKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jwkKey, err := jwk.New(privKey.PublicKey)
+	jwkKey, err := jwk.FromRaw(privKey.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +157,7 @@ func TestSignWithValidKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = jws.Verify(signedToken, jwa.RS256, jwkKey)
+	_, err = jws.Verify(signedToken, jws.WithKey(jwa.RS256, jwkKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +179,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jwkKey, err := jwk.New(privKey.PublicKey)
+	jwkKey, err := jwk.FromRaw(privKey.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,13 +207,13 @@ func TestVerify(t *testing.T) {
 			name:      "Invalid Key ID",
 			privKey:   privKey,
 			kid:       "invalid",
-			expectErr: `"kid" fields do not match`,
+			expectErr: `key provider 0 failed: failed to find key with key ID "invalid" in key set`,
 		},
 		{
 			name:      "Invalid Signature",
 			privKey:   invalidPrivKey,
 			kid:       jwkKey.KeyID(),
-			expectErr: "failed to verify message: crypto/rsa: verification error",
+			expectErr: "could not verify message using any of the signatures or keys",
 		},
 	}
 
@@ -241,7 +240,7 @@ func TestVerify(t *testing.T) {
 			hdrs := jws.NewHeaders()
 			_ = hdrs.Set(jws.TypeKey, "JWT")
 			_ = hdrs.Set(jws.KeyIDKey, test.kid)
-			signed, err := jws.Sign(payload, jwa.RS256, test.privKey, jws.WithHeaders(hdrs))
+			signed, err := jws.Sign(payload, jws.WithKey(jwa.RS256, test.privKey, jws.WithProtectedHeaders(hdrs)))
 			if err != nil {
 				t.Fatal(err)
 			}

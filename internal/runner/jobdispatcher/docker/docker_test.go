@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimage "github.com/docker/docker/api/types/image"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -111,7 +111,7 @@ func TestDispatchJob(t *testing.T) {
 			client.Test(t)
 
 			if !test.localImage {
-				client.On("ImagePull", ctx, image, dockertypes.ImagePullOptions{
+				client.On("ImagePull", ctx, image, dockerimage.PullOptions{
 					RegistryAuth: test.expectAuthStr,
 				}).Return(io.NopCloser(strings.NewReader("")), nil)
 			}
@@ -133,7 +133,7 @@ func TestDispatchJob(t *testing.T) {
 				},
 			}, hostConfig, mock.Anything, mock.Anything, "").Return(test.retOutput, test.containerCreateRetErr)
 
-			client.On("ContainerStart", ctx, test.retOutput.ID, dockertypes.ContainerStartOptions{}).Return(test.containerStartRetErr)
+			client.On("ContainerStart", ctx, test.retOutput.ID, dockercontainer.StartOptions{}).Return(test.containerStartRetErr)
 
 			dispatcher := JobDispatcher{
 				logger:                logger.New(),

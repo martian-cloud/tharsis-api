@@ -7,13 +7,13 @@ import (
 
 	container "github.com/docker/docker/api/types/container"
 
+	image "github.com/docker/docker/api/types/image"
+
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/docker/docker/api/types/network"
-
-	types "github.com/docker/docker/api/types"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -48,11 +48,11 @@ func (_m *mockClient) ContainerCreate(ctx context.Context, config *container.Con
 }
 
 // ContainerStart provides a mock function with given fields: ctx, containerID, options
-func (_m *mockClient) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
+func (_m *mockClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
 	ret := _m.Called(ctx, containerID, options)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ContainerStartOptions) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.StartOptions) error); ok {
 		r0 = rf(ctx, containerID, options)
 	} else {
 		r0 = ret.Error(0)
@@ -62,15 +62,15 @@ func (_m *mockClient) ContainerStart(ctx context.Context, containerID string, op
 }
 
 // ImagePull provides a mock function with given fields: ctx, refStr, options
-func (_m *mockClient) ImagePull(ctx context.Context, refStr string, options types.ImagePullOptions) (io.ReadCloser, error) {
+func (_m *mockClient) ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error) {
 	ret := _m.Called(ctx, refStr, options)
 
 	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ImagePullOptions) (io.ReadCloser, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, image.PullOptions) (io.ReadCloser, error)); ok {
 		return rf(ctx, refStr, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ImagePullOptions) io.ReadCloser); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, image.PullOptions) io.ReadCloser); ok {
 		r0 = rf(ctx, refStr, options)
 	} else {
 		if ret.Get(0) != nil {
@@ -78,7 +78,7 @@ func (_m *mockClient) ImagePull(ctx context.Context, refStr string, options type
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, types.ImagePullOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, image.PullOptions) error); ok {
 		r1 = rf(ctx, refStr, options)
 	} else {
 		r1 = ret.Error(1)

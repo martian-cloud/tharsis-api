@@ -14,10 +14,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
 )
 
 var pluginDataRequiredFields = []string{"key_id", "region"}
@@ -134,7 +133,12 @@ func (j *JWSProvider) GetKeySet(_ context.Context) ([]byte, error) {
 
 // Verify will return an error if the JWT does not have a valid signature
 func (j *JWSProvider) Verify(_ context.Context, token []byte) error {
-	if _, err := jws.Verify(token, jwa.RS256, j.pubKey); err != nil {
+	keySet := jwk.NewSet()
+	if err := keySet.AddKey(jwk.Key(j.pubKey)); err != nil {
+		return err
+	}
+
+	if _, err := jws.Verify(token, jws.WithKeySet(keySet)); err != nil {
 		return err
 	}
 
@@ -143,7 +147,9 @@ func (j *JWSProvider) Verify(_ context.Context, token []byte) error {
 
 func buildKeySet(pubKey jwk.Key) ([]byte, error) {
 	keySet := jwk.NewSet()
-	keySet.Add(pubKey)
+	if err := keySet.AddKey(pubKey); err != nil {
+		return nil, err
+	}
 	buf, err := json.Marshal(keySet)
 	if err != nil {
 		return nil, err
@@ -177,7 +183,7 @@ func getPublicKey(ctx context.Context, client client, keyID string) (jwk.Key, er
 		return nil, fmt.Errorf("invalid public key type")
 	}
 
-	jwkPubKey, err := jwk.New(rsaPubKey)
+	jwkPubKey, err := jwk.FromRaw(rsaPubKey)
 	if err != nil {
 		return nil, err
 	}

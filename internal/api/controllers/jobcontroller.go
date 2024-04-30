@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
@@ -91,7 +91,7 @@ func (c *jobController) verifyJobLogToken(ctx context.Context, token []byte, job
 	}
 
 	// Parse and validate jwt
-	if _, err := jwt.Parse(token, jwt.WithValidate(true), jwt.WithSubject(jobID)); err != nil {
+	if _, err := jwt.Parse(token, jwt.WithVerify(false), jwt.WithValidate(true), jwt.WithSubject(jobID)); err != nil {
 		return fmt.Errorf("failed to decode token %w", err)
 	}
 

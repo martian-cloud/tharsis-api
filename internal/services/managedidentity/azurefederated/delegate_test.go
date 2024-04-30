@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -115,7 +115,7 @@ func TestCreateCredentials(t *testing.T) {
 	mockJWSProvider.Test(t)
 
 	mockJWSProvider.On("Sign", ctx, mock.Anything).Return(func(_ context.Context, token []byte) []byte {
-		signed, sErr := jws.Sign(token, jwa.RS256, privKey)
+		signed, sErr := jws.Sign(token, jws.WithKey(jwa.RS256, privKey))
 		if sErr != nil {
 			t.Fatal(sErr)
 		}
@@ -150,7 +150,7 @@ func TestCreateCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedToken, err := jwt.Parse(payload)
+	parsedToken, err := jwt.Parse(payload, jwt.WithVerify(false))
 	if err != nil {
 		t.Fatal(err)
 	}

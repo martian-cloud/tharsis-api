@@ -13,9 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/registry"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/dustin/go-humanize"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -26,9 +27,9 @@ import (
 var pluginDataRequiredFields = []string{"host", "image", "api_url"}
 
 type client interface {
-	ImagePull(ctx context.Context, refStr string, options types.ImagePullOptions) (io.ReadCloser, error)
+	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
-	ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error
+	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
 }
 
 // JobDispatcher uses the local docker api to dispatch jobs
@@ -108,7 +109,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 			return "", err
 		}
 
-		out, err := j.client.ImagePull(ctx, j.image, types.ImagePullOptions{
+		out, err := j.client.ImagePull(ctx, j.image, image.PullOptions{
 			RegistryAuth: authStr,
 		})
 		if err != nil {
@@ -146,7 +147,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		return "", err
 	}
 
-	if err := j.client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := j.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return "", err
 	}
 
@@ -155,7 +156,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 
 func (j *JobDispatcher) getRegistryAuth() (string, error) {
 	if j.registryUsername != "" && j.registryPassword != "" {
-		authConfig := types.AuthConfig{
+		authConfig := registry.AuthConfig{
 			Username: j.registryUsername,
 			Password: j.registryPassword,
 		}

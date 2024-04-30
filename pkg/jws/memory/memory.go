@@ -11,9 +11,9 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
 )
 
 // InMemoryJWSProvider uses a secret key stored in memory to sign JWT tokens
@@ -43,7 +43,7 @@ func New(pluginData map[string]string) (*InMemoryJWSProvider, error) {
 		}
 	}
 
-	pubKey, err := jwk.New(privKey.PublicKey)
+	pubKey, err := jwk.FromRaw(privKey.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func New(pluginData map[string]string) (*InMemoryJWSProvider, error) {
 
 // Sign signs a JWT payload
 func (im *InMemoryJWSProvider) Sign(_ context.Context, token []byte) ([]byte, error) {
-	key, err := jwk.New(im.privKey)
+	key, err := jwk.FromRaw(im.privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (im *InMemoryJWSProvider) Sign(_ context.Context, token []byte) ([]byte, er
 		return nil, err
 	}
 
-	signed, err := jws.Sign(token, jwa.RS256, key, jws.WithHeaders(hdrs))
+	signed, err := jws.Sign(token, jws.WithKey(jwa.RS256, key, jws.WithProtectedHeaders(hdrs)))
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,12 @@ func (im *InMemoryJWSProvider) GetKeySet(_ context.Context) ([]byte, error) {
 
 // Verify will return an error if the JWT does not have a valid signature
 func (im *InMemoryJWSProvider) Verify(_ context.Context, token []byte) error {
-	if _, err := jws.Verify(token, jwa.RS256, im.pubKey); err != nil {
+	keySet := jwk.NewSet()
+	if err := keySet.AddKey(jwk.Key(im.pubKey)); err != nil {
+		return err
+	}
+
+	if _, err := jws.Verify(token, jws.WithKeySet(keySet)); err != nil {
 		return err
 	}
 
@@ -110,7 +115,9 @@ func (im *InMemoryJWSProvider) Verify(_ context.Context, token []byte) error {
 
 func buildKeySet(pubKey jwk.Key) ([]byte, error) {
 	keySet := jwk.NewSet()
-	keySet.Add(pubKey)
+	if err := keySet.AddKey(pubKey); err != nil {
+		return nil, err
+	}
 	buf, err := json.Marshal(keySet)
 	if err != nil {
 		return nil, err
