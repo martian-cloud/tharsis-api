@@ -3,6 +3,7 @@ package apiserver
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"sync"
@@ -75,12 +76,18 @@ type APIServer struct {
 	dbClient      *db.Client
 	srv           *http.Server
 	traceShutdown func(context.Context) error
+	tlsConfig     *tls.Config
 	shutdownOnce  sync.Once
 }
 
 // New creates a new APIServer instance
 func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version string) (*APIServer, error) {
 	openIDConfigFetcher := auth.NewOpenIDConfigFetcher()
+
+	tlsConfig, err := loadTLSConfig(cfg, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load TLS config: %w", err)
+	}
 
 	var oauthProviders []auth.IdentityProviderConfig
 	for _, idpConfig := range cfg.OauthProviders {
@@ -461,8 +468,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 			Addr:              fmt.Sprintf(":%v", cfg.ServerPort),
 			Handler:           routeBuilder.Router(),
 			ReadHeaderTimeout: time.Minute,
+			TLSConfig:         tlsConfig,
 		},
 		traceShutdown: traceProviderShutdown,
+		tlsConfig:     tlsConfig,
 	}, nil
 }
 
@@ -475,16 +484,35 @@ func (api *APIServer) Start() {
 			Addr:              ":9090",
 			Handler:           promhttp.Handler(),
 			ReadHeaderTimeout: 3 * time.Second,
+			TLSConfig:         api.tlsConfig,
 		}
 
-		if err := promServer.ListenAndServe(); err != nil {
-			api.logger.Error(err)
+		api.logger.Infof("Prometheus server listening on %s", promServer.Addr)
+
+		var err error
+		if api.tlsConfig != nil {
+			err = promServer.ListenAndServeTLS("", "")
+		} else {
+			err = promServer.ListenAndServe()
+		}
+
+		if err != nil {
+			api.logger.Error("Prometheus server failed to start: %v", err)
+			return
 		}
 	}()
 
-	// Start main server
-	if err := api.srv.ListenAndServe(); err != nil {
-		api.logger.Infof("HTTP server ListenAndServe %v", err)
+	var err error
+	if api.tlsConfig != nil {
+		api.logger.Infof("HTTPS server listening on %s", api.srv.Addr)
+		err = api.srv.ListenAndServeTLS("", "")
+	} else {
+		api.logger.Infof("HTTP server listening on %s", api.srv.Addr)
+		err = api.srv.ListenAndServe()
+	}
+
+	if err != nil {
+		api.logger.Errorf("HTTP server failed to start: %v", err)
 	}
 }
 
