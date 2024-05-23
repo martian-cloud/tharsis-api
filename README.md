@@ -30,10 +30,22 @@ Now, the Tharsis CLI can be used to interact with Tharsis. To configure the CLI,
 tharsis configure --profile local --endpoint-url http://localhost:6560
 tharsis -p local sso login
 ```
-
 At the KeyCloak login screen use `martian` for both the username and password to complete authentication.
 
 **Congratulations! The Tharsis CLI is now ready to issue commands, use the `-h` flag for more info!**
+
+## Running Tharsis API from local source
+
+In order to run Tharsis API from local source we suggest you do the following:
+
+    1. Stop the tharsis-api docker container if it is running.
+    2. Copy the `env.example` file in the root folder and paste it as `.env`.
+    3. Open the Tharsis API folder in Visual Studio Code.
+    4. Install the recommended extensions.
+    5. Click the `Run and Debug` menu on the left hand side of Visual Studio Code.
+    6. Click the Start Debugging button next to Launch API.
+
+At this point you can interact with the Tharsis UI at `http://localhost:3000/` and it will be communicating with your local Tharsis API.
 
 ## Documentation
 
