@@ -145,9 +145,8 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 		return nil, err
 	}
 
-	perm := permissions.ViewManagedIdentityPermission
 	if input.NamespacePath != "" {
-		if err = caller.RequirePermission(ctx, perm, auth.WithNamespacePath(input.NamespacePath)); err != nil {
+		if err = caller.RequirePermission(ctx, permissions.ViewManagedIdentityPermission, auth.WithNamespacePath(input.NamespacePath)); err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
@@ -158,7 +157,7 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 			return nil, gErr
 		}
 
-		if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(sourceIdentity.GroupID)); err != nil {
+		if err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(sourceIdentity.GroupID)); err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}

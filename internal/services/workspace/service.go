@@ -89,6 +89,8 @@ type GetWorkspacesInput struct {
 	PaginationOptions *pagination.Options
 	// Group filters the workspaces by the specified group
 	Group *models.Group
+	// AssignedManagedIdentityID filters the workspaces by the specified managed identity
+	AssignedManagedIdentityID *string
 	// Search is used to search for a workspace by name or namespace path
 	Search *string
 }
@@ -138,6 +140,12 @@ type Service interface {
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
 }
 
+type handleCallerFunc func(
+	ctx context.Context,
+	userHandler func(ctx context.Context, caller *auth.UserCaller) error,
+	serviceAccountHandler func(ctx context.Context, caller *auth.ServiceAccountCaller) error,
+) error
+
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
@@ -146,6 +154,7 @@ type service struct {
 	eventManager    *events.EventManager
 	cliService      cli.Service
 	activityService activityevent.Service
+	handleCaller    handleCallerFunc
 }
 
 // NewService creates an instance of Service
@@ -158,6 +167,28 @@ func NewService(
 	cliService cli.Service,
 	activityService activityevent.Service,
 ) Service {
+	return newService(
+		logger,
+		dbClient,
+		limitChecker,
+		artifactStore,
+		eventManager,
+		cliService,
+		activityService,
+		auth.HandleCaller,
+	)
+}
+
+func newService(
+	logger logger.Logger,
+	dbClient *db.Client,
+	limitChecker limits.LimitChecker,
+	artifactStore ArtifactStore,
+	eventManager *events.EventManager,
+	cliService cli.Service,
+	activityService activityevent.Service,
+	handleCaller handleCallerFunc,
+) Service {
 	return &service{
 		logger,
 		dbClient,
@@ -166,6 +197,7 @@ func NewService(
 		eventManager,
 		cliService,
 		activityService,
+		handleCaller,
 	}
 }
 
@@ -283,7 +315,8 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.WorkspaceFilter{
-			Search: input.Search,
+			Search:                    input.Search,
+			AssignedManagedIdentityID: input.AssignedManagedIdentityID,
 		},
 	}
 
@@ -302,7 +335,7 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 		}
 
 		if !policy.AllowAll {
-			if err = auth.HandleCaller(
+			if err = s.handleCaller(
 				ctx,
 				func(_ context.Context, c *auth.UserCaller) error {
 					dbInput.Filter.UserMemberID = &c.User.Metadata.ID

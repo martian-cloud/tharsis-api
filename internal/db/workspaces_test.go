@@ -173,6 +173,12 @@ func TestGetWorkspaces(t *testing.T) {
 	allGroupIDs := groupIDsFromGroupInfos(allGroupInfos)
 	allWorkspaceInfos := workspaceInfoFromWorkspaces(createdWarmupWorkspaces)
 
+	managedIdentityIDs, managedIdentityID2WorkspacePaths, err := createAndAssignManagedIdentitiesToAllButFirstWorkspace(
+		t, ctx, testClient, allGroupIDs, createdWarmupWorkspaces)
+	if err != nil {
+		return
+	}
+
 	// Sort by full paths.
 	sort.Sort(workspaceInfoPathSlice(allWorkspaceInfos))
 	allPaths := pathsFromWorkspaceInfo(allWorkspaceInfos)
@@ -630,11 +636,12 @@ func TestGetWorkspaces(t *testing.T) {
 					First: ptr.Int32(100),
 				},
 				Filter: &WorkspaceFilter{
-					WorkspaceIDs:           []string{},
-					GroupID:                ptr.String(""),
-					UserMemberID:           ptr.String(""),
-					ServiceAccountMemberID: ptr.String(""),
-					Search:                 ptr.String(""),
+					WorkspaceIDs:              []string{},
+					GroupID:                   ptr.String(""),
+					UserMemberID:              ptr.String(""),
+					ServiceAccountMemberID:    ptr.String(""),
+					Search:                    ptr.String(""),
+					AssignedManagedIdentityID: ptr.String(""),
 				},
 			},
 			expectMsg:            emptyUUIDMsg2,
@@ -795,6 +802,61 @@ func TestGetWorkspaces(t *testing.T) {
 				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
 				Filter: &WorkspaceFilter{
 					UserMemberID: ptr.String(invalidID),
+				},
+			},
+			expectMsg:            invalidUUIDMsg2,
+			expectWorkspacePaths: []string{},
+			expectPageInfo:       pagination.PageInfo{},
+		},
+
+		{
+			name: "filter, assigned managed identity ID",
+			input: &GetWorkspacesInput{
+				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
+				Filter: &WorkspaceFilter{
+					AssignedManagedIdentityID: ptr.String(managedIdentityIDs[1]),
+				},
+			},
+			expectWorkspacePaths: managedIdentityID2WorkspacePaths[managedIdentityIDs[1]],
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, assigned managed identity ID, no workspaces assigned",
+			input: &GetWorkspacesInput{
+				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
+				Filter: &WorkspaceFilter{
+					AssignedManagedIdentityID: ptr.String(managedIdentityIDs[0]),
+				},
+			},
+			expectWorkspacePaths: managedIdentityID2WorkspacePaths[managedIdentityIDs[0]],
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, assigned managed identity ID, non-existent",
+			input: &GetWorkspacesInput{
+				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
+				Filter: &WorkspaceFilter{
+					AssignedManagedIdentityID: ptr.String(nonExistentID),
+				},
+			},
+			expectWorkspacePaths: []string{},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, assigned managed identity ID, invalid",
+			input: &GetWorkspacesInput{
+				Sort: ptrWorkspaceSortableField(WorkspaceSortableFieldFullPathAsc),
+				Filter: &WorkspaceFilter{
+					AssignedManagedIdentityID: ptr.String(invalidID),
 				},
 			},
 			expectMsg:            invalidUUIDMsg2,
@@ -1507,50 +1569,9 @@ func TestGetWorkspacesForManagedIdentity(t *testing.T) {
 	require.Nil(t, err)
 	allGroupIDs := groupIDsFromGroupInfos(allGroupInfos)
 
-	// Some managed identities and their connections to workspaces.
-	managedIdentityIDs := []string{}
-	managedIdentityID2WorkspacePaths := make(map[string][]string)
-	for ix := 0; ix < len(allGroupIDs); ix++ {
-
-		// Create one managed identity per group.
-		newManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
-			Type: models.ManagedIdentityAWSFederated,
-			//			ResourcePath: x,
-			Name:        fmt.Sprintf("managed-identity-%d", ix),
-			Description: fmt.Sprintf("This is managed identity %d.", ix),
-			GroupID:     allGroupIDs[ix],
-			Data:        []byte(fmt.Sprintf("managed identity %d data", ix)),
-			CreatedBy:   fmt.Sprintf("someone %d", ix),
-		})
-		require.Nil(t, err)
-		thisManagedIdentityID := newManagedIdentity.Metadata.ID
-		managedIdentityIDs = append(managedIdentityIDs, thisManagedIdentityID)
-		managedIdentityID2WorkspacePaths[thisManagedIdentityID] = []string{}
-
-		// Except for the first one, connect the managed identity to the workspaces in the group.
-		if ix > 0 {
-			for ix2 := 0; ix2 < len(createdWarmupWorkspaces); ix2++ {
-				if createdWarmupWorkspaces[ix2].GroupID == allGroupIDs[ix] {
-
-					err := testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
-						thisManagedIdentityID, createdWarmupWorkspaces[ix2].Metadata.ID)
-					if err != nil {
-						// No point in continuing.
-						return
-					}
-
-					managedIdentityID2WorkspacePaths[thisManagedIdentityID] = append(managedIdentityID2WorkspacePaths[thisManagedIdentityID],
-						createdWarmupWorkspaces[ix2].FullPath)
-
-				}
-			}
-		}
-	}
-
-	// Sort the slices of workspace paths
-	for k, v := range managedIdentityID2WorkspacePaths {
-		sort.Strings(v)
-		managedIdentityID2WorkspacePaths[k] = v
+	managedIdentityIDs, managedIdentityID2WorkspacePaths, err := createAndAssignManagedIdentitiesToAllButFirstWorkspace(t, ctx, testClient, allGroupIDs, createdWarmupWorkspaces)
+	if err != nil {
+		return
 	}
 
 	type testCase struct {
@@ -1817,4 +1838,58 @@ func compareWorkspaces(t *testing.T, expected, actual *models.Workspace, checkID
 	assert.Equal(t, expected.MaxJobDuration, actual.MaxJobDuration)
 	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
 	assert.Equal(t, expected.PreventDestroyPlan, actual.PreventDestroyPlan)
+}
+
+func createAndAssignManagedIdentitiesToAllButFirstWorkspace(t *testing.T, ctx context.Context, testClient *testClient,
+	allGroupIDs []string, createdWarmupWorkspaces []models.Workspace,
+) ([]string, map[string][]string, error) {
+
+	// Some managed identities and their connections to workspaces.
+	managedIdentityIDs := []string{}
+	managedIdentityID2WorkspacePaths := make(map[string][]string)
+	for ix := 0; ix < len(allGroupIDs); ix++ {
+
+		// Create one managed identity per group.
+		newManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+			Type: models.ManagedIdentityAWSFederated,
+			//			ResourcePath: x,
+			Name:        fmt.Sprintf("managed-identity-%d", ix),
+			Description: fmt.Sprintf("This is managed identity %d.", ix),
+			GroupID:     allGroupIDs[ix],
+			Data:        []byte(fmt.Sprintf("managed identity %d data", ix)),
+			CreatedBy:   fmt.Sprintf("someone %d", ix),
+		})
+		require.Nil(t, err)
+		thisManagedIdentityID := newManagedIdentity.Metadata.ID
+		managedIdentityIDs = append(managedIdentityIDs, thisManagedIdentityID)
+		managedIdentityID2WorkspacePaths[thisManagedIdentityID] = []string{}
+
+		// Except for the first one, connect the managed identity to the workspaces in the group.
+		if ix == 0 {
+			continue
+		}
+
+		for ix2 := 0; ix2 < len(createdWarmupWorkspaces); ix2++ {
+			if createdWarmupWorkspaces[ix2].GroupID == allGroupIDs[ix] {
+
+				err := testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx,
+					thisManagedIdentityID, createdWarmupWorkspaces[ix2].Metadata.ID)
+				if err != nil {
+					// No point in continuing.
+					return nil, nil, err
+				}
+
+				managedIdentityID2WorkspacePaths[thisManagedIdentityID] = append(managedIdentityID2WorkspacePaths[thisManagedIdentityID],
+					createdWarmupWorkspaces[ix2].FullPath)
+			}
+		}
+	}
+
+	// Sort the slices of workspace paths
+	for k, v := range managedIdentityID2WorkspacePaths {
+		sort.Strings(v)
+		managedIdentityID2WorkspacePaths[k] = v
+	}
+
+	return managedIdentityIDs, managedIdentityID2WorkspacePaths, nil
 }
