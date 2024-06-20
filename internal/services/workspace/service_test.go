@@ -190,3 +190,167 @@ func TestCreateWorkspace(t *testing.T) {
 		})
 	}
 }
+
+func TestGetWorkspaces(t *testing.T) {
+	sampleWorkspace := models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "some-id",
+		},
+		Name:     "a-workspace",
+		FullPath: "some/full/path",
+		GroupID:  "some-group-id",
+	}
+
+	type testCase struct {
+		getWorkspacesError              error
+		requireWorkspacePermissionError error
+		namespaceAccessPolicyError      error
+		input                           *GetWorkspacesInput
+		handleCaller                    handleCallerFunc
+		userID                          *string
+		serviceAccountID                *string
+		name                            string
+		expectErrorCode                 errors.CodeType
+		expectResult                    []models.Workspace
+		failAuthorization               bool
+		accessPolicyAllowAll            bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "positive: successfully returns workspaces for a group",
+			input: &GetWorkspacesInput{
+				Group: &models.Group{Metadata: models.ResourceMetadata{ID: "some-group-id"}},
+			},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
+			name:              "negative: failed to authorize caller",
+			input:             &GetWorkspacesInput{},
+			failAuthorization: true,
+			expectErrorCode:   errors.EUnauthorized,
+		},
+		{
+			name:                 "positive: successfully returns workspaces",
+			input:                &GetWorkspacesInput{},
+			accessPolicyAllowAll: true,
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
+			name:                       "negative: failed to get namespace access policy",
+			input:                      &GetWorkspacesInput{},
+			namespaceAccessPolicyError: errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:            errors.EInvalid,
+		},
+		{
+			name:                 "positive: successfully returns workspaces the user has permission to",
+			input:                &GetWorkspacesInput{},
+			userID:               ptr.String("user-1"),
+			accessPolicyAllowAll: false,
+			handleCaller: func(ctx context.Context, userHandler func(ctx context.Context, caller *auth.UserCaller) error, _ func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
+				return userHandler(ctx, &auth.UserCaller{User: &models.User{Metadata: models.ResourceMetadata{ID: "user-1"}}})
+			},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
+			name:                 "positive: successfully returns workspaces the service account has permission to",
+			input:                &GetWorkspacesInput{},
+			serviceAccountID:     ptr.String("sa-1"),
+			accessPolicyAllowAll: false,
+			handleCaller: func(ctx context.Context, _ func(ctx context.Context, caller *auth.UserCaller) error, serviceAccountHandler func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
+				return serviceAccountHandler(ctx, &auth.ServiceAccountCaller{ServiceAccountID: "sa-1"})
+			},
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
+			name:                 "negative: failed to set filters for non admin caller",
+			input:                &GetWorkspacesInput{},
+			accessPolicyAllowAll: false,
+			handleCaller: func(_ context.Context, _ func(ctx context.Context, caller *auth.UserCaller) error, _ func(ctx context.Context, caller *auth.ServiceAccountCaller) error) error {
+				return errors.New("failure", errors.WithErrorCode(errors.EInvalid))
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:                 "negative: failed to get workspaces",
+			input:                &GetWorkspacesInput{},
+			accessPolicyAllowAll: true,
+			getWorkspacesError:   errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:      errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			if !test.failAuthorization {
+				ctx = auth.WithCaller(ctx, mockCaller)
+			}
+
+			input := db.GetWorkspacesInput{
+				Sort:              test.input.Sort,
+				PaginationOptions: test.input.PaginationOptions,
+				Filter: &db.WorkspaceFilter{
+					Search:                    test.input.Search,
+					AssignedManagedIdentityID: test.input.AssignedManagedIdentityID,
+				},
+			}
+
+			if test.input.Group != nil {
+				input.Filter.GroupID = &test.input.Group.Metadata.ID
+
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.requireWorkspacePermissionError)
+			}
+
+			policy := auth.NamespaceAccessPolicy{AllowAll: test.accessPolicyAllowAll}
+			mockCaller.On("GetNamespaceAccessPolicy", mock.Anything).Return(&policy, test.namespaceAccessPolicyError).Maybe()
+
+			if test.userID != nil {
+				input.Filter.UserMemberID = test.userID
+			}
+
+			if test.serviceAccountID != nil {
+				input.Filter.ServiceAccountMemberID = test.serviceAccountID
+			}
+
+			workspacesResult := db.WorkspacesResult{Workspaces: test.expectResult}
+			mockWorkspaces.On("GetWorkspaces", mock.Anything, &input).Return(&workspacesResult, test.getWorkspacesError).Maybe()
+
+			dbClient := &db.Client{
+				Workspaces: mockWorkspaces,
+			}
+
+			if test.handleCaller == nil {
+				test.handleCaller = auth.HandleCaller
+			}
+
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, test.handleCaller)
+
+			result, err := service.GetWorkspaces(ctx, test.input)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectResult, result.Workspaces)
+		})
+	}
+}

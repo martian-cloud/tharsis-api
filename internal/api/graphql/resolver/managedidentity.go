@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
@@ -341,6 +342,25 @@ func (r *ManagedIdentityResolver) Aliases(ctx context.Context, args *ManagedIden
 	}
 
 	return NewManagedIdentityConnectionResolver(ctx, &input)
+}
+
+// Workspaces resolver
+func (r *ManagedIdentityResolver) Workspaces(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*WorkspaceConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := workspace.GetWorkspacesInput{
+		PaginationOptions:         &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		AssignedManagedIdentityID: &r.managedIdentity.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.WorkspaceSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewWorkspaceConnectionResolver(ctx, &input)
 }
 
 // IsAlias resolver

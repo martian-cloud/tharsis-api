@@ -60,11 +60,12 @@ func (gs WorkspaceSortableField) getSortDirection() pagination.SortDirection {
 
 // WorkspaceFilter contains the supported fields for filtering Workspace resources
 type WorkspaceFilter struct {
-	GroupID                *string
-	UserMemberID           *string
-	ServiceAccountMemberID *string
-	Search                 *string
-	WorkspaceIDs           []string
+	GroupID                   *string
+	UserMemberID              *string
+	ServiceAccountMemberID    *string
+	Search                    *string
+	AssignedManagedIdentityID *string
+	WorkspaceIDs              []string
 }
 
 // GetWorkspacesInput is the input for listing workspaces
@@ -157,8 +158,17 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 
 	query := dialect.From(goqu.T("workspaces")).
 		Select(w.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
-		Where(ex)
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")}))
+
+	// Since managed identities is a many to many relationship only join them when we are looking for exactly one.
+	// Otherwise duplicates will result.
+	if input.Filter != nil && input.Filter.AssignedManagedIdentityID != nil {
+		query = query.InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_managed_identity_relation.workspace_id")}))
+
+		ex = ex.Append(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": input.Filter.AssignedManagedIdentityID})
+	}
+
+	query = query.Where(ex)
 
 	sortDirection := pagination.AscSort
 

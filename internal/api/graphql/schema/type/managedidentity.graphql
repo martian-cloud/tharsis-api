@@ -115,6 +115,13 @@ type ManagedIdentity implements Node {
     last: Int
     sort: ManagedIdentitySort
   ): ManagedIdentityConnection!
+  workspaces(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: WorkspaceSort
+  ): WorkspaceConnection!
 }
 
 type ManagedIdentityCredentials {

@@ -22,6 +22,13 @@ import (
 )
 
 func TestGetManagedIdentities(t *testing.T) {
+	nonExistentID := "does_not_exist"
+	idOfManagedIdentity := "101"
+	sampleManagedIdentity := models.ManagedIdentity{
+		Metadata: models.ResourceMetadata{ID: idOfManagedIdentity},
+		Name:     "a-sample-managed-identity",
+	}
+
 	sampleResult := &db.ManagedIdentitiesResult{
 		PageInfo: &pagination.PageInfo{
 			Cursor: func(_ pagination.CursorPaginatable) (*string, error) {
@@ -32,19 +39,19 @@ func TestGetManagedIdentities(t *testing.T) {
 			HasPreviousPage: false,
 		},
 		ManagedIdentities: []models.ManagedIdentity{
-			{
-				Name: "a-sample-managed-identity",
-			},
+			sampleManagedIdentity,
 		},
 	}
 
 	type testCase struct {
-		authError       error
-		input           *GetManagedIdentitiesInput
-		dbInput         *db.GetManagedIdentitiesInput
-		expectResult    *db.ManagedIdentitiesResult
-		expectErrorCode errors.CodeType
-		name            string
+		authError        error
+		input            *GetManagedIdentitiesInput
+		dbInput          *db.GetManagedIdentitiesInput
+		expectByIDResult *models.ManagedIdentity
+		expectByIDError  error
+		expectResult     *db.ManagedIdentitiesResult
+		expectErrorCode  errors.CodeType
+		name             string
 	}
 
 	testCases := []testCase{
@@ -96,6 +103,43 @@ func TestGetManagedIdentities(t *testing.T) {
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
+		{
+			name: "positive: input with alias source id",
+			input: &GetManagedIdentitiesInput{
+				AliasSourceID: &idOfManagedIdentity,
+			},
+			dbInput: &db.GetManagedIdentitiesInput{
+				Filter: &db.ManagedIdentityFilter{
+					AliasSourceID: &idOfManagedIdentity,
+				},
+			},
+			expectByIDResult: &sampleManagedIdentity,
+			expectResult:     sampleResult,
+		},
+		{
+			name: "negative: subject does not have access to inheritable managed identity",
+			input: &GetManagedIdentitiesInput{
+				AliasSourceID: &idOfManagedIdentity,
+			},
+			expectByIDResult: &sampleManagedIdentity,
+			authError:        errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:  errors.EForbidden,
+		},
+		{
+			name: "negative: the source does not exist",
+			input: &GetManagedIdentitiesInput{
+				AliasSourceID: &nonExistentID,
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "negative: failed to retrieve source",
+			input: &GetManagedIdentitiesInput{
+				AliasSourceID: &idOfManagedIdentity,
+			},
+			expectByIDError: errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode: errors.EInvalid,
+		},
 	}
 
 	for _, test := range testCases {
@@ -106,7 +150,17 @@ func TestGetManagedIdentities(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
+			if test.input.NamespacePath != "" {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
+			}
+
+			if test.input.AliasSourceID != nil {
+				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, *test.input.AliasSourceID).Return(test.expectByIDResult, test.expectByIDError)
+
+				if test.expectByIDResult != nil {
+					mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
+				}
+			}
 
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, test.dbInput).Return(test.expectResult, nil).Maybe()
 
