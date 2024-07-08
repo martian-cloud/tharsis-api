@@ -22,7 +22,6 @@ const (
 )
 
 var (
-	// runnerID will a constant UUID until runner registration is allowed.
 	claimJobCount = metric.NewCounter("claim_job_count", "Amount of jobs claimed.")
 	claimJobFails = metric.NewCounter("claim_job_fails_count", "Amount of jobs claims failed.")
 

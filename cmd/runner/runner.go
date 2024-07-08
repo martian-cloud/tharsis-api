@@ -75,7 +75,6 @@ func main() {
 		return
 	}
 
-	shutdownDone := make(chan struct{})
 	go func() {
 		sigint := make(chan os.Signal, 1)
 
@@ -88,16 +87,11 @@ func main() {
 
 		// Gracefully shutdown server
 		cancel()
-
-		close(shutdownDone)
 	}()
 
 	runner.Start(ctx)
 
-	// Wait for shutdown to finish
-	<-shutdownDone
-
-	logger.Info("Runner has gracefuly shutdown")
+	logger.Info("Runner has gracefully shutdown")
 }
 
 func loadDispatcherData(envPrefix string) map[string]string {
