@@ -307,13 +307,13 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 			}
 
 			if !foundSubject {
-				diagnostics = append(diagnostics, "subject with digest %s not found in module attestation", moduleDigest)
+				diagnostics = append(diagnostics, fmt.Sprintf("subject with digest %s not found in module attestation", moduleDigest))
 				continue
 			}
 
 			// Verify predicate type if it's defined in the policy
 			if policy.PredicateType != nil && statement.PredicateType != *policy.PredicateType {
-				diagnostics = append(diagnostics, "invalid predicate type, expected=%s actual=%s", *policy.PredicateType, statement.PredicateType)
+				diagnostics = append(diagnostics, fmt.Sprintf("invalid predicate type, expected=%s actual=%s", *policy.PredicateType, statement.PredicateType))
 				continue
 			}
 
