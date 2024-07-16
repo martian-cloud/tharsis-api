@@ -198,9 +198,9 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 	}
 
 	if input.WorkspaceID != nil {
-		err := caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
-		if err != nil {
-			return nil, err
+		rErr := caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
+		if rErr != nil {
+			return nil, rErr
 		}
 	} else if input.RunnerID != nil {
 		runner, rErr := s.dbClient.Runners.GetRunnerByID(ctx, *input.RunnerID)
@@ -831,11 +831,12 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		if !ws.Locked {
 			// Check if this runner has priority to claim this job
 			if runner.Type == models.SharedRunnerType {
-				// Verify that there are no group runners available for this workspace since
+				// Verify that there are no enabled group runners available for this workspace since
 				// group runners have higher precedence than shared runners
 				groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
 					Filter: &db.RunnerFilter{
 						NamespacePaths: ws.ExpandPath(),
+						Enabled:        ptr.Bool(true), // ignore disabled runners
 					},
 				})
 				if err != nil {
@@ -851,11 +852,12 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 						continue
 					}
 
-					// Verify there are no child runners with higher precedence
+					// Verify there are no enabled child runners with higher precedence
 					//runner.
 					groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
 						Filter: &db.RunnerFilter{
 							NamespacePaths: ws.ExpandPath(),
+							Enabled:        ptr.Bool(true), // ignore disabled child runners
 						},
 					})
 					if err != nil {
