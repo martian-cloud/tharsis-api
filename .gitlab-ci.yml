@@ -402,7 +402,7 @@ license_scanning:
 
 dast_api:
   services:
-    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:main-4ab8be1b
       alias: tharsis
   variables:
     DAST_API_GRAPHQL: /graphql
@@ -429,12 +429,12 @@ dast_api:
         --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 apifuzzer_fuzz:
   services:
-    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:main-4ab8be1b
       alias: tharsis
   variables:
     FUZZAPI_GRAPHQL: /graphql
@@ -461,5 +461,5 @@ apifuzzer_fuzz:
         --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
