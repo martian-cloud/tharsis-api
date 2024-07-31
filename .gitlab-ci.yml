@@ -431,6 +431,8 @@ dast_api:
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
   # rules:
   #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  rules:
+    - !reference [.on_merge_request_and_merged_events, rules]
 
 apifuzzer_fuzz:
   services:
@@ -463,3 +465,5 @@ apifuzzer_fuzz:
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   # rules:
   #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  rules:
+    - !reference [.on_merge_request_and_merged_events, rules]
