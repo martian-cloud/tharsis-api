@@ -417,8 +417,8 @@ dast_api:
     KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
     KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
     JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
-  needs:
-    - build_aio_container_image
+  # needs:
+  #   - build_aio_container_image
   before_script:
     - |
       sudo apk add curl jq
@@ -451,8 +451,8 @@ apifuzzer_fuzz:
     KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
     KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
     JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
-  needs:
-    - build_aio_container_image
+  # needs:
+  #   - build_aio_container_image
   before_script:
     - |
       sudo apk add curl jq
