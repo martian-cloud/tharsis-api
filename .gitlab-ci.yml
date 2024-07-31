@@ -421,7 +421,7 @@ dast_api:
     - build_aio_container_image
   before_script:
     - |
-      apk add curl jq
+      sudo apk add curl jq
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
       THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
         -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
@@ -453,7 +453,7 @@ apifuzzer_fuzz:
     - build_aio_container_image
   before_script:
     - |
-      apk add curl jq
+      sudo apk add curl jq
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
       THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
         -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
