@@ -230,14 +230,23 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		return nil, err
 	}
 
-	if options.WorkspaceID == nil {
-		return nil, errors.New("WorkspaceID option is required", errors.WithErrorCode(errors.EInvalid))
-	}
+	var userMemberID *string
+	switch {
+	case options.WorkspaceID != nil:
+		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
+		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
+			return nil, err
+		}
+	default:
+		userCaller, ok := caller.(*auth.UserCaller)
+		if !ok {
+			return nil, errors.New("only users can subscribe to run events without a WorkspaceID filter", errors.WithErrorCode(errors.EForbidden))
+		}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
+		if !userCaller.User.Admin {
+			userMemberID = &userCaller.User.Metadata.ID
+		}
 	}
 
 	outgoing := make(chan *Event)
@@ -267,7 +276,16 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				return
 			}
 
-			run, err := s.getRun(ctx, event.ID)
+			runsResult, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(1),
+				},
+				Filter: &db.RunFilter{
+					WorkspaceID:  options.WorkspaceID,
+					UserMemberID: userMemberID,
+					RunIDs:       []string{event.ID},
+				},
+			})
 			if err != nil {
 				if errors.IsContextCanceledError(err) {
 					return
@@ -276,19 +294,22 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				continue
 			}
 
-			// Check if run is associated with the desired workspace
-			if run.WorkspaceID != *options.WorkspaceID {
+			if runsResult.PageInfo.TotalCount == 0 {
+				// Run isn't for the target workspace or user.
 				continue
 			}
 
+			run := runsResult.Runs[0]
+
 			if options.RunID != nil && run.Metadata.ID != *options.RunID {
+				// Not the run we're looking for.
 				continue
 			}
 
 			select {
 			case <-ctx.Done():
 				return
-			case outgoing <- &Event{Action: event.Action, Run: *run}:
+			case outgoing <- &Event{Action: event.Action, Run: run}:
 			}
 		}
 	}()
@@ -1107,28 +1128,31 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 
 	filter := &db.RunFilter{}
 
-	if input.Workspace != nil {
+	switch {
+	case input.Workspace != nil:
 		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithNamespacePath(input.Workspace.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		filter.WorkspaceID = &input.Workspace.Metadata.ID
-	} else if input.Group != nil {
+	case input.Group != nil:
 		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		filter.GroupID = &input.Group.Metadata.ID
-	} else {
-		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
-		if napErr != nil {
-			tracing.RecordError(span, napErr, "failed to get namespace access policy")
-			return nil, napErr
+	default:
+		// Otherwise, only return runs the user caller has access to.
+		userCaller, ok := caller.(*auth.UserCaller)
+		if !ok {
+			return nil, errors.New("only users can query for runs without a workspace or group filter", errors.WithErrorCode(errors.EForbidden))
 		}
-		if !policy.AllowAll {
-			return nil, errors.New("either a workspace or group must be specified when querying for runs", errors.WithErrorCode(errors.EInvalid))
+
+		if !userCaller.IsAdmin() {
+			// Add filter is user isn't an admin.
+			filter.UserMemberID = &userCaller.User.Metadata.ID
 		}
 	}
 
@@ -1138,11 +1162,7 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 		Filter:            filter,
 	})
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to get runs")
-		return nil, errors.Wrap(
-			err,
-			"Failed to get runs",
-		)
+		return nil, errors.Wrap(err, "Failed to get runs", errors.WithSpan(span))
 	}
 
 	return result, nil

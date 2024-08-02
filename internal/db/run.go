@@ -59,11 +59,12 @@ func (sf RunSortableField) getSortDirection() pagination.SortDirection {
 
 // RunFilter contains the supported fields for filtering Run resources
 type RunFilter struct {
-	PlanID      *string
-	ApplyID     *string
-	WorkspaceID *string
-	GroupID     *string
-	RunIDs      []string
+	PlanID       *string
+	ApplyID      *string
+	WorkspaceID  *string
+	GroupID      *string
+	UserMemberID *string
+	RunIDs       []string
 }
 
 // GetRunsInput is the input for listing runs
@@ -208,35 +209,40 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	selectEx := dialect.From("runs").
+		Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("workspaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("workspaces.id")}))
+
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.RunIDs != nil {
-			ex["runs.id"] = input.Filter.RunIDs
+			ex = ex.Append(goqu.I("runs.id").In(input.Filter.RunIDs))
 		}
 
 		if input.Filter.PlanID != nil {
-			ex["runs.plan_id"] = *input.Filter.PlanID
-
+			ex = ex.Append(goqu.I("runs.plan_id").Eq(*input.Filter.PlanID))
 		}
 
 		if input.Filter.ApplyID != nil {
-			ex["runs.apply_id"] = *input.Filter.ApplyID
+			ex = ex.Append(goqu.I("runs.apply_id").Eq(*input.Filter.ApplyID))
 		}
 
 		if input.Filter.WorkspaceID != nil {
-			ex["runs.workspace_id"] = *input.Filter.WorkspaceID
+			ex = ex.Append(goqu.I("runs.workspace_id").Eq(*input.Filter.WorkspaceID))
 		}
 
 		if input.Filter.GroupID != nil {
-			ex["workspaces.group_id"] = *input.Filter.GroupID
+			ex = ex.Append(goqu.I("workspaces.group_id").Eq(*input.Filter.GroupID))
+		}
+
+		if input.Filter.UserMemberID != nil {
+			selectEx = selectEx.InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")}))
+			ex = ex.Append(namespaceMembershipFilterQuery("namespace_memberships.user_id", *input.Filter.UserMemberID))
 		}
 	}
 
-	query := dialect.From("runs").
-		Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("workspaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("workspaces.id")})).
-		Where(ex)
+	query := selectEx.Where(ex)
 
 	sortDirection := pagination.AscSort
 

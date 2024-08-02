@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
@@ -968,6 +969,131 @@ func TestGetStateVersionsByRunIDs(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Len(t, result, runsCount)
+		})
+	}
+}
+
+func TestGetRuns(t *testing.T) {
+	workspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "workspace-1",
+		},
+	}
+
+	group := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "group-1",
+		},
+	}
+
+	userID := "userID"
+
+	type testCase struct {
+		authError       error
+		input           *GetRunsInput
+		name            string
+		expectErrorCode errors.CodeType
+		isAdmin         bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "filter by workspace",
+			input: &GetRunsInput{
+				Workspace: workspace,
+			},
+		},
+		{
+			name: "filter by group",
+			input: &GetRunsInput{
+				Group: group,
+			},
+		},
+		{
+			name:    "admin user queries for all runs",
+			input:   &GetRunsInput{},
+			isAdmin: true,
+		},
+		{
+			name: "caller does not have access to workspace",
+			input: &GetRunsInput{
+				Workspace: workspace,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "caller does not have access to group",
+			input: &GetRunsInput{
+				Group: group,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockRuns := db.NewMockRuns(t)
+			mockAuthorizer := auth.NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			filter := &db.RunFilter{}
+
+			switch {
+			case test.input.Workspace != nil:
+				filter.WorkspaceID = ptr.String(test.input.Workspace.Metadata.ID)
+			case test.input.Group != nil:
+				filter.GroupID = ptr.String(test.input.Group.Metadata.ID)
+			default:
+				if !test.isAdmin {
+					filter.UserMemberID = &userID
+				}
+			}
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+			mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewRunPermission}, mock.Anything).Return(test.authError).Maybe()
+
+			if test.expectErrorCode == "" {
+				mockRuns.On("GetRuns", mock.Anything, &db.GetRunsInput{
+					Sort:              test.input.Sort,
+					PaginationOptions: test.input.PaginationOptions,
+					Filter:            filter,
+				}).Return(&db.RunsResult{}, nil)
+			}
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			userCaller := auth.NewUserCaller(
+				&models.User{
+					Metadata: models.ResourceMetadata{
+						ID: userID,
+					},
+					Admin: test.isAdmin,
+				},
+				mockAuthorizer,
+				dbClient,
+				mockMaintenanceMonitor,
+			)
+
+			runsResult, err := service.GetRuns(auth.WithCaller(ctx, userCaller), test.input)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.NotNil(t, runsResult)
 		})
 	}
 }
