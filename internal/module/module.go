@@ -30,7 +30,7 @@ func GetModuleRegistryEndpointForHost(httpClient *http.Client, host string) (*ur
 	urlString := url.String()
 	resp, err := httpClient.Get(urlString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to visit well-known URL: %s", urlString)
+		return nil, fmt.Errorf("failed to visit well-known URL: %s: %v", urlString, err)
 	}
 	defer resp.Body.Close()
 
