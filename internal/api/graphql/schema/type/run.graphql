@@ -68,7 +68,7 @@ type RunEvent {
 }
 
 input RunSubscriptionInput {
-  workspacePath: String!
+  workspacePath: String
   runId: String
 }
 

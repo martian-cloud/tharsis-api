@@ -558,28 +558,27 @@ func (r *RunEventResolver) Run() *RunResolver {
 // RunSubscriptionInput is the input for subscribing to run events
 type RunSubscriptionInput struct {
 	RunID         *string
-	WorkspacePath string
+	WorkspacePath *string
 }
 
 func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input *RunSubscriptionInput) (<-chan *RunEventResolver, error) {
 	runService := getRunService(ctx)
 
-	workspace, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
-	if err != nil {
-		return nil, err
-	}
-	workspaceID := workspace.Metadata.ID
+	subscriptionInput := &run.EventSubscriptionOptions{}
 
-	var runID *string
+	if input.WorkspacePath != nil {
+		workspace, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, *input.WorkspacePath)
+		if err != nil {
+			return nil, err
+		}
+		subscriptionInput.WorkspaceID = &workspace.Metadata.ID
+	}
+
 	if input.RunID != nil {
-		id := gid.FromGlobalID(*input.RunID)
-		runID = &id
+		subscriptionInput.RunID = ptr.String(gid.FromGlobalID(*input.RunID))
 	}
 
-	events, err := runService.SubscribeToRunEvents(ctx, &run.EventSubscriptionOptions{
-		WorkspaceID: &workspaceID,
-		RunID:       runID,
-	})
+	events, err := runService.SubscribeToRunEvents(ctx, subscriptionInput)
 	if err != nil {
 		return nil, err
 	}
