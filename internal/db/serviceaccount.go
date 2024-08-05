@@ -83,8 +83,9 @@ type ServiceAccountFilter struct {
 
 // oidcTrustPolicyDBType is the type used to store the trust policies in the DB table
 type oidcTrustPolicyDBType struct {
-	BoundClaims map[string]string `json:"boundClaims"`
-	Issuer      string            `json:"issuer"`
+	BoundClaimsType models.BoundClaimsType `json:"boundClaimsType"`
+	BoundClaims     map[string]string      `json:"boundClaims"`
+	Issuer          string                 `json:"issuer"`
 }
 
 // GetServiceAccountsInput is the input for listing service accounts
@@ -552,8 +553,9 @@ func (s *serviceAccounts) marshalOIDCTrustPolicies(input []models.OIDCTrustPolic
 	policies := []oidcTrustPolicyDBType{}
 	for _, p := range input {
 		policies = append(policies, oidcTrustPolicyDBType{
-			Issuer:      p.Issuer,
-			BoundClaims: p.BoundClaims,
+			Issuer:          p.Issuer,
+			BoundClaimsType: p.BoundClaimsType,
+			BoundClaims:     p.BoundClaims,
 		})
 	}
 	trustPoliciesJSON, err := json.Marshal(policies)
@@ -595,9 +597,16 @@ func scanServiceAccount(row scanner, withResourcePath bool) (*models.ServiceAcco
 
 	serviceAccount.OIDCTrustPolicies = []models.OIDCTrustPolicy{}
 	for _, p := range policies {
+		// Default bound claims type to string if it's not defined
+		boundClaimsType := p.BoundClaimsType
+		if boundClaimsType == "" {
+			boundClaimsType = models.BoundClaimsTypeString
+		}
+
 		serviceAccount.OIDCTrustPolicies = append(serviceAccount.OIDCTrustPolicies, models.OIDCTrustPolicy{
-			Issuer:      p.Issuer,
-			BoundClaims: p.BoundClaims,
+			Issuer:          p.Issuer,
+			BoundClaimsType: boundClaimsType,
+			BoundClaims:     p.BoundClaims,
 		})
 	}
 

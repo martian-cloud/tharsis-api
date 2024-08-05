@@ -34,7 +34,7 @@ import (
 
 const (
 	// forceCancelWait is how long a run must be soft-canceled before it is allowed to be forcefully canceled.
-	forceCancelWait = 30 * time.Minute
+	forceCancelWait = 1 * time.Minute
 )
 
 // Variable represents a run variable

@@ -27,8 +27,9 @@ type JWTClaim struct {
 
 // OIDCTrustPolicy specifies the trust policies for a service account
 type OIDCTrustPolicy struct {
-	Issuer      string
-	BoundClaims []JWTClaim
+	Issuer          string
+	BoundClaimsType *models.BoundClaimsType
+	BoundClaims     []JWTClaim
 }
 
 // ServiceAccountsConnectionQueryArgs are used to query a serviceAccount connection
@@ -211,9 +212,11 @@ func (r *ServiceAccountResolver) NamespaceMemberships(ctx context.Context,
 func (r *ServiceAccountResolver) OIDCTrustPolicies() []OIDCTrustPolicy {
 	policies := []OIDCTrustPolicy{}
 	for _, p := range r.serviceAccount.OIDCTrustPolicies {
+		p := p
 		policy := OIDCTrustPolicy{
-			Issuer:      p.Issuer,
-			BoundClaims: []JWTClaim{},
+			Issuer:          p.Issuer,
+			BoundClaimsType: &p.BoundClaimsType,
+			BoundClaims:     []JWTClaim{},
 		}
 		for k, v := range p.BoundClaims {
 			policy.BoundClaims = append(policy.BoundClaims, JWTClaim{
@@ -406,9 +409,15 @@ func deleteServiceAccountMutation(ctx context.Context, input *DeleteServiceAccou
 func convertOIDCTrustPolicies(src []OIDCTrustPolicy) ([]models.OIDCTrustPolicy, error) {
 	policies := []models.OIDCTrustPolicy{}
 	for _, p := range src {
+		boundClaimsType := models.BoundClaimsTypeString
+		if p.BoundClaimsType != nil {
+			boundClaimsType = *p.BoundClaimsType
+		}
+
 		policy := models.OIDCTrustPolicy{
-			Issuer:      p.Issuer,
-			BoundClaims: map[string]string{},
+			Issuer:          p.Issuer,
+			BoundClaimsType: boundClaimsType,
+			BoundClaims:     map[string]string{},
 		}
 
 		for _, claim := range p.BoundClaims {

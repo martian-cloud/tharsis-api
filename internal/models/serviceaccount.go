@@ -12,10 +12,21 @@ const (
 	maximumTrustPolicies = 10
 )
 
+// BoundClaimsType defines the type of comparison to be used for bound claims
+type BoundClaimsType string
+
+const (
+	// BoundClaimsTypeString is used for exact string matching
+	BoundClaimsTypeString BoundClaimsType = "STRING"
+	// BoundClaimsTypeGlob is used for glob pattern matching (i.e. a wildcard character can be used within the claim value)
+	BoundClaimsTypeGlob BoundClaimsType = "GLOB"
+)
+
 // OIDCTrustPolicy defined the IDP that can be used for logging into the service account
 type OIDCTrustPolicy struct {
-	BoundClaims map[string]string
-	Issuer      string
+	BoundClaimsType BoundClaimsType
+	BoundClaims     map[string]string
+	Issuer          string
 }
 
 // ServiceAccount provided M2M authentication
@@ -71,6 +82,11 @@ func (s *ServiceAccount) Validate() error {
 			return errors.New("Issuer URL is required for trust policy", errors.WithErrorCode(errors.EInvalid))
 		}
 
+		// Verify that bound claims type is defined
+		if policy.BoundClaimsType == "" {
+			return errors.New("Bound claims type is required for trust policy", errors.WithErrorCode(errors.EInvalid))
+		}
+
 		// Verify that issuer is a valid URL
 		if _, err := url.ParseRequestURI(policy.Issuer); err != nil {
 			return errors.New("Invalid issuer URL", errors.WithErrorCode(errors.EInvalid))
@@ -79,6 +95,14 @@ func (s *ServiceAccount) Validate() error {
 		// Verify at least one claim is present in each trust policy
 		if len(policy.BoundClaims) == 0 {
 			return errors.New("A minimum of one claim is required in each OIDC trust policy", errors.WithErrorCode(errors.EInvalid))
+		}
+
+		if policy.BoundClaimsType == BoundClaimsTypeGlob {
+			for k, v := range policy.BoundClaims {
+				if v == "*" {
+					return errors.New("the trust policy claim %q can't contain only a wildcard character", k, errors.WithErrorCode(errors.EInvalid))
+				}
+			}
 		}
 	}
 
