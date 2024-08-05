@@ -8,6 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -159,6 +160,27 @@ func (r *UserResolver) NamespaceMemberships(ctx context.Context,
 	}
 
 	return NewNamespaceMembershipConnectionResolver(ctx, &input)
+}
+
+// Teams resolver
+func (r *UserResolver) Teams(ctx context.Context,
+	args *ConnectionQueryArgs,
+) (*TeamConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := team.GetTeamsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		UserID:            &r.user.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.TeamSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewTeamConnectionResolver(ctx, &input)
 }
 
 // Admin resolver

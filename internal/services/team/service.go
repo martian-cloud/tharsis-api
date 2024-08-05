@@ -24,6 +24,8 @@ type GetTeamsInput struct {
 	PaginationOptions *pagination.Options
 	// TeamNamePrefix filters team list by teamName prefix
 	TeamNamePrefix *string
+	// UserID filters the team list by user ID
+	UserID *string
 }
 
 // GetTeamMembersInput is the input for querying a list of team members
@@ -183,6 +185,7 @@ func (s *service) GetTeams(ctx context.Context, input *GetTeamsInput) (*db.Teams
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.TeamFilter{
 			TeamNamePrefix: input.TeamNamePrefix,
+			UserID:         input.UserID,
 		},
 	}
 
