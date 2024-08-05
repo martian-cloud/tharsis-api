@@ -25,6 +25,13 @@ type User implements Node {
     first: Int
     last: Int
   ): NamespaceMembershipConnection!
+  teams(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: TeamSort
+  ): TeamConnection!
   admin: Boolean!
   active: Boolean!
   scimExternalId: String
