@@ -6,9 +6,79 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: DAST-API.gitlab-ci.yml
   - template: API-Fuzzing.gitlab-ci.yml
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@1.1.0
+    inputs:
+      stage: build
+      module_path: .
+      assert_licenses: true
+      main: cmd/apiserver
+      std: true
+      go_arch_os:
+        - GO_ARCH: "386"
+          GO_OS: [freebsd, linux, openbsd, windows]
+        - GO_ARCH: amd64
+          GO_OS: [darwin, freebsd, linux, openbsd, solaris, windows]
+        - GO_ARCH: arm
+          GO_OS: [freebsd, linux]
+        - GO_ARCH: arm64
+          GO_OS: [darwin, linux]
+      cgo_enabled: "0"
+      verbose: true
+    rules:
+      - if: $CI_COMMIT_TAG
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@1.1.0
+    inputs:
+      stage: build
+      module_path: .
+      assert_licenses: true
+      main: cmd/job
+      std: true
+      go_arch_os:
+        - GO_ARCH: "386"
+          GO_OS: [freebsd, linux, openbsd, windows]
+        - GO_ARCH: amd64
+          GO_OS: [darwin, freebsd, linux, openbsd, solaris, windows]
+        - GO_ARCH: arm
+          GO_OS: [freebsd, linux]
+        - GO_ARCH: arm64
+          GO_OS: [darwin, linux]
+      cgo_enabled: "0"
+      verbose: true
+    rules:
+      - if: $CI_COMMIT_TAG
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@1.1.0
+    inputs:
+      stage: build
+      module_path: .
+      assert_licenses: true
+      main: cmd/runner
+      std: true
+      go_arch_os:
+        - GO_ARCH: "386"
+          GO_OS: [freebsd, linux, openbsd, windows]
+        - GO_ARCH: amd64
+          GO_OS: [darwin, freebsd, linux, openbsd, solaris, windows]
+        - GO_ARCH: arm
+          GO_OS: [freebsd, linux]
+        - GO_ARCH: arm64
+          GO_OS: [darwin, linux]
+      cgo_enabled: "0"
+      verbose: true
+    rules:
+      - if: $CI_COMMIT_TAG
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/merge-sboms@1.1.0
+    inputs:
+      stage: merge-sboms
+      hierarchical: true
+      name: tharsis-api
+      version: $CI_COMMIT_TAG
+    rules:
+      - if: $CI_COMMIT_TAG
 
 stages:
   - test
+  - build
+  - merge-sboms
   - publish
   - container_scanning
   - trigger
