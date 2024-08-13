@@ -65,8 +65,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				CreatedBy:   createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
-						Issuer:      issuer,
-						BoundClaims: map[string]string{claimKey: claimVal},
+						Issuer:          issuer,
+						BoundClaimsType: models.BoundClaimsTypeString,
+						BoundClaims:     map[string]string{claimKey: claimVal},
 					},
 				},
 			},
@@ -79,8 +80,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				CreatedBy:    createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
-						Issuer:      issuer,
-						BoundClaims: map[string]string{claimKey: claimVal},
+						Issuer:          issuer,
+						BoundClaimsType: models.BoundClaimsTypeString,
+						BoundClaims:     map[string]string{claimKey: claimVal},
 					},
 				},
 			},
@@ -96,8 +98,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				CreatedBy:   createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
-						Issuer:      issuer,
-						BoundClaims: map[string]string{claimKey: claimVal},
+						Issuer:          issuer,
+						BoundClaimsType: models.BoundClaimsTypeString,
+						BoundClaims:     map[string]string{claimKey: claimVal},
 					},
 				},
 			},
@@ -113,8 +116,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				CreatedBy:   createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
-						Issuer:      issuer,
-						BoundClaims: map[string]string{claimKey: claimVal},
+						Issuer:          issuer,
+						BoundClaimsType: models.BoundClaimsTypeString,
+						BoundClaims:     map[string]string{claimKey: claimVal},
 					},
 				},
 			},
@@ -127,8 +131,9 @@ func TestCreateServiceAccount(t *testing.T) {
 				CreatedBy:    createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
-						Issuer:      issuer,
-						BoundClaims: map[string]string{claimKey: claimVal},
+						Issuer:          issuer,
+						BoundClaimsType: models.BoundClaimsTypeString,
+						BoundClaims:     map[string]string{claimKey: claimVal},
 					},
 				},
 			},

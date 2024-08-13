@@ -56,6 +56,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/procfs v0.14.0
 	github.com/qiangxue/go-env v1.0.1
+	github.com/ryanuber/go-glob v1.0.0
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/sigstore v1.8.3
 	github.com/stretchr/testify v1.9.0

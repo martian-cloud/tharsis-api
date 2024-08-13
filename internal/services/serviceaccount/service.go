@@ -679,11 +679,7 @@ func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, t
 		jwt.WithValidate(true),
 	}
 	for k, v := range trustPolicy.BoundClaims {
-		if k == "aud" {
-			options = append(options, jwt.WithAudience(v))
-		} else {
-			options = append(options, jwt.WithClaimValue(k, v))
-		}
+		options = append(options, jwt.WithValidator(newClaimValueValidator(k, v, trustPolicy.BoundClaimsType == models.BoundClaimsTypeGlob)))
 	}
 
 	// Parse and Verify token
