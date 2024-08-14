@@ -61,6 +61,12 @@ type Config struct {
 	// The external facing URL for the Tharsis API
 	TharsisAPIURL string `yaml:"tharsis_api_url" env:"API_URL"`
 
+	TLSEnabled bool `yaml:"tls_enabled" env:"TLS_ENABLED"`
+
+	TLSCertFile string `yaml:"tls_cert_file" env:"TLS_CERT_FILE"`
+
+	TLSKeyFile string `yaml:"tls_key_file" env:"TLS_KEY_FILE"`
+
 	// the server port. Defaults to 8000
 	ServerPort string `yaml:"server_port" env:"SERVER_PORT"`
 
