@@ -785,8 +785,7 @@ func TestUpdateModule(t *testing.T) {
 	}
 
 	// Looks up by ID and version.  Also requires group ID.
-	// Updates name and private.  Returns rebuilt resource path.
-	// The NamespacePath field is not updated in the DB, but the value from the argument is returned.
+	// Updates private.
 	positiveTerraformModule := warmupItems.terraformModules[0]
 	positiveGroup := warmupItems.groups[9]
 	otherTerraformModule := warmupItems.terraformModules[1]
@@ -800,8 +799,8 @@ func TestUpdateModule(t *testing.T) {
 					ID:      positiveTerraformModule.Metadata.ID,
 					Version: initialResourceVersion,
 				},
-				Name:    "updated-terraform-module-name",
-				System:  "aws",
+				Name:    positiveTerraformModule.Name,
+				System:  positiveTerraformModule.System,
 				Private: !positiveTerraformModule.Private,
 				GroupID: positiveGroup.Metadata.ID,
 			},
@@ -812,9 +811,9 @@ func TestUpdateModule(t *testing.T) {
 					CreationTimestamp:    positiveTerraformModule.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				Name:         "updated-terraform-module-name",
-				System:       "aws",
-				ResourcePath: positiveGroup.FullPath + "/updated-terraform-module-name/aws",
+				Name:         positiveTerraformModule.Name,
+				System:       positiveTerraformModule.System,
+				ResourcePath: positiveTerraformModule.ResourcePath,
 				RootGroupID:  positiveTerraformModule.RootGroupID,
 				GroupID:      positiveTerraformModule.GroupID,
 				Private:      !positiveTerraformModule.Private,

@@ -312,8 +312,6 @@ func (r *TerraformModuleMutationPayloadResolver) Module() *TerraformModuleResolv
 type UpdateTerraformModuleInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
-	Name             *string
-	System           *string
 	RepositoryURL    *string
 	Private          *bool
 	ID               string
@@ -395,14 +393,6 @@ func updateTerraformModuleMutation(ctx context.Context, input *UpdateTerraformMo
 	}
 
 	// Update fields
-	if input.Name != nil {
-		module.Name = *input.Name
-	}
-
-	if input.System != nil {
-		module.System = *input.System
-	}
-
 	if input.Private != nil {
 		module.Private = *input.Private
 	}
