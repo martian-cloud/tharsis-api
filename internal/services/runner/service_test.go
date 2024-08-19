@@ -34,16 +34,14 @@ func TestGetRunnerByID(t *testing.T) {
 		name          string
 		authError     error
 		expectErrCode errors.CodeType
-		isAdmin       bool
 	}{
 		{
-			name: "get shared runner",
+			name: "all users can view shared runner",
 			expectRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{ID: runnerID},
 				Name:     "test-runner",
 				Type:     models.SharedRunnerType,
 			},
-			isAdmin: true,
 		},
 		{
 			name: "get group runner",
@@ -82,7 +80,6 @@ func TestGetRunnerByID(t *testing.T) {
 					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
 					Return(test.authError)
 			}
-			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
 			mockRunners := db.NewMockRunners(t)
 
@@ -122,16 +119,14 @@ func TestGetRunnerByPath(t *testing.T) {
 		name          string
 		authError     error
 		expectErrCode errors.CodeType
-		isAdmin       bool
 	}{
 		{
-			name: "get shared runner",
+			name: "all users can get a shared runner",
 			expectRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{ID: runnerID},
 				Name:     "test-runner",
 				Type:     models.SharedRunnerType,
 			},
-			isAdmin: true,
 		},
 		{
 			name: "get group runner",
@@ -170,7 +165,6 @@ func TestGetRunnerByPath(t *testing.T) {
 					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
 					Return(test.authError)
 			}
-			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
 			mockRunners := db.NewMockRunners(t)
 
@@ -209,16 +203,14 @@ func TestGetRunnersByIDs(t *testing.T) {
 		name          string
 		authError     error
 		expectErrCode errors.CodeType
-		isAdmin       bool
 	}{
 		{
-			name: "get shared runner",
+			name: "all users can get a shared runner",
 			expectRunner: &models.Runner{
 				Metadata: models.ResourceMetadata{ID: runnerID},
 				Name:     "test-runner",
 				Type:     models.SharedRunnerType,
 			},
-			isAdmin: true,
 		},
 		{
 			name: "get group runner",
@@ -258,7 +250,6 @@ func TestGetRunnersByIDs(t *testing.T) {
 					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
 					Return(test.authError)
 			}
-			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
 			mockRunners := db.NewMockRunners(t)
 
@@ -364,14 +355,13 @@ func TestGetRunners(t *testing.T) {
 			input: &GetRunnersInput{
 				RunnerType: &localSharedRunnerType,
 			},
-			expectErrCode: errors.EForbidden,
 		},
 		{
 			name: "filter runners by group type, non-admin user",
 			input: &GetRunnersInput{
 				RunnerType: &localGroupRunnerType,
 			},
-			expectErrCode: errors.EForbidden,
+			expectErrCode: errors.EInvalid,
 		},
 		{
 			name: "subject does not have viewer role for group",
@@ -386,6 +376,11 @@ func TestGetRunners(t *testing.T) {
 			input: &GetRunnersInput{
 				NamespacePath: &groupID,
 			},
+		},
+		{
+			name:          "non admin cannot view all runners",
+			input:         &GetRunnersInput{},
+			expectErrCode: errors.EForbidden,
 		},
 	}
 	for _, test := range tests {

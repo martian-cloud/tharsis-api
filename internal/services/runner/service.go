@@ -157,10 +157,21 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 			return nil, err
 		}
 	} else if !caller.IsAdmin() {
-		return nil, errors.New(
-			"Only system admins can access shared runners",
-			errors.WithErrorCode(errors.EForbidden),
-		)
+		// Non admin caller shouldn't be able to access all runners, so require a type.
+		if input.RunnerType == nil {
+			return nil, errors.New(
+				"only system admins can view all runners",
+				errors.WithErrorCode(errors.EForbidden),
+			)
+		}
+
+		// Non admin can't retrieve runners for all groups, so require namespace path.
+		if input.RunnerType.Equals(models.GroupRunnerType) {
+			return nil, errors.New(
+				"a namespace path is required when filtering for group runners",
+				errors.WithErrorCode(errors.EInvalid),
+			)
+		}
 	}
 
 	filter := &db.RunnerFilter{
@@ -202,7 +213,7 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	_, err := auth.AuthorizeCaller(ctx)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
@@ -219,8 +230,19 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 	}
 
 	for ix := range result.Runners {
-		if err := RequireViewerAccessToRunner(ctx, &result.Runners[ix]); err != nil {
-			return nil, err
+		runner := result.Runners[ix]
+
+		switch runner.Type {
+		case models.GroupRunnerType:
+			aErr := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+				auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
+			if aErr != nil {
+				return nil, aErr
+			}
+		case models.SharedRunnerType:
+			// Any authenticated caller can view basic runner information.
+		default:
+			return nil, errors.New("unknown runner type %s", runner.Type)
 		}
 	}
 
@@ -330,7 +352,7 @@ func (s *service) GetRunnerSessionByID(ctx context.Context, id string) (*models.
 		return nil, err
 	}
 
-	if err := RequireViewerAccessToRunner(ctx, runner); err != nil {
+	if err := RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
 		return nil, err
 	}
 
@@ -351,7 +373,7 @@ func (s *service) GetRunnerSessions(ctx context.Context, input *GetRunnerSession
 		return nil, err
 	}
 
-	if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+	if err = RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
 		return nil, err
 	}
 
@@ -515,7 +537,7 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	_, err := auth.AuthorizeCaller(ctx)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
@@ -532,8 +554,17 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 		return nil, errors.New("runner with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	if err := RequireViewerAccessToRunner(ctx, runner); err != nil {
-		return nil, err
+	switch runner.Type {
+	case models.GroupRunnerType:
+		aErr := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+			auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
+		if aErr != nil {
+			return nil, aErr
+		}
+	case models.SharedRunnerType:
+		// Any authenticated caller can view basic runner information.
+	default:
+		return nil, errors.New("unknown runner type %s", runner.Type)
 	}
 
 	return runner, nil
@@ -544,7 +575,7 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	_, err := auth.AuthorizeCaller(ctx)
+	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
@@ -561,8 +592,17 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 		return nil, errors.New("runner with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	if err := RequireViewerAccessToRunner(ctx, runner); err != nil {
-		return nil, err
+	switch runner.Type {
+	case models.GroupRunnerType:
+		aErr := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+			auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
+		if aErr != nil {
+			return nil, aErr
+		}
+	case models.SharedRunnerType:
+		// Any authenticated caller can view basic runner information.
+	default:
+		return nil, errors.New("unknown runner type %s", runner.Type)
 	}
 
 	return runner, nil
@@ -930,7 +970,7 @@ func (s *service) ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID
 		return nil, err
 	}
 
-	if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+	if err = RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
 		return nil, err
 	}
 
@@ -964,7 +1004,7 @@ func (s *service) SubscribeToRunnerSessionErrorLog(ctx context.Context, options 
 		return nil, err
 	}
 
-	if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+	if err = RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
 		return nil, err
 	}
 
@@ -1025,7 +1065,7 @@ func (s *service) GetLogStreamsByRunnerSessionIDs(ctx context.Context, idList []
 
 	// Verify caller has access to all runners.
 	for ix := range runnersResp.Runners {
-		if err = RequireViewerAccessToRunner(ctx, &runnersResp.Runners[ix]); err != nil {
+		if err = RequireViewerAccessToRunnerResource(ctx, &runnersResp.Runners[ix]); err != nil {
 			return nil, err
 		}
 	}
@@ -1061,7 +1101,7 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 		if err != nil {
 			return nil, err
 		}
-		if err = RequireViewerAccessToRunner(ctx, runner); err != nil {
+		if err = RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
 			return nil, err
 		}
 	} else if !caller.IsAdmin() {
@@ -1177,8 +1217,9 @@ func (s *service) getRunnerSessionByID(ctx context.Context, span trace.Span, id 
 	return session, nil
 }
 
-// RequireViewerAccessToRunner checks if the caller has viewer access to the runner.
-func RequireViewerAccessToRunner(ctx context.Context, runner *models.Runner) error {
+// RequireViewerAccessToRunnerResource checks if the caller has viewer access to a runner's
+// resource like sessions, jobs, logs, etc.
+func RequireViewerAccessToRunnerResource(ctx context.Context, runner *models.Runner) error {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return err
@@ -1194,7 +1235,7 @@ func RequireViewerAccessToRunner(ctx context.Context, runner *models.Runner) err
 	case models.SharedRunnerType:
 		if !caller.IsAdmin() {
 			return errors.New(
-				"Only system admins can access shared runners",
+				"Only system admins can access shared runner's resources like jobs, sessions and logs",
 				errors.WithErrorCode(errors.EForbidden),
 			)
 		}
