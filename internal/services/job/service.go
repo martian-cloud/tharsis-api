@@ -210,7 +210,7 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 		if runner == nil {
 			return nil, errors.New("runner not found with ID: %s", *input.RunnerID, errors.WithErrorCode(errors.ENotFound))
 		}
-		if rErr = rnr.RequireViewerAccessToRunner(ctx, runner); rErr != nil {
+		if rErr = rnr.RequireViewerAccessToRunnerResource(ctx, runner); rErr != nil {
 			return nil, rErr
 		}
 	} else if !caller.IsAdmin() {
@@ -298,7 +298,7 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 		if runner == nil {
 			return nil, errors.New("runner not found with ID: %s", *options.RunnerID, errors.WithErrorCode(errors.ENotFound))
 		}
-		if rErr = rnr.RequireViewerAccessToRunner(ctx, runner); rErr != nil {
+		if rErr = rnr.RequireViewerAccessToRunnerResource(ctx, runner); rErr != nil {
 			return nil, rErr
 		}
 	} else if !caller.IsAdmin() {
