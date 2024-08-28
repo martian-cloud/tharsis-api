@@ -474,11 +474,11 @@ func TestGetTeams(t *testing.T) {
 		},
 
 		{
-			name: "filter, search field, 5",
+			name: "filter, search field, 3",
 			input: &GetTeamsInput{
 				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
 				Filter: &TeamFilter{
-					TeamNamePrefix: ptr.String("5"),
+					TeamNamePrefix: ptr.String("3"),
 				},
 			},
 			expectTeamIDs:        allTeamIDsByName[3:4],
@@ -488,11 +488,11 @@ func TestGetTeams(t *testing.T) {
 		},
 
 		{
-			name: "filter, search field, 6",
+			name: "filter, search field, 4",
 			input: &GetTeamsInput{
 				Sort: ptrTeamSortableField(TeamSortableFieldNameAsc),
 				Filter: &TeamFilter{
-					TeamNamePrefix: ptr.String("6"),
+					TeamNamePrefix: ptr.String("4"),
 				},
 			},
 			expectTeamIDs:        allTeamIDsByName[4:],
@@ -854,17 +854,17 @@ var standardWarmupTeams = []models.Team{
 		SCIMExternalID: uuid.New().String(),
 	},
 	{
-		Name:           "2-team-3",
+		Name:           "2-team-2",
 		Description:    "team 2 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},
 	{
-		Name:           "5-team-4",
-		Description:    "team 4 for testing teams",
+		Name:           "3-team-3",
+		Description:    "team 3 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},
 	{
-		Name:           "6-team-5",
+		Name:           "4-team-4",
 		Description:    "team 4 for testing teams",
 		SCIMExternalID: uuid.New().String(),
 	},

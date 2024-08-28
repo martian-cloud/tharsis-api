@@ -23,8 +23,8 @@ type GetRolesInput struct {
 	Sort *db.RoleSortableField
 	// PaginationOptions supports cursor based pagination
 	PaginationOptions *pagination.Options
-	// RoleNamePrefix filters role list by roleName prefix
-	RoleNamePrefix *string
+	// Search filters role list by roleName prefix
+	Search *string
 }
 
 // CreateRoleInput is the input for creating a Role.
@@ -168,7 +168,7 @@ func (s *service) GetRoles(ctx context.Context, input *GetRolesInput) (*db.Roles
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.RoleFilter{
-			RoleNamePrefix: input.RoleNamePrefix,
+			Search: input.Search,
 		},
 	}
 

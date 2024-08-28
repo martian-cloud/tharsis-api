@@ -235,7 +235,7 @@ func TestGetRoles(t *testing.T) {
 				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(2),
 				},
-				RoleNamePrefix: ptr.String("role"),
+				Search: ptr.String("role"),
 			},
 			expectResult: &db.RolesResult{
 				Roles: []models.Role{{Name: "role"}},
@@ -243,7 +243,7 @@ func TestGetRoles(t *testing.T) {
 		},
 		{
 			name:            "without caller",
-			input:           &GetRolesInput{RoleNamePrefix: ptr.String("role")},
+			input:           &GetRolesInput{Search: ptr.String("role")},
 			expectErrorCode: errors.EUnauthorized,
 		},
 	}
@@ -257,7 +257,7 @@ func TestGetRoles(t *testing.T) {
 					Sort:              test.input.Sort,
 					PaginationOptions: test.input.PaginationOptions,
 					Filter: &db.RoleFilter{
-						RoleNamePrefix: test.input.RoleNamePrefix,
+						Search: test.input.Search,
 					},
 				}
 				mockRoles.On("GetRoles", mock.Anything, dbInput).Return(test.expectResult, nil)

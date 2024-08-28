@@ -188,7 +188,7 @@ func rolesQuery(ctx context.Context, args *RolesConnectionQueryArgs) (*RoleConne
 
 	input := role.GetRolesInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
-		RoleNamePrefix:    args.Search,
+		Search:            args.Search,
 	}
 
 	if args.Sort != nil {

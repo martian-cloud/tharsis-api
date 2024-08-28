@@ -152,7 +152,7 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		}
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
-			ex = ex.Append(goqu.I("namespaces.path").Like("%" + *input.Filter.Search + "%"))
+			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
 		}
 	}
 

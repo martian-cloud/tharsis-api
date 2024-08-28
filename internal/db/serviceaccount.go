@@ -172,25 +172,25 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("service_accounts.name").Like(serviceAccountName+"%"),
+								goqu.I("service_accounts.name").ILike(serviceAccountName+"%"),
 							),
 							goqu.Or(
-								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("service_accounts.name").Like(serviceAccountName+"%"),
+								goqu.I("namespaces.path").ILike(search+"%"),
+								goqu.I("service_accounts.name").ILike(serviceAccountName+"%"),
 							),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%"))
+					ex = ex.Append(goqu.I("namespaces.path").ILike(namespacePath + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or service account name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%"),
-						goqu.I("service_accounts.name").Like(search+"%"),
+						goqu.I("namespaces.path").ILike(search+"%"),
+						goqu.I("service_accounts.name").ILike(search+"%"),
 					),
 				)
 			}
