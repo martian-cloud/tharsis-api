@@ -605,7 +605,7 @@ func TestGetUsers(t *testing.T) {
 					First: ptr.Int32(100),
 				},
 				Filter: &UserFilter{
-					UsernamePrefix: ptr.String(""),
+					Search: ptr.String(""),
 					// Passing an empty slice to UserIDs likely
 					// causes an SQL syntax error ("... IN ()"), so don't try it.
 					// UserIDs: []string{},
@@ -674,7 +674,7 @@ func TestGetUsers(t *testing.T) {
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
 				Filter: &UserFilter{
-					UsernamePrefix: ptr.String("u"),
+					Search: ptr.String("u"),
 				},
 			},
 			expectUserIDs:        allUserIDsByUpdateTime,
@@ -688,7 +688,7 @@ func TestGetUsers(t *testing.T) {
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
 				Filter: &UserFilter{
-					UsernamePrefix: ptr.String("user"),
+					Search: ptr.String("user"),
 				},
 			},
 			expectUserIDs:        allUserIDsByUpdateTime,
@@ -716,7 +716,7 @@ func TestGetUsers(t *testing.T) {
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
 				Filter: &UserFilter{
-					UsernamePrefix: ptr.String("user-9"),
+					Search: ptr.String("user-9"),
 				},
 			},
 			expectUserIDs:        []string{},
@@ -730,7 +730,7 @@ func TestGetUsers(t *testing.T) {
 			input: &GetUsersInput{
 				Sort: ptrUserSortableField(UserSortableFieldUpdatedAtAsc),
 				Filter: &UserFilter{
-					UsernamePrefix: ptr.String("bogus"),
+					Search: ptr.String("bogus"),
 				},
 			},
 			expectUserIDs:        []string{},

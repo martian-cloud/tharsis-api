@@ -58,6 +58,7 @@ func (js UserSortableField) getSortDirection() pagination.SortDirection {
 
 // UserFilter contains the supported fields for filtering User resources
 type UserFilter struct {
+	Search         *string
 	UsernamePrefix *string
 	UserIDs        []string
 	SCIMExternalID bool
@@ -197,20 +198,23 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.UserIDs != nil {
-			ex["users.id"] = input.Filter.UserIDs
+			ex = ex.Append(goqu.I("users.id").In(input.Filter.UserIDs))
+		}
+		if input.Filter.Search != nil && *input.Filter.Search != "" {
+			ex = ex.Append(goqu.I("users.username").ILike("%" + *input.Filter.Search + "%"))
 		}
 		if input.Filter.UsernamePrefix != nil && *input.Filter.UsernamePrefix != "" {
-			ex["users.username"] = goqu.Op{"like": *input.Filter.UsernamePrefix + "%"}
+			ex = ex.Append(goqu.I("users.username").Like(*input.Filter.UsernamePrefix + "%"))
 		}
 		if input.Filter.SCIMExternalID {
-			ex["users.scim_external_id"] = goqu.Op{"isNot": nil}
+			ex = ex.Append(goqu.I("users.scim_external_id").IsNotNull())
 		}
 		if input.Filter.Active {
-			ex["users.active"] = input.Filter.Active // Return only active users.
+			ex = ex.Append(goqu.I("users.active").IsTrue()) // Return only active users.
 		}
 	}
 

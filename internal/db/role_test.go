@@ -437,7 +437,7 @@ func TestGetRoles(t *testing.T) {
 					First: ptr.Int32(100),
 				},
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String(""),
+					Search: ptr.String(""),
 				},
 			},
 			expectRoleIDs: allRoleIDsByName,
@@ -456,7 +456,7 @@ func TestGetRoles(t *testing.T) {
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String(""),
+					Search: ptr.String(""),
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName,
@@ -470,7 +470,7 @@ func TestGetRoles(t *testing.T) {
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String("1"),
+					Search: ptr.String("1"),
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[1:2],
@@ -484,7 +484,7 @@ func TestGetRoles(t *testing.T) {
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String("2"),
+					Search: ptr.String("2"),
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[2:3],
@@ -494,11 +494,11 @@ func TestGetRoles(t *testing.T) {
 		},
 
 		{
-			name: "filter, search field, 5",
+			name: "filter, search field, 3",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String("5"),
+					Search: ptr.String("3"),
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[3:4],
@@ -508,11 +508,11 @@ func TestGetRoles(t *testing.T) {
 		},
 
 		{
-			name: "filter, search field, 6",
+			name: "filter, search field, 4",
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String("6"),
+					Search: ptr.String("4"),
 				},
 			},
 			expectRoleIDs:        allRoleIDsByName[4:],
@@ -526,7 +526,7 @@ func TestGetRoles(t *testing.T) {
 			input: &GetRolesInput{
 				Sort: ptrRoleSortableField(RoleSortableFieldNameAsc),
 				Filter: &RoleFilter{
-					RoleNamePrefix: ptr.String("bogus"),
+					Search: ptr.String("bogus"),
 				},
 			},
 			expectRoleIDs:        []string{},
@@ -930,17 +930,17 @@ var standardWarmupRoles = []models.Role{
 		CreatedBy:   "someone-r1",
 	},
 	{
-		Name:        "2-role-3",
+		Name:        "2-role-2",
 		Description: "role 2 for testing roles",
 		CreatedBy:   "someone-r3",
 	},
 	{
-		Name:        "5-role-4",
-		Description: "role 4 for testing roles",
+		Name:        "3-role-3",
+		Description: "role 3 for testing roles",
 		CreatedBy:   "someone-r4",
 	},
 	{
-		Name:        "6-role-5",
+		Name:        "4-role-4",
 		Description: "role 4 for testing roles",
 		CreatedBy:   "someone-r4",
 	},

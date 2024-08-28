@@ -59,8 +59,8 @@ func (r RoleSortableField) getSortDirection() pagination.SortDirection {
 
 // RoleFilter contains the supported fields for filtering Role resources
 type RoleFilter struct {
-	RoleNamePrefix *string
-	RoleIDs        []string
+	Search  *string
+	RoleIDs []string
 }
 
 // GetRolesInput is the input for listing roles
@@ -111,14 +111,14 @@ func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResul
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.RoleIDs != nil {
-			ex["roles.id"] = input.Filter.RoleIDs
+			ex = ex.Append(goqu.I("roles.id").In(input.Filter.RoleIDs))
 		}
-		if input.Filter.RoleNamePrefix != nil && *input.Filter.RoleNamePrefix != "" {
-			ex["roles.name"] = goqu.Op{"like": *input.Filter.RoleNamePrefix + "%"}
+		if input.Filter.Search != nil && *input.Filter.Search != "" {
+			ex = ex.Append(goqu.I("roles.name").ILike("%" + *input.Filter.Search + "%"))
 		}
 	}
 

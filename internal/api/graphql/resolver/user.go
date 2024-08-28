@@ -221,7 +221,7 @@ func usersQuery(ctx context.Context, args *UserConnectionQueryArgs) (*UserConnec
 
 	input := user.GetUsersInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
-		UsernamePrefix:    args.Search,
+		Search:            args.Search,
 	}
 
 	if args.Sort != nil {

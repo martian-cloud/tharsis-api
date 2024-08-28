@@ -145,21 +145,21 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 					// and the second part is the module name
 					ex = ex.Append(
 						goqu.And(
-							goqu.I("namespaces.path").Like(registryNamespace+"%"),
-							goqu.I("terraform_modules.name").Like(moduleName+"%"),
+							goqu.I("namespaces.path").ILike(registryNamespace+"%"),
+							goqu.I("terraform_modules.name").ILike(moduleName+"%"),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(registryNamespace + "%"))
+					ex = ex.Append(goqu.I("namespaces.path").ILike(registryNamespace + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or module name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%"),
-						goqu.I("terraform_modules.name").Like(search+"%"),
+						goqu.I("namespaces.path").ILike(search+"%"),
+						goqu.I("terraform_modules.name").ILike(search+"%"),
 					),
 				)
 			}

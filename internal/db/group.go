@@ -184,7 +184,7 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		}
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
-			ex = ex.Append(goqu.I("namespaces.path").Like("%" + *input.Filter.Search + "%"))
+			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
 		}
 	}
 

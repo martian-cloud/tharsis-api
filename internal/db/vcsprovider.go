@@ -168,25 +168,25 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("vcs_providers.name").Like(vcsProviderName+"%"),
+								goqu.I("vcs_providers.name").ILike(vcsProviderName+"%"),
 							),
 							goqu.Or(
-								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("vcs_providers.name").Like(vcsProviderName+"%"),
+								goqu.I("namespaces.path").ILike(search+"%"),
+								goqu.I("vcs_providers.name").ILike(vcsProviderName+"%"),
 							),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%"))
+					ex = ex.Append(goqu.I("namespaces.path").ILike(namespacePath + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or VCS provider name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%"),
-						goqu.I("vcs_providers.name").Like(search+"%"),
+						goqu.I("namespaces.path").ILike(search+"%"),
+						goqu.I("vcs_providers.name").ILike(search+"%"),
 					),
 				)
 			}

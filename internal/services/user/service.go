@@ -19,8 +19,8 @@ type GetUsersInput struct {
 	Sort *db.UserSortableField
 	// PaginationOptions supports cursor based pagination
 	PaginationOptions *pagination.Options
-	// UsernamePrefix filters user list by username prefix
-	UsernamePrefix *string
+	// Search filters user list by username prefix
+	Search *string
 }
 
 // Service implements all user related functionality
@@ -119,7 +119,7 @@ func (s *service) GetUsers(ctx context.Context, input *GetUsersInput) (*db.Users
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.UserFilter{
-			UsernamePrefix: input.UsernamePrefix,
+			Search: input.Search,
 		},
 	})
 	if err != nil {

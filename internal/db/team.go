@@ -120,20 +120,20 @@ func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResul
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.TeamIDs != nil {
-			ex["teams.id"] = input.Filter.TeamIDs
+			ex = ex.Append(goqu.I("teams.id").In(input.Filter.TeamIDs))
 		}
 		if input.Filter.TeamNamePrefix != nil && *input.Filter.TeamNamePrefix != "" {
-			ex["teams.name"] = goqu.Op{"like": *input.Filter.TeamNamePrefix + "%"}
+			ex = ex.Append(goqu.I("teams.name").ILike("%" + *input.Filter.TeamNamePrefix + "%"))
 		}
 		if input.Filter.UserID != nil {
-			ex["team_members.user_id"] = *input.Filter.UserID
+			ex = ex.Append(goqu.I("team_members.user_id").Eq(*input.Filter.UserID))
 		}
 		if input.Filter.SCIMExternalID {
-			ex["teams.scim_external_id"] = goqu.Op{"isNot": nil}
+			ex = ex.Append(goqu.I("teams.scim_external_id").IsNotNull())
 		}
 	}
 

@@ -857,25 +857,25 @@ func (m *managedIdentities) GetManagedIdentities(ctx context.Context, input *Get
 						goqu.Or(
 							goqu.And(
 								goqu.I("namespaces.path").Eq(namespacePath),
-								goqu.I("t1.name").Like(managedIdentityName+"%"),
+								goqu.I("t1.name").ILike(managedIdentityName+"%"),
 							),
 							goqu.Or(
-								goqu.I("namespaces.path").Like(search+"%"),
-								goqu.I("t1.name").Like(managedIdentityName+"%"),
+								goqu.I("namespaces.path").ILike(search+"%"),
+								goqu.I("t1.name").ILike(managedIdentityName+"%"),
 							),
 						),
 					)
 				} else {
 					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").Like(namespacePath + "%"))
+					ex = ex.Append(goqu.I("namespaces.path").ILike(namespacePath + "%"))
 				}
 			} else {
 				// We don't know if the search is for a namespace path or managed identity name; therefore, use
 				// an OR condition to search both
 				ex = ex.Append(
 					goqu.Or(
-						goqu.I("namespaces.path").Like(search+"%"),
-						goqu.I("t1.name").Like(search+"%"),
+						goqu.I("namespaces.path").ILike(search+"%"),
+						goqu.I("t1.name").ILike(search+"%"),
 					),
 				)
 			}
