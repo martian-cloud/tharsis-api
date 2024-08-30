@@ -80,12 +80,26 @@ include:
       version: $CI_COMMIT_TAG
     rules:
       - if: $CI_COMMIT_TAG
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@2a21dfac1d80b98cb94d5da6160205b4c74465b5
+    inputs:
+      stage: post_container_scanning
+      remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
+      remote_sbom_component_mapping_file_branch: main
+      remote_sbom_component_mapping_file_path: ["mapping-alpine.json", "mapping-debian.json"]
+      report_filenames:
+        - "gl-sbom-api-report.cdx.json"
+        - "gl-sbom-job-report.cdx.json"
+        - "gl-sbom-agent-report.cdx.json"
+    rules:
+      - if: $CI_COMMIT_TAG
+# FIXME: After the template has been merged to main and tagged, point the above to the tag.
 
 stages:
   - test
   - merge-sboms
   - publish
   - container_scanning
+  - post_container_scanning
   - trigger
   - dast
   - fuzz
@@ -416,10 +430,28 @@ container_scanning:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"'
       variables:
-        CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${IMAGE_TAG}"
+        USE_TAG: "${IMAGE_TAG}"
     - if: "$CI_COMMIT_TAG"
       variables:
-        CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:latest"
+        USE_TAG: "latest"
+  after_script:
+    mv -i gl-sbom-report.cdx.json gl-sbom-report.$COMPONENT.cdx.json
+  parallel:
+    matrix:
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${USE_TAG}"
+        CS_DOCKERFILE_PATH: "Dockerfile"
+        COMPONENT: api
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/job-executor:${USE_TAG}"
+        CS_DOCKERFILE_PATH: "Dockerfile"
+        COMPONENT: job
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/runner:${USE_TAG}"
+        CS_DOCKERFILE_PATH: "Dockerfile"
+        COMPONENT: runner
+      # This pipeline does not build/publish a db-migrate docker image.
+      # This pipeline builds but does not publish an all-in-one image.
+  artifacts:
+    paths:
+      - "**/gl-sbom-*.cdx.json"
 
 gemnasium-dependency_scanning:
   variables:
