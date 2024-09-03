@@ -80,7 +80,7 @@ include:
       version: $CI_COMMIT_TAG
     rules:
       - if: $CI_COMMIT_TAG
-  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@2a21dfac1d80b98cb94d5da6160205b4c74465b5
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@919b300459759f4cd029cb31276d9d1981315de8
     inputs:
       stage: post_container_scanning
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
