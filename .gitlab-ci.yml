@@ -187,8 +187,8 @@ publish api docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "1"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "2"
   before_script:
     - apk add git
   rules:
@@ -248,8 +248,8 @@ publish job-executor docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "1"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "2"
   before_script:
     - apk add git
   rules:
@@ -302,8 +302,8 @@ publish runner docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "1"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "2"
   before_script:
     - apk add git
   rules:
