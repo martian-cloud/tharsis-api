@@ -153,4 +153,5 @@ type Query {
     groupPath: String!
   ): TerraformProviderVersionMirror
   maintenanceMode: MaintenanceMode
+  version: String!
 }
