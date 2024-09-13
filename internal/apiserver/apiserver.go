@@ -316,6 +316,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		ResourceLimitService:       resourceLimitService,
 		ProviderMirrorService:      providerMirrorService,
 		MaintenanceModeService:     maintenanceModeService,
+		Version:                    version,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)

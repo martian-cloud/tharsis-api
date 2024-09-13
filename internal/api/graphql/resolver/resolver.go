@@ -63,6 +63,7 @@ type State struct {
 	ResourceLimitService       resourcelimit.Service
 	ProviderMirrorService      providermirror.Service
 	MaintenanceModeService     maintenance.Service
+	Version                    string
 }
 
 // Attach is used to attach the resolver state to the context
