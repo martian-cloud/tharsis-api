@@ -80,6 +80,21 @@ include:
       version: $CI_COMMIT_TAG
     rules:
       - if: $CI_COMMIT_TAG
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@1.3.1
+    inputs:
+      stage: container_scanning
+      remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
+      remote_sbom_component_mapping_file_branch: main
+      remote_sbom_component_mapping_file_paths: ["mapping-alpine.json", "mapping-debian.json"]
+      report_filenames:
+        - "gl-sbom-api-report.cdx.json"
+        - "gl-sbom-job-report.cdx.json"
+        - "gl-sbom-runner-report.cdx.json"
+      needs: [container_scanning]
+    rules:
+      - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      - if: '$CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"'
+      - if: $CI_COMMIT_TAG
 
 stages:
   - test
@@ -173,8 +188,8 @@ publish api docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "1"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "2"
   before_script:
     - apk add git
   rules:
@@ -234,21 +249,15 @@ publish job-executor docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "1"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "2"
   before_script:
     - apk add git
   rules:
+    - !reference [.on_default_branch_and_merge_train, rules]
     - !reference [.on_tag_events, rules]
   script:
     - |
-      echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
-
-      # Version is based on semantic versioning
-      full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
-      major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
-      major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
-
       # Build registry URIs.
       registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
       job_executor_uri="$registry_uri"/job-executor
@@ -258,23 +267,36 @@ publish job-executor docker:
       echo "Building job-executor image"
       docker build --target job-executor -t job-executor:latest --build-arg goversion=$GO_VERSION --no-cache .
 
-      # Version tag job executor images.
-      echo "Version tagging the job-executor image"
-      docker image tag job-executor:latest $job_executor_uri:$full_version
-      docker image tag job-executor:latest $job_executor_uri:$major_version
-      docker image tag job-executor:latest $job_executor_uri:$major_minor_version
+      if [ ! -z "$CI_COMMIT_TAG" ]; then
+        echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
 
-      echo "Pushing job-executor versioned image to registry"
-      docker image push $job_executor_uri:$full_version
-      docker image push $job_executor_uri:$major_version
-      docker image push $job_executor_uri:$major_minor_version
+        # Version is based on semantic versioning
+        full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
+        major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
+        major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
 
-      latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
-      if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
-        then
-          echo "Build is latest, tagging and pushing image as latest"
-          docker image tag job-executor:latest $job_executor_uri:latest
-          docker image push $job_executor_uri:latest
+        # Version tag job executor images.
+        echo "Version tagging the job-executor image"
+        docker image tag job-executor:latest $job_executor_uri:$full_version
+        docker image tag job-executor:latest $job_executor_uri:$major_version
+        docker image tag job-executor:latest $job_executor_uri:$major_minor_version
+
+        echo "Pushing job-executor versioned image to registry"
+        docker image push $job_executor_uri:$full_version
+        docker image push $job_executor_uri:$major_version
+        docker image push $job_executor_uri:$major_minor_version
+
+        latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
+        if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
+          then
+            echo "Build is latest, tagging and pushing image as latest"
+            docker image tag job-executor:latest $job_executor_uri:latest
+            docker image push $job_executor_uri:latest
+        fi
+      else
+        echo "This is a normal commit so $IMAGE_TAG tag will be pushed to GitLab registry"
+        docker image tag job-executor:latest $job_executor_uri:$IMAGE_TAG
+        docker image push $job_executor_uri:$IMAGE_TAG
       fi
   interruptible: false
 
@@ -288,21 +310,15 @@ publish runner docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "1"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
+    KUBERNETES_SERVICE_CPU_LIMIT: "2"
   before_script:
     - apk add git
   rules:
+    - !reference [.on_default_branch_and_merge_train, rules]
     - !reference [.on_tag_events, rules]
   script:
     - |
-      echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
-
-      # Version is based on semantic versioning
-      full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
-      major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
-      major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
-
       # Build registry URIs.
       registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
       runner_uri="$registry_uri"/runner
@@ -312,23 +328,36 @@ publish runner docker:
       echo "Building runner image"
       docker build --target runner -t runner:latest --build-arg goversion=$GO_VERSION --no-cache .
 
-      # Version tag runner images.
-      echo "Version tagging the runner image"
-      docker image tag runner:latest $runner_uri:$full_version
-      docker image tag runner:latest $runner_uri:$major_version
-      docker image tag runner:latest $runner_uri:$major_minor_version
+        if [ ! -z "$CI_COMMIT_TAG" ]; then
+        echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
 
-      echo "Pushing runner versioned image to registry"
-      docker image push $runner_uri:$full_version
-      docker image push $runner_uri:$major_version
-      docker image push $runner_uri:$major_minor_version
+        # Version is based on semantic versioning
+        full_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver | grep -Eo '[0-9\.].*$')
+        major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
+        major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
 
-      latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
-      if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
-        then
-          echo "Build is latest, tagging and pushing image as latest"
-          docker image tag runner:latest $runner_uri:latest
-          docker image push $runner_uri:latest
+        # Version tag runner images.
+        echo "Version tagging the runner image"
+        docker image tag runner:latest $runner_uri:$full_version
+        docker image tag runner:latest $runner_uri:$major_version
+        docker image tag runner:latest $runner_uri:$major_minor_version
+
+        echo "Pushing runner versioned image to registry"
+        docker image push $runner_uri:$full_version
+        docker image push $runner_uri:$major_version
+        docker image push $runner_uri:$major_minor_version
+
+        latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
+        if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
+          then
+            echo "Build is latest, tagging and pushing image as latest"
+            docker image tag runner:latest $runner_uri:latest
+            docker image push $runner_uri:latest
+        fi
+      else
+        echo "This is a normal commit so $IMAGE_TAG tag will be pushed to GitLab registry"
+        docker image tag runner:latest $runner_uri:$IMAGE_TAG
+        docker image push $runner_uri:$IMAGE_TAG
       fi
   interruptible: false
 
@@ -415,11 +444,28 @@ container_scanning:
     GIT_STRATEGY: fetch
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"'
-      variables:
-        CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${IMAGE_TAG}"
+      when: always
     - if: "$CI_COMMIT_TAG"
       variables:
-        CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:latest"
+        IMAGE_TAG: "latest"
+  after_script:
+    mv -i gl-sbom-report.cdx.json gl-sbom-$COMPONENT-report.cdx.json
+  parallel:
+    matrix:
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${IMAGE_TAG}"
+        CS_DOCKERFILE_PATH: "Dockerfile"
+        COMPONENT: api
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/job-executor:${IMAGE_TAG}"
+        CS_DOCKERFILE_PATH: "Dockerfile"
+        COMPONENT: job
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/runner:${IMAGE_TAG}"
+        CS_DOCKERFILE_PATH: "Dockerfile"
+        COMPONENT: runner
+      # This pipeline does not build/publish a db-migrate docker image.
+      # This pipeline builds but does not publish an all-in-one image.
+  artifacts:
+    paths:
+      - "**/gl-sbom-*.cdx.json"
 
 gemnasium-dependency_scanning:
   variables:
