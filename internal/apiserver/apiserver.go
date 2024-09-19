@@ -194,7 +194,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, activityService, taskManager)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL), runStateManager)
+		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL), runStateManager, limits)
 		runnerService              = runner.NewService(logger, dbClient, limits, activityService, logStreamManager, eventManager)
 		roleService                = role.NewService(logger, dbClient, activityService)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)

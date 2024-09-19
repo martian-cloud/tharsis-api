@@ -14,8 +14,8 @@ import (
 	"math/big"
 	"time"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 func loadTLSConfig(cfg *config.Config, logger logger.Logger) (*tls.Config, error) {

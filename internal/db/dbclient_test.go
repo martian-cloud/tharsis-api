@@ -568,12 +568,11 @@ func createInitialApplies(ctx context.Context, testClient *testClient,
 
 // createInitialConfigurationVersions creates some warmup configuration versions for a test.
 func createInitialConfigurationVersions(ctx context.Context, testClient *testClient,
-	toCreate []models.ConfigurationVersion, workspaceID string) ([]models.ConfigurationVersion, error) {
+	toCreate []models.ConfigurationVersion) ([]models.ConfigurationVersion, error) {
 	result := []models.ConfigurationVersion{}
 
 	for _, input := range toCreate {
 
-		input.WorkspaceID = workspaceID
 		created, err := testClient.client.ConfigurationVersions.CreateConfigurationVersion(ctx, input)
 		if err != nil {
 			return nil, err

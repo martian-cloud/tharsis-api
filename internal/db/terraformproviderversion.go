@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
@@ -61,6 +62,7 @@ func (ts TerraformProviderVersionSortableField) getSortDirection() pagination.So
 
 // TerraformProviderVersionFilter contains the supported fields for filtering TerraformProviderVersion resources
 type TerraformProviderVersionFilter struct {
+	TimeRangeStart           *time.Time
 	ProviderID               *string
 	SHASumsUploaded          *bool
 	SHASumsSignatureUploaded *bool
@@ -109,26 +111,30 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.ProviderVersionIDs != nil {
-			ex["terraform_provider_versions.id"] = input.Filter.ProviderVersionIDs
+			ex = ex.Append(goqu.I("terraform_provider_versions.id").In(input.Filter.ProviderVersionIDs))
 		}
 		if input.Filter.ProviderID != nil {
-			ex["terraform_provider_versions.provider_id"] = *input.Filter.ProviderID
+			ex = ex.Append(goqu.I("terraform_provider_versions.provider_id").Eq(*input.Filter.ProviderID))
 		}
 		if input.Filter.SHASumsUploaded != nil {
-			ex["terraform_provider_versions.sha_sums_uploaded"] = *input.Filter.SHASumsUploaded
+			ex = ex.Append(goqu.I("terraform_provider_versions.sha_sums_uploaded").Eq(*input.Filter.SHASumsUploaded))
 		}
 		if input.Filter.SHASumsSignatureUploaded != nil {
-			ex["terraform_provider_versions.sha_sums_sig_uploaded"] = *input.Filter.SHASumsSignatureUploaded
+			ex = ex.Append(goqu.I("terraform_provider_versions.sha_sums_sig_uploaded").Eq(*input.Filter.SHASumsSignatureUploaded))
 		}
 		if input.Filter.SemanticVersion != nil {
-			ex["terraform_provider_versions.provider_sem_version"] = *input.Filter.SemanticVersion
+			ex = ex.Append(goqu.I("terraform_provider_versions.provider_sem_version").Eq(*input.Filter.SemanticVersion))
 		}
 		if input.Filter.Latest != nil {
-			ex["terraform_provider_versions.latest"] = *input.Filter.Latest
+			ex = ex.Append(goqu.I("terraform_provider_versions.latest").Eq(*input.Filter.Latest))
+		}
+		if input.Filter.TimeRangeStart != nil {
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("terraform_provider_versions.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
 	}
 

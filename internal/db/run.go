@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/doug-martin/goqu/v9"
@@ -59,12 +60,13 @@ func (sf RunSortableField) getSortDirection() pagination.SortDirection {
 
 // RunFilter contains the supported fields for filtering Run resources
 type RunFilter struct {
-	PlanID       *string
-	ApplyID      *string
-	WorkspaceID  *string
-	GroupID      *string
-	UserMemberID *string
-	RunIDs       []string
+	TimeRangeStart *time.Time
+	PlanID         *string
+	ApplyID        *string
+	WorkspaceID    *string
+	GroupID        *string
+	UserMemberID   *string
+	RunIDs         []string
 }
 
 // GetRunsInput is the input for listing runs
@@ -239,6 +241,11 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		if input.Filter.UserMemberID != nil {
 			selectEx = selectEx.InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")}))
 			ex = ex.Append(namespaceMembershipFilterQuery("namespace_memberships.user_id", *input.Filter.UserMemberID))
+		}
+
+		if input.Filter.TimeRangeStart != nil {
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("runs.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
 	}
 

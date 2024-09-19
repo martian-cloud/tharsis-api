@@ -2,7 +2,9 @@ package workspace
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 
@@ -351,6 +353,409 @@ func TestGetWorkspaces(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectResult, result.Workspaces)
+		})
+	}
+}
+
+func TestCreateStateVersion(t *testing.T) {
+	stateVersionID := "state-version-1"
+	workspaceID := "workspace-1"
+	runID := "run-1"
+	subject := "subject-1"
+	goodData := buildEncodedData("{\"version\": 4}")
+	badData := buildEncodedData("{\"version\": 4, \"serial\": \"bad-serial\"}")
+	currentTime := time.Now().UTC()
+
+	toCreate := &models.StateVersion{
+		WorkspaceID: workspaceID,
+		RunID:       &runID,
+	}
+
+	type testCase struct {
+		authFail                 bool
+		workspacePermissionError error
+		dataUnmarshalError       error
+		uploadError              error
+		createError              error
+		dataDecodeError          error
+		toCreate                 *models.StateVersion
+		injectCreated            *models.StateVersion
+		expectResult             *models.StateVersion
+		data                     []byte
+		name                     string
+		expectErrorCode          errors.CodeType
+		limit                    int
+		injectSVsPerWorkspace    int32
+	}
+
+	/*
+		Test case template:
+
+		name                     string
+		authFail                 bool
+		toCreate                 *models.StateVersion
+		data                     []byte
+		injectCreated            *models.StateVersion
+		workspacePermissionError error
+		dataDecodeError          error
+		createError              error
+		limit                    int
+		injectSVsPerWorkspace    int32
+		dataUnmarshalError       error
+		uploadError              error
+		expectResult             *models.StateVersion
+		expectErrorCode          errors.CodeType
+	*/
+
+	// Test cases
+	tests := []testCase{
+		{
+			name:            "auth failure",
+			toCreate:        toCreate,
+			authFail:        true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name:                     "permission error",
+			toCreate:                 toCreate,
+			workspacePermissionError: errors.New("workspace permission denied", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:          errors.EForbidden,
+		},
+		{
+			name:            "decode failure",
+			toCreate:        toCreate,
+			data:            []byte("something-not-decodable"),
+			dataDecodeError: errors.New("data string not decodable", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode: errors.EInternal, // Had thought it should return EInvalid, but it returns EInternal.
+		},
+		{
+			name:     "create failed",
+			toCreate: toCreate,
+			data:     goodData,
+			injectCreated: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
+			},
+			createError:     errors.New("create failed due to something not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:     "exceeds limit",
+			toCreate: toCreate,
+			data:     goodData,
+			injectCreated: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 5,
+			expectErrorCode:       errors.EInvalid,
+		},
+		{
+			name:     "unmarshal error",
+			toCreate: toCreate,
+			data:     badData,
+			injectCreated: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 4,
+			dataUnmarshalError:    errors.New("failed to unmarshal decoded data", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode:       errors.EInternal,
+		},
+		{
+			name:     "upload error",
+			toCreate: toCreate,
+			data:     goodData,
+			injectCreated: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 4,
+			uploadError:           errors.New("failed to upload data", errors.WithErrorCode(errors.EInternal)),
+			expectErrorCode:       errors.EInternal,
+		},
+		{
+			name:     "successfully created",
+			toCreate: toCreate,
+			data:     goodData,
+			injectCreated: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+					ID:                stateVersionID,
+				},
+				WorkspaceID: workspaceID,
+				RunID:       &runID,
+				CreatedBy:   subject,
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 4,
+			expectResult: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+					ID:                stateVersionID,
+				},
+				CreatedBy:   subject,
+				WorkspaceID: workspaceID,
+				RunID:       &runID,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateStateVersionPermission, mock.Anything).
+				Return(test.workspacePermissionError)
+
+			mockCaller.On("GetSubject").Return("mockSubject")
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+
+			mockStateVersions := db.NewMockStateVersions(t)
+			mockStateVersions.On("CreateStateVersion", mock.Anything, test.toCreate).
+				Return(test.injectCreated, test.createError).Maybe()
+			mockStateVersions.On("GetStateVersions", mock.Anything, mock.Anything).
+				Return(&db.StateVersionsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: test.injectSVsPerWorkspace,
+					},
+				}, nil).Maybe()
+
+			mockResourceLimits := db.NewMockResourceLimits(t)
+			mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: test.limit}, nil).Maybe()
+
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, mock.Anything).
+				Return(&models.Workspace{
+					Metadata: models.ResourceMetadata{
+						ID: workspaceID,
+					},
+				}, nil).Maybe()
+			mockWorkspaces.On("UpdateWorkspace", mock.Anything, mock.Anything).
+				Return(&models.Workspace{
+					Metadata: models.ResourceMetadata{
+						ID: workspaceID,
+					},
+				}, nil).Maybe()
+
+			mockArtifactStore := MockArtifactStore{}
+			mockArtifactStore.Test(t)
+
+			mockArtifactStore.On("UploadStateVersion", mock.Anything, mock.Anything, mock.Anything).
+				Return(test.uploadError)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+				Return(&models.ActivityEvent{}, nil)
+
+			testLogger, _ := logger.NewForTest()
+			dbClient := &db.Client{
+				Transactions:   mockTransactions,
+				StateVersions:  mockStateVersions,
+				ResourceLimits: mockResourceLimits,
+				Workspaces:     mockWorkspaces,
+			}
+
+			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), &mockArtifactStore, nil, nil, &mockActivityEvents)
+
+			if !test.authFail {
+				ctx = auth.WithCaller(ctx, &mockCaller)
+			}
+
+			testDataString := string(test.data)
+			result, err := service.CreateStateVersion(ctx, test.toCreate, &testDataString)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectResult, result)
+		})
+	}
+}
+
+func buildEncodedData(input string) []byte {
+	output := make([]byte, base64.StdEncoding.EncodedLen(len(input)))
+	base64.StdEncoding.Encode(output, []byte(input))
+	return output
+}
+
+func TestCreateConfigurationVersion(t *testing.T) {
+	configurationVersionID := "configuration-version-1"
+	workspaceID := "workspace-1"
+	subject := "mockSubject"
+	isSpeculative := false
+	status := models.ConfigurationPending
+	currentTime := time.Now().UTC()
+
+	toCreate := &CreateConfigurationVersionInput{
+		WorkspaceID: workspaceID,
+		Speculative: isSpeculative,
+	}
+
+	type testCase struct {
+		name                     string
+		authFail                 bool
+		toCreate                 *CreateConfigurationVersionInput
+		injectCreated            *models.ConfigurationVersion
+		workspacePermissionError error
+		createError              error
+		limit                    int
+		injectSVsPerWorkspace    int32
+		expectResult             *models.ConfigurationVersion
+		expectErrorCode          errors.CodeType
+	}
+
+	// Test cases
+	tests := []testCase{
+		{
+			name:            "auth failure",
+			toCreate:        toCreate,
+			authFail:        true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name:                     "permission error",
+			toCreate:                 toCreate,
+			workspacePermissionError: errors.New("workspace permission denied", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:          errors.EForbidden,
+		},
+		{
+			name:     "create failed",
+			toCreate: toCreate,
+			injectCreated: &models.ConfigurationVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
+			},
+			createError:     errors.New("create failed due to something not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:     "exceeds limit",
+			toCreate: toCreate,
+			injectCreated: &models.ConfigurationVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 5,
+			expectErrorCode:       errors.EInvalid,
+		},
+		{
+			name:     "successfully created",
+			toCreate: toCreate,
+			injectCreated: &models.ConfigurationVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+					ID:                configurationVersionID,
+				},
+				WorkspaceID: workspaceID,
+				CreatedBy:   subject,
+			},
+			limit:                 4,
+			injectSVsPerWorkspace: 4,
+			expectResult: &models.ConfigurationVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+					ID:                configurationVersionID,
+				},
+				CreatedBy:   subject,
+				WorkspaceID: workspaceID,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.MockCaller{}
+			mockCaller.Test(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateConfigurationVersionPermission, mock.Anything).
+				Return(test.workspacePermissionError)
+
+			mockCaller.On("GetSubject").Return("mockSubject")
+
+			mockTransactions := db.NewMockTransactions(t)
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+
+			mockConfigurationVersions := db.NewMockConfigurationVersions(t)
+			mockConfigurationVersions.On("CreateConfigurationVersion", mock.Anything, models.ConfigurationVersion{
+				Status:      status,
+				WorkspaceID: test.toCreate.WorkspaceID,
+				CreatedBy:   subject,
+				Speculative: isSpeculative,
+			}).
+				Return(test.injectCreated, test.createError).Maybe()
+			mockConfigurationVersions.On("GetConfigurationVersions", mock.Anything, mock.Anything).
+				Return(&db.ConfigurationVersionsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: test.injectSVsPerWorkspace,
+					},
+				}, nil).Maybe()
+
+			mockResourceLimits := db.NewMockResourceLimits(t)
+			mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: test.limit}, nil).Maybe()
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+				Return(&models.ActivityEvent{}, nil)
+
+			testLogger, _ := logger.NewForTest()
+			dbClient := &db.Client{
+				Transactions:          mockTransactions,
+				ConfigurationVersions: mockConfigurationVersions,
+				ResourceLimits:        mockResourceLimits,
+			}
+
+			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil, &mockActivityEvents)
+
+			if !test.authFail {
+				ctx = auth.WithCaller(ctx, &mockCaller)
+			}
+
+			result, err := service.CreateConfigurationVersion(ctx, test.toCreate)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectResult, result)
 		})
 	}
 }

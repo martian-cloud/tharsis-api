@@ -18,6 +18,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
@@ -161,6 +162,7 @@ type service struct {
 	moduleService   moduleregistry.Service
 	moduleResolver  ModuleResolver
 	ruleEnforcer    rules.RuleEnforcer
+	limitChecker    limits.LimitChecker
 }
 
 // NewService creates an instance of Service
@@ -175,6 +177,7 @@ func NewService(
 	moduleService moduleregistry.Service,
 	moduleResolver ModuleResolver,
 	runStateManager *state.RunStateManager,
+	limitChecker limits.LimitChecker,
 ) Service {
 	return newService(
 		logger,
@@ -188,6 +191,7 @@ func NewService(
 		moduleResolver,
 		runStateManager,
 		rules.NewRuleEnforcer(dbClient),
+		limitChecker,
 	)
 }
 
@@ -203,6 +207,7 @@ func newService(
 	moduleResolver ModuleResolver,
 	runStateManager *state.RunStateManager,
 	ruleEnforcer rules.RuleEnforcer,
+	limitChecker limits.LimitChecker,
 ) Service {
 	return &service{
 		logger,
@@ -216,6 +221,7 @@ func newService(
 		moduleService,
 		moduleResolver,
 		ruleEnforcer,
+		limitChecker,
 	}
 }
 
@@ -572,6 +578,26 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 			err,
 			"Failed to create run",
 		)
+	}
+
+	// Get the number of recent runs for this workspace to check whether we just violated the limit.
+	newRuns, err := s.dbClient.Runs.GetRuns(txContext, &db.GetRunsInput{
+		Filter: &db.RunFilter{
+			TimeRangeStart: ptr.Time(run.Metadata.CreationTimestamp.Add(-limits.ResourceLimitTimePeriod)),
+			WorkspaceID:    &options.WorkspaceID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace's runs")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitRunsPerWorkspacePerTimePeriod, newRuns.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
 	}
 
 	if _, err = s.activityService.CreateActivityEvent(txContext,

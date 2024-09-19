@@ -1085,6 +1085,26 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
+	// Get the number of recent state versions for this workspace to check whether we just violated the limit.
+	recentStateVersions, err := s.dbClient.StateVersions.GetStateVersions(txContext, &db.GetStateVersionsInput{
+		Filter: &db.StateVersionFilter{
+			TimeRangeStart: ptr.Time(createdStateVersion.Metadata.CreationTimestamp.Add(-limits.ResourceLimitTimePeriod)),
+			WorkspaceID:    &stateVersion.WorkspaceID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace's state versions")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitStateVersionsPerWorkspacePerTimePeriod, recentStateVersions.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
 	// Update the current state version field on the workspace.
 	// This is a read-only operation, so there's no need to use the transaction context.
 	workspace, wErr := s.getWorkspaceByID(ctx, createdStateVersion.WorkspaceID)
@@ -1352,7 +1372,20 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 		return nil, err
 	}
 
-	cv, err := s.dbClient.ConfigurationVersions.CreateConfigurationVersion(ctx, models.ConfigurationVersion{
+	// Wrap a transaction around persisting the new configuration version.
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for CreateConfigurationVersion: %v", txErr)
+		}
+	}()
+
+	cv, err := s.dbClient.ConfigurationVersions.CreateConfigurationVersion(txContext, models.ConfigurationVersion{
 		VCSEventID:  options.VCSEventID,
 		WorkspaceID: options.WorkspaceID,
 		Speculative: options.Speculative,
@@ -1361,6 +1394,32 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 	})
 	if err != nil {
 		tracing.RecordError(span, err, "failed to create configuration version")
+		return nil, err
+	}
+
+	// Get the number of recent configuration versions for this workspace to check whether we just violated the limit.
+	recentCVs, err := s.dbClient.ConfigurationVersions.GetConfigurationVersions(txContext, &db.GetConfigurationVersionsInput{
+		Filter: &db.ConfigurationVersionFilter{
+			TimeRangeStart: ptr.Time(cv.Metadata.CreationTimestamp.Add(-limits.ResourceLimitTimePeriod)),
+			WorkspaceID:    &options.WorkspaceID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get workspace's configuration versions")
+		return nil, err
+	}
+	if err = s.limitChecker.CheckLimit(txContext,
+		limits.ResourceLimitConfigurationVersionsPerWorkspacePerTimePeriod, recentCVs.PageInfo.TotalCount); err != nil {
+		tracing.RecordError(span, err, "limit check failed")
+		return nil, err
+	}
+
+	// Commit the transaction here.
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 

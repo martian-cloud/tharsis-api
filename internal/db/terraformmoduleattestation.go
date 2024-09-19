@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
@@ -57,6 +58,7 @@ func (ts TerraformModuleAttestationSortableField) getSortDirection() pagination.
 
 // TerraformModuleAttestationFilter contains the supported fields for filtering TerraformModuleAttestation resources
 type TerraformModuleAttestationFilter struct {
+	TimeRangeStart       *time.Time
 	Digest               *string
 	ModuleID             *string
 	ModuleAttestationIDs []string
@@ -113,6 +115,10 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 		}
 		if input.Filter.Digest != nil {
 			ex = ex.Append(goqu.L(fmt.Sprintf("terraform_module_attestations.digests @> '\"%s\"'", *input.Filter.Digest)))
+		}
+		if input.Filter.TimeRangeStart != nil {
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("terraform_module_attestations.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
 	}
 
