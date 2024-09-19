@@ -555,7 +555,8 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	// Get the number of attestations on this module to check whether we just violated the limit.
 	newAttestations, err := s.dbClient.TerraformModuleAttestations.GetModuleAttestations(txContext, &db.GetModuleAttestationsInput{
 		Filter: &db.TerraformModuleAttestationFilter{
-			ModuleID: &createdAttestation.ModuleID,
+			TimeRangeStart: ptr.Time(createdAttestation.Metadata.CreationTimestamp.Add(-limits.ResourceLimitTimePeriod)),
+			ModuleID:       &createdAttestation.ModuleID,
 		},
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(0),
@@ -566,7 +567,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 		return nil, err
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
-		limits.ResourceLimitAttestationsPerTerraformModule, newAttestations.PageInfo.TotalCount); err != nil {
+		limits.ResourceLimitAttestationsPerTerraformModulePerTimePeriod, newAttestations.PageInfo.TotalCount); err != nil {
 		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}
@@ -1199,7 +1200,8 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 	// Get the number of versions of this module to check whether we just violated the limit.
 	newVersions, err := s.dbClient.TerraformModuleVersions.GetModuleVersions(txContext, &db.GetModuleVersionsInput{
 		Filter: &db.TerraformModuleVersionFilter{
-			ModuleID: &moduleVersion.ModuleID,
+			TimeRangeStart: ptr.Time(moduleVersion.Metadata.CreationTimestamp.Add(-limits.ResourceLimitTimePeriod)),
+			ModuleID:       &moduleVersion.ModuleID,
 		},
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(0),
@@ -1210,7 +1212,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		return nil, err
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
-		limits.ResourceLimitVersionsPerTerraformModule, newVersions.PageInfo.TotalCount); err != nil {
+		limits.ResourceLimitVersionsPerTerraformModulePerTimePeriod, newVersions.PageInfo.TotalCount); err != nil {
 		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}

@@ -821,7 +821,8 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 	// Get the number of versions for the provider to check whether we just violated the limit.
 	newVersions, err := s.dbClient.TerraformProviderVersions.GetProviderVersions(txContext, &db.GetProviderVersionsInput{
 		Filter: &db.TerraformProviderVersionFilter{
-			ProviderID: &providerVersion.ProviderID,
+			TimeRangeStart: ptr.Time(providerVersion.Metadata.CreationTimestamp.Add(-limits.ResourceLimitTimePeriod)),
+			ProviderID:     &providerVersion.ProviderID,
 		},
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(0),
@@ -832,7 +833,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		return nil, err
 	}
 	if err = s.limitChecker.CheckLimit(txContext,
-		limits.ResourceLimitVersionsPerTerraformProvider, newVersions.PageInfo.TotalCount); err != nil {
+		limits.ResourceLimitVersionsPerTerraformProviderPerTimePeriod, newVersions.PageInfo.TotalCount); err != nil {
 		tracing.RecordError(span, err, "limit check failed")
 		return nil, err
 	}

@@ -5,9 +5,16 @@ package limits
 
 import (
 	"context"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
+const (
+	// ResourceLimitTimePeriod is the time period used for time-based resource limits.
+	// Only resources created within the last time period will account towards the limit.
+	ResourceLimitTimePeriod = 1 * time.Hour
 )
 
 // ResourceLimitName is an enum for the names that will be used as keys when doing the checks.
@@ -15,26 +22,29 @@ type ResourceLimitName string
 
 // ResourceLimitName constants
 const (
-	ResourceLimitSubgroupsPerParent                           ResourceLimitName = "ResourceLimitSubgroupsPerParent"
-	ResourceLimitGroupTreeDepth                               ResourceLimitName = "ResourceLimitGroupTreeDepth"
-	ResourceLimitWorkspacesPerGroup                           ResourceLimitName = "ResourceLimitWorkspacesPerGroup"
-	ResourceLimitServiceAccountsPerGroup                      ResourceLimitName = "ResourceLimitServiceAccountsPerGroup"
-	ResourceLimitRunnerAgentsPerGroup                         ResourceLimitName = "ResourceLimitRunnerAgentsPerGroup"
-	ResourceLimitVariablesPerNamespace                        ResourceLimitName = "ResourceLimitVariablesPerNamespace"
-	ResourceLimitGPGKeysPerGroup                              ResourceLimitName = "ResourceLimitGPGKeysPerGroup"
-	ResourceLimitManagedIdentitiesPerGroup                    ResourceLimitName = "ResourceLimitManagedIdentitiesPerGroup"
-	ResourceLimitManagedIdentityAliasesPerManagedIdentity     ResourceLimitName = "ResourceLimitManagedIdentityAliasesPerManagedIdentity"
-	ResourceLimitAssignedManagedIdentitiesPerWorkspace        ResourceLimitName = "ResourceLimitAssignedManagedIdentitiesPerWorkspace"
-	ResourceLimitManagedIdentityAccessRulesPerManagedIdentity ResourceLimitName = "ResourceLimitManagedIdentityAccessRulesPerManagedIdentity"
-	ResourceLimitTerraformModulesPerGroup                     ResourceLimitName = "ResourceLimitTerraformModulesPerGroup"
-	ResourceLimitVersionsPerTerraformModule                   ResourceLimitName = "ResourceLimitVersionsPerTerraformModule"
-	ResourceLimitAttestationsPerTerraformModule               ResourceLimitName = "ResourceLimitAttestationsPerTerraformModule"
-	ResourceLimitTerraformProvidersPerGroup                   ResourceLimitName = "ResourceLimitTerraformProvidersPerGroup"
-	ResourceLimitVersionsPerTerraformProvider                 ResourceLimitName = "ResourceLimitVersionsPerTerraformProvider"
-	ResourceLimitPlatformsPerTerraformProviderVersion         ResourceLimitName = "ResourceLimitPlatformsPerTerraformProviderVersion"
-	ResourceLimitVCSProvidersPerGroup                         ResourceLimitName = "ResourceLimitVCSProvidersPerGroup"
-	ResourceLimitTerraformProviderVersionMirrorsPerGroup      ResourceLimitName = "ResourceLimitTerraformProviderVersionMirrorsPerGroup"
-	ResourceLimitRunnerSessionsPerRunner                      ResourceLimitName = "ResourceLimitRunnerSessionsPerRunner"
+	ResourceLimitSubgroupsPerParent                             ResourceLimitName = "ResourceLimitSubgroupsPerParent"
+	ResourceLimitGroupTreeDepth                                 ResourceLimitName = "ResourceLimitGroupTreeDepth"
+	ResourceLimitWorkspacesPerGroup                             ResourceLimitName = "ResourceLimitWorkspacesPerGroup"
+	ResourceLimitServiceAccountsPerGroup                        ResourceLimitName = "ResourceLimitServiceAccountsPerGroup"
+	ResourceLimitRunnerAgentsPerGroup                           ResourceLimitName = "ResourceLimitRunnerAgentsPerGroup"
+	ResourceLimitVariablesPerNamespace                          ResourceLimitName = "ResourceLimitVariablesPerNamespace"
+	ResourceLimitGPGKeysPerGroup                                ResourceLimitName = "ResourceLimitGPGKeysPerGroup"
+	ResourceLimitManagedIdentitiesPerGroup                      ResourceLimitName = "ResourceLimitManagedIdentitiesPerGroup"
+	ResourceLimitManagedIdentityAliasesPerManagedIdentity       ResourceLimitName = "ResourceLimitManagedIdentityAliasesPerManagedIdentity"
+	ResourceLimitAssignedManagedIdentitiesPerWorkspace          ResourceLimitName = "ResourceLimitAssignedManagedIdentitiesPerWorkspace"
+	ResourceLimitManagedIdentityAccessRulesPerManagedIdentity   ResourceLimitName = "ResourceLimitManagedIdentityAccessRulesPerManagedIdentity"
+	ResourceLimitTerraformModulesPerGroup                       ResourceLimitName = "ResourceLimitTerraformModulesPerGroup"
+	ResourceLimitVersionsPerTerraformModulePerTimePeriod        ResourceLimitName = "ResourceLimitVersionsPerTerraformModulePerTimePeriod"
+	ResourceLimitAttestationsPerTerraformModulePerTimePeriod    ResourceLimitName = "ResourceLimitAttestationsPerTerraformModulePerTimePeriod"
+	ResourceLimitTerraformProvidersPerGroup                     ResourceLimitName = "ResourceLimitTerraformProvidersPerGroup"
+	ResourceLimitVersionsPerTerraformProviderPerTimePeriod      ResourceLimitName = "ResourceLimitVersionsPerTerraformProviderPerTimePeriod"
+	ResourceLimitPlatformsPerTerraformProviderVersion           ResourceLimitName = "ResourceLimitPlatformsPerTerraformProviderVersion"
+	ResourceLimitVCSProvidersPerGroup                           ResourceLimitName = "ResourceLimitVCSProvidersPerGroup"
+	ResourceLimitTerraformProviderVersionMirrorsPerGroup        ResourceLimitName = "ResourceLimitTerraformProviderVersionMirrorsPerGroup"
+	ResourceLimitRunnerSessionsPerRunner                        ResourceLimitName = "ResourceLimitRunnerSessionsPerRunner"
+	ResourceLimitRunsPerWorkspacePerTimePeriod                  ResourceLimitName = "ResourceLimitRunsPerWorkspacePerTimePeriod"
+	ResourceLimitConfigurationVersionsPerWorkspacePerTimePeriod ResourceLimitName = "ResourceLimitConfigurationVersionsPerWorkspacePerTimePeriod"
+	ResourceLimitStateVersionsPerWorkspacePerTimePeriod         ResourceLimitName = "ResourceLimitStateVersionsPerWorkspacePerTimePeriod"
 )
 
 // LimitChecker implements functionality related to resource limits.

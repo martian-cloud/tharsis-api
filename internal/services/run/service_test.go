@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -38,6 +40,7 @@ type mockDBClient struct {
 	MockTeams                 *db.MockTeams
 	MockTeamMembers           *db.MockTeamMembers
 	MockLogStreams            *db.MockLogStreams
+	MockResourceLimits        *db.MockResourceLimits
 }
 
 func buildDBClientWithMocks(t *testing.T) *mockDBClient {
@@ -78,6 +81,9 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockLogStreams := db.MockLogStreams{}
 	mockLogStreams.Test(t)
 
+	mockResourceLimits := db.MockResourceLimits{}
+	mockResourceLimits.Test(t)
+
 	return &mockDBClient{
 		Client: &db.Client{
 			Transactions:          &mockTransactions,
@@ -92,6 +98,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			Teams:                 &mockTeams,
 			TeamMembers:           &mockTeamMembers,
 			LogStreams:            &mockLogStreams,
+			ResourceLimits:        &mockResourceLimits,
 		},
 		MockTransactions:          &mockTransactions,
 		MockManagedIdentities:     &mockManagedIdentities,
@@ -105,11 +112,13 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockTeams:                 &mockTeams,
 		MockTeamMembers:           &mockTeamMembers,
 		MockLogStreams:            &mockLogStreams,
+		MockResourceLimits:        &mockResourceLimits,
 	}
 }
 
 func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 	configurationVersionID := "cv1"
+	currentTime := time.Now().UTC()
 
 	ws := &models.Workspace{
 		Metadata: models.ResourceMetadata{
@@ -138,11 +147,13 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
-		name                 string
-		injectJob            *models.Job
-		expectErrorCode      errors.CodeType
-		enforceRulesResponse error
-		managedIdentities    []models.ManagedIdentity
+		name                   string
+		injectJob              *models.Job
+		expectErrorCode        errors.CodeType
+		enforceRulesResponse   error
+		managedIdentities      []models.ManagedIdentity
+		limit                  int
+		injectRunsPerWorkspace int32
 	}{
 		{
 			name:      "run is created because all managed identity rules are satisfied",
@@ -154,11 +165,15 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 					},
 				},
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
-			name:              "run is created because there are no managed identities",
-			injectJob:         &injectJob,
-			managedIdentities: []models.ManagedIdentity{},
+			name:                   "run is created because there are no managed identities",
+			injectJob:              &injectJob,
+			managedIdentities:      []models.ManagedIdentity{},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "run is not created because a managed identity rule is not satisfied",
@@ -171,6 +186,14 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			},
 			enforceRulesResponse: errors.New("rule not satisfied", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:      errors.EForbidden,
+		},
+		{
+			name:                   "resource limit exceeded",
+			injectJob:              &injectJob,
+			managedIdentities:      []models.ManagedIdentity{},
+			limit:                  4,
+			injectRunsPerWorkspace: 5,
+			expectErrorCode:        errors.EInvalid,
 		},
 	}
 
@@ -197,8 +220,28 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 				Variables: []models.Variable{},
 			}, nil)
 
-			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).Return(&run, nil)
+			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
+				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
+					_ = ctx
+
+					if run != nil {
+						// Must inject creation timestamp so limit check won't hit a nil pointer.
+						runWithTimestamp := *run
+						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
+						return &runWithTimestamp, nil
+					}
+					return nil, nil
+				})
+			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+				Return(&db.RunsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: test.injectRunsPerWorkspace,
+					},
+				}, nil)
 			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
+
+			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: test.limit}, nil)
 
 			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
 				Speculative: false,
@@ -251,6 +294,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 				mockModuleResolver,
 				nil,
 				ruleEnforcer,
+				limits.NewLimitChecker(dbClient.Client),
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
@@ -269,6 +313,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 func TestCreateRunWithPreventDestroy(t *testing.T) {
 	configurationVersionID := "cv1"
 	var duration int32 = 720
+	currentTime := time.Now().UTC()
 
 	injectJob := models.Job{
 		Metadata: models.ResourceMetadata{
@@ -278,11 +323,13 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 	// Test cases
 	type testCase struct {
-		workspace       *models.Workspace
-		runInput        *CreateRunInput
-		injectJob       *models.Job
-		name            string
-		expectErrorCode errors.CodeType
+		workspace              *models.Workspace
+		runInput               *CreateRunInput
+		injectJob              *models.Job
+		name                   string
+		expectErrorCode        errors.CodeType
+		limit                  int
+		injectRunsPerWorkspace int32
 	}
 
 	/*
@@ -310,7 +357,9 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				ConfigurationVersionID: &configurationVersionID,
 				IsDestroy:              false,
 			},
-			injectJob: &injectJob,
+			injectJob:              &injectJob,
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 
 		{
@@ -327,7 +376,9 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				ConfigurationVersionID: &configurationVersionID,
 				IsDestroy:              true,
 			},
-			injectJob: &injectJob,
+			injectJob:              &injectJob,
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 
 		{
@@ -344,7 +395,9 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				ConfigurationVersionID: &configurationVersionID,
 				IsDestroy:              false,
 			},
-			injectJob: &injectJob,
+			injectJob:              &injectJob,
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 
 		{
@@ -363,6 +416,26 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 			},
 			expectErrorCode: errors.EForbidden,
 		},
+
+		{
+			name: "exceeds resource limit",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "test-workspace-metadata-id-1",
+				},
+				MaxJobDuration:     &duration,
+				PreventDestroyPlan: false,
+			},
+			runInput: &CreateRunInput{
+				WorkspaceID:            "test-workspace-metadata-id-1",
+				ConfigurationVersionID: &configurationVersionID,
+				IsDestroy:              false,
+			},
+			injectJob:              &injectJob,
+			limit:                  4,
+			injectRunsPerWorkspace: 5,
+			expectErrorCode:        errors.EInvalid,
+		},
 	}
 
 	for _, test := range tests {
@@ -373,15 +446,6 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
-
-			run := models.Run{
-				Metadata: models.ResourceMetadata{
-					ID: "run1",
-				},
-				WorkspaceID:            test.workspace.Metadata.ID,
-				ConfigurationVersionID: &configurationVersionID,
-				Status:                 models.RunPending,
-			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -400,7 +464,27 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				Variables: []models.Variable{},
 			}, nil)
 
-			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).Return(&run, nil)
+			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
+				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
+					_ = ctx
+
+					if run != nil {
+						// Must inject creation timestamp so limit check won't hit a nil pointer.
+						runWithTimestamp := *run
+						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
+						return &runWithTimestamp, nil
+					}
+					return nil, nil
+				})
+			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+				Return(&db.RunsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: test.injectRunsPerWorkspace,
+					},
+				}, nil)
+
+			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: test.limit}, nil)
 
 			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
 				Speculative: false,
@@ -433,7 +517,19 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := NewService(logger, dbClient.Client, &mockArtifactStore, nil, nil, nil, &mockActivityEvents, nil, nil, nil)
+			service := NewService(
+				logger,
+				dbClient.Client,
+				&mockArtifactStore,
+				nil,
+				nil,
+				nil,
+				&mockActivityEvents,
+				nil,
+				nil,
+				nil,
+				limits.NewLimitChecker(dbClient.Client),
+			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
 			if test.expectErrorCode != "" {
@@ -454,6 +550,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 	applyID := "apply1"
 	isTrue := true
 	isFalse := false
+	currentTime := time.Now().UTC()
 
 	ws := &models.Workspace{
 		Metadata: models.ResourceMetadata{
@@ -465,11 +562,13 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
-		name                    string
 		input                   *CreateRunInput
-		injectConfigVersionSpec bool
-		expectCreateRun         *models.Run // to check the Speculative field in mock.On of DB-layer CreateRun
+		expectCreateRun         *models.Run
+		name                    string
 		expectErrorCode         errors.CodeType
+		injectConfigVersionSpec bool
+		limit                   int
+		injectRunsPerWorkspace  int32
 	}{
 		{
 			name: "module source, speculative not specified; expect false",
@@ -488,6 +587,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:       applyID,
 				Status:        models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "module source, speculative specified true; expect true",
@@ -506,6 +607,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:       "",
 				Status:        models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "module source, speculative specified false; expect false",
@@ -524,6 +627,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:       applyID,
 				Status:        models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "configuration version spec=false, options spec=nil; expect false",
@@ -541,6 +646,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:                applyID,
 				Status:                 models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "configuration version spec=false, options spec=true; expect true",
@@ -558,6 +665,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:                "",
 				Status:                 models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "configuration version spec=false, options spec=false; expect false",
@@ -575,6 +684,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:                applyID,
 				Status:                 models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "configuration version spec=true, options spec=nil; expect true",
@@ -592,6 +703,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:                "",
 				Status:                 models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "configuration version spec=true, options spec=true; expect true",
@@ -609,6 +722,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				ApplyID:                "",
 				Status:                 models.RunPlanQueued,
 			},
+			limit:                  4,
+			injectRunsPerWorkspace: 4,
 		},
 		{
 			name: "configuration version spec=true, options spec=false; expect error",
@@ -619,6 +734,27 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 			},
 			injectConfigVersionSpec: true,
 			expectErrorCode:         errors.EInvalid,
+		},
+		{
+			name: "exceeds limit",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				Speculative:   nil,
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       applyID,
+				Status:        models.RunPlanQueued,
+			},
+			limit:                  4,
+			injectRunsPerWorkspace: 5,
+			expectErrorCode:        errors.EInvalid,
 		},
 	}
 
@@ -646,8 +782,28 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				Variables: []models.Variable{},
 			}, nil)
 
-			dbClient.MockRuns.On("CreateRun", mock.Anything, test.expectCreateRun).Return(test.expectCreateRun, nil)
+			dbClient.MockRuns.On("CreateRun", mock.Anything, test.expectCreateRun).
+				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
+					_ = ctx
+
+					if run != nil {
+						// Must inject creation timestamp so limit check won't hit a nil pointer.
+						runWithTimestamp := *run
+						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
+						return &runWithTimestamp, nil
+					}
+					return nil, nil
+				})
+			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+				Return(&db.RunsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: test.injectRunsPerWorkspace,
+					},
+				}, nil)
 			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
+
+			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: test.limit}, nil)
 
 			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).
 				Return(&models.ConfigurationVersion{
@@ -709,6 +865,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				mockModuleResolver,
 				nil,
 				nil,
+				limits.NewLimitChecker(dbClient.Client),
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
@@ -847,6 +1004,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 				mockModuleResolver,
 				state.NewRunStateManager(dbClient.Client, logger),
 				ruleEnforcer,
+				limits.NewLimitChecker(dbClient.Client),
 			)
 
 			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)

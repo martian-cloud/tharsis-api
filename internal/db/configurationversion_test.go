@@ -100,7 +100,7 @@ func TestGetConfigurationVersions(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	_, warmupConfigurationVersions, err := createWarmupConfigurationVersions(ctx, testClient,
+	warmupWorkspaces, warmupConfigurationVersions, err := createWarmupConfigurationVersions(ctx, testClient,
 		standardWarmupGroupsForConfigurationVersions,
 		standardWarmupWorkspacesForConfigurationVersions,
 		standardWarmupConfigurationVersions)
@@ -378,6 +378,23 @@ func TestGetConfigurationVersions(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, workspace ID, positive",
+			input: &GetConfigurationVersionsInput{
+				Sort: ptrConfigurationVersionSortableField(ConfigurationVersionSortableFieldUpdatedAtAsc),
+				Filter: &ConfigurationVersionFilter{
+					WorkspaceID: &warmupWorkspaces[1].Metadata.ID, // select odd-index configuration versions
+				},
+			},
+			expectConfigurationVersionIDs: []string{
+				allConfigurationVersionIDsByUpdateTime[1],
+				allConfigurationVersionIDsByUpdateTime[3],
+			},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -689,6 +706,11 @@ var standardWarmupWorkspacesForConfigurationVersions = []models.Workspace{
 		FullPath:    "top-level-group-0-for-configuration-versions/workspace-0-for-configuration-versions",
 		CreatedBy:   "someone-w0",
 	},
+	{
+		Description: "workspace 1 for testing configuration version functions",
+		FullPath:    "top-level-group-0-for-configuration-versions/workspace-1-for-configuration-versions",
+		CreatedBy:   "someone-w1",
+	},
 }
 
 // Standard warmup configuration version(s) for tests in this module:
@@ -732,10 +754,14 @@ func createWarmupConfigurationVersions(ctx context.Context, testClient *testClie
 	if err != nil {
 		return nil, nil, err
 	}
-	workspaceID := resultWorkspaces[0].Metadata.ID
+
+	// Set workspace IDs, alternating between workspace 0 and workspace 1.
+	for ix := range newConfigurationVersions {
+		newConfigurationVersions[ix].WorkspaceID = resultWorkspaces[ix&1].Metadata.ID
+	}
 
 	resultConfigurationVersions, err := createInitialConfigurationVersions(ctx, testClient,
-		newConfigurationVersions, workspaceID)
+		newConfigurationVersions)
 	if err != nil {
 		return nil, nil, err
 	}

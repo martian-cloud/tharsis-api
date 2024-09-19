@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
@@ -40,6 +41,8 @@ func (sf ConfigurationVersionSortableField) getSortDirection() pagination.SortDi
 
 // ConfigurationVersionFilter contains the supported fields for filtering ConfigurationVersion resources
 type ConfigurationVersionFilter struct {
+	TimeRangeStart          *time.Time
+	WorkspaceID             *string
 	ConfigurationVersionIDs []string
 }
 
@@ -93,11 +96,20 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.ConfigurationVersionIDs != nil {
-			ex["configuration_versions.id"] = input.Filter.ConfigurationVersionIDs
+			ex = ex.Append(goqu.I("configuration_versions.id").In(input.Filter.ConfigurationVersionIDs))
+		}
+
+		if input.Filter.WorkspaceID != nil {
+			ex = ex.Append(goqu.I("configuration_versions.workspace_id").Eq(*input.Filter.WorkspaceID))
+		}
+
+		if input.Filter.TimeRangeStart != nil {
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("configuration_versions.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
 	}
 

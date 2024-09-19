@@ -3,6 +3,7 @@ package providerregistry
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -213,6 +214,7 @@ func TestCreateProvider(t *testing.T) {
 func TestCreateProviderVersion(t *testing.T) {
 	providerID := "provider123"
 	groupID := "group123"
+	currentTime := time.Now().UTC()
 
 	// Test cases
 	tests := []struct {
@@ -241,6 +243,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				Latest:          false,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "0.1.0",
 				Latest:          true,
 			},
@@ -258,6 +263,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				Latest:          true,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          false,
 			},
@@ -279,6 +287,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				Latest:          false,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
@@ -300,6 +311,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				Latest:          false,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 			},
@@ -313,6 +327,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				ProviderID:      providerID,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 			},
@@ -326,6 +343,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				ProviderID:      providerID,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
@@ -339,6 +359,9 @@ func TestCreateProviderVersion(t *testing.T) {
 				ProviderID:      providerID,
 			},
 			expectCreatedProviderVersion: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},

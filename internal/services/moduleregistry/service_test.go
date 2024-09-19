@@ -6,6 +6,7 @@ import (
 	io "io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
@@ -1331,6 +1332,7 @@ func TestGetModuleVersionsByIDs(t *testing.T) {
 func TestCreateModuleVersion(t *testing.T) {
 	moduleID := "module123"
 	groupID := "group123"
+	currentTime := time.Now().UTC()
 
 	// Test cases
 	tests := []struct {
@@ -1369,6 +1371,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				Latest:          false,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "0.1.0",
 				Latest:          true,
 			},
@@ -1386,6 +1391,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				Latest:          true,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          false,
 			},
@@ -1407,6 +1415,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				Latest:          false,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
@@ -1428,6 +1439,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				Latest:          false,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 			},
@@ -1441,6 +1455,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				ModuleID:        moduleID,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0",
 				Latest:          true,
 				Status:          models.TerraformModuleVersionStatusPending,
@@ -1455,6 +1472,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				ModuleID:        moduleID,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
@@ -1468,6 +1488,9 @@ func TestCreateModuleVersion(t *testing.T) {
 				ModuleID:        moduleID,
 			},
 			expectCreatedModuleVersion: &models.TerraformModuleVersion{
+				Metadata: models.ResourceMetadata{
+					CreationTimestamp: &currentTime,
+				},
 				SemanticVersion: "1.0.0-pre",
 				Latest:          true,
 			},
@@ -2241,6 +2264,7 @@ func TestGetModuleVersionPackageDownloadURL(t *testing.T) {
 func TestCreateModuleAttestation(t *testing.T) {
 	moduleID := "module123"
 	groupID := "group123"
+	currentTime := time.Now().UTC()
 
 	validAttestationData := "eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5pbi10b3RvK2pzb24iLCJwYXlsb2FkIjoiZXlKZmRIbHdaU0k2SW1oMGRIQnpPaTh2YVc0dGRHOTBieTVwYnk5VGRHRjBaVzFsYm5RdmRqQXVNU0lzSW5CeVpXUnBZMkYwWlZSNWNHVWlPaUpqYjNOcFoyNHVjMmxuYzNSdmNtVXVaR1YyTDJGMGRHVnpkR0YwYVc5dUwzWXhJaXdpYzNWaWFtVmpkQ0k2VzNzaWJtRnRaU0k2SW1Kc2IySWlMQ0prYVdkbGMzUWlPbnNpYzJoaE1qVTJJam9pTjJGbE5EY3haV1F4T0RNNU5UTXpPVFUzTW1ZMU1qWTFZamd6TlRnMk1HVXlPR0V5WmpnMU1ERTJORFUxTWpFMFkySXlNVFJpWVdabE5EUXlNbU0zWkNKOWZWMHNJbkJ5WldScFkyRjBaU0k2ZXlKRVlYUmhJam9pZTF3aWRtVnlhV1pwWldSY0lqcDBjblZsZlZ4dUlpd2lWR2x0WlhOMFlXMXdJam9pTWpBeU1pMHhNaTB4TWxReE5EbzFOam8wTVZvaWZYMD0iLCJzaWduYXR1cmVzIjpbeyJrZXlpZCI6IiIsInNpZyI6Ik1FVUNJUURIZGk2UkI2YktESVlPZ3duZkwvaVU5UlQ2a2xyaGRUaEt1NHkzK29JZGNBSWdaVmRQeUczaGhsQTJNZnJxYTkvVUsrOFF4c2d4T2pYcGxGd2JxWW1nQnkwPSJ9XX0="
 
@@ -2361,7 +2385,17 @@ func TestCreateModuleAttestation(t *testing.T) {
 
 			if test.expectErrCode == "" || test.exceedsLimit {
 				mockModuleAttestations.On("CreateModuleAttestation", mock.Anything, test.expectCreatedModuleAttestation).
-					Return(test.expectCreatedModuleAttestation, nil)
+					Return(func(ctx context.Context, input *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error) {
+						_ = ctx
+
+						// Inject creation timestamp to avoid nil pointer access in main module.
+						if input != nil {
+							input.Metadata = models.ResourceMetadata{
+								CreationTimestamp: &currentTime,
+							}
+						}
+						return input, nil
+					})
 			}
 
 			if test.shouldDoTx {

@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
@@ -41,6 +42,7 @@ func (sf StateVersionSortableField) getSortDirection() pagination.SortDirection 
 
 // StateVersionFilter contains the supported fields for filtering StateVersion resources
 type StateVersionFilter struct {
+	TimeRangeStart  *time.Time
 	WorkspaceID     *string
 	RunIDs          []string
 	StateVersionIDs []string
@@ -88,17 +90,21 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.StateVersionIDs != nil {
-			ex["state_versions.id"] = input.Filter.StateVersionIDs
+			ex = ex.Append(goqu.I("state_versions.id").In(input.Filter.StateVersionIDs))
 		}
 		if input.Filter.WorkspaceID != nil {
-			ex["state_versions.workspace_id"] = *input.Filter.WorkspaceID
+			ex = ex.Append(goqu.I("state_versions.workspace_id").Eq(*input.Filter.WorkspaceID))
 		}
 		if len(input.Filter.RunIDs) > 0 {
-			ex["state_versions.run_id"] = input.Filter.RunIDs
+			ex = ex.Append(goqu.I("state_versions.run_id").In(input.Filter.RunIDs))
+		}
+		if input.Filter.TimeRangeStart != nil {
+			// Must use UTC here otherwise, queries will return unexpected results.
+			ex = ex.Append(goqu.I("state_versions.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
 	}
 
