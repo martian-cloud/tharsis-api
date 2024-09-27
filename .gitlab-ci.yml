@@ -6,7 +6,7 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: DAST-API.gitlab-ci.yml
   - template: API-Fuzzing.gitlab-ci.yml
-  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@1.2.0
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
       assert_licenses: true
@@ -28,7 +28,7 @@ include:
       remote_sbom_component_mapping_file_path: mapping-go.json
     rules:
       - if: $CI_COMMIT_TAG
-  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@1.2.0
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
       assert_licenses: true
@@ -50,7 +50,7 @@ include:
       remote_sbom_component_mapping_file_path: mapping-go.json
     rules:
       - if: $CI_COMMIT_TAG
-  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@1.2.0
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
       assert_licenses: true
@@ -72,33 +72,30 @@ include:
       remote_sbom_component_mapping_file_path: mapping-go.json
     rules:
       - if: $CI_COMMIT_TAG
-  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/merge-sboms@1.2.0
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/merge-sboms@$SBOM_COMPONENT_VERSION
     inputs:
-      stage: merge-sboms
       hierarchical: true
       name: tharsis-api
       version: $CI_COMMIT_TAG
-    rules:
-      - if: $CI_COMMIT_TAG
-  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@1.3.1
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@$SBOM_COMPONENT_VERSION
     inputs:
       stage: container_scanning
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
-      remote_sbom_component_mapping_file_paths: ["mapping-alpine.json", "mapping-debian.json"]
+      remote_sbom_component_mapping_file_paths:
+        ["mapping-alpine.json", "mapping-debian.json"]
       report_filenames:
         - "gl-sbom-api-report.cdx.json"
         - "gl-sbom-job-report.cdx.json"
         - "gl-sbom-runner-report.cdx.json"
       needs: [container_scanning]
     rules:
-      - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
       - if: '$CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"'
       - if: $CI_COMMIT_TAG
 
 stages:
   - test
-  - merge-sboms
   - publish
   - container_scanning
   - trigger
@@ -448,8 +445,7 @@ container_scanning:
     - if: "$CI_COMMIT_TAG"
       variables:
         IMAGE_TAG: "latest"
-  after_script:
-    mv -i gl-sbom-report.cdx.json gl-sbom-$COMPONENT-report.cdx.json
+  after_script: mv -i gl-sbom-report.cdx.json gl-sbom-$COMPONENT-report.cdx.json
   parallel:
     matrix:
       - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${IMAGE_TAG}"
@@ -584,3 +580,16 @@ apifuzzer_fuzz:
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+merge-cyclonedx-sboms:
+  rules:
+    - !reference [.on_tag_events, rules]
+  needs:
+    - job: "add-container-sbom-details"
+      optional: true
+    - job: "go-sbom (cmd/apiserver,0)"
+      optional: true
+    - job: "go-sbom (cmd/job,0)"
+      optional: true
+    - job: "go-sbom (cmd/runner,0)"
+      optional: true
