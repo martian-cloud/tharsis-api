@@ -76,6 +76,7 @@ type GetModuleVersionsInput struct {
 	SemanticVersion   *string
 	Latest            *bool
 	ModuleID          string
+	Search            *string
 }
 
 // GetModuleAttestationsInput is the input for getting a list of module attestations
@@ -1058,6 +1059,7 @@ func (s *service) GetModuleVersions(ctx context.Context, input *GetModuleVersion
 			Status:          input.Status,
 			SemanticVersion: input.SemanticVersion,
 			Latest:          input.Latest,
+			Search:          input.Search,
 		},
 	}
 

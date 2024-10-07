@@ -23,6 +23,7 @@ import (
 // TerraformModuleVersionsConnectionQueryArgs is used to query a moduleVersion connection
 type TerraformModuleVersionsConnectionQueryArgs struct {
 	ConnectionQueryArgs
+	Search *string
 }
 
 // TerraformModuleVersionConfigurationDetailsQueryArgs is used to query configuration details
