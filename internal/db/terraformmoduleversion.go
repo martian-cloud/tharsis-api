@@ -65,6 +65,7 @@ type TerraformModuleVersionFilter struct {
 	SHASum           []byte
 	Latest           *bool
 	ModuleVersionIDs []string
+	Search           *string
 }
 
 // GetModuleVersionsInput is the input for listing terraform module versions
@@ -144,6 +145,9 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 		if input.Filter.TimeRangeStart != nil {
 			// Must use UTC here otherwise, queries will return unexpected results.
 			ex = ex.Append(goqu.I("terraform_module_versions.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
+		}
+		if input.Filter.Search != nil && *input.Filter.Search != "" {
+			ex = ex.Append(goqu.I("terraform_module_versions.semantic_version").ILike("%" + *input.Filter.Search + "%"))
 		}
 	}
 

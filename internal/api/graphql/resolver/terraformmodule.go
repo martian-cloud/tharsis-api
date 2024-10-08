@@ -206,6 +206,7 @@ func (r *TerraformModuleResolver) Versions(ctx context.Context, args *TerraformM
 			After:  args.After,
 		},
 		ModuleID: r.module.Metadata.ID,
+		Search:   args.Search,
 	}
 
 	if args.Sort != nil {

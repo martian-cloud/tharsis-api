@@ -53,6 +53,7 @@ type TerraformModule implements Node {
     before: String
     first: Int
     last: Int
+    search: String
     sort: TerraformModuleVersionSort
   ): TerraformModuleVersionConnection!
   attestations(

@@ -254,6 +254,19 @@ func TestGetModuleVersions(t *testing.T) {
 			expectMsg:                       invalidUUIDMsg2,
 			expectTerraformModuleVersionIDs: []string{},
 		},
+
+		{
+			name: "filter, search, positive",
+			input: &GetModuleVersionsInput{
+				Sort: ptrTerraformModuleVersionSortableField(TerraformModuleVersionSortableFieldUpdatedAtAsc),
+				Filter: &TerraformModuleVersionFilter{
+					Search: ptr.String("2"),
+				},
+			},
+			expectTerraformModuleVersionIDs: []string{
+				allTerraformModuleVersionIDsByTime[1], allTerraformModuleVersionIDsByTime[2],
+			},
+		},
 	}
 
 	for _, test := range testCases {
