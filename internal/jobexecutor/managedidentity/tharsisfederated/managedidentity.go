@@ -28,17 +28,30 @@ func (a *Authenticator) Close(context.Context) error {
 }
 
 // Authenticate configures the environment with the identity information used by the Tharsis terraform provider
-func (a *Authenticator) Authenticate(_ context.Context,
-	managedIdentity *types.ManagedIdentity, creds []byte,
+func (a *Authenticator) Authenticate(
+	ctx context.Context,
+	managedIdentities []types.ManagedIdentity,
+	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
 ) (map[string]string, error) {
+	if len(managedIdentities) != 1 {
+		return nil, fmt.Errorf("expected exactly one tharsis federated managed identity, got %d", len(managedIdentities))
+	}
+
+	managedIdentity := managedIdentities[0]
+
 	decodedData, err := base64.StdEncoding.DecodeString(string(managedIdentity.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed identity payload %v", err)
 	}
 
 	federatedData := tharsisfederated.Data{}
-	if err := json.Unmarshal(decodedData, &federatedData); err != nil {
+	if err = json.Unmarshal(decodedData, &federatedData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal managed identity payload %v", err)
+	}
+
+	creds, err := credsRetriever(ctx, &managedIdentity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve credentials %v", err)
 	}
 
 	return map[string]string{
@@ -46,5 +59,3 @@ func (a *Authenticator) Authenticate(_ context.Context,
 		"THARSIS_SERVICE_ACCOUNT_TOKEN": string(creds),
 	}, nil
 }
-
-// The End.

@@ -37,7 +37,17 @@ func (a *Authenticator) Close(_ context.Context) error {
 }
 
 // Authenticate configures the environment with the identity information used by the Azure terraform provider
-func (a *Authenticator) Authenticate(_ context.Context, managedIdentity *types.ManagedIdentity, creds []byte) (map[string]string, error) {
+func (a *Authenticator) Authenticate(
+	ctx context.Context,
+	managedIdentities []types.ManagedIdentity,
+	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
+) (map[string]string, error) {
+	if len(managedIdentities) != 1 {
+		return nil, fmt.Errorf("expected exactly one azure federated managed identity, got %d", len(managedIdentities))
+	}
+
+	managedIdentity := managedIdentities[0]
+
 	decodedData, err := base64.StdEncoding.DecodeString(string(managedIdentity.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed identity payload %v", err)
@@ -46,6 +56,11 @@ func (a *Authenticator) Authenticate(_ context.Context, managedIdentity *types.M
 	federatedData := azurefederated.Data{}
 	if err = json.Unmarshal(decodedData, &federatedData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal managed identity payload %v", err)
+	}
+
+	creds, err := credsRetriever(ctx, &managedIdentity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve managed identity token %v", err)
 	}
 
 	filePath := filepath.Join(a.dir, fmt.Sprintf("%s-token", managedIdentity.Metadata.ID))

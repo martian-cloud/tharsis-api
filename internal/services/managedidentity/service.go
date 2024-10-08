@@ -354,10 +354,12 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return err
 	}
 
-	// Verify that only one type of each managed identity can be assigned at a time
-	for _, mi := range identitiesInWorkspace {
-		if mi.Type == identity.Type {
-			return errors.New("managed identity with type %s already assigned to workspace %s", identity.Type, workspaceID, errors.WithErrorCode(errors.EInvalid))
+	// We only allow one managed identity of each type in a workspace, except for AWS federated.
+	if identity.Type != models.ManagedIdentityAWSFederated {
+		for _, mi := range identitiesInWorkspace {
+			if mi.Type == identity.Type {
+				return errors.New("managed identity with type %s already assigned to workspace %s", identity.Type, workspaceID, errors.WithErrorCode(errors.EInvalid))
+			}
 		}
 	}
 
