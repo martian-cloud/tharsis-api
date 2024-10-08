@@ -37,7 +37,13 @@ func TestAuthenticate(t *testing.T) {
 
 	token := []byte("tokendata")
 
-	env, err := authenticator.Authenticate(ctx, &identity, token)
+	env, err := authenticator.Authenticate(
+		ctx,
+		[]types.ManagedIdentity{identity},
+		func(_ context.Context, _ *types.ManagedIdentity) ([]byte, error) {
+			return token, nil
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +53,7 @@ func TestAuthenticate(t *testing.T) {
 	filePath := env["AZURE_FEDERATED_TOKEN_FILE"]
 
 	data, _ := os.ReadFile(filePath)
-	assert.Equal(t, []byte("tokendata"), data)
+	assert.Equal(t, token, data)
 
 	assert.Equal(t, map[string]string{
 		"ARM_TENANT_ID":              tenantID,

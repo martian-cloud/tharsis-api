@@ -65,17 +65,15 @@ func (l *managedIdentities) initialize(ctx context.Context) (map[string]string, 
 		return nil, fmt.Errorf("failed to get assigned managed identities for workspace %v", err)
 	}
 
+	identitiesMap := map[types.ManagedIdentityType][]types.ManagedIdentity{}
 	for _, identity := range identities {
-		l.jobLogger.Infof("Loading credentials for %s managed identity: %s\n", identity.Type, identity.ResourcePath)
+		identitiesMap[identity.Type] = append(identitiesMap[identity.Type], identity)
+	}
 
-		creds, err := l.client.CreateManagedIdentityCredentials(ctx, identity.Metadata.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create managed identity credentials %v", err)
-		}
-
-		factoryFunc, ok := l.factoryMap[identity.Type]
+	for identityType, identities := range identitiesMap {
+		factoryFunc, ok := l.factoryMap[identityType]
 		if !ok {
-			return nil, fmt.Errorf("managed identity type %s is not supported", identity.Type)
+			return nil, fmt.Errorf("managed identity type %s is not supported", identityType)
 		}
 
 		authenticator, err := factoryFunc()
@@ -84,9 +82,13 @@ func (l *managedIdentities) initialize(ctx context.Context) (map[string]string, 
 		}
 
 		l.authenticators = append(l.authenticators, authenticator)
-		id := identity
 
-		env, err := authenticator.Authenticate(ctx, &id, creds)
+		credsRetriever := func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error) {
+			l.jobLogger.Infof("Loading credentials for %s managed identity: %s\n", managedIdentity.Type, managedIdentity.ResourcePath)
+			return l.client.CreateManagedIdentityCredentials(ctx, managedIdentity.Metadata.ID)
+		}
+
+		env, err := authenticator.Authenticate(ctx, identities, credsRetriever)
 		if err != nil {
 			return nil, fmt.Errorf("failed to authenticate with managed identity %v", err)
 		}

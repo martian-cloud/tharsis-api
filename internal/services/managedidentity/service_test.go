@@ -384,7 +384,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 }
 
 func TestAddManagedIdentityToWorkspace(t *testing.T) {
-	sampleManagedIdentity := &models.ManagedIdentity{
+	awsManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
 			ID: "some-managed-identity-id",
 		},
@@ -402,7 +402,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 		NamespacePath: &sampleWorkspace.FullPath,
 		Action:        models.ActionAdd,
 		TargetType:    models.TargetManagedIdentity,
-		TargetID:      sampleManagedIdentity.Metadata.ID,
+		TargetID:      awsManagedIdentity.Metadata.ID,
 	}
 
 	type testCase struct {
@@ -422,7 +422,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:                                "positive: successfully add managed identity to workspace",
-			existingManagedIdentity:             sampleManagedIdentity,
+			existingManagedIdentity:             awsManagedIdentity,
 			existingWorkspace:                   sampleWorkspace,
 			identitiesInWorkspace:               []models.ManagedIdentity{},
 			managedIdentityID:                   "some-managed-identity-id",
@@ -438,7 +438,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 		},
 		{
 			name:                    "negative: managed identity is not under the same group hierarchy",
-			existingManagedIdentity: sampleManagedIdentity,
+			existingManagedIdentity: awsManagedIdentity,
 			existingWorkspace: &models.Workspace{
 				FullPath: "another/path",
 			},
@@ -447,11 +447,39 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			expectErrorCode:   errors.EInvalid,
 		},
 		{
-			name:                    "negative: managed identity with type is already assigned to workspace",
-			existingManagedIdentity: sampleManagedIdentity,
+			name:                    "can assign more than one aws managed identity",
+			existingManagedIdentity: awsManagedIdentity,
 			existingWorkspace:       sampleWorkspace,
 			identitiesInWorkspace: []models.ManagedIdentity{
-				*sampleManagedIdentity,
+				*awsManagedIdentity,
+			},
+			managedIdentityID:                   "some-managed-identity-id",
+			workspaceID:                         "some-workspace-id",
+			limit:                               5,
+			injectManagedIdentitiesPerWorkspace: 5,
+		},
+		{
+			name: "cannot assign more than one non-aws managed identity",
+			existingManagedIdentity: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID: "some-managed-identity-id",
+				},
+				Name:         "a-managed-identity",
+				ResourcePath: "some/resource/path",
+				GroupID:      "some-group-id",
+				Type:         models.ManagedIdentityAzureFederated,
+			},
+			existingWorkspace: sampleWorkspace,
+			identitiesInWorkspace: []models.ManagedIdentity{
+				{
+					Metadata: models.ResourceMetadata{
+						ID: "some-managed-identity-id-1",
+					},
+					Name:         "a-managed-identity",
+					ResourcePath: "some/resource/path",
+					GroupID:      "some-group-id",
+					Type:         models.ManagedIdentityAzureFederated,
+				},
 			},
 			managedIdentityID: "some-managed-identity-id",
 			workspaceID:       "some-workspace-id",
@@ -466,7 +494,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 		},
 		{
 			name:                                "exceeds limit",
-			existingManagedIdentity:             sampleManagedIdentity,
+			existingManagedIdentity:             awsManagedIdentity,
 			existingWorkspace:                   sampleWorkspace,
 			identitiesInWorkspace:               []models.ManagedIdentity{},
 			managedIdentityID:                   "some-managed-identity-id",
