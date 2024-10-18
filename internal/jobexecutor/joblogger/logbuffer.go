@@ -39,7 +39,7 @@ Tharsis Modifications:
 	have been renamed and / or removed as needed for use within Tharsis.
 */
 
-package jobexecutor
+package joblogger
 
 import (
 	"errors"

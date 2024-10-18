@@ -10,6 +10,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"github.com/mitchellh/go-ps"
 	"github.com/prometheus/procfs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 )
 
 const (
@@ -37,12 +38,12 @@ type MemoryMonitor interface {
 
 type memoryMonitor struct {
 	doneChannel chan bool
-	jobLogger   *jobLogger
+	jobLogger   joblogger.Logger
 	memoryLimit uint64
 }
 
 // NewMemoryMonitor creates an instance of the memory monitor.
-func NewMemoryMonitor(jobLogger *jobLogger, memoryLimit uint64) (MemoryMonitor, error) {
+func NewMemoryMonitor(jobLogger joblogger.Logger, memoryLimit uint64) (MemoryMonitor, error) {
 	// error out if the limit is zero.
 	if memoryLimit == 0 {
 		return nil, fmt.Errorf("memory limit must not be zero")

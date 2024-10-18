@@ -1031,8 +1031,8 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 	}
 
 	if sErr := delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); sErr != nil {
-		tracing.RecordError(span, err, "failed to set managed identity date")
-		return nil, errors.Wrap(err, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
+		tracing.RecordError(span, sErr, "failed to set managed identity date")
+		return nil, errors.Wrap(sErr, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	s.logger.Infow("Updated a managed identity.",

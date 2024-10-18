@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/awsfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity/azurefederated"
@@ -14,19 +16,24 @@ import (
 type authenticatorFactoryFunc func() (managedidentity.Authenticator, error)
 
 type managedIdentities struct {
-	client         Client
-	jobLogger      *jobLogger
+	client         jobclient.Client
+	jobLogger      joblogger.Logger
 	factoryMap     map[types.ManagedIdentityType]authenticatorFactoryFunc
 	workspaceID    string
 	workspaceDir   string
 	authenticators []managedidentity.Authenticator
 }
 
+type managedIdentityInitializeResponse struct {
+	Env                       map[string]string
+	HostCredentialFileMapping map[string]string
+}
+
 func newManagedIdentities(
 	workspaceID string,
 	workspaceDir string,
-	jobLogger *jobLogger,
-	client Client,
+	jobLogger joblogger.Logger,
+	client jobclient.Client,
 ) *managedIdentities {
 	return &managedIdentities{
 		workspaceID:    workspaceID,
@@ -42,7 +49,7 @@ func newManagedIdentities(
 				return azurefederated.New()
 			},
 			types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
-				return tharsisfederated.New(), nil
+				return tharsisfederated.New(client, workspaceDir, jobLogger)
 			},
 		},
 	}
@@ -57,8 +64,11 @@ func (l *managedIdentities) close(ctx context.Context) error {
 	return nil
 }
 
-func (l *managedIdentities) initialize(ctx context.Context) (map[string]string, error) {
-	allEnvVars := map[string]string{}
+func (l *managedIdentities) initialize(ctx context.Context) (*managedIdentityInitializeResponse, error) {
+	response := managedIdentityInitializeResponse{
+		Env:                       map[string]string{},
+		HostCredentialFileMapping: map[string]string{},
+	}
 
 	identities, err := l.client.GetAssignedManagedIdentities(ctx, l.workspaceID)
 	if err != nil {
@@ -88,15 +98,19 @@ func (l *managedIdentities) initialize(ctx context.Context) (map[string]string, 
 			return l.client.CreateManagedIdentityCredentials(ctx, managedIdentity.Metadata.ID)
 		}
 
-		env, err := authenticator.Authenticate(ctx, identities, credsRetriever)
+		authResponse, err := authenticator.Authenticate(ctx, identities, credsRetriever)
 		if err != nil {
 			return nil, fmt.Errorf("failed to authenticate with managed identity %v", err)
 		}
 
-		for k, v := range env {
-			allEnvVars[k] = v
+		for k, v := range authResponse.Env {
+			response.Env[k] = v
+		}
+
+		for k, v := range authResponse.HostCredentialFileMapping {
+			response.HostCredentialFileMapping[k] = v
 		}
 	}
 
-	return allEnvVars, nil
+	return &response, nil
 }

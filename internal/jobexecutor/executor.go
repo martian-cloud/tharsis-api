@@ -8,6 +8,8 @@ import (
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
@@ -39,14 +41,14 @@ type JobConfig struct {
 // JobExecutor executes a job
 type JobExecutor struct {
 	cfg    *JobConfig
-	client Client
+	client jobclient.Client
 	logger logger.Logger
 }
 
 // NewJobExecutor creates a new JobExecutor
 func NewJobExecutor(
 	cfg *JobConfig,
-	client Client,
+	client jobclient.Client,
 	logger logger.Logger,
 ) *JobExecutor {
 	return &JobExecutor{cfg, client, logger}
@@ -54,14 +56,14 @@ func NewJobExecutor(
 
 // Execute executes the job associated with the JobExecutor instance
 func (j *JobExecutor) Execute(ctx context.Context) error {
-	jobLogger, err := newJobLogger(j.cfg.JobID, j.client, j.logger)
+	jobLogger, err := joblogger.NewLogger(j.cfg.JobID, j.client, j.logger)
 	if err != nil {
 		return fmt.Errorf("failed to create job logger %v", err)
 	}
 
 	defer jobLogger.Close()
 
-	jobLogger.start()
+	jobLogger.Start()
 
 	// Get the memory limit if one has been passed in.
 	memoryLimit := uint64(0)
@@ -112,7 +114,7 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, jobLogger *jobLogger) (JobHandler, error) {
+func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, jobLogger joblogger.Logger) (JobHandler, error) {
 	// Get Job
 	job, err := j.client.GetJob(ctx, j.cfg.JobID)
 	if err != nil {
@@ -147,7 +149,7 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 	return handler, err
 }
 
-func (j *JobExecutor) onError(ctx context.Context, jobLogger *jobLogger, jobImpl JobHandler, err error) {
+func (j *JobExecutor) onError(ctx context.Context, jobLogger joblogger.Logger, jobImpl JobHandler, err error) {
 	jobLogger.Errorf("Error occurred while executing run: %s\n", err)
 	jobLogger.Flush()
 
@@ -156,7 +158,7 @@ func (j *JobExecutor) onError(ctx context.Context, jobLogger *jobLogger, jobImpl
 	}
 }
 
-func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger *jobLogger, runID string, maxJobDuration int32) context.Context {
+func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger joblogger.Logger, runID string, maxJobDuration int32) context.Context {
 	// This will gracefully cancel the job after the job timeout is reached.
 	cancellableCtx, cancelFunc := context.WithTimeout(ctx, time.Duration(maxJobDuration)*time.Minute)
 

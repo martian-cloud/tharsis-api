@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -33,7 +34,7 @@ func main() {
 		return
 	}
 
-	client, err := jobexecutor.NewClient(apiURL, token)
+	client, err := jobclient.NewClient(apiURL, token)
 	if err != nil {
 		logger.Errorf("Failed to create client %v", err)
 		return

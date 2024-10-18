@@ -37,7 +37,7 @@ func TestAuthenticate(t *testing.T) {
 
 	token := []byte("tokendata")
 
-	env, err := authenticator.Authenticate(
+	response, err := authenticator.Authenticate(
 		ctx,
 		[]types.ManagedIdentity{identity},
 		func(_ context.Context, _ *types.ManagedIdentity) ([]byte, error) {
@@ -50,7 +50,7 @@ func TestAuthenticate(t *testing.T) {
 
 	// Because the temporary file path/name is generated inside the authenticator,
 	// this has to query the returned environment variable to get to the file.
-	filePath := env["AZURE_FEDERATED_TOKEN_FILE"]
+	filePath := response.Env["AZURE_FEDERATED_TOKEN_FILE"]
 
 	data, _ := os.ReadFile(filePath)
 	assert.Equal(t, token, data)
@@ -63,5 +63,7 @@ func TestAuthenticate(t *testing.T) {
 		"AZURE_CLIENT_ID":            clientID,
 		"AZURE_TENANT_ID":            tenantID,
 		"AZURE_FEDERATED_TOKEN_FILE": filePath,
-	}, env)
+	}, response.Env)
+
+	assert.Nil(t, response.HostCredentialFileMapping)
 }

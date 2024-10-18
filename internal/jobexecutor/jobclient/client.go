@@ -1,4 +1,7 @@
-package jobexecutor
+// Package jobclient package
+package jobclient
+
+//go:generate mockery --name Client --inpackage --case underscore
 
 import (
 	"bytes"
@@ -7,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	tharsis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/auth"
@@ -34,7 +38,10 @@ type Client interface {
 	DownloadStateVersion(ctx context.Context, stateVersion *types.StateVersion, writer io.WriterAt) error
 	DownloadPlanCache(ctx context.Context, planID string, writer io.WriterAt) error
 	Close() error
+	CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, token string) (string, *time.Duration, error)
 }
+
+var _ Client = (*client)(nil)
 
 type client struct {
 	tharsisClient *tharsis.Client
@@ -280,4 +287,19 @@ func (c *client) CreateTerraformCLIDownloadURL(ctx context.Context,
 	}
 
 	return downloadURL, nil
+}
+
+// CreateServiceAccountToken Creates a service account token from the given token
+func (c *client) CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, managedIdentityToken string) (string, *time.Duration, error) {
+	input := &types.ServiceAccountCreateTokenInput{
+		ServiceAccountPath: serviceAccountPath,
+		Token:              managedIdentityToken,
+	}
+
+	response, err := c.tharsisClient.ServiceAccount.CreateToken(ctx, input)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return response.Token, &response.ExpiresIn, nil
 }

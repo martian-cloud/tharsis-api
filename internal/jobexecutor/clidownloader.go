@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
@@ -150,12 +151,12 @@ ZF5q4h4I33PSGDdSvGXn9UMY5Isjpg==
 
 type cliDownloader struct {
 	httpClient *http.Client
-	client     Client
+	client     jobclient.Client
 }
 
 func newCLIDownloader(
 	httpClient *http.Client,
-	client Client,
+	client jobclient.Client,
 ) *cliDownloader {
 	return &cliDownloader{
 		httpClient: httpClient,

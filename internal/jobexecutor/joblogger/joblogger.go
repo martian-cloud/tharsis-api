@@ -1,4 +1,6 @@
-package jobexecutor
+package joblogger
+
+//go:generate mockery --name JobLogger --inpackage --case underscore
 
 import (
 	"context"
@@ -6,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -14,9 +17,27 @@ const (
 	defaultUpdateInterval   = 3 * time.Second
 )
 
+// Logger is an interface for logging job output
+type Logger interface {
+	// Close flushes the logger
+	Close()
+	// Infof writes an info log to the job's log output
+	Infof(format string, a ...interface{})
+	// Errorf writes an error log to the job's log output
+	Errorf(format string, a ...interface{})
+	// Write will append the data to the log buffer
+	Write(data []byte) (n int, err error)
+	// Start starts the logger
+	Start()
+	// Flush flushes the logger
+	Flush()
+}
+
+var _ Logger = (*jobLogger)(nil)
+
 type jobLogger struct {
 	sentTime         time.Time
-	client           Client
+	client           jobclient.Client
 	logger           logger.Logger
 	buffer           *LogBuffer
 	finished         chan bool
@@ -27,7 +48,8 @@ type jobLogger struct {
 	lock             sync.RWMutex
 }
 
-func newJobLogger(jobID string, client Client, logger logger.Logger) (*jobLogger, error) {
+// NewLogger creates a new Logger
+func NewLogger(jobID string, client jobclient.Client, logger logger.Logger) (Logger, error) {
 	buffer, err := NewLogBuffer()
 	if err != nil {
 		return nil, err
@@ -74,7 +96,7 @@ func (j *jobLogger) bytesize() int {
 	return j.buffer.Size()
 }
 
-func (j *jobLogger) start() {
+func (j *jobLogger) Start() {
 	j.finished = make(chan bool)
 	go j.run()
 }

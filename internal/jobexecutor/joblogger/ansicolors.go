@@ -1,5 +1,5 @@
-// Package jobexecutor package
-package jobexecutor
+// Package joblogger package
+package joblogger
 
 // ANSI color constants for job log output
 const (
