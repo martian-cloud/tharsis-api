@@ -1,3 +1,4 @@
+// Package jobexecutor package
 package jobexecutor
 
 import (
@@ -7,16 +8,18 @@ import (
 	"os"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
 // ApplyHandler handles an apply job
 type ApplyHandler struct {
-	client             Client
+	client             jobclient.Client
 	cancellableCtx     context.Context
 	terraformWorkspace *terraformWorkspace
 	run                *types.Run
-	jobLogger          *jobLogger
+	jobLogger          joblogger.Logger
 	workspaceDir       string
 }
 
@@ -27,8 +30,8 @@ func NewApplyHandler(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
-	jobLogger *jobLogger,
-	client Client,
+	jobLogger joblogger.Logger,
+	client jobclient.Client,
 ) *ApplyHandler {
 	terraformWorkspace := newTerraformWorkspace(cancellableCtx, jobCfg, workspaceDir, workspace, run, jobLogger, client)
 

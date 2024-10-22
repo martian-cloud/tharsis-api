@@ -330,13 +330,14 @@ func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissio
 		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.ViewVariablePermission:             j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.ViewStateVersionDataPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.CreateStateVersionPermission:       j.requireAccessToJobWorkspace,
-		permissions.ViewVariableValuePermission:        j.requireAccessToJobWorkspace,
-		permissions.ViewRunPermission:                  j.requireRunAccess, // View is automatically granted if action != View.
-		permissions.ViewJobPermission:                  j.requireJobAccess, // View is automatically granted if action != View.
-		permissions.UpdateJobPermission:                j.requireJobAccess,
-		permissions.UpdatePlanPermission:               j.requirePlanWriteAccess,
-		permissions.UpdateApplyPermission:              j.requireApplyWriteAccess,
+		//permissions.ViewStateVersionDataPermission:     j.requireAccessToJobWorkspace,	//TODO: This will go into effect a few weeks after the initial release of remote datasource.
+		permissions.CreateStateVersionPermission: j.requireAccessToJobWorkspace,
+		permissions.ViewVariableValuePermission:  j.requireAccessToJobWorkspace,
+		permissions.ViewRunPermission:            j.requireRunAccess, // View is automatically granted if action != View.
+		permissions.ViewJobPermission:            j.requireJobAccess, // View is automatically granted if action != View.
+		permissions.UpdateJobPermission:          j.requireJobAccess,
+		permissions.UpdatePlanPermission:         j.requirePlanWriteAccess,
+		permissions.UpdateApplyPermission:        j.requireApplyWriteAccess,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

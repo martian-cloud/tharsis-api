@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,7 +50,7 @@ func TestAuthenticate(t *testing.T) {
 				}
 			}
 
-			envs, err := authenticator.Authenticate(
+			response, err := authenticator.Authenticate(
 				ctx,
 				identities,
 				func(_ context.Context, _ *types.ManagedIdentity) ([]byte, error) {
@@ -58,6 +59,10 @@ func TestAuthenticate(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+
+			assert.Nil(t, response.HostCredentialFileMapping)
+
+			envs := response.Env
 
 			if tc.identitiesCount == 1 {
 				// Should set AWS_CONFIG_FILE, AWS_ROLE_ARN, and AWS_WEB_IDENTITY_TOKEN_FILE
@@ -82,7 +87,8 @@ func TestAuthenticate(t *testing.T) {
 
 			for i := 0; i < tc.identitiesCount; i++ {
 				role := fmt.Sprintf("testrole-%d", i)
-				tokenFilepath := fmt.Sprintf("%s/%s-token", authenticator.dir, identities[i].Metadata.ID)
+				nameOfFile := fmt.Sprintf("%s-token", identities[i].Metadata.ID)
+				tokenFilepath := filepath.Join(authenticator.dir, nameOfFile)
 
 				profile := fmt.Sprintf(awsProfileTemplate, identities[i].ResourcePath, role, tokenFilepath)
 				assert.Contains(t, string(configFile), profile)

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
@@ -20,6 +21,8 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
@@ -30,6 +33,7 @@ terraform {
 	backend "local" {}
 }
 `
+
 	// Ensure binary not found error.
 	hcInstallBinaryNotFoundErr = "unable to find, install"
 )
@@ -37,16 +41,17 @@ terraform {
 type terraformWorkspace struct {
 	cliDownloader     cliDownloader
 	cancellableCtx    context.Context
-	client            Client
+	client            jobclient.Client
 	jobCfg            *JobConfig
 	workspace         *types.Workspace
 	run               *types.Run
-	jobLogger         *jobLogger
+	jobLogger         joblogger.Logger
 	managedIdentities *managedIdentities
 	fullEnv           map[string]string
 	workspaceDir      string
 	variables         []types.RunVariable
 	pathsToRemove     []string
+	credentialHelper  *credentialHelper
 }
 
 func newTerraformWorkspace(
@@ -55,8 +60,8 @@ func newTerraformWorkspace(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
-	jobLogger *jobLogger,
-	client Client,
+	jobLogger joblogger.Logger,
+	client jobclient.Client,
 ) *terraformWorkspace {
 	managedIdentities := newManagedIdentities(
 		workspace.Metadata.ID,
@@ -79,6 +84,7 @@ func newTerraformWorkspace(
 			http.NewHTTPClient(),
 			client,
 		),
+		credentialHelper: newCredentialHelper(),
 	}
 }
 
@@ -87,6 +93,8 @@ func (t *terraformWorkspace) close(ctx context.Context) error {
 	for _, toRemove := range t.pathsToRemove {
 		os.RemoveAll(toRemove)
 	}
+
+	t.credentialHelper.close()
 
 	// Cleanup managed identity resources
 	return t.managedIdentities.close(ctx)
@@ -108,20 +116,20 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		}
 	}
 
-	// Add built-in variables to environment
-	if envErr := t.setBuiltInEnvVars(ctx); envErr != nil {
-		return nil, envErr
-	}
-
 	t.variables = variables
 
-	managedIdentityEnv, err := t.managedIdentities.initialize(ctx)
+	managedIdentitiesResponse, err := t.managedIdentities.initialize(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for k, v := range managedIdentityEnv {
+	for k, v := range managedIdentitiesResponse.Env {
 		t.fullEnv[k] = v
+	}
+
+	// Add built-in variables to environment
+	if envErr := t.setBuiltInEnvVars(ctx, managedIdentitiesResponse.HostCredentialFileMapping); envErr != nil {
+		return nil, envErr
 	}
 
 	// Handle a possible configuration version.  Configuration version and module
@@ -195,12 +203,17 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 
 		// Contains the temporary directory that needs to be removed
 		// after the job completes.
-		t.pathsToRemove = append(t.pathsToRemove, filepath.Dir(execPath))
+		t.deletePathWhenJobCompletes(filepath.Dir(execPath))
 	}
 
 	tf, err := tfexec.NewTerraform(t.workspaceDir, execPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize tfexec: %v", err)
+	}
+
+	err = t.setupCredentialHelper(managedIdentitiesResponse.HostCredentialFileMapping)
+	if err != nil {
+		return nil, err
 	}
 
 	if err = t.mapSupportedTerraformEnvConfiguration(tf); err != nil {
@@ -267,6 +280,38 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	}
 
 	return tf, nil
+}
+
+func (t *terraformWorkspace) setupCredentialHelper(hostCredentialFileMapping map[string]string) error {
+	isWindows := runtime.GOOS == "windows"
+	hasHosts := len(hostCredentialFileMapping) > 0
+
+	if isWindows && hasHosts {
+		t.jobLogger.Errorf("Warning: Managed Identity hosts are not supported on windows")
+	}
+
+	if isWindows || !hasHosts {
+		return nil
+	}
+
+	hosts := make([]string, 0, len(hostCredentialFileMapping))
+	for host := range hostCredentialFileMapping {
+		hosts = append(hosts, host)
+	}
+
+	t.jobLogger.Infof("The following managed identity hosts each have a credential file: %v", hosts)
+
+	credHelperName, err := t.credentialHelper.install(hostCredentialFileMapping)
+	if err != nil {
+		return err
+	}
+
+	err = t.setupCliConfiguration(*credHelperName)
+	if err != nil {
+		return fmt.Errorf("failed to setup cli configuration: %v", err)
+	}
+
+	return nil
 }
 
 // mapSupportedTerraformEnvConfiguration
@@ -363,35 +408,63 @@ func (t *terraformWorkspace) downloadCurrentStateVersion(ctx context.Context) er
 }
 
 // setBuiltInEnvVars will add Tharsis built in environment variables for the job.
-func (t *terraformWorkspace) setBuiltInEnvVars(ctx context.Context) error {
+func (t *terraformWorkspace) setBuiltInEnvVars(_ context.Context, hostCredentialFileMapping map[string]string) error {
 	// Set THARSIS_GROUP_PATH
 	t.fullEnv["THARSIS_GROUP_PATH"] = t.workspace.FullPath[:strings.LastIndex(t.workspace.FullPath, "/")]
 
+	// Set THARSIS_ENDPOINT which is used by the Terraform Tharsis Provider
+	t.fullEnv["THARSIS_ENDPOINT"] = t.jobCfg.APIEndpoint
+
+	err := t.setAPIHostTfTokenEnvVar(hostCredentialFileMapping)
+	if err != nil {
+		return err
+	}
+
+	t.setDiscoveryProtocolHostTfTokenEnvVar(hostCredentialFileMapping)
+
+	return nil
+}
+
+func (t *terraformWorkspace) setAPIHostTfTokenEnvVar(hostCredentialFileMapping map[string]string) error {
 	apiURL, err := url.Parse(t.jobCfg.APIEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to parse API URL %v", err)
 	}
 
-	// Set TF_TOKEN_<host>
+	_, hasCredentialFile := hostCredentialFileMapping[apiURL.Host]
+	if hasCredentialFile {
+		return nil
+	}
+
 	apiEncHost, err := module.BuildTokenEnvVar(apiURL.Host)
 	if err != nil {
 		return fmt.Errorf("failed to encode API URL for environment variable: %v", err)
 	}
+
 	t.fullEnv[apiEncHost] = t.jobCfg.JobToken
 
-	if t.jobCfg.DiscoveryProtocolHost != "" {
-		if dpEncHost, err := module.BuildTokenEnvVar(t.jobCfg.DiscoveryProtocolHost); err == nil {
-			t.fullEnv[dpEncHost] = t.jobCfg.JobToken
-		} else {
-			t.jobLogger.logger.Infof("failed to encode Discovery Protocol Host: %v", err)
-		}
+	return nil
+}
+
+func (t *terraformWorkspace) setDiscoveryProtocolHostTfTokenEnvVar(hostCredentialFileMapping map[string]string) {
+	host := t.jobCfg.DiscoveryProtocolHost
+
+	if host == "" {
+		return
 	}
 
-	// Set THARSIS_ENDPOINT which is used by the Terraform Tharsis Provider
-	t.fullEnv["THARSIS_ENDPOINT"] = t.jobCfg.APIEndpoint
+	_, hasCredentialFile := hostCredentialFileMapping[host]
+	if hasCredentialFile {
+		return
+	}
 
-	// Placeholder in case we need to make an API call to get additional variables
-	_ = ctx
+	if dpEncHost, err := module.BuildTokenEnvVar(host); err == nil {
+		t.fullEnv[dpEncHost] = t.jobCfg.JobToken
+	} else {
+		t.jobLogger.Infof("failed to encode Discovery Protocol Host: %v", err)
+	}
+}
 
-	return nil
+func (t *terraformWorkspace) deletePathWhenJobCompletes(path string) {
+	t.pathsToRemove = append(t.pathsToRemove, path)
 }

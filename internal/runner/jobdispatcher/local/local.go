@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -35,7 +36,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 
 // DispatchJob will launch a local job executor that can be used to facilitate debugging
 func (l *JobDispatcher) DispatchJob(_ context.Context, jobID string, token string) (string, error) {
-	client, err := jobexecutor.NewClient(l.apiURL, token)
+	client, err := jobclient.NewClient(l.apiURL, token)
 	if err != nil {
 		return "", err
 	}

@@ -1385,14 +1385,16 @@ func TestCreateManagedIdentity(t *testing.T) {
 	}
 
 	type testCase struct {
-		authError              error
-		input                  *CreateManagedIdentityInput
-		existingServiceAccount *models.ServiceAccount
-		name                   string
-		expectErrorCode        errors.CodeType
-		limit                  int
-		injectMIPerGroup       int32
-		exceedsLimit           bool
+		authError                   error
+		input                       *CreateManagedIdentityInput
+		existingServiceAccount      *models.ServiceAccount
+		name                        string
+		expectErrorCode             errors.CodeType
+		expectError                 string
+		limit                       int
+		injectMIPerGroup            int32
+		exceedsLimit                bool
+		setManagedIdentityDataError error
 	}
 
 	testCases := []testCase{
@@ -1453,6 +1455,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				},
 			},
 			expectErrorCode:  errors.ENotFound,
+			expectError:      "service account with ID non-existent-service-account not found",
 			limit:            5, // enables mock On calls
 			injectMIPerGroup: 5,
 		},
@@ -1486,6 +1489,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				ResourcePath: "outside/scope/service-account",
 			},
 			expectErrorCode:  errors.EInvalid,
+			expectError:      "service account outside/scope/service-account is outside the scope of group some/resource",
 			limit:            5, // enables mock On calls
 			injectMIPerGroup: 5,
 		},
@@ -1496,6 +1500,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID: "some-group-id",
 			},
 			expectErrorCode: errors.EInvalid,
+			expectError:     "managed identity with type unknown-type is not supported",
 		},
 		{
 			name: "negative: managed identity has an invalid name",
@@ -1505,6 +1510,23 @@ func TestCreateManagedIdentity(t *testing.T) {
 				GroupID: "some-group-id",
 			},
 			expectErrorCode: errors.EInvalid,
+			expectError:     "Invalid name, name can only include lowercase letters and numbers with - and _ supported in non leading or trailing positions. Max length is 64 characters.",
+		},
+		{
+			name: "negative: managed identity has an invalid host",
+			input: &CreateManagedIdentityInput{
+				Type:        models.ManagedIdentityAWSFederated,
+				Name:        "a-managed-identity",
+				Description: "this is a managed identity being created",
+				GroupID:     "some-group-id",
+				Data:        []byte("some-data"),
+			},
+			existingServiceAccount: sampleServiceAccount,
+			//limit:                       5,
+			injectMIPerGroup:            5,
+			setManagedIdentityDataError: errors.New("host invalid", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:             errors.EInvalid,
+			expectError:                 "failed to set managed identity data: host invalid",
 		},
 		{
 			name: "negative: subject does not have perms for group",
@@ -1515,6 +1537,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			},
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
+			expectError:     "Forbidden",
 		},
 		{
 			name: "exceeds limit",
@@ -1547,6 +1570,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			injectMIPerGroup:       6,
 			exceedsLimit:           true,
 			expectErrorCode:        errors.EInvalid,
+			expectError:            "for limit ResourceLimitManagedIdentitiesPerGroup: value 6 exceeds limit of 5",
 		},
 	}
 
@@ -1575,7 +1599,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
-			mockDelegate.On("SetManagedIdentityData", mock.Anything, sampleManagedIdentity, sampleManagedIdentity.Data).Return(nil).Maybe()
+			mockDelegate.On("SetManagedIdentityData", mock.Anything, sampleManagedIdentity, sampleManagedIdentity.Data).Return(test.setManagedIdentityDataError).Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
 
@@ -1625,6 +1649,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				assert.Equal(t, test.expectError, errors.ErrorMessage(err))
 				return
 			}
 
@@ -1743,12 +1768,14 @@ func TestUpdateManagedIdentity(t *testing.T) {
 	}
 
 	type testCase struct {
-		authError               error
-		existingManagedIdentity *models.ManagedIdentity
-		expectManagedIdentity   *models.ManagedIdentity
-		input                   *UpdateManagedIdentityInput
-		name                    string
-		expectErrorCode         errors.CodeType
+		authError                   error
+		setManagedIdentityDataError error
+		existingManagedIdentity     *models.ManagedIdentity
+		expectManagedIdentity       *models.ManagedIdentity
+		input                       *UpdateManagedIdentityInput
+		name                        string
+		expectErrorCode             errors.CodeType
+		expectError                 string
 	}
 
 	testCases := []testCase{
@@ -1773,6 +1800,18 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			},
 		},
 		{
+			name: "negative: set managed identity data fails validation",
+			input: &UpdateManagedIdentityInput{
+				ID:          "some-managed-identity-id",
+				Description: "This is an updated description",
+				Data:        []byte("this is new data"),
+			},
+			setManagedIdentityDataError: errors.New("host invalid", errors.WithErrorCode(errors.EInvalid)),
+			expectErrorCode:             errors.EInvalid,
+			expectError:                 "failed to set managed identity data: host invalid",
+			existingManagedIdentity:     sampleManagedIdentity,
+		},
+		{
 			name: "negative: updated description is too long",
 			input: &UpdateManagedIdentityInput{
 				ID:          "some-managed-identity-id",
@@ -1780,6 +1819,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				Data:        []byte("this is new data"),
 			},
 			expectErrorCode:         errors.EInvalid,
+			expectError:             "invalid description, cannot be greater than 100 characters",
 			existingManagedIdentity: sampleManagedIdentity,
 		},
 		{
@@ -1790,6 +1830,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				Data:        []byte("this is new data"),
 			},
 			expectErrorCode: errors.ENotFound,
+			expectError:     "managed identity with ID non-existent-id not found",
 		},
 		{
 			name: "negative: attempting to update a managed identity alias",
@@ -1802,6 +1843,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
 			},
 			expectErrorCode: errors.EInvalid,
+			expectError:     "Only a source managed identity can be updated, not an alias",
 		},
 		{
 			name: "negative: subject does not have access to group",
@@ -1813,6 +1855,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			existingManagedIdentity: sampleManagedIdentity,
 			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
+			expectError:             "Forbidden",
 		},
 	}
 
@@ -1827,6 +1870,10 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			mockDelegate := NewMockDelegate(t)
 			mockCaller := auth.NewMockCaller(t)
 
+			if test.expectErrorCode == "" || test.setManagedIdentityDataError != nil {
+				mockDelegate.On("SetManagedIdentityData", mock.Anything, test.existingManagedIdentity, test.input.Data).Return(test.setManagedIdentityDataError)
+			}
+
 			if test.expectErrorCode == "" {
 				mockManagedIdentities.On("UpdateManagedIdentity", mock.Anything, test.existingManagedIdentity).Return(test.expectManagedIdentity, nil)
 
@@ -1837,8 +1884,6 @@ func TestUpdateManagedIdentity(t *testing.T) {
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-				mockDelegate.On("SetManagedIdentityData", mock.Anything, test.existingManagedIdentity, test.input.Data).Return(nil)
 			}
 
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ID).Return(test.existingManagedIdentity, nil)
@@ -1865,6 +1910,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				assert.Equal(t, test.expectError, errors.ErrorMessage(err))
 				return
 			}
 

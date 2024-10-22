@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/awsfederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
@@ -50,7 +51,7 @@ func (a *Authenticator) Authenticate(
 	ctx context.Context,
 	managedIdentities []types.ManagedIdentity,
 	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
-) (map[string]string, error) {
+) (*managedidentity.AuthenticateResponse, error) {
 	envs := map[string]string{}
 
 	configFile, tErr := os.CreateTemp(a.dir, "aws-profiles-*")
@@ -95,5 +96,7 @@ func (a *Authenticator) Authenticate(
 		}
 	}
 
-	return envs, nil
+	response := managedidentity.AuthenticateResponse{Env: envs}
+
+	return &response, nil
 }

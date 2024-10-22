@@ -1,6 +1,8 @@
 // Package managedidentity package
 package managedidentity
 
+//go:generate mockery --name Authenticator --inpackage --case underscore
+
 import (
 	"context"
 
@@ -13,6 +15,12 @@ type Authenticator interface {
 		ctx context.Context,
 		managedIdentities []types.ManagedIdentity,
 		credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
-	) (map[string]string, error)
+	) (*AuthenticateResponse, error)
 	Close(ctx context.Context) error
+}
+
+// AuthenticateResponse contains the environment variables and host credential file mappings
+type AuthenticateResponse struct {
+	Env                       map[string]string
+	HostCredentialFileMapping map[string]string
 }

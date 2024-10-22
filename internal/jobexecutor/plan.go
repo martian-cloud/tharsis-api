@@ -9,16 +9,18 @@ import (
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/zclconf/go-cty/cty"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
 // PlanHandler handles a plan job
 type PlanHandler struct {
-	client             Client
+	client             jobclient.Client
 	cancellableCtx     context.Context
 	terraformWorkspace *terraformWorkspace
 	run                *types.Run
-	jobLogger          *jobLogger
+	jobLogger          joblogger.Logger
 	workspaceDir       string
 }
 
@@ -29,8 +31,8 @@ func NewPlanHandler(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
-	jobLogger *jobLogger,
-	client Client,
+	jobLogger joblogger.Logger,
+	client jobclient.Client,
 ) *PlanHandler {
 	terraformWorkspace := newTerraformWorkspace(cancellableCtx, jobCfg, workspaceDir, workspace, run, jobLogger, client)
 

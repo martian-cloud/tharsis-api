@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity/azurefederated"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
@@ -41,7 +42,7 @@ func (a *Authenticator) Authenticate(
 	ctx context.Context,
 	managedIdentities []types.ManagedIdentity,
 	credsRetriever func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error),
-) (map[string]string, error) {
+) (*managedidentity.AuthenticateResponse, error) {
 	if len(managedIdentities) != 1 {
 		return nil, fmt.Errorf("expected exactly one azure federated managed identity, got %d", len(managedIdentities))
 	}
@@ -68,13 +69,17 @@ func (a *Authenticator) Authenticate(
 		return nil, fmt.Errorf("failed to write managed identity token to disk %v", err)
 	}
 
-	return map[string]string{
-		"ARM_TENANT_ID":              federatedData.TenantID,
-		"ARM_CLIENT_ID":              federatedData.ClientID,
-		"ARM_USE_OIDC":               "true",
-		"ARM_OIDC_TOKEN":             string(creds),
-		"AZURE_CLIENT_ID":            federatedData.ClientID,
-		"AZURE_TENANT_ID":            federatedData.TenantID,
-		"AZURE_FEDERATED_TOKEN_FILE": filePath,
-	}, nil
+	response := managedidentity.AuthenticateResponse{
+		Env: map[string]string{
+			"ARM_TENANT_ID":              federatedData.TenantID,
+			"ARM_CLIENT_ID":              federatedData.ClientID,
+			"ARM_USE_OIDC":               "true",
+			"ARM_OIDC_TOKEN":             string(creds),
+			"AZURE_CLIENT_ID":            federatedData.ClientID,
+			"AZURE_TENANT_ID":            federatedData.TenantID,
+			"AZURE_FEDERATED_TOKEN_FILE": filePath,
+		},
+	}
+
+	return &response, nil
 }
