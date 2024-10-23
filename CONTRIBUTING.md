@@ -65,6 +65,7 @@ If your talents lean more toward writing documentation than code, your contribut
 
 ## Submitting Changes
 
+- submit your changes to the GitLab project: https://gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api  (Do NOT submit changes to the mirrored GitHub project.)
 - do your development in a feature or bug-fix branch based on "main"
 - please submit your contribution of code or documentation as a Git pull request
 - please respond as promptly as you can to feedback regarding your contribution (in order to save your time and ours)
