@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"time"
 
+	tfjson "github.com/hashicorp/terraform-json"
 	tharsis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/config"
@@ -34,6 +35,7 @@ type Client interface {
 	UpdateApply(ctx context.Context, apply *types.Apply) (*types.Apply, error)
 	UpdatePlan(ctx context.Context, apply *types.Plan) (*types.Plan, error)
 	UploadPlanCache(ctx context.Context, plan *types.Plan, body io.Reader) error
+	UploadPlanData(ctx context.Context, plan *types.Plan, tfPlan *tfjson.Plan, tfProviderScheams *tfjson.ProviderSchemas) error
 	DownloadConfigurationVersion(ctx context.Context, configurationVersion *types.ConfigurationVersion, writer io.WriterAt) error
 	DownloadStateVersion(ctx context.Context, stateVersion *types.StateVersion, writer io.WriterAt) error
 	DownloadPlanCache(ctx context.Context, planID string, writer io.WriterAt) error
@@ -183,9 +185,6 @@ func (c *client) UpdatePlan(ctx context.Context, plan *types.Plan) (*types.Plan,
 			ID:                   plan.Metadata.ID,
 			Status:               plan.Status,
 			HasChanges:           plan.HasChanges,
-			ResourceAdditions:    plan.ResourceAdditions,
-			ResourceChanges:      plan.ResourceChanges,
-			ResourceDestructions: plan.ResourceDestructions,
 		},
 	)
 	if err != nil {
@@ -275,6 +274,11 @@ func (c *client) DownloadPlanCache(ctx context.Context, planID string, writer io
 // UploadPlanCache uploads a plan cache and returns any errors
 func (c *client) UploadPlanCache(ctx context.Context, plan *types.Plan, body io.Reader) error {
 	return c.tharsisClient.Plan.UploadPlanCache(ctx, plan.Metadata.ID, body)
+}
+
+// UploadPlanData uploads the json plan and provider schemas and returns any errors
+func (c *client) UploadPlanData(ctx context.Context, plan *types.Plan, tfPlan *tfjson.Plan, tfProviderScheams *tfjson.ProviderSchemas) error {
+	return c.tharsisClient.Plan.UploadPlanData(ctx, plan.Metadata.ID, tfPlan, tfProviderScheams)
 }
 
 // CreateTerraformCLIDownloadURL creates a download URL which can be used to

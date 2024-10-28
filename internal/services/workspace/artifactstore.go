@@ -22,7 +22,11 @@ type ArtifactStore interface {
 	UploadStateVersion(ctx context.Context, stateVersion *models.StateVersion, body io.Reader) error
 	DownloadPlanCache(ctx context.Context, run *models.Run, writer io.WriterAt) error
 	UploadPlanCache(ctx context.Context, run *models.Run, body io.Reader) error
+	UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) error
+	UploadPlanDiff(ctx context.Context, run *models.Run, body io.Reader) error
 	GetPlanCache(ctx context.Context, run *models.Run) (io.ReadCloser, error)
+	GetPlanJSON(ctx context.Context, run *models.Run) (io.ReadCloser, error)
+	GetPlanDiff(ctx context.Context, run *models.Run) (io.ReadCloser, error)
 	UploadRunVariables(ctx context.Context, run *models.Run, body io.Reader) error
 	GetRunVariables(ctx context.Context, run *models.Run) (io.ReadCloser, error)
 }
@@ -80,6 +84,38 @@ func (a *artifactStore) GetStateVersion(ctx context.Context, stateVersion *model
 	return a.objectStore.GetObjectStream(
 		ctx,
 		getStateVersionObjectKey(stateVersion),
+		nil,
+	)
+}
+
+func (a *artifactStore) UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) error {
+	return a.upload(
+		ctx,
+		getPlanJSONObjectKey(run),
+		body,
+	)
+}
+
+func (a *artifactStore) GetPlanJSON(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
+	return a.objectStore.GetObjectStream(
+		ctx,
+		getPlanJSONObjectKey(run),
+		nil,
+	)
+}
+
+func (a *artifactStore) UploadPlanDiff(ctx context.Context, run *models.Run, body io.Reader) error {
+	return a.upload(
+		ctx,
+		getPlanDiffObjectKey(run),
+		body,
+	)
+}
+
+func (a *artifactStore) GetPlanDiff(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
+	return a.objectStore.GetObjectStream(
+		ctx,
+		getPlanDiffObjectKey(run),
 		nil,
 	)
 }
@@ -143,6 +179,14 @@ func getRunVariablesObjectKey(run *models.Run) string {
 
 func getPlanCacheObjectKey(run *models.Run) string {
 	return fmt.Sprintf("workspaces/%s/runs/%s/plan/%s", run.WorkspaceID, run.Metadata.ID, run.PlanID)
+}
+
+func getPlanJSONObjectKey(run *models.Run) string {
+	return fmt.Sprintf("workspaces/%s/runs/%s/plan/%s.json", run.WorkspaceID, run.Metadata.ID, run.PlanID)
+}
+
+func getPlanDiffObjectKey(run *models.Run) string {
+	return fmt.Sprintf("workspaces/%s/runs/%s/plan/diff_%s.json", run.WorkspaceID, run.Metadata.ID, run.PlanID)
 }
 
 func getConfigurationVersionObjectKey(configurationVersion *models.ConfigurationVersion) string {

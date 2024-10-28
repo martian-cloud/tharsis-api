@@ -258,9 +258,9 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 		ID:                   gid.ToGlobalID(gid.PlanType, plan.Metadata.ID),
 		Status:               gotfe.PlanStatus(plan.Status),
 		HasChanges:           plan.HasChanges,
-		ResourceAdditions:    plan.ResourceAdditions,
-		ResourceChanges:      plan.ResourceChanges,
-		ResourceDestructions: plan.ResourceDestructions,
+		ResourceAdditions:    int(plan.Summary.ResourceAdditions),
+		ResourceChanges:      int(plan.Summary.ResourceChanges),
+		ResourceDestructions: int(plan.Summary.ResourceDestructions),
 	}
 
 	if job != nil && c.tharsisAPIURL != "" {

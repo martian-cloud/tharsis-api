@@ -7,6 +7,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 	"github.com/graph-gophers/dataloader"
@@ -14,6 +15,21 @@ import (
 )
 
 /* Plan Query Resolvers */
+
+// PlanChangesResolver resolves plan changes
+type PlanChangesResolver struct {
+	planDiff *plan.Diff
+}
+
+// Resources resolver
+func (r *PlanChangesResolver) Resources() []*plan.ResourceDiff {
+	return r.planDiff.Resources
+}
+
+// Outputs resolver
+func (r *PlanChangesResolver) Outputs() []*plan.OutputDiff {
+	return r.planDiff.Outputs
+}
 
 // PlanResolver resolves a plan resource
 type PlanResolver struct {
@@ -35,24 +51,34 @@ func (r *PlanResolver) HasChanges() bool {
 	return bool(r.plan.HasChanges)
 }
 
-// Metadata resolver
-func (r *PlanResolver) Metadata() *MetadataResolver {
-	return &MetadataResolver{metadata: &r.plan.Metadata}
+// Summary resolver
+func (r *PlanResolver) Summary() models.PlanSummary {
+	return r.plan.Summary
+}
+
+// DiffSize resolver
+func (r *PlanResolver) DiffSize() int32 {
+	return int32(r.plan.PlanDiffSize)
 }
 
 // ResourceAdditions resolver
 func (r *PlanResolver) ResourceAdditions() int32 {
-	return int32(r.plan.ResourceAdditions)
+	return r.plan.Summary.ResourceAdditions
 }
 
 // ResourceChanges resolver
 func (r *PlanResolver) ResourceChanges() int32 {
-	return int32(r.plan.ResourceChanges)
+	return r.plan.Summary.ResourceChanges
 }
 
 // ResourceDestructions resolver
 func (r *PlanResolver) ResourceDestructions() int32 {
-	return int32(r.plan.ResourceDestructions)
+	return r.plan.Summary.ResourceDestructions
+}
+
+// Metadata resolver
+func (r *PlanResolver) Metadata() *MetadataResolver {
+	return &MetadataResolver{metadata: &r.plan.Metadata}
 }
 
 // CurrentJob returns the current job for the plan resource
@@ -65,6 +91,19 @@ func (r *PlanResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
 		return nil, err
 	}
 	return &JobResolver{job: job}, nil
+}
+
+// Changes resolver
+func (r *PlanResolver) Changes(ctx context.Context) (*PlanChangesResolver, error) {
+	diff, err := getRunService(ctx).GetPlanDiff(ctx, r.plan.Metadata.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &PlanChangesResolver{planDiff: diff}, nil
 }
 
 /* Plan Mutation Resolvers */
@@ -91,14 +130,11 @@ func (r *PlanMutationPayloadResolver) Plan() *PlanResolver {
 
 // UpdatePlanInput contains the input for updating a plan
 type UpdatePlanInput struct {
-	ClientMutationID     *string
-	ID                   string
-	Metadata             *MetadataInput
-	Status               string
-	HasChanges           bool
-	ResourceAdditions    int32
-	ResourceChanges      int32
-	ResourceDestructions int32
+	ClientMutationID *string
+	ID               string
+	Metadata         *MetadataInput
+	Status           string
+	HasChanges       bool
 }
 
 func handlePlanMutationProblem(e error, clientMutationID *string) (*PlanMutationPayloadResolver, error) {
@@ -131,9 +167,6 @@ func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutat
 	// Update fields
 	plan.Status = models.PlanStatus(input.Status)
 	plan.HasChanges = input.HasChanges
-	plan.ResourceAdditions = int(input.ResourceAdditions)
-	plan.ResourceChanges = int(input.ResourceChanges)
-	plan.ResourceDestructions = int(input.ResourceDestructions)
 
 	plan, err = runService.UpdatePlan(ctx, plan)
 	if err != nil {

@@ -75,7 +75,21 @@ type plans struct {
 	dbClient *Client
 }
 
-var planFieldList = append(metadataFieldList, "workspace_id", "status", "has_changes", "resource_additions", "resource_changes", "resource_destructions")
+var planFieldList = append(
+	metadataFieldList,
+	"workspace_id",
+	"status",
+	"has_changes",
+	"resource_additions",
+	"resource_changes",
+	"resource_destructions",
+	"resource_imports",
+	"resource_drift",
+	"output_additions",
+	"output_changes",
+	"output_destructions",
+	"diff_size",
+)
 
 // NewPlans returns an instance of the Plan interface
 func NewPlans(dbClient *Client) Plans {
@@ -199,9 +213,15 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 			"workspace_id":          plan.WorkspaceID,
 			"status":                plan.Status,
 			"has_changes":           plan.HasChanges,
-			"resource_additions":    plan.ResourceAdditions,
-			"resource_changes":      plan.ResourceChanges,
-			"resource_destructions": plan.ResourceDestructions,
+			"resource_additions":    plan.Summary.ResourceAdditions,
+			"resource_changes":      plan.Summary.ResourceChanges,
+			"resource_destructions": plan.Summary.ResourceDestructions,
+			"resource_imports":      plan.Summary.ResourceImports,
+			"resource_drift":        plan.Summary.ResourceDrift,
+			"output_additions":      plan.Summary.OutputAdditions,
+			"output_changes":        plan.Summary.OutputChanges,
+			"output_destructions":   plan.Summary.OutputDestructions,
+			"diff_size":             plan.PlanDiffSize,
 		}).
 		Returning(planFieldList...).ToSQL()
 
@@ -236,9 +256,15 @@ func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 				"updated_at":            timestamp,
 				"status":                plan.Status,
 				"has_changes":           plan.HasChanges,
-				"resource_additions":    plan.ResourceAdditions,
-				"resource_changes":      plan.ResourceChanges,
-				"resource_destructions": plan.ResourceDestructions,
+				"resource_additions":    plan.Summary.ResourceAdditions,
+				"resource_changes":      plan.Summary.ResourceChanges,
+				"resource_destructions": plan.Summary.ResourceDestructions,
+				"resource_imports":      plan.Summary.ResourceImports,
+				"resource_drift":        plan.Summary.ResourceDrift,
+				"output_additions":      plan.Summary.OutputAdditions,
+				"output_changes":        plan.Summary.OutputChanges,
+				"output_destructions":   plan.Summary.OutputDestructions,
+				"diff_size":             plan.PlanDiffSize,
 			},
 		).Where(goqu.Ex{"id": plan.Metadata.ID, "version": plan.Metadata.Version}).Returning(planFieldList...).ToSQL()
 
@@ -272,9 +298,15 @@ func scanPlan(row scanner) (*models.Plan, error) {
 		&plan.WorkspaceID,
 		&plan.Status,
 		&plan.HasChanges,
-		&plan.ResourceAdditions,
-		&plan.ResourceChanges,
-		&plan.ResourceDestructions,
+		&plan.Summary.ResourceAdditions,
+		&plan.Summary.ResourceChanges,
+		&plan.Summary.ResourceDestructions,
+		&plan.Summary.ResourceImports,
+		&plan.Summary.ResourceDrift,
+		&plan.Summary.OutputAdditions,
+		&plan.Summary.OutputChanges,
+		&plan.Summary.OutputDestructions,
+		&plan.PlanDiffSize,
 	)
 	if err != nil {
 		return nil, err

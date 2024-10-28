@@ -1,12 +1,17 @@
 package run
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -16,6 +21,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
@@ -295,6 +302,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 				nil,
 				ruleEnforcer,
 				limits.NewLimitChecker(dbClient.Client),
+				nil,
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
@@ -866,6 +874,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				nil,
 				nil,
 				limits.NewLimitChecker(dbClient.Client),
+				nil,
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
@@ -1005,6 +1014,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 				state.NewRunStateManager(dbClient.Client, logger),
 				ruleEnforcer,
 				limits.NewLimitChecker(dbClient.Client),
+				nil,
 			)
 
 			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)
@@ -1252,6 +1262,306 @@ func TestGetRuns(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.NotNil(t, runsResult)
+		})
+	}
+}
+
+func TestGetPlanDiff(t *testing.T) {
+	workspaceID := "ws1"
+	runID := "run1"
+
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: runID,
+		},
+		WorkspaceID: workspaceID,
+		PlanID:      "plan-1",
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+		expectedDiff    *plan.Diff
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject does not have permission to view run",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:         "get plan diff",
+			expectedDiff: &plan.Diff{},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+
+			planDiffBuf, err := json.Marshal(test.expectedDiff)
+			require.NoError(t, err)
+
+			mockArtifactStore.On("GetPlanDiff", mock.Anything, run).Return(io.NopCloser(bytes.NewReader(planDiffBuf)), nil).Maybe()
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				artifactStore: mockArtifactStore,
+			}
+
+			actualDiff, err := service.GetPlanDiff(auth.WithCaller(ctx, mockCaller), run.PlanID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectedDiff, actualDiff)
+		})
+	}
+}
+
+func TestUploadPlanBinary(t *testing.T) {
+	workspaceID := "ws1"
+	runID := "run1"
+	planID := "plan-1"
+
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: runID,
+		},
+		WorkspaceID: workspaceID,
+		PlanID:      planID,
+	}
+
+	type testCase struct {
+		authError       error
+		name            string
+		expectErrorCode errors.CodeType
+		expectData      string
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject does not have permission to upload plan binary",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:       "upload plan binary",
+			expectData: "test data",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+
+			mockRuns := db.NewMockRuns(t)
+
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdatePlanPermission, mock.Anything).Return(test.authError)
+
+			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil).Maybe()
+
+			if test.authError == nil {
+				matcher := mock.MatchedBy(func(reader io.Reader) bool {
+					actual, err := io.ReadAll(reader)
+					require.NoError(t, err)
+
+					return string(actual) == test.expectData
+				})
+				mockArtifactStore.On("UploadPlanCache", mock.Anything, run, matcher).Return(nil)
+			}
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				artifactStore: mockArtifactStore,
+			}
+
+			err := service.UploadPlanBinary(auth.WithCaller(ctx, mockCaller), run.PlanID, strings.NewReader(test.expectData))
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestProcessPlanData(t *testing.T) {
+	workspaceID := "ws1"
+	runID := "run1"
+	planID := "plan-1"
+
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: runID,
+		},
+		WorkspaceID: workspaceID,
+		PlanID:      planID,
+	}
+
+	type testCase struct {
+		authError         error
+		name              string
+		expectErrorCode   errors.CodeType
+		tfPlan            *tfjson.Plan
+		tfProviderSchemas *tfjson.ProviderSchemas
+		expectedPlan      *models.Plan
+		expectDiff        *plan.Diff
+	}
+
+	testCases := []testCase{
+		{
+			name:            "subject does not have permission to update plan",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "process plan data",
+			tfPlan: &tfjson.Plan{
+				FormatVersion: "0.1",
+				OutputChanges: map[string]*tfjson.Change{
+					"test": {
+						Actions: tfjson.Actions{tfjson.ActionCreate},
+					},
+				},
+			},
+			tfProviderSchemas: &tfjson.ProviderSchemas{
+				FormatVersion: "0.1",
+			},
+			expectedPlan: &models.Plan{
+				Metadata: models.ResourceMetadata{
+					ID: planID,
+				},
+				WorkspaceID: workspaceID,
+				Summary: models.PlanSummary{
+					OutputAdditions: 1,
+				},
+				PlanDiffSize: 126,
+			},
+			expectDiff: &plan.Diff{
+				Outputs: []*plan.OutputDiff{
+					{
+						OutputName: "test",
+						Action:     action.Create,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+
+			mockRuns := db.NewMockRuns(t)
+			mockPlans := db.NewMockPlans(t)
+			mockTransactions := db.NewMockTransactions(t)
+
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			mockParser := plan.NewMockParser(t)
+
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdatePlanPermission, mock.Anything).Return(test.authError)
+
+			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil).Maybe()
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+
+			if test.authError == nil {
+				mockParser.On("Parse", test.tfPlan, test.tfProviderSchemas).Return(test.expectDiff, nil)
+
+				mockPlans.On("GetPlan", mock.Anything, run.PlanID).Return(&models.Plan{
+					Metadata: models.ResourceMetadata{
+						ID: planID,
+					},
+					WorkspaceID: workspaceID,
+				}, nil)
+				mockPlans.On("UpdatePlan", mock.Anything, test.expectedPlan).Return(test.expectedPlan, nil)
+
+				planDiffMatcher := mock.MatchedBy(func(reader io.Reader) bool {
+					actual, err := io.ReadAll(reader)
+					require.NoError(t, err)
+
+					expected, err := json.Marshal(test.expectDiff)
+					require.NoError(t, err)
+
+					return string(actual) == string(expected)
+				})
+				mockArtifactStore.On("UploadPlanDiff", mock.Anything, run, planDiffMatcher).Return(nil)
+
+				planJSONMatcher := mock.MatchedBy(func(reader io.Reader) bool {
+					actual, err := io.ReadAll(reader)
+					require.NoError(t, err)
+
+					expected, err := json.Marshal(test.tfPlan)
+					require.NoError(t, err)
+
+					return string(actual) == string(expected)
+				})
+				mockArtifactStore.On("UploadPlanJSON", mock.Anything, run, planJSONMatcher).Return(nil)
+
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+			}
+
+			dbClient := &db.Client{
+				Runs:         mockRuns,
+				Plans:        mockPlans,
+				Transactions: mockTransactions,
+			}
+
+			logger, _ := logger.NewForTest()
+
+			service := &service{
+				dbClient:        dbClient,
+				artifactStore:   mockArtifactStore,
+				runStateManager: state.NewRunStateManager(dbClient, logger),
+				planParser:      mockParser,
+			}
+
+			err := service.ProcessPlanData(auth.WithCaller(ctx, mockCaller), run.PlanID, test.tfPlan, test.tfProviderSchemas)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

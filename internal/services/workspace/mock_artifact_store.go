@@ -110,6 +110,58 @@ func (_m *MockArtifactStore) GetPlanCache(ctx context.Context, run *models.Run) 
 	return r0, r1
 }
 
+// GetPlanDiff provides a mock function with given fields: ctx, run
+func (_m *MockArtifactStore) GetPlanDiff(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, run)
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run) (io.ReadCloser, error)); ok {
+		return rf(ctx, run)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run) io.ReadCloser); ok {
+		r0 = rf(ctx, run)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run) error); ok {
+		r1 = rf(ctx, run)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPlanJSON provides a mock function with given fields: ctx, run
+func (_m *MockArtifactStore) GetPlanJSON(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, run)
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run) (io.ReadCloser, error)); ok {
+		return rf(ctx, run)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run) io.ReadCloser); ok {
+		r0 = rf(ctx, run)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Run) error); ok {
+		r1 = rf(ctx, run)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunVariables provides a mock function with given fields: ctx, run
 func (_m *MockArtifactStore) GetRunVariables(ctx context.Context, run *models.Run) (io.ReadCloser, error) {
 	ret := _m.Called(ctx, run)
@@ -178,6 +230,34 @@ func (_m *MockArtifactStore) UploadConfigurationVersion(ctx context.Context, con
 
 // UploadPlanCache provides a mock function with given fields: ctx, run, body
 func (_m *MockArtifactStore) UploadPlanCache(ctx context.Context, run *models.Run, body io.Reader) error {
+	ret := _m.Called(ctx, run, body)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r0 = rf(ctx, run, body)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadPlanDiff provides a mock function with given fields: ctx, run, body
+func (_m *MockArtifactStore) UploadPlanDiff(ctx context.Context, run *models.Run, body io.Reader) error {
+	ret := _m.Called(ctx, run, body)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Run, io.Reader) error); ok {
+		r0 = rf(ctx, run, body)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadPlanJSON provides a mock function with given fields: ctx, run, body
+func (_m *MockArtifactStore) UploadPlanJSON(ctx context.Context, run *models.Run, body io.Reader) error {
 	ret := _m.Called(ctx, run, body)
 
 	var r0 error

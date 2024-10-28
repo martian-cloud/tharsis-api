@@ -486,24 +486,18 @@ func TestCreatePlan(t *testing.T) {
 		{
 			name: "positive full",
 			toCreate: &models.Plan{
-				WorkspaceID:          warmupWorkspaceID,
-				Status:               models.PlanFinished,
-				HasChanges:           true,
-				ResourceAdditions:    21,
-				ResourceChanges:      22,
-				ResourceDestructions: 23,
+				WorkspaceID: warmupWorkspaceID,
+				Status:      models.PlanFinished,
+				HasChanges:  true,
 			},
 			expectCreated: &models.Plan{
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
 				},
-				WorkspaceID:          warmupWorkspaceID,
-				Status:               models.PlanFinished,
-				HasChanges:           true,
-				ResourceAdditions:    21,
-				ResourceChanges:      22,
-				ResourceDestructions: 23,
+				WorkspaceID: warmupWorkspaceID,
+				Status:      models.PlanFinished,
+				HasChanges:  true,
 			},
 		},
 
@@ -588,12 +582,9 @@ func TestUpdatePlan(t *testing.T) {
 					ID:      positivePlan.Metadata.ID,
 					Version: positivePlan.Metadata.Version,
 				},
-				WorkspaceID:          warmupWorkspaceID,
-				Status:               models.PlanFinished,
-				HasChanges:           true,
-				ResourceAdditions:    141,
-				ResourceChanges:      152,
-				ResourceDestructions: 163,
+				WorkspaceID: warmupWorkspaceID,
+				Status:      models.PlanFinished,
+				HasChanges:  true,
 			},
 			expectPlan: &models.Plan{
 				Metadata: models.ResourceMetadata{
@@ -602,12 +593,9 @@ func TestUpdatePlan(t *testing.T) {
 					CreationTimestamp:    positivePlan.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
 				},
-				WorkspaceID:          warmupWorkspaceID,
-				Status:               models.PlanFinished,
-				HasChanges:           true,
-				ResourceAdditions:    141,
-				ResourceChanges:      152,
-				ResourceDestructions: 163,
+				WorkspaceID: warmupWorkspaceID,
+				Status:      models.PlanFinished,
+				HasChanges:  true,
 			},
 		},
 		{
@@ -680,24 +668,19 @@ var standardWarmupWorkspacesForPlans = []models.Workspace{
 // Standard warmup plan(s) for tests in this module:
 var standardWarmupPlans = []models.Plan{
 	{
-		HasChanges:        true,
-		ResourceAdditions: 10,
+		HasChanges: true,
 	},
 	{
-		HasChanges:        true,
-		ResourceAdditions: 11,
+		HasChanges: true,
 	},
 	{
-		HasChanges:        true,
-		ResourceAdditions: 12,
+		HasChanges: true,
 	},
 	{
-		HasChanges:        true,
-		ResourceAdditions: 13,
+		HasChanges: true,
 	},
 	{
-		HasChanges:        true,
-		ResourceAdditions: 14,
+		HasChanges: true,
 	},
 }
 
@@ -791,9 +774,9 @@ func comparePlans(t *testing.T, expected, actual *models.Plan,
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
 	assert.Equal(t, expected.Status, actual.Status)
 	assert.Equal(t, expected.HasChanges, actual.HasChanges)
-	assert.Equal(t, expected.ResourceAdditions, actual.ResourceAdditions)
-	assert.Equal(t, expected.ResourceChanges, actual.ResourceChanges)
-	assert.Equal(t, expected.ResourceDestructions, actual.ResourceDestructions)
+	assert.Equal(t, expected.Summary.ResourceAdditions, actual.Summary.ResourceAdditions)
+	assert.Equal(t, expected.Summary.ResourceChanges, actual.Summary.ResourceChanges)
+	assert.Equal(t, expected.Summary.ResourceDestructions, actual.Summary.ResourceDestructions)
 
 	if checkID {
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
