@@ -14,12 +14,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
+	tfjson "github.com/hashicorp/terraform-json"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
@@ -138,9 +141,11 @@ type Service interface {
 	GetRunVariables(ctx context.Context, runID string) ([]Variable, error)
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
 	GetPlan(ctx context.Context, planID string) (*models.Plan, error)
+	GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error)
 	UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error)
 	DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error)
-	UploadPlan(ctx context.Context, planID string, reader io.Reader) error
+	UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error
+	ProcessPlanData(ctx context.Context, planID string, plan *tfjson.Plan, providerSchemas *tfjson.ProviderSchemas) error
 	GetAppliesByIDs(ctx context.Context, idList []string) ([]models.Apply, error)
 	GetApply(ctx context.Context, applyID string) (*models.Apply, error)
 	UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error)
@@ -163,6 +168,7 @@ type service struct {
 	moduleResolver  ModuleResolver
 	ruleEnforcer    rules.RuleEnforcer
 	limitChecker    limits.LimitChecker
+	planParser      plan.Parser
 }
 
 // NewService creates an instance of Service
@@ -192,6 +198,7 @@ func NewService(
 		runStateManager,
 		rules.NewRuleEnforcer(dbClient),
 		limitChecker,
+		plan.NewParser(),
 	)
 }
 
@@ -208,6 +215,7 @@ func newService(
 	runStateManager *state.RunStateManager,
 	ruleEnforcer rules.RuleEnforcer,
 	limitChecker limits.LimitChecker,
+	planParser plan.Parser,
 ) Service {
 	return &service{
 		logger,
@@ -222,6 +230,7 @@ func newService(
 		moduleResolver,
 		ruleEnforcer,
 		limitChecker,
+		planParser,
 	}
 }
 
@@ -1435,9 +1444,8 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 	return variables, nil
 }
 
-func (s *service) UploadPlan(ctx context.Context, planID string, reader io.Reader) error {
-	ctx, span := tracer.Start(ctx, "svc.UploadPlan")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error {
+	ctx, span := tracer.Start(ctx, "svc.UploadPlanBinary")
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -1467,6 +1475,174 @@ func (s *service) UploadPlan(ctx context.Context, planID string, reader io.Reade
 	}
 
 	return nil
+}
+
+func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tfjson.Plan, tfProviderSchemas *tfjson.ProviderSchemas) error {
+	ctx, span := tracer.Start(ctx, "svc.ProcessPlanData")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(planID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return err
+	}
+
+	run, err := s.dbClient.Runs.GetRunByPlanID(ctx, planID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by plan ID")
+		return err
+	}
+
+	if run == nil {
+		return errors.New("run with plan ID %s not found", planID)
+	}
+
+	diff, err := s.planParser.Parse(tfPlan, tfProviderSchemas)
+	if err != nil {
+		return errors.Wrap(
+			err,
+			"failed to create plan diff",
+		)
+	}
+
+	planDiff, err := json.Marshal(diff)
+	if err != nil {
+		return errors.Wrap(
+			err,
+			"failed to marshal plan diff",
+		)
+	}
+
+	planModel, err := s.dbClient.Plans.GetPlan(ctx, planID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get plan")
+		return err
+	}
+
+	if planModel == nil {
+		return errors.New("plan with ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	// Update plan summary
+	for _, change := range diff.Resources {
+		switch change.Action {
+		case action.Create:
+			planModel.Summary.ResourceAdditions++
+		case action.Update:
+			planModel.Summary.ResourceChanges++
+		case action.Delete:
+			planModel.Summary.ResourceDestructions++
+		case action.CreateThenDelete, action.DeleteThenCreate:
+			planModel.Summary.ResourceAdditions++
+			planModel.Summary.ResourceDestructions++
+		}
+
+		if change.Imported {
+			planModel.Summary.ResourceImports++
+		}
+
+		if change.Drifted {
+			planModel.Summary.ResourceDrift++
+		}
+	}
+	for _, change := range diff.Outputs {
+		switch change.Action {
+		case action.Create:
+			planModel.Summary.OutputAdditions++
+		case action.Update:
+			planModel.Summary.OutputChanges++
+		case action.Delete:
+			planModel.Summary.OutputDestructions++
+		}
+	}
+
+	planModel.PlanDiffSize = len(planDiff)
+
+	if _, err = s.runStateManager.UpdatePlan(ctx, planModel); err != nil {
+		return errors.Wrap(
+			err,
+			"failed to update plan",
+		)
+	}
+
+	if err = s.artifactStore.UploadPlanDiff(ctx, run, bytes.NewReader(planDiff)); err != nil {
+		return errors.Wrap(
+			err,
+			"Failed to write plan diff to object storage",
+			errors.WithSpan(span),
+		)
+	}
+
+	planJSON, err := json.Marshal(tfPlan)
+	if err != nil {
+		return errors.Wrap(
+			err,
+			"failed to marshal plan json",
+		)
+	}
+
+	if err := s.artifactStore.UploadPlanJSON(ctx, run, bytes.NewReader(planJSON)); err != nil {
+		return errors.Wrap(
+			err,
+			"Failed to write plan json to object storage",
+			errors.WithSpan(span),
+		)
+	}
+
+	return nil
+}
+
+// GetPlanDiff returns the plan diff
+func (s *service) GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetPlanDiff")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	run, err := s.dbClient.Runs.GetRunByPlanID(ctx, planID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by plan ID")
+		return nil, err
+	}
+
+	if run == nil {
+		return nil, errors.New("run with plan ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	reader, err := s.artifactStore.GetPlanDiff(ctx, run)
+	if err != nil {
+		return nil, errors.Wrap(
+			err,
+			"Failed to get plan diff from artifact store",
+		)
+	}
+	defer reader.Close()
+
+	var diff *plan.Diff
+	if err := json.NewDecoder(reader).Decode(&diff); err != nil {
+		return nil, errors.Wrap(
+			err,
+			"failed to decode plan diff",
+		)
+	}
+
+	return diff, nil
 }
 
 func (s *service) GetAppliesByIDs(ctx context.Context, idList []string) ([]models.Apply, error) {

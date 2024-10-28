@@ -1063,12 +1063,16 @@ var standardWarmupRuns = []models.Run{
 // Standard warmup plan(s) for tests in this module:
 var standardWarmupPlansForRuns = []models.Plan{
 	{
-		HasChanges:        true,
-		ResourceAdditions: 10,
+		HasChanges: true,
+		Summary: models.PlanSummary{
+			ResourceAdditions: 10,
+		},
 	},
 	{
-		HasChanges:        true,
-		ResourceAdditions: 11,
+		HasChanges: true,
+		Summary: models.PlanSummary{
+			ResourceAdditions: 11,
+		},
 	},
 }
 

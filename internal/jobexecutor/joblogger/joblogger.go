@@ -1,6 +1,6 @@
 package joblogger
 
-//go:generate mockery --name JobLogger --inpackage --case underscore
+//go:generate mockery --name Logger --inpackage --case underscore
 
 import (
 	"context"

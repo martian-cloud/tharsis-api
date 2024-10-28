@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
+	"golang.org/x/sync/errgroup"
 )
 
 // PlanHandler handles a plan job
@@ -122,49 +123,66 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 		return fmt.Errorf("plan operation returned an error %v", err)
 	}
 
+	p.jobLogger.Write([]byte("\nPreparing plan output...\n"))
+
 	tf.SetStdout(nil)
-	planOutput, err := tf.ShowPlanFile(ctx, planOutputPath)
+
+	// Get plan
+	planJSON, err := tf.ShowPlanFile(ctx, planOutputPath)
 	if err != nil {
 		return fmt.Errorf("failed to run show command on plan file %v", err)
 	}
+
+	// Provider schemas
+	providerSchemasJSON, err := tf.ProvidersSchema(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to run provider schema command: %v", err)
+	}
+
 	tf.SetStdout(p.jobLogger)
 
-	for _, resource := range planOutput.ResourceChanges {
-		for _, action := range resource.Change.Actions {
-			switch action {
-			case "create":
-				plan.ResourceAdditions++
-			case "update":
-				plan.ResourceChanges++
-			case "delete":
-				plan.ResourceDestructions++
-			}
+	// Use error group to upload plan cache and plan data in parallel
+	eg := errgroup.Group{}
+
+	eg.Go(func() error {
+		// Upload plan cache
+		planReader, err := os.Open(planOutputPath) // nosemgrep: gosec.G304-1
+		if err != nil {
+			return fmt.Errorf("failed to read plan output %v", err)
 		}
+
+		defer planReader.Close()
+
+		if err = p.client.UploadPlanCache(ctx, plan, planReader); err != nil {
+			return fmt.Errorf("failed to upload plan binary%v", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		if err = p.client.UploadPlanData(ctx, plan, planJSON, providerSchemasJSON); err != nil {
+			// Log error and continue
+			p.jobLogger.Errorf("failed to upload plan json output %v", err)
+		}
+		return nil
+	})
+
+	// Wait for both uploads to finish
+	if err = eg.Wait(); err != nil {
+		return err
 	}
-
-	// Upload plan cache
-	planReader, err := os.Open(planOutputPath) // nosemgrep: gosec.G304-1
-	if err != nil {
-		return fmt.Errorf("failed to read plan output %v", err)
-	}
-
-	defer planReader.Close()
-
-	if err = p.client.UploadPlanCache(ctx, plan, planReader); err != nil {
-		return fmt.Errorf("failed to upload plan output to the object store %v", err)
-	}
-
-	p.jobLogger.Infof("\nUploaded plan output to object store\n")
-
-	// Flush all logs before updating plan state
-	p.jobLogger.Flush()
 
 	// Update plan and run status
 	if p.cancellableCtx.Err() != nil {
 		plan.Status = types.PlanCanceled
+		p.jobLogger.Infof("\nPlan was canceled \u274c")
 	} else {
 		plan.Status = types.PlanFinished
+		p.jobLogger.Infof("\nPlan complete! \u2705")
 	}
+
+	// Flush all logs before updating plan
+	p.jobLogger.Flush()
 
 	plan.HasChanges = hasChanges
 	_, err = p.client.UpdatePlan(ctx, plan)

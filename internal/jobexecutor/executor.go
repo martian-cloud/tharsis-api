@@ -150,7 +150,8 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 }
 
 func (j *JobExecutor) onError(ctx context.Context, jobLogger joblogger.Logger, jobImpl JobHandler, err error) {
-	jobLogger.Errorf("Error occurred while executing run: %s\n", err)
+	jobLogger.Errorf("Error occurred while executing run \u274c")
+	jobLogger.Errorf("%s", err)
 	jobLogger.Flush()
 
 	if err = jobImpl.OnError(ctx, err); err != nil {

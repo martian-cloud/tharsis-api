@@ -7,10 +7,75 @@ enum PlanStatus {
   running
 }
 
+enum PlanChangeAction {
+    NOOP
+    CREATE
+    READ
+    UPDATE
+    DELETE_THEN_CREATE
+    CREATE_THEN_DELETE
+    DELETE
+}
+
+enum TerraformResourceMode {
+  data
+  managed
+}
+
 type UpdatePlanPayload {
   clientMutationId: String
   plan: Plan
   problems: [Problem!]!
+}
+
+enum PlanChangeWarningType {
+    before
+    after
+}
+
+type PlanChangeWarning {
+    changeType: PlanChangeWarningType!
+    line: Int!
+    message: String!
+}
+
+type PlanResourceChange {
+    action: PlanChangeAction!
+    address: String!
+    mode: TerraformResourceMode!
+    providerName: String!
+    resourceType: String!
+    resourceName: String!
+    moduleAddress: String!
+    unifiedDiff: String!
+    originalSource: String!
+    imported: Boolean!
+    drifted: Boolean!
+    warnings: [PlanChangeWarning!]!
+}
+
+type PlanOutputChange {
+    action: PlanChangeAction!
+    outputName: String!
+    unifiedDiff: String!
+    originalSource: String!
+    warnings: [PlanChangeWarning!]!
+}
+
+type PlanChanges {
+    resources: [PlanResourceChange!]!
+    outputs: [PlanOutputChange!]!
+}
+
+type PlanSummary {
+    resourceAdditions: Int!
+    resourceChanges: Int!
+    resourceDestructions: Int!
+    resourceImports: Int!
+    resourceDrift: Int!
+    outputAdditions: Int!
+    outputChanges: Int!
+    outputDestructions: Int!
 }
 
 type Plan implements Node {
@@ -18,10 +83,13 @@ type Plan implements Node {
   metadata: ResourceMetadata!
   status: PlanStatus!
   hasChanges: Boolean!
-  resourceAdditions: Int!
-  resourceChanges: Int!
-  resourceDestructions: Int!
+  summary: PlanSummary!
   currentJob: Job
+  changes: PlanChanges
+  diffSize: Int!
+  resourceAdditions: Int! @deprecated(reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release")
+  resourceChanges: Int! @deprecated(reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release")
+  resourceDestructions: Int! @deprecated(reason: "Field has been moved to the PlanSummary type and will be removed in an upcoming release")
 }
 
 input UpdatePlanInput {
@@ -30,7 +98,4 @@ input UpdatePlanInput {
   metadata: ResourceMetadataInput
   status: PlanStatus!
   hasChanges: Boolean!
-  resourceAdditions: Int!
-  resourceChanges: Int!
-  resourceDestructions: Int!
 }

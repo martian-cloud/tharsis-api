@@ -13,15 +13,26 @@ const (
 	PlanRunning  PlanStatus = "running"
 )
 
+// PlanSummary contains a summary of the types of changes this plan includes
+type PlanSummary struct {
+	ResourceAdditions    int32
+	ResourceChanges      int32
+	ResourceDestructions int32
+	ResourceImports      int32
+	ResourceDrift        int32
+	OutputAdditions      int32
+	OutputChanges        int32
+	OutputDestructions   int32
+}
+
 // Plan includes information related to running a terraform plan command
 type Plan struct {
-	WorkspaceID          string
-	Status               PlanStatus
-	Metadata             ResourceMetadata
-	ResourceAdditions    int
-	ResourceChanges      int
-	ResourceDestructions int
-	HasChanges           bool
+	WorkspaceID  string
+	Status       PlanStatus
+	Metadata     ResourceMetadata
+	HasChanges   bool
+	Summary      PlanSummary
+	PlanDiffSize int
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
