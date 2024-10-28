@@ -1,0 +1,237 @@
+---
+Version: 1
+Name: Default
+Config:
+  CaCert:
+  CaKey:
+  ServerKey:
+  ClientCert:
+  ClientKey:
+  ConnectTimeout: 30
+  SendTimeout: 30
+  ReceiveTimeout: 30
+Routes:
+  - &Route0
+    Order: 0
+    Url: "**"
+    Mutate: true
+    SwaggerUrl:
+    Script:
+    Headers:
+      - Pattern: Host
+        Mutate: false
+      - Pattern: Connection
+        Mutate: false
+      - Pattern: Content-Length
+        Mutate: false
+    ApiTokens:
+      - Name: Authorization
+        Where: Header
+        Expiration: 120
+        IsSignatureOfRequest: false
+      - Name: access_token
+        Where: FormData
+        Expiration: 120
+        IsSignatureOfRequest: false
+      - Name: access_token
+        Where: Query
+        Expiration: 120
+        IsSignatureOfRequest: false
+      - Name: X-API-Key
+        Where: Header
+        Expiration: 120
+        IsSignatureOfRequest: false
+Assertions:
+  - Name: ResponseAnalysisAssertion
+    Configuration:
+      UserEntries: []
+  - Name: BlindInjectionAssertion
+    Configuration:
+      DefaultSleepTime: 10
+  - Name: CustomBodyContainsAssertion
+    Configuration:
+      IsRequired: false
+      IsCaseSensitive: false
+      IsRegex: false
+      SearchString: ""
+  - Name: CustomParameterContainsAssertion
+    Configuration:
+      ComparisonType: Contains
+      IsRequired: false
+      IsCaseSensitive: false
+      IsRegex: false
+      ParameterPart: Body
+      ParameterName: ""
+      Value: ""
+  - Name: StatusCodeAssertion
+    Configuration:
+      IsWhitelist: false
+      StatusCodes:
+        - 500
+        - 502
+        - 504
+Checks:
+  - Name: ApplicationInformationCheck
+    Configuration: {}
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+  - Name: CleartextAuthenticationCheck
+    Configuration: {}
+    Assertions: []
+  - Name: CorsCheck
+    Configuration:
+      AllowOriginWildcard: false
+    Assertions: []
+  - Name: DnsRebindingCheck
+    Configuration:
+      AllowedStatusCodes:
+        - 400
+    Assertions: []
+  - Name: FrameworkDebugModeCheck
+    Configuration: {}
+    Assertions: []
+  - Name: HtmlInjectionCheck
+    Configuration:
+      ForceRunning: false
+      UserInjections: []
+    Assertions: []
+  - Name: InsecureHttpMethodsCheck
+    Configuration:
+      CheckOptions: false
+      CheckTrace: true
+      CheckArbitrary: true
+    Assertions: []
+  - Name: JsonHijackingCheck
+    Configuration: {}
+    Assertions: []
+  - Name: JsonInjectionCheck
+    Configuration:
+      ForceRunning: false
+      UserInjections: []
+    Assertions: []
+  - Name: OpenRedirectCheck
+    Configuration:
+      UserFullUrlInjections: []
+      UserPartialUrlInjections: []
+    Assertions: []
+  - Name: OsCommandInjectionCheck
+    Configuration: {}
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+      - Name: BlindInjectionAssertion
+  - Name: PathTraversalCheck
+    Configuration: {}
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+  - Name: SensitiveFileCheck
+    Configuration:
+      ErrorPageRegex: ""
+      UserEntries: []
+    Assertions: []
+  - Name: SensitiveInformationCheck
+    Configuration: {}
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+  - Name: SessionCookieCheck
+    Configuration:
+      RequireHttpOnly: true
+      RequireSecure: true
+      MaxExpiration: 1440
+      UserEntries: []
+    Assertions: []
+  - Name: ShellShockCheck
+    Configuration:
+      UserInjections: []
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+      - Name: BlindInjectionAssertion
+  - Name: SqlInjectionCheck
+    Configuration:
+      UserInjections: []
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+      - Name: StatusCodeAssertion
+      - Name: BlindInjectionAssertion
+  - Name: TlsConfigurationCheck
+    Configuration:
+      CheckForCompression: true
+      TlsVersions:
+        - TlSv1
+        - TlSv11
+        - TlSv12
+        - TlSv13
+      ClearTlsVersions: false
+      Hmacs:
+        - Sha256
+        - Sha384
+        - Sha512
+        - Aead
+      ClearHmacs: false
+      Ciphers:
+        - 52392
+        - 52393
+        - 52394
+        - 49196
+        - 49200
+        - 52244
+        - 52243
+        - 49195
+        - 49199
+        - 49188
+        - 49192
+        - 49187
+        - 49191
+      ClearCiphers: false
+    Assertions: []
+  - Name: TokenCheck
+    Configuration:
+      MinSize: 16
+    Assertions: []
+  - Name: XmlInjectionCheck
+    Configuration:
+      ForceRunning: false
+      UserInjections: []
+    Assertions: []
+  - Name: HeartbleedOpenSslCheck
+    Configuration: {}
+  - Name: XmlExternalEntityCheck
+    Configuration:
+      IsLocalFileInclusionAttackEnabled: true
+      IsLocalFileReflectionAttackEnabled: true
+      IsParameterInjectionEnabled: true
+      MaxElementTestCount: 72
+    Assertions:
+      - Name: ResponseAnalysisAssertion
+Profiles:
+  # ##################################
+  - Name: Profile_1
+    DefaultProfile: Empty
+    Routes:
+      - Route: *Route0
+        Checks:
+          - Name: ApplicationInformationCheck
+          - Name: CleartextAuthenticationCheck
+          - Name: FrameworkDebugModeCheck
+          - Name: HtmlInjectionCheck
+          - Name: InsecureHttpMethodsCheck
+          - Name: JsonHijackingCheck
+          - Name: JsonInjectionCheck
+          - Name: SensitiveInformationCheck
+          - Name: SessionCookieCheck
+          - Name: TokenCheck
+          - Name: XmlInjectionCheck
+  ##################################
+  - Name: Profile_2
+    DefaultProfile: Empty
+    Routes:
+      - Route: *Route0
+        Checks:
+          - Name: OsCommandInjectionCheck
+  ##################################
+  - Name: Profile_3
+    DefaultProfile: Empty
+    Routes:
+      - Route: *Route0
+        Checks:
+          - Name: SqlInjectionCheck
+Findings: []

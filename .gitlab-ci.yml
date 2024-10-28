@@ -4,7 +4,7 @@ include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/SAST-IaC.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
-  - template: DAST-API.gitlab-ci.yml
+  - template: API-Security.gitlab-ci.yml
   - template: API-Fuzzing.gitlab-ci.yml
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
@@ -517,14 +517,28 @@ license_scanning:
   rules:
     - !reference [.on_default_branch_and_merge_train_with_golang_changes, rules]
 
-dast_api:
+merge-cyclonedx-sboms:
+  rules:
+    - !reference [.on_tag_events, rules]
+  needs:
+    - job: "add-container-sbom-details"
+      optional: true
+    - job: "go-sbom (cmd/apiserver,0)"
+      optional: true
+    - job: "go-sbom (cmd/job,0)"
+      optional: true
+    - job: "go-sbom (cmd/runner,0)"
+      optional: true
+
+api_security:
   services:
     - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
       alias: tharsis
   variables:
-    DAST_API_GRAPHQL: /graphql
-    DAST_API_TARGET_URL: http://tharsis:8000/
-    DAST_API_OVERRIDES_FILE: dast-api-overrides.json
+    APISEC_GRAPHQL: /graphql
+    APISEC_TARGET_URL: http://tharsis:8000/
+    APISEC_OVERRIDES_FILE: gitlab-api-config.yml
+    APISEC_CONFIG: .gitlab/gitlab-api-config.yml
     KUBERNETES_CPU_REQUEST: "2"
     KUBERNETES_CPU_LIMIT: "4"
     KUBERNETES_MEMORY_REQUEST: "500Mi"
@@ -545,7 +559,30 @@ dast_api:
         --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
         --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
       export THARSIS_STATIC_TOKEN
-      echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $DAST_API_OVERRIDES_FILE
+      echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $APISEC_OVERRIDES_FILE
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: never
+  timeout: 90m
+
+api_security_1:
+  extends: api_security
+  variables:
+    APISEC_PROFILE: Profile_1
+  rules:
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+api_security_2:
+  extends: api_security
+  variables:
+    APISEC_PROFILE: Profile_2
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+api_security_3:
+  extends: api_security
+  variables:
+    APISEC_PROFILE: Profile_3
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -556,7 +593,7 @@ apifuzzer_fuzz:
   variables:
     FUZZAPI_GRAPHQL: /graphql
     FUZZAPI_TARGET_URL: http://tharsis:8000/
-    FUZZAPI_OVERRIDES_FILE: dast-api-overrides.json
+    FUZZAPI_OVERRIDES_FILE: gitlab-api-config.yml
     KUBERNETES_CPU_REQUEST: "2"
     KUBERNETES_CPU_LIMIT: "4"
     KUBERNETES_MEMORY_REQUEST: "500Mi"
@@ -580,16 +617,3 @@ apifuzzer_fuzz:
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-merge-cyclonedx-sboms:
-  rules:
-    - !reference [.on_tag_events, rules]
-  needs:
-    - job: "add-container-sbom-details"
-      optional: true
-    - job: "go-sbom (cmd/apiserver,0)"
-      optional: true
-    - job: "go-sbom (cmd/job,0)"
-      optional: true
-    - job: "go-sbom (cmd/runner,0)"
-      optional: true
