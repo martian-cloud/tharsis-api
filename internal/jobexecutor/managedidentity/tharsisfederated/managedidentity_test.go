@@ -137,7 +137,8 @@ func TestAuthenticate(t *testing.T) {
 			}
 			assert.Equal(t, expectedEnv, response.Env)
 
-			verifyHostCredentialFileMapping(workspaceDir, t, hosts, response)
+			//TODO: Remote Datasource - put this back in place when we have overrideHost
+			//verifyHostCredentialFileMapping(workspaceDir, t, hosts, response)
 
 			lastToken := test.tokens[len(test.tokens)-1]
 			verifyServiceAccountTokenFileEventuallyContains(t, workspaceDir, lastToken)
@@ -216,10 +217,10 @@ func buildManagedIdentity(t *testing.T, serviceAccountPath string, hosts []strin
 	}
 }
 
-func buildManagedIdentityData(t *testing.T, serviceAccountPath string, hosts []string) string {
+func buildManagedIdentityData(t *testing.T, serviceAccountPath string, _ []string) string {
+	//TODO: Remote Datasource - Need to specify overrideHost and remove discarded parameter
 	data := &tharsisfederated.Data{
 		ServiceAccountPath: serviceAccountPath,
-		Hosts:              hosts,
 	}
 
 	dataBuffer, err := json.Marshal(data)
