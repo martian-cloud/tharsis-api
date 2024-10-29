@@ -88,11 +88,14 @@ func (a *Authenticator) Authenticate(
 		HostCredentialFileMapping: map[string]string{},
 	}
 
-	tokenFilePath := buildServiceAccountTokenFilepath(a.workspaceDir)
+	//TODO: Remote Datasource - if overrideHost is true, then put the api host into the host credential file mapping with the token file path.
+	/*
+		tokenFilePath := buildServiceAccountTokenFilepath(a.workspaceDir)
 
-	for _, host := range federatedData.Hosts {
-		response.HostCredentialFileMapping[host] = tokenFilePath
-	}
+		for _, host := range federatedData.Hosts {
+			response.HostCredentialFileMapping[host] = tokenFilePath
+		}
+	*/
 
 	return &response, nil
 }
