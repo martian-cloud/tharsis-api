@@ -75,10 +75,11 @@ func (a *Authenticator) Authenticate(
 
 	convertedCreds := string(creds)
 
-	err = setupServiceAccountTokenWithRefresh(ctx, federatedData.ServiceAccountPath, convertedCreds, a)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: Save token file to directory outside of workspace
+	// err = setupServiceAccountTokenWithRefresh(ctx, federatedData.ServiceAccountPath, convertedCreds, a)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	response := managedidentity.AuthenticateResponse{
 		Env: map[string]string{
