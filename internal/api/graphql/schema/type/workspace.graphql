@@ -34,6 +34,18 @@ type DeleteWorkspacePayload {
   problems: [Problem!]!
 }
 
+type LockWorkspacePayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
+type UnlockWorkspacePayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
 type WorkspaceEvent {
   action: String!
   workspace: Workspace!
@@ -145,4 +157,14 @@ input DeleteWorkspaceInput {
   id: String
   force: Boolean
   metadata: ResourceMetadataInput
+}
+
+input LockWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
+}
+
+input UnlockWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
 }

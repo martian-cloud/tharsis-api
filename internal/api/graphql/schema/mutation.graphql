@@ -3,6 +3,8 @@ type Mutation {
   createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload!
   updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload!
   deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload!
+  lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
+  unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   createGroup(input: CreateGroupInput!): CreateGroupPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!
   deleteGroup(input: DeleteGroupInput!): DeleteGroupPayload!

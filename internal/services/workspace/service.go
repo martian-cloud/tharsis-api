@@ -45,13 +45,13 @@ const (
 // These error messages must be translated to TFE equivalent by caller.
 var (
 	// Error returned when workspace is already locked.
-	ErrWorkspaceLocked = errors.New("workspace locked", errors.WithErrorCode(errors.EConflict))
+	ErrWorkspaceLocked = errors.New("workspace already locked", errors.WithErrorCode(errors.EConflict))
 
 	// Error returned when workspace is already unlocked.
-	ErrWorkspaceUnlocked = errors.New("workspace unlocked", errors.WithErrorCode(errors.EConflict))
+	ErrWorkspaceUnlocked = errors.New("workspace already unlocked", errors.WithErrorCode(errors.EConflict))
 
 	// Error returned when a workspace unlock is attempted but it's locked by a run.
-	ErrWorkspaceLockedByRun = errors.New("workspace locked by run", errors.WithErrorCode(errors.EConflict))
+	ErrWorkspaceLockedByRun = errors.New("cannot unlock workspace locked by run", errors.WithErrorCode(errors.EConflict))
 )
 
 // Event represents a workspace event

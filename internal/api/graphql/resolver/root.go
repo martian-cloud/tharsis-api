@@ -80,6 +80,26 @@ func (r RootResolver) WorkspaceEvents(ctx context.Context, args *struct{ Input *
 	return r.workspaceEventsSubscription(ctx, args.Input)
 }
 
+// LockWorkspace mutation locks a workspace
+func (r RootResolver) LockWorkspace(ctx context.Context, args *struct{ Input *LockWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	response, err := lockWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UnlockWorkspace mutation unlocks a workspace
+func (r RootResolver) UnlockWorkspace(ctx context.Context, args *struct{ Input *UnlockWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	response, err := unlockWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* State Version Queries and Mutations */
 
 // CreateStateVersion creates a new state version
