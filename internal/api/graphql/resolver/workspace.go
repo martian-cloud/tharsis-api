@@ -511,6 +511,18 @@ type DeleteWorkspaceInput struct {
 	ID               *string
 }
 
+// LockWorkspaceInput contains the input for locking a workspace
+type LockWorkspaceInput struct {
+	ClientMutationID *string
+	WorkspacePath    string
+}
+
+// UnlockWorkspaceInput contains the input for unlocking a workspace
+type UnlockWorkspaceInput struct {
+	ClientMutationID *string
+	WorkspacePath    string
+}
+
 func handleWorkspaceMutationProblem(e error, clientMutationID *string) (*WorkspaceMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -644,6 +656,40 @@ func deleteWorkspaceMutation(ctx context.Context, input *DeleteWorkspaceInput) (
 	}
 
 	if err := wsService.DeleteWorkspace(ctx, ws, force); err != nil {
+		return nil, err
+	}
+
+	payload := WorkspaceMutationPayload{ClientMutationID: input.ClientMutationID, Workspace: ws, Problems: []Problem{}}
+	return &WorkspaceMutationPayloadResolver{WorkspaceMutationPayload: payload}, nil
+}
+
+func lockWorkspaceMutation(ctx context.Context, input *LockWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
+	wsService := getWorkspaceService(ctx)
+
+	ws, err := wsService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	ws, err = wsService.LockWorkspace(ctx, ws)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := WorkspaceMutationPayload{ClientMutationID: input.ClientMutationID, Workspace: ws, Problems: []Problem{}}
+	return &WorkspaceMutationPayloadResolver{WorkspaceMutationPayload: payload}, nil
+}
+
+func unlockWorkspaceMutation(ctx context.Context, input *UnlockWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
+	wsService := getWorkspaceService(ctx)
+
+	ws, err := wsService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	ws, err = wsService.UnlockWorkspace(ctx, ws)
+	if err != nil {
 		return nil, err
 	}
 
