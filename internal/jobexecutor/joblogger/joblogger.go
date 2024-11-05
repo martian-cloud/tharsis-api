@@ -1,3 +1,4 @@
+// Package joblogger is used to handle job logs
 package joblogger
 
 //go:generate mockery --name Logger --inpackage --case underscore
@@ -8,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -72,12 +74,12 @@ func (j *jobLogger) Close() {
 
 // Infof writes an info log to the job's log output
 func (j *jobLogger) Infof(format string, a ...interface{}) {
-	j.Write([]byte(fmt.Sprintf(AnsiBoldCyan+format+"\n"+AnsiReset, a...)))
+	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldCyan)+"\n", a...)))
 }
 
 // Errorf writes an error log to the job's log output
 func (j *jobLogger) Errorf(format string, a ...interface{}) {
-	j.Write([]byte(fmt.Sprintf(AnsiBoldRed+format+"\n"+AnsiReset, a...)))
+	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldRed)+"\n", a...)))
 }
 
 // Write will append the data to the log buffer

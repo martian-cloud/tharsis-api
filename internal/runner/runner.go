@@ -52,10 +52,11 @@ func NewRunner(
 	ctx context.Context,
 	runnerPath string,
 	logger logger.Logger,
+	version string,
 	client Client,
 	jobDispatcherSettings *JobDispatcherSettings,
 ) (*Runner, error) {
-	dispatcher, err := newJobDispatcherPlugin(ctx, logger, jobDispatcherSettings)
+	dispatcher, err := newJobDispatcherPlugin(ctx, logger, version, jobDispatcherSettings)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job dispatcher %v", err)
 	}
@@ -161,7 +162,7 @@ func (r *Runner) sendRunnerSessionHeartbeat(ctx context.Context, sessionID strin
 	}
 }
 
-func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, settings *JobDispatcherSettings) (jobdispatcher.JobDispatcher, error) {
+func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, version string, settings *JobDispatcherSettings) (jobdispatcher.JobDispatcher, error) {
 	var (
 		plugin jobdispatcher.JobDispatcher
 		err    error
@@ -175,7 +176,7 @@ func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, settings 
 	case "docker":
 		plugin, err = docker.New(settings.PluginData, settings.ServiceDiscoveryHost, logger)
 	case "local":
-		plugin, err = local.New(settings.PluginData, settings.ServiceDiscoveryHost, logger)
+		plugin, err = local.New(settings.PluginData, settings.ServiceDiscoveryHost, logger, version)
 	default:
 		err = fmt.Errorf("the specified Job Executor plugin %s is not currently supported", settings.DispatcherType)
 	}

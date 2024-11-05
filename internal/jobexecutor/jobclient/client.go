@@ -167,8 +167,9 @@ func (c *client) GetWorkspace(ctx context.Context, id string) (*types.Workspace,
 func (c *client) UpdateApply(ctx context.Context, apply *types.Apply) (*types.Apply, error) {
 	updatedApply, err := c.tharsisClient.Apply.UpdateApply(ctx,
 		&types.UpdateApplyInput{
-			ID:     apply.Metadata.ID,
-			Status: apply.Status,
+			ID:           apply.Metadata.ID,
+			Status:       apply.Status,
+			ErrorMessage: apply.ErrorMessage,
 		},
 	)
 	if err != nil {
@@ -182,9 +183,10 @@ func (c *client) UpdateApply(ctx context.Context, apply *types.Apply) (*types.Ap
 func (c *client) UpdatePlan(ctx context.Context, plan *types.Plan) (*types.Plan, error) {
 	updatedPlan, err := c.tharsisClient.Plan.UpdatePlan(ctx,
 		&types.UpdatePlanInput{
-			ID:                   plan.Metadata.ID,
-			Status:               plan.Status,
-			HasChanges:           plan.HasChanges,
+			ID:           plan.Metadata.ID,
+			Status:       plan.Status,
+			HasChanges:   plan.HasChanges,
+			ErrorMessage: plan.ErrorMessage,
 		},
 	)
 	if err != nil {

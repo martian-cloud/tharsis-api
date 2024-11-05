@@ -1,5 +1,9 @@
 package models
 
+import (
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
 // PlanStatus represents the various states for a Plan resource
 type PlanStatus string
 
@@ -27,15 +31,24 @@ type PlanSummary struct {
 
 // Plan includes information related to running a terraform plan command
 type Plan struct {
+	ErrorMessage *string
 	WorkspaceID  string
 	Status       PlanStatus
 	Metadata     ResourceMetadata
-	HasChanges   bool
-	Summary      PlanSummary
 	PlanDiffSize int
+	Summary      PlanSummary
+	HasChanges   bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (p *Plan) ResolveMetadata(key string) (string, error) {
 	return p.Metadata.resolveFieldValue(key)
+}
+
+// Validate returns an error if the model is not valid
+func (p *Plan) Validate() error {
+	if p.ErrorMessage != nil && p.Status != PlanErrored {
+		return errors.New("invalid plan status, must be errored if error message is set", errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
 }

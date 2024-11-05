@@ -76,7 +76,7 @@ type applies struct {
 	dbClient *Client
 }
 
-var applyFieldList = append(metadataFieldList, "workspace_id", "status", "comment", "triggered_by")
+var applyFieldList = append(metadataFieldList, "workspace_id", "status", "error_message", "comment", "triggered_by")
 
 // NewApplies returns an instance of the Apply interface
 func NewApplies(dbClient *Client) Applies {
@@ -189,14 +189,15 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 	sql, args, err := dialect.Insert("applies").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":           newResourceID(),
-			"version":      initialResourceVersion,
-			"created_at":   timestamp,
-			"updated_at":   timestamp,
-			"workspace_id": apply.WorkspaceID,
-			"status":       apply.Status,
-			"comment":      apply.Comment,
-			"triggered_by": nullableString(apply.TriggeredBy),
+			"id":            newResourceID(),
+			"version":       initialResourceVersion,
+			"created_at":    timestamp,
+			"updated_at":    timestamp,
+			"workspace_id":  apply.WorkspaceID,
+			"status":        apply.Status,
+			"error_message": apply.ErrorMessage,
+			"comment":       apply.Comment,
+			"triggered_by":  nullableString(apply.TriggeredBy),
 		}).
 		Returning(applyFieldList...).ToSQL()
 
@@ -226,11 +227,12 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		Prepared(true).
 		Set(
 			goqu.Record{
-				"version":      goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":   timestamp,
-				"status":       apply.Status,
-				"comment":      apply.Comment,
-				"triggered_by": nullableString(apply.TriggeredBy),
+				"version":       goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":    timestamp,
+				"status":        apply.Status,
+				"error_message": apply.ErrorMessage,
+				"comment":       apply.Comment,
+				"triggered_by":  nullableString(apply.TriggeredBy),
 			},
 		).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).Returning(applyFieldList...).ToSQL()
 
@@ -265,6 +267,7 @@ func scanApply(row scanner) (*models.Apply, error) {
 		&apply.Metadata.Version,
 		&apply.WorkspaceID,
 		&apply.Status,
+		&apply.ErrorMessage,
 		&apply.Comment,
 		&triggeredBy,
 	)

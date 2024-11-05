@@ -82,6 +82,7 @@ type Plan implements Node {
   id: ID!
   metadata: ResourceMetadata!
   status: PlanStatus!
+  errorMessage: String
   hasChanges: Boolean!
   summary: PlanSummary!
   currentJob: Job
@@ -98,4 +99,5 @@ input UpdatePlanInput {
   metadata: ResourceMetadataInput
   status: PlanStatus!
   hasChanges: Boolean!
+  errorMessage: String
 }

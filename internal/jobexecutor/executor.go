@@ -21,13 +21,19 @@ const (
 
 	// waitForcedCancel is the duration to sleep between polls looking for forced cancel.
 	waitForcedCancel = 30 * time.Second
+
+	// successIcon is the icon used for success messages
+	successIcon = "\u2705"
+
+	// failureIcon is the icon used for failure messages
+	failureIcon = "\u274c"
 )
 
 // JobHandler contains the job lifecycle functions
 type JobHandler interface {
 	Execute(ctx context.Context) error
-	OnError(ctx context.Context, err error) error
-	OnSuccess(ctx context.Context) error
+	OnError(ctx context.Context, err error)
+	Cleanup(ctx context.Context) error
 }
 
 // JobConfig is used to configure the job
@@ -40,9 +46,10 @@ type JobConfig struct {
 
 // JobExecutor executes a job
 type JobExecutor struct {
-	cfg    *JobConfig
-	client jobclient.Client
-	logger logger.Logger
+	cfg     *JobConfig
+	client  jobclient.Client
+	logger  logger.Logger
+	version string
 }
 
 // NewJobExecutor creates a new JobExecutor
@@ -50,8 +57,9 @@ func NewJobExecutor(
 	cfg *JobConfig,
 	client jobclient.Client,
 	logger logger.Logger,
+	version string,
 ) *JobExecutor {
-	return &JobExecutor{cfg, client, logger}
+	return &JobExecutor{cfg, client, logger, version}
 }
 
 // Execute executes the job associated with the JobExecutor instance
@@ -93,22 +101,25 @@ func (j *JobExecutor) Execute(ctx context.Context) error {
 	}
 	defer os.RemoveAll(workspaceDir)
 
-	jobLogger.Infof("Starting job %s \n", j.cfg.JobID)
+	jobLogger.Infof("Job executor version %s", j.version)
+	jobLogger.Infof("Starting job %s", j.cfg.JobID)
 
 	// Build job
 	handler, err := j.buildJobHandler(ctx, workspaceDir, jobLogger)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err = handler.Cleanup(ctx); err != nil {
+			j.logger.Infof("Error occurred while cleaning up job: %v\n", err)
+		}
+	}()
 
 	// Execute job
 	if eErr := handler.Execute(ctx); eErr != nil {
-		j.onError(ctx, jobLogger, handler, eErr)
+		jobLogger.Errorf("%v", eErr)
+		handler.OnError(ctx, eErr)
 		return nil
-	}
-
-	if err := handler.OnSuccess(ctx); err != nil {
-		jobLogger.Infof("Error occurred while calling OnSuccess lifecycle function: %v\n", err)
 	}
 
 	return nil
@@ -139,24 +150,14 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 
 	switch job.Type {
 	case types.JobPlanType:
-		handler = NewPlanHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, jobLogger, j.client)
+		handler = NewPlanHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, j.logger, jobLogger, j.client)
 	case types.JobApplyType:
-		handler = NewApplyHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, jobLogger, j.client)
+		handler = NewApplyHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, j.logger, jobLogger, j.client)
 	default:
 		j.logger.Infof("Invalid job type %s", job.Type)
 	}
 
 	return handler, err
-}
-
-func (j *JobExecutor) onError(ctx context.Context, jobLogger joblogger.Logger, jobImpl JobHandler, err error) {
-	jobLogger.Errorf("Error occurred while executing run \u274c")
-	jobLogger.Errorf("%s", err)
-	jobLogger.Flush()
-
-	if err = jobImpl.OnError(ctx, err); err != nil {
-		jobLogger.Errorf("Error occurred while handling job error: %v\n", err)
-	}
 }
 
 func (j *JobExecutor) createCancellableContext(ctx context.Context, jobLogger joblogger.Logger, runID string, maxJobDuration int32) context.Context {

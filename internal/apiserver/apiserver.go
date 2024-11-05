@@ -449,7 +449,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 		logger.Infof("starting internal runner %s", r.Name)
 
-		runner, err := rnr.NewRunner(ctx, r.Name, logger, runnerClient, &rnr.JobDispatcherSettings{
+		runner, err := rnr.NewRunner(ctx, r.Name, logger, version, runnerClient, &rnr.JobDispatcherSettings{
 			DispatcherType:       r.JobDispatcherType,
 			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
 			PluginData:           r.JobDispatcherData,
