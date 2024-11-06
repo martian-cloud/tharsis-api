@@ -15,6 +15,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	tfjson "github.com/hashicorp/terraform-json"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -39,6 +40,8 @@ import (
 const (
 	// forceCancelWait is how long a run must be soft-canceled before it is allowed to be forcefully canceled.
 	forceCancelWait = 1 * time.Minute
+	// Max error message length for plan and apply errors.
+	maxErrorMessageLength = 2048
 )
 
 // Variable represents a run variable
@@ -1315,7 +1318,6 @@ func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, err
 
 func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdatePlan")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -1327,6 +1329,15 @@ func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Pl
 	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(plan.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	if plan.ErrorMessage != nil {
+		plan.ErrorMessage = truncateErrorMessage(*plan.ErrorMessage)
+	}
+
+	if err := plan.Validate(); err != nil {
+		tracing.RecordError(span, err, "plan is not valid")
 		return nil, err
 	}
 
@@ -1741,6 +1752,15 @@ func (s *service) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		return nil, err
 	}
 
+	if apply.ErrorMessage != nil {
+		apply.ErrorMessage = truncateErrorMessage(*apply.ErrorMessage)
+	}
+
+	if err := apply.Validate(); err != nil {
+		tracing.RecordError(span, err, "apply is not valid")
+		return nil, err
+	}
+
 	return s.runStateManager.UpdateApply(ctx, apply)
 }
 
@@ -1966,4 +1986,16 @@ func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error)
 	}
 
 	return run, nil
+}
+
+func truncateErrorMessage(errorMessage string) *string {
+	if len(errorMessage) > maxErrorMessageLength {
+		truncatedMessage := fmt.Sprintf(
+			"%s...\n%s",
+			errorMessage[:maxErrorMessageLength],
+			ansi.Colorize("Error message has been truncated, check the logs for the full error message", ansi.Yellow),
+		)
+		return &truncatedMessage
+	}
+	return &errorMessage
 }

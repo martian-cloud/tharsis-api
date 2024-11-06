@@ -21,6 +21,7 @@ type Apply implements Node {
   currentJob: Job
   triggeredBy: String
   comment: String!
+  errorMessage: String
 }
 
 input UpdateApplyInput {
@@ -28,4 +29,5 @@ input UpdateApplyInput {
   id: ID!
   metadata: ResourceMetadataInput
   status: ApplyStatus!
+  errorMessage: String
 }

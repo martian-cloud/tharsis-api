@@ -17,10 +17,11 @@ type JobDispatcher struct {
 	logger                logger.Logger
 	apiURL                string
 	discoveryProtocolHost string
+	version               string
 }
 
 // New creates a JobDispatcher
-func New(pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger) (*JobDispatcher, error) {
+func New(pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger, version string) (*JobDispatcher, error) {
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("docker job dispatcher requires plugin data '%s' field", field)
@@ -31,6 +32,7 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		logger:                logger,
 		apiURL:                pluginData["api_url"],
 		discoveryProtocolHost: discoveryProtocolHost,
+		version:               version,
 	}, nil
 }
 
@@ -54,7 +56,7 @@ func (l *JobDispatcher) DispatchJob(_ context.Context, jobID string, token strin
 		}
 
 		// Start the job executor
-		executor := jobexecutor.NewJobExecutor(&cfg, client, l.logger)
+		executor := jobexecutor.NewJobExecutor(&cfg, client, l.logger, l.version)
 
 		if err := executor.Execute(jobCtx); err != nil {
 			l.logger.Errorf("Error running job %v", err)

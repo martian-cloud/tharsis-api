@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/martian-cloud/terraform-exec/tfexec"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
@@ -19,6 +20,7 @@ type ApplyHandler struct {
 	cancellableCtx     context.Context
 	terraformWorkspace *terraformWorkspace
 	run                *types.Run
+	logger             logger.Logger
 	jobLogger          joblogger.Logger
 	workspaceDir       string
 }
@@ -30,6 +32,7 @@ func NewApplyHandler(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
+	logger logger.Logger,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
 ) *ApplyHandler {
@@ -39,38 +42,39 @@ func NewApplyHandler(
 		workspaceDir:       workspaceDir,
 		terraformWorkspace: terraformWorkspace,
 		run:                run,
+		logger:             logger,
 		jobLogger:          jobLogger,
 		client:             client,
 		cancellableCtx:     cancellableCtx,
 	}
 }
 
-// OnSuccess is called after the job has been executed successfully
-func (a *ApplyHandler) OnSuccess(ctx context.Context) error {
+// Cleanup is called after the job has been executed
+func (a *ApplyHandler) Cleanup(ctx context.Context) error {
 	// Cleanup workspace
 	return a.terraformWorkspace.close(ctx)
 }
 
 // OnError is called if the job returns an error while executing
-func (a *ApplyHandler) OnError(ctx context.Context, _ error) error {
-	// Cleanup workspace
-	if err := a.terraformWorkspace.close(ctx); err != nil {
-		return err
-	}
-
+func (a *ApplyHandler) OnError(ctx context.Context, applyErr error) {
 	apply := a.run.Apply
 
 	if a.cancellableCtx.Err() != nil {
+		a.jobLogger.Errorf("Apply canceled while in progress %s", failureIcon)
 		apply.Status = types.ApplyCanceled
 	} else {
+		a.jobLogger.Errorf("Error occurred while executing apply %s", failureIcon)
 		apply.Status = types.ApplyErrored
-	}
-	_, err := a.client.UpdateApply(ctx, apply)
-	if err != nil {
-		return fmt.Errorf("failed to update apply in database %v", err)
+		apply.ErrorMessage = parseTfExecError(applyErr)
 	}
 
-	return nil
+	// Flush all logs before updating apply state
+	a.jobLogger.Flush()
+
+	_, err := a.client.UpdateApply(ctx, apply)
+	if err != nil {
+		a.logger.Errorf("failed to update apply in database %v", err)
+	}
 }
 
 // Execute will execute the job
@@ -146,8 +150,8 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		a.jobLogger.Infof("Terraform apply command gracefully exited due to job cancellation")
 		apply.Status = types.ApplyCanceled
 	} else if cmdErr != nil {
-		a.jobLogger.Errorf("Terraform apply command exited with an error")
-		apply.Status = types.ApplyErrored
+		a.OnError(ctx, cmdErr)
+		return nil
 	} else {
 		apply.Status = types.ApplyFinished
 	}

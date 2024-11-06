@@ -30,6 +30,11 @@ func (r *ApplyResolver) Status() string {
 	return string(r.apply.Status)
 }
 
+// ErrorMessage resolver
+func (r *ApplyResolver) ErrorMessage() *string {
+	return r.apply.ErrorMessage
+}
+
 // TriggeredBy resolver
 func (r *ApplyResolver) TriggeredBy() *string {
 	if r.apply.TriggeredBy == "" {
@@ -88,6 +93,7 @@ type UpdateApplyInput struct {
 	ID               string
 	Metadata         *MetadataInput
 	Status           string
+	ErrorMessage     *string
 }
 
 func handleApplyMutationProblem(e error, clientMutationID *string) (*ApplyMutationPayloadResolver, error) {
@@ -119,6 +125,7 @@ func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMu
 
 	// Update fields
 	apply.Status = models.ApplyStatus(input.Status)
+	apply.ErrorMessage = input.ErrorMessage
 
 	apply, err = runService.UpdateApply(ctx, apply)
 	if err != nil {

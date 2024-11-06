@@ -46,6 +46,11 @@ func (r *PlanResolver) Status() string {
 	return string(r.plan.Status)
 }
 
+// ErrorMessage resolver
+func (r *PlanResolver) ErrorMessage() *string {
+	return r.plan.ErrorMessage
+}
+
 // HasChanges resolver
 func (r *PlanResolver) HasChanges() bool {
 	return bool(r.plan.HasChanges)
@@ -135,6 +140,7 @@ type UpdatePlanInput struct {
 	Metadata         *MetadataInput
 	Status           string
 	HasChanges       bool
+	ErrorMessage     *string
 }
 
 func handlePlanMutationProblem(e error, clientMutationID *string) (*PlanMutationPayloadResolver, error) {
@@ -167,6 +173,7 @@ func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutat
 	// Update fields
 	plan.Status = models.PlanStatus(input.Status)
 	plan.HasChanges = input.HasChanges
+	plan.ErrorMessage = input.ErrorMessage
 
 	plan, err = runService.UpdatePlan(ctx, plan)
 	if err != nil {

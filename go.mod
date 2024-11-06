@@ -19,7 +19,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.6
 	github.com/aws/smithy-go v1.20.2
 	github.com/bmatcuk/doublestar/v4 v4.6.1
-	github.com/chmike/domain v1.1.0
 	github.com/docker/docker v27.1.1+incompatible
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/dustin/go-humanize v1.0.1
@@ -39,12 +38,11 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/go-slug v0.15.0
 	github.com/hashicorp/go-tfe v1.51.0
-	github.com/hashicorp/go-version v1.6.0
-	github.com/hashicorp/hc-install v0.6.4
+	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/hc-install v0.8.0
 	github.com/hashicorp/hcl/v2 v2.20.1
 	github.com/hashicorp/jsonapi v1.3.1
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20231204233900-a34142ec2a72
-	github.com/hashicorp/terraform-exec v0.20.0
 	github.com/hashicorp/terraform-json v0.22.1
 	github.com/hashicorp/terraform-registry-address v0.2.3
 	github.com/hashicorp/terraform-svchost v0.1.1
@@ -55,6 +53,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.3
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/lestrrat-go/jwx/v2 v2.0.21
+	github.com/martian-cloud/terraform-exec v0.22.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/opencontainers/image-spec v1.1.0
@@ -66,11 +65,11 @@ require (
 	github.com/sigstore/sigstore v1.8.3
 	github.com/stretchr/testify v1.9.0
 	github.com/swaggo/http-swagger v1.3.4
-	github.com/zclconf/go-cty v1.14.4
+	github.com/zclconf/go-cty v1.15.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.40.2-0.20241021195259-b615d2bde712
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.40.2-0.20241104170219-60b5e32573e8
 	go.opentelemetry.io/contrib/propagators/aws v1.26.0
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.26.0
@@ -199,7 +198,7 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.22.0 // indirect
-	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.19.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect

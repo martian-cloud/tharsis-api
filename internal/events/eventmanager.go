@@ -120,6 +120,9 @@ func (e *EventManager) Start(ctx context.Context) {
 					break
 				}
 			}
+
+			// Wait before reconnecting
+			time.Sleep(10 * time.Second)
 		}
 	}()
 }

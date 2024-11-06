@@ -94,7 +94,7 @@ func (l *managedIdentities) initialize(ctx context.Context) (*managedIdentityIni
 		l.authenticators = append(l.authenticators, authenticator)
 
 		credsRetriever := func(ctx context.Context, managedIdentity *types.ManagedIdentity) ([]byte, error) {
-			l.jobLogger.Infof("Loading credentials for %s managed identity: %s\n", managedIdentity.Type, managedIdentity.ResourcePath)
+			l.jobLogger.Infof("Loading credentials for %s managed identity: %s", managedIdentity.Type, managedIdentity.ResourcePath)
 			return l.client.CreateManagedIdentityCredentials(ctx, managedIdentity.Metadata.ID)
 		}
 

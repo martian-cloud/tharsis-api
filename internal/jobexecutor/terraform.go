@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/hc-install/fs"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/src"
-	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/martian-cloud/terraform-exec/tfexec"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
@@ -136,7 +136,7 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	// source are mutually exclusive, so downloading to workspaceDir is okay.
 	if t.run.ConfigurationVersionID != nil {
 
-		t.jobLogger.Infof("Downloading configuration version %s \n", *t.run.ConfigurationVersionID)
+		t.jobLogger.Infof("Downloading configuration version %s", *t.run.ConfigurationVersionID)
 
 		if err = t.downloadConfigurationVersion(ctx); err != nil {
 			return nil, err
@@ -210,6 +210,8 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize tfexec: %v", err)
 	}
+	// Enable ansi colors
+	tf.SetColor(true)
 
 	err = t.setupCredentialHelper(managedIdentitiesResponse.HostCredentialFileMapping)
 	if err != nil {
@@ -467,4 +469,17 @@ func (t *terraformWorkspace) setDiscoveryProtocolHostTfTokenEnvVar(hostCredentia
 
 func (t *terraformWorkspace) deletePathWhenJobCompletes(path string) {
 	t.pathsToRemove = append(t.pathsToRemove, path)
+}
+
+func parseTfExecError(err error) *string {
+	errStr := err.Error()
+	errLines := strings.Split(errStr, "\n")
+	// Remove exit status from error message if it exists
+	if len(errLines) > 0 && errLines[0] == "exit status 1" {
+		errStr = strings.Join(errLines[1:], "\n")
+	}
+	if errStr != "" {
+		return &errStr
+	}
+	return nil
 }

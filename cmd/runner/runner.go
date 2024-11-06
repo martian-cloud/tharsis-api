@@ -65,7 +65,7 @@ func main() {
 		return
 	}
 
-	runner, err := runner.NewRunner(ctx, runnerPath, logger, client, &runner.JobDispatcherSettings{
+	runner, err := runner.NewRunner(ctx, runnerPath, logger, Version, client, &runner.JobDispatcherSettings{
 		DispatcherType:       dispatcherType,
 		ServiceDiscoveryHost: os.Getenv("THARSIS_SERVICE_DISCOVERY_HOST"),
 		PluginData:           pluginData,

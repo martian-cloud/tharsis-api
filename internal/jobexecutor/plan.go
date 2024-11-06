@@ -7,10 +7,12 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
-	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	"github.com/martian-cloud/terraform-exec/tfexec"
 	"github.com/zclconf/go-cty/cty"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/joblogger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 	"golang.org/x/sync/errgroup"
 )
@@ -21,6 +23,7 @@ type PlanHandler struct {
 	cancellableCtx     context.Context
 	terraformWorkspace *terraformWorkspace
 	run                *types.Run
+	logger             logger.Logger
 	jobLogger          joblogger.Logger
 	workspaceDir       string
 }
@@ -32,6 +35,7 @@ func NewPlanHandler(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
+	logger logger.Logger,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
 ) *PlanHandler {
@@ -41,38 +45,39 @@ func NewPlanHandler(
 		workspaceDir:       workspaceDir,
 		terraformWorkspace: terraformWorkspace,
 		run:                run,
+		logger:             logger,
 		jobLogger:          jobLogger,
 		client:             client,
 		cancellableCtx:     cancellableCtx,
 	}
 }
 
-// OnSuccess is called after the job has been executed successfully
-func (p *PlanHandler) OnSuccess(ctx context.Context) error {
+// Cleanup is called after the job has been executed
+func (p *PlanHandler) Cleanup(ctx context.Context) error {
 	// Cleanup workspace
 	return p.terraformWorkspace.close(ctx)
 }
 
 // OnError is called if the job returns an error while executing
-func (p *PlanHandler) OnError(ctx context.Context, _ error) error {
-	// Cleanup workspace
-	if err := p.terraformWorkspace.close(ctx); err != nil {
-		return err
-	}
-
+func (p *PlanHandler) OnError(ctx context.Context, planErr error) {
 	plan := p.run.Plan
 
 	if p.cancellableCtx.Err() != nil {
+		p.jobLogger.Errorf("Plan canceled while in progress %s", failureIcon)
 		plan.Status = types.PlanCanceled
 	} else {
+		p.jobLogger.Errorf("Error occurred while executing plan %s", failureIcon)
 		plan.Status = types.PlanErrored
-	}
-	_, err := p.client.UpdatePlan(ctx, plan)
-	if err != nil {
-		return fmt.Errorf("failed to update plan in database %v", err)
+		plan.ErrorMessage = parseTfExecError(planErr)
 	}
 
-	return nil
+	// Flush all logs before updating apply state
+	p.jobLogger.Flush()
+
+	_, err := p.client.UpdatePlan(ctx, plan)
+	if err != nil {
+		p.logger.Errorf("failed to update plan in database %v", err)
+	}
 }
 
 // Execute will execute the job
@@ -97,8 +102,14 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Parse terraform config
+	terraformModule, diag := tfconfig.LoadModule(p.workspaceDir)
+	if diag.HasErrors() {
+		return fmt.Errorf("failed to load terraform module %v", diag)
+	}
+
 	planOutputPath := fmt.Sprintf("%s/%s", tmpDir, plan.Metadata.ID)
-	tfVarsFilePath, err := p.createVarsFile(ctx)
+	tfVarsFilePath, err := p.createVarsFile(ctx, terraformModule)
 	if err != nil {
 		return fmt.Errorf("failed to create tfvars file: %v", err)
 	}
@@ -120,7 +131,8 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	if isCancellationError(err) {
 		p.jobLogger.Infof("Terraform plan command gracefully exited due to job cancellation")
 	} else if err != nil {
-		return fmt.Errorf("plan operation returned an error %v", err)
+		p.OnError(ctx, err)
+		return nil
 	}
 
 	p.jobLogger.Write([]byte("\nPreparing plan output...\n"))
@@ -175,10 +187,12 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	// Update plan and run status
 	if p.cancellableCtx.Err() != nil {
 		plan.Status = types.PlanCanceled
-		p.jobLogger.Infof("\nPlan was canceled \u274c")
+		p.jobLogger.Write([]byte("\n"))
+		p.jobLogger.Infof("Plan was canceled %s", failureIcon)
 	} else {
 		plan.Status = types.PlanFinished
-		p.jobLogger.Infof("\nPlan complete! \u2705")
+		p.jobLogger.Write([]byte("\n"))
+		p.jobLogger.Infof("Plan complete! %s", successIcon)
 	}
 
 	// Flush all logs before updating plan
@@ -193,13 +207,35 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (p *PlanHandler) createVarsFile(_ context.Context) (string, error) {
+func (p *PlanHandler) createVarsFile(_ context.Context, terraformModule *tfconfig.Module) (string, error) {
+	// Get all variables in the module
+	hclVariables := []types.RunVariable{}
+	stringVariables := []types.RunVariable{}
+
+	workspacePath := p.terraformWorkspace.workspace.FullPath
+	for _, v := range p.terraformWorkspace.variables {
+		if v.Category == types.TerraformVariableCategory {
+			// If this is a group variable then only add it if there is an hcl definition for it
+			if v.NamespacePath != nil && *v.NamespacePath != workspacePath {
+				// Check if there is an hcl definition for this variable
+				if _, ok := terraformModule.Variables[v.Key]; !ok {
+					// Skip this variable
+					continue
+				}
+			}
+
+			if v.HCL {
+				hclVariables = append(hclVariables, v)
+			} else {
+				stringVariables = append(stringVariables, v)
+			}
+		}
+	}
+
 	// First write HCL variables
 	fileContents := ""
-	for _, v := range p.terraformWorkspace.variables {
-		if v.Category == types.TerraformVariableCategory && v.HCL {
-			fileContents += fmt.Sprintf("%s = %s\n", v.Key, *v.Value)
-		}
+	for _, v := range hclVariables {
+		fileContents += fmt.Sprintf("%s = %s\n", v.Key, *v.Value)
 	}
 
 	// Parse buffer contents
@@ -210,10 +246,8 @@ func (p *PlanHandler) createVarsFile(_ context.Context) (string, error) {
 	rootBody := f.Body()
 
 	// Use hclwriter for string values to provide HCL character escaping
-	for _, v := range p.terraformWorkspace.variables {
-		if v.Category == types.TerraformVariableCategory && !v.HCL {
-			rootBody.SetAttributeValue(v.Key, cty.StringVal(*v.Value))
-		}
+	for _, v := range stringVariables {
+		rootBody.SetAttributeValue(v.Key, cty.StringVal(*v.Value))
 	}
 
 	filePath := fmt.Sprintf("%s/run-%s.tfvars", p.workspaceDir, p.run.Metadata.ID)

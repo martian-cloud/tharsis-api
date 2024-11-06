@@ -753,7 +753,7 @@ func (s *service) getNextAvailableQueuedJob(ctx context.Context, runnerID string
 	// Subscribe to workspace delete events because deleting a workspace may cause a job in a different workspace to become available
 	workspaceSubscription := events.Subscription{
 		Type:    events.WorkspaceSubscription,
-		Actions: []events.SubscriptionAction{events.DeleteAction},
+		Actions: []events.SubscriptionAction{events.UpdateAction, events.DeleteAction},
 	}
 
 	// Subscribe to job and run events
