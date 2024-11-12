@@ -114,6 +114,7 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 		tfexec.DirOrPlan(planCachePath),
 		tfexec.StateOut(stateOutputPath),
 		tfexec.Refresh(a.run.Refresh),
+		tfexec.RefreshOnly(a.run.RefreshOnly),
 	}
 	for _, target := range a.run.TargetAddresses {
 		applyOptions = append(applyOptions, tfexec.Target(target))

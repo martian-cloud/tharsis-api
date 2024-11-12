@@ -124,6 +124,9 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	if req.Refresh != nil {
 		options.Refresh = *req.Refresh
 	}
+	if req.RefreshOnly != nil {
+		options.RefreshOnly = *req.RefreshOnly
+	}
 
 	run, err := c.runService.CreateRun(r.Context(), options)
 	if err != nil {
