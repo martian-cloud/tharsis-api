@@ -110,6 +110,7 @@ var runFieldList = append(
 	"terraform_version",
 	"targets",
 	"refresh",
+	"refresh_only",
 )
 
 // NewRuns returns an instance of the Run interface
@@ -343,6 +344,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 			"terraform_version":         run.TerraformVersion,
 			"targets":                   targets,
 			"refresh":                   run.Refresh,
+			"refresh_only":              run.RefreshOnly,
 		}).
 		Returning(runFieldList...).ToSQL()
 
@@ -449,6 +451,7 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.TerraformVersion,
 		&run.TargetAddresses,
 		&run.Refresh,
+		&run.RefreshOnly,
 	)
 	if err != nil {
 		return nil, err

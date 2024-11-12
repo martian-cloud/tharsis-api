@@ -59,6 +59,7 @@ type Run implements Node {
   terraformVersion: String!
   targetAddresses: [String!]!
   refresh: Boolean!
+  refreshOnly: Boolean!
   speculative: Boolean!
 }
 
@@ -97,6 +98,7 @@ input CreateRunInput {
   variables: [RunVariableInput!]
   targetAddresses: [String!]
   refresh: Boolean
+  refreshOnly: Boolean
   speculative: Boolean
 }
 

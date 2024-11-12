@@ -155,6 +155,11 @@ func (r *RunResolver) Refresh() bool {
 	return r.run.Refresh
 }
 
+// RefreshOnly resolver
+func (r *RunResolver) RefreshOnly() bool {
+	return r.run.RefreshOnly
+}
+
 // Speculative resolver
 func (r *RunResolver) Speculative() bool {
 	return r.run.Speculative()
@@ -417,6 +422,7 @@ type CreateRunInput struct {
 	TerraformVersion *string
 	TargetAddresses  *[]string
 	Refresh          *bool
+	RefreshOnly      *bool
 	Speculative      *bool
 	WorkspacePath    string
 }
@@ -499,6 +505,11 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 	runOptions.Refresh = true // default to true unless the option was set
 	if input.Refresh != nil {
 		runOptions.Refresh = *input.Refresh
+	}
+
+	runOptions.RefreshOnly = false // default to false unless the option was set
+	if input.RefreshOnly != nil {
+		runOptions.RefreshOnly = *input.RefreshOnly
 	}
 
 	run, err := getRunService(ctx).CreateRun(ctx, runOptions)

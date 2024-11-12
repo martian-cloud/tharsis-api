@@ -90,6 +90,7 @@ type CreateRunInput struct {
 	TargetAddresses        []string
 	IsDestroy              bool
 	Refresh                bool
+	RefreshOnly            bool
 }
 
 // Validate attempts to ensure the CreateRunInput structure is in good form and able to be used.
@@ -121,6 +122,11 @@ func (c CreateRunInput) Validate() error {
 		if err != nil {
 			return fmt.Errorf("module version is not a valid semver string: %v", err)
 		}
+	}
+
+	// Don't allow refresh_only in combination with other options that would conflict.
+	if c.RefreshOnly && (c.Refresh || c.IsDestroy) {
+		return fmt.Errorf("refresh_only is not allowed with refresh or destroy")
 	}
 
 	return nil
@@ -562,6 +568,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		TerraformVersion:       terraformVersion,
 		TargetAddresses:        options.TargetAddresses,
 		Refresh:                options.Refresh,
+		RefreshOnly:            options.RefreshOnly,
 	}
 
 	if options.Comment != nil {

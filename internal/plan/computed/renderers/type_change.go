@@ -11,8 +11,8 @@ package renderers
 import (
 	"fmt"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/computed/node"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/computed"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/computed/node"
 )
 
 var _ computed.DiffRenderer = (*typeChangeRenderer)(nil)

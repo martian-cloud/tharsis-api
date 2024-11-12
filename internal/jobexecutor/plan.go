@@ -120,6 +120,7 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 		tfexec.Destroy(p.run.IsDestroy),
 		tfexec.VarFile(tfVarsFilePath),
 		tfexec.Refresh(p.run.Refresh),
+		tfexec.RefreshOnly(p.run.RefreshOnly),
 	}
 	for _, target := range p.run.TargetAddresses {
 		planOptions = append(planOptions, tfexec.Target(target))

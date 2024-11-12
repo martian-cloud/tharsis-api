@@ -43,6 +43,7 @@ type Run struct {
 	ForceCanceled          bool
 	AutoApply              bool
 	Refresh                bool
+	RefreshOnly            bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
