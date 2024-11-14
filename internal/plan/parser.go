@@ -105,8 +105,8 @@ func (p *parser) Parse(plan *tjson.Plan, schemas *tjson.ProviderSchemas) (*Diff,
 			return nil, err
 		}
 
-		if resourceDiff.Action == action.NoOp && !resourceDiff.Moved && !resourceDiff.Imported && !resourceDiff.Drifted {
-			// Don't show anything for NoOp changes unless they are moved, imported, or drifted
+		if resourceDiff.Action == action.NoOp && !resourceDiff.Moved && !resourceDiff.Imported {
+			// Don't show anything for NoOp changes unless they are moved or imported
 			continue
 		}
 
