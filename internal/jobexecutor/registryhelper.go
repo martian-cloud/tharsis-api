@@ -79,20 +79,20 @@ func getPreSignedURL(httpClient http.Client, token *string, registryURL *url.URL
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		if resp.StatusCode == http.StatusUnauthorized {
-			envVar, bErr := module.BuildTokenEnvVar(registryURL.Host)
-			if bErr != nil {
-				return "", bErr
-			}
-
-			if token != nil {
-				// Since we were able to make the request with a token we can assume the host is correct but token is bad.
-				return "", fmt.Errorf("token in environment variable '%s' is apparently not authorized to access this module", envVar)
-			}
-			// Required token environment variable was not provided.
-			return "", fmt.Errorf("missing required environment variable '%s' for host %s", envVar, registryURL.Host)
+		return "", fmt.Errorf("failed to visit download URL %s: %v", downloadURLString, err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		envVar, bErr := module.BuildTokenEnvVar(registryURL.Host)
+		if bErr != nil {
+			return "", bErr
 		}
-		return "", fmt.Errorf("failed to visit download URL: %s", downloadURLString)
+
+		if token != nil {
+			// Since we were able to make the request with a token we can assume the host is correct but token is bad.
+			return "", fmt.Errorf("token in environment variable '%s' is apparently not authorized to access this module", envVar)
+		}
+		// Required token environment variable was not provided.
+		return "", fmt.Errorf("missing required environment variable '%s' for host %s", envVar, registryURL.Host)
 	}
 	if resp.StatusCode != http.StatusNoContent {
 		return "", fmt.Errorf("not-ok status from download URL: %s: %s", downloadURLString, resp.Status)
