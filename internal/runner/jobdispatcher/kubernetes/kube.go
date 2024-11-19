@@ -6,7 +6,10 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"github.com/aws/smithy-go/ptr"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,6 +61,7 @@ type JobDispatcher struct {
 	discoveryProtocolHost string
 	memoryRequest         resource.Quantity
 	memoryLimit           resource.Quantity
+	securityContext       *corev1.SecurityContext
 }
 
 // New creates a JobDispatcher
@@ -93,6 +97,33 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		namespace = ns
 	}
 
+	var runAsUser *int64
+	if runAsUserStr, ok := pluginData["security_context_run_as_user"]; ok {
+		val, err := strconv.ParseInt(runAsUserStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse security_context_run_as_user for runner jobs: %v", err)
+		}
+		runAsUser = &val
+	}
+
+	var runAsGroup *int64
+	if runAsGroupStr, ok := pluginData["security_context_run_as_group"]; ok {
+		val, err := strconv.ParseInt(runAsGroupStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse security_context_run_as_group for runner jobs: %v", err)
+		}
+		runAsGroup = &val
+	}
+
+	var runAsNonRoot *bool
+	if runAsNonRootStr, ok := pluginData["security_context_run_as_non_root"]; ok {
+		val, err := strconv.ParseBool(runAsNonRootStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse security_context_run_as_non_root for runner jobs: %v", err)
+		}
+		runAsNonRoot = &val
+	}
+
 	memoryRequest, err := resource.ParseQuantity(pluginData["memory_request"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse memory request for runner jobs: %v", err)
@@ -110,6 +141,18 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		discoveryProtocolHost: discoveryProtocolHost,
 		memoryRequest:         memoryRequest,
 		memoryLimit:           memoryLimit,
+		securityContext: &corev1.SecurityContext{
+			Privileged:               ptr.Bool(false),
+			AllowPrivilegeEscalation: ptr.Bool(false),
+			RunAsUser:                runAsUser,
+			RunAsGroup:               runAsGroup,
+			RunAsNonRoot:             runAsNonRoot,
+			// TODO: Add host users option when user namespace feature is generally available
+			//HostUsers:                    ptr.Bool(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"NET_RAW"},
+			},
+		},
 		client: &k8sRunner{
 			logger:     logger,
 			namespace:  namespace,
@@ -131,7 +174,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 			Kind:       "Job",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "tharsis-job-executor",
+			GenerateName: "tharsis-job-" + strings.ToLower(jobID[:8]),
 		},
 		Spec: v1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -139,12 +182,17 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 					Labels: map[string]string{
 						"cluster-autoscaler.kubernetes.io/safe-to-evict": "false",
 					},
+					Annotations: map[string]string{
+						"job.tharsis.io/id": jobID,
+					},
 				},
 				Spec: corev1.PodSpec{
+					AutomountServiceAccountToken: ptr.Bool(false),
 					Containers: []corev1.Container{
 						{
-							Name:  "main",
-							Image: j.image,
+							Name:            "main",
+							Image:           j.image,
+							SecurityContext: j.securityContext,
 							Env: []corev1.EnvVar{
 								{
 									Name:  "JOB_ID",

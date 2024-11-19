@@ -250,7 +250,7 @@ func TestJobDispatcher_DispatchJob(t *testing.T) {
 				ctx: context.TODO(),
 				job: &models.Job{
 					Metadata: models.ResourceMetadata{
-						ID: "id",
+						ID: "test-job-123",
 					},
 				},
 				token: "myToken",
@@ -279,7 +279,7 @@ func TestJobDispatcher_DispatchJob(t *testing.T) {
 				ctx: context.TODO(),
 				job: &models.Job{
 					Metadata: models.ResourceMetadata{
-						ID: "id",
+						ID: "test-job-123",
 					},
 				},
 				token: "myToken",
