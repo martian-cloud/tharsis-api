@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
@@ -756,6 +757,218 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectResult, result)
+		})
+	}
+}
+
+func TestMigrateWorkspace(t *testing.T) {
+	oldParentID := "old-parent-id"
+	oldParentName := "old-parent-name"
+
+	testOldParent := models.Group{
+		Metadata: models.ResourceMetadata{ID: oldParentID},
+		Name:     oldParentName,
+		FullPath: oldParentName,
+	}
+
+	testWorkspaceID := "test-workspace-id"
+	testWorkspaceName := "test-workspace-name"
+	testWorkspaceOldPath := "old-parent-path/" + testWorkspaceName
+
+	testWorkspace := models.Workspace{
+		Metadata: models.ResourceMetadata{ID: testWorkspaceID},
+		Name:     testWorkspaceName,
+		GroupID:  oldParentID,
+		FullPath: testWorkspaceOldPath,
+	}
+
+	newParentID := "new-parent-id"
+	newParentName := "new-parent-name"
+	newParentPath := "new-grandparent-name/" + newParentName
+
+	testNewParent := models.Group{
+		Metadata: models.ResourceMetadata{ID: newParentID},
+		Name:     newParentName,
+		FullPath: newParentPath,
+	}
+
+	// Test cases
+	tests := []struct {
+		newParentID              string
+		expectWorkspace          *models.Workspace
+		name                     string
+		expectErrorCode          errors.CodeType
+		inputWorkspace           models.Workspace
+		limit                    int
+		newParentChildren        int32
+		isUserAdmin              bool
+		isGroupOwner             bool
+		isCallerDeployerOfParent bool
+	}{
+		{
+			name:                     "successful move",
+			inputWorkspace:           testWorkspace,
+			newParentID:              newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			limit:                    5,
+			newParentChildren:        5,
+			expectWorkspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{ID: testWorkspaceID},
+				Name:     testWorkspaceName,
+				GroupID:  newParentID,
+				FullPath: newParentPath + "/" + testWorkspaceName,
+			},
+		},
+		{
+			name:            "caller is not owner of workspace to be moved",
+			inputWorkspace:  testWorkspace,
+			newParentID:     newParentID,
+			isGroupOwner:    false,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:                     "caller is not deployer (or better) of new parent group",
+			inputWorkspace:           testWorkspace,
+			newParentID:              newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: false,
+			expectErrorCode:          errors.EForbidden,
+		},
+		{
+			name:                     "exceeds limit on workspaces in group",
+			inputWorkspace:           testWorkspace,
+			newParentID:              newParentID,
+			isGroupOwner:             true,
+			isCallerDeployerOfParent: true,
+			limit:                    5,
+			newParentChildren:        6,
+			expectWorkspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{ID: testWorkspaceID},
+				Name:     testWorkspaceName,
+				GroupID:  "",
+				FullPath: testWorkspaceName,
+			},
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			var workspaceAccessError, parentAccessError error
+			if !test.isGroupOwner {
+				workspaceAccessError = errors.New("test user is not owner of workspace being moved", errors.WithErrorCode(errors.EForbidden))
+			}
+			if !test.isCallerDeployerOfParent {
+				parentAccessError = errors.New("test user is not deployer of old or new parent", errors.WithErrorCode(errors.EForbidden))
+			}
+
+			mockAuthorizer := auth.MockAuthorizer{}
+			mockAuthorizer.Test(t)
+
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
+			perms := []permissions.Permission{permissions.UpdateWorkspacePermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(workspaceAccessError)
+
+			perms = []permissions.Permission{permissions.DeleteWorkspacePermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
+
+			perms = []permissions.Permission{permissions.CreateWorkspacePermission}
+			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
+
+			mockGroups := db.MockGroups{}
+			mockGroups.Test(t)
+
+			mockWorkspaces := db.MockWorkspaces{}
+			mockGroups.Test(t)
+
+			mockGroups.On("GetGroupByID", mock.Anything, oldParentID).Return(&testOldParent, nil)
+			mockGroups.On("GetGroupByID", mock.Anything, newParentID).Return(&testNewParent, nil)
+
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.inputWorkspace.Metadata.ID).
+				Return(&test.inputWorkspace, nil)
+
+			newParent := &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: test.newParentID,
+				},
+				FullPath: newParentPath,
+				Name:     newParentName,
+			}
+
+			mockWorkspaces.On("GetWorkspaces", mock.Anything, mock.Anything).Return(
+				&db.WorkspacesResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: test.newParentChildren,
+					},
+				}, nil)
+
+			if test.limit > 0 {
+				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: test.limit}, nil)
+			}
+
+			mockGroups.On("GetGroups", mock.Anything, &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					ParentID: &testWorkspaceID,
+				},
+			}).Return(&db.GroupsResult{Groups: []models.Group{}}, nil)
+
+			mockWorkspaces.On("MigrateWorkspace", mock.Anything, &test.inputWorkspace, newParent).Return(test.expectWorkspace, nil)
+
+			mockTransactions := db.MockTransactions{}
+			mockTransactions.Test(t)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
+
+			dbClient := db.Client{
+				Groups:         &mockGroups,
+				Workspaces:     &mockWorkspaces,
+				Transactions:   &mockTransactions,
+				ResourceLimits: mockResourceLimits,
+			}
+
+			limiter := limits.NewLimitChecker(&dbClient)
+
+			testCaller := auth.NewUserCaller(
+				&models.User{
+					Metadata: models.ResourceMetadata{
+						ID: "123",
+					},
+					Admin:    test.isUserAdmin,
+					Username: "user1",
+				},
+				&mockAuthorizer,
+				&dbClient,
+				mockMaintenanceMonitor,
+			)
+
+			logger, _ := logger.NewForTest()
+			service := NewService(logger, &dbClient, limiter, nil, nil, nil, &mockActivityEvents)
+
+			migrated, err := service.MigrateWorkspace(auth.WithCaller(ctx, testCaller),
+				test.inputWorkspace.Metadata.ID, test.newParentID)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			} else if err != nil {
+				t.Fatal(err)
+			} else {
+				assert.Equal(t, test.expectWorkspace, migrated)
+			}
 		})
 	}
 }

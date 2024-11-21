@@ -262,6 +262,12 @@ func (r *ActivityEventPayloadResolver) ToActivityEventMigrateGroupPayload() (*Ac
 	return res, ok
 }
 
+// ToActivityEventMigrateWorkspacePayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventMigrateWorkspacePayload() (*ActivityEventMigrateWorkspacePayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventMigrateWorkspacePayloadResolver)
+	return res, ok
+}
+
 // ToActivityEventMoveManagedIdentityPayload resolver
 func (r *ActivityEventPayloadResolver) ToActivityEventMoveManagedIdentityPayload() (*ActivityEventMoveManagedIdentityPayloadResolver, bool) {
 	res, ok := r.result.(*ActivityEventMoveManagedIdentityPayloadResolver)
@@ -528,6 +534,13 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 			}
 			return &ActivityEventPayloadResolver{result: &ActivityEventMigrateGroupPayloadResolver{payload: &payload}}, nil
 		case (r.activityEvent.Action == models.ActionMigrate) &&
+			(r.activityEvent.TargetType == models.TargetWorkspace):
+			var payload models.ActivityEventMigrateWorkspacePayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventMigrateWorkspacePayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionMigrate) &&
 			(r.activityEvent.TargetType == models.TargetManagedIdentity):
 			var payload models.ActivityEventMoveManagedIdentityPayload
 			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
@@ -608,8 +621,19 @@ type ActivityEventMigrateGroupPayloadResolver struct {
 	payload *models.ActivityEventMigrateGroupPayload
 }
 
+// ActivityEventMigrateWorkspacePayloadResolver resolves an activity event
+// migrate workspace payload resource
+type ActivityEventMigrateWorkspacePayloadResolver struct {
+	payload *models.ActivityEventMigrateWorkspacePayload
+}
+
 // PreviousGroupPath resolver
 func (r *ActivityEventMigrateGroupPayloadResolver) PreviousGroupPath() string {
+	return r.payload.PreviousGroupPath
+}
+
+// PreviousGroupPath resolver (for workspace migration)
+func (r *ActivityEventMigrateWorkspacePayloadResolver) PreviousGroupPath() string {
 	return r.payload.PreviousGroupPath
 }
 

@@ -87,6 +87,10 @@ type ActivityEventMigrateGroupPayload {
   previousGroupPath: String!
 }
 
+type ActivityEventMigrateWorkspacePayload {
+  previousGroupPath: String!
+}
+
 type ActivityEventAddTeamMemberPayload {
   user: User
   maintainer: Boolean!
@@ -114,6 +118,7 @@ union ActivityEventPayload =
   | ActivityEventRemoveTeamMemberPayload
   | ActivityEventUpdateTeamMemberPayload
   | ActivityEventMigrateGroupPayload
+  | ActivityEventMigrateWorkspacePayload
   | ActivityEventMoveManagedIdentityPayload
 
 type ActivityEvent implements Node {

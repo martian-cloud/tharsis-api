@@ -204,9 +204,9 @@ func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, e
 	}
 
 	if group == nil {
-		tracing.RecordError(span, nil, "Group with id %s not found", id)
+		tracing.RecordError(span, nil, "group with id %s not found", id)
 		return nil, errors.New(
-			"Group with id %s not found", id,
+			"group with id %s not found", id,
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
@@ -555,13 +555,13 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		return nil, err
 	}
 	if group == nil {
-		tracing.RecordError(span, nil, "Group with id %s not found", groupID)
+		tracing.RecordError(span, nil, "group with id %s not found", groupID)
 		return nil, errors.New(
-			"Group with id %s not found", groupID,
+			"group with id %s not found", groupID,
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	// Caller must have UpdateGroupPermission in the group being moved.
+	// Caller must have DeleteGroupPermission in the group being moved.
 	err = caller.RequirePermission(ctx, permissions.DeleteGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
@@ -579,9 +579,9 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 			return nil, nErr
 		}
 		if newParent == nil {
-			tracing.RecordError(span, nil, "Group with id %s not found", *newParentID)
+			tracing.RecordError(span, nil, "group with id %s not found", *newParentID)
 			return nil, errors.New(
-				"Group with id %s not found", *newParentID,
+				"group with id %s not found", *newParentID,
 				errors.WithErrorCode(errors.ENotFound))
 		}
 
@@ -641,6 +641,13 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	// Because the group to be moved and the new parent group have been fetched from the DB,
 	// there's no need to validate them.
 
+	s.logger.Infow("Requested a group migration.",
+		"caller", caller.GetSubject(),
+		"fullPath", group.FullPath, // This is the full path of the group prior to migration.
+		"groupID", group.Metadata.ID,
+		"newParentPath", newParentPath,
+	)
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin a DB transaction")
@@ -652,13 +659,6 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 			s.logger.Errorf("failed to rollback tx for service layer MigrateGroup: %v", txErr)
 		}
 	}()
-
-	s.logger.Infow("Requested a group migration.",
-		"caller", caller.GetSubject(),
-		"fullPath", group.FullPath, // This is the full path of the group prior to migration.
-		"groupID", group.Metadata.ID,
-		"newParentPath", newParentPath,
-	)
 
 	// Now that all checks have passed and the transaction is open, do the actual work of the migration.
 	migratedGroup, err := s.dbClient.Groups.MigrateGroup(txContext, group, newParent)

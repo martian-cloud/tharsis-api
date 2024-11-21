@@ -523,6 +523,13 @@ type UnlockWorkspaceInput struct {
 	WorkspacePath    string
 }
 
+// MigrateWorkspaceInput contains the input for migrating a workspace
+type MigrateWorkspaceInput struct {
+	ClientMutationID *string
+	NewGroupPath     string
+	WorkspacePath    string
+}
+
 func handleWorkspaceMutationProblem(e error, clientMutationID *string) (*WorkspaceMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -694,6 +701,31 @@ func unlockWorkspaceMutation(ctx context.Context, input *UnlockWorkspaceInput) (
 	}
 
 	payload := WorkspaceMutationPayload{ClientMutationID: input.ClientMutationID, Workspace: ws, Problems: []Problem{}}
+	return &WorkspaceMutationPayloadResolver{WorkspaceMutationPayload: payload}, nil
+}
+
+func migrateWorkspaceMutation(ctx context.Context, input *MigrateWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
+	groupService := getGroupService(ctx)
+	workspaceService := getWorkspaceService(ctx)
+
+	workspace, err := workspaceService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the new parent group.
+	newParent, err := groupService.GetGroupByFullPath(ctx, input.NewGroupPath)
+	if err != nil {
+		return nil, err
+	}
+	newParentID := newParent.Metadata.ID
+
+	workspace, err = workspaceService.MigrateWorkspace(ctx, workspace.Metadata.ID, newParentID)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := WorkspaceMutationPayload{ClientMutationID: input.ClientMutationID, Workspace: workspace, Problems: []Problem{}}
 	return &WorkspaceMutationPayloadResolver{WorkspaceMutationPayload: payload}, nil
 }
 

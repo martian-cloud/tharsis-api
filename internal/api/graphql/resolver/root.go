@@ -100,6 +100,17 @@ func (r RootResolver) UnlockWorkspace(ctx context.Context, args *struct{ Input *
 	return response, nil
 }
 
+// MigrateWorkspace migrates an existing workspace
+func (r RootResolver) MigrateWorkspace(ctx context.Context,
+	args *struct{ Input *MigrateWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	response, err := migrateWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* State Version Queries and Mutations */
 
 // CreateStateVersion creates a new state version

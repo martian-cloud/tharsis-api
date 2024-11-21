@@ -134,7 +134,7 @@ func (s *service) GetTeamByID(ctx context.Context, id string) (*models.Team, err
 	if team == nil {
 		tracing.RecordError(span, nil, "team not found")
 		return nil, errors.New(
-			"Team with id %s not found", id,
+			"team with id %s not found", id,
 			errors.WithErrorCode(errors.ENotFound))
 	}
 

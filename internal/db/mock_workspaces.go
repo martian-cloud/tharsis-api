@@ -158,6 +158,32 @@ func (_m *MockWorkspaces) GetWorkspacesForManagedIdentity(ctx context.Context, m
 	return r0, r1
 }
 
+// MigrateWorkspace provides a mock function with given fields: ctx, workspace, newParentGroup
+func (_m *MockWorkspaces) MigrateWorkspace(ctx context.Context, workspace *models.Workspace, newParentGroup *models.Group) (*models.Workspace, error) {
+	ret := _m.Called(ctx, workspace, newParentGroup)
+
+	var r0 *models.Workspace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace, *models.Group) (*models.Workspace, error)); ok {
+		return rf(ctx, workspace, newParentGroup)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace, *models.Group) *models.Workspace); ok {
+		r0 = rf(ctx, workspace, newParentGroup)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Workspace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Workspace, *models.Group) error); ok {
+		r1 = rf(ctx, workspace, newParentGroup)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdateWorkspace provides a mock function with given fields: ctx, workspace
 func (_m *MockWorkspaces) UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
 	ret := _m.Called(ctx, workspace)

@@ -55,6 +55,12 @@ input WorkspaceSubscriptionInput {
   workspacePath: String!
 }
 
+type MigrateWorkspacePayload {
+  clientMutationId: String
+  workspace: Workspace
+  problems: [Problem!]!
+}
+
 type Workspace implements Node, Namespace {
   id: ID!
   metadata: ResourceMetadata!
@@ -167,4 +173,10 @@ input LockWorkspaceInput {
 input UnlockWorkspaceInput {
   clientMutationId: String
   workspacePath: String!
+}
+
+input MigrateWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
+  newGroupPath: String!
 }
