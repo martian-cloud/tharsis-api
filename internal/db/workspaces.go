@@ -27,6 +27,7 @@ type Workspaces interface {
 	CreateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
 	DeleteWorkspace(ctx context.Context, workspace *models.Workspace) error
 	GetWorkspacesForManagedIdentity(ctx context.Context, managedIdentityID string) ([]models.Workspace, error)
+	MigrateWorkspace(ctx context.Context, workspace *models.Workspace, newParentGroup *models.Group) (*models.Workspace, error)
 }
 
 // WorkspaceSortableField represents the fields that a workspace can be sorted by
@@ -429,6 +430,159 @@ func (w *workspaces) GetWorkspacesForManagedIdentity(ctx context.Context, manage
 	}
 
 	return results, nil
+}
+
+// MigrateWorkspace migrates a workspace.
+func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Workspace, newParentGroup *models.Group) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.MigrateWorkspace")
+	defer span.End()
+
+	newPath := newParentGroup.FullPath + "/" + workspace.Name
+	newParentID := newParentGroup.Metadata.ID
+
+	tx, err := w.dbClient.getConnection(ctx).Begin(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin DB transaction", errors.WithSpan(span))
+	}
+
+	// Rollback is safe to call even if the tx is already closed, so if
+	// the tx commits successfully, this is a no-op
+	defer func() {
+		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
+			w.dbClient.logger.Errorf("failed to rollback tx for MigrateWorkspace: %v", txErr)
+		}
+	}()
+
+	timestamp := currentTime()
+
+	// Substitute the affected paths in the namespaces table first so that the FullPath field below will be set correctly.
+	if err = migrateNamespaces(ctx, tx, workspace.FullPath, newPath); err != nil {
+		return nil, errors.Wrap(err, "failed to migrate namespaces", errors.WithSpan(span))
+	}
+
+	// Update the group_id field in the workspace being migrated.
+	sql, args, err := dialect.Update("workspaces").
+		Prepared(true).
+		Set(
+			goqu.Record{
+				"version":    goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at": timestamp,
+				"group_id":   newParentID,
+			},
+		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL to update the migrating workspace's group ID", errors.WithSpan(span))
+	}
+
+	migratedWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), false)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			tracing.RecordError(span, err, "optimistic lock error")
+			return nil, ErrOptimisticLockError
+		}
+		return nil, errors.Wrap(err, "failed to execute query to update the migrating workspace's group ID", errors.WithSpan(span))
+	}
+
+	namespace, err := getNamespaceByWorkspaceID(ctx, tx, migratedWorkspace.Metadata.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get new namespace of migrating workspace", errors.WithSpan(span))
+	}
+	if namespace == nil {
+		return nil, errors.New("failed to get new namespace of migrating workspace", errors.WithSpan(span))
+	}
+
+	migratedWorkspace.FullPath = namespace.path
+
+	// Delete managed identity assignments to the workspace being migrated
+	// if the home group path of the managed identity is no longer a direct ancestor of the workspace.
+	sql, args, err = dialect.Delete("workspace_managed_identity_relation").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("workspace_managed_identity_relation.workspace_id").Eq(migratedWorkspace.Metadata.ID),
+			goqu.I("workspace_managed_identity_relation.managed_identity_id").In(
+				dialect.From(goqu.T("managed_identities")).
+					InnerJoin(goqu.T("groups"),
+						goqu.On(goqu.Ex{"managed_identities.group_id": goqu.I("groups.id")})).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.group_id": goqu.I("groups.id")})).
+					Select("managed_identities.id").
+					Where(
+						// Managed identity's home group path is no longer a direct ancestor of the workspace.
+						goqu.I("namespaces.path").NotIn(migratedWorkspace.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL to delete managed identity assignments", errors.WithSpan(span))
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, errors.Wrap(err, "failed to execute query to delete managed identity assignments", errors.WithSpan(span))
+	}
+
+	// Delete namespace memberships of service accounts
+	// where the namespace (workspace) is being migrated
+	// and the home group path of the service account is no longer a direct ancestor of the namespace.
+	sql, args, err = dialect.Delete("namespace_memberships").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("namespace_memberships.id").In(
+				dialect.From(goqu.T("namespace_memberships")).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
+					Select("namespace_memberships.id").
+					Where(
+						// Namespace membership is to the workspace being migrated.
+						goqu.I("namespaces.workspace_id").Eq(migratedWorkspace.Metadata.ID),
+					)),
+			goqu.I("namespace_memberships.service_account_id").In(
+				dialect.From(goqu.T("service_accounts")).
+					InnerJoin(goqu.T("groups"),
+						goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("groups.id")})).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.group_id": goqu.I("groups.id")})).
+					Select("service_accounts.id").
+					Where(
+						// Home group of the service account is no longer a direct ancestor of the namespace.
+						goqu.I("namespaces.path").NotIn(migratedWorkspace.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL to delete service account namespace memberships", errors.WithSpan(span))
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, errors.Wrap(err, "failed to execute query to delete service account namespace memberships", errors.WithSpan(span))
+	}
+
+	// Delete workspace VCS provider links to workspaces
+	// where the workspace is being migrated
+	// and the home group path of the VCS provider link is no longer a direct ancestor of the workspace.
+	sql, args, err = dialect.Delete("workspace_vcs_provider_links").
+		Prepared(true).
+		Where(goqu.And(
+			goqu.I("workspace_vcs_provider_links.workspace_id").Eq(migratedWorkspace.Metadata.ID),
+			goqu.I("workspace_vcs_provider_links.provider_id").In(
+				dialect.From(goqu.T("vcs_providers")).
+					InnerJoin(goqu.T("groups"),
+						goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("groups.id")})).
+					InnerJoin(goqu.T("namespaces"),
+						goqu.On(goqu.Ex{"namespaces.group_id": goqu.I("groups.id")})).
+					Select("vcs_providers.id").
+					Where(
+						// Home group of the provider is no longer a direct ancestor of the namespace.
+						goqu.I("namespaces.path").NotIn(migratedWorkspace.ExpandPath()),
+					)),
+		)).ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL to delete workspace VCS provider links", errors.WithSpan(span))
+	}
+	if _, err = tx.Exec(ctx, sql, args...); err != nil {
+		return nil, errors.Wrap(err, "failed to execute query to delete workspace VCS provider links", errors.WithSpan(span))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to commit workspace migration transaction", errors.WithSpan(span))
+	}
+
+	return migratedWorkspace, nil
 }
 
 func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Workspace, error) {

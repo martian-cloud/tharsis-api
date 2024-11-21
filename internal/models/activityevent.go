@@ -105,6 +105,11 @@ type ActivityEventMigrateGroupPayload struct {
 	PreviousGroupPath string `json:"previousGroupPath"`
 }
 
+// ActivityEventMigrateWorkspacePayload is the custom payload for migrating a workspace.
+type ActivityEventMigrateWorkspacePayload struct {
+	PreviousGroupPath string `json:"previousGroupPath"`
+}
+
 // ActivityEventMoveManagedIdentityPayload is the custom payload for moving a managed identity to another group.
 type ActivityEventMoveManagedIdentityPayload struct {
 	PreviousGroupPath string `json:"previousGroupPath"`
@@ -152,5 +157,3 @@ func (*ActivityEvent) stringPtrToString(p *string) string {
 	}
 	return *p
 }
-
-// The End.

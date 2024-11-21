@@ -203,4 +203,5 @@ type Mutation {
   createRunnerSessionError(
     input: CreateRunnerSessionErrorInput!
   ): CreateRunnerSessionErrorPayload!
+  migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
 }

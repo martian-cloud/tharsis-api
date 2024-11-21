@@ -140,6 +140,12 @@ func migrateNamespaces(ctx context.Context, conn connection, oldPath, newPath st
 
 	_, err = conn.Exec(ctx, sql, args...)
 	if err != nil {
+		if pgErr := asPgError(err); pgErr != nil {
+			if isUniqueViolation(pgErr) && pgErr.ConstraintName == "namespaces_path_key" {
+				return errors.New("namespace %s already exists", newPath,
+					errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
+			}
+		}
 		tracing.RecordError(span, err, "failed to execute DB query")
 		return err
 	}

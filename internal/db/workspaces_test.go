@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -1628,6 +1629,334 @@ func TestGetWorkspacesForManagedIdentity(t *testing.T) {
 				sort.Strings(test.expectWorkspacePaths)
 				sort.Strings(actualPaths)
 				assert.Equal(t, test.expectWorkspacePaths, actualPaths)
+			}
+		})
+	}
+}
+
+// TestMigrateWorkspace tests MigrateWorkspace's full functionality.
+func TestMigrateWorkspace(t *testing.T) {
+	defaultJobDuration := int32((time.Hour * 12).Minutes()) // defined in service layer, so not readily available
+
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Root group and associated resources:
+	rootGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "root group for testing workspace migration",
+		Name:        "root-group",
+		FullPath:    "root-group",
+	})
+	require.Nil(t, err)
+
+	_, err = testClient.client.Variables.CreateVariable(ctx, &models.Variable{
+		Key:           "root-var",
+		Value:         ptr.String("root variable for testing workspace migration"),
+		Category:      models.EnvironmentVariableCategory,
+		NamespacePath: rootGroup.FullPath,
+	})
+	require.Nil(t, err)
+
+	role, rErr := testClient.client.Roles.CreateRole(ctx, &models.Role{Name: "owner"})
+	require.Nil(t, rErr)
+
+	rootServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Description: "root group service account for testing workspace migration",
+		Name:        "root-service-account",
+		GroupID:     rootGroup.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	rootManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Description:  "root group managed identity for testing workspace migration",
+		Name:         "root-managed-identity",
+		Type:         models.ManagedIdentityTharsisFederated,
+		GroupID:      rootGroup.Metadata.ID,
+		ResourcePath: "root-group/root-managed-identity",
+		Data:         []byte("this is a test"),
+	})
+	require.Nil(t, err)
+
+	// Would like to test a root group VCS provider, but only one VCS provider can be linked to a workspace.
+
+	// The old parent group and associated resources:
+	oldParentGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "old group for testing workspace migration",
+		Name:        "g1",
+		FullPath:    "g1",
+		ParentID:    rootGroup.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	oldParentManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Description:  "old group managed identity for testing workspace migration",
+		Name:         "old-parent-managed-identity",
+		Type:         models.ManagedIdentityTharsisFederated,
+		GroupID:      oldParentGroup.Metadata.ID,
+		ResourcePath: "g1/old-parent-managed-identity",
+		Data:         []byte("this is another test"),
+	})
+	require.Nil(t, err)
+
+	oldParentGroupServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Description: "old parent group service account for testing workspace migration",
+		Name:        "old-parent-group-service-account",
+		GroupID:     oldParentGroup.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	oldParentVCSProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:    "old-parent-vcs-provider",
+		GroupID: oldParentGroup.Metadata.ID,
+	})
+	require.Nil(t, err)
+	require.NotNil(t, oldParentVCSProvider)
+
+	// The new parent group:
+	newParentGroup, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Description: "new group for testing workspace migration",
+		Name:        "g2",
+		FullPath:    "g2",
+		ParentID:    rootGroup.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	// The workspace that will be moved and associated resources:
+	ws, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Description:    "workspace for testing workspace migration",
+		Name:           "ws",
+		FullPath:       "root-group/g1/ws",
+		GroupID:        oldParentGroup.Metadata.ID,
+		MaxJobDuration: &defaultJobDuration,
+	})
+	require.Nil(t, err)
+
+	err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx, rootManagedIdentity.Metadata.ID, ws.Metadata.ID)
+	require.Nil(t, err)
+
+	err = testClient.client.ManagedIdentities.AddManagedIdentityToWorkspace(ctx, oldParentManagedIdentity.Metadata.ID, ws.Metadata.ID)
+	require.Nil(t, err)
+
+	_, err = testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath:    ws.FullPath,
+		ServiceAccountID: &rootServiceAccount.Metadata.ID,
+		RoleID:           role.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	_, err = testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath:    ws.FullPath,
+		ServiceAccountID: &oldParentGroupServiceAccount.Metadata.ID,
+		RoleID:           role.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	workspaceVar, err := testClient.client.Variables.CreateVariable(ctx, &models.Variable{
+		Key:           "workspace-var",
+		Value:         ptr.String("workspace variable for testing workspace migration"),
+		Category:      models.EnvironmentVariableCategory,
+		NamespacePath: ws.FullPath,
+	})
+	require.Nil(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: ws.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID: ws.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	// Must be a UUID but is not tied to any table.
+	tokenNonce, err := uuid.NewRandom()
+	require.Nil(t, err)
+
+	_, err = testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		ProviderID:  oldParentVCSProvider.Metadata.ID,
+		WorkspaceID: ws.Metadata.ID,
+		TokenNonce:  tokenNonce.String(),
+	})
+	require.Nil(t, err)
+
+	activityEvent, err := testClient.client.ActivityEvents.CreateActivityEvent(ctx, &models.ActivityEvent{
+		NamespacePath: &ws.FullPath,
+		Action:        models.ActionMigrate,
+		TargetType:    models.TargetWorkspace,
+		TargetID:      ws.Metadata.ID,
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		workspace *models.Workspace
+		newParent *models.Group
+		expectMsg *string
+		name      string
+	}
+
+	/*
+		TestCase fields template:
+		name      string
+		workspace *models.Workspace
+		newParent *models.Group
+		expectMsg *string
+	*/
+
+	testCases := []testCase{
+		{
+			name:      "positive",
+			workspace: ws,
+			newParent: newParentGroup,
+		},
+		{
+			name: "negative, workspace to move does not exist",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: nonExistentID,
+				},
+				FullPath: "the-workspace-that-does-not-exist",
+			},
+			newParent: oldParentGroup, // would move it back to the original group
+			expectMsg: ptr.String(ErrOptimisticLockError.Error()),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			testWorkspace := test.workspace
+
+			if test.expectMsg == nil {
+				// Before the migration, verify the root managed identity and old parent group managed identity are both still properly connected.
+				managedIdentities, err := testClient.client.ManagedIdentities.GetManagedIdentitiesForWorkspace(ctx, test.workspace.Metadata.ID)
+				assert.Nil(t, err)
+				assert.NotNil(t, managedIdentities)
+				assert.Equal(t, 2, len(managedIdentities))
+				assert.ElementsMatch(t, []models.ManagedIdentity{*rootManagedIdentity, *oldParentManagedIdentity}, managedIdentities)
+			}
+
+			// Do the migration.
+			newWorkspace, err := testClient.client.Workspaces.MigrateWorkspace(ctx, testWorkspace, test.newParent)
+
+			checkError(t, test.expectMsg, err)
+
+			if test.expectMsg == nil {
+
+				require.NotNil(t, newWorkspace)
+
+				// Claimed new workspace fields must match, except full path and parent ID.
+				assert.Equal(t, testWorkspace.Name, newWorkspace.Name)
+				assert.Equal(t, testWorkspace.Description, newWorkspace.Description)
+				assert.Equal(t, testWorkspace.CreatedBy, newWorkspace.CreatedBy)
+
+				// Claimed new workspace full path and parent ID must be correct.
+				newParentID := test.newParent.Metadata.ID
+				fetchPath := test.newParent.FullPath + "/" + testWorkspace.Name
+				assert.Equal(t, newParentID, newWorkspace.GroupID)
+				assert.Equal(t, fetchPath, newWorkspace.FullPath)
+
+				// Workspace can be fetched from new path.
+				fetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByFullPath(ctx, fetchPath)
+				require.Nil(t, err)
+				require.NotNil(t, fetchedWorkspace)
+
+				// Fetched workspace fields match claimed new workspace.
+				assert.Equal(t, newWorkspace.Metadata.ID, fetchedWorkspace.Metadata.ID)
+				assert.Equal(t, newWorkspace.Metadata.CreationTimestamp, fetchedWorkspace.Metadata.CreationTimestamp)
+				assert.Equal(t, newWorkspace.Metadata.Version, fetchedWorkspace.Metadata.Version)
+				assert.Equal(t, newWorkspace.Metadata.LastUpdatedTimestamp, fetchedWorkspace.Metadata.LastUpdatedTimestamp)
+				assert.Equal(t, newWorkspace.Name, fetchedWorkspace.Name)
+				assert.Equal(t, testWorkspace.Description, fetchedWorkspace.Description)
+				assert.Equal(t, newWorkspace.FullPath, fetchedWorkspace.FullPath)
+				assert.Equal(t, newWorkspace.CreatedBy, fetchedWorkspace.CreatedBy)
+
+				// No workspace at old path.
+				oldFetchedGroup, err := testClient.client.Groups.GetGroupByFullPath(ctx, testWorkspace.FullPath)
+				assert.Nil(t, err)
+				assert.Nil(t, oldFetchedGroup)
+
+				// Verify the workspace found by ID has the correct path.
+				fetchedWorkspace, err = testClient.client.Workspaces.GetWorkspaceByID(ctx, testWorkspace.Metadata.ID)
+				assert.Nil(t, err)
+				assert.NotNil(t, fetchedWorkspace)
+				assert.Equal(t, fetchPath, fetchedWorkspace.FullPath)
+
+				// Verify the root variable and workspace variable are both still properly connected.
+				// However, a query for variables in the workspace does not return the root variable.
+				expectedVar := *workspaceVar
+				expectedVar.NamespacePath = fetchedWorkspace.FullPath
+				vars, err := testClient.client.Variables.GetVariables(ctx, &GetVariablesInput{
+					Filter: &VariableFilter{
+						NamespacePaths: []string{fetchedWorkspace.FullPath},
+					},
+					Sort: ptrVariableSortableField(VariableSortableFieldNamespacePathAsc),
+				})
+				assert.Nil(t, err)
+				assert.NotNil(t, vars)
+				assert.NotNil(t, vars.PageInfo)
+				assert.NotNil(t, vars.Variables)
+				assert.Equal(t, vars.PageInfo.TotalCount, int32(1))
+				assert.Equal(t, []models.Variable{expectedVar}, vars.Variables)
+
+				// Verify the root managed identity is still properly assigned
+				// and the old parent group managed identity assignment has been deleted.
+				managedIdentities, err := testClient.client.ManagedIdentities.
+					GetManagedIdentitiesForWorkspace(ctx, test.workspace.Metadata.ID)
+				assert.Nil(t, err)
+				assert.NotNil(t, managedIdentities)
+				assert.Equal(t, 1, len(managedIdentities))
+				assert.ElementsMatch(t, []models.ManagedIdentity{*rootManagedIdentity}, managedIdentities)
+
+				// Verify the workspace run is still properly connected.
+				runs, err := testClient.client.Runs.GetRuns(ctx, &GetRunsInput{
+					Filter: &RunFilter{
+						WorkspaceID: &fetchedWorkspace.Metadata.ID,
+					},
+				})
+				assert.Nil(t, err)
+				assert.NotNil(t, runs)
+				assert.NotNil(t, runs.PageInfo)
+				assert.NotNil(t, runs.Runs)
+				assert.Equal(t, runs.PageInfo.TotalCount, int32(1))
+				assert.Equal(t, []models.Run{*run}, runs.Runs)
+
+				// Verify the workspace state version is still properly connected.
+				stateVersions, err := testClient.client.StateVersions.GetStateVersions(ctx, &GetStateVersionsInput{
+					Filter: &StateVersionFilter{
+						WorkspaceID: &fetchedWorkspace.Metadata.ID,
+					},
+				})
+				assert.Nil(t, err)
+				assert.NotNil(t, stateVersions)
+				assert.NotNil(t, stateVersions.PageInfo)
+				assert.NotNil(t, stateVersions.StateVersions)
+				assert.Equal(t, stateVersions.PageInfo.TotalCount, int32(1))
+				assert.Equal(t, []models.StateVersion{*stateVersion}, stateVersions.StateVersions)
+
+				// A query on the workspace does not return any group memberships,
+				// so cannot directly verify the old parent group service account membership has been deleted
+				// or that the root group service account membership is still properly connected.
+
+				// Verify the old parent group VCS provider link has been deleted.
+				link, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByWorkspaceID(ctx, fetchedWorkspace.Metadata.ID)
+				assert.Nil(t, err)
+				assert.Nil(t, link)
+
+				// Verify the activity event is still properly connected and has been updated.
+				expectedActivityEvent := *activityEvent
+				expectedActivityEvent.NamespacePath = &fetchedWorkspace.FullPath
+				fetchedActivityEvent, err := testClient.client.ActivityEvents.GetActivityEvents(ctx, &GetActivityEventsInput{
+					Filter: &ActivityEventFilter{
+						NamespacePath: &fetchedWorkspace.FullPath,
+					},
+				})
+				assert.Nil(t, err)
+				assert.NotNil(t, fetchedActivityEvent)
+				assert.NotNil(t, fetchedActivityEvent.PageInfo)
+				assert.NotNil(t, fetchedActivityEvent.ActivityEvents)
+				assert.Equal(t, fetchedActivityEvent.PageInfo.TotalCount, int32(1))
+				assert.Equal(t, []models.ActivityEvent{expectedActivityEvent}, fetchedActivityEvent.ActivityEvents)
 			}
 		})
 	}

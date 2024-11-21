@@ -526,6 +526,32 @@ func (_m *MockService) LockWorkspace(ctx context.Context, workspace *models.Work
 	return r0, r1
 }
 
+// MigrateWorkspace provides a mock function with given fields: ctx, workspaceID, newGroupID
+func (_m *MockService) MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error) {
+	ret := _m.Called(ctx, workspaceID, newGroupID)
+
+	var r0 *models.Workspace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*models.Workspace, error)); ok {
+		return rf(ctx, workspaceID, newGroupID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *models.Workspace); ok {
+		r0 = rf(ctx, workspaceID, newGroupID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Workspace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, workspaceID, newGroupID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SubscribeToWorkspaceEvents provides a mock function with given fields: ctx, options
 func (_m *MockService) SubscribeToWorkspaceEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error) {
 	ret := _m.Called(ctx, options)

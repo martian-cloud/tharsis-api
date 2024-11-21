@@ -138,6 +138,7 @@ type Service interface {
 	GetStateVersionOutputs(context context.Context, stateVersionID string) ([]models.StateVersionOutput, error)
 	GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error)
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
+	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
 }
 
 type handleCallerFunc func(
@@ -1600,11 +1601,139 @@ func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Work
 
 	if workspace == nil {
 		return nil, errors.New(
-			"Workspace with id %s not found", id,
+			"workspace with id %s not found", id,
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return workspace, nil
+}
+
+func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.MigrateWorkspace")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	// The caller must have CreateWorkspacePermission in the new parent.
+	err = caller.RequirePermission(ctx, permissions.CreateWorkspacePermission, auth.WithGroupID(newGroupID))
+	if err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	// Caller must have DeleteWorkspacePermission in the workspace being moved.
+	err = caller.RequirePermission(ctx, permissions.DeleteWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	if err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	// Get the workspace to be moved.
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace by ID", errors.WithSpan(span))
+	}
+	if workspace == nil {
+		return nil, errors.New(
+			"workspace with id %s not found", workspaceID,
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Get the old parent group.
+	oldGroupID := workspace.GroupID
+	oldParent, err := s.dbClient.Groups.GetGroupByID(ctx, oldGroupID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get old parent group by ID", errors.WithSpan(span))
+	}
+	if oldParent == nil {
+		return nil, errors.New(
+			"Old parent group with id %s not found", oldGroupID,
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Get the new parent group.
+	newGroup, nErr := s.dbClient.Groups.GetGroupByID(ctx, newGroupID)
+	if nErr != nil {
+		return nil, errors.Wrap(nErr, "failed to get a group by ID", errors.WithSpan(span))
+	}
+	if newGroup == nil {
+		return nil, errors.New(
+			"group with id %s not found", newGroupID,
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// In case a user gets confused or otherwise tries to do a no-op move, detect and bail out.
+	// Because nothing gets done, it's safe to do this before the authorization check on the new parent.
+	if oldGroupID == newGroupID {
+		// Return BadRequest.
+		return nil, errors.New("workspace is already in the specified group", errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span))
+	}
+
+	// Because the workspace to be moved and the new parent group have been fetched from the DB,
+	// there's no need to validate them.
+
+	s.logger.Infow("Requested a workspace migration.",
+		"caller", caller.GetSubject(),
+		"fullPath", workspace.FullPath, // This is the full path of the workspace prior to migration.
+		"workspaceID", workspace.Metadata.ID,
+		"newGroupPath", newGroup.FullPath,
+	)
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin a DB transaction", errors.WithSpan(span))
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for service layer MigrateWorkspace: %v", txErr)
+		}
+	}()
+
+	// Now that all checks have passed and the transaction is open, do the actual work of the migration.
+	migratedWorkspace, err := s.dbClient.Workspaces.MigrateWorkspace(txContext, workspace, newGroup)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to migrate a workspace", errors.WithSpan(span))
+	}
+
+	// Check limits to see whether we just committed a violation.
+	children, err := s.dbClient.Workspaces.GetWorkspaces(txContext, &db.GetWorkspacesInput{
+		Filter: &db.WorkspaceFilter{
+			GroupID: &newGroupID,
+		},
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get parent group's children", errors.WithSpan(span))
+	}
+
+	if err = s.limitChecker.CheckLimit(txContext, limits.ResourceLimitWorkspacesPerGroup, children.PageInfo.TotalCount); err != nil {
+		return nil, errors.Wrap(err, "limit check failed", errors.WithSpan(span))
+	}
+
+	// Generate an activity event on the workspace that was migrated.
+	if _, err = s.activityService.CreateActivityEvent(txContext,
+		&activityevent.CreateActivityEventInput{
+			NamespacePath: &migratedWorkspace.FullPath,
+			Action:        models.ActionMigrate,
+			TargetType:    models.TargetWorkspace,
+			TargetID:      migratedWorkspace.Metadata.ID,
+			Payload: &models.ActivityEventMigrateWorkspacePayload{
+				PreviousGroupPath: oldParent.FullPath,
+			},
+		}); err != nil {
+		return nil, errors.Wrap(err, "failed to create an activity event", errors.WithSpan(span))
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit a DB transaction", errors.WithSpan(span))
+	}
+
+	return migratedWorkspace, nil
 }
 
 // validateMaxJobDuration validates if duration is within MaxJobDuration limits.
@@ -1620,5 +1749,3 @@ func validateMaxJobDuration(duration int32) error {
 
 	return nil
 }
-
-// The End.
