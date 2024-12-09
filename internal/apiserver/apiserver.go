@@ -54,6 +54,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -81,7 +82,7 @@ type APIServer struct {
 }
 
 // New creates a new APIServer instance
-func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version string) (*APIServer, error) {
+func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersion string) (*APIServer, error) {
 	openIDConfigFetcher := auth.NewOpenIDConfigFetcher()
 
 	tlsConfig, err := loadTLSConfig(cfg, logger)
@@ -113,7 +114,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 			Type:    cfg.OtelTraceType,
 			Host:    cfg.OtelTraceCollectorHost,
 			Port:    cfg.OtelTraceCollectorPort,
-			Version: version,
+			Version: apiVersion,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize trace provider: %w", err)
@@ -179,6 +180,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 	// Services.
 	var (
+		versionService             = version.NewService(dbClient, apiVersion)
 		activityService            = activityevent.NewService(dbClient, logger)
 		userService                = user.NewService(logger, dbClient)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
@@ -316,7 +318,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 		ResourceLimitService:       resourceLimitService,
 		ProviderMirrorService:      providerMirrorService,
 		MaintenanceModeService:     maintenanceModeService,
-		Version:                    version,
+		VersionService:             versionService,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)
@@ -449,7 +451,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, version 
 
 		logger.Infof("starting internal runner %s", r.Name)
 
-		runner, err := rnr.NewRunner(ctx, r.Name, logger, version, runnerClient, &rnr.JobDispatcherSettings{
+		runner, err := rnr.NewRunner(ctx, r.Name, logger, apiVersion, runnerClient, &rnr.JobDispatcherSettings{
 			DispatcherType:       r.JobDispatcherType,
 			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
 			PluginData:           r.JobDispatcherData,
