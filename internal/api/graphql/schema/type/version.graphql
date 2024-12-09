@@ -1,0 +1,5 @@
+type Version {
+  apiVersion: String!
+  dbMigrationVersion: String!
+  dbMigrationDirty: Boolean!
+}

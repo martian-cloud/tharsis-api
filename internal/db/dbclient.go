@@ -101,6 +101,7 @@ type Client struct {
 	MaintenanceModes                 MaintenanceModes
 	LogStreams                       LogStreams
 	RunnerSessions                   RunnerSessions
+	SchemaMigrations                 SchemaMigrations
 }
 
 // NewClient creates a new Client
@@ -200,6 +201,7 @@ func NewClient(
 	dbClient.MaintenanceModes = NewMaintenanceModes(dbClient)
 	dbClient.LogStreams = NewLogStreams(dbClient)
 	dbClient.RunnerSessions = NewRunnerSessions(dbClient)
+	dbClient.SchemaMigrations = NewSchemaMigrations(dbClient)
 
 	return dbClient, nil
 }

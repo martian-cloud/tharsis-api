@@ -1319,7 +1319,7 @@ func (r RootResolver) DisableMaintenanceMode(ctx context.Context,
 	return response, nil
 }
 
-// Version returns the version of the API.
-func (r RootResolver) Version(ctx context.Context) string {
-	return extract(ctx).Version
+// Version returns the version of the API and its components
+func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
+	return versionQuery(ctx)
 }

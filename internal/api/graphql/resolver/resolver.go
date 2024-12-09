@@ -26,6 +26,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -63,7 +64,7 @@ type State struct {
 	ResourceLimitService       resourcelimit.Service
 	ProviderMirrorService      providermirror.Service
 	MaintenanceModeService     maintenance.Service
-	Version                    string
+	VersionService             version.Service
 }
 
 // Attach is used to attach the resolver state to the context
@@ -180,4 +181,8 @@ func getProviderMirrorService(ctx context.Context) providermirror.Service {
 
 func getMaintenanceModeService(ctx context.Context) maintenance.Service {
 	return extract(ctx).MaintenanceModeService
+}
+
+func getVersionService(ctx context.Context) version.Service {
+	return extract(ctx).VersionService
 }
