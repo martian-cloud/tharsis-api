@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	httpClientTimeout = 30 * time.Second
+	httpClientTimeout = 60 * time.Second
 )
 
 // NewHTTPClient creates a new HTTP client with a timeout.
