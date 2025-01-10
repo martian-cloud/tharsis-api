@@ -2000,12 +2000,14 @@ var standardWarmupWorkspaces = []models.Workspace{
 		FullPath:           "top-level-group-0-for-workspaces/workspace-1",
 		CreatedBy:          "someone-1",
 		PreventDestroyPlan: false,
+		RunnerTags:         []string{"tag1"},
 	},
 	{
 		Description:        "workspace 5 for testing workspace functions",
 		FullPath:           "top-level-group-1-for-workspaces/workspace-5",
 		CreatedBy:          "someone-6",
 		PreventDestroyPlan: true,
+		RunnerTags:         []string{"tag2", "tag3"},
 	},
 	{
 		Description:        "workspace 3 for testing workspace functions",

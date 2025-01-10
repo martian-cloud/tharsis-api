@@ -1986,11 +1986,13 @@ var standardWarmupGroups = []models.Group{
 		Description: "top level group 1 for testing group functions",
 		FullPath:    "top-level-group-1",
 		CreatedBy:   "someone",
+		RunnerTags:  []string{"tag1"},
 	},
 	{
 		Description: "top level group 2 for testing group functions",
 		FullPath:    "top-level-group-2",
 		CreatedBy:   "someone-else",
+		RunnerTags:  []string{"tag2", "tag3"},
 	},
 	{
 		Description: "top level group 3 for testing group functions",

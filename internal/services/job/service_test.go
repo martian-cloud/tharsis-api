@@ -14,9 +14,232 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
+
+func TestClaimJob(t *testing.T) {
+	jobID := "job-1"
+	runnerID := "runner-1"
+	workspaceID := "workspace-1"
+	groupID := "group-1"
+	token := "job-token"
+
+	sampleQueuedJob := models.Job{
+		Metadata: models.ResourceMetadata{
+			ID: jobID,
+		},
+		WorkspaceID: workspaceID,
+	}
+
+	type testCase struct {
+		existingRunner         *models.Runner
+		expectResponse         *ClaimJobResponse
+		name                   string
+		authError              error
+		expectErrorCode        errors.CodeType
+		expectGetRunnersInput  *db.GetRunnersInput
+		injectGetRunnersResult *db.RunnersResult
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully claim a job with shared runner",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID: runnerID,
+				},
+				Type: models.SharedRunnerType,
+				Name: "shared-runner",
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerName: &runnerID,
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type: models.SharedRunnerType,
+						Name: "shared-runner",
+					},
+				},
+			},
+			expectResponse: &ClaimJobResponse{
+				JobID: jobID,
+				Token: token,
+			},
+		},
+		{
+			name: "successfully claim a job with an group runner",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID: runnerID,
+				},
+				Type:         models.GroupRunnerType,
+				Name:         "group-runner",
+				ResourcePath: "group-1/group-runner",
+				GroupID:      &groupID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerName: &runnerID,
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type:         models.GroupRunnerType,
+						Name:         "group-runner",
+						ResourcePath: "group-1/group-runner",
+					},
+				},
+			},
+			expectResponse: &ClaimJobResponse{
+				JobID: jobID,
+				Token: token,
+			},
+		},
+		{
+			name:            "runner not found",
+			expectErrorCode: errors.ENotFound,
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerName: &runnerID,
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{},
+			},
+		},
+		{
+			name: "subject does not have permissions to claim job",
+			existingRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID: runnerID,
+				},
+				Type: models.SharedRunnerType,
+				Name: "shared-runner",
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerName: &runnerID,
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type: models.SharedRunnerType,
+						Name: "shared-runner",
+					},
+				},
+			},
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockJobs := db.NewMockJobs(t)
+			mockRunners := db.NewMockRunners(t)
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockJWSProvider := jws.NewMockProvider(t)
+
+			mockRunners.On("GetRunnerByID", mock.Anything, runnerID).
+				Return(test.existingRunner, nil).Maybe()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ClaimJobPermission, mock.Anything).
+				Return(test.authError).Maybe()
+
+			mockRunners.On("GetRunners", mock.Anything, test.expectGetRunnersInput).
+				Return(test.injectGetRunnersResult, nil)
+
+			if test.expectErrorCode == "" {
+				// Mock jobs
+				sortBy := db.JobSortableFieldCreatedAtAsc
+				jobQueued := models.JobQueued
+				jobsInput := &db.GetJobsInput{
+					Sort: &sortBy,
+					Filter: &db.JobFilter{
+						JobStatus: &jobQueued,
+						TagFilter: &db.JobTagFilter{TagSuperset: []string{}, ExcludeUntaggedJobs: ptr.Bool(true)},
+					},
+				}
+				mockJobs.On("GetJobs", mock.Anything, jobsInput).Return(&db.JobsResult{Jobs: []models.Job{sampleQueuedJob}}, nil)
+
+				mockJobs.On("GetJobCountForRunner", mock.Anything, runnerID).Return(1, nil)
+
+				mockJobs.On("UpdateJob", mock.Anything, mock.Anything).Return(&sampleQueuedJob, nil)
+
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).
+					Return(&models.Workspace{
+						Locked:   false,
+						FullPath: "group-1/workspace-1",
+					}, nil)
+
+				// These are for the transaction opened by RunStateManager.
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+				mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+
+				mockJobs.On("GetJobByID", mock.Anything, mock.Anything).
+					Return(&sampleQueuedJob, nil)
+
+				mockCaller.On("GetSubject").Return("testSubject")
+
+				mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte(token), nil)
+			}
+
+			dbClient := &db.Client{
+				Jobs:         mockJobs,
+				Runners:      mockRunners,
+				Workspaces:   mockWorkspaces,
+				Transactions: mockTransactions,
+			}
+
+			identityProvider := auth.NewIdentityProvider(mockJWSProvider, "http://tharsis.domain")
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient:        dbClient,
+				logger:          logger,
+				idp:             identityProvider,
+				eventManager:    events.NewEventManager(dbClient, logger),
+				runStateManager: state.NewRunStateManager(dbClient, logger),
+			}
+
+			actualResponse, err := service.ClaimJob(auth.WithCaller(ctx, mockCaller), runnerID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectResponse, actualResponse)
+		})
+	}
+}
 
 func TestGetNextAvailableJob(t *testing.T) {
 	// Test cases
@@ -27,6 +250,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 		name                  string
 		runners               []models.Runner
 		queuedJobs            []models.Job
+		disallowQueuedJobs    bool
 		currentRunnerJobCount int
 	}{
 		{
@@ -46,7 +270,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			expectJobID: "job1",
 		},
 		{
-			name: "shared runner should not get next job because a group runner exists",
+			name: "shared runner can get next job even if a group runner exists",
 			runner: &models.Runner{
 				Type: models.SharedRunnerType,
 			},
@@ -61,6 +285,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 					Locked: false,
 				},
 			},
+			expectJobID: "job1",
 		},
 		{
 			name: "shared runner should not get next job because workspace is locked",
@@ -89,7 +314,8 @@ func TestGetNextAvailableJob(t *testing.T) {
 			currentRunnerJobCount: runnerJobsLimit,
 			workspaceMap: map[string]models.Workspace{
 				"ws1": {
-					Locked: false,
+					Locked:   false,
+					FullPath: "group1/group2/group3/ws1",
 				},
 			},
 		},
@@ -135,7 +361,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 			expectJobID: "job1",
 		},
 		{
-			name: "group runner should not get next job because there is a child group that has a runner with higher precedence",
+			name: "group runner can get next job even if there is a child group that has a runner",
 			runner: &models.Runner{
 				Type:         models.GroupRunnerType,
 				ResourcePath: "group1/runner1",
@@ -159,6 +385,7 @@ func TestGetNextAvailableJob(t *testing.T) {
 					FullPath: "group1/group2/group3/ws1",
 				},
 			},
+			expectJobID: "job1",
 		},
 		{
 			name: "group runner should not get next job because the workspace is in a different group hierarchy",
@@ -177,6 +404,44 @@ func TestGetNextAvailableJob(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "runner should not get next job because tags are not satisfied (job has a tag the runner lacks)",
+			runner: &models.Runner{
+				Type: models.SharedRunnerType,
+				Tags: []string{"extra-runner-tags-do-not-prevent-job-assignment"},
+			},
+			queuedJobs: []models.Job{
+				{
+					Metadata:    models.ResourceMetadata{ID: "job1"},
+					WorkspaceID: "ws1",
+					Tags:        []string{"job-tag-that-the-runner-lacks"},
+				},
+			},
+			disallowQueuedJobs: true,
+			runners:            []models.Runner{},
+			workspaceMap: map[string]models.Workspace{
+				"ws1": {
+					Locked: false,
+				},
+			},
+		},
+		{
+			name: "runner should not get next job because runner does not run untagged jobs",
+			runner: &models.Runner{
+				Type:            models.SharedRunnerType,
+				RunUntaggedJobs: false,
+			},
+			queuedJobs: []models.Job{
+				{Metadata: models.ResourceMetadata{ID: "job1"}, WorkspaceID: "ws1"},
+			},
+			disallowQueuedJobs: true,
+			runners:            []models.Runner{},
+			workspaceMap: map[string]models.Workspace{
+				"ws1": {
+					Locked: false,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -190,8 +455,13 @@ func TestGetNextAvailableJob(t *testing.T) {
 
 			mockRunners.On("GetRunnerByID", mock.Anything, mock.Anything).Return(test.runner, nil)
 
+			// Mimic what the DB layer does with the tag filter.
+			returnJobs := test.queuedJobs
+			if test.disallowQueuedJobs {
+				returnJobs = []models.Job{}
+			}
 			mockJobs.On("GetJobs", ctx, mock.Anything).Return(&db.JobsResult{
-				Jobs: test.queuedJobs,
+				Jobs: returnJobs,
 			}, nil)
 
 			for _, j := range test.queuedJobs {
@@ -283,7 +553,7 @@ func TestSubscribeToJobs(t *testing.T) {
 			expectErrCode: errors.EForbidden,
 		},
 		{
-			name: "subscribe to job events for an group runner",
+			name: "subscribe to job events for a group runner",
 			input: &SubscribeToJobsInput{
 				RunnerID: ptr.String("runner1"),
 			},
@@ -317,7 +587,7 @@ func TestSubscribeToJobs(t *testing.T) {
 			},
 		},
 		{
-			name: "not authorized to subscribe to job events for an group runner",
+			name: "not authorized to subscribe to job events for a group runner",
 			input: &SubscribeToJobsInput{
 				RunnerID: ptr.String("runner1"),
 			},

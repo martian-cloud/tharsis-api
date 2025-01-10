@@ -26,8 +26,8 @@ type namespaceWarmupsOutput struct {
 
 // pathChecksType contains maps from group/workspace ID to namespace path and is used for the group migration test.
 type pathChecksType struct {
-	groups     map[models.Group]string
-	workspaces map[models.Workspace]string
+	groups     map[string]string
+	workspaces map[string]string
 }
 
 func TestGetNamespaceByGroupID(t *testing.T) {
@@ -423,12 +423,12 @@ func TestMigrateNamespace(t *testing.T) {
 			oldPath: "top-level-group-3-for-nothing",
 			newPath: "migrated-group-3",
 			pathChecks: buildPathChecks(warmupOutput, &pathChecksType{
-				groups: map[models.Group]string{
-					warmupOutput.groups[3]: "migrated-group-3",
-					warmupOutput.groups[8]: "migrated-group-3/2nd-level-group-30",
+				groups: map[string]string{
+					warmupOutput.groups[3].Metadata.ID: "migrated-group-3",
+					warmupOutput.groups[8].Metadata.ID: "migrated-group-3/2nd-level-group-30",
 				},
-				workspaces: map[models.Workspace]string{
-					warmupOutput.workspaces[9]: "migrated-group-3/2nd-level-group-30/workspace-30x",
+				workspaces: map[string]string{
+					warmupOutput.workspaces[9].Metadata.ID: "migrated-group-3/2nd-level-group-30/workspace-30x",
 				},
 			}),
 		},
@@ -438,12 +438,12 @@ func TestMigrateNamespace(t *testing.T) {
 			oldPath: "migrated-group-3",
 			newPath: "top-level-group-0-for-namespaces/double-migrated-group-3",
 			pathChecks: buildPathChecks(warmupOutput, &pathChecksType{
-				groups: map[models.Group]string{
-					warmupOutput.groups[3]: "top-level-group-0-for-namespaces/double-migrated-group-3",
-					warmupOutput.groups[8]: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30",
+				groups: map[string]string{
+					warmupOutput.groups[3].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3",
+					warmupOutput.groups[8].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30",
 				},
-				workspaces: map[models.Workspace]string{
-					warmupOutput.workspaces[9]: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30/workspace-30x",
+				workspaces: map[string]string{
+					warmupOutput.workspaces[9].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30/workspace-30x",
 				},
 			}),
 		},
@@ -453,16 +453,16 @@ func TestMigrateNamespace(t *testing.T) {
 			oldPath: "top-level-group-1-for-namespaces/2nd-level-group-10",
 			newPath: "migrated-2nd-level-group-10-now-root",
 			pathChecks: buildPathChecks(warmupOutput, &pathChecksType{
-				groups: map[models.Group]string{
-					warmupOutput.groups[3]: "top-level-group-0-for-namespaces/double-migrated-group-3",
-					warmupOutput.groups[8]: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30",
-					warmupOutput.groups[4]: "migrated-2nd-level-group-10-now-root",
-					warmupOutput.groups[5]: "migrated-2nd-level-group-10-now-root/3rd-level-group-100",
+				groups: map[string]string{
+					warmupOutput.groups[3].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3",
+					warmupOutput.groups[8].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30",
+					warmupOutput.groups[4].Metadata.ID: "migrated-2nd-level-group-10-now-root",
+					warmupOutput.groups[5].Metadata.ID: "migrated-2nd-level-group-10-now-root/3rd-level-group-100",
 				},
-				workspaces: map[models.Workspace]string{
-					warmupOutput.workspaces[9]: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30/workspace-30x",
-					warmupOutput.workspaces[5]: "migrated-2nd-level-group-10-now-root/workspace-10x",
-					warmupOutput.workspaces[6]: "migrated-2nd-level-group-10-now-root/3rd-level-group-100/workspace-100x",
+				workspaces: map[string]string{
+					warmupOutput.workspaces[9].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30/workspace-30x",
+					warmupOutput.workspaces[5].Metadata.ID: "migrated-2nd-level-group-10-now-root/workspace-10x",
+					warmupOutput.workspaces[6].Metadata.ID: "migrated-2nd-level-group-10-now-root/3rd-level-group-100/workspace-100x",
 				},
 			}),
 		},
@@ -472,20 +472,20 @@ func TestMigrateNamespace(t *testing.T) {
 			oldPath: "top-level-group-2-for-namespaces/2nd-level-group-20",
 			newPath: "top-level-group-1-for-namespaces/2nd-level-group-20",
 			pathChecks: buildPathChecks(warmupOutput, &pathChecksType{
-				groups: map[models.Group]string{
-					warmupOutput.groups[3]: "top-level-group-0-for-namespaces/double-migrated-group-3",
-					warmupOutput.groups[8]: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30",
-					warmupOutput.groups[4]: "migrated-2nd-level-group-10-now-root",
-					warmupOutput.groups[5]: "migrated-2nd-level-group-10-now-root/3rd-level-group-100",
-					warmupOutput.groups[6]: "top-level-group-1-for-namespaces/2nd-level-group-20",
-					warmupOutput.groups[7]: "top-level-group-1-for-namespaces/2nd-level-group-20/3rd-level-group-200",
+				groups: map[string]string{
+					warmupOutput.groups[3].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3",
+					warmupOutput.groups[8].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30",
+					warmupOutput.groups[4].Metadata.ID: "migrated-2nd-level-group-10-now-root",
+					warmupOutput.groups[5].Metadata.ID: "migrated-2nd-level-group-10-now-root/3rd-level-group-100",
+					warmupOutput.groups[6].Metadata.ID: "top-level-group-1-for-namespaces/2nd-level-group-20",
+					warmupOutput.groups[7].Metadata.ID: "top-level-group-1-for-namespaces/2nd-level-group-20/3rd-level-group-200",
 				},
-				workspaces: map[models.Workspace]string{
-					warmupOutput.workspaces[9]: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30/workspace-30x",
-					warmupOutput.workspaces[5]: "migrated-2nd-level-group-10-now-root/workspace-10x",
-					warmupOutput.workspaces[6]: "migrated-2nd-level-group-10-now-root/3rd-level-group-100/workspace-100x",
-					warmupOutput.workspaces[7]: "top-level-group-1-for-namespaces/2nd-level-group-20/workspace-20x",
-					warmupOutput.workspaces[8]: "top-level-group-1-for-namespaces/2nd-level-group-20/3rd-level-group-200/workspace-200x",
+				workspaces: map[string]string{
+					warmupOutput.workspaces[9].Metadata.ID: "top-level-group-0-for-namespaces/double-migrated-group-3/2nd-level-group-30/workspace-30x",
+					warmupOutput.workspaces[5].Metadata.ID: "migrated-2nd-level-group-10-now-root/workspace-10x",
+					warmupOutput.workspaces[6].Metadata.ID: "migrated-2nd-level-group-10-now-root/3rd-level-group-100/workspace-100x",
+					warmupOutput.workspaces[7].Metadata.ID: "top-level-group-1-for-namespaces/2nd-level-group-20/workspace-20x",
+					warmupOutput.workspaces[8].Metadata.ID: "top-level-group-1-for-namespaces/2nd-level-group-20/3rd-level-group-200/workspace-200x",
 				},
 			}),
 		},
@@ -502,13 +502,13 @@ func TestMigrateNamespace(t *testing.T) {
 			if test.pathChecks != nil {
 				for g1, expectPath := range test.pathChecks.groups {
 					// Must fetch the group by ID to get the updated full path.
-					g2, err := testClient.client.Groups.GetGroupByID(ctx, g1.Metadata.ID)
+					g2, err := testClient.client.Groups.GetGroupByID(ctx, g1)
 					require.Nil(t, err)
 					assert.Equal(t, expectPath, g2.FullPath)
 				}
 				for w1, expectPath := range test.pathChecks.workspaces {
 					// Must fetch the workspace by ID to get the updated full path.
-					w2, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, w1.Metadata.ID)
+					w2, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, w1)
 					require.Nil(t, err)
 					assert.Equal(t, expectPath, w2.FullPath)
 				}
@@ -677,16 +677,16 @@ func createWarmupNamespaces(ctx context.Context, testClient *testClient,
 // buildPathChecks builds a pathChecksType struct from a namespaceWarmupsOutput and a block of exceptions.
 func buildPathChecks(base *namespaceWarmupsOutput, exceptions *pathChecksType) *pathChecksType {
 	result := pathChecksType{
-		groups:     map[models.Group]string{},
-		workspaces: map[models.Workspace]string{},
+		groups:     map[string]string{},
+		workspaces: map[string]string{},
 	}
 
 	// Build the base.
 	for _, g := range base.groups {
-		result.groups[g] = g.FullPath
+		result.groups[g.Metadata.ID] = g.FullPath
 	}
 	for _, w := range base.workspaces {
-		result.workspaces[w] = w.FullPath
+		result.workspaces[w.Metadata.ID] = w.FullPath
 	}
 
 	// Apply the exceptions.

@@ -585,15 +585,23 @@ func createInitialConfigurationVersions(ctx context.Context, testClient *testCli
 }
 
 // createInitialJobs creates some warmup jobs for a test.
+// Workspace IDs are assigned by rotation.
 func createInitialJobs(ctx context.Context, testClient *testClient,
-	toCreate []models.Job, workspaceID, runID, runnerID string) ([]models.Job, error) {
+	toCreate []models.Job, workspaceIDs []string, runID, runnerID string) ([]models.Job, error) {
 	result := []models.Job{}
+	nextWorkspaceIndex := 0
 
 	for _, input := range toCreate {
+
+		workspaceID := workspaceIDs[nextWorkspaceIndex]
+		nextWorkspaceIndex = (nextWorkspaceIndex + 1) % len(workspaceIDs)
 
 		input.WorkspaceID = workspaceID
 		input.RunID = runID
 		input.RunnerID = &runnerID
+		if input.Tags == nil {
+			input.Tags = []string{}
+		}
 		created, err := testClient.client.Jobs.CreateJob(ctx, &input)
 		if err != nil {
 			return nil, err

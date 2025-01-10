@@ -10,6 +10,7 @@ type Group struct {
 	FullPath    string
 	CreatedBy   string
 	Metadata    ResourceMetadata
+	RunnerTags  []string
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -35,7 +36,12 @@ func (g *Group) Validate() error {
 	}
 
 	// Verify description satisfies constraints
-	return verifyValidDescription(g.Description)
+	if err := verifyValidDescription(g.Description); err != nil {
+		return err
+	}
+
+	// Check for duplicate tags, too-long tags, and too many tags.
+	return verifyValidRunnerTags(g.RunnerTags)
 }
 
 // GetRootGroupPath returns the root path for the group
@@ -68,6 +74,46 @@ func (g *Group) GetDepth() int {
 // IsDescendantOfGroup returns true if the group is a descendant of the specified (other/ancestor group) path.
 func (g *Group) IsDescendantOfGroup(otherGroupPath string) bool {
 	return IsDescendantOfPath(g.FullPath, otherGroupPath)
+}
+
+// GetRunnerTagsSetting returns the runner tag settings from a list of parent groups.
+func GetRunnerTagsSetting(parentGroups []*Group) *RunnerTagsSetting {
+
+	// Find the first/lowest group with tags set.
+	var taggedGroup *Group
+	for _, g := range parentGroups {
+		if g.RunnerTags != nil {
+			taggedGroup = g
+			break
+		}
+	}
+
+	if taggedGroup == nil {
+		// No tags set in any ancestor group.
+		// The last group in the list is a root group, so return its full path.
+		return &RunnerTagsSetting{
+			Inherited:     true,
+			NamespacePath: parentGroups[len(parentGroups)-1].FullPath,
+			Value:         []string{},
+		}
+	}
+
+	// Just in case taggedGroup.RunnerTags is nil.
+	if taggedGroup.RunnerTags == nil {
+		// No tags set in any ancestor group.
+		// The last group in the list is a root group, so return its full path.
+		return &RunnerTagsSetting{
+			Inherited:     true,
+			NamespacePath: taggedGroup.FullPath,
+			Value:         []string{},
+		}
+	}
+
+	return &RunnerTagsSetting{
+		Inherited:     true,
+		NamespacePath: taggedGroup.FullPath,
+		Value:         taggedGroup.RunnerTags,
+	}
 }
 
 // GetGroupParentPath returns the path for a group's parent based only on the current path.

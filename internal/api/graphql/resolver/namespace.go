@@ -167,3 +167,53 @@ func namespaceQuery(ctx context.Context, args *NamespaceQueryArgs) (*NamespaceRe
 
 	return &NamespaceResolver{result: &WorkspaceResolver{workspace: ws}}, nil
 }
+
+// NamespaceRunnerTagsInput represents the settings for runner tags.
+type NamespaceRunnerTagsInput struct {
+	Tags    *[]string
+	Inherit bool
+}
+
+// Validate returns an error if the input is not valid.
+func (r *NamespaceRunnerTagsInput) Validate() error {
+
+	// Tags and Inherit are mutually exclusive.
+	if r != nil && r.Tags != nil && r.Inherit {
+		return errors.New("cannot specify both tags and inherit", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return nil
+}
+
+// NamespaceRunnerTagsResolver resolves a NamespaceRunnerTags resource
+type NamespaceRunnerTagsResolver struct {
+	inherited     bool
+	namespacePath string
+	value         []string
+}
+
+// RunnerTags resolver
+func (r *NamespaceResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTagsResolver, error) {
+	switch v := r.result.(type) {
+	case *GroupResolver:
+		return v.RunnerTags(ctx)
+	case *WorkspaceResolver:
+		return v.RunnerTags(ctx)
+	}
+	return nil, r.invalidNamespaceType()
+}
+
+// Inherited resolver.
+func (r *NamespaceRunnerTagsResolver) Inherited() bool {
+	return r.inherited
+}
+
+// NamespacePath resolver.
+func (r *NamespaceRunnerTagsResolver) NamespacePath() string {
+	return r.namespacePath
+}
+
+// Value resolver.
+func (r *NamespaceRunnerTagsResolver) Value() []string {
+	return r.value
+}

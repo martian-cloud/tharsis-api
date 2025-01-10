@@ -491,7 +491,7 @@ func createWarmupLogStreams(
 	}
 
 	resultJobs, err := createInitialJobs(ctx, testClient, input.jobs,
-		resultWorkspaces[0].Metadata.ID, resultRuns[0].Metadata.ID, resultRunners[0].Metadata.ID)
+		[]string{resultWorkspaces[0].Metadata.ID}, resultRuns[0].Metadata.ID, resultRunners[0].Metadata.ID)
 	if err != nil {
 		return nil, err
 	}

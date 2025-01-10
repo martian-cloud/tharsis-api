@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -102,6 +103,7 @@ var workspaceFieldList = append(
 	"created_by",
 	"terraform_version",
 	"prevent_destroy_plan",
+	"runner_tags",
 )
 
 // NewWorkspaces returns an instance of the Workspaces interface
@@ -227,6 +229,15 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	var runnerTags []byte
+	var err error
+	if workspace.RunnerTags != nil {
+		runnerTags, err = json.Marshal(workspace.RunnerTags)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("workspaces").
@@ -243,6 +254,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 				"max_job_duration":         workspace.MaxJobDuration,
 				"terraform_version":        workspace.TerraformVersion,
 				"prevent_destroy_plan":     workspace.PreventDestroyPlan,
+				"runner_tags":              runnerTags,
 			},
 		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
@@ -275,6 +287,15 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	ctx, span := tracer.Start(ctx, "db.CreateWorkspace")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
+
+	var runnerTags []byte
+	var err error
+	if workspace.RunnerTags != nil {
+		runnerTags, err = json.Marshal(workspace.RunnerTags)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Use transaction to update workspaces and namespaces tables
 	tx, err := w.dbClient.getConnection(ctx).Begin(ctx)
@@ -311,6 +332,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"created_by":               workspace.CreatedBy,
 			"terraform_version":        workspace.TerraformVersion,
 			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
+			"runner_tags":              runnerTags,
 		}).
 		Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
@@ -674,6 +696,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.CreatedBy,
 		&ws.TerraformVersion,
 		&ws.PreventDestroyPlan,
+		&ws.RunnerTags,
 	}
 
 	if withFullPath {

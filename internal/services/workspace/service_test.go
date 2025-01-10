@@ -53,6 +53,7 @@ func TestCreateWorkspace(t *testing.T) {
 				MaxJobDuration:     ptr.Int32(1234),
 				PreventDestroyPlan: true,
 				TerraformVersion:   terraformVersion,
+				RunnerTags:         []string{"tag1"},
 			},
 			expectCreatedWorkspace: &models.Workspace{
 				Metadata:           models.ResourceMetadata{ID: workspaceID},
@@ -190,6 +191,127 @@ func TestCreateWorkspace(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectCreatedWorkspace, workspace)
+		})
+	}
+}
+
+func TestUpdateWorkspace(t *testing.T) {
+	terraformVersion := "1.2.2"
+
+	originalWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "workspace-id",
+		},
+		Name:             "workspace-name",
+		FullPath:         "parent-group/workspace-name",
+		Description:      "This is the old description",
+		MaxJobDuration:   ptr.Int32(35),
+		RunnerTags:       []string{"tag1"},
+		TerraformVersion: terraformVersion,
+	}
+
+	updatedWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "workspace-id",
+		},
+		Name:             "workspace-name",
+		FullPath:         "parent-group/workspace-name",
+		Description:      "This is the new description",
+		MaxJobDuration:   ptr.Int32(38),
+		RunnerTags:       []string{"tag2", "tag3"},
+		TerraformVersion: terraformVersion,
+	}
+
+	type testCase struct {
+		name            string
+		foundWorkspace  *models.Workspace
+		authError       error
+		updateError     error
+		expectWorkspace *models.Workspace
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:            "successfully update an workspace",
+			foundWorkspace:  originalWorkspace,
+			expectWorkspace: updatedWorkspace,
+		},
+		{
+			name:            "workspace does not exist",
+			updateError:     errors.New("workspace not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "caller does not have permission",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockActivityEvents := activityevent.NewMockService(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).
+				Return(test.authError)
+
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+
+			mockTransactions.On("BeginTx", mock.Anything).
+				Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).
+				Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).
+				Return(nil).Maybe()
+
+			mockWorkspaces.On("UpdateWorkspace", mock.Anything, updatedWorkspace).
+				Return(updatedWorkspace, test.updateError).Maybe()
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything,
+				&activityevent.CreateActivityEventInput{
+					NamespacePath: &originalWorkspace.FullPath,
+					Action:        models.ActionUpdate,
+					TargetType:    models.TargetWorkspace,
+					TargetID:      originalWorkspace.Metadata.ID,
+				},
+			).Return(&models.ActivityEvent{}, nil).Maybe()
+
+			testLogger, _ := logger.NewForTest()
+			mockCLIStore := cli.NewMockTerraformCLIStore(t)
+			mockCLIService := cli.NewService(testLogger, nil, nil, mockCLIStore, ">= 1.0.0")
+
+			dbClient := &db.Client{
+				Workspaces:   mockWorkspaces,
+				Transactions: mockTransactions,
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient:        dbClient,
+				logger:          logger,
+				activityService: mockActivityEvents,
+				cliService:      mockCLIService,
+			}
+
+			actualUpdated, err := service.UpdateWorkspace(auth.WithCaller(ctx, mockCaller), updatedWorkspace)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, updatedWorkspace, actualUpdated)
 		})
 	}
 }

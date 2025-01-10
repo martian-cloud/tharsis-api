@@ -48,6 +48,7 @@ type mockDBClient struct {
 	MockTeamMembers           *db.MockTeamMembers
 	MockLogStreams            *db.MockLogStreams
 	MockResourceLimits        *db.MockResourceLimits
+	MockGroups                *db.MockGroups
 }
 
 func buildDBClientWithMocks(t *testing.T) *mockDBClient {
@@ -91,6 +92,9 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 	mockResourceLimits := db.MockResourceLimits{}
 	mockResourceLimits.Test(t)
 
+	mockGroups := db.MockGroups{}
+	mockGroups.Test(t)
+
 	return &mockDBClient{
 		Client: &db.Client{
 			Transactions:          &mockTransactions,
@@ -106,6 +110,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			TeamMembers:           &mockTeamMembers,
 			LogStreams:            &mockLogStreams,
 			ResourceLimits:        &mockResourceLimits,
+			Groups:                &mockGroups,
 		},
 		MockTransactions:          &mockTransactions,
 		MockManagedIdentities:     &mockManagedIdentities,
@@ -120,6 +125,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockTeamMembers:           &mockTeamMembers,
 		MockLogStreams:            &mockLogStreams,
 		MockResourceLimits:        &mockResourceLimits,
+		MockGroups:                &mockGroups,
 	}
 }
 
@@ -134,6 +140,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 		FullPath:       "groupA/ws1",
 		MaxJobDuration: ptr.Int32(60),
 	}
+	groupName := "groupA"
 
 	run := models.Run{
 		Metadata: models.ResourceMetadata{
@@ -267,6 +274,17 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			}, nil)
 			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
 
+			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
+				Groups: []models.Group{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: groupName,
+						},
+						Name: groupName,
+					},
+				},
+			}, nil)
+
 			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
 
 			mockArtifactStore := workspace.MockArtifactStore{}
@@ -323,6 +341,8 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 	var duration int32 = 720
 	currentTime := time.Now().UTC()
 
+	groupName := "groupA"
+
 	injectJob := models.Job{
 		Metadata: models.ResourceMetadata{
 			ID: "job1",
@@ -357,6 +377,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "test-workspace-metadata-id-1",
 				},
+				FullPath:           groupName + "/ws1",
 				MaxJobDuration:     &duration,
 				PreventDestroyPlan: false,
 			},
@@ -376,6 +397,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "test-workspace-metadata-id-2",
 				},
+				FullPath:           groupName + "/ws1",
 				MaxJobDuration:     &duration,
 				PreventDestroyPlan: false,
 			},
@@ -395,6 +417,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "test-workspace-metadata-id-3",
 				},
+				FullPath:           groupName + "/ws1",
 				MaxJobDuration:     &duration,
 				PreventDestroyPlan: true,
 			},
@@ -414,6 +437,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "test-workspace-metadata-id-4",
 				},
+				FullPath:           groupName + "/ws1",
 				MaxJobDuration:     &duration,
 				PreventDestroyPlan: true,
 			},
@@ -431,6 +455,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "test-workspace-metadata-id-1",
 				},
+				FullPath:           groupName + "/ws1",
 				MaxJobDuration:     &duration,
 				PreventDestroyPlan: false,
 			},
@@ -509,6 +534,18 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 					ID: "apply1",
 				},
 			}, nil)
+
+			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
+				Groups: []models.Group{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: groupName,
+						},
+						Name: groupName,
+					},
+				},
+			}, nil)
+
 			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
 
 			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
@@ -554,6 +591,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 	moduleSource := "module-source-1"
 	moduleVersion := "1.2.3"
 	createdBySubject := "mock-caller"
+	groupName := "groupA"
 	planID := "plan1"
 	applyID := "apply1"
 	isTrue := true
@@ -829,6 +867,18 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 					ID: applyID,
 				},
 			}, nil)
+
+			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
+				Groups: []models.Group{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: groupName,
+						},
+						Name: groupName,
+					},
+				},
+			}, nil)
+
 			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
 				Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
 					return &models.Job{
@@ -887,8 +937,276 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 	}
 }
 
+func TestCreateRunWithJobTags(t *testing.T) {
+	configVersionID := "cv1"
+	createdBySubject := "mock-caller"
+	planID := "plan1"
+	applyID := "apply1"
+	currentTime := time.Now().UTC()
+	runnerTags := []string{
+		"tag1",
+		"tag2",
+	}
+
+	tests := []struct {
+		name             string
+		workspace        *models.Workspace
+		parentGroup      *models.Group
+		grandparentGroup *models.Group
+		createRunInputs  *CreateRunInput
+		expectTags       []string
+		// No errors expected for this test function.
+	}{
+		{
+			name: "tags set by workspace",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "ws1",
+				},
+				FullPath:       "groupB/ws1",
+				MaxJobDuration: ptr.Int32(60),
+				RunnerTags:     runnerTags,
+			},
+			parentGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "groupB",
+				},
+				Name:     "groupB",
+				FullPath: "groupB",
+			},
+			createRunInputs: &CreateRunInput{
+				WorkspaceID:            "ws1",
+				ConfigurationVersionID: &configVersionID,
+			},
+			expectTags: runnerTags,
+		},
+		{
+			name: "tags set by parent group",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "ws1",
+				},
+				FullPath:       "groupB/ws1",
+				MaxJobDuration: ptr.Int32(60),
+				GroupID:        "groupB",
+			},
+			parentGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "groupB",
+				},
+				Name:       "groupB",
+				FullPath:   "groupB",
+				RunnerTags: runnerTags,
+			},
+			createRunInputs: &CreateRunInput{
+				WorkspaceID:            "ws1",
+				ConfigurationVersionID: &configVersionID,
+			},
+			expectTags: runnerTags,
+		},
+		{
+			name: "tags set by grandparent group",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "ws1",
+				},
+				FullPath:       "groupA/groupB/ws1",
+				MaxJobDuration: ptr.Int32(60),
+				GroupID:        "groupB",
+			},
+			parentGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "groupB",
+				},
+				Name:     "groupB",
+				FullPath: "groupA/groupB",
+				ParentID: "groupA",
+			},
+			grandparentGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "groupA",
+				},
+				Name:       "groupA",
+				FullPath:   "groupA",
+				RunnerTags: runnerTags,
+			},
+			createRunInputs: &CreateRunInput{
+				WorkspaceID:            "ws1",
+				ConfigurationVersionID: &configVersionID,
+			},
+			expectTags: runnerTags,
+		},
+		{
+			name: "tags not set by any group",
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "ws1",
+				},
+				FullPath:       "groupA/groupB/ws1",
+				MaxJobDuration: ptr.Int32(60),
+				GroupID:        "groupB",
+			},
+			parentGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "groupB",
+				},
+				Name:     "groupB",
+				FullPath: "groupA/groupB",
+				ParentID: "groupA",
+			},
+			grandparentGroup: &models.Group{
+				Metadata: models.ResourceMetadata{
+					ID: "groupA",
+				},
+				Name:     "groupA",
+				FullPath: "groupA",
+			},
+			createRunInputs: &CreateRunInput{
+				WorkspaceID:            "ws1",
+				ConfigurationVersionID: &configVersionID,
+			},
+			expectTags: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dbClient := buildDBClientWithMocks(t)
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspace.Metadata.ID).
+				Return(test.workspace, nil)
+
+			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+				Variables: []models.Variable{},
+			}, nil)
+
+			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspace.Metadata.ID).
+				Return([]models.ManagedIdentity{}, nil)
+
+			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
+				Metadata: models.ResourceMetadata{
+					ID: planID,
+				},
+			}, nil)
+
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configVersionID).
+				Return(&models.ConfigurationVersion{}, nil)
+
+			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
+				Metadata: models.ResourceMetadata{
+					ID: applyID,
+				},
+			}, nil)
+
+			dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
+				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
+					_ = ctx
+
+					if run != nil {
+						// Must inject creation timestamp so limit check won't hit a nil pointer.
+						runWithTimestamp := *run
+						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
+						return &runWithTimestamp, nil
+					}
+					return nil, nil
+				})
+			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+				Return(&db.RunsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: 1,
+					},
+				}, nil)
+
+			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: 1}, nil)
+
+			dbClient.MockJobs.On("CreateJob", mock.Anything,
+				mock.MatchedBy(func(input *models.Job) bool {
+					return assert.ElementsMatch(t, input.Tags, test.expectTags)
+				})).
+				Return(&models.Job{
+					Metadata: models.ResourceMetadata{
+						ID: "job1",
+					},
+					WorkspaceID: test.workspace.Metadata.ID,
+				}, nil)
+
+			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
+
+			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).
+				Return(func(_ context.Context, input *db.GetGroupsInput) (*db.GroupsResult, error) {
+					groups := []models.Group{}
+					if test.parentGroup != nil {
+						groups = append(groups, *test.parentGroup)
+					}
+					if test.grandparentGroup != nil {
+						groups = append(groups, *test.grandparentGroup)
+					}
+
+					// Make sure we're returning the correct number of groups.
+					assert.Equal(t, len(input.Filter.GroupPaths), len(groups))
+
+					return &db.GroupsResult{
+						Groups: groups,
+					}, nil
+				})
+
+			mockArtifactStore := workspace.MockArtifactStore{}
+			mockArtifactStore.Test(t)
+
+			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+				Return(&models.ActivityEvent{}, nil)
+
+			mockModuleService := moduleregistry.NewMockService(t)
+			mockModuleResolver := NewMockModuleResolver(t)
+
+			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
+				Return(&ModuleRegistrySource{}, nil).Maybe()
+
+			logger, _ := logger.NewForTest()
+			service := newService(
+				logger,
+				dbClient.Client,
+				&mockArtifactStore,
+				nil,
+				nil,
+				nil,
+				&mockActivityEvents,
+				mockModuleService,
+				mockModuleResolver,
+				nil,
+				nil,
+				limits.NewLimitChecker(dbClient.Client),
+				nil,
+			)
+
+			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.createRunInputs)
+			assert.Nil(t, err)
+
+			// The expected job tags are checked by the inputs to CreateJob.
+		})
+	}
+}
+
 func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 	var duration int32 = 1
+	groupName := "groupA"
 	ws := &models.Workspace{
 		Metadata: models.ResourceMetadata{
 			ID: "ws1",
@@ -982,6 +1300,18 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			dbClient.MockApplies.On("GetApply", mock.Anything, mock.Anything).Return(&apply, nil)
 			dbClient.MockApplies.On("UpdateApply", mock.Anything, mock.Anything).Return(&apply, nil)
+
+			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
+				Groups: []models.Group{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: groupName,
+						},
+						Name: groupName,
+					},
+				},
+			}, nil)
+
 			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(test.injectJob, nil)
 			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, run.WorkspaceID).Return(ws, nil)

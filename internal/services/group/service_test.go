@@ -59,8 +59,9 @@ func TestCreateTopLevelGroup(t *testing.T) {
 		{
 			name: "create group",
 			input: models.Group{
-				Name:     "group1",
-				Metadata: models.ResourceMetadata{ID: "group1"},
+				Name:       "group1",
+				Metadata:   models.ResourceMetadata{ID: "group1"},
+				RunnerTags: []string{"tag1"},
 			},
 			caller: &auth.UserCaller{
 				User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Admin: true},
@@ -157,10 +158,11 @@ func TestCreateNestedGroup(t *testing.T) {
 		{
 			name: "create group",
 			input: models.Group{
-				Name:     "group1",
-				Metadata: models.ResourceMetadata{ID: "group1"},
-				ParentID: "group0",
-				FullPath: "a/b/c/group0/group1",
+				Name:       "group1",
+				Metadata:   models.ResourceMetadata{ID: "group1"},
+				ParentID:   "group0",
+				FullPath:   "a/b/c/group0/group1",
+				RunnerTags: []string{"tag2", "tag3"},
 			},
 			limit:          5,
 			parentChildren: 5,
@@ -737,6 +739,117 @@ func TestGetGroups(t *testing.T) {
 			assert.Equal(t, &db.GroupsResult{
 				Groups: []models.Group{},
 			}, actualOutput)
+		})
+	}
+}
+
+func TestUpdateGroup(t *testing.T) {
+
+	originalGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "group-id",
+		},
+		Name:        "group-name",
+		FullPath:    "root-group/group-name",
+		Description: "This is the old description",
+		RunnerTags:  []string{"tag1"},
+	}
+
+	updatedGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "group-id",
+		},
+		Name:        "group-name",
+		FullPath:    "root-group/group-name",
+		Description: "This is the new description",
+		RunnerTags:  []string{"tag2", "tag3"},
+	}
+
+	type testCase struct {
+		name            string
+		foundGroup      *models.Group
+		authError       error
+		updateError     error
+		expectGroup     *models.Group
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:        "successfully update a group",
+			foundGroup:  originalGroup,
+			expectGroup: updatedGroup,
+		},
+		{
+			name:            "group does not exist",
+			updateError:     errors.New("group not found", errors.WithErrorCode(errors.ENotFound)),
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "caller does not have permission",
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+
+			mockGroups := db.NewMockGroups(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockActivityEvents := activityevent.NewMockService(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateGroupPermission, mock.Anything).
+				Return(test.authError)
+
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+
+			mockTransactions.On("BeginTx", mock.Anything).
+				Return(ctx, nil).Maybe()
+			mockTransactions.On("RollbackTx", mock.Anything).
+				Return(nil).Maybe()
+			mockTransactions.On("CommitTx", mock.Anything).
+				Return(nil).Maybe()
+
+			mockGroups.On("UpdateGroup", mock.Anything, updatedGroup).
+				Return(updatedGroup, test.updateError).Maybe()
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything,
+				&activityevent.CreateActivityEventInput{
+					NamespacePath: &originalGroup.FullPath,
+					Action:        models.ActionUpdate,
+					TargetType:    models.TargetGroup,
+					TargetID:      originalGroup.Metadata.ID,
+				},
+			).Return(&models.ActivityEvent{}, nil).Maybe()
+
+			dbClient := &db.Client{
+				Groups:       mockGroups,
+				Transactions: mockTransactions,
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient:        dbClient,
+				logger:          logger,
+				activityService: mockActivityEvents,
+			}
+
+			actualUpdated, err := service.UpdateGroup(auth.WithCaller(ctx, mockCaller), updatedGroup)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, updatedGroup, actualUpdated)
 		})
 	}
 }
