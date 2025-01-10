@@ -261,6 +261,16 @@ func sharedRunnersQuery(ctx context.Context, args *ConnectionQueryArgs) (*Runner
 	return NewRunnerConnectionResolver(ctx, &input)
 }
 
+// RunUntaggedJobs resolver
+func (r *RunnerResolver) RunUntaggedJobs() bool {
+	return r.runner.RunUntaggedJobs
+}
+
+// Tags resolver
+func (r *RunnerResolver) Tags() []string {
+	return r.runner.Tags
+}
+
 /* Runner Mutation Resolvers */
 
 // RunnerMutationPayload is the response payload for a runner mutation
@@ -300,6 +310,8 @@ type CreateRunnerInput struct {
 	Disabled         *bool
 	Name             string
 	Description      string
+	RunUntaggedJobs  bool
+	Tags             []string
 }
 
 // UpdateRunnerInput contains the input for updating a runner
@@ -309,6 +321,8 @@ type UpdateRunnerInput struct {
 	Metadata         *MetadataInput
 	Disabled         *bool
 	Description      string
+	RunUntaggedJobs  *bool
+	Tags             *[]string
 }
 
 // DeleteRunnerInput contains the input for deleting a runner
@@ -341,12 +355,16 @@ func createRunnerMutation(ctx context.Context, input *CreateRunnerInput) (*Runne
 		return nil, err
 	}
 
-	createdRunner, err := getRunnerService(ctx).CreateRunner(ctx, &runner.CreateRunnerInput{
-		Name:        input.Name,
-		Description: input.Description,
-		GroupID:     group.Metadata.ID,
-		Disabled:    input.Disabled,
-	})
+	toCreate := &runner.CreateRunnerInput{
+		Name:            input.Name,
+		Description:     input.Description,
+		GroupID:         group.Metadata.ID,
+		Disabled:        input.Disabled,
+		RunUntaggedJobs: input.RunUntaggedJobs,
+		Tags:            input.Tags,
+	}
+
+	createdRunner, err := getRunnerService(ctx).CreateRunner(ctx, toCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -377,6 +395,14 @@ func updateRunnerMutation(ctx context.Context, input *UpdateRunnerInput) (*Runne
 	runner.Description = input.Description
 	if input.Disabled != nil {
 		runner.Disabled = *input.Disabled
+	}
+
+	if input.RunUntaggedJobs != nil {
+		runner.RunUntaggedJobs = *input.RunUntaggedJobs
+	}
+
+	if input.Tags != nil {
+		runner.Tags = *input.Tags
 	}
 
 	runner, err = service.UpdateRunner(ctx, runner)

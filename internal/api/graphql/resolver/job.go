@@ -192,6 +192,11 @@ func (r *JobResolver) RunnerPath() *string {
 	return r.job.RunnerPath
 }
 
+// Tags resolver
+func (r *JobResolver) Tags() []string {
+	return r.job.Tags
+}
+
 // Runner resolver
 func (r *JobResolver) Runner(ctx context.Context) (*RunnerResolver, error) {
 	if r.job.RunnerID == nil {

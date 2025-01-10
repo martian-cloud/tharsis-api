@@ -17,6 +17,7 @@ type Workspace struct {
 	DirtyState            bool
 	Locked                bool
 	PreventDestroyPlan    bool
+	RunnerTags            []string
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -42,7 +43,12 @@ func (w *Workspace) Validate() error {
 	}
 
 	// Verify description satisfies constraints
-	return verifyValidDescription(w.Description)
+	if err := verifyValidDescription(w.Description); err != nil {
+		return err
+	}
+
+	// Check for duplicate tags, too-long tags, and too many tags.
+	return verifyValidRunnerTags(w.RunnerTags)
 }
 
 // GetGroupPath returns the group path

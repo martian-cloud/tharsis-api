@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -97,7 +98,10 @@ type terraformRunners struct {
 	dbClient *Client
 }
 
-var runnerFieldList = append(metadataFieldList, "type", "name", "description", "group_id", "created_by", "disabled")
+var runnerFieldList = append(metadataFieldList,
+	"type", "name", "description", "group_id", "created_by", "disabled",
+	"tags", "run_untagged_jobs",
+)
 
 // NewRunners returns an instance of the Runners interface
 func NewRunners(dbClient *Client) Runners {
@@ -230,6 +234,11 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	tags, err := json.Marshal(runner.Tags)
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
@@ -249,16 +258,18 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 	sql, args, err := dialect.Insert("runners").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":          newResourceID(),
-			"version":     initialResourceVersion,
-			"created_at":  timestamp,
-			"updated_at":  timestamp,
-			"type":        runner.Type,
-			"group_id":    runner.GroupID,
-			"name":        runner.Name,
-			"description": runner.Description,
-			"created_by":  runner.CreatedBy,
-			"disabled":    runner.Disabled,
+			"id":                newResourceID(),
+			"version":           initialResourceVersion,
+			"created_at":        timestamp,
+			"updated_at":        timestamp,
+			"type":              runner.Type,
+			"group_id":          runner.GroupID,
+			"name":              runner.Name,
+			"description":       runner.Description,
+			"created_by":        runner.CreatedBy,
+			"disabled":          runner.Disabled,
+			"tags":              tags,
+			"run_untagged_jobs": runner.RunUntaggedJobs,
 		}).
 		Returning(runnerFieldList...).ToSQL()
 	if err != nil {
@@ -306,6 +317,11 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	tags, err := json.Marshal(runner.Tags)
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := currentTime()
 
 	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
@@ -325,10 +341,12 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 	sql, args, err := dialect.Update("runners").
 		Prepared(true).
 		Set(goqu.Record{
-			"version":     goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":  timestamp,
-			"description": runner.Description,
-			"disabled":    runner.Disabled,
+			"version":           goqu.L("? + ?", goqu.C("version"), 1),
+			"updated_at":        timestamp,
+			"description":       runner.Description,
+			"disabled":          runner.Disabled,
+			"tags":              tags,
+			"run_untagged_jobs": runner.RunUntaggedJobs,
 		}).
 		Where(goqu.Ex{"id": runner.Metadata.ID, "version": runner.Metadata.Version}).
 		Returning(runnerFieldList...).ToSQL()
@@ -456,6 +474,8 @@ func scanRunner(row scanner, withResourcePath bool) (*models.Runner, error) {
 		&runner.GroupID,
 		&runner.CreatedBy,
 		&runner.Disabled,
+		&runner.Tags,
+		&runner.RunUntaggedJobs,
 	}
 	var path sql.NullString
 	if withResourcePath {

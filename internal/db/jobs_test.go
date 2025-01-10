@@ -424,13 +424,13 @@ func TestGetJobs(t *testing.T) {
 		{
 			name: "filter, workspace ID",
 			input: &GetJobsInput{
-				Sort: ptrJobSortableField(JobSortableFieldUpdatedAtAsc),
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
 				Filter: &JobFilter{
 					WorkspaceID: ptr.String(warmupWorkspaces[0].Metadata.ID),
 				},
 			},
-			expectJobIDs:         allJobIDsByUpdateTime,
-			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDs)), Cursor: dummyCursorFunc},
+			expectJobIDs:         []string{allJobIDsByCreateTime[0], allJobIDsByCreateTime[2], allJobIDsByCreateTime[4]},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(3), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -613,6 +613,108 @@ func TestGetJobs(t *testing.T) {
 			},
 			expectMsg:            invalidUUIDMsg2,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, tag filter, run untagged, don't filter by tags, return all",
+			input: &GetJobsInput{
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
+				Filter: &JobFilter{
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(false),
+						TagSuperset:         nil,
+					},
+				},
+			},
+			expectJobIDs:         allJobIDsByCreateTime,
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(len(allJobIDsByCreateTime)), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, tag filter, run untagged, require empty tags, return only jobs with no tags",
+			input: &GetJobsInput{
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
+				Filter: &JobFilter{
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(false),
+						TagSuperset:         []string{},
+					},
+				},
+			},
+			expectJobIDs:         []string{allJobIDsByCreateTime[0], allJobIDsByCreateTime[2], allJobIDsByCreateTime[4]},
+			expectPageInfo:       pagination.PageInfo{TotalCount: int32(3), Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, tag filter, don't run untagged, return none",
+			input: &GetJobsInput{
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
+				Filter: &JobFilter{
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(true),
+						TagSuperset:         []string{},
+					},
+				},
+			},
+			expectJobIDs:         []string{},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, tag filter, require tag 1, return empty",
+			input: &GetJobsInput{
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
+				Filter: &JobFilter{
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(true),
+						TagSuperset:         []string{"tag1"},
+					},
+				},
+			},
+			expectJobIDs:         []string{},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "filter, tag filter, require tag1 and tag2, return workspace 1",
+			input: &GetJobsInput{
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
+				Filter: &JobFilter{
+					TagFilter: &JobTagFilter{
+						ExcludeUntaggedJobs: ptr.Bool(true),
+						TagSuperset:         []string{"tag1", "tag2"},
+					},
+				},
+			},
+			expectJobIDs:         []string{allJobIDsByCreateTime[1], allJobIDsByCreateTime[3]},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
+			expectHasStartCursor: true,
+			expectHasEndCursor:   true,
+		},
+
+		{
+			name: "duplicate the exact query the service layer uses to claim a job",
+			input: &GetJobsInput{
+				Sort: ptrJobSortableField(JobSortableFieldCreatedAtAsc),
+				Filter: &JobFilter{
+					JobStatus: &JobStatusQueued,
+					TagFilter: &JobTagFilter{
+						TagSuperset: []string{},
+					},
+				},
+			},
+			expectJobIDs:         []string{allJobIDsByCreateTime[0], allJobIDsByCreateTime[4]},
+			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
 		},
@@ -1121,6 +1223,14 @@ var standardWarmupWorkspacesForJobs = []models.Workspace{
 		FullPath:    "top-level-group-0-for-jobs/workspace-0-for-jobs",
 		CreatedBy:   "someone-w0",
 	},
+	{
+		Description: "workspace 1 for testing job functions",
+		FullPath:    "top-level-group-0-for-jobs/workspace-1-for-jobs",
+		CreatedBy:   "someone-w1",
+		RunnerTags:  []string{"tag1", "tag2"},
+		// The tags must also be set in the job objects,
+		// because the test setup does not set the jobs tags field from the workspace and groups.
+	},
 }
 
 // Standard warmup run(s) for tests in this module:
@@ -1174,6 +1284,7 @@ var standardWarmupJobs = []models.Job{
 			FinishedTimestamp: ptr.Time(currentTime().Add(-11 * time.Minute)),
 		},
 		MaxJobDuration: 139,
+		Tags:           []string{"tag1", "tag2"}, // corresponds to workspace 1
 	},
 	{
 		Status:                   models.JobRunning,
@@ -1200,6 +1311,7 @@ var standardWarmupJobs = []models.Job{
 			FinishedTimestamp: ptr.Time(currentTime().Add(-31 * time.Minute)),
 		},
 		MaxJobDuration: 339,
+		Tags:           []string{"tag1", "tag2"}, // corresponds to workspace 1
 	},
 	{
 		Status:                   models.JobQueued,
@@ -1242,9 +1354,13 @@ func createWarmupJobs(ctx context.Context, testClient *testClient,
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	workspaceID := resultWorkspaces[0].Metadata.ID
 
-	resultRuns, err := createInitialRuns(ctx, testClient, newRuns, workspaceID)
+	workspaceIDs := []string{}
+	for _, workspace := range resultWorkspaces {
+		workspaceIDs = append(workspaceIDs, workspace.Metadata.ID)
+	}
+
+	resultRuns, err := createInitialRuns(ctx, testClient, newRuns, workspaceIDs[0])
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1255,7 +1371,7 @@ func createWarmupJobs(ctx context.Context, testClient *testClient,
 	}
 
 	resultJobs, err := createInitialJobs(ctx, testClient, newJobs,
-		workspaceID, resultRuns[0].Metadata.ID, resultRunners[0].Metadata.ID)
+		workspaceIDs, resultRuns[0].Metadata.ID, resultRunners[0].Metadata.ID)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

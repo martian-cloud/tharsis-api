@@ -105,6 +105,7 @@ type Group implements Node, Namespace {
     includeInherited: Boolean
     sort: RunnerSort
   ): RunnerConnection!
+  runnerTags: NamespaceRunnerTags!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
   activityEvents(
@@ -145,6 +146,7 @@ input CreateGroupInput {
   name: String!
   parentPath: String
   description: String!
+  runnerTags: NamespaceRunnerTagsInput
 }
 
 input UpdateGroupInput {
@@ -153,6 +155,7 @@ input UpdateGroupInput {
   id: String
   description: String
   metadata: ResourceMetadataInput
+  runnerTags: NamespaceRunnerTagsInput
 }
 
 input DeleteGroupInput {

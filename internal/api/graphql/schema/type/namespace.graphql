@@ -37,4 +37,16 @@ interface Namespace {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  runnerTags: NamespaceRunnerTags
+}
+
+input NamespaceRunnerTagsInput  {
+  inherit: Boolean!
+  tags: [String!]
+}
+
+type NamespaceRunnerTags {
+  inherited: Boolean!
+  namespacePath: String!
+  value: [String!]!
 }

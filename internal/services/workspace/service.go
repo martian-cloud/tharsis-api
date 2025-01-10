@@ -139,6 +139,7 @@ type Service interface {
 	GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error)
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
+	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*models.RunnerTagsSetting, error)
 }
 
 type handleCallerFunc func(
@@ -1591,6 +1592,52 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 	}
 
 	return result, nil
+}
+
+// GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a workspace.
+func (s *service) GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*models.RunnerTagsSetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerTagsSetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	// The workspace sets its own tags.
+	if workspace.RunnerTags != nil {
+		return &models.RunnerTagsSetting{
+			Inherited:     false,
+			NamespacePath: workspace.FullPath,
+			Value:         workspace.RunnerTags,
+		}, nil
+	}
+
+	sortLowestToHighest := db.GroupSortableFieldFullPathDesc
+	parentGroupsResult, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
+		Sort: &sortLowestToHighest,
+		Filter: &db.GroupFilter{
+			GroupPaths: workspace.ExpandPath()[1:],
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	parentGroups := []*models.Group{}
+	for _, g := range parentGroupsResult.Groups {
+		copyGroup := g
+		parentGroups = append(parentGroups, &copyGroup)
+	}
+
+	return models.GetRunnerTagsSetting(parentGroups), nil
 }
 
 func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {

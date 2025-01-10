@@ -5,6 +5,8 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
@@ -56,6 +58,12 @@ func (js JobSortableField) getSortDirection() pagination.SortDirection {
 	return pagination.AscSort
 }
 
+// JobTagFilter is a filter condition for job tags
+type JobTagFilter struct {
+	ExcludeUntaggedJobs *bool
+	TagSuperset         []string
+}
+
 // JobFilter contains the supported fields for filtering Job resources
 type JobFilter struct {
 	RunID       *string
@@ -63,6 +71,7 @@ type JobFilter struct {
 	RunnerID    *string
 	JobType     *models.JobType
 	JobStatus   *models.JobStatus
+	TagFilter   *JobTagFilter
 	JobIDs      []string
 }
 
@@ -88,7 +97,7 @@ type jobs struct {
 
 var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
 	"cancel_requested", "cancel_requested_at",
-	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration")
+	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "tags")
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -133,31 +142,46 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	ex := goqu.Ex{}
+	ex := goqu.And()
 
 	if input.Filter != nil {
 		if input.Filter.RunID != nil {
-			ex["jobs.run_id"] = *input.Filter.RunID
+			ex = ex.Append(goqu.I("jobs.run_id").Eq(*input.Filter.RunID))
 		}
 
 		if input.Filter.WorkspaceID != nil {
-			ex["jobs.workspace_id"] = *input.Filter.WorkspaceID
+			ex = ex.Append(goqu.I("jobs.workspace_id").Eq(*input.Filter.WorkspaceID))
 		}
 
 		if input.Filter.RunnerID != nil {
-			ex["jobs.runner_id"] = *input.Filter.RunnerID
+			ex = ex.Append(goqu.I("jobs.runner_id").Eq(*input.Filter.RunnerID))
 		}
 
 		if input.Filter.JobType != nil {
-			ex["jobs.type"] = *input.Filter.JobType
+			ex = ex.Append(goqu.I("jobs.type").Eq(*input.Filter.JobType))
 		}
 
 		if input.Filter.JobStatus != nil {
-			ex["jobs.status"] = *input.Filter.JobStatus
+			ex = ex.Append(goqu.I("jobs.status").Eq(*input.Filter.JobStatus))
 		}
 
 		if input.Filter.JobIDs != nil {
-			ex["jobs.id"] = input.Filter.JobIDs
+			ex = ex.Append(goqu.I("jobs.id").In(input.Filter.JobIDs))
+		}
+
+		if input.Filter.TagFilter != nil {
+			if input.Filter.TagFilter.ExcludeUntaggedJobs != nil && *input.Filter.TagFilter.ExcludeUntaggedJobs {
+				ex = ex.Append(goqu.L("jsonb_array_length(jobs.tags) > 0"))
+			}
+			if input.Filter.TagFilter.TagSuperset != nil {
+				json, err := json.Marshal(input.Filter.TagFilter.TagSuperset)
+				if err != nil {
+					return nil, err
+				}
+				// This filter condition will only return jobs where the job tags are a subset of the tag
+				// superset list specified in the filter
+				ex = ex.Append(goqu.L(fmt.Sprintf("jobs.tags <@ '%s'", json)))
+			}
 		}
 	}
 
@@ -222,6 +246,11 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	tags, err := json.Marshal(job.Tags)
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("jobs").
@@ -242,6 +271,7 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 				"finished_at":         job.Timestamps.FinishedTimestamp,
 				"runner_id":           job.RunnerID,
 				"runner_path":         job.RunnerPath,
+				"tags":                tags,
 			},
 		).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).Returning(jobFieldList...).ToSQL()
 
@@ -269,6 +299,11 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	tags, err := json.Marshal(job.Tags)
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Insert("jobs").
@@ -291,6 +326,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 			"max_job_duration":    job.MaxJobDuration,
 			"runner_id":           job.RunnerID,
 			"runner_path":         job.RunnerPath,
+			"tags":                tags,
 		}).
 		Returning(jobFieldList...).ToSQL()
 
@@ -392,6 +428,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&runningAt,
 		&finishedAt,
 		&job.MaxJobDuration,
+		&job.Tags,
 	}
 
 	err := row.Scan(fields...)

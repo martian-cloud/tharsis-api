@@ -804,6 +804,19 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		return nil, nil
 	}
 
+	runnerTags := runner.Tags
+	if runnerTags == nil {
+		runnerTags = []string{}
+	}
+
+	tagFilter := &db.JobTagFilter{
+		TagSuperset: runnerTags,
+	}
+
+	if !runner.RunUntaggedJobs {
+		tagFilter.ExcludeUntaggedJobs = ptr.Bool(true)
+	}
+
 	// Request next available Job
 	queuedStatus := models.JobQueued
 	sortBy := db.JobSortableFieldCreatedAtAsc
@@ -811,6 +824,7 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		Sort: &sortBy,
 		Filter: &db.JobFilter{
 			JobStatus: &queuedStatus,
+			TagFilter: tagFilter,
 		},
 	})
 	if err != nil {
@@ -824,68 +838,30 @@ func (s *service) getNextAvailableJob(ctx context.Context, runnerID string) (*mo
 		}
 
 		if ws == nil {
-			// This will only occur if the worspace is deleted after the job is queried
+			// This will only occur if the workspace is deleted after the job is queried
 			continue
 		}
 
-		if !ws.Locked {
-			// Check if this runner has priority to claim this job
-			if runner.Type == models.SharedRunnerType {
-				// Verify that there are no enabled group runners available for this workspace since
-				// group runners have higher precedence than shared runners
-				groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
-					Filter: &db.RunnerFilter{
-						NamespacePaths: ws.ExpandPath(),
-						Enabled:        ptr.Bool(true), // ignore disabled runners
-					},
-				})
-				if err != nil {
-					return nil, err
-				}
-				if len(groupRunners.Runners) != 0 {
+		if ws.Locked {
+			continue
+		}
+
+		if runner.Type == models.GroupRunnerType {
+			// Check if this group runner is in an ancestor group of the job's workspace to claim this job
+			runnerGroupPath := runner.GetGroupPath()
+			if runnerGroupPath != ws.GetGroupPath() {
+				if !strings.HasPrefix(ws.GetGroupPath(), fmt.Sprintf("%s/", runnerGroupPath)) {
 					continue
 				}
-			} else {
-				runnerGroupPath := runner.GetGroupPath()
-				if runnerGroupPath != ws.GetGroupPath() {
-					if !strings.HasPrefix(ws.GetGroupPath(), fmt.Sprintf("%s/", runnerGroupPath)) {
-						continue
-					}
-
-					// Verify there are no enabled child runners with higher precedence
-					//runner.
-					groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
-						Filter: &db.RunnerFilter{
-							NamespacePaths: ws.ExpandPath(),
-							Enabled:        ptr.Bool(true), // ignore disabled child runners
-						},
-					})
-					if err != nil {
-						return nil, err
-					}
-
-					runnerHasPrecedence := true
-					for _, r := range groupRunners.Runners {
-						if len(r.GetGroupPath()) > len(runnerGroupPath) {
-							// There is a runner lower in the hieararchy which as precedence
-							runnerHasPrecedence = false
-							break
-						}
-					}
-
-					if !runnerHasPrecedence {
-						continue
-					}
-				}
 			}
+		}
 
-			below, err := s.isRunnerBelowJobsLimit(ctx, runner)
-			if err != nil {
-				return nil, err
-			}
-			if below {
-				return &job, nil
-			}
+		below, err := s.isRunnerBelowJobsLimit(ctx, runner)
+		if err != nil {
+			return nil, err
+		}
+		if below {
+			return &job, nil
 		}
 	}
 	return nil, nil

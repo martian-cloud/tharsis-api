@@ -57,6 +57,8 @@ type Service interface {
 	UpdateGroup(ctx context.Context, group *models.Group) (*models.Group, error)
 	// MigrateGroup migrates an existing group to a new parent (or to root)
 	MigrateGroup(ctx context.Context, groupID string, newParentID *string) (*models.Group, error)
+	// GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a group.
+	GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*models.RunnerTagsSetting, error)
 }
 
 type service struct {
@@ -713,6 +715,64 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	}
 
 	return migratedGroup, nil
+}
+
+// GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a group.
+func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*models.RunnerTagsSetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerTagsSetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	// The group sets its own tags.
+	if group.RunnerTags != nil {
+		return &models.RunnerTagsSetting{
+			Inherited:     false,
+			NamespacePath: group.FullPath,
+			Value:         group.RunnerTags,
+		}, nil
+	}
+
+	// A root group has no ancestors.
+	// To avoid false positives, don't look for ancestor groups.
+	if group.ParentID == "" {
+		// At this point, we know group.RunnerTags is nil.
+		// This is a root group, but it does not set tags, so treat it as if it sets tags empty.
+		return &models.RunnerTagsSetting{
+			Inherited:     false,
+			NamespacePath: group.FullPath,
+			Value:         []string{},
+		}, nil
+	}
+
+	sortLowestToHighest := db.GroupSortableFieldFullPathDesc
+	parentGroupsResult, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
+		Sort: &sortLowestToHighest,
+		Filter: &db.GroupFilter{
+			GroupPaths: group.ExpandPath()[1:],
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	parentGroups := []*models.Group{}
+	for _, g := range parentGroupsResult.Groups {
+		copyGroup := g
+		parentGroups = append(parentGroups, &copyGroup)
+	}
+
+	return models.GetRunnerTagsSetting(parentGroups), nil
 }
 
 // checkParentSubgroupLimit checks whether the parent subgroup limit has just been violated.

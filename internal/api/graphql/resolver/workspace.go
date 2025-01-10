@@ -411,6 +411,20 @@ func (r *WorkspaceResolver) VCSEvents(ctx context.Context, args *VCSEventConnect
 	return NewVCSEventConnectionResolver(ctx, &input)
 }
 
+// RunnerTags resolver
+func (r *WorkspaceResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTagsResolver, error) {
+	setting, err := getWorkspaceService(ctx).GetRunnerTagsSetting(ctx, r.workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &NamespaceRunnerTagsResolver{
+		inherited:     setting.Inherited,
+		namespacePath: setting.NamespacePath,
+		value:         setting.Value,
+	}, nil
+}
+
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
 	workspaceService := getWorkspaceService(ctx)
 
@@ -483,6 +497,7 @@ type CreateWorkspaceInput struct {
 	MaxJobDuration     *int32
 	TerraformVersion   *string
 	PreventDestroyPlan *bool
+	RunnerTags         *NamespaceRunnerTagsInput
 	Name               string
 	GroupPath          string
 	Description        string
@@ -500,6 +515,7 @@ type UpdateWorkspaceInput struct {
 	PreventDestroyPlan *bool
 	WorkspacePath      *string
 	ID                 *string
+	RunnerTags         *NamespaceRunnerTagsInput
 }
 
 // DeleteWorkspaceInput contains the input for deleting a workspace
@@ -557,6 +573,12 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		preventDestroyPlan = *input.PreventDestroyPlan
 	}
 
+	if input.RunnerTags != nil {
+		if vErr := input.RunnerTags.Validate(); vErr != nil {
+			return nil, vErr
+		}
+	}
+
 	wsCreateOptions := models.Workspace{
 		Name:               input.Name,
 		GroupID:            groupID,
@@ -564,6 +586,10 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		MaxJobDuration:     input.MaxJobDuration,
 		TerraformVersion:   terraformVersion,
 		PreventDestroyPlan: preventDestroyPlan,
+	}
+
+	if input.RunnerTags != nil && input.RunnerTags.Tags != nil {
+		wsCreateOptions.RunnerTags = *input.RunnerTags.Tags
 	}
 
 	createdWorkspace, err := getWorkspaceService(ctx).CreateWorkspace(ctx, &wsCreateOptions)
@@ -619,6 +645,20 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 	// Update PreventDestroyPlan if specified.
 	if input.PreventDestroyPlan != nil {
 		ws.PreventDestroyPlan = *input.PreventDestroyPlan
+	}
+
+	if input.RunnerTags != nil {
+		if tErr := input.RunnerTags.Validate(); tErr != nil {
+			return nil, tErr
+		}
+
+		if input.RunnerTags.Tags != nil {
+			ws.RunnerTags = *input.RunnerTags.Tags
+		}
+
+		if input.RunnerTags.Inherit {
+			ws.RunnerTags = nil
+		}
 	}
 
 	ws, err = wsService.UpdateWorkspace(ctx, ws)

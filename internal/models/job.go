@@ -43,6 +43,7 @@ type Job struct {
 	Metadata                 ResourceMetadata
 	MaxJobDuration           int32
 	CancelRequested          bool
+	Tags                     []string
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination

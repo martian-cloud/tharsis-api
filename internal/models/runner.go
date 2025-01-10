@@ -22,14 +22,23 @@ func (r RunnerType) Equals(other RunnerType) bool {
 
 // Runner resource
 type Runner struct {
-	Type         RunnerType
-	Name         string
-	Description  string
-	GroupID      *string
-	ResourcePath string
-	CreatedBy    string
-	Metadata     ResourceMetadata
-	Disabled     bool
+	Type            RunnerType
+	Name            string
+	Description     string
+	GroupID         *string
+	ResourcePath    string
+	CreatedBy       string
+	Metadata        ResourceMetadata
+	Disabled        bool
+	Tags            []string
+	RunUntaggedJobs bool
+}
+
+// RunnerTagsSetting contains tag settings, inherited or direct, returned to the group and workspace resolvers.
+type RunnerTagsSetting struct {
+	Inherited     bool
+	NamespacePath string
+	Value         []string
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -70,7 +79,13 @@ func (r *Runner) Validate() error {
 		return errors.New("group runner must specify a group", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	return nil
+	if !r.RunUntaggedJobs && len(r.Tags) == 0 {
+		return errors.New("at least one tag must be specified when the run untagged job setting is set to false",
+			errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// Check for duplicate tags, too-long tags, and too many tags.
+	return verifyValidRunnerTags(r.Tags)
 }
 
 // GetGroupPath returns the group path
@@ -79,4 +94,32 @@ func (r *Runner) GetGroupPath() string {
 		return ""
 	}
 	return r.ResourcePath[:strings.LastIndex(r.ResourcePath, "/")]
+}
+
+// verifyValidRunnerTags checks for duplicate tags, too-long tags, and too many tags.
+func verifyValidRunnerTags(tags []string) error {
+	if tags == nil {
+		return nil
+	}
+
+	if len(tags) > maxTagsPerResource {
+		return errors.New("exceeded max number of tags per resource: %d", maxTagsPerResource,
+			errors.WithErrorCode(errors.EInvalid))
+	}
+
+	tagMap := map[string]struct{}{}
+	for _, tag := range tags {
+		if _, ok := tagMap[tag]; ok {
+			return errors.New("duplicate tag values are not allowed: tag %s has been duplicated",
+				tag, errors.WithErrorCode(errors.EInvalid))
+		}
+		tagMap[tag] = struct{}{}
+
+		if !nameRegex.MatchString(tag) {
+			return errors.New("tag %s contains invalid characters, only lowercase letters and numbers with - and _ supported "+
+				"in non leading or trailing positions. Max length is 64 characters.", tag, errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
+	return nil
 }

@@ -55,10 +55,12 @@ type GetRunnerSessionsInput struct {
 
 // CreateRunnerInput is the input for creating a new runner
 type CreateRunnerInput struct {
-	GroupID     string
-	Disabled    *bool
-	Name        string
-	Description string
+	GroupID         string
+	Disabled        *bool
+	Name            string
+	Description     string
+	RunUntaggedJobs bool
+	Tags            []string
 }
 
 // CreateRunnerSessionInput is the input for creating a new runner session.
@@ -630,11 +632,13 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	}
 
 	runnerToCreate := models.Runner{
-		Type:        models.GroupRunnerType,
-		Name:        input.Name,
-		Description: input.Description,
-		GroupID:     &input.GroupID,
-		CreatedBy:   caller.GetSubject(),
+		Type:            models.GroupRunnerType,
+		Name:            input.Name,
+		Description:     input.Description,
+		GroupID:         &input.GroupID,
+		CreatedBy:       caller.GetSubject(),
+		Tags:            input.Tags,
+		RunUntaggedJobs: input.RunUntaggedJobs,
 	}
 
 	// Validate model

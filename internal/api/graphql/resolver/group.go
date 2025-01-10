@@ -349,6 +349,20 @@ func (r *GroupResolver) Runners(ctx context.Context, args *RunnersConnectionQuer
 	return NewRunnerConnectionResolver(ctx, &input)
 }
 
+// RunnerTags resolver
+func (r *GroupResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTagsResolver, error) {
+	setting, err := getGroupService(ctx).GetRunnerTagsSetting(ctx, r.group)
+	if err != nil {
+		return nil, err
+	}
+
+	return &NamespaceRunnerTagsResolver{
+		inherited:     setting.Inherited,
+		namespacePath: setting.NamespacePath,
+		value:         setting.Value,
+	}, nil
+}
+
 // CreatedBy resolver
 func (r *GroupResolver) CreatedBy() string {
 	return r.group.CreatedBy
@@ -491,6 +505,7 @@ type CreateGroupInput struct {
 	ClientMutationID *string
 	Name             string
 	ParentPath       *string
+	RunnerTags       *NamespaceRunnerTagsInput
 	Description      string
 }
 
@@ -501,6 +516,7 @@ type UpdateGroupInput struct {
 	Description      *string
 	GroupPath        *string
 	ID               *string
+	RunnerTags       *NamespaceRunnerTagsInput
 }
 
 // DeleteGroupInput contains the input for deleting a group
@@ -529,7 +545,21 @@ func handleGroupMutationProblem(e error, clientMutationID *string) (*GroupMutati
 }
 
 func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMutationPayloadResolver, error) {
-	groupCreateOptions := models.Group{Name: input.Name, Description: input.Description}
+	if input.RunnerTags != nil {
+		if err := input.RunnerTags.Validate(); err != nil {
+			return nil, err
+		}
+	}
+
+	groupCreateOptions := models.Group{
+		Name:        input.Name,
+		Description: input.Description,
+	}
+
+	if input.RunnerTags != nil && input.RunnerTags.Tags != nil {
+		groupCreateOptions.RunnerTags = *input.RunnerTags.Tags
+	}
+
 	groupService := getGroupService(ctx)
 
 	if input.ParentPath != nil {
@@ -580,6 +610,20 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 	// Update fields
 	if input.Description != nil {
 		group.Description = *input.Description
+	}
+
+	if input.RunnerTags != nil {
+		if rErr := input.RunnerTags.Validate(); rErr != nil {
+			return nil, rErr
+		}
+
+		if input.RunnerTags.Tags != nil {
+			group.RunnerTags = *input.RunnerTags.Tags
+		}
+
+		if input.RunnerTags.Inherit {
+			group.RunnerTags = nil
+		}
 	}
 
 	group, err = groupService.UpdateGroup(ctx, group)

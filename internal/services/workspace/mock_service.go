@@ -214,6 +214,32 @@ func (_m *MockService) GetCurrentStateVersion(ctx context.Context, workspaceID s
 	return r0, r1
 }
 
+// GetRunnerTagsSetting provides a mock function with given fields: ctx, workspace
+func (_m *MockService) GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*models.RunnerTagsSetting, error) {
+	ret := _m.Called(ctx, workspace)
+
+	var r0 *models.RunnerTagsSetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) (*models.RunnerTagsSetting, error)); ok {
+		return rf(ctx, workspace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) *models.RunnerTagsSetting); ok {
+		r0 = rf(ctx, workspace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.RunnerTagsSetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Workspace) error); ok {
+		r1 = rf(ctx, workspace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetStateVersion provides a mock function with given fields: ctx, stateVersionID
 func (_m *MockService) GetStateVersion(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
 	ret := _m.Called(ctx, stateVersionID)

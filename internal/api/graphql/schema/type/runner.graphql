@@ -78,6 +78,8 @@ type Runner implements Node {
     first: Int
     last: Int
   ): ServiceAccountConnection!
+  runUntaggedJobs: Boolean!
+  tags: [String!]!
 }
 
 input AssignServiceAccountToRunnerInput {
@@ -92,6 +94,8 @@ input CreateRunnerInput {
   description: String!
   groupPath: String!
   disabled: Boolean
+  runUntaggedJobs: Boolean!
+  tags: [String!]!
 }
 
 input UpdateRunnerInput {
@@ -100,6 +104,8 @@ input UpdateRunnerInput {
   metadata: ResourceMetadataInput
   description: String!
   disabled: Boolean
+  runUntaggedJobs: Boolean
+  tags: [String!]
 }
 
 input DeleteRunnerInput {

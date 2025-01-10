@@ -134,6 +134,7 @@ type Workspace implements Node, Namespace {
     last: Int
     sort: VCSEventSort
   ): VCSEventConnection!
+  runnerTags: NamespaceRunnerTags!
 }
 
 input CreateWorkspaceInput {
@@ -144,6 +145,7 @@ input CreateWorkspaceInput {
   maxJobDuration: Int
   terraformVersion: String
   preventDestroyPlan: Boolean
+  runnerTags: NamespaceRunnerTagsInput
 }
 
 input UpdateWorkspaceInput {
@@ -155,6 +157,7 @@ input UpdateWorkspaceInput {
   maxJobDuration: Int
   terraformVersion: String
   preventDestroyPlan: Boolean
+  runnerTags: NamespaceRunnerTagsInput
 }
 
 input DeleteWorkspaceInput {

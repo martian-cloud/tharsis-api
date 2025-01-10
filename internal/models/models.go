@@ -8,8 +8,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
-// maxDescriptionLength is the maximum length for a resource's description field.
-const maxDescriptionLength int = 100
+const (
+	// maxDescriptionLength is the maximum length for a resource's description field.
+	maxDescriptionLength = 100
+	maxTagsPerResource   = 10
+)
 
 // nameRegex allows letters, numbers with - and _ allowed in non leading or trailing positions, max length is 64
 var nameRegex = regexp.MustCompile("^[0-9a-z](?:[0-9a-z-_]{0,62}[0-9a-z])?$")

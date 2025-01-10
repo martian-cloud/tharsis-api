@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -48,6 +49,7 @@ type GroupFilter struct {
 	GroupIDs               []string
 	NamespaceIDs           []string
 	RootOnly               bool
+	GroupPaths             []string
 }
 
 // GroupSortableField represents the fields that a group can be sorted by
@@ -106,7 +108,7 @@ type GroupsResult struct {
 	Groups   []models.Group
 }
 
-var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by")
+var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags")
 
 type groups struct {
 	dbClient *Client
@@ -145,11 +147,8 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 			ex = ex.Append(goqu.I("groups.parent_id").Eq(nil))
 		}
 
-		if input.Filter.GroupIDs != nil {
-			// This check avoids an SQL syntax error if an empty slice is provided.
-			if len(input.Filter.GroupIDs) > 0 {
-				ex = ex.Append(goqu.I("groups.id").In(input.Filter.GroupIDs))
-			}
+		if len(input.Filter.GroupIDs) > 0 {
+			ex = ex.Append(goqu.I("groups.id").In(input.Filter.GroupIDs))
 		}
 
 		if input.Filter.ParentID != nil {
@@ -185,6 +184,10 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
 			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
+		}
+
+		if len(input.Filter.GroupPaths) > 0 {
+			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.GroupPaths))
 		}
 	}
 
@@ -252,6 +255,15 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	var runnerTags []byte
+	if group.RunnerTags != nil {
+		decoded, err := json.Marshal(group.RunnerTags)
+		if err != nil {
+			return nil, err
+		}
+		runnerTags = decoded
+	}
+
 	// Use transaction to update groups and namespaces tables
 	tx, err := g.dbClient.getConnection(ctx).Begin(ctx)
 	if err != nil {
@@ -280,6 +292,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"description": nullableString(group.Description),
 			"parent_id":   nullableString(group.ParentID),
 			"created_by":  group.CreatedBy,
+			"runner_tags": runnerTags,
 		}).
 		Returning(groupFieldList...).ToSQL()
 	if err != nil {
@@ -340,6 +353,15 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
+	var runnerTags []byte
+	var err error
+	if group.RunnerTags != nil {
+		runnerTags, err = json.Marshal(group.RunnerTags)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.Update("groups").
@@ -349,6 +371,7 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 				"version":     goqu.L("? + ?", goqu.C("version"), 1),
 				"updated_at":  timestamp,
 				"description": nullableString(group.Description),
+				"runner_tags": runnerTags,
 			},
 		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
 	if err != nil {
@@ -880,6 +903,7 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 		&description,
 		&parentID,
 		&group.CreatedBy,
+		&group.RunnerTags,
 	}
 
 	if withFullPath {

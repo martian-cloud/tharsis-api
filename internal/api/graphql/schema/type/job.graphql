@@ -62,6 +62,7 @@ type Job implements Node {
   logs(startOffset: Int!, limit: Int!): String!
   runner: Runner
   runnerPath: String
+  tags: [String!]!
 }
 
 input JobLogStreamSubscriptionInput {
