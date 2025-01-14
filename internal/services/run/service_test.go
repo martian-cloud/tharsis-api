@@ -1065,7 +1065,7 @@ func TestCreateRunWithJobTags(t *testing.T) {
 				WorkspaceID:            "ws1",
 				ConfigurationVersionID: &configVersionID,
 			},
-			expectTags: nil,
+			expectTags: []string{},
 		},
 	}
 
@@ -1133,7 +1133,7 @@ func TestCreateRunWithJobTags(t *testing.T) {
 
 			dbClient.MockJobs.On("CreateJob", mock.Anything,
 				mock.MatchedBy(func(input *models.Job) bool {
-					return assert.ElementsMatch(t, input.Tags, test.expectTags)
+					return assert.ElementsMatch(t, input.Tags, test.expectTags) && assert.NotNil(t, input.Tags, "Should never be nil")
 				})).
 				Return(&models.Job{
 					Metadata: models.ResourceMetadata{

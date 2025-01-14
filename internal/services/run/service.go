@@ -2008,37 +2008,31 @@ func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error)
 }
 
 // getJobTags gets the applicable runner tags from the workspace or the lowest level ancestor group with tags set.
-// If no tags are set, it returns nil.
 func (s *service) getJobTags(ctx context.Context, workspace *models.Workspace) ([]string, error) {
-	var result []string // starts out nil
-
-	// First, check for tags on the workspace itself.
 	if workspace.RunnerTags != nil {
-		result = workspace.RunnerTags
-	} else {
+		return workspace.RunnerTags, nil
+	}
 
-		// Get the workspace's ancestor groups, lowest to highest.
-		sortLowestToHighest := db.GroupSortableFieldFullPathDesc
-		groups, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
-			Sort: &sortLowestToHighest, // Must use a variable to take its address.
-			Filter: &db.GroupFilter{
-				GroupPaths: workspace.ExpandPath()[1:], // Remove the first element, which is the workspace.
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
+	// Get the workspace's ancestor groups, lowest to highest.
+	sortLowestToHighest := db.GroupSortableFieldFullPathDesc
+	groups, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
+		Sort: &sortLowestToHighest, // Must use a variable to take its address.
+		Filter: &db.GroupFilter{
+			GroupPaths: workspace.ExpandPath()[1:], // Remove the first element, which is the workspace.
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
 
-		// Find the first/lowest group with tags set.
-		for _, group := range groups.Groups {
-			if group.RunnerTags != nil {
-				result = group.RunnerTags
-				break
-			}
+	// Find the first/lowest group with tags set.
+	for _, group := range groups.Groups {
+		if group.RunnerTags != nil {
+			return group.RunnerTags, nil
 		}
 	}
 
-	return result, nil
+	return []string{}, nil
 }
 
 func truncateErrorMessage(errorMessage string) *string {
