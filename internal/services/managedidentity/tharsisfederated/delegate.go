@@ -17,13 +17,15 @@ import (
 
 // InputData contains the input data fields specific to this managed identity type
 type InputData struct {
-	ServiceAccountPath string `json:"serviceAccountPath"`
+	ServiceAccountPath               string `json:"serviceAccountPath"`
+	UseServiceAccountForTerraformCLI bool   `json:"useServiceAccountForTerraformCLI"`
 }
 
 // Data contains the data fields specific to this managed identity type
 type Data struct {
-	Subject            string `json:"subject"`
-	ServiceAccountPath string `json:"serviceAccountPath"`
+	Subject                          string `json:"subject"`
+	ServiceAccountPath               string `json:"serviceAccountPath"`
+	UseServiceAccountForTerraformCLI bool   `json:"useServiceAccountForTerraformCLI"`
 }
 
 // Delegate for the Tharsis OIDC Federated managed identity type
@@ -112,6 +114,7 @@ func (d *Delegate) SetManagedIdentityData(_ context.Context, managedIdentity *mo
 	}
 
 	federatedData.ServiceAccountPath = inputData.ServiceAccountPath
+	federatedData.UseServiceAccountForTerraformCLI = inputData.UseServiceAccountForTerraformCLI
 
 	buffer, err := json.Marshal(federatedData)
 	if err != nil {

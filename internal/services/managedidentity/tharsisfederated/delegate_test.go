@@ -22,26 +22,40 @@ import (
 func TestSetManagedIdentityData(t *testing.T) {
 	// Test cases
 	tests := []struct {
-		name         string
-		expectPath   string
-		expectErr    string
-		existingData []byte
-		inputData    []byte
-		expectHosts  []string
+		name                                   string
+		expectPath                             string
+		expectErr                              string
+		existingData                           []byte
+		inputData                              []byte
+		expectUseServiceAccountForTerraformCLI bool
 	}{
 		{
-			name:         "new data payload",
-			existingData: []byte{},
-			inputData:    []byte(`{"serviceAccountPath":"service/account/path"}`),
-			expectPath:   "service/account/path",
-			expectHosts:  []string{"example.com", "myotherdomain.com"},
+			name:                                   "new data payload",
+			existingData:                           []byte{},
+			inputData:                              []byte(`{"serviceAccountPath":"service/account/path"}`),
+			expectPath:                             "service/account/path",
+			expectUseServiceAccountForTerraformCLI: false,
 		},
 		{
-			name:         "update data payload",
-			existingData: []byte(`{"serviceAccountPath":"original/path", "subject": "TV9tYW5hZ2VkSWRlbnRpdHktMQ", "hosts": ["myotherdomain.com"]}`),
-			inputData:    []byte(`{"serviceAccountPath":"updated/path"}`),
-			expectPath:   "updated/path",
-			expectHosts:  []string{"updatedhost.com"},
+			name:                                   "new data payload",
+			existingData:                           []byte{},
+			inputData:                              []byte(`{"serviceAccountPath":"service/account/path", "useServiceAccountForTerraformCLI": true}`),
+			expectPath:                             "service/account/path",
+			expectUseServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                                   "update data payload",
+			existingData:                           []byte(`{"serviceAccountPath":"original/path", "subject": "TV9tYW5hZ2VkSWRlbnRpdHktMQ", "useServiceAccountForTerraformCLI": true}`),
+			inputData:                              []byte(`{"serviceAccountPath":"updated/path", "useServiceAccountForTerraformCLI": false}`),
+			expectPath:                             "updated/path",
+			expectUseServiceAccountForTerraformCLI: false,
+		},
+		{
+			name:                                   "update data payload with useServiceAccountForTerraformCLI omitted",
+			existingData:                           []byte(`{"serviceAccountPath":"original/path", "subject": "TV9tYW5hZ2VkSWRlbnRpdHktMQ"}`),
+			inputData:                              []byte(`{"serviceAccountPath":"updated/path", "useServiceAccountForTerraformCLI": true}`),
+			expectPath:                             "updated/path",
+			expectUseServiceAccountForTerraformCLI: true,
 		},
 		{
 			name:      "invalid data payload",
@@ -93,8 +107,7 @@ func TestSetManagedIdentityData(t *testing.T) {
 				}
 
 				assert.Equal(t, test.expectPath, decodedData.ServiceAccountPath)
-				//TODO: Remote Datasource - Need to check the overrideHost
-				//assert.Equal(t, test.expectHosts, decodedData.Hosts)
+				assert.Equal(t, test.expectUseServiceAccountForTerraformCLI, decodedData.UseServiceAccountForTerraformCLI)
 				assert.Equal(t, gid.ToGlobalID(gid.ManagedIdentityType, managedIdentity.Metadata.ID), decodedData.Subject)
 			}
 		})

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/go-homedir"
@@ -15,10 +16,7 @@ const (
 	pluginPermissions      = os.FileMode(0750)
 )
 
-const bashCredHelper = `#!/bin/bash
-
-# hostsTokenFileMapping is an associative array that maps hosts to a token file
-%v
+const bashCredHelper = `#!/bin/sh
 
 if [ $# != 2 ]; then
 	echo "2 positional arguments required, $# provided"
@@ -33,23 +31,19 @@ if [ "$command" != "get" ]; then
 	exit 1
 fi
 
-for supportedHosts in ${!hostsTokenFileMapping[@]}
-do
-	if [[ $supportedHosts != *$host* ]]; then
-		continue
-	fi
+{{ range $hostCandidate, $tokenFile := .}}
 
-    tokenFile=${hostsTokenFileMapping[${supportedHosts}]}
-
-	tokenContents=$(<$tokenFile)
+if [ "{{$hostCandidate}}" = "$host" ]; then
+	tokenContents=` + "`cat {{$tokenFile}}`" + `
 	if [ $? -ne 0 ]; then
-		echo "Failed to read token file: $tokenFile"
+		echo "Failed to read token file: {{$tokenFile}}"
 		exit 1
 	fi
 
 	echo '{ "token": "'"$tokenContents"'" }'
 	exit 0
-done
+fi
+{{ end }}
 
 echo "{}"
 exit 0
@@ -83,11 +77,21 @@ func (c *credentialHelper) install(hostsCredentialFileMapping map[string]string)
 
 	c.filepath = filepath.Join(*pluginPath, credHelperPrefix+name)
 
-	contents := fmt.Sprintf(bashCredHelper, serializeToBashAssociativeArray(hostsCredentialFileMapping))
-
-	err = os.WriteFile(c.filepath, []byte(contents), pluginPermissions)
+	tmpl, err := template.New("credential helper").Parse(bashCredHelper)
 	if err != nil {
-		return nil, fmt.Errorf("failed to write credential helper: %v", err)
+		return nil, fmt.Errorf("failed to parse credential helper template: %v", err)
+	}
+
+	helperFile, err := os.OpenFile(c.filepath, os.O_WRONLY|os.O_CREATE, pluginPermissions) // nosemgrep: gosec.G304-1
+	if err != nil {
+		return nil, fmt.Errorf("failed to create credential helper file: %v", err)
+	}
+
+	defer helperFile.Close()
+
+	err = tmpl.Execute(helperFile, hostsCredentialFileMapping)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate credential helper from template: %v", err)
 	}
 
 	return &name, nil
@@ -151,14 +155,4 @@ func (c *credentialHelper) getTerraformConfigDirectory() (*string, error) {
 	var terraformConfigDirectory = filepath.Join(dir, c.configDir)
 
 	return &terraformConfigDirectory, nil
-}
-
-func serializeToBashAssociativeArray(hostsCredentialFileMapping map[string]string) string {
-	bashArray := "declare -A hostsTokenFileMapping\n"
-
-	for host, tokenFile := range hostsCredentialFileMapping {
-		bashArray += fmt.Sprintf("hostsTokenFileMapping[\"%s\"]=\"%s\"\n", host, tokenFile)
-	}
-
-	return bashArray
 }

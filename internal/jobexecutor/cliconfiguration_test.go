@@ -2,7 +2,8 @@ package jobexecutor
 
 import (
 	"os"
-	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,90 +11,36 @@ import (
 
 func TestSetupCliConfiguration(t *testing.T) {
 	tests := []struct {
-		name          string
-		workspaceDir  string
-		expectedError string
+		name string
 	}{
 		{
-			name: "should configure environment when authenticating",
-		},
-		{
-			name:          "should fail if unable to write cli configuration file",
-			workspaceDir:  "~InvalidDirectory~",
-			expectedError: "failed to write terraform cli configuration file",
+			name: "should setup cli configuration",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			workspace := buildTerraformWorkspace(t, test.workspaceDir)
+			workspace := buildTerraformWorkspace()
 
 			err := workspace.setupCliConfiguration("helper-name")
 
-			verifyFailedSetupResult(t, err, test.expectedError)
-			if err != nil {
-				return
-			}
+			assert.Nil(t, err, "should not have any errors")
 
-			verifyFileHasContents(t, workspace, `credentials_helper "helper-name" {}`)
-			verifyEnvironmentVariableSet(t, workspace)
+			cliConfigurationPath := workspace.fullEnv[tfCliConfigFileEnvName]
+
+			assert.NotEmpty(t, cliConfigurationPath)
+
+			assert.Equal(t, `credentials_helper "helper-name" {}`, readFile(t, cliConfigurationPath))
+
+			verifyWillCleanupTempDir(t, workspace, cliConfigurationPath)
 		})
 	}
 }
 
-func buildTerraformWorkspace(t *testing.T, workspaceDir string) *terraformWorkspace {
-	if workspaceDir != "" {
-		return buildTerraformWorkspaceWith(workspaceDir)
-
-	}
-
-	path, err := os.MkdirTemp("", "cliconfiguration-test-workspace-*")
-	if err != nil {
-		t.Fatalf("failed to create temporary workspace directory: %v", err)
-	}
-
-	return buildTerraformWorkspaceWith(path)
-}
-
-func buildTerraformWorkspaceWith(path string) *terraformWorkspace {
+func buildTerraformWorkspace() *terraformWorkspace {
 	return &terraformWorkspace{
-		workspaceDir: path,
-		fullEnv:      make(map[string]string),
+		fullEnv: make(map[string]string),
 	}
-}
-func verifyFailedSetupResult(t *testing.T, err error, expectedError string) {
-	if err == nil {
-		if expectedError == "" {
-			return
-		}
-
-		t.Fatalf("Expected error %v but got nil", expectedError)
-	}
-
-	if expectedError == "" {
-		t.Fatal(err)
-	}
-
-	assert.Contains(t, err.Error(), expectedError)
-}
-
-func verifyFileHasContents(t *testing.T, workspace *terraformWorkspace, expectedContents string) {
-	path := buildCliConfigurationFilePath(workspace)
-
-	contents := readFile(t, path)
-
-	assert.Equal(t, expectedContents, contents)
-}
-
-func verifyEnvironmentVariableSet(t *testing.T, workspace *terraformWorkspace) {
-	path := buildCliConfigurationFilePath(workspace)
-
-	assert.Equal(t, path, workspace.fullEnv[tfCliConfigFileEnvName])
-}
-
-func buildCliConfigurationFilePath(workspace *terraformWorkspace) string {
-	path := filepath.Join(workspace.workspaceDir, filename)
-	return path
 }
 
 func readFile(t *testing.T, path string) string {
@@ -103,4 +50,12 @@ func readFile(t *testing.T, path string) string {
 	}
 
 	return string(contents)
+}
+
+func verifyWillCleanupTempDir(t *testing.T, workspace *terraformWorkspace, cliConfigurationPath string) {
+	indexOfTempDir := slices.IndexFunc(workspace.pathsToRemove, func(path string) bool {
+		return strings.Contains(cliConfigurationPath, path)
+	})
+
+	assert.True(t, indexOfTempDir >= 0, "Should remove the tempDir when job finished")
 }
