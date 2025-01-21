@@ -114,7 +114,7 @@ workflow:
     - when: never
 
 variables:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.22"
   CGO_ENABLED: "0"
   GOPATH_RELATIVE_PATH: .go
   GOPATH: "$CI_PROJECT_DIR/$GOPATH_RELATIVE_PATH"
