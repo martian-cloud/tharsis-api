@@ -130,9 +130,6 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 		GPGKeyID:     gpgKeyID,
 	}
 
-	dbClient := buildDBClientWithMocks(t)
-	limiter := limits.NewLimitChecker(dbClient.Client)
-
 	type testCase struct {
 		expectErrorCode errors.CodeType
 		input           *models.GPGKey
@@ -142,19 +139,6 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 		keyCount        int32
 	}
 
-	/*
-		template test case:
-		{
-			name            string
-			input           *models.GPGKey
-			limit           int
-			keyCount        int32
-			expectErrorCode errors.CodeType
-			expectOutput    *models.GPGKey
-		}
-	*/
-
-	// Test cases
 	testCases := []testCase{
 
 		{
@@ -180,6 +164,9 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			dbClient := buildDBClientWithMocks(t)
+			limiter := limits.NewLimitChecker(dbClient.Client)
 
 			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)

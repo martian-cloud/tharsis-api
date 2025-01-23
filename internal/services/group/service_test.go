@@ -133,18 +133,6 @@ func TestCreateTopLevelGroup(t *testing.T) {
 }
 
 func TestCreateNestedGroup(t *testing.T) {
-	mockGroups := db.NewMockGroups(t)
-	mockTransactions := db.NewMockTransactions(t)
-	mockResourceLimits := db.NewMockResourceLimits(t)
-
-	dbClient := db.Client{
-		Groups:         mockGroups,
-		Transactions:   mockTransactions,
-		ResourceLimits: mockResourceLimits,
-	}
-
-	limiter := limits.NewLimitChecker(&dbClient)
-
 	// Test cases
 	tests := []struct {
 		authError       error
@@ -212,6 +200,18 @@ func TestCreateNestedGroup(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
+			mockGroups := db.NewMockGroups(t)
+			mockTransactions := db.NewMockTransactions(t)
+			mockResourceLimits := db.NewMockResourceLimits(t)
+
+			dbClient := db.Client{
+				Groups:         mockGroups,
+				Transactions:   mockTransactions,
+				ResourceLimits: mockResourceLimits,
+			}
+
+			limiter := limits.NewLimitChecker(&dbClient)
+
 			mockCaller := auth.NewMockCaller(t)
 
 			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateGroupPermission, mock.Anything).Return(test.authError)
@@ -221,17 +221,14 @@ func TestCreateNestedGroup(t *testing.T) {
 			if test.authError == nil {
 				mockCaller.On("GetSubject").Return("testsubject")
 
-				if !test.exceedsDepth {
-					mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
+				mockGroups.On("CreateGroup", mock.Anything, &test.input).Return(&test.input, nil)
 
-					mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-					mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+
+				if test.expectErrorCode == "" {
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-					if test.expectErrorCode == "" {
-						mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-					}
-
+					mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 				}
 
 				// called from inside checkParentSubgroupLimit

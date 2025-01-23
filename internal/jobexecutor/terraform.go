@@ -36,6 +36,9 @@ terraform {
 
 	// Ensure binary not found error.
 	hcInstallBinaryNotFoundErr = "unable to find, install"
+
+	// Env variable name prefix used by Terraform for tokens. Format is TF_TOKEN_<host>
+	tfTokenVarPrefix = "TF_TOKEN_"
 )
 
 type terraformWorkspace struct {
@@ -65,9 +68,9 @@ func newTerraformWorkspace(
 ) *terraformWorkspace {
 	managedIdentities := newManagedIdentities(
 		workspace.Metadata.ID,
-		workspaceDir,
 		jobLogger,
 		client,
+		jobCfg,
 	)
 
 	return &terraformWorkspace{
@@ -151,7 +154,29 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 			// Registry-style module source; version is always defined in this case
 			t.jobLogger.Infof("Resolving module version %s/%s", *t.run.ModuleSource, *t.run.ModuleVersion)
 
-			presignedURL, rErr := resolveModuleSource(*t.run.ModuleSource, *t.run.ModuleVersion, t.fullEnv)
+			hostTokenMap := map[string]string{}
+			for k, v := range t.fullEnv {
+				// Add env variables that start with the TF_TOKEN_ prefix to the hostTokenMap
+				if strings.HasPrefix(k, tfTokenVarPrefix) {
+					hostTokenMap[k] = v
+				}
+			}
+
+			// Add service account tokens to the host map
+			for k, v := range managedIdentitiesResponse.HostCredentialFileMapping {
+				// Read the service account token data from the file
+				tokenData, err := os.ReadFile(v)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read service account token data from file %s: %v", v, err)
+				}
+				encodedHost, err := module.BuildTokenEnvVar(k)
+				if err != nil {
+					return nil, fmt.Errorf("failed to encode host %s for environment variable: %v", k, err)
+				}
+				hostTokenMap[encodedHost] = string(tokenData)
+			}
+
+			presignedURL, rErr := resolveModuleSource(*t.run.ModuleSource, *t.run.ModuleVersion, hostTokenMap)
 			if rErr != nil {
 				return nil, fmt.Errorf("failed to resolve module source: %s", rErr)
 			}
@@ -301,7 +326,7 @@ func (t *terraformWorkspace) setupCredentialHelper(hostCredentialFileMapping map
 		hosts = append(hosts, host)
 	}
 
-	t.jobLogger.Infof("The following managed identity hosts each have a credential file: %v", hosts)
+	t.jobLogger.Infof("The following managed identity hosts each have a credential file: %v", strings.Join(hosts, ", "))
 
 	credHelperName, err := t.credentialHelper.install(hostCredentialFileMapping)
 	if err != nil {

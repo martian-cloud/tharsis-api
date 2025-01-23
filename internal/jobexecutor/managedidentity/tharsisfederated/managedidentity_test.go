@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
@@ -22,19 +24,34 @@ const refreshTokenEarlyDuration = 1 * time.Second
 
 func TestAuthenticate(t *testing.T) {
 	tests := []struct {
-		name                           string
-		workspaceDir                   string
-		expectError                    string
-		expectLogWarning               string
-		createServiceAccountTokenError string
-		managedIdentityData            string
-		expiresIn                      *time.Duration
-		tokens                         []string
-		additionalManagedIdentityID    string
+		name                             string
+		tokenDir                         string
+		apiEndpoint                      string
+		discoveryProtocolHost            *string
+		expectError                      string
+		expectLogWarning                 string
+		createServiceAccountTokenError   string
+		managedIdentityData              string
+		expiresIn                        *time.Duration
+		tokens                           []string
+		additionalManagedIdentityID      string
+		useServiceAccountForTerraformCLI bool
 	}{
 		{
-			name:   "should configure environment when authenticating",
-			tokens: []string{"expected-token1"},
+			name:                             "should configure environment when authenticating and not using service account for terraform cli",
+			tokens:                           []string{},
+			useServiceAccountForTerraformCLI: false,
+		},
+		{
+			name:                             "should configure environment when authenticating",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should configure environment when authenticating without a discovery protocol host",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+			discoveryProtocolHost:            ptr.String(""),
 		},
 		{
 			name:                        "should fail if more than one managed identity is provided",
@@ -51,72 +68,94 @@ func TestAuthenticate(t *testing.T) {
 			managedIdentityData: base64.StdEncoding.EncodeToString([]byte("invalid-json")),
 			expectError:         "failed to unmarshal managed identity payload invalid character 'i' looking for beginning of value",
 		},
-		// {
-		// 	name:                           "should fail if unable to create service account token",
-		// 	createServiceAccountTokenError: "failed to create service account token",
-		// 	expectError:                    "failed to create service account token",
-		// 	tokens:                         []string{"expected-token1"},
-		// },
-		// {
-		// 	name:         "should fail if unable to write service account token file",
-		// 	workspaceDir: "::~NotValid~",
-		// 	expectError:  "failed to write managed identity service account token to disk open",
-		// 	tokens:       []string{"expected-token1"},
-		// },
-		// {
-		// 	name:             "should not refresh token if expiration less than the refresh token early duration",
-		// 	expiresIn:        ptr.Duration(500 * time.Millisecond),
-		// 	expectLogWarning: "Warning: Service account token expiration is less than or equal to estimated time to refresh, token will not be refreshed",
-		// 	tokens:           []string{"expected-token1"},
-		// },
-		// {
-		// 	name:             "should not refresh token if expiration equal to the refresh token early duration",
-		// 	expiresIn:        ptr.Duration(refreshTokenEarlyDuration),
-		// 	expectLogWarning: "Warning: Service account token expiration is less than or equal to estimated time to refresh, token will not be refreshed",
-		// 	tokens:           []string{"expected-token1"},
-		// },
-		// {
-		// 	name:      "should refresh token if expiration greater than the refresh token early duration",
-		// 	expiresIn: ptr.Duration(2 * time.Second),
-		// 	tokens:    []string{"expected-token1"},
-		// },
-		// {
-		// 	name:      "should update service account token file with new token before expiration",
-		// 	expiresIn: ptr.Duration(2 * time.Second),
-		// 	tokens:    []string{"expected-token1", "expected-token2"},
-		// },
+		{
+			name:                             "should fail if unable to create service account token",
+			createServiceAccountTokenError:   "failed to create service account token",
+			expectError:                      "failed to create service account token",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should fail if unable to write service account token file",
+			tokenDir:                         "::~NotValid~",
+			expectError:                      "failed to write managed identity service account token to disk open",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should fail if unable to setup host credential file mapping",
+			apiEndpoint:                      ".comhttps://",
+			expectError:                      "parse \".comhttps://\": first path segment in URL cannot contain colon",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should not refresh token if expiration less than the refresh token early duration",
+			expiresIn:                        ptr.Duration(500 * time.Millisecond),
+			expectLogWarning:                 "Warning: Service account token expiration is less than or equal to estimated time to refresh, token will not be refreshed",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should not refresh token if expiration equal to the refresh token early duration",
+			expiresIn:                        ptr.Duration(refreshTokenEarlyDuration),
+			expectLogWarning:                 "Warning: Service account token expiration is less than or equal to estimated time to refresh, token will not be refreshed",
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should refresh token if expiration greater than the refresh token early duration",
+			expiresIn:                        ptr.Duration(2 * time.Second),
+			tokens:                           []string{"expected-token1"},
+			useServiceAccountForTerraformCLI: true,
+		},
+		{
+			name:                             "should update service account token file with new token before expiration",
+			expiresIn:                        ptr.Duration(2 * time.Second),
+			tokens:                           []string{"expected-token1", "expected-token2"},
+			useServiceAccountForTerraformCLI: true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := jobclient.NewMockClient(t)
 
-			workspaceDir := ensureWorkspaceDirSetup(t, test.workspaceDir)
+			tokenDir := ensureTokenDirSetup(t, test.tokenDir)
 
 			jobLogger := buildJobLoggerWithStubs(t)
 
-			authenticator := buildAuthenticator(t, client, workspaceDir, jobLogger)
+			apiEndpoint := test.apiEndpoint
+			if apiEndpoint == "" {
+				apiEndpoint = "https://api.tharsis.dev.com"
+			}
+
+			discoveryProtocolHost := test.discoveryProtocolHost
+			if discoveryProtocolHost == nil {
+				discoveryProtocolHost = ptr.String("tharsis.dev.com")
+			}
+
+			authenticator := buildAuthenticator(t, client, tokenDir, jobLogger, apiEndpoint, discoveryProtocolHost)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			const serviceAccountPath = "service/account/path"
-			hosts := []string{"alpha.com", "beta.com"}
 
-			identities := setupManagedIdentities(t, serviceAccountPath, hosts, test.additionalManagedIdentityID, test.managedIdentityData)
+			identities := setupManagedIdentities(t, serviceAccountPath, test.additionalManagedIdentityID, test.managedIdentityData, test.useServiceAccountForTerraformCLI)
 
 			creds := []byte("tokendata")
 
-			// for _, token := range test.tokens {
-			// 	stubCreateServiceAccountToken(
-			// 		ctx,
-			// 		client,
-			// 		serviceAccountPath,
-			// 		creds,
-			// 		test.expiresIn,
-			// 		token,
-			// 		test.createServiceAccountTokenError)
-			// }
+			for _, token := range test.tokens {
+				stubCreateServiceAccountToken(
+					ctx,
+					client,
+					serviceAccountPath,
+					creds,
+					test.expiresIn,
+					token,
+					test.createServiceAccountTokenError)
+			}
 
 			response, err := authenticator.Authenticate(
 				ctx,
@@ -136,11 +175,20 @@ func TestAuthenticate(t *testing.T) {
 			}
 			assert.Equal(t, expectedEnv, response.Env)
 
-			//TODO: Remote Datasource - put this back in place when we have overrideHost
-			//verifyHostCredentialFileMapping(workspaceDir, t, hosts, response)
+			expectedHosts := []string{}
+			if test.useServiceAccountForTerraformCLI {
+				expectedHosts = append(expectedHosts, "api.tharsis.dev.com")
 
-			//lastToken := test.tokens[len(test.tokens)-1]
-			//verifyServiceAccountTokenFileEventuallyContains(t, workspaceDir, lastToken)
+				if discoveryProtocolHost != nil && *discoveryProtocolHost != "" {
+					expectedHosts = append(expectedHosts, "tharsis.dev.com")
+				}
+			}
+			verifyHostCredentialFileMapping(tokenDir, t, expectedHosts, response)
+
+			if len(test.tokens) >= 1 {
+				lastToken := test.tokens[len(test.tokens)-1]
+				verifyServiceAccountTokenFileEventuallyContains(t, tokenDir, lastToken)
+			}
 
 			if test.expectLogWarning != "" {
 				jobLogger.AssertCalled(t, "Errorf", test.expectLogWarning)
@@ -149,33 +197,68 @@ func TestAuthenticate(t *testing.T) {
 	}
 }
 
-func ensureWorkspaceDirSetup(t *testing.T, workspaceDir string) string {
-	if workspaceDir != "" {
-		return workspaceDir
-	}
+func TestClose(t *testing.T) {
+	client := jobclient.NewMockClient(t)
 
-	return buildWorkspaceDir(t)
+	tokenDir := buildTokenDir(t)
+
+	err := os.WriteFile(filepath.Join(tokenDir, "test.log"), []byte("testing"), os.ModeAppend)
+	assert.Nil(t, err, "should create test file in token directory")
+
+	jobLogger := buildJobLoggerWithStubs(t)
+
+	const apiEndpoint = "https://api.tharsis.dev.com"
+	discoveryProtocolHost := ptr.String("tharsis.dev.com")
+
+	authenticator := buildAuthenticator(t, client, tokenDir, jobLogger, apiEndpoint, discoveryProtocolHost)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = authenticator.Close(ctx)
+
+	assert.Nil(t, err, "should have no errors")
+
+	_, err = os.Stat(tokenDir)
+
+	assert.True(t, os.IsNotExist(err), "The token directory was not deleted: %v", err)
 }
 
-func buildWorkspaceDir(t *testing.T) string {
-	workspaceDir, err := os.MkdirTemp("", "managedidentity-test-workspace-*")
+func ensureTokenDirSetup(t *testing.T, tokenDir string) string {
+	if tokenDir != "" {
+		return tokenDir
+	}
+
+	return buildTokenDir(t)
+}
+
+func buildTokenDir(t *testing.T) string {
+	tokenDir, err := os.MkdirTemp("", "managedidentity-test-token-*")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return workspaceDir
+	return tokenDir
 }
 
 func buildJobLoggerWithStubs(t *testing.T) *joblogger.MockJobLogger {
 	jobLogger := joblogger.NewMockJobLogger(t)
 
+	jobLogger.On("Infof", mock.Anything, mock.Anything).Maybe().Return()
 	jobLogger.On("Errorf", mock.Anything).Maybe().Return()
 
 	return jobLogger
 }
 
-func buildAuthenticator(t *testing.T, client jobclient.Client, workspaceDir string, jobLogger *joblogger.MockJobLogger) *Authenticator {
-	authenticator, err := newAuthenticator(client, workspaceDir, jobLogger, refreshTokenEarlyDuration)
+func buildAuthenticator(
+	t *testing.T,
+	client jobclient.Client,
+	tokenDir string,
+	jobLogger *joblogger.MockJobLogger,
+	apiEndpoint string,
+	discoveryProtocolHost *string,
+) *Authenticator {
+	authenticator, err := newAuthenticator(client, jobLogger, refreshTokenEarlyDuration, tokenDir, apiEndpoint, discoveryProtocolHost)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,26 +269,26 @@ func buildAuthenticator(t *testing.T, client jobclient.Client, workspaceDir stri
 func setupManagedIdentities(
 	t *testing.T,
 	serviceAccountPath string,
-	hosts []string,
 	additionalManagedIdentityID string,
 	managedIdentityData string,
+	useServiceAccountForTerraformCLI bool,
 ) []types.ManagedIdentity {
 	identities := []types.ManagedIdentity{}
 
-	firstIdentity := buildManagedIdentity(t, serviceAccountPath, hosts, "managedIdentity-1", managedIdentityData)
+	firstIdentity := buildManagedIdentity(t, serviceAccountPath, "managedIdentity-1", managedIdentityData, useServiceAccountForTerraformCLI)
 	identities = append(identities, *firstIdentity)
 
 	if additionalManagedIdentityID != "" {
-		secondIdentity := buildManagedIdentity(t, serviceAccountPath, hosts, additionalManagedIdentityID, "")
+		secondIdentity := buildManagedIdentity(t, serviceAccountPath, additionalManagedIdentityID, "", useServiceAccountForTerraformCLI)
 		identities = append(identities, *secondIdentity)
 	}
 
 	return identities
 }
 
-func buildManagedIdentity(t *testing.T, serviceAccountPath string, hosts []string, id string, managedIdentityData string) *types.ManagedIdentity {
+func buildManagedIdentity(t *testing.T, serviceAccountPath string, id string, managedIdentityData string, useServiceAccountForTerraformCLI bool) *types.ManagedIdentity {
 	if managedIdentityData == "" {
-		managedIdentityData = buildManagedIdentityData(t, serviceAccountPath, hosts)
+		managedIdentityData = buildManagedIdentityData(t, serviceAccountPath, useServiceAccountForTerraformCLI)
 	}
 
 	return &types.ManagedIdentity{
@@ -216,10 +299,10 @@ func buildManagedIdentity(t *testing.T, serviceAccountPath string, hosts []strin
 	}
 }
 
-func buildManagedIdentityData(t *testing.T, serviceAccountPath string, _ []string) string {
-	//TODO: Remote Datasource - Need to specify overrideHost and remove discarded parameter
+func buildManagedIdentityData(t *testing.T, serviceAccountPath string, useServiceAccountForTerraformCLI bool) string {
 	data := &tharsisfederated.Data{
-		ServiceAccountPath: serviceAccountPath,
+		ServiceAccountPath:               serviceAccountPath,
+		UseServiceAccountForTerraformCLI: useServiceAccountForTerraformCLI,
 	}
 
 	dataBuffer, err := json.Marshal(data)

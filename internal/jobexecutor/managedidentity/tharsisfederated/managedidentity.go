@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -27,28 +28,44 @@ const (
 // Authenticator supports Tharsis Federation
 type Authenticator struct {
 	client                    jobclient.Client
-	workspaceDir              string
 	jobLogger                 joblogger.Logger
 	refreshTokenEarlyDuration time.Duration
+	tokenDir                  string
+	apiEndpoint               string
+	discoveryProtocolHost     *string
 }
 
 // New creates a new instance of Authenticator
-func New(client jobclient.Client, workspaceDir string, jobLogger joblogger.Logger) (*Authenticator, error) {
-	return newAuthenticator(client, workspaceDir, jobLogger, 1*time.Minute)
+func New(client jobclient.Client, jobLogger joblogger.Logger, apiEndpoint string, discoveryProtocolHost *string) (*Authenticator, error) {
+	tokenDir, err := os.MkdirTemp("", "tharsis-federated-token-*")
+	if err != nil {
+		return nil, err
+	}
+
+	return newAuthenticator(client, jobLogger, 1*time.Minute, tokenDir, apiEndpoint, discoveryProtocolHost)
 }
 
-func newAuthenticator(client jobclient.Client, workspaceDir string, jobLogger joblogger.Logger, refreshTokenEarlyDuration time.Duration) (*Authenticator, error) {
+func newAuthenticator(
+	client jobclient.Client,
+	jobLogger joblogger.Logger,
+	refreshTokenEarlyDuration time.Duration,
+	tokenDir string,
+	apiEndpoint string,
+	discoveryProtocolHost *string,
+) (*Authenticator, error) {
 	return &Authenticator{
 		client:                    client,
-		workspaceDir:              workspaceDir,
 		jobLogger:                 jobLogger,
 		refreshTokenEarlyDuration: refreshTokenEarlyDuration,
+		tokenDir:                  tokenDir,
+		apiEndpoint:               apiEndpoint,
+		discoveryProtocolHost:     discoveryProtocolHost,
 	}, nil
 }
 
 // Close cleans up any open resources
 func (a *Authenticator) Close(_ context.Context) error {
-	return nil
+	return os.RemoveAll(a.tokenDir)
 }
 
 // Authenticate configures the environment with the identity information used by the Tharsis terraform provider
@@ -75,12 +92,6 @@ func (a *Authenticator) Authenticate(
 
 	convertedCreds := string(creds)
 
-	// TODO: Save token file to directory outside of workspace
-	// err = setupServiceAccountTokenWithRefresh(ctx, federatedData.ServiceAccountPath, convertedCreds, a)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	response := managedidentity.AuthenticateResponse{
 		Env: map[string]string{
 			tharsisServiceAccountPathEnvName:  federatedData.ServiceAccountPath,
@@ -89,20 +100,25 @@ func (a *Authenticator) Authenticate(
 		HostCredentialFileMapping: map[string]string{},
 	}
 
-	//TODO: Remote Datasource - if overrideHost is true, then put the api host into the host credential file mapping with the token file path.
-	/*
-		tokenFilePath := buildServiceAccountTokenFilepath(a.workspaceDir)
+	if !federatedData.UseServiceAccountForTerraformCLI {
+		return &response, nil
+	}
 
-		for _, host := range federatedData.Hosts {
-			response.HostCredentialFileMapping[host] = tokenFilePath
-		}
-	*/
+	err = a.setupServiceAccountTokenWithRefresh(ctx, federatedData.ServiceAccountPath, convertedCreds)
+	if err != nil {
+		return nil, err
+	}
+
+	err = a.setupHostCredentialFileMapping(response.HostCredentialFileMapping)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, nil
 }
 
-func buildServiceAccountTokenFilepath(workspaceDir string) string {
-	return filepath.Join(workspaceDir, serviceAccountTokenFilename)
+func buildServiceAccountTokenFilepath(tokenDir string) string {
+	return filepath.Join(tokenDir, serviceAccountTokenFilename)
 }
 
 func retrieveManagedIdentityPayload(data string) (*tharsisfederated.Data, error) {
@@ -119,7 +135,7 @@ func retrieveManagedIdentityPayload(data string) (*tharsisfederated.Data, error)
 	return &federatedData, nil
 }
 
-func setupServiceAccountTokenWithRefresh(ctx context.Context, serviceAccountPath string, creds string, a *Authenticator) error {
+func (a *Authenticator) setupServiceAccountTokenWithRefresh(ctx context.Context, serviceAccountPath string, creds string) error {
 	expiresIn, err := updateServiceAccountTokenFile(ctx, serviceAccountPath, creds, a)
 	if err != nil {
 		return err
@@ -130,13 +146,30 @@ func setupServiceAccountTokenWithRefresh(ctx context.Context, serviceAccountPath
 	return nil
 }
 
+func (a *Authenticator) setupHostCredentialFileMapping(hostCredFileMap map[string]string) error {
+	apiURL, err := url.Parse(a.apiEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to parse apiEndpoint: %v", err)
+	}
+
+	tokenFilePath := buildServiceAccountTokenFilepath(a.tokenDir)
+
+	hostCredFileMap[apiURL.Host] = tokenFilePath
+
+	if a.discoveryProtocolHost != nil && *a.discoveryProtocolHost != "" {
+		hostCredFileMap[*a.discoveryProtocolHost] = tokenFilePath
+	}
+
+	return nil
+}
+
 func updateServiceAccountTokenFile(ctx context.Context, serviceAccountPath string, creds string, a *Authenticator) (*time.Duration, error) {
 	serviceAccountToken, expiresIn, err := a.client.CreateServiceAccountToken(ctx, serviceAccountPath, creds)
 	if err != nil {
 		return nil, err
 	}
 
-	err = writeServiceAccountTokenFile(a.workspaceDir, serviceAccountToken)
+	err = writeServiceAccountTokenFile(a.tokenDir, serviceAccountToken)
 	if err != nil {
 		return nil, err
 	}
@@ -171,8 +204,8 @@ func refreshTokenBeforeExpiration(ctx context.Context, serviceAccountPath string
 	}
 }
 
-func writeServiceAccountTokenFile(workspaceDir string, serviceAccountToken string) error {
-	filepath := buildServiceAccountTokenFilepath(workspaceDir)
+func writeServiceAccountTokenFile(tokenDir string, serviceAccountToken string) error {
+	filepath := buildServiceAccountTokenFilepath(tokenDir)
 	if err := os.WriteFile(filepath, []byte(serviceAccountToken), tokenFilePermissions); err != nil {
 		return fmt.Errorf("failed to write managed identity service account token to disk %v", err)
 	}

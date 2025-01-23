@@ -13,29 +13,29 @@ const tfConfigDir = "terraform.d"
 
 func TestInstallCredentialHelper(t *testing.T) {
 	tests := []struct {
-		name                     string
-		hosts                    []string
-		expectedArrayAssignments []string
-		homeDir                  homeDirGetter
-		setup                    func(*testing.T, homeDirGetter)
-		expectedError            string
+		name             string
+		hosts            []string
+		expectedContents []string
+		homeDir          homeDirGetter
+		setup            func(*testing.T, homeDirGetter)
+		expectedError    string
 	}{
 		{
-			name:                     "should install credential helper",
-			hosts:                    []string{"example.com"},
-			expectedArrayAssignments: []string{`hostsTokenFileMapping["example.com"]="tokenFileContents"`},
+			name:             "should install credential helper",
+			hosts:            []string{"example.com"},
+			expectedContents: []string{`if [ "example.com" = "$host" ]; then`},
 		},
 		{
-			name:                     "should install credential helper with complex home directory",
-			hosts:                    []string{"example.com"},
-			expectedArrayAssignments: []string{`hostsTokenFileMapping["example.com"]="tokenFileContents"`},
-			homeDir:                  buildTempComplexPathHomeDirGetter(),
+			name:             "should install credential helper with complex home directory",
+			hosts:            []string{"example.com"},
+			expectedContents: []string{`if [ "example.com" = "$host" ]; then`},
+			homeDir:          buildTempComplexPathHomeDirGetter(),
 		},
 		{
-			name:                     "should install credential helper when plugin directory exists",
-			setup:                    createPluginDirectory,
-			hosts:                    []string{"example.com"},
-			expectedArrayAssignments: []string{`hostsTokenFileMapping["example.com"]="tokenFileContents"`},
+			name:             "should install credential helper when plugin directory exists",
+			setup:            createPluginDirectory,
+			hosts:            []string{"example.com"},
+			expectedContents: []string{`if [ "example.com" = "$host" ]; then`},
 		},
 		{
 			name: "should install credential helper when there are multiple hosts",
@@ -43,9 +43,9 @@ func TestInstallCredentialHelper(t *testing.T) {
 				"example.com",
 				"myotherdomain.com",
 			},
-			expectedArrayAssignments: []string{
-				`hostsTokenFileMapping["example.com"]="tokenFileContents"`,
-				`hostsTokenFileMapping["myotherdomain.com"]="tokenFileContents"`,
+			expectedContents: []string{
+				`if [ "example.com" = "$host" ]; then`,
+				`if [ "myotherdomain.com" = "$host" ]; then`,
 			},
 		},
 		{
@@ -85,10 +85,28 @@ func TestInstallCredentialHelper(t *testing.T) {
 				return
 			}
 
-			verifyCredHelperFileContains(t, name, homeDir, test.expectedArrayAssignments)
+			verifyCredHelperFileContains(t, name, homeDir, test.expectedContents)
 			verifyFilePath(t, credentialHelper, homeDir, name)
 		})
 	}
+}
+
+func TestInstallCredentialHelperShouldHaveUniqueName(t *testing.T) {
+	homeDir := buildTempHomeDirGetter()
+
+	credentialHelper := buildCredentialHelper(homeDir)
+
+	fileMapping := map[string]string{
+		"example.com": "tokenFileContents",
+	}
+
+	firstName, firstErr := credentialHelper.install(fileMapping)
+	secondName, secondErr := credentialHelper.install(fileMapping)
+
+	assert.Nil(t, firstErr, "There should be no error")
+	assert.Nil(t, secondErr, "There should be no error")
+
+	assert.NotEqual(t, firstName, secondName, "Names must be unique")
 }
 
 func TestClose(t *testing.T) {
@@ -195,7 +213,7 @@ func verifyFailedInstallResult(t *testing.T, err error, expectedError string) {
 	assert.Contains(t, err.Error(), expectedError)
 }
 
-func verifyCredHelperFileContains(t *testing.T, name *string, homeDir homeDirGetter, expectedContents []string) {
+func verifyCredHelperFileContains(t *testing.T, name *string, homeDir homeDirGetter, allExpectedContents []string) {
 	helperPath, err := buildCredHelperFilePath(homeDir, *name)
 	if err != nil {
 		t.Fatal(err)
@@ -208,7 +226,7 @@ func verifyCredHelperFileContains(t *testing.T, name *string, homeDir homeDirGet
 		return
 	}
 
-	for _, expectedContent := range expectedContents {
+	for _, expectedContent := range allExpectedContents {
 		assert.Contains(t, string(contents), expectedContent)
 	}
 }

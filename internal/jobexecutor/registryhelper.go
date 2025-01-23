@@ -15,7 +15,7 @@ const (
 )
 
 // resolveModuleSource returns the final pre-signed URL for a module source.
-func resolveModuleSource(moduleSource string, moduleVersion string, variables map[string]string) (string, error) {
+func resolveModuleSource(moduleSource string, moduleVersion string, hostTokenMap map[string]string) (string, error) {
 	// Separate the pieces of the source module string.
 	// These are equal to the fields of Terraform's addrs.ModuleSourceRegistry.PackageAddr.
 	parts := strings.Split(moduleSource, "/")
@@ -34,7 +34,7 @@ func resolveModuleSource(moduleSource string, moduleVersion string, variables ma
 	}
 
 	var token *string
-	if t, ok := variables[wantVar]; ok {
+	if t, ok := hostTokenMap[wantVar]; ok {
 		// Use token if one is provided.
 		token = &t
 	}

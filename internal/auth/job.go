@@ -330,7 +330,7 @@ func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissio
 		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.ViewVariablePermission:             j.requireAccessToWorkspacesInGroupHierarchy,
 		permissions.ViewStateVersionDataPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
-		//permissions.ViewStateVersionDataPermission:     j.requireAccessToJobWorkspace,	//TODO: This will go into effect a few weeks after the initial release of remote datasource.
+		//permissions.ViewStateVersionDataPermission: j.requireAccessToJobWorkspace, //TODO: This will go into effect a few weeks after the initial release of remote datasource.
 		permissions.CreateStateVersionPermission: j.requireAccessToJobWorkspace,
 		permissions.ViewVariableValuePermission:  j.requireAccessToJobWorkspace,
 		permissions.ViewRunPermission:            j.requireRunAccess, // View is automatically granted if action != View.

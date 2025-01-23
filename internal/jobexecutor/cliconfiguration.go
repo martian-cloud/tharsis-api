@@ -15,19 +15,36 @@ const (
 )
 
 func (t *terraformWorkspace) setupCliConfiguration(credentialHelperName string) error {
-	cliConfigurationPath, err := writeCliConfigurationFile(credentialHelperName, t.workspaceDir)
+	tempDir, err := t.createTempDir()
+	if err != nil {
+		return err
+	}
+
+	cliConfigurationPath, err := writeCliConfigurationFile(credentialHelperName, *tempDir)
 	if err != nil {
 		return err
 	}
 
 	t.fullEnv[tfCliConfigFileEnvName] = *cliConfigurationPath
+
 	return nil
 }
 
-func writeCliConfigurationFile(credHelperName, workspaceDir string) (*string, error) {
-	contents := fmt.Sprintf(cliConfigurationFormat, credHelperName)
+func (t *terraformWorkspace) createTempDir() (*string, error) {
+	tempDir, err := os.MkdirTemp("", "cli-configuration-*")
+	if err != nil {
+		return nil, err
+	}
 
-	cliConfigurationPath := filepath.Join(workspaceDir, filename)
+	t.deletePathWhenJobCompletes(tempDir)
+
+	return &tempDir, nil
+}
+
+func writeCliConfigurationFile(credHelperName string, tempDir string) (*string, error) {
+	cliConfigurationPath := filepath.Join(tempDir, filename)
+
+	contents := fmt.Sprintf(cliConfigurationFormat, credHelperName)
 
 	err := os.WriteFile(cliConfigurationPath, []byte(contents), permissions)
 	if err != nil {

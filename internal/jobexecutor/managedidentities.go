@@ -20,7 +20,6 @@ type managedIdentities struct {
 	jobLogger      joblogger.Logger
 	factoryMap     map[types.ManagedIdentityType]authenticatorFactoryFunc
 	workspaceID    string
-	workspaceDir   string
 	authenticators []managedidentity.Authenticator
 }
 
@@ -31,13 +30,12 @@ type managedIdentityInitializeResponse struct {
 
 func newManagedIdentities(
 	workspaceID string,
-	workspaceDir string,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
+	jobCfg *JobConfig,
 ) *managedIdentities {
 	return &managedIdentities{
 		workspaceID:    workspaceID,
-		workspaceDir:   workspaceDir,
 		jobLogger:      jobLogger,
 		client:         client,
 		authenticators: []managedidentity.Authenticator{},
@@ -49,7 +47,7 @@ func newManagedIdentities(
 				return azurefederated.New()
 			},
 			types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
-				return tharsisfederated.New(client, workspaceDir, jobLogger)
+				return tharsisfederated.New(client, jobLogger, jobCfg.APIEndpoint, &jobCfg.DiscoveryProtocolHost)
 			},
 		},
 	}
