@@ -273,21 +273,19 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		}
 	}
 
-	outgoing := make(chan *Event)
+	subscription := events.Subscription{
+		Type: events.RunSubscription,
+		Actions: []events.SubscriptionAction{
+			events.CreateAction,
+			events.UpdateAction,
+		},
+	}
+	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
 
+	outgoing := make(chan *Event)
 	go func() {
 		// Defer close of outgoing channel
 		defer close(outgoing)
-
-		subscription := events.Subscription{
-			Type: events.RunSubscription,
-			Actions: []events.SubscriptionAction{
-				events.CreateAction,
-				events.UpdateAction,
-			},
-		}
-		subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
-
 		defer s.eventManager.Unsubscribe(subscriber)
 
 		// Wait for run updates
@@ -298,6 +296,22 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 					s.logger.Errorf("Error occurred while waiting for run events: %v", err)
 				}
 				return
+			}
+
+			eventData, err := event.ToRunEventData()
+			if err != nil {
+				s.logger.Errorf("failed to get run event data in run event subscription: %v", err)
+				continue
+			}
+
+			if options.RunID != nil && eventData.ID != *options.RunID {
+				// Not the run we're looking for.
+				continue
+			}
+
+			if options.WorkspaceID != nil && eventData.WorkspaceID != *options.WorkspaceID {
+				// Not the workspace we're looking for.
+				continue
 			}
 
 			runsResult, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
@@ -323,17 +337,10 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				continue
 			}
 
-			run := runsResult.Runs[0]
-
-			if options.RunID != nil && run.Metadata.ID != *options.RunID {
-				// Not the run we're looking for.
-				continue
-			}
-
 			select {
 			case <-ctx.Done():
 				return
-			case outgoing <- &Event{Action: event.Action, Run: run}:
+			case outgoing <- &Event{Action: event.Action, Run: runsResult.Runs[0]}:
 			}
 		}
 	}()

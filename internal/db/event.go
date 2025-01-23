@@ -5,10 +5,19 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
+const (
+	eventTableJobs           = "jobs"
+	eventTableLogStreams     = "log_streams"
+	eventTableRuns           = "runs"
+	eventTableWorkspaces     = "workspaces"
+	eventTableRunnerSessions = "runner_sessions"
 )
 
 // Events provides the ability to listen for async events from the database
@@ -17,11 +26,39 @@ type Events interface {
 	Listen(ctx context.Context) (<-chan Event, <-chan error)
 }
 
-// Event contains information related to the database row that was changed
+// Event contains processed information related to the database row that was changed
+// The ID field is needed for triage independent of the type of the event data.
 type Event struct {
-	Table  string `json:"table"`
-	Action string `json:"action"`
-	ID     string `json:"id"`
+	Table  string          `json:"table"`
+	Action string          `json:"action"`
+	ID     string          `json:"id"`
+	Data   json.RawMessage `json:"data"`
+}
+
+// JobEventData contains the event response data for a row from the jobs table.
+type JobEventData struct {
+	ID              string  `json:"id"`
+	RunnerID        *string `json:"runner_id"`
+	WorkspaceID     string  `json:"workspace_id"`
+	CancelRequested bool    `json:"cancel_requested"`
+}
+
+// LogStreamEventData contains the event response data for a row from the log_streams table.
+type LogStreamEventData struct {
+	Size      int  `json:"size"`
+	Completed bool `json:"completed"`
+}
+
+// RunEventData contains the event response data for a row from the runs table.
+type RunEventData struct {
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+}
+
+// RunnerSessionEventData contains the event response data for a row from the runner_sessions table.
+type RunnerSessionEventData struct {
+	ID       string `json:"id"`
+	RunnerID string `json:"runner_id"`
 }
 
 type events struct {
@@ -99,4 +136,63 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 	// Recording errors to the tracing span above is okay because of this wait.
 	wg.Wait()
 	return ch, fatalErrors
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+// Shorthand methods to convert an event to specific event data references.
+
+// ToJobEventData is a shorthand method to return type-checked event data.
+func (e *Event) ToJobEventData() (*JobEventData, error) {
+	if e.Table != eventTableJobs {
+		return nil, fmt.Errorf("invalid event table, expected '%s': %s", eventTableJobs, e.Table)
+	}
+
+	d := JobEventData{}
+	if err := json.Unmarshal(e.Data, &d); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal db jobs event data, %v", err)
+	}
+
+	return &d, nil
+}
+
+// ToLogStreamEventData is a shorthand method to return type-checked event data.
+func (e *Event) ToLogStreamEventData() (*LogStreamEventData, error) {
+	if e.Table != eventTableLogStreams {
+		return nil, fmt.Errorf("invalid event table, expected '%s': %s", eventTableLogStreams, e.Table)
+	}
+
+	d := LogStreamEventData{}
+	if err := json.Unmarshal(e.Data, &d); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal db log_streams event data, %v", err)
+	}
+
+	return &d, nil
+}
+
+// ToRunEventData is a shorthand method to return type-checked event data.
+func (e *Event) ToRunEventData() (*RunEventData, error) {
+	if e.Table != eventTableRuns {
+		return nil, fmt.Errorf("invalid event table, expected '%s': %s", eventTableRuns, e.Table)
+	}
+
+	d := RunEventData{}
+	if err := json.Unmarshal(e.Data, &d); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal db runs event data, %v", err)
+	}
+
+	return &d, nil
+}
+
+// ToRunnerSessionEventData is a shorthand method to return type-checked event data.
+func (e *Event) ToRunnerSessionEventData() (*RunnerSessionEventData, error) {
+	if e.Table != eventTableRunnerSessions {
+		return nil, fmt.Errorf("invalid event table, expected '%s': %s", eventTableRunnerSessions, e.Table)
+	}
+
+	d := RunnerSessionEventData{}
+	if err := json.Unmarshal(e.Data, &d); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal db runner_sessions event data, %v", err)
+	}
+
+	return &d, nil
 }

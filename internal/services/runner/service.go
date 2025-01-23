@@ -1136,31 +1136,27 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) {
-					s.logger.Errorf("Error occurred while waiting for runner session events: %v", err)
+					s.logger.Errorf("error occurred while waiting for runner session events: %v", err)
 				}
 				return
 			}
 
-			session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, event.ID)
+			eventData, err := event.ToRunnerSessionEventData()
 			if err != nil {
-				s.logger.Errorf("Error querying for runner session in subscription goroutine: %v", err)
-				continue
-			}
-			if session == nil {
-				s.logger.Errorf("Received event for runner session that does not exist %s", event.ID)
+				s.logger.Errorf("failed to get runner session event data in run session event subscription: %v", err)
 				continue
 			}
 
 			// Check if this event is for the runner we're interested in
-			if options.RunnerID != nil && *options.RunnerID != session.RunnerID {
+			if options.RunnerID != nil && *options.RunnerID != eventData.RunnerID {
 				continue
 			}
 
 			if options.GroupID != nil || options.RunnerID != nil {
 				// We need to query the runner to check if it belongs to the organization
-				runner, err := s.getRunnerByID(ctx, span, session.RunnerID)
+				runner, err := s.getRunnerByID(ctx, span, eventData.RunnerID)
 				if err != nil {
-					s.logger.Errorf("Error querying for runner in subscription goroutine: %v", err)
+					s.logger.Errorf("error querying for runner in subscription goroutine: %v", err)
 					continue
 				}
 				if options.GroupID != nil && *runner.GroupID != *options.GroupID {
@@ -1169,6 +1165,16 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 				if options.RunnerType != nil && runner.Type != *options.RunnerType {
 					continue
 				}
+			}
+
+			session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, event.ID)
+			if err != nil {
+				s.logger.Errorf("error querying for runner session in subscription goroutine: %v", err)
+				continue
+			}
+			if session == nil {
+				s.logger.Errorf("Received event for runner session that does not exist %s", event.ID)
+				continue
 			}
 
 			select {

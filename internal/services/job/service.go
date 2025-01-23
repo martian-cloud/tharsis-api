@@ -324,33 +324,39 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 		defer close(outgoing)
 		defer s.eventManager.Unsubscribe(subscriber)
 
-		// Wait for runner session updates
+		// Wait for job updates
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) {
-					s.logger.Errorf("Error occurred while waiting for job events: %v", err)
+					s.logger.Errorf("error occurred while waiting for job events: %v", err)
 				}
 				return
 			}
 
-			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
+			eventData, err := event.ToJobEventData()
 			if err != nil {
-				s.logger.Errorf("Error querying for job in subscription goroutine: %v", err)
-				continue
-			}
-			if job == nil {
-				s.logger.Errorf("Received event for job that does not exist %s", event.ID)
+				s.logger.Errorf("failed to get job event data in job subscription: %v", err)
 				continue
 			}
 
 			// Check if this event is for the runner we're interested in
-			if options.RunnerID != nil && (job.RunnerID == nil || *job.RunnerID != *options.RunnerID) {
+			if options.RunnerID != nil && (eventData.RunnerID == nil || *eventData.RunnerID != *options.RunnerID) {
 				continue
 			}
 
-			// Check if this event is for the project we're interested in
-			if options.WorkspaceID != nil && job.WorkspaceID != *options.WorkspaceID {
+			// Check if this event is for the workspace we're interested in
+			if options.WorkspaceID != nil && eventData.WorkspaceID != *options.WorkspaceID {
+				continue
+			}
+
+			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
+			if err != nil {
+				s.logger.Errorf("error querying for job in subscription goroutine: %v", err)
+				continue
+			}
+			if job == nil {
+				s.logger.Errorf("received event for job that does not exist %s", event.ID)
 				continue
 			}
 
@@ -391,23 +397,23 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		return nil, err
 	}
 
+	subscription := events.Subscription{
+		Type:    events.JobSubscription,
+		ID:      jobID,
+		Actions: []events.SubscriptionAction{events.UpdateAction},
+	}
+	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
+
 	outgoing := make(chan *CancellationEvent)
 
 	go func() {
 		defer close(outgoing)
+		defer s.eventManager.Unsubscribe(subscriber)
 
 		// Because this goroutine will survive after the parent function returns,
 		// this span is not nested inside that for the parent function.
 		innerCtx, innerSpan := tracer.Start(outerCtx, "svc.SubscribeToCancellationEvent.goroutine")
 		defer innerSpan.End()
-
-		subscription := events.Subscription{
-			Type:    events.JobSubscription,
-			ID:      jobID,
-			Actions: []events.SubscriptionAction{events.UpdateAction},
-		}
-		subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
-		defer s.eventManager.Unsubscribe(subscriber)
 
 		// Query for the job after the subscription is setup to ensure no events are missed
 		job, err := s.GetJob(innerCtx, jobID)
@@ -425,7 +431,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 			return
 		}
 
-		// Wait for job updates
+		// Wait for cancellation event updates
 		for {
 			event, err := subscriber.GetEvent(innerCtx)
 			if err != nil {
@@ -434,6 +440,16 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 					s.logger.Errorf("Error occurred while waiting for job cancellation events: %v", err)
 				}
 				return
+			}
+
+			eventData, err := event.ToJobEventData()
+			if err != nil {
+				s.logger.Errorf("failed to get job event data in job event subscription: %v", err)
+				continue
+			}
+
+			if !eventData.CancelRequested {
+				continue
 			}
 
 			job, err := s.GetJob(innerCtx, event.ID)
@@ -453,9 +469,6 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 				continue
 			}
 
-			if !job.CancelRequested {
-				continue
-			}
 			select {
 			case <-innerCtx.Done():
 				return

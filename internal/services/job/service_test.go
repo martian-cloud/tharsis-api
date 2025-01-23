@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -511,7 +512,7 @@ func TestSubscribeToJobs(t *testing.T) {
 		name           string
 		expectErrCode  errors.CodeType
 		runner         *models.Runner
-		sendEvents     []Event
+		sendEventData  []*db.JobEventData
 		expectedEvents []Event
 		isAdmin        bool
 	}{
@@ -520,18 +521,14 @@ func TestSubscribeToJobs(t *testing.T) {
 			input: &SubscribeToJobsInput{
 				WorkspaceID: ptr.String("workspace1"),
 			},
-			sendEvents: []Event{
+			sendEventData: []*db.JobEventData{
 				{
-					Job: &models.Job{
-						Metadata:    models.ResourceMetadata{ID: "job1"},
-						WorkspaceID: "workspace1",
-					},
+					ID:          "job1",
+					WorkspaceID: "workspace1",
 				},
 				{
-					Job: &models.Job{
-						Metadata:    models.ResourceMetadata{ID: "job2"},
-						WorkspaceID: "workspace2",
-					},
+					ID:          "job2",
+					WorkspaceID: "workspace2",
 				},
 			},
 			expectedEvents: []Event{
@@ -557,18 +554,14 @@ func TestSubscribeToJobs(t *testing.T) {
 			input: &SubscribeToJobsInput{
 				RunnerID: ptr.String("runner1"),
 			},
-			sendEvents: []Event{
+			sendEventData: []*db.JobEventData{
 				{
-					Job: &models.Job{
-						Metadata: models.ResourceMetadata{ID: "job1"},
-						RunnerID: ptr.String("runner1"),
-					},
+					ID:       "job1",
+					RunnerID: ptr.String("runner1"),
 				},
 				{
-					Job: &models.Job{
-						Metadata: models.ResourceMetadata{ID: "job2"},
-						RunnerID: ptr.String("runner2"),
-					},
+					ID:       "job2",
+					RunnerID: ptr.String("runner2"),
 				},
 			},
 			expectedEvents: []Event{
@@ -625,18 +618,14 @@ func TestSubscribeToJobs(t *testing.T) {
 			name:    "subscribe to all job events",
 			input:   &SubscribeToJobsInput{},
 			isAdmin: true,
-			sendEvents: []Event{
+			sendEventData: []*db.JobEventData{
 				{
-					Job: &models.Job{
-						Metadata: models.ResourceMetadata{ID: "job1"},
-						RunnerID: ptr.String("runner1"),
-					},
+					ID:       "job1",
+					RunnerID: ptr.String("runner1"),
 				},
 				{
-					Job: &models.Job{
-						Metadata: models.ResourceMetadata{ID: "job2"},
-						RunnerID: ptr.String("runner2"),
-					},
+					ID:       "job2",
+					RunnerID: ptr.String("runner2"),
 				},
 			},
 			expectedEvents: []Event{
@@ -692,8 +681,14 @@ func TestSubscribeToJobs(t *testing.T) {
 				mockCaller.On("IsAdmin").Return(test.isAdmin)
 			}
 
-			for _, e := range test.sendEvents {
-				mockJobs.On("GetJobByID", mock.Anything, e.Job.Metadata.ID).Return(e.Job, nil).Maybe()
+			for _, e := range test.sendEventData {
+				mockJobs.On("GetJobByID", mock.Anything, e.ID).Return(&models.Job{
+					Metadata: models.ResourceMetadata{
+						ID: e.ID,
+					},
+					WorkspaceID: e.WorkspaceID,
+					RunnerID:    e.RunnerID,
+				}, nil).Maybe()
 			}
 
 			dbClient := db.Client{
@@ -726,11 +721,15 @@ func TestSubscribeToJobs(t *testing.T) {
 			receivedEvents := []*Event{}
 
 			go func() {
-				for _, e := range test.sendEvents {
+				for _, e := range test.sendEventData {
+					encoded, err := json.Marshal(e)
+					require.Nil(t, err)
+
 					mockEventChannel <- db.Event{
 						Table:  "jobs",
 						Action: "UPDATE",
-						ID:     e.Job.Metadata.ID,
+						ID:     e.ID,
+						Data:   encoded,
 					}
 				}
 			}()
@@ -889,6 +888,155 @@ func TestGetJobs(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, jobsResult)
 			assert.Equal(t, []models.Job{sampleJob}, jobsResult.Jobs)
+		})
+	}
+}
+
+func TestSubscribeToCancellationEvent(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		authError      error
+		input          *CancellationSubscriptionsOptions
+		name           string
+		expectErrCode  errors.CodeType
+		sendEvents     []*CancellationEvent
+		expectedEvents []CancellationEvent
+		isAdmin        bool
+	}{
+		{
+			name: "subscribe to cancellation events for a job",
+			input: &CancellationSubscriptionsOptions{
+				JobID: "job1",
+			},
+			sendEvents: []*CancellationEvent{
+				{
+					Job: models.Job{
+						Metadata: models.ResourceMetadata{
+							ID: "job1",
+						},
+					},
+				},
+				{
+					Job: models.Job{
+						Metadata: models.ResourceMetadata{
+							ID: "job2",
+						},
+					},
+				},
+			},
+			expectedEvents: []CancellationEvent{
+				{
+					Job: models.Job{
+						Metadata: models.ResourceMetadata{
+							ID: "job1",
+						},
+						CancelRequested: true,
+					},
+				},
+			},
+		},
+		{
+			name: "not authorized to subscribe to events for a job",
+			input: &CancellationSubscriptionsOptions{
+				JobID: "job1",
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockEvents := db.NewMockEvents(t)
+
+			mockJobs := db.NewMockJobs(t)
+
+			mockEventChannel := make(chan db.Event, 1)
+			var roEventChan <-chan db.Event = mockEventChannel
+			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewJobPermission, mock.Anything, mock.Anything).
+				Return(test.authError).Maybe()
+
+			// For the call to GetJob outside the wait-for loop.
+			mockJobs.On("GetJobByID", mock.Anything, "job1").
+				Return(&models.Job{
+					Metadata: models.ResourceMetadata{
+						ID: "job1",
+					},
+					CancelRequested: true,
+				}, nil).Maybe()
+
+			// For the calls to GetJob inside the wait-for loop.
+			for _, e := range test.sendEvents {
+				mockJobs.On("GetJobByID", mock.Anything, e.Job.Metadata.ID).
+					Return(&models.Job{
+						Metadata: models.ResourceMetadata{
+							ID: e.Job.Metadata.ID,
+						},
+						CancelRequested: true,
+					}, nil).Maybe()
+			}
+
+			dbClient := db.Client{
+				Jobs:   mockJobs,
+				Events: mockEvents,
+			}
+
+			logger, _ := logger.NewForTest()
+			eventManager := events.NewEventManager(&dbClient, logger)
+			eventManager.Start(ctx)
+
+			service := &service{
+				dbClient:     &dbClient,
+				eventManager: eventManager,
+				logger:       logger,
+			}
+
+			events, err := service.SubscribeToCancellationEvent(auth.WithCaller(ctx, mockCaller), test.input)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			go func() {
+				for _, e := range test.sendEvents {
+					encoded, err := json.Marshal(e)
+					require.Nil(t, err)
+
+					mockEventChannel <- db.Event{
+						Table:  "jobs",
+						Action: "UPDATE",
+						ID:     e.Job.Metadata.ID,
+						Data:   encoded,
+					}
+				}
+			}()
+
+			receivedEvents := []*CancellationEvent{}
+			if len(test.expectedEvents) > 0 {
+				for e := range events {
+					eCopy := e
+					receivedEvents = append(receivedEvents, eCopy)
+
+					if len(receivedEvents) == len(test.expectedEvents) {
+						break
+					}
+				}
+			}
+
+			require.Equal(t, len(test.expectedEvents), len(receivedEvents))
+			for i, e := range test.expectedEvents {
+				assert.Equal(t, e, *receivedEvents[i])
+			}
 		})
 	}
 }

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -1966,7 +1967,7 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 		name           string
 		expectErrCode  errors.CodeType
 		runners        []models.Runner
-		sendEvents     []SessionEvent
+		sendEventData  []*db.RunnerSessionEventData
 		expectedEvents []SessionEvent
 		isAdmin        bool
 	}{
@@ -1975,18 +1976,14 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 			input: &SubscribeToRunnerSessionsInput{
 				GroupID: ptr.String("group1"),
 			},
-			sendEvents: []SessionEvent{
+			sendEventData: []*db.RunnerSessionEventData{
 				{
-					RunnerSession: &models.RunnerSession{
-						Metadata: models.ResourceMetadata{ID: "session1"},
-						RunnerID: "runner1",
-					},
+					ID:       "session1",
+					RunnerID: "runner1",
 				},
 				{
-					RunnerSession: &models.RunnerSession{
-						Metadata: models.ResourceMetadata{ID: "session2"},
-						RunnerID: "runner2",
-					},
+					ID:       "session2",
+					RunnerID: "runner2",
 				},
 			},
 			expectedEvents: []SessionEvent{
@@ -2024,18 +2021,14 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 			input: &SubscribeToRunnerSessionsInput{
 				RunnerID: ptr.String("runner1"),
 			},
-			sendEvents: []SessionEvent{
+			sendEventData: []*db.RunnerSessionEventData{
 				{
-					RunnerSession: &models.RunnerSession{
-						Metadata: models.ResourceMetadata{ID: "session1"},
-						RunnerID: "runner1",
-					},
+					ID:       "session1",
+					RunnerID: "runner1",
 				},
 				{
-					RunnerSession: &models.RunnerSession{
-						Metadata: models.ResourceMetadata{ID: "session2"},
-						RunnerID: "runner2",
-					},
+					ID:       "session2",
+					RunnerID: "runner2",
 				},
 			},
 			expectedEvents: []SessionEvent{
@@ -2105,18 +2098,14 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 			name:    "subscribe to all runner session events",
 			input:   &SubscribeToRunnerSessionsInput{},
 			isAdmin: true,
-			sendEvents: []SessionEvent{
+			sendEventData: []*db.RunnerSessionEventData{
 				{
-					RunnerSession: &models.RunnerSession{
-						Metadata: models.ResourceMetadata{ID: "session1"},
-						RunnerID: "runner1",
-					},
+					ID:       "session1",
+					RunnerID: "runner1",
 				},
 				{
-					RunnerSession: &models.RunnerSession{
-						Metadata: models.ResourceMetadata{ID: "session2"},
-						RunnerID: "runner2",
-					},
+					ID:       "session2",
+					RunnerID: "runner2",
 				},
 			},
 			expectedEvents: []SessionEvent{
@@ -2185,8 +2174,14 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 				mockCaller.On("IsAdmin").Return(test.isAdmin)
 			}
 
-			for _, e := range test.sendEvents {
-				mockRunnerSessions.On("GetRunnerSessionByID", mock.Anything, e.RunnerSession.Metadata.ID).Return(e.RunnerSession, nil).Maybe()
+			for _, e := range test.sendEventData {
+				mockRunnerSessions.On("GetRunnerSessionByID", mock.Anything, e.ID).
+					Return(&models.RunnerSession{
+						Metadata: models.ResourceMetadata{
+							ID: e.ID,
+						},
+						RunnerID: e.RunnerID,
+					}, nil).Maybe()
 			}
 
 			dbClient := db.Client{
@@ -2219,11 +2214,15 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 			receivedEvents := []*SessionEvent{}
 
 			go func() {
-				for _, e := range test.sendEvents {
+				for _, e := range test.sendEventData {
+					encoded, err := json.Marshal(e)
+					require.Nil(t, err)
+
 					mockEventChannel <- db.Event{
 						Table:  "runner_sessions",
 						Action: "UPDATE",
-						ID:     e.RunnerSession.Metadata.ID,
+						ID:     e.ID,
+						Data:   encoded,
 					}
 				}
 			}()

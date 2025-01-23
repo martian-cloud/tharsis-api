@@ -44,7 +44,7 @@ const (
 	DeleteAction SubscriptionAction = "DELETE"
 )
 
-// Subscription includes the model type to subscribe to
+// Subscription includes the table to subscribe to
 type Subscription struct {
 	Type    SubscriptionType
 	ID      string               // Optional ID of resource to subscribe to

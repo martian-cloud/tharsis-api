@@ -220,22 +220,20 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 		return nil, err
 	}
 
-	outgoing := make(chan *Event)
+	subscription := events.Subscription{
+		Type: events.WorkspaceSubscription,
+		ID:   options.WorkspaceID, // Subscribe to specific workspace ID
+		Actions: []events.SubscriptionAction{
+			events.CreateAction,
+			events.UpdateAction,
+		},
+	}
+	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
 
+	outgoing := make(chan *Event)
 	go func() {
 		// Defer close of outgoing channel
 		defer close(outgoing)
-
-		subscription := events.Subscription{
-			Type: events.WorkspaceSubscription,
-			ID:   options.WorkspaceID, // Subscribe to specific workspace ID
-			Actions: []events.SubscriptionAction{
-				events.CreateAction,
-				events.UpdateAction,
-			},
-		}
-		subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
-
 		defer s.eventManager.Unsubscribe(subscriber)
 
 		// Wait for workspace updates
@@ -243,7 +241,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) {
-					s.logger.Errorf("Error occurred while waiting for workspace events: %v", err)
+					s.logger.Errorf("error occurred while waiting for workspace events: %v", err)
 				}
 				return
 			}
@@ -253,7 +251,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 				if errors.IsContextCanceledError(err) {
 					return
 				}
-				s.logger.Errorf("Error occurred while querying for workspace associated with workspace event %s: %v", event.ID, err)
+				s.logger.Errorf("error occurred while querying for workspace associated with workspace event %s: %v", event.ID, err)
 				continue
 			}
 
