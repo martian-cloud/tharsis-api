@@ -2,6 +2,7 @@ package logstream
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -127,12 +128,12 @@ func TestSubscribe(t *testing.T) {
 	tests := []struct {
 		name           string
 		lastSeenSize   *int
-		sendEvents     []LogEvent
+		sendEventData  []*db.LogStreamEventData
 		expectedEvents []LogEvent
 	}{
 		{
 			name: "stream 2 events with last seen size not set",
-			sendEvents: []LogEvent{
+			sendEventData: []*db.LogStreamEventData{
 				{Size: 5, Completed: false},
 				{Size: 10, Completed: true},
 			},
@@ -143,7 +144,7 @@ func TestSubscribe(t *testing.T) {
 		},
 		{
 			name: "last seen does not equal the current stream size",
-			sendEvents: []LogEvent{
+			sendEventData: []*db.LogStreamEventData{
 				{Size: 5, Completed: false},
 				{Size: 10, Completed: true},
 			},
@@ -188,7 +189,7 @@ func TestSubscribe(t *testing.T) {
 
 			manager := New(mockStore, dbClient, eventManager, logger)
 
-			events, err := manager.Subscribe(ctx, &SubscriptionOptions{
+			eventChannel, err := manager.Subscribe(ctx, &SubscriptionOptions{
 				LogStreamID:     streamID,
 				LastSeenLogSize: test.lastSeenSize,
 			})
@@ -196,29 +197,23 @@ func TestSubscribe(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for _, e := range test.sendEvents {
-				mockLogStreams.On("GetLogStreamByID", mock.Anything, streamID).Return(&models.LogStream{
-					Metadata: models.ResourceMetadata{
-						ID: streamID,
-					},
-					Size:      e.Size,
-					Completed: e.Completed,
-				}, nil).Once()
-			}
-
 			receivedEvents := []*LogEvent{}
 
 			go func() {
-				for range test.sendEvents {
+				for _, d := range test.sendEventData {
+					encoded, err := json.Marshal(d)
+					require.Nil(t, err)
+
 					mockEventChannel <- db.Event{
 						Table:  "log_streams",
-						Action: "UPDATE",
+						Action: string(events.UpdateAction),
 						ID:     streamID,
+						Data:   encoded,
 					}
 				}
 			}()
 
-			for e := range events {
+			for e := range eventChannel {
 				eCopy := e
 				receivedEvents = append(receivedEvents, eCopy)
 

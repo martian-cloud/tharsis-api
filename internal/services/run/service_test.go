@@ -18,6 +18,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -1892,6 +1893,282 @@ func TestProcessPlanData(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestSubscribeToRunEvents(t *testing.T) {
+	userID := "user1"
+
+	// Test cases
+	tests := []struct {
+		authError      error
+		input          *EventSubscriptionOptions
+		name           string
+		expectErrCode  errors.CodeType
+		runner         *models.Runner
+		sendEventData  []*db.RunEventData
+		expectedEvents []Event
+		isAdmin        bool
+		useUserCaller  bool
+		nilUserMember  bool
+		nilWorkspaceID bool
+	}{
+		{
+			name: "subscribe to run events for a workspace",
+			input: &EventSubscriptionOptions{
+				WorkspaceID: ptr.String("workspace1"),
+			},
+			sendEventData: []*db.RunEventData{
+				{
+					ID:          "run1",
+					WorkspaceID: "workspace1",
+				},
+				{
+					ID:          "run2",
+					WorkspaceID: "workspace1",
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Run: models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run1",
+						},
+					},
+					Action: "UPDATE",
+				},
+				{
+					Run: models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run2",
+						},
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
+		{
+			name: "not authorized to subscribe to run events for a workspace",
+			input: &EventSubscriptionOptions{
+				WorkspaceID: ptr.String("workspace1"),
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name: "subscribe to run events for a run",
+			input: &EventSubscriptionOptions{
+				RunID: ptr.String("run1"),
+			},
+			useUserCaller:  true,
+			nilWorkspaceID: true,
+			sendEventData: []*db.RunEventData{
+				{
+					ID: "run1",
+				},
+				{
+					ID: "run2",
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Run: models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run1",
+						},
+					},
+					Action: "UPDATE",
+				},
+			},
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: "runner1"},
+				Type:     models.GroupRunnerType,
+				GroupID:  ptr.String("group1"),
+			},
+		},
+		{
+			name: "not authorized to subscribe to run events for a run",
+			input: &EventSubscriptionOptions{
+				RunID: ptr.String("run1"),
+			},
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{ID: "runner1"},
+				Type:     models.GroupRunnerType,
+				GroupID:  ptr.String("group1"),
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:    "subscribe to all run events",
+			input:   &EventSubscriptionOptions{},
+			isAdmin: true,
+			sendEventData: []*db.RunEventData{
+				{
+					ID: "run1",
+				},
+				{
+					ID: "run2",
+				},
+			},
+			useUserCaller:  true,
+			nilUserMember:  true,
+			nilWorkspaceID: true,
+			expectedEvents: []Event{
+				{
+					Run: models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run1",
+						},
+					},
+					Action: "UPDATE",
+				},
+				{
+					Run: models.Run{
+						Metadata: models.ResourceMetadata{
+							ID: "run2",
+						},
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
+		{
+			name:          "not authorized to subscribe to all run events",
+			input:         &EventSubscriptionOptions{},
+			expectErrCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRunners := db.NewMockRunners(t)
+			mockRuns := db.NewMockRuns(t)
+			mockEvents := db.NewMockEvents(t)
+
+			mockAuthorizer := auth.NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockEventChannel := make(chan db.Event, 1)
+			var roEventChan <-chan db.Event = mockEventChannel
+			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+
+			if test.input.WorkspaceID != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunPermission, mock.Anything).
+					Return(test.authError)
+			}
+
+			for _, d := range test.sendEventData {
+				dCopy := d
+
+				getRunsFilter := &db.RunFilter{
+					WorkspaceID: &dCopy.WorkspaceID,
+					RunIDs:      []string{dCopy.ID},
+				}
+				if test.nilWorkspaceID {
+					getRunsFilter.WorkspaceID = nil
+				}
+				if test.useUserCaller && !test.nilUserMember {
+					getRunsFilter.UserMemberID = &userID
+				}
+				mockRuns.On("GetRuns", mock.Anything, &db.GetRunsInput{
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(1),
+					},
+					Filter: getRunsFilter,
+				}).
+					Return(&db.RunsResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: 1,
+						},
+						Runs: []models.Run{
+							{
+								Metadata: models.ResourceMetadata{
+									ID: dCopy.ID,
+								},
+							}},
+					}, nil).Maybe()
+			}
+
+			dbClient := db.Client{
+				Runners: mockRunners,
+				Runs:    mockRuns,
+				Events:  mockEvents,
+			}
+
+			logger, _ := logger.NewForTest()
+			eventManager := events.NewEventManager(&dbClient, logger)
+			eventManager.Start(ctx)
+
+			service := &service{
+				dbClient:     &dbClient,
+				eventManager: eventManager,
+				logger:       logger,
+			}
+
+			var useCaller auth.Caller = mockCaller
+			if test.useUserCaller {
+				useCaller = auth.NewUserCaller(
+					&models.User{
+						Metadata: models.ResourceMetadata{
+							ID: userID,
+						},
+						Admin: test.isAdmin,
+					},
+					mockAuthorizer,
+					&dbClient,
+					mockMaintenanceMonitor,
+				)
+			}
+
+			eventChannel, err := service.SubscribeToRunEvents(auth.WithCaller(ctx, useCaller), test.input)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			receivedEvents := []*Event{}
+
+			go func() {
+				for _, d := range test.sendEventData {
+					encoded, err := json.Marshal(d)
+					require.Nil(t, err)
+
+					mockEventChannel <- db.Event{
+						Table:  "runs",
+						Action: "UPDATE",
+						ID:     d.ID,
+						Data:   encoded,
+					}
+				}
+			}()
+
+			if len(test.expectedEvents) > 0 {
+				for e := range eventChannel {
+					eCopy := e
+
+					receivedEvents = append(receivedEvents, eCopy)
+
+					if len(receivedEvents) == len(test.expectedEvents) {
+						break
+					}
+				}
+			}
+
+			require.Equal(t, len(test.expectedEvents), len(receivedEvents))
+			for i, e := range test.expectedEvents {
+				assert.Equal(t, e, *receivedEvents[i])
+			}
 		})
 	}
 }

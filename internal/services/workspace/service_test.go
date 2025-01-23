@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -10,8 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -1090,6 +1093,164 @@ func TestMigrateWorkspace(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				assert.Equal(t, test.expectWorkspace, migrated)
+			}
+		})
+	}
+}
+
+func TestSubscribeToWorkspaceEvents(t *testing.T) {
+	userID := "user1"
+
+	// Test cases
+	tests := []struct {
+		authError      error
+		input          *EventSubscriptionOptions
+		name           string
+		expectErrCode  errors.CodeType
+		workspace      *models.Workspace
+		sendEvents     []*db.Event
+		expectedEvents []Event
+		isAdmin        bool
+		useUserCaller  bool
+		nilUserMember  bool
+		nilWorkspaceID bool
+	}{
+		{
+			name: "subscribe to workspace events for a workspace",
+			input: &EventSubscriptionOptions{
+				WorkspaceID: "workspace1",
+			},
+			sendEvents: []*db.Event{
+				{
+					ID: "workspace1",
+				},
+				{
+					ID: "workspace2",
+				},
+			},
+			expectedEvents: []Event{
+				{
+					Workspace: models.Workspace{
+						Metadata: models.ResourceMetadata{
+							ID: "workspace1",
+						},
+					},
+					Action: "UPDATE",
+				},
+			},
+		},
+		{
+			name: "not authorized to subscribe to workspace events for a workspace",
+			input: &EventSubscriptionOptions{
+				WorkspaceID: "workspace1",
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+			mockEvents := db.NewMockEvents(t)
+
+			mockAuthorizer := auth.NewMockAuthorizer(t)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+
+			mockEventChannel := make(chan db.Event, 1)
+			var roEventChan <-chan db.Event = mockEventChannel
+			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).
+				Return(test.authError)
+
+			for _, d := range test.sendEvents {
+				dCopy := d
+
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, dCopy.ID).
+					Return(&models.Workspace{
+						Metadata: models.ResourceMetadata{
+							ID: dCopy.ID,
+						},
+					}, nil).Maybe()
+			}
+
+			dbClient := db.Client{
+				Workspaces: mockWorkspaces,
+				Events:     mockEvents,
+			}
+
+			logger, _ := logger.NewForTest()
+			eventManager := events.NewEventManager(&dbClient, logger)
+			eventManager.Start(ctx)
+
+			service := &service{
+				dbClient:     &dbClient,
+				eventManager: eventManager,
+				logger:       logger,
+			}
+
+			var useCaller auth.Caller = mockCaller
+			if test.useUserCaller {
+				useCaller = auth.NewUserCaller(
+					&models.User{
+						Metadata: models.ResourceMetadata{
+							ID: userID,
+						},
+						Admin: test.isAdmin,
+					},
+					mockAuthorizer,
+					&dbClient,
+					mockMaintenanceMonitor,
+				)
+			}
+
+			eventChannel, err := service.SubscribeToWorkspaceEvents(auth.WithCaller(ctx, useCaller), test.input)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			receivedEvents := []*Event{}
+
+			go func() {
+				for _, d := range test.sendEvents {
+					encoded, err := json.Marshal(d)
+					require.Nil(t, err)
+
+					mockEventChannel <- db.Event{
+						Table:  "workspaces",
+						Action: "UPDATE",
+						ID:     d.ID,
+						Data:   encoded,
+					}
+				}
+			}()
+
+			if len(test.expectedEvents) > 0 {
+				for e := range eventChannel {
+					eCopy := e
+
+					receivedEvents = append(receivedEvents, eCopy)
+
+					if len(receivedEvents) == len(test.expectedEvents) {
+						break
+					}
+				}
+			}
+
+			require.Equal(t, len(test.expectedEvents), len(receivedEvents))
+			for i, e := range test.expectedEvents {
+				assert.Equal(t, e, *receivedEvents[i])
 			}
 		})
 	}

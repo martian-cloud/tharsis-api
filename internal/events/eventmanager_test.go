@@ -230,7 +230,10 @@ func createMockEvents(eventChan chan db.Event, errorChan chan error) *db.MockEve
 
 func containsEvent(events []db.Event, event db.Event) bool {
 	for _, e := range events {
-		if event == e {
+		// Because one field is []byte rather than string, must compare individual fields.
+		if event.Table == e.Table &&
+			event.Action == e.Action &&
+			event.ID == e.ID {
 			return true
 		}
 	}

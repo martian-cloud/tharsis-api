@@ -137,26 +137,21 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) {
-					s.logger.Errorf("Error occurred while waiting for log events: %v", err)
+					s.logger.Errorf("error occurred while waiting for log events: %v", err)
 				}
 				return
 			}
 
-			logStream, err = s.dbClient.LogStreams.GetLogStreamByID(ctx, event.ID)
+			logStreamEventData, err := event.ToLogStreamEventData()
 			if err != nil {
-				s.logger.Errorf("Error occurred while querying for log stream associated with log event %s: %v", event.ID, err)
+				s.logger.Errorf("failed to get log stream event data in log stream subscription, log event %s: %v", event.ID, err)
 				return
-			}
-
-			if logStream == nil {
-				s.logger.Errorf("Error occurred while querying for log stream associated with log event %s: stream not found", event.ID)
-				continue
 			}
 
 			select {
 			case <-ctx.Done():
 				return
-			case outgoing <- &LogEvent{Size: logStream.Size, Completed: logStream.Completed}:
+			case outgoing <- &LogEvent{Size: logStreamEventData.Size, Completed: logStreamEventData.Completed}:
 			}
 
 			// Return from loop if log stream has been completed because there are no more logs to process
