@@ -313,8 +313,8 @@ func (r *RunVariableResolver) Category() string {
 }
 
 // Hcl resolver
-func (r *RunVariableResolver) Hcl() bool {
-	return r.variable.Hcl
+func (r *RunVariableResolver) Hcl() *bool {
+	return &r.variable.Hcl
 }
 
 // NamespacePath resolver
@@ -417,7 +417,8 @@ type CreateRunInput struct {
 		Key      string
 		Value    string
 		Category string
-		Hcl      bool
+		// DEPRECATED: HCL is deprecated, to be removed in a future release.
+		Hcl *bool
 	}
 	TerraformVersion *string
 	TargetAddresses  *[]string
@@ -486,7 +487,7 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 			variables = append(variables, run.Variable{
 				Key:      v.Key,
 				Value:    &vCopy.Value,
-				Hcl:      v.Hcl,
+				Hcl:      ptr.ToBool(vCopy.Hcl),
 				Category: models.VariableCategory(v.Category),
 			})
 		}

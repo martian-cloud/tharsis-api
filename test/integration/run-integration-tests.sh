@@ -7,8 +7,6 @@
 # This is set based on the path Go puts in the binary for the variables:
 ldflagVarPrefix='gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db'
 
-LAUNCH_LOCAL_IF_ZERO="$(echo "${THARSIS_DB_TEST_HOST}" | wc -w)"
-
 : ${THARSIS_DB_TEST_HOST:="localhost"}
 : ${THARSIS_DB_TEST_PORT:="29432"}
 : ${THARSIS_DB_TEST_NAME:="tharsisdbtest"}
@@ -19,36 +17,30 @@ LAUNCH_LOCAL_IF_ZERO="$(echo "${THARSIS_DB_TEST_HOST}" | wc -w)"
 THARSIS_DB_TEST_CONTAINER_PORT=5432
 THARSIS_DB_TEST_INSTANCE_NAME=postgres-integration-test-server
 
-: ${THARSIS_DB_TEST_URI:="pgx://${THARSIS_DB_TEST_USERNAME}:${THARSIS_DB_TEST_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${THARSIS_DB_TEST_NAME}?sslmode=${THARSIS_DB_TEST_SSL_MODE}"}
+docker kill ${THARSIS_DB_TEST_INSTANCE_NAME} &> /dev/null || true
+docker run -d --rm --name ${THARSIS_DB_TEST_INSTANCE_NAME}        \
+	-e POSTGRES_DB=${THARSIS_DB_TEST_NAME}                        \
+	-e POSTGRES_USER=${THARSIS_DB_TEST_USERNAME}                  \
+	-e POSTGRES_PASSWORD=${THARSIS_DB_TEST_PASSWORD}              \
+	-p ${THARSIS_DB_TEST_PORT}:${THARSIS_DB_TEST_CONTAINER_PORT}   \
+	postgres
 
-if [ ${LAUNCH_LOCAL_IF_ZERO} == 0 ]; then
-	docker run -d --rm --name ${THARSIS_DB_TEST_INSTANCE_NAME}                 \
-		-e POSTGRES_DB=${THARSIS_DB_TEST_NAME}                             \
-		-e POSTGRES_USER=${THARSIS_DB_TEST_USERNAME}                       \
-		-e POSTGRES_PASSWORD=${THARSIS_DB_TEST_PASSWORD}                   \
-		-p ${THARSIS_DB_TEST_PORT}:${THARSIS_DB_TEST_CONTAINER_PORT}   \
-		postgres
+LIMIT=40
+SLEEP=1
+READY=
+for ((i=1;i<=LIMIT;i++)); do
+	if docker exec ${THARSIS_DB_TEST_INSTANCE_NAME} pg_isready -U ${THARSIS_DB_TEST_USERNAME} -d ${THARSIS_DB_TEST_NAME} &> /dev/null; then
+		READY=1
+		break
+	fi
+	sleep ${SLEEP}
+done
 
-	LIMIT=40
-	SLEEP=1
-	READY=
-	CHECK="psql -h ${THARSIS_DB_TEST_HOST} -p ${THARSIS_DB_TEST_PORT} ${THARSIS_DB_TEST_NAME} ${THARSIS_DB_TEST_USERNAME}"
-	for ((i=1;i<=LIMIT;i++)); do
-		if ${CHECK} < /dev/null >& /dev/null; then
-			READY=1
-			break
-		fi
-		sleep ${SLEEP}
-	done
-fi
-
-go test -tags=integration --ldflags "-X ${ldflagVarPrefix}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${ldflagVarPrefix}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${ldflagVarPrefix}.TestDBName=${THARSIS_DB_TEST_NAME} -X ${ldflagVarPrefix}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${ldflagVarPrefix}.TestDBUser=${THARSIS_DB_TEST_USERNAME} -X ${ldflagVarPrefix}.TestDBPass=${THARSIS_DB_TEST_PASSWORD}" ./...
-testCompletionStatus=$?
-
-if [ ${LAUNCH_LOCAL_IF_ZERO} == 0 ]; then
+if [ -z "${READY}" ]; then
+	echo "Docker container did not start in time."
+	docker logs ${THARSIS_DB_TEST_INSTANCE_NAME}
 	docker kill ${THARSIS_DB_TEST_INSTANCE_NAME}
+	exit 1
 fi
 
-exit $testCompletionStatus
-
-# The End.
+go test -count=1 -tags=integration --ldflags "-X ${ldflagVarPrefix}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${ldflagVarPrefix}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${ldflagVarPrefix}.TestDBName=${THARSIS_DB_TEST_NAME} -X ${ldflagVarPrefix}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${ldflagVarPrefix}.TestDBUser=${THARSIS_DB_TEST_USERNAME} -X ${ldflagVarPrefix}.TestDBPass=${THARSIS_DB_TEST_PASSWORD}" ./...

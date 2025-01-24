@@ -32,7 +32,10 @@ type RunEdge {
 type RunVariable {
   namespacePath: String
   category: VariableCategory!
-  hcl: Boolean!
+  hcl: Boolean
+    @deprecated(
+      reason: "HCL field will be determined automatically, to be removed in a future release"
+    )
   key: String!
   value: String
 }
@@ -81,7 +84,7 @@ type RunMutationPayload {
 
 input RunVariableInput {
   category: VariableCategory!
-  hcl: Boolean!
+  hcl: Boolean
   key: String!
   value: String!
 }

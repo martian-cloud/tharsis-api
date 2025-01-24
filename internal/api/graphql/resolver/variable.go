@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -28,8 +29,9 @@ func (r *NamespaceVariableResolver) Category() string {
 }
 
 // Hcl resolver
-func (r *NamespaceVariableResolver) Hcl() bool {
-	return r.variable.Hcl
+// DEPRECATED: Hcl is deprecated and will be removed in a future release
+func (r *NamespaceVariableResolver) Hcl() *bool {
+	return &r.variable.Hcl
 }
 
 // NamespacePath resolver
@@ -112,7 +114,8 @@ type CreateNamespaceVariableInput struct {
 	Category         string
 	Key              string
 	Value            string
-	Hcl              bool
+	// DEPRECATED: to be removed in a future release.
+	Hcl *bool
 }
 
 // UpdateNamespaceVariableInput is the input for updating a variable
@@ -121,7 +124,8 @@ type UpdateNamespaceVariableInput struct {
 	ID               string
 	Key              string
 	Value            string
-	Hcl              bool
+	// DEPRECATED: to be removed in a future release.
+	Hcl *bool
 }
 
 // DeleteNamespaceVariableInput is the input for deleting a variable
@@ -138,7 +142,8 @@ type SetNamespaceVariablesInput struct {
 	Variables        []struct {
 		Key   string
 		Value string
-		Hcl   bool
+		// DEPRECATED: to be removed in a future release.
+		Hcl *bool
 	}
 }
 
@@ -157,7 +162,7 @@ func setNamespaceVariablesMutation(ctx context.Context, input *SetNamespaceVaria
 	for _, v := range input.Variables {
 		vCopy := v
 		variables = append(variables, models.Variable{
-			Hcl:           v.Hcl,
+			Hcl:           ptr.ToBool(v.Hcl),
 			Key:           v.Key,
 			Value:         &vCopy.Value,
 			Category:      input.Category,
@@ -181,7 +186,7 @@ func createNamespaceVariableMutation(ctx context.Context, input *CreateNamespace
 	variable, err := getVariableService(ctx).CreateVariable(ctx, &models.Variable{
 		NamespacePath: input.NamespacePath,
 		Category:      models.VariableCategory(input.Category),
-		Hcl:           input.Hcl,
+		Hcl:           ptr.ToBool(input.Hcl),
 		Key:           input.Key,
 		Value:         &input.Value,
 	})
@@ -201,7 +206,7 @@ func updateNamespaceVariableMutation(ctx context.Context, input *UpdateNamespace
 		return nil, err
 	}
 
-	variable.Hcl = input.Hcl
+	variable.Hcl = ptr.ToBool(input.Hcl)
 	variable.Key = input.Key
 	variable.Value = &input.Value
 

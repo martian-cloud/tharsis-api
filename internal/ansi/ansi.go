@@ -8,11 +8,12 @@ type Code string
 
 // ANSI color constants for job log output
 const (
-	BoldRed   Code = "\033[31;1m"
-	BoldGreen Code = "\033[32;1m"
-	BoldCyan  Code = "\033[36;1m"
-	Yellow    Code = "\033[33m"
-	Reset     Code = "\033[0;m"
+	BoldRed    Code = "\033[31;1m"
+	BoldGreen  Code = "\033[32;1m"
+	BoldCyan   Code = "\033[36;1m"
+	BoldYellow Code = "\033[33;1m"
+	Yellow     Code = "\033[33m"
+	Reset      Code = "\033[0;m"
 )
 
 // Colorize wraps the string in the specified ansi color

@@ -27,6 +27,8 @@ type Logger interface {
 	Infof(format string, a ...interface{})
 	// Errorf writes an error log to the job's log output
 	Errorf(format string, a ...interface{})
+	// Warningf writes a warning log to the job's log output
+	Warningf(format string, a ...interface{})
 	// Write will append the data to the log buffer
 	Write(data []byte) (n int, err error)
 	// Start starts the logger
@@ -80,6 +82,11 @@ func (j *jobLogger) Infof(format string, a ...interface{}) {
 // Errorf writes an error log to the job's log output
 func (j *jobLogger) Errorf(format string, a ...interface{}) {
 	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldRed)+"\n", a...)))
+}
+
+// Warningf writes a warning log to the job's log output
+func (j *jobLogger) Warningf(format string, a ...interface{}) {
+	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldYellow)+"\n", a...)))
 }
 
 // Write will append the data to the log buffer

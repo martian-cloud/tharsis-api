@@ -241,8 +241,8 @@ func buildTokenDir(t *testing.T) string {
 	return tokenDir
 }
 
-func buildJobLoggerWithStubs(t *testing.T) *joblogger.MockJobLogger {
-	jobLogger := joblogger.NewMockJobLogger(t)
+func buildJobLoggerWithStubs(t *testing.T) *joblogger.MockLogger {
+	jobLogger := joblogger.NewMockLogger(t)
 
 	jobLogger.On("Infof", mock.Anything, mock.Anything).Maybe().Return()
 	jobLogger.On("Errorf", mock.Anything).Maybe().Return()
@@ -254,7 +254,7 @@ func buildAuthenticator(
 	t *testing.T,
 	client jobclient.Client,
 	tokenDir string,
-	jobLogger *joblogger.MockJobLogger,
+	jobLogger *joblogger.MockLogger,
 	apiEndpoint string,
 	discoveryProtocolHost *string,
 ) *Authenticator {

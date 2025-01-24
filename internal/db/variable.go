@@ -147,7 +147,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 		"key":          input.Key,
 		"value":        input.Value,
 		"category":     input.Category,
-		"hcl":          input.Hcl,
+		"hcl":          input.Hcl, // DEPRECATED: Remove this field when the column is removed from the table
 	}
 
 	sql, args, err := dialect.Insert("namespace_variables").
@@ -218,7 +218,7 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 			"key":          v.Key,
 			"value":        v.Value,
 			"category":     v.Category,
-			"hcl":          v.Hcl,
+			"hcl":          v.Hcl, // DEPRECATED: Remove this field when the column is removed from the table
 		})
 	}
 

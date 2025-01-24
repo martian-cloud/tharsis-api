@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -108,11 +109,12 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to load terraform module %v", diag)
 	}
 
-	planOutputPath := fmt.Sprintf("%s/%s", tmpDir, plan.Metadata.ID)
-	tfVarsFilePath, err := p.createVarsFile(ctx, terraformModule)
+	tfVarsFilePath, err := p.createVarsFile(terraformModule)
 	if err != nil {
 		return fmt.Errorf("failed to create tfvars file: %v", err)
 	}
+
+	planOutputPath := fmt.Sprintf("%s/%s", tmpDir, plan.Metadata.ID)
 
 	// To avoid compiler type problems, must build up a slice of PlanOptions before calling Plan
 	planOptions := []tfexec.PlanOption{
@@ -208,28 +210,33 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (p *PlanHandler) createVarsFile(_ context.Context, terraformModule *tfconfig.Module) (string, error) {
+func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, error) {
 	// Get all variables in the module
 	hclVariables := []types.RunVariable{}
 	stringVariables := []types.RunVariable{}
 
-	workspacePath := p.terraformWorkspace.workspace.FullPath
 	for _, v := range p.terraformWorkspace.variables {
-		if v.Category == types.TerraformVariableCategory {
-			// If this is a group variable then only add it if there is an hcl definition for it
-			if v.NamespacePath != nil && *v.NamespacePath != workspacePath {
-				// Check if there is an hcl definition for this variable
-				if _, ok := terraformModule.Variables[v.Key]; !ok {
-					// Skip this variable
-					continue
-				}
+		if v.Category != types.TerraformVariableCategory {
+			continue
+		}
+
+		// Check if there is an hcl definition for this variable
+		variable, ok := terraformModule.Variables[v.Key]
+		if !ok {
+			// Make it easier for the user to identity where the variable is coming from.
+			if v.NamespacePath != nil {
+				p.jobLogger.Warningf("WARNING: Variable %q from namespace %s has a value but is not defined in the terraform module.", v.Key, prettifyNamespacePath(*v.NamespacePath))
+			} else {
+				p.jobLogger.Warningf("WARNING: Run variable %q has a value but is not defined in the terraform module.", v.Key)
 			}
 
-			if v.HCL {
-				hclVariables = append(hclVariables, v)
-			} else {
-				stringVariables = append(stringVariables, v)
-			}
+			continue
+		}
+
+		if isHCLVariable(v.Value, variable) {
+			hclVariables = append(hclVariables, v)
+		} else {
+			stringVariables = append(stringVariables, v)
 		}
 	}
 
@@ -265,4 +272,13 @@ func (p *PlanHandler) createVarsFile(_ context.Context, terraformModule *tfconfi
 	}
 
 	return filePath, nil
+}
+
+// prettifyNamespacePath replaces the middle part of the namespace path with "..." to improve readability.
+func prettifyNamespacePath(namespacePath string) string {
+	parts := strings.Split(namespacePath, "/")
+	if len(parts) > 2 {
+		namespacePath = fmt.Sprintf("%s/.../%s", parts[0], parts[len(parts)-1])
+	}
+	return namespacePath
 }
