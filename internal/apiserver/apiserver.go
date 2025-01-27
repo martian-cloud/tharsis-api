@@ -439,9 +439,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	for _, r := range cfg.InternalRunners {
 		// Create DB entry for runner
 		_, err := dbClient.Runners.CreateRunner(ctx, &models.Runner{
-			Type:      models.SharedRunnerType,
-			Name:      r.Name,
-			CreatedBy: "system",
+			Type:            models.SharedRunnerType,
+			Name:            r.Name,
+			CreatedBy:       "system",
+			RunUntaggedJobs: true,
 		})
 		if err != nil {
 			if errors.ErrorCode(err) != errors.EConflict {

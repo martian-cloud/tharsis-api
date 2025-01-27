@@ -40,6 +40,14 @@ func (_m *MockLogger) Start() {
 	_m.Called()
 }
 
+// Warningf provides a mock function with given fields: format, a
+func (_m *MockLogger) Warningf(format string, a ...interface{}) {
+	var _ca []interface{}
+	_ca = append(_ca, format)
+	_ca = append(_ca, a...)
+	_m.Called(_ca...)
+}
+
 // Write provides a mock function with given fields: data
 func (_m *MockLogger) Write(data []byte) (int, error) {
 	ret := _m.Called(data)

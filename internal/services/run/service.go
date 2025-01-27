@@ -50,7 +50,8 @@ type Variable struct {
 	NamespacePath *string                 `json:"namespacePath"`
 	Key           string                  `json:"key"`
 	Category      models.VariableCategory `json:"category"`
-	Hcl           bool                    `json:"hcl"`
+	// DEPRECATED: Hcl is deprecated and will be removed in a future release
+	Hcl bool `json:"hcl"`
 }
 
 // Event represents a run event

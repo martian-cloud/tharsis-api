@@ -39,7 +39,7 @@ func TestInitialize(t *testing.T) {
 
 	managedIdentities := &managedIdentities{
 		workspaceID:    workspaceID,
-		jobLogger:      joblogger.NewMockJobLogger(t),
+		jobLogger:      joblogger.NewMockLogger(t),
 		client:         jobClient,
 		authenticators: []managedidentity.Authenticator{},
 		factoryMap:     buildFactoryMap(authenticator),

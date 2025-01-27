@@ -2283,7 +2283,6 @@ var warmupVariablesForGroupMigration = []models.Variable{
 	{
 		Category:      models.EnvironmentVariableCategory,
 		NamespacePath: "top-level-group-1/2nd-level-group-1a/workspace-20",
-		Hcl:           true,
 		Key:           "key-0",
 		Value:         ptr.String("value-0"),
 	},

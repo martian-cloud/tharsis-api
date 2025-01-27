@@ -1019,7 +1019,6 @@ var standardWarmupVariablesForActivityEvents = []models.Variable{
 	{
 		Category:      models.EnvironmentVariableCategory,
 		NamespacePath: "top-level-group-0-for-activity-events",
-		Hcl:           false,
 		Key:           "variable-0-key",
 		Value:         ptr.String("variable-0-value"),
 	},
