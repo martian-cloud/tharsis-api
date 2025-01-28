@@ -232,6 +232,58 @@ func usersQuery(ctx context.Context, args *UserConnectionQueryArgs) (*UserConnec
 	return NewUserConnectionResolver(ctx, &input)
 }
 
+/* User Mutation Resolvers */
+
+// UserMutationPayload is the response payload for a user mutation.
+type UserMutationPayload struct {
+	ClientMutationID *string
+	User             *models.User
+	Problems         []Problem
+}
+
+// UserMutationPayloadResolver resolves a UserMutationPayload
+type UserMutationPayloadResolver struct {
+	UserMutationPayload
+}
+
+// User field resolver
+func (r *UserMutationPayloadResolver) User() *UserResolver {
+	if r.UserMutationPayload.User == nil {
+		return nil
+	}
+
+	return &UserResolver{user: r.UserMutationPayload.User}
+}
+
+// UpdateUserAdminStatusInput is the input for updating users as admins.
+type UpdateUserAdminStatusInput struct {
+	ClientMutationID *string
+	UserID           string
+	Admin            bool
+}
+
+func handleUserMutationProblem(e error, clientMutationID *string) (*UserMutationPayloadResolver, error) {
+	problem, err := buildProblem(e)
+	if err != nil {
+		return nil, err
+	}
+	payload := UserMutationPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
+}
+
+func updateUserAdminStatusMutation(ctx context.Context, input *UpdateUserAdminStatusInput) (*UserMutationPayloadResolver, error) {
+	user, err := getUserService(ctx).UpdateAdminStatusForUser(ctx, &user.UpdateAdminStatusForUserInput{
+		UserID: gid.FromGlobalID(input.UserID),
+		Admin:  input.Admin,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, User: user, Problems: []Problem{}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
+}
+
 /* User loader */
 
 const userLoaderKey = "user"

@@ -207,4 +207,7 @@ type Mutation {
     input: CreateRunnerSessionErrorInput!
   ): CreateRunnerSessionErrorPayload!
   migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
+  updateUserAdminStatus(
+    input: UpdateUserAdminStatusInput!
+  ): UpdateUserAdminStatusPayload!
 }

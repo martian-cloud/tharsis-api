@@ -290,6 +290,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 				"email":            user.Email,
 				"scim_external_id": nullableString(user.SCIMExternalID),
 				"active":           user.Active,
+				"admin":            user.Admin,
 			},
 		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
 	if err != nil {
