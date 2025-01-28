@@ -224,9 +224,11 @@ func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, 
 		variable, ok := terraformModule.Variables[v.Key]
 		if !ok {
 			// Make it easier for the user to identity where the variable is coming from.
-			if v.NamespacePath != nil {
-				p.jobLogger.Warningf("WARNING: Variable %q from namespace %s has a value but is not defined in the terraform module.", v.Key, prettifyNamespacePath(*v.NamespacePath))
-			} else {
+			if v.NamespacePath != nil && *v.NamespacePath == p.terraformWorkspace.workspace.FullPath {
+				p.jobLogger.Warningf("WARNING: Variable %q from workspace %s has a value but is not defined in the terraform module.", v.Key, prettifyNamespacePath(*v.NamespacePath))
+			}
+
+			if v.NamespacePath == nil {
 				p.jobLogger.Warningf("WARNING: Run variable %q has a value but is not defined in the terraform module.", v.Key)
 			}
 
