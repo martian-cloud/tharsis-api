@@ -38,6 +38,7 @@ type RunVariable {
     )
   key: String!
   value: String
+  includedInTfConfig: Boolean
 }
 
 type Run implements Node {
@@ -82,6 +83,12 @@ type RunMutationPayload {
   problems: [Problem!]!
 }
 
+type SetVariablesIncludedInTFConfigPayload {
+  clientMutationId: String
+  run: Run
+  problems: [Problem!]!
+}
+
 input RunVariableInput {
   category: VariableCategory!
   hcl: Boolean
@@ -116,4 +123,9 @@ input CancelRunInput {
   runId: String!
   comment: String
   force: Boolean
+}
+
+input SetVariablesIncludedInTFConfigInput {
+  runId: String!
+  variableKeys: [String!]!
 }

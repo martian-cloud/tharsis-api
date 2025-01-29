@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -109,9 +108,16 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to load terraform module %v", diag)
 	}
 
-	tfVarsFilePath, err := p.createVarsFile(terraformModule)
+	tfVarsFilePath, variablesIncludedInTFConfig, err := p.createVarsFile(terraformModule)
 	if err != nil {
 		return fmt.Errorf("failed to create tfvars file: %v", err)
+	}
+
+	if len(variablesIncludedInTFConfig) > 0 {
+		// Update run variables with latest usage.
+		if err = p.client.SetVariablesIncludedInTFConfig(ctx, p.run.Metadata.ID, variablesIncludedInTFConfig); err != nil {
+			return fmt.Errorf("failed to set variables included in tfconfig: %v", err)
+		}
 	}
 
 	planOutputPath := fmt.Sprintf("%s/%s", tmpDir, plan.Metadata.ID)
@@ -210,10 +216,11 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, error) {
+func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, []string, error) {
 	// Get all variables in the module
 	hclVariables := []types.RunVariable{}
 	stringVariables := []types.RunVariable{}
+	variablesIncludedInTFConfig := []string{}
 
 	for _, v := range p.terraformWorkspace.variables {
 		if v.Category != types.TerraformVariableCategory {
@@ -225,7 +232,7 @@ func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, 
 		if !ok {
 			// Make it easier for the user to identity where the variable is coming from.
 			if v.NamespacePath != nil && *v.NamespacePath == p.terraformWorkspace.workspace.FullPath {
-				p.jobLogger.Warningf("WARNING: Variable %q from workspace %s has a value but is not defined in the terraform module.", v.Key, prettifyNamespacePath(*v.NamespacePath))
+				p.jobLogger.Warningf("WARNING: Workspace variable %q has a value but is not defined in the terraform module.", v.Key)
 			}
 
 			if v.NamespacePath == nil {
@@ -234,6 +241,8 @@ func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, 
 
 			continue
 		}
+
+		variablesIncludedInTFConfig = append(variablesIncludedInTFConfig, v.Key)
 
 		if isHCLVariable(v.Value, variable) {
 			hclVariables = append(hclVariables, v)
@@ -251,7 +260,7 @@ func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, 
 	// Parse buffer contents
 	f, diag := hclwrite.ParseConfig([]byte(fileContents), "", hcl.InitialPos)
 	if diag != nil {
-		return "", diag
+		return "", nil, diag
 	}
 	rootBody := f.Body()
 
@@ -263,24 +272,15 @@ func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, 
 	filePath := fmt.Sprintf("%s/run-%s.tfvars", p.workspaceDir, p.run.Metadata.ID)
 	tfVarsFile, err := os.Create(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create temporary file for tfvars %v", err)
+		return "", nil, fmt.Errorf("failed to create temporary file for tfvars %v", err)
 	}
 
 	defer tfVarsFile.Close()
 
 	// Save file
 	if _, err := f.WriteTo(tfVarsFile); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	return filePath, nil
-}
-
-// prettifyNamespacePath replaces the middle part of the namespace path with "..." to improve readability.
-func prettifyNamespacePath(namespacePath string) string {
-	parts := strings.Split(namespacePath, "/")
-	if len(parts) > 2 {
-		namespacePath = fmt.Sprintf("%s/.../%s", parts[0], parts[len(parts)-1])
-	}
-	return namespacePath
+	return filePath, variablesIncludedInTFConfig, nil
 }

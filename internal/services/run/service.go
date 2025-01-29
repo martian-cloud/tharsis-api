@@ -35,6 +35,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -51,7 +52,8 @@ type Variable struct {
 	Key           string                  `json:"key"`
 	Category      models.VariableCategory `json:"category"`
 	// DEPRECATED: Hcl is deprecated and will be removed in a future release
-	Hcl bool `json:"hcl"`
+	Hcl                bool  `json:"hcl"`
+	IncludedInTFConfig *bool `json:"includedInTFConfig"`
 }
 
 // Event represents a run event
@@ -64,6 +66,13 @@ type Event struct {
 type EventSubscriptionOptions struct {
 	WorkspaceID *string
 	RunID       *string // RunID is optional
+}
+
+// SetVariablesIncludedInTFConfigInput is the input for setting variables
+// that are included in the Terraform config.
+type SetVariablesIncludedInTFConfigInput struct {
+	RunID        string
+	VariableKeys []string
 }
 
 // GetRunsInput is the input for querying a list of runs
@@ -149,6 +158,7 @@ type Service interface {
 	ApplyRun(ctx context.Context, runID string, comment *string) (*models.Run, error)
 	CancelRun(ctx context.Context, options *CancelRunInput) (*models.Run, error)
 	GetRunVariables(ctx context.Context, runID string) ([]Variable, error)
+	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
 	GetPlan(ctx context.Context, planID string) (*models.Plan, error)
 	GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error)
@@ -1480,6 +1490,73 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 	})
 
 	return variables, nil
+}
+
+func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error {
+	ctx, span := tracer.Start(ctx, "svc.SetVariablesIncludedInTFConfig")
+	span.SetAttributes(attribute.String("run_id", input.RunID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	run, err := s.dbClient.Runs.GetRun(ctx, input.RunID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get run", errors.WithSpan(span))
+	}
+
+	if run == nil {
+		return errors.New("run with ID %s not found", input.RunID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Since variables should only be updated during the plan operation, we're requiring that permission here.
+	if err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(run.PlanID)); err != nil {
+		return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	if len(input.VariableKeys) == 0 {
+		// Nothing to do.
+		return nil
+	}
+
+	result, err := s.artifactStore.GetRunVariables(ctx, run)
+	if err != nil {
+		return errors.Wrap(err, "failed to get run variables from object store", errors.WithSpan(span))
+	}
+	defer result.Close()
+
+	var variables []Variable
+	if err = json.NewDecoder(result).Decode(&variables); err != nil {
+		return errors.Wrap(err, "failed to decode run variables", errors.WithSpan(span))
+	}
+
+	variablesIncludedInTFConfig := make(map[string]struct{}, len(input.VariableKeys))
+	for _, key := range input.VariableKeys {
+		variablesIncludedInTFConfig[key] = struct{}{}
+	}
+
+	for i, variable := range variables {
+		if variable.Category != models.TerraformVariableCategory {
+			// We only need to filter for terraform vars.
+			continue
+		}
+
+		_, hasUsage := variablesIncludedInTFConfig[variable.Key]
+		variables[i].IncludedInTFConfig = &hasUsage
+	}
+
+	data, err := json.Marshal(variables)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal variables", errors.WithSpan(span))
+	}
+
+	if err = s.artifactStore.UploadRunVariables(ctx, run, bytes.NewReader(data)); err != nil {
+		return errors.Wrap(err, "failed to upload run variables", errors.WithSpan(span))
+	}
+
+	return nil
 }
 
 func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error {

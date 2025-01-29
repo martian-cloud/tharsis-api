@@ -41,6 +41,7 @@ type Client interface {
 	DownloadPlanCache(ctx context.Context, planID string, writer io.WriterAt) error
 	Close() error
 	CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, token string) (string, *time.Duration, error)
+	SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error
 }
 
 var _ Client = (*client)(nil)
@@ -308,4 +309,12 @@ func (c *client) CreateServiceAccountToken(ctx context.Context, serviceAccountPa
 	}
 
 	return response.Token, &response.ExpiresIn, nil
+}
+
+// SetVariablesIncludedInTFConfig updates run variables usage.
+func (c *client) SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error {
+	return c.tharsisClient.Run.SetVariablesIncludedInTFConfig(ctx, &types.SetVariablesIncludedInTFConfigInput{
+		RunID:        runID,
+		VariableKeys: variableKeys,
+	})
 }
