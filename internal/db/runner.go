@@ -67,6 +67,12 @@ func (ts RunnerSortableField) getTransformFunc() pagination.SortTransformFunc {
 	}
 }
 
+// RunnerTagFilter is a filter condition for runner tags
+type RunnerTagFilter struct {
+	RunUntaggedJobs *bool
+	TagSubset       []string
+}
+
 // RunnerFilter contains the supported fields for filtering Runner resources
 type RunnerFilter struct {
 	GroupID        *string
@@ -76,6 +82,7 @@ type RunnerFilter struct {
 	RunnerType     *models.RunnerType
 	RunnerIDs      []string
 	NamespacePaths []string
+	TagFilter      *RunnerTagFilter
 }
 
 // GetRunnersInput is the input for listing runners
@@ -166,6 +173,21 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 
 		if input.Filter.RunnerType != nil {
 			ex = ex.Append(goqu.I("runners.type").Eq(*input.Filter.RunnerType))
+		}
+
+		if input.Filter.TagFilter != nil {
+			if input.Filter.TagFilter.RunUntaggedJobs != nil {
+				ex = ex.Append(goqu.I("runners.run_untagged_jobs").Eq(*input.Filter.TagFilter.RunUntaggedJobs))
+			}
+			if input.Filter.TagFilter.TagSubset != nil {
+				json, err := json.Marshal(input.Filter.TagFilter.TagSubset)
+				if err != nil {
+					return nil, err
+				}
+				// This filter condition will only return runners where the runner tags are a superset of the tag
+				// subset list specified in the filter
+				ex = ex.Append(goqu.L(fmt.Sprintf("runners.tags @> '%s'", json)))
+			}
 		}
 	}
 

@@ -19,6 +19,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestClaimJob(t *testing.T) {
@@ -1036,6 +1037,331 @@ func TestSubscribeToCancellationEvent(t *testing.T) {
 			require.Equal(t, len(test.expectedEvents), len(receivedEvents))
 			for i, e := range test.expectedEvents {
 				assert.Equal(t, e, *receivedEvents[i])
+			}
+		})
+	}
+}
+
+func TestGetRunnerAvailabilityForJob(t *testing.T) {
+	jobID := "job-1"
+	runnerID := "runner-1"
+	groupID := "group-1"
+	workspaceID := "workspace-1"
+	workspacePath := groupID + "/" + workspaceID
+	now := time.Now()
+	recent := now.Add(-40 * time.Second)
+	longAgo := now.Add(-80 * time.Second)
+	groupRunnerType := models.GroupRunnerType
+
+	sampleWorkspace := models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: workspaceID,
+		},
+		FullPath: workspacePath,
+	}
+
+	type testCase struct {
+		job                    *models.Job
+		expectResponse         RunnerAvailabilityStatusType
+		name                   string
+		authError              error
+		permsError             error
+		expectErrorCode        errors.CodeType
+		expectGetRunnersInput  *db.GetRunnersInput
+		sessionTimestamp       time.Time
+		injectGetRunnersResult *db.RunnersResult
+	}
+
+	testCases := []testCase{
+		{
+			name: "has an active shared runner",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType:     &groupRunnerType,
+					NamespacePaths: []string{"group-1/workspace-1", "group-1"},
+					Enabled:        ptr.Bool(true),
+					TagFilter: &db.RunnerTagFilter{
+						RunUntaggedJobs: ptr.Bool(true),
+					},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type:            models.SharedRunnerType,
+						Name:            "shared-runner",
+						RunUntaggedJobs: true,
+					},
+				},
+			},
+			sessionTimestamp: recent,
+			expectResponse:   RunnerAvailabilityStatusAvailableType,
+		},
+		{
+			name: "runner disqualified due to job tags that runner does not have",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+				Tags:        []string{"job-tag"},
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType:     &groupRunnerType,
+					NamespacePaths: []string{"group-1/workspace-1", "group-1"},
+					Enabled:        ptr.Bool(true),
+					TagFilter: &db.RunnerTagFilter{
+						TagSubset: []string{"job-tag"},
+					},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{},
+			},
+			sessionTimestamp: recent,
+			expectResponse:   RunnerAvailabilityStatusNoneType,
+		},
+		{
+			name: "runner disqualified because it won't run untagged jobs",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType:     &groupRunnerType,
+					NamespacePaths: []string{"group-1/workspace-1", "group-1"},
+					Enabled:        ptr.Bool(true),
+					TagFilter: &db.RunnerTagFilter{
+						RunUntaggedJobs: ptr.Bool(true),
+					},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{},
+			},
+			sessionTimestamp: recent,
+			expectResponse:   RunnerAvailabilityStatusNoneType,
+		},
+		{
+			name: "has a stale group runner",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType:     &groupRunnerType,
+					NamespacePaths: []string{"group-1/workspace-1", "group-1"},
+					Enabled:        ptr.Bool(true),
+					TagFilter: &db.RunnerTagFilter{
+						RunUntaggedJobs: ptr.Bool(true),
+					},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type:            models.GroupRunnerType,
+						Name:            "group-runner",
+						ResourcePath:    "group-1/group-runner",
+						RunUntaggedJobs: true,
+					},
+				},
+			},
+			sessionTimestamp: longAgo,
+			expectResponse:   RunnerAvailabilityStatusInactiveType,
+		},
+		{
+			name: "no matching group runner",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType:     &groupRunnerType,
+					NamespacePaths: []string{"group-1/workspace-1", "group-1"},
+					Enabled:        ptr.Bool(true),
+					TagFilter: &db.RunnerTagFilter{
+						RunUntaggedJobs: ptr.Bool(true),
+					},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{},
+			},
+			sessionTimestamp: recent,
+			expectResponse:   RunnerAvailabilityStatusNoneType,
+		},
+		{
+			name: "subject lacks permission to query",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType:     &groupRunnerType,
+					NamespacePaths: []string{"group-1/workspace-1", "group-1"},
+					Enabled:        ptr.Bool(true),
+					TagFilter:      &db.RunnerTagFilter{},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type:         models.GroupRunnerType,
+						Name:         "group-runner",
+						ResourcePath: "group-1/group-runner",
+					},
+				},
+			},
+			sessionTimestamp: recent,
+			permsError:       errors.New("Permission Denied", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode:  errors.EForbidden,
+		},
+		{
+			name: "subject is not authenticated",
+			job: &models.Job{
+				Metadata: models.ResourceMetadata{
+					ID: jobID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			expectGetRunnersInput: &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType: &groupRunnerType,
+					RunnerName: &runnerID,
+					Enabled:    ptr.Bool(true),
+					TagFilter:  &db.RunnerTagFilter{},
+				},
+			},
+			injectGetRunnersResult: &db.RunnersResult{
+				Runners: []models.Runner{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: runnerID,
+						},
+						Type: models.SharedRunnerType,
+						Name: "shared-runner",
+					},
+				},
+			},
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockJobs := db.NewMockJobs(t)
+			mockRunners := db.NewMockRunners(t)
+			mockRunnerSessions := db.NewMockRunnerSessions(t)
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			mockJobs.On("GetJobByID", mock.Anything, jobID).
+				Return(test.job, nil).Maybe()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewJobPermission, mock.Anything, mock.Anything).
+				Return(test.permsError).Maybe()
+
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, workspaceID).
+				Return(&sampleWorkspace, nil).Maybe()
+
+			// For the call to get shared runners.
+			sharedRunnerType := models.SharedRunnerType
+			mockRunners.On("GetRunners", mock.Anything, &db.GetRunnersInput{
+				Filter: &db.RunnerFilter{
+					RunnerType: &sharedRunnerType,
+					Enabled:    ptr.Bool(true),
+					TagFilter:  test.expectGetRunnersInput.Filter.TagFilter,
+				},
+			}).
+				Return(test.injectGetRunnersResult, nil).Maybe()
+
+			// For the call to get group runners.
+			mockRunners.On("GetRunners", mock.Anything, test.expectGetRunnersInput).
+				Return(test.injectGetRunnersResult, nil).Maybe()
+
+			toSort := db.RunnerSessionSortableFieldLastContactedAtDesc
+			mockRunnerSessions.On("GetRunnerSessions", mock.Anything, &db.GetRunnerSessionsInput{
+				Sort: &toSort,
+				PaginationOptions: &pagination.Options{
+					First: ptr.Int32(1),
+				},
+				Filter: &db.RunnerSessionFilter{
+					RunnerID: &runnerID,
+				},
+			}).
+				Return(&db.RunnerSessionsResult{
+					RunnerSessions: []models.RunnerSession{
+						{
+							LastContactTimestamp: test.sessionTimestamp,
+							RunnerID:             runnerID,
+						},
+					},
+				}, nil).Maybe()
+
+			dbClient := &db.Client{
+				Jobs:           mockJobs,
+				Runners:        mockRunners,
+				RunnerSessions: mockRunnerSessions,
+				Workspaces:     mockWorkspaces,
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: dbClient,
+				logger:   logger,
+			}
+
+			callerContext := ctx
+			if test.authError == nil {
+				callerContext = auth.WithCaller(ctx, mockCaller)
+			}
+
+			actualResponse, err := service.GetRunnerAvailabilityForJob(callerContext, jobID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if test.expectResponse != "" {
+				assert.Equal(t, &test.expectResponse, actualResponse)
 			}
 		})
 	}

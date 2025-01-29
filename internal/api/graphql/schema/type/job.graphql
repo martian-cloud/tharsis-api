@@ -12,6 +12,13 @@ enum JobStatus {
   finished
 }
 
+enum RunnerAvailabilityStatus {
+  NONE
+  INACTIVE
+  AVAILABLE
+  ASSIGNED
+}
+
 enum JobType {
   plan
   apply
@@ -63,6 +70,7 @@ type Job implements Node {
   runner: Runner
   runnerPath: String
   tags: [String!]!
+  runnerAvailabilityStatus: RunnerAvailabilityStatus!
 }
 
 input JobLogStreamSubscriptionInput {

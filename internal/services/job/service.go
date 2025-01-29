@@ -31,6 +31,20 @@ const (
 	runnerJobsLimit int = 100
 )
 
+// RunnerAvailabilityStatusType describes a job's runner availability status
+type RunnerAvailabilityStatusType string
+
+const (
+	// RunnerAvailabilityStatusNoneType indicates no runners are available
+	RunnerAvailabilityStatusNoneType RunnerAvailabilityStatusType = "NONE"
+	// RunnerAvailabilityStatusInactiveType indicates no active runners are available (but one or more stale ones are)
+	RunnerAvailabilityStatusInactiveType RunnerAvailabilityStatusType = "INACTIVE"
+	// RunnerAvailabilityStatusAvailableType indicates one or more active runners are available
+	RunnerAvailabilityStatusAvailableType RunnerAvailabilityStatusType = "AVAILABLE"
+	// RunnerAvailabilityStatusAssignedType indicates the job has been assigned to a runner
+	RunnerAvailabilityStatusAssignedType RunnerAvailabilityStatusType = "ASSIGNED"
+)
+
 // GetJobsInput includes options for getting jobs
 type GetJobsInput struct {
 	// Sort specifies the field to sort on and direction
@@ -101,6 +115,7 @@ type Service interface {
 	SubscribeToLogStreamEvents(ctx context.Context, options *LogStreamEventSubscriptionOptions) (<-chan *logstream.LogEvent, error)
 	GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([]models.LogStream, error)
 	SubscribeToJobs(ctx context.Context, options *SubscribeToJobsInput) (<-chan *Event, error)
+	GetRunnerAvailabilityForJob(ctx context.Context, jobID string) (*RunnerAvailabilityStatusType, error)
 }
 
 type service struct {
@@ -692,6 +707,145 @@ func (s *service) ReadLogs(ctx context.Context, jobID string, startOffset int, l
 	}
 
 	return s.logStreamManager.ReadLogs(ctx, stream.Metadata.ID, startOffset, limit)
+}
+
+// GetRunnerAvailabilityForJob returns a job's runner status, whether there exists a runner with an active session,
+// a runner with a stale session, or no runner that could claim the job.
+func (s *service) GetRunnerAvailabilityForJob(ctx context.Context, jobID string) (*RunnerAvailabilityStatusType, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerAvailabilityForJob")
+	defer span.End()
+	runnerAvailability := RunnerAvailabilityStatusInactiveType
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	job, err := s.dbClient.Jobs.GetJobByID(ctx, jobID)
+	if err != nil {
+		return nil, errors.Wrap(
+			err,
+			"Failed to get job",
+			errors.WithSpan(span),
+		)
+	}
+
+	if job == nil {
+		return nil, errors.New("Job with ID %s not found", jobID,
+			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	}
+
+	if job.RunnerID != nil {
+		runnerAvailability = RunnerAvailabilityStatusAssignedType
+		return &runnerAvailability, nil
+	}
+
+	runners, err := s.getRunnersForWorkspace(ctx, job.WorkspaceID, job.Tags)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runners", errors.WithSpan(span))
+	}
+
+	if len(runners) == 0 {
+		runnerAvailability = RunnerAvailabilityStatusNoneType
+		return &runnerAvailability, nil
+	}
+
+	for _, runner := range runners {
+		runnerSession, err := s.getRunnerSession(ctx, runner.Metadata.ID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get runner sessions", errors.WithSpan(span))
+		}
+
+		if runnerSession != nil {
+			if runnerSession.Active() {
+				// Any active runner means we should return available.
+				runnerAvailability = RunnerAvailabilityStatusAvailableType
+				return &runnerAvailability, nil
+			}
+		}
+	}
+
+	// If we get to this point, there was at least one runner but no runner was active.
+	return &runnerAvailability, nil
+}
+
+func (s *service) getRunnerSession(ctx context.Context, runnerID string) (*models.RunnerSession, error) {
+	// Get the most recently contacted session first.
+	toSort := db.RunnerSessionSortableFieldLastContactedAtDesc
+
+	sessionsResult, err := s.dbClient.RunnerSessions.GetRunnerSessions(ctx, &db.GetRunnerSessionsInput{
+		Sort: &toSort,
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(1),
+		},
+		Filter: &db.RunnerSessionFilter{
+			RunnerID: &runnerID,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner sessions")
+	}
+
+	var foundSession *models.RunnerSession
+	if len(sessionsResult.RunnerSessions) > 0 {
+		foundSession = &sessionsResult.RunnerSessions[0]
+	}
+
+	return foundSession, nil
+}
+
+// getRunnersForWorkspace returns a list of shared and group runners that could possibly claim a job in the workspace
+// The caller should wrap any errors with the span.
+func (s *service) getRunnersForWorkspace(ctx context.Context,
+	workspaceID string, jobTags []string) ([]models.Runner, error) {
+
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace by ID")
+	}
+
+	if workspace == nil {
+		return nil, errors.New("workspace not found", errors.WithErrorCode(errors.ENotFound))
+	}
+
+	tagFilter := &db.RunnerTagFilter{
+		TagSubset: jobTags,
+	}
+	if len(jobTags) == 0 {
+		tagFilter.RunUntaggedJobs = ptr.Bool(true)
+	}
+
+	sharedRunnerType := models.SharedRunnerType
+	sharedRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
+		Filter: &db.RunnerFilter{
+			RunnerType: &sharedRunnerType,
+			Enabled:    ptr.Bool(true),
+			TagFilter:  tagFilter,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runners")
+	}
+
+	groupRunnerType := models.GroupRunnerType
+	groupRunners, err := s.dbClient.Runners.GetRunners(ctx, &db.GetRunnersInput{
+		Filter: &db.RunnerFilter{
+			RunnerType:     &groupRunnerType,
+			NamespacePaths: workspace.ExpandPath(),
+			Enabled:        ptr.Bool(true),
+			TagFilter:      tagFilter,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runners")
+	}
+
+	return append(sharedRunners.Runners, groupRunners.Runners...), nil
 }
 
 // getJobByID returns a non-nil job.

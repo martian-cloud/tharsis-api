@@ -287,6 +287,16 @@ func (r *JobResolver) Logs(ctx context.Context, args *JobLogsQueryArgs) (string,
 	return string(buffer), nil
 }
 
+// RunnerAvailabilityStatus resolver
+func (r *JobResolver) RunnerAvailabilityStatus(ctx context.Context) (*job.RunnerAvailabilityStatusType, error) {
+	runnerAvailabilityStatus, err := getJobService(ctx).GetRunnerAvailabilityForJob(ctx, r.job.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return runnerAvailabilityStatus, nil
+}
+
 /* Job Subscriptions */
 
 // JobLogStreamEventResolver resolves a job log stream event
