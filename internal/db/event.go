@@ -16,7 +16,6 @@ const (
 	eventTableJobs           = "jobs"
 	eventTableLogStreams     = "log_streams"
 	eventTableRuns           = "runs"
-	eventTableWorkspaces     = "workspaces"
 	eventTableRunnerSessions = "runner_sessions"
 )
 

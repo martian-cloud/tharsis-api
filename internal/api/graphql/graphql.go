@@ -27,7 +27,10 @@ import (
 )
 
 // fieldOverrides is initialized map passed into GetQueryComplexity
-var fieldOverrides = map[string]int{"readme": 1}
+var fieldOverrides = map[string]int{
+	"readme":                   1,
+	"runnerAvailabilityStatus": 5,
+}
 
 type queryComplexityResult struct {
 	Throttled          bool `json:"throttled"`

@@ -174,6 +174,32 @@ func (_m *MockService) GetLogStreamsByJobIDs(ctx context.Context, idList []strin
 	return r0, r1
 }
 
+// GetRunnerAvailabilityForJob provides a mock function with given fields: ctx, jobID
+func (_m *MockService) GetRunnerAvailabilityForJob(ctx context.Context, jobID string) (*RunnerAvailabilityStatusType, error) {
+	ret := _m.Called(ctx, jobID)
+
+	var r0 *RunnerAvailabilityStatusType
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*RunnerAvailabilityStatusType, error)); ok {
+		return rf(ctx, jobID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *RunnerAvailabilityStatusType); ok {
+		r0 = rf(ctx, jobID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*RunnerAvailabilityStatusType)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, jobID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ReadLogs provides a mock function with given fields: ctx, jobID, startOffset, limit
 func (_m *MockService) ReadLogs(ctx context.Context, jobID string, startOffset int, limit int) ([]byte, error) {
 	ret := _m.Called(ctx, jobID, startOffset, limit)

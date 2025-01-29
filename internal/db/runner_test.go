@@ -5,7 +5,6 @@ package db
 import (
 	"context"
 	"fmt"
-	"sort"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -193,209 +193,836 @@ func TestGetRunners(t *testing.T) {
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupRunners(ctx, testClient, warmupRunners{
-		groups:  standardWarmupGroupsForRunners,
-		runners: standardWarmupRunners,
-	})
-	require.Nil(t, err)
+	t.Run("subtest: non-nil but mostly empty input", func(t *testing.T) {
 
-	allRunnerInfos := runnerInfoFromRunners(warmupItems.runners)
-
-	// Sort by runner IDs.
-	sort.Sort(runnerInfoIDSlice(allRunnerInfos))
-	allRunnerIDs := runnerIDsFromRunnerInfos(allRunnerInfos)
-
-	// Sort by last update times.
-	sort.Sort(runnerInfoUpdateSlice(allRunnerInfos))
-	allRunnerIDsByTime := runnerIDsFromRunnerInfos(allRunnerInfos)
-	reverseRunnerIDsByTime := reverseStringSlice(allRunnerIDsByTime)
-
-	// Allow a pointer to a constant.
-	localSharedRunnerType := models.SharedRunnerType
-	localGroupRunnerType := models.GroupRunnerType
-
-	type testCase struct {
-		input           *GetRunnersInput
-		expectMsg       *string
-		name            string
-		expectRunnerIDs []string
-	}
-
-	testCases := []testCase{
-		{
-			name: "non-nil but mostly empty input",
-			input: &GetRunnersInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			expectRunnerIDs: allRunnerIDs,
-		},
-
-		{
-			name: "populated sort and pagination, nil filter",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectRunnerIDs: allRunnerIDsByTime,
-		},
-
-		{
-			name: "sort in ascending order of time of last update",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-			},
-			expectRunnerIDs: allRunnerIDsByTime,
-		},
-
-		{
-			name: "sort in descending order of time of last update",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtDesc),
-			},
-			expectRunnerIDs: reverseRunnerIDsByTime,
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
-			},
-			expectMsg:       ptr.String("only first or last can be defined, not both"),
-			expectRunnerIDs: allRunnerIDs[4:],
-		},
-
-		{
-			name: "filter, group ID, positive",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					GroupID: warmupItems.runners[0].GroupID,
-				},
-			},
-			expectRunnerIDs: allRunnerIDsByTime[0:1],
-		},
-
-		{
-			name: "filter, group ID, non-existent",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					GroupID: ptr.String(nonExistentID),
-				},
-			},
-			expectRunnerIDs: []string{},
-		},
-
-		{
-			name: "filter, group ID, invalid",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					GroupID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:       invalidUUIDMsg2,
-			expectRunnerIDs: []string{},
-		},
-
-		{
-			name: "filter, runner IDs, positive",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					RunnerIDs: []string{
-						allRunnerIDsByTime[0], allRunnerIDsByTime[1], allRunnerIDsByTime[3]},
-				},
-			},
-			expectRunnerIDs: []string{
-				allRunnerIDsByTime[0], allRunnerIDsByTime[1], allRunnerIDsByTime[3],
-			},
-		},
-
-		{
-			name: "filter, runner IDs, non-existent",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					RunnerIDs: []string{nonExistentID},
-				},
-			},
-			expectRunnerIDs: []string{},
-		},
-
-		{
-			name: "filter, runner IDs, invalid ID",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					RunnerIDs: []string{invalidID},
-				},
-			},
-			expectMsg:       invalidUUIDMsg2,
-			expectRunnerIDs: []string{},
-		},
-
-		{
-			name: "filter, get shared runners",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					RunnerType: &localSharedRunnerType,
-				},
-			},
-			expectRunnerIDs: allRunnerIDsByTime[5:],
-		},
-
-		{
-			name: "filter, get group runners",
-			input: &GetRunnersInput{
-				Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
-				Filter: &RunnerFilter{
-					RunnerType: &localGroupRunnerType,
-				},
-			},
-			expectRunnerIDs: allRunnerIDsByTime[:5],
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			runnersResult, err := testClient.client.Runners.GetRunners(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if err == nil {
-				// Never returns nil if error is nil.
-				require.NotNil(t, runnersResult.PageInfo)
-
-				runners := runnersResult.Runners
-
-				// Check the runners result by comparing a list of the runner IDs.
-				actualRunnerIDs := []string{}
-				for _, runner := range runners {
-					actualRunnerIDs = append(actualRunnerIDs, runner.Metadata.ID)
-				}
-
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(actualRunnerIDs)
-				}
-
-				assert.Equal(t, len(test.expectRunnerIDs), len(actualRunnerIDs))
-				assert.Equal(t, test.expectRunnerIDs, actualRunnerIDs)
-			}
+		t.Log("Setting up subtest non-nil but mostly empty input")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
 		})
-	}
+		assert.Nil(t, err)
+
+		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest non-nil but mostly empty input")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest non-nil but mostly empty input")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort:              nil,
+			PaginationOptions: nil,
+			Filter:            nil,
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(runnersResult.Runners))
+		assert.Equal(t, runner.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+	})
+
+	t.Run("subtest: populated sort and pagination, nil filter", func(t *testing.T) {
+
+		t.Log("Setting up subtest populated sort and pagination, nil filter")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest populated sort and pagination, nil filter")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest populated sort and pagination, nil filter")
+
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			PaginationOptions: &pagination.Options{
+				First: ptr.Int32(100),
+			},
+			Filter: nil,
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(runnersResult.Runners))
+		assert.Equal(t, runner.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+	})
+
+	t.Run("subtest: sort in ascending order of time of last update", func(t *testing.T) {
+
+		t.Log("Setting up subtest sort in ascending order of time of last update")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest sort in ascending order of time of last update")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest sort in ascending order of time of last update")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(runnersResult.Runners))
+		assert.Equal(t, runner0.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, runner1.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+	})
+
+	t.Run("subtest: sort in descending order of time of last update", func(t *testing.T) {
+
+		t.Log("Setting up subtest sort in descending order of time of last update")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest sort in descending order of time of last update")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest sort in descending order of time of last update")
+
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtDesc),
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(runnersResult.Runners))
+		assert.Equal(t, runner1.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, runner0.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+	})
+
+	t.Run("subtest: pagination, first one and last two, expect error", func(t *testing.T) {
+
+		t.Log("Setting up subtest pagination, first one and last two, expect error")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest pagination, first one and last two, expect error")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest pagination, first one and last two, expect error")
+
+		_, err = testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			PaginationOptions: &pagination.Options{
+				First: ptr.Int32(1),
+				Last:  ptr.Int32(2),
+			},
+		})
+
+		require.NotNil(t, err)
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("subtest: filter, group ID, positive", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter, group ID, positive")
+		group0, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 1 for testing runner functions",
+			Name:        "top-level-group-1-for-runners",
+			FullPath:    "top-level-group-1-for-runners",
+			CreatedBy:   "someone-g1",
+		})
+		assert.Nil(t, err)
+
+		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group0.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter, group ID, positive")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group0))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group1))
+		})
+
+		t.Log("Running subtest filter, group ID, positive")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				GroupID: &group0.Metadata.ID,
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(runnersResult.Runners))
+		assert.Equal(t, runner.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+	})
+
+	t.Run("subtest: filter, group ID, non-existent", func(t *testing.T) {
+		t.Log("Setting up subtest filter, group ID, non-existent")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				GroupID: ptr.String(nonExistentID),
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 0, len(runnersResult.Runners))
+	})
+
+	t.Run("subtest: filter, group ID, invalid", func(t *testing.T) {
+		t.Log("Running subtest filter, group ID, invalid")
+		_, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				GroupID: ptr.String(invalidID),
+			},
+		})
+		require.NotNil(t, err)
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("subtest: filter, runner IDs, positive", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter, runner IDs, positive")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv1",
+		})
+		assert.Nil(t, err)
+
+		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-2",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv2",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter, runner IDs, positive")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner2))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter, runner IDs, positive")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				RunnerIDs: []string{runner0.Metadata.ID, runner2.Metadata.ID},
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(runnersResult.Runners))
+		assert.Equal(t, runner0.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, runner2.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+	})
+
+	t.Run("subtest: filter, runner IDs, non-existent", func(t *testing.T) {
+		t.Log("Running subtest filter, runner IDs, non-existent")
+		_, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				RunnerIDs: []string{nonExistentID},
+			},
+		})
+		assert.Nil(t, err)
+	})
+
+	t.Run("subtest: filter, runner IDs, invalid ID", func(t *testing.T) {
+		t.Log("Running subtest filter, runner IDs, invalid ID")
+		_, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				RunnerIDs: []string{invalidID},
+			},
+		})
+		require.NotNil(t, err)
+		assert.Equal(t, errors.EInternal, errors.ErrorCode(err))
+	})
+
+	t.Run("subtest: filter, get shared runners", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter, get shared runners")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		groupRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "group-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/group-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		groupRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "group-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/group-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv1",
+		})
+		assert.Nil(t, err)
+
+		sharedRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.SharedRunnerType,
+			Name:         "shared-runner-0",
+			ResourcePath: "shared-runner-0",
+			CreatedBy:    "someone-sv2",
+		})
+		assert.Nil(t, err)
+
+		sharedRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.SharedRunnerType,
+			Name:         "shared-runner-1",
+			ResourcePath: "shared-runner-1",
+			CreatedBy:    "someone-sv3",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter, get shared runners")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, groupRunner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, groupRunner1))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, sharedRunner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, sharedRunner1))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter, get shared runners")
+		localSharedRunnerType := models.SharedRunnerType
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				RunnerType: &localSharedRunnerType,
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(runnersResult.Runners))
+		assert.Equal(t, sharedRunner0.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, sharedRunner1.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+	})
+
+	t.Run("subtest: filter, get group runners", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter, get group runners")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		groupRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "group-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/group-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+		})
+		assert.Nil(t, err)
+
+		groupRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "group-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/group-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv1",
+		})
+		assert.Nil(t, err)
+
+		sharedRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.SharedRunnerType,
+			Name:         "shared-runner-0",
+			ResourcePath: "shared-runner-0",
+			CreatedBy:    "someone-sv2",
+		})
+		assert.Nil(t, err)
+
+		sharedRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.SharedRunnerType,
+			Name:         "shared-runner-1",
+			ResourcePath: "shared-runner-1",
+			CreatedBy:    "someone-sv3",
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter, get group runners")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, groupRunner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, groupRunner1))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, sharedRunner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, sharedRunner1))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter, get group runners")
+		localGroupRunnerType := models.GroupRunnerType
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				RunnerType: &localGroupRunnerType,
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(runnersResult.Runners))
+		assert.Equal(t, groupRunner0.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, groupRunner1.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+	})
+
+	t.Run("subtest: filter by run-untagged-jobs, true", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter by run-untagged-jobs, true")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:            models.GroupRunnerType,
+			Name:            "1-runner-0",
+			ResourcePath:    "top-level-group-0-for-runners/1-runner-0",
+			GroupID:         &group.Metadata.ID,
+			CreatedBy:       "someone-sv0",
+			RunUntaggedJobs: true,
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:            models.GroupRunnerType,
+			Name:            "1-runner-1",
+			ResourcePath:    "top-level-group-0-for-runners/1-runner-1",
+			GroupID:         &group.Metadata.ID,
+			CreatedBy:       "someone-sv1",
+			RunUntaggedJobs: false,
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter by run-untagged-jobs, true")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter by run-untagged-jobs, true")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				TagFilter: &RunnerTagFilter{
+					RunUntaggedJobs: ptr.Bool(true),
+				},
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(runnersResult.Runners))
+		assert.Equal(t, runner0.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+	})
+
+	t.Run("subtest: filter by run-untagged-jobs, false", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter by run-untagged-jobs, false")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:            models.GroupRunnerType,
+			Name:            "1-runner-0",
+			ResourcePath:    "top-level-group-0-for-runners/1-runner-0",
+			GroupID:         &group.Metadata.ID,
+			CreatedBy:       "someone-sv0",
+			RunUntaggedJobs: true,
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:            models.GroupRunnerType,
+			Name:            "1-runner-1",
+			ResourcePath:    "top-level-group-0-for-runners/1-runner-1",
+			GroupID:         &group.Metadata.ID,
+			CreatedBy:       "someone-sv1",
+			RunUntaggedJobs: false,
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter by run-untagged-jobs, false")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter by run-untagged-jobs, false")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				TagFilter: &RunnerTagFilter{
+					RunUntaggedJobs: ptr.Bool(false),
+				},
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(runnersResult.Runners))
+		assert.Equal(t, runner1.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+	})
+
+	t.Run("subtest: filter by tags, zero tags", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter by tags, zero tags")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+			Tags:         []string{},
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv1",
+			Tags:         []string{"tag1"},
+		})
+		assert.Nil(t, err)
+
+		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-2",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv2",
+			Tags:         []string{"tag1", "tag2"},
+		})
+		assert.Nil(t, err)
+
+		runner3, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-3",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-3",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv3",
+			Tags:         []string{"tag1", "tag2", "tag3"},
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter by tags, zero tags")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner2))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner3))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter by tags, zero tags")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				TagFilter: &RunnerTagFilter{
+					TagSubset: []string{},
+				},
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 4, len(runnersResult.Runners))
+		assert.Equal(t, runner0.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, runner1.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+		assert.Equal(t, runner2.Metadata.ID, runnersResult.Runners[2].Metadata.ID)
+		assert.Equal(t, runner3.Metadata.ID, runnersResult.Runners[3].Metadata.ID)
+	})
+
+	t.Run("subtest: filter by tags, one tag", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter by tags, one tag")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+			Tags:         []string{},
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv1",
+			Tags:         []string{"tag1"},
+		})
+		assert.Nil(t, err)
+
+		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-2",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv2",
+			Tags:         []string{"tag1", "tag2"},
+		})
+		assert.Nil(t, err)
+
+		runner3, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-3",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-3",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv3",
+			Tags:         []string{"tag1", "tag2", "tag3"},
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter by tags, one tag")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner2))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner3))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter by tags, one tag")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				TagFilter: &RunnerTagFilter{
+					TagSubset: []string{"tag1"},
+				},
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 3, len(runnersResult.Runners))
+		assert.Equal(t, runner1.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, runner2.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+		assert.Equal(t, runner3.Metadata.ID, runnersResult.Runners[2].Metadata.ID)
+	})
+
+	t.Run("subtest: filter by tags, two tags", func(t *testing.T) {
+
+		t.Log("Setting up subtest filter by tags, two tags")
+		group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+			Description: "top level group 0 for testing runner functions",
+			Name:        "top-level-group-0-for-runners",
+			FullPath:    "top-level-group-0-for-runners",
+			CreatedBy:   "someone-g0",
+		})
+		assert.Nil(t, err)
+
+		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-0",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv0",
+			Tags:         []string{},
+		})
+		assert.Nil(t, err)
+
+		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-1",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv1",
+			Tags:         []string{"tag1"},
+		})
+		assert.Nil(t, err)
+
+		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-2",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv2",
+			Tags:         []string{"tag1", "tag2"},
+		})
+		assert.Nil(t, err)
+
+		runner3, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+			Type:         models.GroupRunnerType,
+			Name:         "1-runner-3",
+			ResourcePath: "top-level-group-0-for-runners/1-runner-3",
+			GroupID:      &group.Metadata.ID,
+			CreatedBy:    "someone-sv3",
+			Tags:         []string{"tag1", "tag2", "tag3"},
+		})
+		assert.Nil(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Cleaning up subtest filter by tags, two tags")
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner0))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner1))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner2))
+			assert.Nil(t, testClient.client.Runners.DeleteRunner(ctx, runner3))
+			assert.Nil(t, testClient.client.Groups.DeleteGroup(ctx, group))
+		})
+
+		t.Log("Running subtest filter by tags, two tags")
+		runnersResult, err := testClient.client.Runners.GetRunners(ctx, &GetRunnersInput{
+			Sort: ptrRunnerSortableField(RunnerSortableFieldUpdatedAtAsc),
+			Filter: &RunnerFilter{
+				TagFilter: &RunnerTagFilter{
+					TagSubset: []string{"tag1", "tag2"},
+				},
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(runnersResult.Runners))
+		assert.Equal(t, runner2.Metadata.ID, runnersResult.Runners[0].Metadata.ID)
+		assert.Equal(t, runner3.Metadata.ID, runnersResult.Runners[1].Metadata.ID)
+	})
 }
 
 func TestCreateRunner(t *testing.T) {
@@ -939,5 +1566,3 @@ func createInitialRunners(ctx context.Context, testClient *testClient,
 
 	return result, resourcePath2ID, nil
 }
-
-// The End.

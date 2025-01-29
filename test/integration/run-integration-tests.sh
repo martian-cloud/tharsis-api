@@ -17,12 +17,19 @@ ldflagVarPrefix='gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/intern
 THARSIS_DB_TEST_CONTAINER_PORT=5432
 THARSIS_DB_TEST_INSTANCE_NAME=postgres-integration-test-server
 
-docker kill ${THARSIS_DB_TEST_INSTANCE_NAME} &> /dev/null || true
-docker run -d --rm --name ${THARSIS_DB_TEST_INSTANCE_NAME}        \
+function cleanup {
+	docker kill ${THARSIS_DB_TEST_INSTANCE_NAME} &> /dev/null || true
+	docker rm ${THARSIS_DB_TEST_INSTANCE_NAME} &> /dev/null || true
+}
+
+# Remove any existing container.
+cleanup
+
+docker run -d --name ${THARSIS_DB_TEST_INSTANCE_NAME}        	  \
 	-e POSTGRES_DB=${THARSIS_DB_TEST_NAME}                        \
 	-e POSTGRES_USER=${THARSIS_DB_TEST_USERNAME}                  \
 	-e POSTGRES_PASSWORD=${THARSIS_DB_TEST_PASSWORD}              \
-	-p ${THARSIS_DB_TEST_PORT}:${THARSIS_DB_TEST_CONTAINER_PORT}   \
+	-p ${THARSIS_DB_TEST_PORT}:${THARSIS_DB_TEST_CONTAINER_PORT}  \
 	postgres
 
 LIMIT=40
@@ -39,8 +46,11 @@ done
 if [ -z "${READY}" ]; then
 	echo "Docker container did not start in time."
 	docker logs ${THARSIS_DB_TEST_INSTANCE_NAME}
-	docker kill ${THARSIS_DB_TEST_INSTANCE_NAME}
+	cleanup # Ensure we clean up the container.
 	exit 1
 fi
 
 go test -count=1 -tags=integration --ldflags "-X ${ldflagVarPrefix}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${ldflagVarPrefix}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${ldflagVarPrefix}.TestDBName=${THARSIS_DB_TEST_NAME} -X ${ldflagVarPrefix}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${ldflagVarPrefix}.TestDBUser=${THARSIS_DB_TEST_USERNAME} -X ${ldflagVarPrefix}.TestDBPass=${THARSIS_DB_TEST_PASSWORD}" ./...
+
+# Clean up the container.
+cleanup
