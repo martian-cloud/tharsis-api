@@ -355,6 +355,20 @@ func (_m *MockClient) SaveJobLogs(ctx context.Context, jobID string, startOffset
 	return r0
 }
 
+// SetVariablesIncludedInTFConfig provides a mock function with given fields: ctx, runID, variableKeys
+func (_m *MockClient) SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error {
+	ret := _m.Called(ctx, runID, variableKeys)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string) error); ok {
+		r0 = rf(ctx, runID, variableKeys)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SubscribeToJobCancellationEvent provides a mock function with given fields: ctx, jobID
 func (_m *MockClient) SubscribeToJobCancellationEvent(ctx context.Context, jobID string) (<-chan *types.CancellationEvent, error) {
 	ret := _m.Called(ctx, jobID)

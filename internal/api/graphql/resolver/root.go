@@ -242,6 +242,18 @@ func (r RootResolver) UpdateApply(ctx context.Context, args *struct{ Input *Upda
 	return response, nil
 }
 
+// SetVariablesIncludedInTFConfig sets the variables that are included in the Terraform config.
+func (r RootResolver) SetVariablesIncludedInTFConfig(ctx context.Context, args *struct {
+	Input *SetVariablesIncludedInTFConfigInput
+}) (*RunMutationPayloadResolver, error) {
+	response, err := setVariablesIncludedInTFConfigMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Managed Identity / Credentials Queries and Mutations */
 
 // ManagedIdentity query returns a managed identity

@@ -332,6 +332,11 @@ func (r *RunVariableResolver) Value() *string {
 	return r.variable.Value
 }
 
+// IncludedInTFConfig resolver
+func (r *RunVariableResolver) IncludedInTFConfig() *bool {
+	return r.variable.IncludedInTFConfig
+}
+
 func runQuery(ctx context.Context, args *RunQueryArgs) (*RunResolver, error) {
 	runService := getRunService(ctx)
 
@@ -443,6 +448,14 @@ type CancelRunInput struct {
 	RunID            string
 }
 
+// SetVariablesIncludedInTFConfigInput is the input for setting variables
+// that are included in the Terraform config.
+type SetVariablesIncludedInTFConfigInput struct {
+	ClientMutationID *string
+	RunID            string
+	VariableKeys     []string
+}
+
 func handleRunMutationProblem(e error, clientMutationID *string) (*RunMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -542,6 +555,26 @@ func cancelRunMutation(ctx context.Context, input *CancelRunInput) (*RunMutation
 		Comment: input.Comment,
 		Force:   force,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: run, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
+func setVariablesIncludedInTFConfigMutation(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) (*RunMutationPayloadResolver, error) {
+	runID := gid.FromGlobalID(input.RunID)
+
+	// Set variables
+	if err := getRunService(ctx).SetVariablesIncludedInTFConfig(ctx, &run.SetVariablesIncludedInTFConfigInput{
+		RunID:        runID,
+		VariableKeys: input.VariableKeys,
+	}); err != nil {
+		return nil, err
+	}
+
+	run, err := getRunService(ctx).GetRun(ctx, runID)
 	if err != nil {
 		return nil, err
 	}

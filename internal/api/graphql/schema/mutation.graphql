@@ -71,6 +71,9 @@ type Mutation {
   cancelRun(input: CancelRunInput!): RunMutationPayload!
   updatePlan(input: UpdatePlanInput!): UpdatePlanPayload!
   updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
+  setVariablesIncludedInTFConfig(
+    input: SetVariablesIncludedInTFConfigInput!
+  ): SetVariablesIncludedInTFConfigPayload!
   createConfigurationVersion(
     input: CreateConfigurationVersionInput!
   ): ConfigurationVersionMutationPayload!

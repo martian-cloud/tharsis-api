@@ -452,6 +452,20 @@ func (_m *MockService) ProcessPlanData(ctx context.Context, planID string, _a2 *
 	return r0
 }
 
+// SetVariablesIncludedInTFConfig provides a mock function with given fields: ctx, input
+func (_m *MockService) SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error {
+	ret := _m.Called(ctx, input)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *SetVariablesIncludedInTFConfigInput) error); ok {
+		r0 = rf(ctx, input)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SubscribeToRunEvents provides a mock function with given fields: ctx, options
 func (_m *MockService) SubscribeToRunEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error) {
 	ret := _m.Called(ctx, options)

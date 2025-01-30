@@ -2172,3 +2172,115 @@ func TestSubscribeToRunEvents(t *testing.T) {
 		})
 	}
 }
+
+func TestSetVariablesIncludedInTFConfig(t *testing.T) {
+	runID := "run-1"
+	planID := "plan-1"
+
+	type testCase struct {
+		name            string
+		run             *models.Run
+		authError       error
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "set run variables",
+			run: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				PlanID: planID,
+			},
+		},
+		{
+			name: "not authorized to set run variables",
+			run: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: runID,
+				},
+				PlanID: planID,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "run not found",
+			expectErrorCode: errors.ENotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockRuns := db.NewMockRuns(t)
+			mockCaller := auth.NewMockCaller(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+
+			sampleVariables := []Variable{
+				{
+					Key:           "my_var",
+					Value:         ptr.String("my value"),
+					NamespacePath: ptr.String("group/workspace"),
+					Category:      models.TerraformVariableCategory,
+				},
+				{
+					Key:      "my_var2",
+					Value:    ptr.String("my value2"),
+					Category: models.TerraformVariableCategory,
+				},
+				{
+					Key:      "my_var",
+					Value:    ptr.String("my value"),
+					Category: models.EnvironmentVariableCategory,
+				},
+			}
+
+			mockRuns.On("GetRun", mock.Anything, runID).Return(tc.run, nil)
+
+			if tc.run != nil {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdatePlanPermission, mock.Anything).Return(tc.authError)
+
+				if tc.authError == nil {
+					data, err := json.Marshal(sampleVariables)
+					require.NoError(t, err)
+
+					mockArtifactStore.On("GetRunVariables", mock.Anything, tc.run).Return(io.NopCloser(bytes.NewReader(data)), nil)
+
+					// Should only mark first variable as used.
+					sampleVariables[0].IncludedInTFConfig = ptr.Bool(true)
+					sampleVariables[1].IncludedInTFConfig = ptr.Bool(false)
+
+					data, err = json.Marshal(sampleVariables)
+					require.NoError(t, err)
+
+					mockArtifactStore.On("UploadRunVariables", mock.Anything, tc.run, bytes.NewReader(data)).Return(nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				artifactStore: mockArtifactStore,
+			}
+
+			err := service.SetVariablesIncludedInTFConfig(auth.WithCaller(ctx, mockCaller), &SetVariablesIncludedInTFConfigInput{
+				RunID:        runID,
+				VariableKeys: []string{"my_var"},
+			})
+
+			if tc.expectErrorCode != "" {
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
