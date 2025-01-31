@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // GetUsersInput is the input for listing users
@@ -23,12 +24,19 @@ type GetUsersInput struct {
 	Search *string
 }
 
+// UpdateAdminStatusForUserInput is the input for setting / unsetting users as admin.
+type UpdateAdminStatusForUserInput struct {
+	UserID string
+	Admin  bool
+}
+
 // Service implements all user related functionality
 type Service interface {
 	GetUserByID(ctx context.Context, userID string) (*models.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
 	GetUsers(ctx context.Context, input *GetUsersInput) (*db.UsersResult, error)
 	GetUsersByIDs(ctx context.Context, idList []string) ([]models.User, error)
+	UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdminStatusForUserInput) (*models.User, error)
 }
 
 type service struct {
@@ -148,4 +156,67 @@ func (s *service) GetUsersByIDs(ctx context.Context, idList []string) ([]models.
 	}
 
 	return resp.Users, nil
+}
+
+func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdminStatusForUserInput) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.UpdateAdminStatusForUser")
+	span.SetAttributes(attribute.String("userID", input.UserID))
+	span.SetAttributes(attribute.Bool("admin", input.Admin))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can update admin status for other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if !userCaller.IsAdmin() {
+		return nil, errors.New("only admins users can alter admin status of other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	// Nothing wrong with this just prevents accidental changes to self.
+	if input.UserID == userCaller.User.Metadata.ID {
+		return nil, errors.New("a user cannot alter their own admin status", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	user, err := s.dbClient.Users.GetUserByID(ctx, input.UserID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user by ID", errors.WithSpan(span))
+	}
+
+	if user == nil {
+		return nil, errors.New("user with id %s not found", input.UserID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if !user.Active && input.Admin {
+		return nil, errors.New("user %s is not active in the system; only active users can be granted admin rights",
+			user.Username,
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	if user.Admin == input.Admin {
+		// Short-circuit since we're already updated.
+		return user, nil
+	}
+
+	user.Admin = input.Admin
+
+	updateUser, err := s.dbClient.Users.UpdateUser(ctx, user)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
+	}
+
+	s.logger.Infow("Updated the admin status of a user.",
+		"caller", caller.GetSubject(),
+		"email", user.Email,
+		"admin", input.Admin,
+	)
+
+	return updateUser, nil
 }

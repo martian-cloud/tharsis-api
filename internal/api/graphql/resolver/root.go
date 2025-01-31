@@ -622,6 +622,16 @@ func (r RootResolver) Users(ctx context.Context, args *UserConnectionQueryArgs) 
 	return usersQuery(ctx, args)
 }
 
+// UpdateUserAdminStatus updates the admin status of a user.
+func (r RootResolver) UpdateUserAdminStatus(ctx context.Context, args *struct{ Input *UpdateUserAdminStatusInput }) (*UserMutationPayloadResolver, error) {
+	response, err := updateUserAdminStatusMutation(ctx, args.Input)
+	if err != nil {
+		return handleUserMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Teams Queries and Mutations */
 
 // Team query returns a team by name

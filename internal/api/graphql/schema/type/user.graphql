@@ -14,6 +14,12 @@ type UserEdge {
   node: User
 }
 
+type UpdateUserAdminStatusPayload {
+  clientMutationId: String
+  user: User
+  problems: [Problem!]!
+}
+
 type User implements Node {
   id: ID!
   metadata: ResourceMetadata!
@@ -47,4 +53,9 @@ type User implements Node {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+}
+
+input UpdateUserAdminStatusInput {
+  userId: String!
+  admin: Boolean!
 }
