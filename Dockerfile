@@ -11,7 +11,7 @@ RUN make build-api
 RUN make build-job-executor
 RUN make build-runner
 
-FROM gcr.io/distroless/static-debian11:nonroot as distroless-base
+FROM gcr.io/distroless/static-debian12:nonroot as distroless-base
 WORKDIR /app/
 
 FROM distroless-base AS api
