@@ -53,24 +53,24 @@ func TestIsHCLVariable(t *testing.T) {
 		},
 		// Complex types
 		{
-			name:      "no type, a bool should be treated as a complex type",
+			name:      "no type, a bool should be treated as a string type",
 			rawValue:  ptr.String("true"),
-			expectHCL: true,
+			expectHCL: false,
 		},
 		{
-			name:      "no type, a boolean expression should be treated as a complex type",
+			name:      "no type, a boolean expression should be treated as a string type",
 			rawValue:  ptr.String(`1 == 1`),
-			expectHCL: true,
+			expectHCL: false,
 		},
 		{
-			name:      "no type, a number should be treated as a complex type",
+			name:      "no type, a number should be treated as a string type",
 			rawValue:  ptr.String("123"),
-			expectHCL: true,
+			expectHCL: false,
 		},
 		{
-			name:      "no type, a number expression should be treated as a complex type",
+			name:      "no type, a number expression should be treated as a string type",
 			rawValue:  ptr.String(`1 + 1`),
-			expectHCL: true,
+			expectHCL: false,
 		},
 		{
 			name:      "no type, a list should be treated as a complex type",
