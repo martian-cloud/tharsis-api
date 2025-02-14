@@ -52,14 +52,21 @@ type Config struct {
 	ObjectStorePluginData    map[string]string `yaml:"object_store_plugin_data"`
 	RateLimitStorePluginData map[string]string `yaml:"rate_limit_store_plugin_data" env:"RATE_LIMIT_STORE_PLUGIN_DATA"`
 	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data"`
+	EmailClientPluginData    map[string]string `yaml:"email_client_plugin_data"`
 
-	// Plugin Typ
+	// Plugin Type
 	ObjectStorePluginType    string `yaml:"object_store_plugin_type" env:"OBJECT_STORE_PLUGIN_TYPE"`
 	RateLimitStorePluginType string `yaml:"rate_limit_store_plugin_type" env:"RATE_LIMIT_STORE_PLUGIN_TYPE"`
 	JWSProviderPluginType    string `yaml:"jws_provider_plugin_type" env:"JWS_PROVIDER_PLUGIN_TYPE"`
+	EmailClientPluginType    string `yaml:"email_client_plugin_type" env:"EMAIL_CLIENT_PLUGIN_TYPE"`
+
+	EmailFooter string `yaml:"email_footer" env:"EMAIL_FOOTER"`
 
 	// The external facing URL for the Tharsis API
 	TharsisAPIURL string `yaml:"tharsis_api_url" env:"API_URL"`
+
+	// The external facing URL for the Tharsis Frontend UI
+	TharsisUIURL string `yaml:"tharsis_ui_url" env:"UI_URL"`
 
 	TLSEnabled bool `yaml:"tls_enabled" env:"TLS_ENABLED"`
 
@@ -210,6 +217,10 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		c.RateLimitStorePluginData = make(map[string]string)
 	}
 
+	if c.EmailClientPluginData == nil {
+		c.EmailClientPluginData = make(map[string]string)
+	}
+
 	// Load JWS Provider plugin data
 	for k, v := range loadPluginData("THARSIS_JWS_PROVIDER_PLUGIN_DATA_") {
 		c.JWSProviderPluginData[k] = v
@@ -223,6 +234,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load Rate Limiter plugin data
 	for k, v := range loadPluginData("THARSIS_RATE_LIMIT_STORE_PLUGIN_DATA_") {
 		c.RateLimitStorePluginData[k] = v
+	}
+
+	// Load Email Client plugin data
+	for k, v := range loadPluginData("THARSIS_EMAIL_CLIENT_PLUGIN_DATA_") {
+		c.EmailClientPluginData[k] = v
 	}
 
 	// Default ServiceAccountIssuerURL to TharsisURL

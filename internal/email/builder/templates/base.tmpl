@@ -1,0 +1,108 @@
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+
+<head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" /><!--$-->
+    <style type="text/css" rel="stylesheet" media="all">
+        p {
+            margin: 0;
+        }
+
+        ul {
+            margin: 0;
+        }
+
+        h6 {
+            margin: 0;
+        }
+
+        .primary-button {
+            line-height: 100%;
+            text-decoration: none;
+            display: block;
+            max-width: 100%;
+            mso-padding-alt: 0px;
+            background-color: #4db6ac;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            width: 100%;
+            padding: 10px 10px 10px 10px;
+        }
+
+        .primary-button-text {
+            max-width: 100%;
+            display: inline-block;
+            line-height: 120%;
+            mso-padding-alt: 0px;
+            mso-text-raise: 7.5px;
+        }
+
+        .divider {
+            width: 100%;
+            border: none;
+            border-top: 1px solid #eaeaea;
+            border-color: #e6ebf1;
+            margin: 20px 0
+        }
+
+        .text {
+            font-size: 16px;
+            line-height: 24px;
+            color: #525f7f;
+            text-align: left;
+        }
+
+        .gutter-bottom {
+            margin-bottom: 16px;
+        }
+
+        .body {
+            background-color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Ubuntu, sans-serif
+        }
+
+        .parent-table {
+            max-width: 37.5em;
+            background-color: #ffffff;
+            margin: 0 auto;
+            padding: 20px 0 48px;
+            margin-bottom: 64px
+        }
+
+        .link {
+            color: #4db6ac;
+            text-decoration: none
+        }
+    </style>
+</head>
+
+<body class="body">
+    <table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"
+        class="parent-table">
+        <tbody>
+            <tr style="width:100%">
+                <td>
+                    <table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"
+                        style="padding:0 48px">
+                        <tbody>
+                            <tr>
+                                <td>
+                                    {{.Body}}
+                                    <hr class="divider" />
+                                    {{.Footer}}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+
+</html>

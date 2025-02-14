@@ -14,6 +14,17 @@
             "envFile": "${workspaceFolder}/.env",
             "args": [],
             "stopOnEntry": false,
+        },
+        {
+            "name": "Email Preview",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/oss/internal/email/preview",
+            "env": {},
+            "envFile": "${workspaceFolder}/oss/.env",
+            "args": [],
+            "stopOnEntry": false,
         }
     ]
 }
