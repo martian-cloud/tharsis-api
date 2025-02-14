@@ -6,7 +6,6 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-	"github.com/zclconf/go-cty/cty"
 )
 
 // isHCLVariable determines if a variable is a complex type or a simple string.
@@ -43,7 +42,8 @@ func isHCLVariable(rawValue *string, v *tfconfig.Variable) bool {
 			return false
 		}
 
-		if ctyVal.Type().Equals(cty.String) {
+		// We will always convert primitive types (i.e. string, number, bool) to a string
+		if ctyVal.Type().IsPrimitiveType() {
 			// The raw value is quoted string.
 			return false
 		}

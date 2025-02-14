@@ -1728,7 +1728,7 @@ func (s *service) refreshOAuthToken(ctx context.Context, provider Provider, vp *
 		return *vp.OAuthAccessToken, nil
 	}
 
-	if vp.OAuthAccessTokenExpiresAt != nil && vp.OAuthAccessTokenExpiresAt.After(time.Now().Add(-tokenExpirationLeeway)) {
+	if vp.OAuthAccessTokenExpiresAt != nil && vp.OAuthAccessTokenExpiresAt.After(time.Now().Add(tokenExpirationLeeway)) {
 		// Since the access token hasn't expired yet, continue to use it.
 		return *vp.OAuthAccessToken, nil
 	}
