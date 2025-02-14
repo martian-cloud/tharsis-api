@@ -15,13 +15,15 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-type eventType string
+// EventType identifies the type of an event.
+type EventType string
 
 const (
-	runEventType   eventType = "run"
-	planEventType  eventType = "plan"
-	applyEventType eventType = "apply"
-	jobEventType   eventType = "job"
+	// RunEventType is for run events.
+	RunEventType   EventType = "run"
+	planEventType  EventType = "plan"
+	applyEventType EventType = "apply"
+	jobEventType   EventType = "job"
 )
 
 var (
@@ -33,13 +35,13 @@ var (
 	runFinished   = metric.NewCounter("run_completed_count", "Amount of times a run is completed.")
 )
 
-type eventHandlerFunc func(ctx context.Context, eventType eventType, old interface{}, new interface{}) error
+type eventHandlerFunc func(ctx context.Context, eventType EventType, old interface{}, new interface{}) error
 
 // RunStateManager is used to manage state changes for run resources
 type RunStateManager struct {
 	dbClient   *db.Client
 	logger     logger.Logger
-	handlerMap map[eventType][]eventHandlerFunc
+	handlerMap map[EventType][]eventHandlerFunc
 }
 
 // NewRunStateManager creates a new RunStateManager instance
@@ -47,7 +49,7 @@ func NewRunStateManager(dbClient *db.Client, logger logger.Logger) *RunStateMana
 	manager := &RunStateManager{
 		dbClient:   dbClient,
 		logger:     logger,
-		handlerMap: map[eventType][]eventHandlerFunc{},
+		handlerMap: map[EventType][]eventHandlerFunc{},
 	}
 
 	registerRunHandlers(manager)
@@ -59,14 +61,15 @@ func NewRunStateManager(dbClient *db.Client, logger logger.Logger) *RunStateMana
 	return manager
 }
 
-func (r *RunStateManager) registerHandler(eventType eventType, handler eventHandlerFunc) {
+// RegisterHandler registers an event handler for a particular event type.
+func (r *RunStateManager) RegisterHandler(eventType EventType, handler eventHandlerFunc) {
 	if _, ok := r.handlerMap[eventType]; !ok {
 		r.handlerMap[eventType] = []eventHandlerFunc{}
 	}
 	r.handlerMap[eventType] = append(r.handlerMap[eventType], handler)
 }
 
-func (r *RunStateManager) fireEvent(ctx context.Context, eventType eventType, old interface{}, new interface{}) error {
+func (r *RunStateManager) fireEvent(ctx context.Context, eventType EventType, old interface{}, new interface{}) error {
 	for _, h := range r.handlerMap[eventType] {
 		// Use retry handler here for optimistic lock errors since these are internal updates and
 		// we don't want to return until the handler completes successfully.
@@ -178,7 +181,7 @@ func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 		return nil, err
 	}
 
-	if err := r.fireEvent(txContext, runEventType, oldRun, updatedRun); err != nil {
+	if err := r.fireEvent(txContext, RunEventType, oldRun, updatedRun); err != nil {
 		return nil, err
 	}
 
@@ -313,13 +316,13 @@ type runHandlers struct {
 
 func registerRunHandlers(manager *RunStateManager) {
 	handlers := &runHandlers{manager: manager}
-	manager.registerHandler(runEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
 	})
-	manager.registerHandler(planEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
 	})
-	manager.registerHandler(applyEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(applyEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleApplyStateChangeEvent(ctx, old.(*models.Apply), new.(*models.Apply))
 	})
 }
@@ -409,7 +412,7 @@ type planHandlers struct {
 
 func registerPlanHandlers(manager *RunStateManager) {
 	handlers := &planHandlers{manager: manager}
-	manager.registerHandler(jobEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
 	})
 }
@@ -449,7 +452,7 @@ type applyHandlers struct {
 
 func registerApplyHandlers(manager *RunStateManager) {
 	handlers := &applyHandlers{manager: manager}
-	manager.registerHandler(jobEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
 	})
 }
@@ -489,10 +492,10 @@ type jobHandlers struct {
 
 func registerJobHandlers(manager *RunStateManager) {
 	handlers := &jobHandlers{manager: manager}
-	manager.registerHandler(planEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
 	})
-	manager.registerHandler(applyEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(applyEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleApplyStateChangeEvent(ctx, old.(*models.Apply), new.(*models.Apply))
 	})
 }
@@ -595,10 +598,10 @@ type workspaceHandlers struct {
 
 func registerWorkspaceHandlers(manager *RunStateManager) {
 	handlers := &workspaceHandlers{manager: manager}
-	manager.registerHandler(runEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
 	})
-	manager.registerHandler(jobEventType, func(ctx context.Context, _ eventType, old interface{}, new interface{}) error {
+	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
 	})
 }

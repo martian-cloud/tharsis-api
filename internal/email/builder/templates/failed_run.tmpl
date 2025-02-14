@@ -1,0 +1,57 @@
+<h6 class="text" style="color:red;">
+    {{.this.Title}}
+</h6>
+<hr class="divider" />
+
+<p class="text">
+    <strong>Workspace:</strong>
+</p>
+<p class="text gutter-bottom">
+    <a href="{{.common.FrontendURL}}/groups/{{.this.WorkspacePath}}" class="link" target="_blank">
+        {{.this.WorkspacePath}}
+    </a>
+</p>
+
+{{if .this.ModuleSource}}
+<p class="text">
+    <strong>Module Source:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.ModuleSource}}
+</p>
+{{end}}
+
+{{if .this.ModuleVersion}}
+<p class="text">
+    <strong>Module Version:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.ModuleVersion}}
+</p>
+{{end}}
+
+<p class="text">
+    <strong>Triggered By:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.CreatedBy}}
+</p>
+
+{{if .this.ErrorMessage}}
+<p class="text">
+    <strong>Error Message:</strong>
+</p>
+<p class="text gutter-bottom">
+<pre>
+    {{.this.ErrorMessage}}
+</pre>
+</p>
+{{end}}
+
+<a class="primary-button" style="margin-top: 24px;"
+    href="{{.common.FrontendURL}}/groups/{{.this.WorkspacePath}}/-/runs/{{.this.RunID}}/{{.this.RunStage}}"
+    target="_blank">
+    <span class="primary-button-text">
+        View Run
+    </span>
+</a>

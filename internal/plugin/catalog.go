@@ -3,13 +3,19 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter/memorystore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/plunk"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/ses"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/smtp"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
@@ -26,6 +32,7 @@ type Catalog struct {
 	JWSProvider           jws.Provider
 	GraphqlRateLimitStore ratelimitstore.Store
 	HTTPRateLimitStore    ratelimitstore.Store
+	EmailProvider         email.Provider
 }
 
 // NewCatalog creates a new Catalog
@@ -53,11 +60,17 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		return nil, err
 	}
 
+	emailProvider, err := newEmailProvider(ctx, logger, cfg.EmailClientPluginType, cfg.EmailClientPluginData)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Catalog{
 		ObjectStore:           objectStore,
 		JWSProvider:           jwsProvider,
 		GraphqlRateLimitStore: graphqlRateLimitStore,
 		HTTPRateLimitStore:    httpRateLimitStore,
+		EmailProvider:         emailProvider,
 	}, nil
 }
 
@@ -151,4 +164,82 @@ func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Conf
 	}
 
 	return plugin, err
+}
+
+func newEmailProvider(ctx context.Context, logger logger.Logger, pluginType string, pluginData map[string]string) (email.Provider, error) {
+	switch pluginType {
+	case "smtp":
+		smtpHost, ok := pluginData["smtp_host"]
+		if !ok {
+			return nil, errors.New("'smtp_host' is required when using the smtp email client plugin")
+		}
+		smtpPortRaw, ok := pluginData["smtp_port"]
+		if !ok {
+			return nil, errors.New("'smtp_port' is required when using the smtp email client plugin")
+		}
+		fromAddress, ok := pluginData["from_address"]
+		if !ok {
+			return nil, errors.New("'from_address' is required when using the smtp email client plugin")
+		}
+		smtpUsername, ok := pluginData["smtp_username"]
+		if !ok {
+			return nil, errors.New("'smtp_username' is required when using the smtp email client plugin")
+		}
+		smtpPassword, ok := pluginData["smtp_password"]
+		if !ok {
+			return nil, errors.New("'smtp_password' is required when using the smtp email client plugin")
+		}
+
+		disableTLS := false
+
+		disableTLSRaw, ok := pluginData["disable_tls"]
+		if ok {
+			val, err := strconv.ParseBool(disableTLSRaw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse 'disable_tls option for smpt plugin: %v", err)
+			}
+			disableTLS = val
+		}
+
+		smtpPort, err := strconv.Atoi(smtpPortRaw)
+		if err != nil {
+			return nil, fmt.Errorf("port must be a valid integer: %v", err)
+		}
+
+		return smtp.NewProvider(logger, smtpHost, smtpPort, fromAddress, smtpUsername, smtpPassword, disableTLS), nil
+	case "ses":
+		fromAddress, ok := pluginData["from_address"]
+		if !ok {
+			return nil, errors.New("'from_address' is required when using the ses email client plugin")
+		}
+		awsConfigSetName, ok := pluginData["aws_configuration_set_name"]
+		if !ok {
+			return nil, errors.New("'aws_configuration_set_name' is required when using the ses email client plugin")
+		}
+		region, ok := pluginData["region"]
+		if !ok {
+			return nil, errors.New("'region' is required when using the ses email client plugin")
+		}
+
+		sesClient, err := ses.NewProvider(ctx, logger, fromAddress, awsConfigSetName, region)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load ses email plugin: %v", err)
+		}
+
+		return sesClient, nil
+	case "plunk":
+		endpoint, ok := pluginData["endpoint"]
+		if !ok {
+			return nil, errors.New("'endpoint' is required when using the plunk email client plugin")
+		}
+		apiKey, ok := pluginData["api_key"]
+		if !ok {
+			return nil, errors.New("'api_key' is required when using the plunk email client plugin")
+		}
+		return plunk.NewProvider(logger, endpoint, apiKey), nil
+	case "":
+		return &email.NoopProvider{}, nil
+	default:
+		return nil, fmt.Errorf("the specified email client plugin %s is not currently supported", pluginType)
+	}
 }

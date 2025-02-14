@@ -50,5 +50,8 @@
     },
     "[typescriptreact]": {
         "editor.insertSpaces": true
+    },
+    "files.associations": {
+        "*.tmpl": "html"
     }
 }
