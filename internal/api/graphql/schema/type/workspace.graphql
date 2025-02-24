@@ -46,6 +46,12 @@ type UnlockWorkspacePayload {
   problems: [Problem!]!
 }
 
+type DestroyWorkspacePayload {
+  clientMutationId: String
+  run: Run
+  problems: [Problem!]!
+}
+
 type WorkspaceEvent {
   action: String!
   workspace: Workspace!
@@ -174,6 +180,11 @@ input LockWorkspaceInput {
 }
 
 input UnlockWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
+}
+
+input DestroyWorkspaceInput {
   clientMutationId: String
   workspacePath: String!
 }
