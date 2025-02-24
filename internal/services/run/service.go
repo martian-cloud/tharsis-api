@@ -93,7 +93,7 @@ type CreateRunInput struct {
 	Comment                *string
 	ModuleSource           *string
 	ModuleVersion          *string
-	Speculative            *bool // optional field, default depends on module source vs. configuration version
+	Speculative            *bool // optional field, defaults to false unless using a speculative configuration version
 	WorkspaceID            string
 	TerraformVersion       string
 	Variables              []Variable
@@ -101,6 +101,13 @@ type CreateRunInput struct {
 	IsDestroy              bool
 	Refresh                bool
 	RefreshOnly            bool
+	UseRunVariablesOnly    bool
+}
+
+// CreateDestroyRunForWorkspaceInput is the input for creating a destroy run using the current
+// configuration version or module that is applied.
+type CreateDestroyRunForWorkspaceInput struct {
+	WorkspaceID string
 }
 
 // Validate attempts to ensure the CreateRunInput structure is in good form and able to be used.
@@ -157,6 +164,7 @@ type Service interface {
 	CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error)
 	ApplyRun(ctx context.Context, runID string, comment *string) (*models.Run, error)
 	CancelRun(ctx context.Context, options *CancelRunInput) (*models.Run, error)
+	CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error)
 	GetRunVariables(ctx context.Context, runID string) ([]Variable, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
@@ -359,17 +367,9 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	return outgoing, nil
 }
 
-// CreateRun creates a new run and associates a Plan with it
-func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error) {
-	ctx, span := tracer.Start(ctx, "svc.CreateRun")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateDestroyRunForWorkspace")
 	defer span.End()
-
-	err := options.Validate()
-	if err != nil {
-		tracing.RecordError(span, err, "failed to validate create run options")
-		return nil, err
-	}
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
@@ -383,8 +383,110 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
+	// Get the workspace
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace with ID %s", options.WorkspaceID, errors.WithSpan(span))
+	}
+
+	if workspace == nil {
+		return nil, errors.New("workspace not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if workspace.CurrentStateVersionID == "" {
+		return nil, errors.New(
+			"destroy run cannot be created because workspace has no current state version",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get the current state version for the workspace
+	stateVersion, err := s.dbClient.StateVersions.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get state version with ID %s", workspace.CurrentStateVersionID, errors.WithSpan(span))
+	}
+
+	if stateVersion == nil {
+		return nil, errors.New("state version not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if stateVersion.RunID == nil {
+		return nil, errors.New(
+			"cannot create destroy run because state version was created manually and has no module or configuration version associated",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get the run
+	run, err := s.dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run with ID %s", *stateVersion.RunID, errors.WithSpan(span))
+	}
+
+	if run == nil {
+		return nil, errors.New("run not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Get run variables
+	variables, err := s.getRunVariables(ctx, run, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run variables for run with ID %s", run.Metadata.ID, errors.WithSpan(span))
+	}
+
+	destroyRunInput := &CreateRunInput{
+		IsDestroy:              true,
+		WorkspaceID:            options.WorkspaceID,
+		ConfigurationVersionID: run.ConfigurationVersionID,
+		ModuleSource:           run.ModuleSource,
+		ModuleVersion:          run.ModuleVersion,
+		Variables:              variables,
+		// Set UseRunVariablesOnly to true so that we don't use the workspace and inherited group variables for the destroy run
+		UseRunVariablesOnly: true,
+	}
+
+	return s.createRun(ctx, destroyRunInput)
+}
+
+// CreateRun creates a new run and associates a Plan with it
+func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateRun")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.createRun(ctx, options)
+}
+
+// CreateRun creates a new run and associates a Plan with it
+func (s *service) createRun(ctx context.Context, options *CreateRunInput) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.createRun")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	if err = options.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate create run options")
+		return nil, err
+	}
+
 	// Build run variables
-	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables)
+	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables, options.UseRunVariablesOnly)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to build run variables")
 		return nil, errors.Wrap(
@@ -1418,7 +1520,6 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 
 func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetRunVariables")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -1449,27 +1550,9 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 		return nil, err
 	}
 
-	result, err := s.artifactStore.GetRunVariables(ctx, run)
+	variables, err := s.getRunVariables(ctx, run, includeValues)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get run variables from object store")
-		return nil, errors.Wrap(
-			err,
-			"Failed to get run variables from object store",
-		)
-	}
-
-	defer result.Close()
-
-	var variables []Variable
-	if err := json.NewDecoder(result).Decode(&variables); err != nil {
-		tracing.RecordError(span, err, "failed to decode run variables")
 		return nil, err
-	}
-
-	if !includeValues {
-		for i := range variables {
-			variables[i].Value = nil
-		}
 	}
 
 	// Sort variable list
@@ -1977,38 +2060,37 @@ func (s *service) GetStateVersionsByRunIDs(ctx context.Context, runIDs []string)
 	return []models.StateVersion{}, nil
 }
 
-func (s *service) buildRunVariables(ctx context.Context, workspaceID string, runVariables []Variable) ([]Variable, error) {
-	// Get Workspace
-	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+func (s *service) getRunVariables(ctx context.Context, run *models.Run, includeValues bool) ([]Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.getRunVariables")
+	defer span.End()
+
+	result, err := s.artifactStore.GetRunVariables(ctx, run)
 	if err != nil {
+		tracing.RecordError(span, err, "failed to get run variables from object store")
+		return nil, errors.Wrap(
+			err,
+			"Failed to get run variables from object store",
+		)
+	}
+
+	defer result.Close()
+
+	var variables []Variable
+	if err := json.NewDecoder(result).Decode(&variables); err != nil {
+		tracing.RecordError(span, err, "failed to decode run variables")
 		return nil, err
 	}
 
-	if ws == nil {
-		return nil, fmt.Errorf("workspace with id %s not found", workspaceID)
+	if !includeValues {
+		for i := range variables {
+			variables[i].Value = nil
+		}
 	}
 
-	pathParts := strings.Split(ws.FullPath, "/")
+	return variables, nil
+}
 
-	namespacePaths := []string{}
-	for len(pathParts) > 0 {
-		namespacePaths = append(namespacePaths, strings.Join(pathParts, "/"))
-		// Remove last element
-		pathParts = pathParts[:len(pathParts)-1]
-	}
-
-	// Use a descending sort so the variables from the closest ancestor will take precedence
-	sortBy := db.VariableSortableFieldNamespacePathDesc
-	result, err := s.dbClient.Variables.GetVariables(ctx, &db.GetVariablesInput{
-		Filter: &db.VariableFilter{
-			NamespacePaths: namespacePaths,
-		},
-		Sort: &sortBy,
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func (s *service) buildRunVariables(ctx context.Context, workspaceID string, runVariables []Variable, useRunVariablesOnly bool) ([]Variable, error) {
 	variableMap := map[string]Variable{}
 
 	buildMapKey := func(key string, category string) string {
@@ -2029,17 +2111,50 @@ func (s *service) buildRunVariables(ctx context.Context, workspaceID string, run
 		}
 	}
 
-	for _, v := range result.Variables {
-		vCopy := v
+	if !useRunVariablesOnly {
+		// Get Workspace
+		ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+		if err != nil {
+			return nil, err
+		}
 
-		keyAndCategory := buildMapKey(v.Key, string(v.Category))
-		if _, ok := variableMap[keyAndCategory]; !ok {
-			variableMap[keyAndCategory] = Variable{
-				Key:           v.Key,
-				Value:         v.Value,
-				Category:      v.Category,
-				Hcl:           v.Hcl,
-				NamespacePath: &vCopy.NamespacePath,
+		if ws == nil {
+			return nil, fmt.Errorf("workspace with id %s not found", workspaceID)
+		}
+
+		pathParts := strings.Split(ws.FullPath, "/")
+
+		namespacePaths := []string{}
+		for len(pathParts) > 0 {
+			namespacePaths = append(namespacePaths, strings.Join(pathParts, "/"))
+			// Remove last element
+			pathParts = pathParts[:len(pathParts)-1]
+		}
+
+		// Use a descending sort so the variables from the closest ancestor will take precedence
+		sortBy := db.VariableSortableFieldNamespacePathDesc
+		result, err := s.dbClient.Variables.GetVariables(ctx, &db.GetVariablesInput{
+			Filter: &db.VariableFilter{
+				NamespacePaths: namespacePaths,
+			},
+			Sort: &sortBy,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, v := range result.Variables {
+			vCopy := v
+
+			keyAndCategory := buildMapKey(v.Key, string(v.Category))
+			if _, ok := variableMap[keyAndCategory]; !ok {
+				variableMap[keyAndCategory] = Variable{
+					Key:           v.Key,
+					Value:         v.Value,
+					Category:      v.Category,
+					Hcl:           v.Hcl,
+					NamespacePath: &vCopy.NamespacePath,
+				}
 			}
 		}
 	}

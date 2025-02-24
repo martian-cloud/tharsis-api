@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -539,6 +540,12 @@ type UnlockWorkspaceInput struct {
 	WorkspacePath    string
 }
 
+// DestroyWorkspaceInput contains the input for destroying a workspace
+type DestroyWorkspaceInput struct {
+	ClientMutationID *string
+	WorkspacePath    string
+}
+
 // MigrateWorkspaceInput contains the input for migrating a workspace
 type MigrateWorkspaceInput struct {
 	ClientMutationID *string
@@ -742,6 +749,23 @@ func unlockWorkspaceMutation(ctx context.Context, input *UnlockWorkspaceInput) (
 
 	payload := WorkspaceMutationPayload{ClientMutationID: input.ClientMutationID, Workspace: ws, Problems: []Problem{}}
 	return &WorkspaceMutationPayloadResolver{WorkspaceMutationPayload: payload}, nil
+}
+
+func destroyWorkspaceMutation(ctx context.Context, input *DestroyWorkspaceInput) (*RunMutationPayloadResolver, error) {
+	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	run, err := getRunService(ctx).CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
+		WorkspaceID: ws.Metadata.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: run, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
 }
 
 func migrateWorkspaceMutation(ctx context.Context, input *MigrateWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {

@@ -111,6 +111,17 @@ func (r RootResolver) MigrateWorkspace(ctx context.Context,
 	return response, nil
 }
 
+// DestroyWorkspace creates a destroy run for an existing workspace
+func (r RootResolver) DestroyWorkspace(ctx context.Context,
+	args *struct{ Input *DestroyWorkspaceInput }) (*RunMutationPayloadResolver, error) {
+	response, err := destroyWorkspaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* State Version Queries and Mutations */
 
 // CreateStateVersion creates a new state version
