@@ -117,6 +117,12 @@ func (r *NodeResolver) ToNamespaceVariable() (*NamespaceVariableResolver, bool) 
 	return res, ok
 }
 
+// ToNamespaceVariableVersion resolver
+func (r *NodeResolver) ToNamespaceVariableVersion() (*NamespaceVariableVersionResolver, bool) {
+	res, ok := r.result.(*NamespaceVariableVersionResolver)
+	return res, ok
+}
+
 // ToWorkspace resolver
 func (r *NodeResolver) ToWorkspace() (*WorkspaceResolver, bool) {
 	res, ok := r.result.(*WorkspaceResolver)
@@ -334,6 +340,13 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &NamespaceVariableResolver{variable: variable}
+	case gid.VariableVersionType:
+		version, err := getVariableService(ctx).GetVariableVersionByID(ctx, parsedGlobalID.ID, false)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &NamespaceVariableVersionResolver{version: version}
 	case gid.WorkspaceType:
 		workspace, err := getWorkspaceService(ctx).GetWorkspaceByID(ctx, parsedGlobalID.ID)
 		if err != nil {

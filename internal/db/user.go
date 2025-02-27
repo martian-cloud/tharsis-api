@@ -320,7 +320,6 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 
 func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User, error) {
 	ctx, span := tracer.Start(ctx, "db.CreateUser")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	timestamp := currentTime()

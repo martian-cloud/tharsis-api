@@ -17,9 +17,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/smtp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
+	secretawskms "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret/awskms"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/awskms"
+	jwsawskms "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/awskms"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws/memory"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
@@ -32,6 +34,7 @@ type Catalog struct {
 	JWSProvider           jws.Provider
 	GraphqlRateLimitStore ratelimitstore.Store
 	HTTPRateLimitStore    ratelimitstore.Store
+	SecretManager         secret.Manager
 	EmailProvider         email.Provider
 }
 
@@ -39,25 +42,30 @@ type Catalog struct {
 func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (*Catalog, error) {
 	objectStore, err := newObjectStorePlugin(ctx, logger, cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize object store plugin: %v", err)
 	}
 
 	jwsProvider, err := newJWSProviderPlugin(ctx, logger, cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize JWS provider plugin: %v", err)
 	}
 
 	graphqlRateLimitStore, err := newRateLimitStore(ctx, logger,
 		cfg.RateLimitStorePluginType, cfg.RateLimitStorePluginData, cfg.MaxGraphQLComplexity)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize rate limit store plugin: %v", err)
 	}
 
 	// An authenticated request count as 1 unit; an unauthenticated request generally counts for more than 1 unit.
 	httpRateLimitStore, err := newRateLimitStore(ctx, logger,
 		cfg.RateLimitStorePluginType, cfg.RateLimitStorePluginData, cfg.HTTPRateLimit)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize rate limit store plugin: %v", err)
+	}
+
+	secretManager, err := newSecretManagerPlugin(ctx, logger, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize secret manager plugin: %v", err)
 	}
 
 	emailProvider, err := newEmailProvider(ctx, logger, cfg.EmailClientPluginType, cfg.EmailClientPluginData)
@@ -70,6 +78,7 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		JWSProvider:           jwsProvider,
 		GraphqlRateLimitStore: graphqlRateLimitStore,
 		HTTPRateLimitStore:    httpRateLimitStore,
+		SecretManager:         secretManager,
 		EmailProvider:         emailProvider,
 	}, nil
 }
@@ -121,7 +130,7 @@ func newRateLimitStore(_ context.Context, logger logger.Logger, pluginType strin
 		return mem, nil
 	default:
 		return nil, errors.New(
-			"The specified rate limit store type %s is not currently supported",
+			"The specified rate limit store type %q is not currently supported",
 			pluginType,
 		)
 
@@ -139,7 +148,7 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 		store, err = aws.New(ctx, logger, cfg.ObjectStorePluginData)
 	default:
 		err = errors.New(
-			"The specified object store %s is not currently supported", cfg.ObjectStorePluginType,
+			"The specified object store %q is not currently supported", cfg.ObjectStorePluginType,
 		)
 	}
 
@@ -156,10 +165,30 @@ func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Conf
 	case "memory":
 		plugin, err = memory.New(cfg.JWSProviderPluginData)
 	case "awskms":
-		plugin, err = awskms.New(ctx, cfg.JWSProviderPluginData)
+		plugin, err = jwsawskms.New(ctx, cfg.JWSProviderPluginData)
 	default:
 		err = errors.New(
-			"The specified JWS Provider plugin %s is not currently supported", cfg.JWSProviderPluginType,
+			"The specified JWS Provider plugin %q is not currently supported", cfg.JWSProviderPluginType,
+		)
+	}
+
+	return plugin, err
+}
+
+func newSecretManagerPlugin(ctx context.Context, _ logger.Logger, cfg *config.Config) (secret.Manager, error) {
+	var (
+		plugin secret.Manager
+		err    error
+	)
+
+	switch cfg.SecretManagerPluginType {
+	case "awskms":
+		plugin, err = secretawskms.New(ctx, cfg.SecretManagerPluginData)
+	case "":
+		plugin, err = &secret.NoopManager{}, nil
+	default:
+		err = errors.New(
+			"The specified secret manager plugin %q is not currently supported", cfg.JWSProviderPluginType,
 		)
 	}
 

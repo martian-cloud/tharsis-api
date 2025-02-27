@@ -330,7 +330,7 @@ func TestGetVariables(t *testing.T) {
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
-			expectMsg:                   ptr.String("only before or after can be defined, not both"),
+			expectMsg:                   ptr.String("failed to create paginated query builder: only before or after can be defined, not both"),
 			expectVariableIDs:           []string{},
 			expectPageInfo:              pagination.PageInfo{},
 		},
@@ -344,7 +344,7 @@ func TestGetVariables(t *testing.T) {
 					Last:  ptr.Int32(2),
 				},
 			},
-			expectMsg:         ptr.String("only first or last can be defined, not both"),
+			expectMsg:         ptr.String("failed to create paginated query builder: only first or last can be defined, not both"),
 			expectVariableIDs: allVariableIDs[4:],
 			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allVariableIDs)),
@@ -731,14 +731,14 @@ func TestCreateVariables(t *testing.T) {
 		expectMsg     *string
 		namespacePath string
 		name          string
-		toCreate      []models.Variable
+		toCreate      []*models.Variable
 	}
 
 	testCases := []testCase{
 		{
 			name:          "positive",
 			namespacePath: "top-level-group-0-for-variables/workspace-0-for-variables",
-			toCreate: []models.Variable{
+			toCreate: []*models.Variable{
 				{
 					Category: models.EnvironmentVariableCategory,
 					Hcl:      true,
@@ -757,7 +757,7 @@ func TestCreateVariables(t *testing.T) {
 		{
 			name:          "external duplicate namespace, category, and key",
 			namespacePath: "top-level-group-0-for-variables/workspace-0-for-variables",
-			toCreate: []models.Variable{
+			toCreate: []*models.Variable{
 				{
 					Category: models.EnvironmentVariableCategory,
 					Hcl:      false,
@@ -771,7 +771,7 @@ func TestCreateVariables(t *testing.T) {
 		{
 			name:          "internal duplicate namespace, category, and key",
 			namespacePath: "top-level-group-0-for-variables/workspace-0-for-variables",
-			toCreate: []models.Variable{
+			toCreate: []*models.Variable{
 				{
 					Category: models.EnvironmentVariableCategory,
 					Hcl:      false,
@@ -791,7 +791,7 @@ func TestCreateVariables(t *testing.T) {
 		{
 			name:          "negative, non-existent namespace path",
 			namespacePath: "non-existent-namespace-path",
-			toCreate: []models.Variable{
+			toCreate: []*models.Variable{
 				{
 					Category: models.EnvironmentVariableCategory,
 					Hcl:      true,
@@ -849,7 +849,7 @@ func TestUpdateVariable(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 				Category:      "something else",
-				NamespacePath: "some/other/path",
+				NamespacePath: "top-level-group-0-for-variables/workspace-0-for-variables",
 				Hcl:           false,
 				Key:           "updated-key-0",
 				Value:         ptr.String("updated-value-0"),
@@ -862,7 +862,7 @@ func TestUpdateVariable(t *testing.T) {
 					LastUpdatedTimestamp: &now,
 				},
 				Category:      positiveVariable.Category,
-				NamespacePath: "some/other/path",
+				NamespacePath: "top-level-group-0-for-variables/workspace-0-for-variables",
 				Hcl:           false,
 				Key:           "updated-key-0",
 				Value:         ptr.String("updated-value-0"),
@@ -892,7 +892,7 @@ func TestUpdateVariable(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: resourceVersionMismatch,
+			expectMsg: ptr.String("variable does not exist"),
 		},
 
 		{
@@ -993,57 +993,6 @@ func TestDeleteVariable(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			err := testClient.client.Variables.DeleteVariable(ctx, test.toDelete)
-
-			checkError(t, test.expectMsg, err)
-		})
-	}
-}
-
-func TestDeleteVariables(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupVariables, err := createWarmupVariables(ctx, testClient,
-		standardWarmupGroupsForVariables, standardWarmupWorkspacesForVariables,
-		standardWarmupVariables)
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg     *string
-		namespacePath string
-		category      models.VariableCategory
-		name          string
-	}
-
-	// Looks up by ID and version.
-	positiveVariable := warmupVariables[0]
-	testCases := []testCase{
-		{
-			name:          "positive",
-			namespacePath: positiveVariable.NamespacePath,
-			category:      positiveVariable.Category,
-		},
-
-		{
-			name:          "negative, non-existent namespace path",
-			namespacePath: "this-namespace-path-does-not-exist",
-			category:      positiveVariable.Category,
-			// expect error to be nil
-		},
-
-		// Attempt to delete the same ones deleted in the positive test case.
-		{
-			name:          "negative, non-existent category",
-			namespacePath: positiveVariable.NamespacePath,
-			category:      positiveVariable.Category,
-			// expect error to be nil
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			err := testClient.client.Variables.DeleteVariables(ctx, test.namespacePath, test.category)
 
 			checkError(t, test.expectMsg, err)
 		})

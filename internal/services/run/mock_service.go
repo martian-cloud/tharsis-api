@@ -360,25 +360,25 @@ func (_m *MockService) GetRun(ctx context.Context, runID string) (*models.Run, e
 	return r0, r1
 }
 
-// GetRunVariables provides a mock function with given fields: ctx, runID
-func (_m *MockService) GetRunVariables(ctx context.Context, runID string) ([]Variable, error) {
-	ret := _m.Called(ctx, runID)
+// GetRunVariables provides a mock function with given fields: ctx, runID, includeSensitiveValues
+func (_m *MockService) GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]Variable, error) {
+	ret := _m.Called(ctx, runID, includeSensitiveValues)
 
 	var r0 []Variable
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]Variable, error)); ok {
-		return rf(ctx, runID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) ([]Variable, error)); ok {
+		return rf(ctx, runID, includeSensitiveValues)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []Variable); ok {
-		r0 = rf(ctx, runID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) []Variable); ok {
+		r0 = rf(ctx, runID, includeSensitiveValues)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]Variable)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, runID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = rf(ctx, runID, includeSensitiveValues)
 	} else {
 		r1 = ret.Error(1)
 	}

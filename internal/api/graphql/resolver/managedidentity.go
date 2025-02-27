@@ -34,14 +34,14 @@ type ManagedIdentityQueryArgs struct {
 	Path *string
 }
 
-// ManagedIdentityEdgeResolver resolves managedIdentity edges
-type ManagedIdentityEdgeResolver struct {
-	edge Edge
-}
-
 // ManagedIdentityCredentials represents the credentials for a managed identity
 type ManagedIdentityCredentials struct {
 	Data []byte
+}
+
+// ManagedIdentityEdgeResolver resolves managedIdentity edges
+type ManagedIdentityEdgeResolver struct {
+	edge Edge
 }
 
 // Cursor returns an opaque cursor

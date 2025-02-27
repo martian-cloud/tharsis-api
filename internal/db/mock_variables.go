@@ -41,11 +41,11 @@ func (_m *MockVariables) CreateVariable(ctx context.Context, input *models.Varia
 }
 
 // CreateVariables provides a mock function with given fields: ctx, namespacePath, variables
-func (_m *MockVariables) CreateVariables(ctx context.Context, namespacePath string, variables []models.Variable) error {
+func (_m *MockVariables) CreateVariables(ctx context.Context, namespacePath string, variables []*models.Variable) error {
 	ret := _m.Called(ctx, namespacePath, variables)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []models.Variable) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, []*models.Variable) error); ok {
 		r0 = rf(ctx, namespacePath, variables)
 	} else {
 		r0 = ret.Error(0)
@@ -61,20 +61,6 @@ func (_m *MockVariables) DeleteVariable(ctx context.Context, variable *models.Va
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *models.Variable) error); ok {
 		r0 = rf(ctx, variable)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DeleteVariables provides a mock function with given fields: ctx, namespacePath, category
-func (_m *MockVariables) DeleteVariables(ctx context.Context, namespacePath string, category models.VariableCategory) error {
-	ret := _m.Called(ctx, namespacePath, category)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, models.VariableCategory) error); ok {
-		r0 = rf(ctx, namespacePath, category)
 	} else {
 		r0 = ret.Error(0)
 	}

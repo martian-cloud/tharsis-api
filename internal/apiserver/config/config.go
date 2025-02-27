@@ -52,13 +52,17 @@ type Config struct {
 	ObjectStorePluginData    map[string]string `yaml:"object_store_plugin_data"`
 	RateLimitStorePluginData map[string]string `yaml:"rate_limit_store_plugin_data" env:"RATE_LIMIT_STORE_PLUGIN_DATA"`
 	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data"`
+	SecretManagerPluginData  map[string]string `yaml:"secret_manager_plugin_data"`
 	EmailClientPluginData    map[string]string `yaml:"email_client_plugin_data"`
 
 	// Plugin Type
 	ObjectStorePluginType    string `yaml:"object_store_plugin_type" env:"OBJECT_STORE_PLUGIN_TYPE"`
 	RateLimitStorePluginType string `yaml:"rate_limit_store_plugin_type" env:"RATE_LIMIT_STORE_PLUGIN_TYPE"`
 	JWSProviderPluginType    string `yaml:"jws_provider_plugin_type" env:"JWS_PROVIDER_PLUGIN_TYPE"`
+	SecretManagerPluginType  string `yaml:"secret_manager_plugin_type" env:"SECRET_MANAGER_PLUGIN_TYPE"`
 	EmailClientPluginType    string `yaml:"email_client_plugin_type" env:"EMAIL_CLIENT_PLUGIN_TYPE"`
+
+	DisableSensitiveVariableFeature bool `yaml:"disable_sensitive_variable_feature" env:"DISABLE_SENSITIVE_VARIABLE_FEATURE"`
 
 	EmailFooter string `yaml:"email_footer" env:"EMAIL_FOOTER"`
 
@@ -210,6 +214,10 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		c.JWSProviderPluginData = make(map[string]string)
 	}
 
+	if c.SecretManagerPluginData == nil {
+		c.SecretManagerPluginData = make(map[string]string)
+	}
+
 	if c.ObjectStorePluginData == nil {
 		c.ObjectStorePluginData = make(map[string]string)
 	}
@@ -224,6 +232,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load JWS Provider plugin data
 	for k, v := range loadPluginData("THARSIS_JWS_PROVIDER_PLUGIN_DATA_") {
 		c.JWSProviderPluginData[k] = v
+	}
+
+	// Load Secret Manager plugin data
+	for k, v := range loadPluginData("THARSIS_SECRET_MANAGER_PLUGIN_DATA_") {
+		c.SecretManagerPluginData[k] = v
 	}
 
 	// Load Object Store plugin data
