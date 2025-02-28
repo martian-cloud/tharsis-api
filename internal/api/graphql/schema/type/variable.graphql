@@ -1,3 +1,19 @@
+enum NamespaceVariableVersionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+type NamespaceVariableVersionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [NamespaceVariableVersionEdge]
+}
+
+type NamespaceVariableVersionEdge {
+  cursor: String!
+  node: NamespaceVariableVersion
+}
+
 enum VariableCategory {
   terraform
   environment
@@ -8,12 +24,30 @@ type NamespaceVariable implements Node {
   metadata: ResourceMetadata!
   namespacePath: String!
   category: VariableCategory!
+  sensitive: Boolean!
+  hcl: Boolean @deprecated(
+    reason: "HCL field will be determined automatically, to be removed in a future release"
+  )
   key: String!
   value: String
-  hcl: Boolean
-    @deprecated(
-      reason: "HCL field will be determined automatically, to be removed in a future release"
-    )
+  latestVersionId: String!
+  versions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: NamespaceVariableVersionSort
+  ): NamespaceVariableVersionConnection!
+}
+
+type NamespaceVariableVersion implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  key: String!
+  value: String
+  hcl: Boolean @deprecated(
+    reason: "HCL field will be determined automatically, to be removed in a future release"
+  )
 }
 
 type NamespaceVariableMutationPayload {
@@ -26,6 +60,7 @@ input CreateNamespaceVariableInput {
   clientMutationId: String
   namespacePath: String!
   category: VariableCategory!
+  sensitive: Boolean
   hcl: Boolean
   key: String!
   value: String!
@@ -45,6 +80,7 @@ input DeleteNamespaceVariableInput {
 }
 
 input NamespaceVariableInput {
+  sensitive: Boolean
   hcl: Boolean
   key: String!
   value: String!

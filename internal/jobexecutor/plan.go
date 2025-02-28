@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -110,7 +111,7 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 
 	tfVarsFilePath, variablesIncludedInTFConfig, err := p.createVarsFile(terraformModule)
 	if err != nil {
-		return fmt.Errorf("failed to create tfvars file: %v", err)
+		return fmt.Errorf("failed to process variables: %v", err)
 	}
 
 	if len(variablesIncludedInTFConfig) > 0 {
@@ -240,6 +241,15 @@ func (p *PlanHandler) createVarsFile(terraformModule *tfconfig.Module) (string, 
 			}
 
 			continue
+		}
+
+		// Verify that the variable definition is marked as sensitive
+		if v.Sensitive && !variable.Sensitive {
+			return "", nil, fmt.Errorf(
+				"variable %q is marked as sensitive but the hcl definition in the terraform file %q is not sensitive, sensitive variables can only be passed to variable definitions with sensitive set to true",
+				v.Key,
+				filepath.Base(variable.Pos.Filename),
+			)
 		}
 
 		variablesIncludedInTFConfig = append(variablesIncludedInTFConfig, v.Key)

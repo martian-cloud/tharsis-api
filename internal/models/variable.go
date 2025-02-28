@@ -12,12 +12,15 @@ const (
 
 // Variable resource
 type Variable struct {
-	Value         *string
-	Category      VariableCategory
-	NamespacePath string
-	Key           string
-	Metadata      ResourceMetadata
-	Hcl           bool
+	Value           *string
+	SecretData      []byte
+	Category        VariableCategory
+	NamespacePath   string
+	Key             string
+	Metadata        ResourceMetadata
+	Hcl             bool
+	Sensitive       bool
+	LatestVersionID string
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -35,4 +38,21 @@ func (v *Variable) ResolveMetadata(key string) (string, error) {
 	}
 
 	return val, nil
+}
+
+// VariableVersion resource
+type VariableVersion struct {
+	VariableID string
+	Value      *string
+	Key        string
+	Metadata   ResourceMetadata
+	Hcl        bool
+	// SecretData is only used for sensitive variables and it stores data
+	// returned by the configured secret manager plugin
+	SecretData []byte
+}
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (v *VariableVersion) ResolveMetadata(key string) (string, error) {
+	return v.Metadata.resolveFieldValue(key)
 }

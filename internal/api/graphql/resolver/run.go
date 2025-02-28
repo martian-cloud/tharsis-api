@@ -125,6 +125,12 @@ func (r *RunConnectionResolver) Edges() *[]*RunEdgeResolver {
 	return &resolvers
 }
 
+// RunVariableSensitiveValueResolver resolves a sensitive variable value
+type RunVariableSensitiveValueResolver struct {
+	VersionID string
+	Value     string
+}
+
 // RunResolver resolves a run resource
 type RunResolver struct {
 	run *models.Run
@@ -229,7 +235,7 @@ func (r *RunResolver) Variables(ctx context.Context) ([]*RunVariableResolver, er
 
 	service := getRunService(ctx)
 
-	variables, err := service.GetRunVariables(ctx, r.run.Metadata.ID)
+	variables, err := service.GetRunVariables(ctx, r.run.Metadata.ID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +243,33 @@ func (r *RunResolver) Variables(ctx context.Context) ([]*RunVariableResolver, er
 	for _, v := range variables {
 		varCopy := v
 		resolvers = append(resolvers, &RunVariableResolver{variable: &varCopy})
+	}
+
+	return resolvers, nil
+}
+
+// SensitiveVariableValues resolver
+func (r *RunResolver) SensitiveVariableValues(ctx context.Context) ([]*RunVariableSensitiveValueResolver, error) {
+	resolvers := []*RunVariableSensitiveValueResolver{}
+
+	// Get run variables including sensitive values
+	variables, err := getRunService(ctx).GetRunVariables(ctx, r.run.Metadata.ID, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Append sensitive variable values to resolvers
+	for _, v := range variables {
+		if v.Sensitive {
+			// Verify that value and version id are not nil
+			if v.Value == nil || v.VersionID == nil {
+				return nil, errors.New("value and version id should be defined for sensitive variable version because includeSensitiveValues is true")
+			}
+			resolvers = append(resolvers, &RunVariableSensitiveValueResolver{
+				VersionID: gid.ToGlobalID(gid.VariableVersionType, *v.VersionID),
+				Value:     *v.Value,
+			})
+		}
 	}
 
 	return resolvers, nil
@@ -330,6 +363,20 @@ func (r *RunVariableResolver) Key() string {
 // Value resolver
 func (r *RunVariableResolver) Value() *string {
 	return r.variable.Value
+}
+
+// Sensitive resolver
+func (r *RunVariableResolver) Sensitive() bool {
+	return r.variable.Sensitive
+}
+
+// VersionID resolver
+func (r *RunVariableResolver) VersionID() *string {
+	if r.variable.VersionID == nil {
+		return nil
+	}
+	versionID := gid.ToGlobalID(gid.VariableVersionType, *r.variable.VersionID)
+	return &versionID
 }
 
 // IncludedInTFConfig resolver

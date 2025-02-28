@@ -7,11 +7,152 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
+
+// NamesapceVariableVersionQueryArgs are used to query a variable version
+type NamesapceVariableVersionQueryArgs struct {
+	ID                    string
+	IncludeSensitiveValue *bool
+}
+
+// NamespaceVariableVersionConnectionQueryArgs are used to query a version connection
+type NamespaceVariableVersionConnectionQueryArgs struct {
+	ConnectionQueryArgs
+}
+
+// NamespaceVariableVersionQueryArgs are used to query a single version
+type NamespaceVariableVersionQueryArgs struct {
+	Name string
+}
+
+// NamespaceVariableVersionEdgeResolver resolves version edges
+type NamespaceVariableVersionEdgeResolver struct {
+	edge Edge
+}
+
+// Cursor returns an opaque cursor
+func (r *NamespaceVariableVersionEdgeResolver) Cursor() (string, error) {
+	version, ok := r.edge.Node.(models.VariableVersion)
+	if !ok {
+		return "", errors.New("Failed to convert node type")
+	}
+	cursor, err := r.edge.CursorFunc(&version)
+	return *cursor, err
+}
+
+// Node returns a version node
+func (r *NamespaceVariableVersionEdgeResolver) Node() (*NamespaceVariableVersionResolver, error) {
+	version, ok := r.edge.Node.(models.VariableVersion)
+	if !ok {
+		return nil, errors.New("Failed to convert node type")
+	}
+
+	return &NamespaceVariableVersionResolver{version: &version}, nil
+}
+
+// NamespaceVariableVersionConnectionResolver resolves a version connection
+type NamespaceVariableVersionConnectionResolver struct {
+	connection Connection
+}
+
+// NewNamespaceVariableVersionConnectionResolver creates a new NamespaceVariableVersionConnectionResolver
+func NewNamespaceVariableVersionConnectionResolver(ctx context.Context, input *variable.GetVariableVersionsInput) (*NamespaceVariableVersionConnectionResolver, error) {
+	versionService := getVariableService(ctx)
+
+	result, err := versionService.GetVariableVersions(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	versions := result.VariableVersions
+
+	// Create edges
+	edges := make([]Edge, len(versions))
+	for i, version := range versions {
+		edges[i] = Edge{CursorFunc: result.PageInfo.Cursor, Node: version}
+	}
+
+	pageInfo := PageInfo{
+		HasNextPage:     result.PageInfo.HasNextPage,
+		HasPreviousPage: result.PageInfo.HasPreviousPage,
+	}
+
+	if len(versions) > 0 {
+		var err error
+		pageInfo.StartCursor, err = result.PageInfo.Cursor(&versions[0])
+		if err != nil {
+			return nil, err
+		}
+
+		pageInfo.EndCursor, err = result.PageInfo.Cursor(&versions[len(edges)-1])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	connection := Connection{
+		TotalCount: result.PageInfo.TotalCount,
+		PageInfo:   pageInfo,
+		Edges:      edges,
+	}
+
+	return &NamespaceVariableVersionConnectionResolver{connection: connection}, nil
+}
+
+// TotalCount returns the total result count for the connection
+func (r *NamespaceVariableVersionConnectionResolver) TotalCount() int32 {
+	return r.connection.TotalCount
+}
+
+// PageInfo returns the connection page information
+func (r *NamespaceVariableVersionConnectionResolver) PageInfo() *PageInfoResolver {
+	return &PageInfoResolver{pageInfo: r.connection.PageInfo}
+}
+
+// Edges returns the connection edges
+func (r *NamespaceVariableVersionConnectionResolver) Edges() *[]*NamespaceVariableVersionEdgeResolver {
+	resolvers := make([]*NamespaceVariableVersionEdgeResolver, len(r.connection.Edges))
+	for i, edge := range r.connection.Edges {
+		resolvers[i] = &NamespaceVariableVersionEdgeResolver{edge: edge}
+	}
+	return &resolvers
+}
+
+// NamespaceVariableVersionResolver resolves a variable version
+type NamespaceVariableVersionResolver struct {
+	version *models.VariableVersion
+}
+
+// ID resolver
+func (r *NamespaceVariableVersionResolver) ID() graphql.ID {
+	return graphql.ID(gid.ToGlobalID(gid.VariableVersionType, r.version.Metadata.ID))
+}
+
+// Metadata resolver
+func (r *NamespaceVariableVersionResolver) Metadata() *MetadataResolver {
+	return &MetadataResolver{metadata: &r.version.Metadata}
+}
+
+// Hcl resolver
+func (r *NamespaceVariableVersionResolver) Hcl() *bool {
+	return &r.version.Hcl
+}
+
+// Key resolver
+func (r *NamespaceVariableVersionResolver) Key() string {
+	return r.version.Key
+}
+
+// Value resolver
+func (r *NamespaceVariableVersionResolver) Value() *string {
+	return r.version.Value
+}
 
 // NamespaceVariableResolver resolves a variable resource
 type NamespaceVariableResolver struct {
@@ -26,6 +167,11 @@ func (r *NamespaceVariableResolver) ID() graphql.ID {
 // Category resolver
 func (r *NamespaceVariableResolver) Category() string {
 	return string(r.variable.Category)
+}
+
+// Sensitive resolver
+func (r *NamespaceVariableResolver) Sensitive() bool {
+	return r.variable.Sensitive
 }
 
 // Hcl resolver
@@ -49,9 +195,33 @@ func (r *NamespaceVariableResolver) Value() *string {
 	return r.variable.Value
 }
 
+// LatestVersionID resolver
+func (r *NamespaceVariableResolver) LatestVersionID() string {
+	return gid.ToGlobalID(gid.VariableVersionType, r.variable.LatestVersionID)
+}
+
 // Metadata resolver
 func (r *NamespaceVariableResolver) Metadata() *MetadataResolver {
 	return &MetadataResolver{metadata: &r.variable.Metadata}
+}
+
+// Versions resolver
+func (r *NamespaceVariableResolver) Versions(ctx context.Context, args *NamespaceVariableVersionConnectionQueryArgs) (*NamespaceVariableVersionConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := variable.GetVariableVersionsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		VariableID:        r.variable.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.VariableVersionSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewNamespaceVariableVersionConnectionResolver(ctx, &input)
 }
 
 /* Variable Queries */
@@ -71,6 +241,25 @@ func getVariables(ctx context.Context, namespacePath string) ([]*NamespaceVariab
 	}
 
 	return resolvers, nil
+}
+
+func namespaceVariableVersionQuery(ctx context.Context, args *NamesapceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
+	variableService := getVariableService(ctx)
+
+	includeSensitiveValue := false
+	if args.IncludeSensitiveValue != nil {
+		includeSensitiveValue = *args.IncludeSensitiveValue
+	}
+
+	version, err := variableService.GetVariableVersionByID(ctx, gid.FromGlobalID(args.ID), includeSensitiveValue)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &NamespaceVariableVersionResolver{version: version}, nil
 }
 
 /* Variable Mutations */
@@ -112,6 +301,7 @@ type CreateNamespaceVariableInput struct {
 	ClientMutationID *string
 	NamespacePath    string
 	Category         string
+	Sensitive        *bool
 	Key              string
 	Value            string
 	// DEPRECATED: to be removed in a future release.
@@ -140,8 +330,9 @@ type SetNamespaceVariablesInput struct {
 	NamespacePath    string
 	Category         models.VariableCategory
 	Variables        []struct {
-		Key   string
-		Value string
+		Sensitive *bool
+		Key       string
+		Value     string
 		// DEPRECATED: to be removed in a future release.
 		Hcl *bool
 	}
@@ -157,17 +348,20 @@ func handleVariableMutationProblem(e error, clientMutationID *string) (*Variable
 }
 
 func setNamespaceVariablesMutation(ctx context.Context, input *SetNamespaceVariablesInput) (*VariableMutationPayloadResolver, error) {
-	variables := []models.Variable{}
+	variables := []*variable.SetVariablesInputVariable{}
 
 	for _, v := range input.Variables {
-		vCopy := v
-		variables = append(variables, models.Variable{
-			Hcl:           ptr.ToBool(v.Hcl),
-			Key:           v.Key,
-			Value:         &vCopy.Value,
-			Category:      input.Category,
-			NamespacePath: input.NamespacePath,
-		})
+		varableInput := &variable.SetVariablesInputVariable{
+			Hcl:   ptr.ToBool(v.Hcl),
+			Key:   v.Key,
+			Value: v.Value,
+		}
+
+		if v.Sensitive != nil {
+			varableInput.Sensitive = *v.Sensitive
+		}
+
+		variables = append(variables, varableInput)
 	}
 
 	if err := getVariableService(ctx).SetVariables(ctx, &variable.SetVariablesInput{
@@ -183,13 +377,19 @@ func setNamespaceVariablesMutation(ctx context.Context, input *SetNamespaceVaria
 }
 
 func createNamespaceVariableMutation(ctx context.Context, input *CreateNamespaceVariableInput) (*VariableMutationPayloadResolver, error) {
-	variable, err := getVariableService(ctx).CreateVariable(ctx, &models.Variable{
+	options := &variable.CreateVariableInput{
 		NamespacePath: input.NamespacePath,
 		Category:      models.VariableCategory(input.Category),
 		Hcl:           ptr.ToBool(input.Hcl),
 		Key:           input.Key,
-		Value:         &input.Value,
-	})
+		Value:         input.Value,
+	}
+
+	if input.Sensitive != nil {
+		options.Sensitive = *input.Sensitive
+	}
+
+	variable, err := getVariableService(ctx).CreateVariable(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -201,16 +401,12 @@ func createNamespaceVariableMutation(ctx context.Context, input *CreateNamespace
 func updateNamespaceVariableMutation(ctx context.Context, input *UpdateNamespaceVariableInput) (*VariableMutationPayloadResolver, error) {
 	service := getVariableService(ctx)
 
-	variable, err := service.GetVariableByID(ctx, gid.FromGlobalID(input.ID))
-	if err != nil {
-		return nil, err
-	}
-
-	variable.Hcl = ptr.ToBool(input.Hcl)
-	variable.Key = input.Key
-	variable.Value = &input.Value
-
-	updatedVar, err := service.UpdateVariable(ctx, variable)
+	updatedVar, err := service.UpdateVariable(ctx, &variable.UpdateVariableInput{
+		ID:    gid.FromGlobalID(input.ID),
+		Key:   input.Key,
+		Value: input.Value,
+		Hcl:   ptr.ToBool(input.Hcl),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -222,16 +418,18 @@ func updateNamespaceVariableMutation(ctx context.Context, input *UpdateNamespace
 func deleteNamespaceVariableMutation(ctx context.Context, input *DeleteNamespaceVariableInput) (*VariableMutationPayloadResolver, error) {
 	service := getVariableService(ctx)
 
-	variable, err := service.GetVariableByID(ctx, gid.FromGlobalID(input.ID))
+	variableModel, err := service.GetVariableByID(ctx, gid.FromGlobalID(input.ID))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := service.DeleteVariable(ctx, variable); err != nil {
+	if err := service.DeleteVariable(ctx, &variable.DeleteVariableInput{
+		ID: variableModel.Metadata.ID,
+	}); err != nil {
 		return nil, err
 	}
 
-	payload := VariableMutationPayload{ClientMutationID: input.ClientMutationID, NamespacePath: &variable.NamespacePath, Problems: []Problem{}}
+	payload := VariableMutationPayload{ClientMutationID: input.ClientMutationID, NamespacePath: &variableModel.NamespacePath, Problems: []Problem{}}
 	return &VariableMutationPayloadResolver{VariableMutationPayload: payload}, nil
 }
 

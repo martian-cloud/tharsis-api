@@ -81,6 +81,7 @@ type Client struct {
 	TeamMembers                      TeamMembers
 	Transactions                     Transactions
 	Variables                        Variables
+	VariableVersions                 VariableVersions
 	TerraformProviders               TerraformProviders
 	TerraformProviderVersions        TerraformProviderVersions
 	TerraformProviderPlatforms       TerraformProviderPlatforms
@@ -181,6 +182,7 @@ func NewClient(
 	dbClient.TeamMembers = NewTeamMembers(dbClient)
 	dbClient.Transactions = NewTransactions(dbClient)
 	dbClient.Variables = NewVariables(dbClient)
+	dbClient.VariableVersions = NewVariableVersions(dbClient)
 	dbClient.TerraformProviders = NewTerraformProviders(dbClient)
 	dbClient.TerraformProviderVersions = NewTerraformProviderVersions(dbClient)
 	dbClient.TerraformProviderPlatforms = NewTerraformProviderPlatforms(dbClient)

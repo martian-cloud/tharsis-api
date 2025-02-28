@@ -38,7 +38,14 @@ type RunVariable {
     )
   key: String!
   value: String
+  sensitive: Boolean!
+  versionId: String
   includedInTfConfig: Boolean
+}
+
+type RunVariableSensitiveValue {
+   versionId: String!
+   value: String!
 }
 
 type Run implements Node {
@@ -52,6 +59,7 @@ type Run implements Node {
   plan: Plan!
   apply: Apply
   variables: [RunVariable!]!
+  sensitiveVariableValues: [RunVariableSensitiveValue!]!
   stateVersion: StateVersion
   moduleSource: String
   moduleVersion: String

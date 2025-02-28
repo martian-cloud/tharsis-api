@@ -39,7 +39,7 @@ require (
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-getter v1.7.6
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/hashicorp/go-slug v0.16.3
+	github.com/hashicorp/go-slug v0.16.4
 	github.com/hashicorp/go-tfe v1.51.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/hc-install v0.8.0
@@ -73,7 +73,7 @@ require (
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.43.1
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.45.0
 	go.opentelemetry.io/contrib/propagators/aws v1.26.0
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.26.0

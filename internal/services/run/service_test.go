@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
@@ -40,6 +42,7 @@ type mockDBClient struct {
 	MockManagedIdentities     *db.MockManagedIdentities
 	MockWorkspaces            *db.MockWorkspaces
 	MockVariables             *db.MockVariables
+	MockVariableVersions      *db.MockVariableVersions
 	MockRuns                  *db.MockRuns
 	MockConfigurationVersions *db.MockConfigurationVersions
 	MockApplies               *db.MockApplies
@@ -66,6 +69,9 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 
 	mockVariables := db.MockVariables{}
 	mockVariables.Test(t)
+
+	mockVariableVersions := db.MockVariableVersions{}
+	mockVariableVersions.Test(t)
 
 	mockRuns := db.MockRuns{}
 	mockRuns.Test(t)
@@ -106,6 +112,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			ManagedIdentities:     &mockManagedIdentities,
 			Workspaces:            &mockWorkspaces,
 			Variables:             &mockVariables,
+			VariableVersions:      &mockVariableVersions,
 			Runs:                  &mockRuns,
 			ConfigurationVersions: &mockConfigurationVersions,
 			Applies:               &mockApplies,
@@ -122,6 +129,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockManagedIdentities:     &mockManagedIdentities,
 		MockWorkspaces:            &mockWorkspaces,
 		MockVariables:             &mockVariables,
+		MockVariableVersions:      &mockVariableVersions,
 		MockRuns:                  &mockRuns,
 		MockConfigurationVersions: &mockConfigurationVersions,
 		MockApplies:               &mockApplies,
@@ -133,6 +141,369 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockResourceLimits:        &mockResourceLimits,
 		MockGroups:                &mockGroups,
 		MockStateVersions:         &mockStateVersions,
+	}
+}
+
+func TestGetRunVariables(t *testing.T) {
+	ctx := context.Background()
+
+	runID := "run1"
+	run := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: runID,
+		},
+		WorkspaceID: "ws1",
+	}
+
+	runVariables := []Variable{
+		{
+			Key:       "var1",
+			Value:     ptr.String("value1"),
+			Category:  models.TerraformVariableCategory,
+			Sensitive: false,
+		},
+		{
+			Key:       "var2",
+			Category:  models.EnvironmentVariableCategory,
+			Sensitive: true,
+			VersionID: ptr.String("1"),
+		},
+	}
+
+	marshaledRunVariables, err := json.Marshal(runVariables)
+	require.NoError(t, err)
+
+	variableVersions := []models.VariableVersion{}
+	variableVersionIDs := []string{}
+	// Add variable version for each sensitive variable
+	for i, v := range runVariables {
+		if v.Sensitive {
+			id := strconv.Itoa(i)
+			variableVersionIDs = append(variableVersionIDs, id)
+			variableVersions = append(variableVersions, models.VariableVersion{
+				Metadata:   models.ResourceMetadata{ID: id},
+				Key:        v.Key,
+				SecretData: []byte(fmt.Sprintf("%s-encrypted", v.Key)),
+			})
+		}
+	}
+
+	tests := []struct {
+		name                            string
+		includeSensitiveValues          bool
+		expectedVariables               []Variable
+		hasViewVariableValuePermissions bool
+		authError                       error
+		expectedErrorCode               errors.CodeType
+	}{
+		{
+			name:                            "include sensitive values for caller with view variable value permission",
+			includeSensitiveValues:          true,
+			hasViewVariableValuePermissions: true,
+			expectedVariables: []Variable{
+				{
+					Key:       "var1",
+					Value:     ptr.String("value1"),
+					Category:  models.TerraformVariableCategory,
+					Sensitive: false,
+				},
+				{
+					Key:       "var2",
+					Value:     ptr.String("var2-plaintext"),
+					Category:  models.EnvironmentVariableCategory,
+					Sensitive: true,
+					VersionID: ptr.String("1"),
+				},
+			},
+		},
+		{
+			name:                            "don't include sensitive values for caller with view variable value permission",
+			includeSensitiveValues:          false,
+			hasViewVariableValuePermissions: true,
+			expectedVariables: []Variable{
+				{
+					Key:       "var1",
+					Value:     ptr.String("value1"),
+					Category:  models.TerraformVariableCategory,
+					Sensitive: false,
+				},
+				{
+					Key:       "var2",
+					Category:  models.EnvironmentVariableCategory,
+					Sensitive: true,
+					VersionID: ptr.String("1"),
+				},
+			},
+		},
+		{
+			name:                            "don't include any values for caller without view variable value permission",
+			includeSensitiveValues:          false,
+			hasViewVariableValuePermissions: false,
+			expectedVariables: []Variable{
+				{
+					Key:       "var1",
+					Category:  models.TerraformVariableCategory,
+					Sensitive: false,
+				},
+				{
+					Key:       "var2",
+					Category:  models.EnvironmentVariableCategory,
+					Sensitive: true,
+					VersionID: ptr.String("1"),
+				},
+			},
+		},
+		{
+			name:                            "return error if caller without view variable value permission requests sensitive values",
+			includeSensitiveValues:          true,
+			hasViewVariableValuePermissions: false,
+			expectedErrorCode:               errors.EForbidden,
+		},
+		{
+			name:                            "return error if caller doesn't have view variable permission",
+			hasViewVariableValuePermissions: false,
+			authError:                       errors.New("no permission", errors.WithErrorCode(errors.EForbidden)),
+			expectedErrorCode:               errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockDBClient := buildDBClientWithMocks(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+			mockSecretManager := secret.NewMockManager(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			service := &service{
+				dbClient:      mockDBClient.Client,
+				artifactStore: mockArtifactStore,
+				secretManager: mockSecretManager,
+			}
+
+			if test.hasViewVariableValuePermissions {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariableValuePermission, mock.Anything).Return(nil)
+			} else {
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariableValuePermission, mock.Anything).Return(errors.New("no permission", errors.WithErrorCode(errors.EForbidden)))
+				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariablePermission, mock.Anything).Return(test.authError)
+			}
+
+			mockDBClient.MockRuns.On("GetRun", mock.Anything, runID).Return(run, nil)
+
+			mockArtifactStore.On("GetRunVariables", mock.Anything, run).Return(io.NopCloser(bytes.NewReader(marshaledRunVariables)), nil).Maybe()
+
+			if test.includeSensitiveValues && test.expectedErrorCode == "" {
+				mockDBClient.MockVariableVersions.On("GetVariableVersions", mock.Anything, &db.GetVariableVersionsInput{
+					Filter: &db.VariableVersionFilter{
+						VariableVersionIDs: variableVersionIDs,
+					},
+				}).Return(&db.VariableVersionResult{
+					VariableVersions: variableVersions,
+				}, nil)
+
+				for _, v := range variableVersions {
+					mockSecretManager.On("Get", mock.Anything, v.Key, v.SecretData).Return(fmt.Sprintf("%s-plaintext", v.Key), nil)
+				}
+			}
+
+			vars, err := service.GetRunVariables(auth.WithCaller(ctx, mockCaller), runID, test.includeSensitiveValues)
+			if test.expectedErrorCode != "" {
+				require.Error(t, err)
+				require.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.expectedVariables, vars)
+			}
+		})
+	}
+}
+
+func TestCreateRunWithSensitiveVariables(t *testing.T) {
+	configurationVersionID := "cv1"
+
+	ws := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "ws1",
+		},
+		FullPath:       "groupA/ws1",
+		MaxJobDuration: ptr.Int32(60),
+	}
+	groupName := "groupA"
+
+	run := models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: "run1",
+		},
+		WorkspaceID:            ws.Metadata.ID,
+		ConfigurationVersionID: &configurationVersionID,
+		Status:                 models.RunPending,
+	}
+
+	dbClient := buildDBClientWithMocks(t)
+
+	mockSecretManager := secret.NewMockManager(t)
+
+	mockCaller := auth.NewMockCaller(t)
+	mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+	mockCaller.On("GetSubject").Return("mock-caller").Maybe()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+	dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+	dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+	dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).Return([]models.ManagedIdentity{}, nil)
+
+	dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
+
+	sortBy := db.VariableSortableFieldNamespacePathDesc
+	dbClient.MockVariables.On("GetVariables", mock.Anything, &db.GetVariablesInput{
+		Filter: &db.VariableFilter{
+			NamespacePaths: ws.ExpandPath(),
+		},
+		Sort: &sortBy,
+	}).Return(&db.VariableResult{
+		Variables: []models.Variable{
+			{
+				Key:             "v1",
+				Value:           ptr.String("v1-value"),
+				Category:        models.TerraformVariableCategory,
+				NamespacePath:   ws.FullPath,
+				Sensitive:       true,
+				SecretData:      []byte("v1-encrypted"),
+				LatestVersionID: "1",
+			},
+			{
+				Key:             "v2",
+				Value:           ptr.String("v2-value"),
+				Category:        models.TerraformVariableCategory,
+				NamespacePath:   ws.FullPath,
+				LatestVersionID: "2",
+			},
+			{
+				Key:             "v3",
+				Value:           ptr.String("v3-value"),
+				Category:        models.EnvironmentVariableCategory,
+				NamespacePath:   ws.FullPath,
+				LatestVersionID: "3",
+			},
+		},
+	}, nil)
+
+	// Mock for secret manager plugin since the v1 variable is sensitive
+	mockSecretManager.On("Get", mock.Anything, "v1", []byte("v1-encrypted")).Return("v1-value", nil)
+
+	dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
+		Return(func(_ context.Context, run *models.Run) (*models.Run, error) {
+			run.Metadata.CreationTimestamp = ptr.Time(time.Now().UTC())
+			return run, nil
+		})
+	dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+		Return(&db.RunsResult{
+			PageInfo: &pagination.PageInfo{
+				TotalCount: 1,
+			},
+		}, nil)
+	dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
+
+	dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+		Return(&models.ResourceLimit{Value: 100}, nil)
+
+	dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
+		Speculative: false,
+	}, nil)
+
+	dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
+		Metadata: models.ResourceMetadata{
+			ID: "plan1",
+		},
+	}, nil)
+
+	dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
+		Metadata: models.ResourceMetadata{
+			ID: "apply1",
+		},
+	}, nil)
+	dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).Return(&models.Job{
+		Metadata: models.ResourceMetadata{
+			ID: "job1",
+		},
+		WorkspaceID: ws.Metadata.ID,
+		RunID:       run.Metadata.ID,
+	}, nil)
+
+	dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
+		Groups: []models.Group{
+			{
+				Metadata: models.ResourceMetadata{
+					ID: groupName,
+				},
+				Name: groupName,
+			},
+		},
+	}, nil)
+
+	dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
+
+	mockArtifactStore := workspace.MockArtifactStore{}
+	mockArtifactStore.Test(t)
+
+	readerMatcher := mock.MatchedBy(func(r io.Reader) bool {
+		body, _ := io.ReadAll(r)
+
+		var decodedVariables []Variable
+		if err := json.Unmarshal(body, &decodedVariables); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify that value is nill for sensitive variables
+		for _, v := range decodedVariables {
+			if v.Sensitive && v.Value != nil {
+				return false
+			}
+			if !v.Sensitive && v.Value == nil {
+				return false
+			}
+		}
+
+		return true
+	})
+	mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, readerMatcher).Return(nil)
+
+	mockActivityEvents := activityevent.MockService{}
+	mockActivityEvents.Test(t)
+
+	mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+	mockModuleService := moduleregistry.NewMockService(t)
+	mockModuleResolver := NewMockModuleResolver(t)
+	ruleEnforcer := rules.NewMockRuleEnforcer(t)
+
+	logger, _ := logger.NewForTest()
+	service := newService(
+		logger,
+		dbClient.Client,
+		&mockArtifactStore,
+		nil,
+		nil,
+		nil,
+		&mockActivityEvents,
+		mockModuleService,
+		mockModuleResolver,
+		nil,
+		ruleEnforcer,
+		limits.NewLimitChecker(dbClient.Client),
+		nil,
+		mockSecretManager,
+	)
+
+	_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
+		WorkspaceID:            ws.Metadata.ID,
+		ConfigurationVersionID: &configurationVersionID,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -299,6 +670,8 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
+			mockSecretManager := secret.NewMockManager(t)
+
 			mockActivityEvents := activityevent.MockService{}
 			mockActivityEvents.Test(t)
 
@@ -328,6 +701,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 				ruleEnforcer,
 				limits.NewLimitChecker(dbClient.Client),
 				nil,
+				mockSecretManager,
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
@@ -562,6 +936,8 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
+			mockSecretManager := secret.NewMockManager(t)
+
 			mockActivityEvents := activityevent.MockService{}
 			mockActivityEvents.Test(t)
 
@@ -581,6 +957,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 				nil,
 				nil,
 				limits.NewLimitChecker(dbClient.Client),
+				mockSecretManager,
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
@@ -917,6 +1294,8 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 			mockModuleResolver.On("ResolveModuleVersion", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(moduleVersion, nil).Maybe()
 
+			mockSecretManager := secret.NewMockManager(t)
+
 			logger, _ := logger.NewForTest()
 			service := newService(
 				logger,
@@ -932,6 +1311,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 				nil,
 				limits.NewLimitChecker(dbClient.Client),
 				nil,
+				mockSecretManager,
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
@@ -1186,6 +1566,8 @@ func TestCreateRunWithJobTags(t *testing.T) {
 			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
 				Return(&ModuleRegistrySource{}, nil).Maybe()
 
+			mockSecretManager := secret.NewMockManager(t)
+
 			logger, _ := logger.NewForTest()
 			service := newService(
 				logger,
@@ -1201,6 +1583,7 @@ func TestCreateRunWithJobTags(t *testing.T) {
 				nil,
 				limits.NewLimitChecker(dbClient.Client),
 				nil,
+				mockSecretManager,
 			)
 
 			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.createRunInputs)
@@ -1323,6 +1706,8 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, run.WorkspaceID).Return(ws, nil)
 
+			mockSecretManager := secret.NewMockManager(t)
+
 			mockActivityEvents := activityevent.MockService{}
 			mockActivityEvents.Test(t)
 
@@ -1352,6 +1737,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 				ruleEnforcer,
 				limits.NewLimitChecker(dbClient.Client),
 				nil,
+				mockSecretManager,
 			)
 
 			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)

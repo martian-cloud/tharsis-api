@@ -1356,3 +1356,10 @@ func (r RootResolver) DisableMaintenanceMode(ctx context.Context,
 func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
 	return versionQuery(ctx)
 }
+
+/* Namespace Variable Version Queries */
+
+// NamespaceVariableVersion query returns a namespace variable version by ID
+func (r RootResolver) NamespaceVariableVersion(ctx context.Context, args *NamesapceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
+	return namespaceVariableVersionQuery(ctx, args)
+}

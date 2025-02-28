@@ -115,7 +115,11 @@ func (c *client) GetRun(ctx context.Context, id string) (*types.Run, error) {
 
 // GetRunVariables gets RunVariables for a run
 func (c *client) GetRunVariables(ctx context.Context, runID string) ([]types.RunVariable, error) {
-	runVariables, err := c.tharsisClient.Run.GetRunVariables(ctx, &types.GetRunInput{ID: runID})
+	// Get run variables and include sensitive values since they will be needed to run the job
+	runVariables, err := c.tharsisClient.Run.GetRunVariables(ctx, &types.GetRunVariablesInput{
+		RunID:                  runID,
+		IncludeSensitiveValues: true,
+	})
 	if err != nil {
 		return nil, err
 	}

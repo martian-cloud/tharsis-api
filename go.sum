@@ -552,8 +552,8 @@ github.com/hashicorp/go-retryablehttp v0.7.7 h1:C8hUCYzor8PIfXHa4UrZkU4VvK8o9ISH
 github.com/hashicorp/go-retryablehttp v0.7.7/go.mod h1:pkQpWZeYWskR+D1tR2O5OcBFOxfA7DoAO6xtkuQnHTk=
 github.com/hashicorp/go-safetemp v1.0.0 h1:2HR189eFNrjHQyENnQMMpCiBAsRxzbTMIgBhEyExpmo=
 github.com/hashicorp/go-safetemp v1.0.0/go.mod h1:oaerMy3BhqiTbVye6QuFhFtIceqFoDHxNAB65b+Rj1I=
-github.com/hashicorp/go-slug v0.16.3 h1:pe0PMwz2UWN1168QksdW/d7u057itB2gY568iF0E2Ns=
-github.com/hashicorp/go-slug v0.16.3/go.mod h1:THWVTAXwJEinbsp4/bBRcmbaO5EYNLTqxbG4tZ3gCYQ=
+github.com/hashicorp/go-slug v0.16.4 h1:kI0mOUVjbBsyocwO29pZIQzzkBnfQNdU4eqlUpNdNVA=
+github.com/hashicorp/go-slug v0.16.4/go.mod h1:THWVTAXwJEinbsp4/bBRcmbaO5EYNLTqxbG4tZ3gCYQ=
 github.com/hashicorp/go-tfe v1.51.0 h1:nZIIMOGxzKJvL6fNO3wS/wpTdLVGHUMT6up82H9eJCE=
 github.com/hashicorp/go-tfe v1.51.0/go.mod h1:yZ/FCqBsOZ/e75kL29JYqAsKctL1Tti2zYcIoQh69Ck=
 github.com/hashicorp/go-uuid v1.0.3 h1:2gKiV6YVmrJ1i2CKKa9obLvRieoRGviZFL26PcT/Co8=
@@ -859,8 +859,8 @@ gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747
 gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8/go.mod h1:mMYcru0pfzczcqWk3fo9T4vlucHvOqt6Xb8WGPyJmzM=
 gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0 h1:wjYAvCMMLxWzJvCvVsnlBEHEdHTVlJ/7/pxc37jTEIE=
 gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.2.0/go.mod h1:5KyvfNcn3wC4wot7Bma+v/g+hjw+/nhSGP0fODz7k4Q=
-gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.43.1 h1:x3AhFAcYKzLWlASyjhCUxg0eWREImlvOvRFDCaQgnAA=
-gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.43.1/go.mod h1:zgttjFAWaNyCHTaWKP/fG/CsysrbbZgiUkwQCO1r5JQ=
+gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.45.0 h1:BUFGzo6LaKxe1AJJTUjWG8WQ/6aEUt/SyUiObiUApus=
+gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.45.0/go.mod h1:qYVLLFNDZvrsA6s2V3equ399/qFXgGn1Kujf5iAdLYw=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=

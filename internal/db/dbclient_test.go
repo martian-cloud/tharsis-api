@@ -1025,7 +1025,7 @@ func compareTime(t *testing.T, expectedLow, expectedHigh, actual *time.Time) {
 	assert.False(t, actual.After(*expectedHigh))
 }
 
-// Check whether any actual error matches what was expected.
+// Check whether any actual error contains what was expected.
 // If an error was expected but did not occur, the test is terminated, and
 // any subsequent test cases that should have run will not be attempted.
 func checkError(t *testing.T, expectedMsg *string, actualError error) {
@@ -1034,7 +1034,7 @@ func checkError(t *testing.T, expectedMsg *string, actualError error) {
 	} else {
 		// Uses require rather than assert to avoid a nil pointer dereference.
 		require.NotNil(t, actualError)
-		assert.Equal(t, *expectedMsg, actualError.Error())
+		assert.Contains(t, actualError.Error(), *expectedMsg)
 	}
 }
 

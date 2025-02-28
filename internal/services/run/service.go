@@ -24,6 +24,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
@@ -47,10 +48,12 @@ const (
 
 // Variable represents a run variable
 type Variable struct {
+	VersionID     *string                 `json:"version_id"`
 	Value         *string                 `json:"value"`
 	NamespacePath *string                 `json:"namespacePath"`
 	Key           string                  `json:"key"`
 	Category      models.VariableCategory `json:"category"`
+	Sensitive     bool                    `json:"sensitive"`
 	// DEPRECATED: Hcl is deprecated and will be removed in a future release
 	Hcl                bool  `json:"hcl"`
 	IncludedInTFConfig *bool `json:"includedInTFConfig"`
@@ -101,7 +104,6 @@ type CreateRunInput struct {
 	IsDestroy              bool
 	Refresh                bool
 	RefreshOnly            bool
-	UseRunVariablesOnly    bool
 }
 
 // CreateDestroyRunForWorkspaceInput is the input for creating a destroy run using the current
@@ -156,6 +158,21 @@ type CancelRunInput struct {
 	Force   bool
 }
 
+type createRunInput struct {
+	ConfigurationVersionID *string
+	Comment                *string
+	ModuleSource           *string
+	ModuleVersion          *string
+	Speculative            *bool // optional field, defaults to false unless using a speculative configuration version
+	WorkspaceID            string
+	TerraformVersion       string
+	Variables              []Variable
+	TargetAddresses        []string
+	IsDestroy              bool
+	Refresh                bool
+	RefreshOnly            bool
+}
+
 // Service encapsulates Terraform Enterprise Support
 type Service interface {
 	GetRun(ctx context.Context, runID string) (*models.Run, error)
@@ -164,8 +181,8 @@ type Service interface {
 	CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error)
 	ApplyRun(ctx context.Context, runID string, comment *string) (*models.Run, error)
 	CancelRun(ctx context.Context, options *CancelRunInput) (*models.Run, error)
+	GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]Variable, error)
 	CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error)
-	GetRunVariables(ctx context.Context, runID string) ([]Variable, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
 	GetPlan(ctx context.Context, planID string) (*models.Plan, error)
@@ -197,6 +214,7 @@ type service struct {
 	ruleEnforcer    rules.RuleEnforcer
 	limitChecker    limits.LimitChecker
 	planParser      plan.Parser
+	secretManager   secret.Manager
 }
 
 // NewService creates an instance of Service
@@ -212,6 +230,7 @@ func NewService(
 	moduleResolver ModuleResolver,
 	runStateManager *state.RunStateManager,
 	limitChecker limits.LimitChecker,
+	secretManager secret.Manager,
 ) Service {
 	return newService(
 		logger,
@@ -227,6 +246,7 @@ func NewService(
 		rules.NewRuleEnforcer(dbClient),
 		limitChecker,
 		plan.NewParser(),
+		secretManager,
 	)
 }
 
@@ -244,6 +264,7 @@ func newService(
 	ruleEnforcer rules.RuleEnforcer,
 	limitChecker limits.LimitChecker,
 	planParser plan.Parser,
+	secretManager secret.Manager,
 ) Service {
 	return &service{
 		logger,
@@ -259,6 +280,7 @@ func newService(
 		ruleEnforcer,
 		limitChecker,
 		planParser,
+		secretManager,
 	}
 }
 
@@ -435,15 +457,18 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 		return nil, errors.Wrap(err, "failed to get run variables for run with ID %s", run.Metadata.ID, errors.WithSpan(span))
 	}
 
-	destroyRunInput := &CreateRunInput{
+	// Clear namespace path from variables
+	for i := range variables {
+		variables[i].NamespacePath = nil
+	}
+
+	destroyRunInput := &createRunInput{
 		IsDestroy:              true,
 		WorkspaceID:            options.WorkspaceID,
 		ConfigurationVersionID: run.ConfigurationVersionID,
 		ModuleSource:           run.ModuleSource,
 		ModuleVersion:          run.ModuleVersion,
 		Variables:              variables,
-		// Set UseRunVariablesOnly to true so that we don't use the workspace and inherited group variables for the destroy run
-		UseRunVariablesOnly: true,
 	}
 
 	return s.createRun(ctx, destroyRunInput)
@@ -466,11 +491,39 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
-	return s.createRun(ctx, options)
+	if err = options.Validate(); err != nil {
+		tracing.RecordError(span, err, "failed to validate create run options")
+		return nil, err
+	}
+
+	// Build run variables
+	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to build run variables")
+		return nil, errors.Wrap(
+			err,
+			"failed to build run variables",
+		)
+	}
+
+	return s.createRun(ctx, &createRunInput{
+		ConfigurationVersionID: options.ConfigurationVersionID,
+		Comment:                options.Comment,
+		ModuleSource:           options.ModuleSource,
+		ModuleVersion:          options.ModuleVersion,
+		Speculative:            options.Speculative,
+		WorkspaceID:            options.WorkspaceID,
+		TerraformVersion:       options.TerraformVersion,
+		Variables:              runVariables,
+		TargetAddresses:        options.TargetAddresses,
+		IsDestroy:              options.IsDestroy,
+		Refresh:                options.Refresh,
+		RefreshOnly:            options.RefreshOnly,
+	})
 }
 
 // CreateRun creates a new run and associates a Plan with it
-func (s *service) createRun(ctx context.Context, options *CreateRunInput) (*models.Run, error) {
+func (s *service) createRun(ctx context.Context, options *createRunInput) (*models.Run, error) {
 	ctx, span := tracer.Start(ctx, "svc.createRun")
 	defer span.End()
 
@@ -480,20 +533,7 @@ func (s *service) createRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
-	if err = options.Validate(); err != nil {
-		tracing.RecordError(span, err, "failed to validate create run options")
-		return nil, err
-	}
-
-	// Build run variables
-	runVariables, err := s.buildRunVariables(ctx, options.WorkspaceID, options.Variables, options.UseRunVariablesOnly)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to build run variables")
-		return nil, errors.Wrap(
-			err,
-			"failed to build run variables",
-		)
-	}
+	runVariables := options.Variables
 
 	// Filter out the environment variables.
 	runEnvVars := []Variable{}
@@ -790,6 +830,14 @@ func (s *service) createRun(ctx context.Context, options *CreateRunInput) (*mode
 			err,
 			"Failed to create log stream for plan job",
 		)
+	}
+
+	// When saving run variables we'll remove the sensitive values.
+	// This is done to prevent the sensitive values from being stored in object storage.
+	for i, variable := range runVariables {
+		if variable.Sensitive {
+			runVariables[i].Value = nil
+		}
 	}
 
 	// Save run variables.
@@ -1518,7 +1566,7 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 	return result, nil
 }
 
-func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable, error) {
+func (s *service) GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]Variable, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetRunVariables")
 	defer span.End()
 
@@ -1550,15 +1598,27 @@ func (s *service) GetRunVariables(ctx context.Context, runID string) ([]Variable
 		return nil, err
 	}
 
-	variables, err := s.getRunVariables(ctx, run, includeValues)
+	if !includeValues && includeSensitiveValues {
+		return nil, errors.New("caller does not have permission to view sensitive variable values", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	variables, err := s.getRunVariables(ctx, run, includeSensitiveValues)
 	if err != nil {
 		return nil, err
+	}
+
+	if !includeValues {
+		for i := range variables {
+			variables[i].Value = nil
+		}
 	}
 
 	// Sort variable list
 	sort.Slice(variables, func(i, j int) bool {
 		var v int
-		if variables[i].NamespacePath != nil && variables[j].NamespacePath != nil {
+		if variables[i].NamespacePath == variables[j].NamespacePath {
+			v = 0
+		} else if variables[i].NamespacePath != nil && variables[j].NamespacePath != nil {
 			v = strings.Compare(*variables[i].NamespacePath, *variables[j].NamespacePath)
 		} else if variables[i].NamespacePath != nil && variables[j].NamespacePath == nil {
 			v = 1
@@ -2060,7 +2120,7 @@ func (s *service) GetStateVersionsByRunIDs(ctx context.Context, runIDs []string)
 	return []models.StateVersion{}, nil
 }
 
-func (s *service) getRunVariables(ctx context.Context, run *models.Run, includeValues bool) ([]Variable, error) {
+func (s *service) getRunVariables(ctx context.Context, run *models.Run, includeSensitiveValues bool) ([]Variable, error) {
 	ctx, span := tracer.Start(ctx, "svc.getRunVariables")
 	defer span.End()
 
@@ -2072,7 +2132,6 @@ func (s *service) getRunVariables(ctx context.Context, run *models.Run, includeV
 			"Failed to get run variables from object store",
 		)
 	}
-
 	defer result.Close()
 
 	var variables []Variable
@@ -2081,16 +2140,64 @@ func (s *service) getRunVariables(ctx context.Context, run *models.Run, includeV
 		return nil, err
 	}
 
-	if !includeValues {
-		for i := range variables {
-			variables[i].Value = nil
+	if includeSensitiveValues {
+		runID := run.Metadata.ID
+
+		// Extract variable version IDs for sensitive variables
+		variableVersionIDs := make([]string, 0, len(variables))
+		for _, v := range variables {
+			if v.Sensitive {
+				if v.VersionID == nil {
+					return nil, errors.New("variable version ID is missing for sensitive variable %q in run %q", v.Key, runID, errors.WithSpan(span))
+				}
+				variableVersionIDs = append(variableVersionIDs, *v.VersionID)
+			}
+		}
+
+		if len(variableVersionIDs) > 0 {
+			// Query for variable versions
+			variableVersionsResp, err := s.dbClient.VariableVersions.GetVariableVersions(ctx, &db.GetVariableVersionsInput{
+				Filter: &db.VariableVersionFilter{
+					VariableVersionIDs: variableVersionIDs,
+				},
+			})
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to query for variable versions associated with run %q", runID, errors.WithSpan(span))
+			}
+
+			// Ensure that we recieved all the requested variable versions
+			if len(variableVersionsResp.VariableVersions) != len(variableVersionIDs) {
+				return nil, errors.New("some of the requested variable versions are missing for run %q", runID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+			}
+
+			// Build map of secret values
+			secretValues := make(map[string]string, len(variableVersionsResp.VariableVersions))
+			for _, v := range variableVersionsResp.VariableVersions {
+				// Use secret manager to get the secret value
+				value, err := s.secretManager.Get(ctx, v.Key, v.SecretData)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get secret value for variable version with ID %q", v.Metadata.ID, errors.WithSpan(span))
+				}
+				secretValues[v.Metadata.ID] = value
+			}
+
+			// Populate sensitive variable values
+			for i, v := range variables {
+				if v.Sensitive {
+					if value, ok := secretValues[*v.VersionID]; ok {
+						variables[i].Value = &value
+					} else {
+						return nil, errors.New("failed to populate secret value for variable version %q because secret value was not found", *v.VersionID, errors.WithSpan(span))
+					}
+				}
+			}
 		}
 	}
 
 	return variables, nil
 }
 
-func (s *service) buildRunVariables(ctx context.Context, workspaceID string, runVariables []Variable, useRunVariablesOnly bool) ([]Variable, error) {
+func (s *service) buildRunVariables(ctx context.Context, workspaceID string, runVariables []Variable) ([]Variable, error) {
 	variableMap := map[string]Variable{}
 
 	buildMapKey := func(key string, category string) string {
@@ -2104,57 +2211,60 @@ func (s *service) buildRunVariables(ctx context.Context, workspaceID string, run
 		}
 
 		variableMap[buildMapKey(v.Key, string(v.Category))] = Variable{
-			Key:      v.Key,
-			Value:    v.Value,
-			Category: v.Category,
-			Hcl:      v.Hcl,
+			Key:       v.Key,
+			Value:     v.Value,
+			Category:  v.Category,
+			Hcl:       v.Hcl,
+			Sensitive: false,
 		}
 	}
 
-	if !useRunVariablesOnly {
-		// Get Workspace
-		ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
-		if err != nil {
-			return nil, err
-		}
+	// Get Workspace
+	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
 
-		if ws == nil {
-			return nil, fmt.Errorf("workspace with id %s not found", workspaceID)
-		}
+	if ws == nil {
+		return nil, fmt.Errorf("workspace with id %s not found", workspaceID)
+	}
 
-		pathParts := strings.Split(ws.FullPath, "/")
+	// Use a descending sort so the variables from the closest ancestor will take precedence
+	sortBy := db.VariableSortableFieldNamespacePathDesc
+	result, err := s.dbClient.Variables.GetVariables(ctx, &db.GetVariablesInput{
+		Filter: &db.VariableFilter{
+			NamespacePaths: ws.ExpandPath(),
+		},
+		Sort: &sortBy,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-		namespacePaths := []string{}
-		for len(pathParts) > 0 {
-			namespacePaths = append(namespacePaths, strings.Join(pathParts, "/"))
-			// Remove last element
-			pathParts = pathParts[:len(pathParts)-1]
-		}
+	for _, v := range result.Variables {
+		v := v
 
-		// Use a descending sort so the variables from the closest ancestor will take precedence
-		sortBy := db.VariableSortableFieldNamespacePathDesc
-		result, err := s.dbClient.Variables.GetVariables(ctx, &db.GetVariablesInput{
-			Filter: &db.VariableFilter{
-				NamespacePaths: namespacePaths,
-			},
-			Sort: &sortBy,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, v := range result.Variables {
-			vCopy := v
-
-			keyAndCategory := buildMapKey(v.Key, string(v.Category))
-			if _, ok := variableMap[keyAndCategory]; !ok {
-				variableMap[keyAndCategory] = Variable{
-					Key:           v.Key,
-					Value:         v.Value,
-					Category:      v.Category,
-					Hcl:           v.Hcl,
-					NamespacePath: &vCopy.NamespacePath,
+		keyAndCategory := buildMapKey(v.Key, string(v.Category))
+		if _, ok := variableMap[keyAndCategory]; !ok {
+			value := v.Value
+			// Get secret value if variable is sensitive
+			if v.Sensitive {
+				// Use secret manager to get the secret value
+				secret, err := s.secretManager.Get(ctx, v.Key, v.SecretData)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get secret value for variable %q when saving run variables %q", v.Key)
 				}
+				value = &secret
+			}
+
+			variableMap[keyAndCategory] = Variable{
+				Key:           v.Key,
+				Value:         value,
+				Category:      v.Category,
+				Hcl:           v.Hcl,
+				NamespacePath: &v.NamespacePath,
+				Sensitive:     v.Sensitive,
+				VersionID:     &v.LatestVersionID,
 			}
 		}
 	}

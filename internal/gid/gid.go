@@ -33,6 +33,7 @@ const (
 	TeamMemberType                      Type = "TM"
 	UserType                            Type = "U"
 	VariableType                        Type = "V"
+	VariableVersionType                 Type = "VV"
 	WorkspaceType                       Type = "W"
 	TerraformProviderType               Type = "TP"
 	TerraformProviderVersionType        Type = "TPV"
@@ -74,6 +75,7 @@ func (t Type) IsValid() error {
 		TeamMemberType,
 		UserType,
 		VariableType,
+		VariableVersionType,
 		WorkspaceType,
 		TerraformProviderType,
 		TerraformProviderVersionType,
