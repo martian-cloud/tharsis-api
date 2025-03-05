@@ -3,7 +3,7 @@ package secret
 
 import "context"
 
-//go:generate mockery --name Manager --inpackage --case underscore
+//go:generate go tool mockery --name Manager --inpackage --case underscore
 
 // Manager manages secret values
 type Manager interface {

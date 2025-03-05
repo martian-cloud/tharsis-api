@@ -1,7 +1,7 @@
 // Package asynctask package
 package asynctask
 
-//go:generate mockery --name Manager --inpackage --case underscore
+//go:generate go tool mockery --name Manager --inpackage --case underscore
 
 import (
 	"context"

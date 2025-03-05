@@ -2,8 +2,8 @@
 // related to cursor-based pagination.
 package pagination
 
-//go:generate mockery --name Connection --inpackage --case underscore
-//go:generate mockery --srcpkg github.com/jackc/pgx/v4 --name Rows
+//go:generate go tool mockery --name Connection --inpackage --case underscore
+//go:generate go tool mockery --srcpkg github.com/jackc/pgx/v4 --name Rows
 
 import (
 	"context"

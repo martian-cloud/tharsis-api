@@ -23,7 +23,7 @@ const (
 	defaultRateLimitStorePluginType    = "memory"
 	defaultModuleRegistryMaxUploadSize = 1024 * 1024 * 128 // 128 MiB
 	defaultVCSRepositorySizeLimit      = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
-	defaultAsyncTaskTimeout            = 100               // seconds
+	defaultAsyncTaskTimeout            = 180               // seconds
 	defaultDBAutoMigrateEnabled        = true
 	defaultOtelTraceEnabled            = false
 	defaultHTTPRateLimit               = 60 // in calls per second

@@ -1,7 +1,7 @@
 // Package objectstore package
 package objectstore
 
-//go:generate mockery --name ObjectStore --inpackage --case underscore
+//go:generate go tool mockery --name ObjectStore --inpackage --case underscore
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package namespacemembership package
 package namespacemembership
 
-//go:generate mockery --name Service --inpackage --case underscore
+//go:generate go tool mockery --name Service --inpackage --case underscore
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package configurer package
 package configurer
 
-//go:generate mockery --name Configurer --inpackage --case underscore
+//go:generate go tool mockery --name Configurer --inpackage --case underscore
 
 import (
 	"context"

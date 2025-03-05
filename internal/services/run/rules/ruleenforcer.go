@@ -1,7 +1,7 @@
 // Package rules package
 package rules
 
-//go:generate mockery --name RuleEnforcer --inpackage --case underscore
+//go:generate go tool mockery --name RuleEnforcer --inpackage --case underscore
 
 import (
 	"context"

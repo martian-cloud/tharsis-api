@@ -8,7 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 )
 
-//go:generate mockery --name TerraformCLIStore --inpackage --case underscore
+//go:generate go tool mockery --name TerraformCLIStore --inpackage --case underscore
 
 // TerraformCLIStore interface encapsulates the logic for saving Terraform CLI binaries.
 type TerraformCLIStore interface {

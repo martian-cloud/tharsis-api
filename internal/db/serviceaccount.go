@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name ServiceAccounts --inpackage --case underscore
+//go:generate go tool mockery --name ServiceAccounts --inpackage --case underscore
 
 import (
 	"context"

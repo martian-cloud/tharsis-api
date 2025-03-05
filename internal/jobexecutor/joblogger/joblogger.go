@@ -1,7 +1,7 @@
 // Package joblogger is used to handle job logs
 package joblogger
 
-//go:generate mockery --name Logger --inpackage --case underscore
+//go:generate go tool mockery --name Logger --inpackage --case underscore
 
 import (
 	"context"

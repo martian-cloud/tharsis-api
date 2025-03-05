@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name SCIMTokens --inpackage --case underscore
+//go:generate go tool mockery --name SCIMTokens --inpackage --case underscore
 
 import (
 	"context"

@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name TerraformProviderVersions --inpackage --case underscore
+//go:generate go tool mockery --name TerraformProviderVersions --inpackage --case underscore
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package jobclient package
 package jobclient
 
-//go:generate mockery --name Client --inpackage --case underscore
+//go:generate go tool mockery --name Client --inpackage --case underscore
 
 import (
 	"bytes"

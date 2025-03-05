@@ -1,7 +1,7 @@
 // Package email supports sending emails.
 package email
 
-//go:generate mockery --name Provider --inpackage --case underscore
+//go:generate go tool mockery --name Provider --inpackage --case underscore
 
 import "context"
 

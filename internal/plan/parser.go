@@ -1,6 +1,6 @@
 package plan
 
-//go:generate mockery --name Parser --inpackage --case underscore
+//go:generate go tool mockery --name Parser --inpackage --case underscore
 
 import (
 	"fmt"

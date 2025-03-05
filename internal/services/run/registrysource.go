@@ -1,7 +1,7 @@
 // Package run package
 package run
 
-//go:generate mockery --name ModuleResolver --inpackage --case underscore
+//go:generate go tool mockery --name ModuleResolver --inpackage --case underscore
 
 import (
 	"context"

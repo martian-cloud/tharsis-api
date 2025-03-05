@@ -1,6 +1,6 @@
 package logstream
 
-//go:generate mockery --name Store --inpackage --case underscore
+//go:generate go tool mockery --name Store --inpackage --case underscore
 
 import (
 	"context"

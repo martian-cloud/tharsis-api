@@ -1,6 +1,6 @@
 package auth
 
-//go:generate mockery --name Caller --inpackage --case underscore
+//go:generate go tool mockery --name Caller --inpackage --case underscore
 
 import (
 	"context"

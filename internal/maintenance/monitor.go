@@ -1,7 +1,7 @@
 // Package maintenance provides the maintenance mode monitor
 package maintenance
 
-//go:generate mockery --name Monitor --inpackage --case underscore
+//go:generate go tool mockery --name Monitor --inpackage --case underscore
 
 import (
 	"context"

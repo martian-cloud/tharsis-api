@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name MaintenanceModes --inpackage --case underscore
+//go:generate go tool mockery --name MaintenanceModes --inpackage --case underscore
 
 import (
 	"context"
