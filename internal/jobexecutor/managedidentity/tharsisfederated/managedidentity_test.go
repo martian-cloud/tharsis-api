@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -325,7 +325,7 @@ func stubCreateServiceAccountToken(
 	var err error
 
 	if errorMessage != "" {
-		err = fmt.Errorf(errorMessage)
+		err = errors.New(errorMessage)
 		expiresIn = nil
 		createdToken = ""
 	}

@@ -1,6 +1,6 @@
 package moduleregistry
 
-//go:generate mockery --name RegistryStore --inpackage --case underscore
+//go:generate go tool mockery --name RegistryStore --inpackage --case underscore
 
 import (
 	"bytes"

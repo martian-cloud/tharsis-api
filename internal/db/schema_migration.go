@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name SchemaMigrations --inpackage --case underscore
+//go:generate go tool mockery --name SchemaMigrations --inpackage --case underscore
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package builder handles building email templates
 package builder
 
-//go:generate mockery --name EmailBuilder --inpackage --case underscore
+//go:generate go tool mockery --name EmailBuilder --inpackage --case underscore
 
 import (
 	"bytes"

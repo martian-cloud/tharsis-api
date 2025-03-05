@@ -1,7 +1,7 @@
 // Package managedidentity package
 package managedidentity
 
-//go:generate mockery --name Authenticator --inpackage --case underscore
+//go:generate go tool mockery --name Authenticator --inpackage --case underscore
 
 import (
 	"context"

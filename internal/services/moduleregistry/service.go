@@ -1,6 +1,6 @@
 package moduleregistry
 
-//go:generate mockery --name Service --inpackage --case underscore
+//go:generate go tool mockery --name Service --inpackage --case underscore
 
 import (
 	"context"

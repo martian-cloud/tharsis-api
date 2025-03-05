@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name Transactions --inpackage --case underscore
+//go:generate go tool mockery --name Transactions --inpackage --case underscore
 
 import (
 	"context"

@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name NamespaceMemberships --inpackage --case underscore
+//go:generate go tool mockery --name NamespaceMemberships --inpackage --case underscore
 
 import (
 	"context"

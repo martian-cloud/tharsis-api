@@ -1,7 +1,7 @@
 // Package docker package
 package docker
 
-//go:generate mockery --name client --inpackage --case underscore
+//go:generate go tool mockery --name client --inpackage --case underscore
 
 import (
 	"context"

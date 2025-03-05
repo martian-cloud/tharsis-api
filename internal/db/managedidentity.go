@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name ManagedIdentities --inpackage --case underscore
+//go:generate go tool mockery --name ManagedIdentities --inpackage --case underscore
 
 import (
 	"context"

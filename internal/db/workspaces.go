@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name Workspaces --inpackage --case underscore
+//go:generate go tool mockery --name Workspaces --inpackage --case underscore
 
 import (
 	"context"

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	graphqlgo "github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
@@ -14,6 +15,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
+const (
+	graphqlSubscriptionMaxMessageSize = 1024 * 10
+	graphqlSubscriptionWriteTimeout   = 10 * time.Second
 )
 
 func newSubscriptionHandler(
@@ -31,7 +37,10 @@ func newSubscriptionHandler(
 			loaders:       loaders,
 			// Disable cache for subscriptions since they don't refresh the context per response
 			disableCache: true,
-		}))
+		}),
+		graphqlws.WithReadLimit(graphqlSubscriptionMaxMessageSize),
+		graphqlws.WithWriteTimeout(graphqlSubscriptionWriteTimeout),
+	)
 }
 
 type connectionParams struct {

@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name GPGKeys --inpackage --case underscore
+//go:generate go tool mockery --name GPGKeys --inpackage --case underscore
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package db package
 package db
 
-//go:generate mockery --name ActivityEvents --inpackage --case underscore
+//go:generate go tool mockery --name ActivityEvents --inpackage --case underscore
 
 import (
 	"context"

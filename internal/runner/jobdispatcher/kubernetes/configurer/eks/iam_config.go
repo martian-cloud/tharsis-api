@@ -1,8 +1,8 @@
 // Package eks package
 package eks
 
-//go:generate mockery --name eksClient --inpackage --case underscore
-//go:generate mockery --name presigner --inpackage --case underscore
+//go:generate go tool mockery --name eksClient --inpackage --case underscore
+//go:generate go tool mockery --name presigner --inpackage --case underscore
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package limits package
 package limits
 
-//go:generate mockery --name LimitChecker --inpackage --case underscore
+//go:generate go tool mockery --name LimitChecker --inpackage --case underscore
 
 import (
 	"context"

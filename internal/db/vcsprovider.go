@@ -1,6 +1,6 @@
 package db
 
-//go:generate mockery --name VCSProviders --inpackage --case underscore
+//go:generate go tool mockery --name VCSProviders --inpackage --case underscore
 
 import (
 	"context"

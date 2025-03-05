@@ -1,7 +1,7 @@
 // Package workspace package
 package workspace
 
-//go:generate mockery --name ArtifactStore --inpackage --case underscore
+//go:generate go tool mockery --name ArtifactStore --inpackage --case underscore
 
 import (
 	"context"

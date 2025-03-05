@@ -1,7 +1,7 @@
 // Package logstream provides functionality for saving and retrieving logs
 package logstream
 
-//go:generate mockery --name Manager --inpackage --case underscore
+//go:generate go tool mockery --name Manager --inpackage --case underscore
 
 import (
 	"context"
