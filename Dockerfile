@@ -1,17 +1,17 @@
-ARG goversion
+ARG goversion=1.24
 
-FROM golang:${goversion}-alpine as builder
+FROM golang:${goversion}-alpine AS builder
 RUN apk add --no-cache build-base git curl
 COPY go.mod /app/
 WORKDIR /app
 RUN go mod download
 COPY . /app
-RUN curl https://gitlab.com/api/v4/projects/44551702/packages/generic/iam-oidc-credential-helper/v0.0.1/iamoidccredhelper_v0.0.1_linux_amd64 -L --output iamoidccredhelper
-RUN make build-api
-RUN make build-job-executor
-RUN make build-runner
+RUN curl --fail --silent --show-error -L --output iamoidccredhelper https://gitlab.com/api/v4/projects/44551702/packages/generic/iam-oidc-credential-helper/v0.1.1/iamoidccredhelper_v0.1.1_linux_amd64 && \
+    make build-api && \
+    make build-job-executor && \
+    make build-runner
 
-FROM gcr.io/distroless/static-debian12:nonroot as distroless-base
+FROM gcr.io/distroless/static-debian12:nonroot AS distroless-base
 WORKDIR /app/
 
 FROM distroless-base AS api
@@ -21,14 +21,22 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "cu
 EXPOSE 8000
 CMD ["./apiserver"]
 
-FROM distroless-base AS runner
+FROM alpine:3.21 AS runner
+RUN apk --no-cache add git curl python3 py3-pip jq && \
+    apk --no-cache upgrade && \
+    adduser tharsis -D && \
+    addgroup docker && \
+    adduser tharsis docker && \
+    mkdir -p /app /opt/credhelpers && \
+    chown tharsis:tharsis /app
+WORKDIR /app/
 COPY --from=builder /app/runner .
 COPY --chmod=0755 --from=builder /app/iamoidccredhelper /opt/credhelpers/iamoidccredhelper
-USER nonroot
+USER tharsis
 HEALTHCHECK NONE
 CMD ["./runner"]
 
-FROM alpine:3.17 AS job-executor
+FROM alpine:3.21 AS job-executor
 WORKDIR /app/
 COPY --from=builder /app/job .
 RUN apk add --no-cache git curl python3 py3-pip jq && \
