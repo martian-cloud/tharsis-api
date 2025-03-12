@@ -464,6 +464,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 
 	destroyRunInput := &createRunInput{
 		IsDestroy:              true,
+		Refresh:                true,
 		WorkspaceID:            options.WorkspaceID,
 		ConfigurationVersionID: run.ConfigurationVersionID,
 		ModuleSource:           run.ModuleSource,
