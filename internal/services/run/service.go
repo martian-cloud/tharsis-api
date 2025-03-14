@@ -22,6 +22,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
@@ -2320,30 +2321,16 @@ func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error)
 
 // getJobTags gets the applicable runner tags from the workspace or the lowest level ancestor group with tags set.
 func (s *service) getJobTags(ctx context.Context, workspace *models.Workspace) ([]string, error) {
-	if workspace.RunnerTags != nil {
-		return workspace.RunnerTags, nil
-	}
-
-	// Get the workspace's ancestor groups, lowest to highest.
-	sortLowestToHighest := db.GroupSortableFieldFullPathDesc
-	groups, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
-		Sort: &sortLowestToHighest, // Must use a variable to take its address.
-		Filter: &db.GroupFilter{
-			GroupPaths: workspace.ExpandPath()[1:], // Remove the first element, which is the workspace.
-		},
-	})
+	setting, err := namespace.NewInheritedSettingResolver(s.dbClient).GetRunnerTags(ctx, workspace)
 	if err != nil {
 		return nil, err
 	}
 
-	// Find the first/lowest group with tags set.
-	for _, group := range groups.Groups {
-		if group.RunnerTags != nil {
-			return group.RunnerTags, nil
-		}
+	if setting.Value == nil {
+		return []string{}, nil
 	}
 
-	return []string{}, nil
+	return setting.Value, nil
 }
 
 func truncateErrorMessage(errorMessage string) *string {

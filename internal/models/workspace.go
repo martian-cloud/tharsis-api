@@ -51,6 +51,21 @@ func (w *Workspace) Validate() error {
 	return verifyValidRunnerTags(w.RunnerTags)
 }
 
+// GetPath returns the full path for this workspace
+func (w *Workspace) GetPath() string {
+	return w.FullPath
+}
+
+// GetParentID returns the parent group ID
+func (w *Workspace) GetParentID() string {
+	return w.GroupID
+}
+
+// GetRunnerTags returns the runner tags for this workspace
+func (w *Workspace) GetRunnerTags() []string {
+	return w.RunnerTags
+}
+
 // GetGroupPath returns the group path
 func (w *Workspace) GetGroupPath() string {
 	return w.FullPath[:strings.LastIndex(w.FullPath, "/")]

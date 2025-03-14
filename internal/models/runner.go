@@ -34,13 +34,6 @@ type Runner struct {
 	RunUntaggedJobs bool
 }
 
-// RunnerTagsSetting contains tag settings, inherited or direct, returned to the group and workspace resolvers.
-type RunnerTagsSetting struct {
-	Inherited     bool
-	NamespacePath string
-	Value         []string
-}
-
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (r *Runner) ResolveMetadata(key string) (string, error) {
 	val, err := r.Metadata.resolveFieldValue(key)
