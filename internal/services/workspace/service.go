@@ -20,6 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -139,7 +140,7 @@ type Service interface {
 	GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error)
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
-	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*models.RunnerTagsSetting, error)
+	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error)
 }
 
 type handleCallerFunc func(
@@ -1593,7 +1594,7 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 }
 
 // GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a workspace.
-func (s *service) GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*models.RunnerTagsSetting, error) {
+func (s *service) GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetRunnerTagsSetting")
 	defer span.End()
 
@@ -1609,33 +1610,7 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, workspace *models.Wo
 		return nil, err
 	}
 
-	// The workspace sets its own tags.
-	if workspace.RunnerTags != nil {
-		return &models.RunnerTagsSetting{
-			Inherited:     false,
-			NamespacePath: workspace.FullPath,
-			Value:         workspace.RunnerTags,
-		}, nil
-	}
-
-	sortLowestToHighest := db.GroupSortableFieldFullPathDesc
-	parentGroupsResult, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
-		Sort: &sortLowestToHighest,
-		Filter: &db.GroupFilter{
-			GroupPaths: workspace.ExpandPath()[1:],
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	parentGroups := []*models.Group{}
-	for _, g := range parentGroupsResult.Groups {
-		copyGroup := g
-		parentGroups = append(parentGroups, &copyGroup)
-	}
-
-	return models.GetRunnerTagsSetting(parentGroups), nil
+	return namespace.NewInheritedSettingResolver(s.dbClient).GetRunnerTags(ctx, workspace)
 }
 
 func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {

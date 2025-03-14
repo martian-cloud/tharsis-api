@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -58,7 +59,7 @@ type Service interface {
 	// MigrateGroup migrates an existing group to a new parent (or to root)
 	MigrateGroup(ctx context.Context, groupID string, newParentID *string) (*models.Group, error)
 	// GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a group.
-	GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*models.RunnerTagsSetting, error)
+	GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*namespace.RunnerTagsSetting, error)
 }
 
 type service struct {
@@ -718,7 +719,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 }
 
 // GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a group.
-func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*models.RunnerTagsSetting, error) {
+func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*namespace.RunnerTagsSetting, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetRunnerTagsSetting")
 	defer span.End()
 
@@ -734,45 +735,7 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group)
 		return nil, err
 	}
 
-	// The group sets its own tags.
-	if group.RunnerTags != nil {
-		return &models.RunnerTagsSetting{
-			Inherited:     false,
-			NamespacePath: group.FullPath,
-			Value:         group.RunnerTags,
-		}, nil
-	}
-
-	// A root group has no ancestors.
-	// To avoid false positives, don't look for ancestor groups.
-	if group.ParentID == "" {
-		// At this point, we know group.RunnerTags is nil.
-		// This is a root group, but it does not set tags, so treat it as if it sets tags empty.
-		return &models.RunnerTagsSetting{
-			Inherited:     false,
-			NamespacePath: group.FullPath,
-			Value:         []string{},
-		}, nil
-	}
-
-	sortLowestToHighest := db.GroupSortableFieldFullPathDesc
-	parentGroupsResult, err := s.dbClient.Groups.GetGroups(ctx, &db.GetGroupsInput{
-		Sort: &sortLowestToHighest,
-		Filter: &db.GroupFilter{
-			GroupPaths: group.ExpandPath()[1:],
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	parentGroups := []*models.Group{}
-	for _, g := range parentGroupsResult.Groups {
-		copyGroup := g
-		parentGroups = append(parentGroups, &copyGroup)
-	}
-
-	return models.GetRunnerTagsSetting(parentGroups), nil
+	return namespace.NewInheritedSettingResolver(s.dbClient).GetRunnerTags(ctx, group)
 }
 
 // checkParentSubgroupLimit checks whether the parent subgroup limit has just been violated.
