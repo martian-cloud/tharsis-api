@@ -1,7 +1,9 @@
 ARG goversion=1.24
 
 FROM golang:${goversion}-alpine AS builder
-RUN apk add --no-cache build-base git curl
+RUN apk update --no-cache && \
+    apk upgrade --no-cache && \
+    apk add --no-cache build-base git curl
 COPY go.mod /app/
 WORKDIR /app
 RUN go mod download
@@ -22,8 +24,9 @@ EXPOSE 8000
 CMD ["./apiserver"]
 
 FROM alpine:3.21 AS runner
-RUN apk --no-cache add git curl python3 py3-pip jq && \
-    apk --no-cache upgrade && \
+RUN apk update --no-cache && \
+    apk upgrade --no-cache && \
+    apk add --no-cache git curl python3 py3-pip jq && \
     adduser tharsis -D && \
     addgroup docker && \
     adduser tharsis docker && \
@@ -39,8 +42,9 @@ CMD ["./runner"]
 FROM alpine:3.21 AS job-executor
 WORKDIR /app/
 COPY --from=builder /app/job .
-RUN apk add --no-cache git curl python3 py3-pip jq && \
-    apk --no-cache upgrade && \
+RUN apk update --no-cache && \
+    apk upgrade --no-cache && \
+    apk add --no-cache git curl python3 py3-pip jq && \
     adduser tharsis -D && \
     chown tharsis:tharsis /app
 USER tharsis
