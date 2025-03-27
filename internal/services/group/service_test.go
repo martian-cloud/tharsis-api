@@ -6,12 +6,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -116,7 +118,7 @@ func TestCreateTopLevelGroup(t *testing.T) {
 			limiter := limits.NewLimitChecker(dbClient)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, limiter, mockNamespaceMemberships, mockActivityEvents)
+			service := NewService(logger, dbClient, limiter, mockNamespaceMemberships, mockActivityEvents, nil)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, test.caller), &test.input)
 			if test.expectErrorCode != "" {
@@ -249,7 +251,7 @@ func TestCreateNestedGroup(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, limiter, nil, mockActivityEvents)
+			service := NewService(logger, &dbClient, limiter, nil, mockActivityEvents, nil)
 
 			group, err := service.CreateGroup(auth.WithCaller(ctx, mockCaller), &test.input)
 			if test.expectErrorCode != "" {
@@ -725,7 +727,7 @@ func TestGetGroups(t *testing.T) {
 			logger, _ := logger.NewForTest()
 			activityService := activityevent.NewService(dbClient.Client, logger)
 			namespaceMembershipService := namespacemembership.NewService(logger, dbClient.Client, activityService)
-			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, activityService)
+			service := NewService(logger, dbClient.Client, limiter, namespaceMembershipService, activityService, nil)
 
 			// Call the service function.
 			actualOutput, actualError := service.GetGroups(auth.WithCaller(ctx, testCaller), test.svcInput)
@@ -1133,7 +1135,7 @@ func TestMigrateGroup(t *testing.T) {
 			)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, limiter, nil, &mockActivityEvents)
+			service := NewService(logger, &dbClient, limiter, nil, &mockActivityEvents, nil)
 
 			migrated, err := service.MigrateGroup(auth.WithCaller(ctx, testCaller),
 				test.inputGroup.Metadata.ID, test.newParentID)
@@ -1144,6 +1146,58 @@ func TestMigrateGroup(t *testing.T) {
 			} else {
 				assert.Equal(t, test.expectGroup, migrated)
 			}
+		})
+	}
+}
+
+func TestGetDriftDetectionEnabledSetting(t *testing.T) {
+	group := models.Group{
+		Metadata: models.ResourceMetadata{ID: "group-1"},
+	}
+	// Test cases
+	tests := []struct {
+		expectSetting *namespace.DriftDetectionEnabledSetting
+		name          string
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get setting",
+			expectSetting: &namespace.DriftDetectionEnabledSetting{
+				Value: true,
+			},
+		},
+		{
+			name:          "unauthorized",
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewGroupPermission, mock.Anything).Return(test.authError)
+
+			mockInheritedSettingsResolver.On("GetDriftDetectionEnabled", mock.Anything, &group).Return(test.expectSetting, nil).Maybe()
+
+			service := NewService(testLogger, nil, nil, nil, nil, mockInheritedSettingsResolver)
+
+			setting, err := service.GetDriftDetectionEnabledSetting(auth.WithCaller(ctx, mockCaller), &group)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectSetting, setting)
 		})
 	}
 }

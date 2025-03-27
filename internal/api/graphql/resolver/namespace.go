@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	graphql "github.com/graph-gophers/graphql-go"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -185,15 +186,8 @@ func (r *NamespaceRunnerTagsInput) Validate() error {
 	return nil
 }
 
-// NamespaceRunnerTagsResolver resolves a NamespaceRunnerTags resource
-type NamespaceRunnerTagsResolver struct {
-	inherited     bool
-	namespacePath string
-	value         []string
-}
-
 // RunnerTags resolver
-func (r *NamespaceResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTagsResolver, error) {
+func (r *NamespaceResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTagsSetting, error) {
 	switch v := r.result.(type) {
 	case *GroupResolver:
 		return v.RunnerTags(ctx)
@@ -203,17 +197,30 @@ func (r *NamespaceResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTag
 	return nil, r.invalidNamespaceType()
 }
 
-// Inherited resolver.
-func (r *NamespaceRunnerTagsResolver) Inherited() bool {
-	return r.inherited
+// NamespaceDriftDetectionEnabledInput represents the settings for enabling drift detection
+type NamespaceDriftDetectionEnabledInput struct {
+	Enabled *bool
+	Inherit bool
 }
 
-// NamespacePath resolver.
-func (r *NamespaceRunnerTagsResolver) NamespacePath() string {
-	return r.namespacePath
+// Validate returns an error if the input is not valid.
+func (r *NamespaceDriftDetectionEnabledInput) Validate() error {
+
+	// Tags and Inherit are mutually exclusive.
+	if r != nil && r.Enabled != nil && r.Inherit {
+		return errors.New("cannot specify both enabled and inherit", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return nil
 }
 
-// Value resolver.
-func (r *NamespaceRunnerTagsResolver) Value() []string {
-	return r.value
+// DriftDetectionEnabled resolver
+func (r *NamespaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
+	switch v := r.result.(type) {
+	case *GroupResolver:
+		return v.DriftDetectionEnabled(ctx)
+	case *WorkspaceResolver:
+		return v.DriftDetectionEnabled(ctx)
+	}
+	return nil, r.invalidNamespaceType()
 }

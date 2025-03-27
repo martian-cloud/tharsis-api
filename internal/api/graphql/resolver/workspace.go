@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
@@ -333,6 +334,18 @@ func (r *WorkspaceResolver) TerraformVersion() string {
 	return r.workspace.TerraformVersion
 }
 
+// Assessment resolver
+func (r *WorkspaceResolver) Assessment(ctx context.Context) (*WorkspaceAssessmentResolver, error) {
+	assessment, err := loadWorkspaceAssessment(ctx, r.workspace.Metadata.ID)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &WorkspaceAssessmentResolver{assessment: assessment}, nil
+}
+
 // ActivityEvents resolver
 func (r *WorkspaceResolver) ActivityEvents(ctx context.Context,
 	args *ActivityEventConnectionQueryArgs,
@@ -413,17 +426,13 @@ func (r *WorkspaceResolver) VCSEvents(ctx context.Context, args *VCSEventConnect
 }
 
 // RunnerTags resolver
-func (r *WorkspaceResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTagsResolver, error) {
-	setting, err := getWorkspaceService(ctx).GetRunnerTagsSetting(ctx, r.workspace)
-	if err != nil {
-		return nil, err
-	}
+func (r *WorkspaceResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTagsSetting, error) {
+	return getWorkspaceService(ctx).GetRunnerTagsSetting(ctx, r.workspace)
+}
 
-	return &NamespaceRunnerTagsResolver{
-		inherited:     setting.Inherited,
-		namespacePath: setting.NamespacePath,
-		value:         setting.Value,
-	}, nil
+// DriftDetectionEnabled resolver
+func (r *WorkspaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
+	return getWorkspaceService(ctx).GetDriftDetectionEnabledSetting(ctx, r.workspace)
 }
 
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
@@ -494,29 +503,31 @@ func (r *WorkspaceMutationPayloadResolver) Workspace() *WorkspaceResolver {
 
 // CreateWorkspaceInput contains the input for creating a new workspace
 type CreateWorkspaceInput struct {
-	ClientMutationID   *string
-	MaxJobDuration     *int32
-	TerraformVersion   *string
-	PreventDestroyPlan *bool
-	RunnerTags         *NamespaceRunnerTagsInput
-	Name               string
-	GroupPath          string
-	Description        string
+	ClientMutationID      *string
+	MaxJobDuration        *int32
+	TerraformVersion      *string
+	PreventDestroyPlan    *bool
+	RunnerTags            *NamespaceRunnerTagsInput
+	Name                  string
+	GroupPath             string
+	Description           string
+	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 }
 
 // UpdateWorkspaceInput contains the input for updating a workspace
 // Find the workspace via either ID or WorkspacePath.
 // Modify the other fields.
 type UpdateWorkspaceInput struct {
-	ClientMutationID   *string
-	Metadata           *MetadataInput
-	MaxJobDuration     *int32
-	TerraformVersion   *string
-	Description        *string
-	PreventDestroyPlan *bool
-	WorkspacePath      *string
-	ID                 *string
-	RunnerTags         *NamespaceRunnerTagsInput
+	ClientMutationID      *string
+	Metadata              *MetadataInput
+	MaxJobDuration        *int32
+	TerraformVersion      *string
+	Description           *string
+	PreventDestroyPlan    *bool
+	WorkspacePath         *string
+	ID                    *string
+	RunnerTags            *NamespaceRunnerTagsInput
+	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 }
 
 // DeleteWorkspaceInput contains the input for deleting a workspace
@@ -542,6 +553,12 @@ type UnlockWorkspaceInput struct {
 
 // DestroyWorkspaceInput contains the input for destroying a workspace
 type DestroyWorkspaceInput struct {
+	ClientMutationID *string
+	WorkspacePath    string
+}
+
+// AssessWorkspaceInput contains the input for running a workspace assessment
+type AssessWorkspaceInput struct {
 	ClientMutationID *string
 	WorkspacePath    string
 }
@@ -580,12 +597,6 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		preventDestroyPlan = *input.PreventDestroyPlan
 	}
 
-	if input.RunnerTags != nil {
-		if vErr := input.RunnerTags.Validate(); vErr != nil {
-			return nil, vErr
-		}
-	}
-
 	wsCreateOptions := models.Workspace{
 		Name:               input.Name,
 		GroupID:            groupID,
@@ -595,8 +606,24 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		PreventDestroyPlan: preventDestroyPlan,
 	}
 
-	if input.RunnerTags != nil && input.RunnerTags.Tags != nil {
-		wsCreateOptions.RunnerTags = *input.RunnerTags.Tags
+	if input.RunnerTags != nil {
+		if err = input.RunnerTags.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.RunnerTags.Tags != nil {
+			wsCreateOptions.RunnerTags = *input.RunnerTags.Tags
+		}
+	}
+
+	if input.DriftDetectionEnabled != nil {
+		if err = input.DriftDetectionEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.DriftDetectionEnabled.Enabled != nil {
+			wsCreateOptions.EnableDriftDetection = input.DriftDetectionEnabled.Enabled
+		}
 	}
 
 	createdWorkspace, err := getWorkspaceService(ctx).CreateWorkspace(ctx, &wsCreateOptions)
@@ -665,6 +692,20 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 
 		if input.RunnerTags.Inherit {
 			ws.RunnerTags = nil
+		}
+	}
+
+	if input.DriftDetectionEnabled != nil {
+		if err = input.DriftDetectionEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.DriftDetectionEnabled.Enabled != nil {
+			ws.EnableDriftDetection = input.DriftDetectionEnabled.Enabled
+		}
+
+		if input.DriftDetectionEnabled.Inherit {
+			ws.EnableDriftDetection = nil
 		}
 	}
 
@@ -758,6 +799,23 @@ func destroyWorkspaceMutation(ctx context.Context, input *DestroyWorkspaceInput)
 	}
 
 	run, err := getRunService(ctx).CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
+		WorkspaceID: ws.Metadata.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: run, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
+func assessWorkspaceMutation(ctx context.Context, input *AssessWorkspaceInput) (*RunMutationPayloadResolver, error) {
+	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	run, err := getRunService(ctx).CreateAssessmentRunForWorkspace(ctx, &run.CreateAssessmentRunForWorkspaceInput{
 		WorkspaceID: ws.Metadata.ID,
 	})
 	if err != nil {

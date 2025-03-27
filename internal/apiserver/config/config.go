@@ -16,18 +16,20 @@ import (
 )
 
 const (
-	defaultServerPort                  = "8000"
-	envOidcProviderConfigPrefix        = "THARSIS_OAUTH_PROVIDERS_"
-	envRunnerConfigPrefix              = "THARSIS_INTERNAL_RUNNERS_"
-	defaultMaxGraphQLComplexity        = 0
-	defaultRateLimitStorePluginType    = "memory"
-	defaultModuleRegistryMaxUploadSize = 1024 * 1024 * 128 // 128 MiB
-	defaultVCSRepositorySizeLimit      = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
-	defaultAsyncTaskTimeout            = 180               // seconds
-	defaultDBAutoMigrateEnabled        = true
-	defaultOtelTraceEnabled            = false
-	defaultHTTPRateLimit               = 60 // in calls per second
-	defaultTerraformCLIVersions        = ">= 1.0.0"
+	defaultServerPort                       = "8000"
+	envOidcProviderConfigPrefix             = "THARSIS_OAUTH_PROVIDERS_"
+	envRunnerConfigPrefix                   = "THARSIS_INTERNAL_RUNNERS_"
+	defaultMaxGraphQLComplexity             = 0
+	defaultRateLimitStorePluginType         = "memory"
+	defaultModuleRegistryMaxUploadSize      = 1024 * 1024 * 128 // 128 MiB
+	defaultVCSRepositorySizeLimit           = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
+	defaultAsyncTaskTimeout                 = 180               // seconds
+	defaultDBAutoMigrateEnabled             = true
+	defaultOtelTraceEnabled                 = false
+	defaultHTTPRateLimit                    = 60 // in calls per second
+	defaultTerraformCLIVersions             = ">= 1.0.0"
+	defaultWorkspaceAssessmentIntervalHours = 24
+	defaultWorkspaceAssessmentRunLimit      = 20
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -138,6 +140,12 @@ type Config struct {
 
 	// Whether to auto migrate the database
 	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED"`
+
+	// WorkspaceAssessmentIntervalHours is the min duration for running workspace assessments
+	WorkspaceAssessmentIntervalHours int `yaml:"workspace_assessment_interval_hours" env:"WORKSPACE_ASSESSMENT_INTERVAL_HOURS"`
+
+	// WorkspaceAssessmentRunLimit is the max number of assessment runs that can be created at a time
+	WorkspaceAssessmentRunLimit int `yaml:"workspace_assessment_run_limit" env:"WORKSPACE_ASSESSMENT_RUN_LIMIT"`
 }
 
 // Validate validates the application configuration.
@@ -154,16 +162,18 @@ func (c Config) Validate() error {
 func Load(file string, logger logger.Logger) (*Config, error) {
 	// default config
 	c := Config{
-		ServerPort:                    defaultServerPort,
-		MaxGraphQLComplexity:          defaultMaxGraphQLComplexity,
-		RateLimitStorePluginType:      defaultRateLimitStorePluginType,
-		ModuleRegistryMaxUploadSize:   defaultModuleRegistryMaxUploadSize,
-		VCSRepositorySizeLimit:        defaultVCSRepositorySizeLimit,
-		AsyncTaskTimeout:              defaultAsyncTaskTimeout,
-		DBAutoMigrateEnabled:          defaultDBAutoMigrateEnabled,
-		OtelTraceEnabled:              defaultOtelTraceEnabled,
-		HTTPRateLimit:                 defaultHTTPRateLimit,
-		TerraformCLIVersionConstraint: defaultTerraformCLIVersions,
+		ServerPort:                       defaultServerPort,
+		MaxGraphQLComplexity:             defaultMaxGraphQLComplexity,
+		RateLimitStorePluginType:         defaultRateLimitStorePluginType,
+		ModuleRegistryMaxUploadSize:      defaultModuleRegistryMaxUploadSize,
+		VCSRepositorySizeLimit:           defaultVCSRepositorySizeLimit,
+		AsyncTaskTimeout:                 defaultAsyncTaskTimeout,
+		DBAutoMigrateEnabled:             defaultDBAutoMigrateEnabled,
+		OtelTraceEnabled:                 defaultOtelTraceEnabled,
+		HTTPRateLimit:                    defaultHTTPRateLimit,
+		TerraformCLIVersionConstraint:    defaultTerraformCLIVersions,
+		WorkspaceAssessmentIntervalHours: defaultWorkspaceAssessmentIntervalHours,
+		WorkspaceAssessmentRunLimit:      defaultWorkspaceAssessmentRunLimit,
 	}
 
 	// load from YAML config file

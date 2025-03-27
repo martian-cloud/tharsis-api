@@ -60,13 +60,14 @@ func (sf RunSortableField) getSortDirection() pagination.SortDirection {
 
 // RunFilter contains the supported fields for filtering Run resources
 type RunFilter struct {
-	TimeRangeStart *time.Time
-	PlanID         *string
-	ApplyID        *string
-	WorkspaceID    *string
-	GroupID        *string
-	UserMemberID   *string
-	RunIDs         []string
+	TimeRangeStart      *time.Time
+	PlanID              *string
+	ApplyID             *string
+	WorkspaceID         *string
+	GroupID             *string
+	UserMemberID        *string
+	RunIDs              []string
+	WorkspaceAssessment *bool
 }
 
 // GetRunsInput is the input for listing runs
@@ -111,6 +112,7 @@ var runFieldList = append(
 	"targets",
 	"refresh",
 	"refresh_only",
+	"is_assessment_run",
 )
 
 // NewRuns returns an instance of the Run interface
@@ -248,6 +250,10 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 			// Must use UTC here otherwise, queries will return unexpected results.
 			ex = ex.Append(goqu.I("runs.created_at").Gte(input.Filter.TimeRangeStart.UTC()))
 		}
+
+		if input.Filter.WorkspaceAssessment != nil {
+			ex = ex.Append(goqu.I("runs.is_assessment_run").Eq(*input.Filter.WorkspaceAssessment))
+		}
 	}
 
 	query := selectEx.Where(ex)
@@ -345,6 +351,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 			"targets":                   targets,
 			"refresh":                   run.Refresh,
 			"refresh_only":              run.RefreshOnly,
+			"is_assessment_run":         run.IsAssessmentRun,
 		}).
 		Returning(runFieldList...).ToSQL()
 
@@ -452,6 +459,7 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.TargetAddresses,
 		&run.Refresh,
 		&run.RefreshOnly,
+		&run.IsAssessmentRun,
 	)
 	if err != nil {
 		return nil, err

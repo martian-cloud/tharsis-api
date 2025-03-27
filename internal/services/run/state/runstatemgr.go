@@ -607,15 +607,24 @@ func registerWorkspaceHandlers(manager *RunStateManager) {
 }
 
 func (w *workspaceHandlers) handleRunStateChangeEvent(ctx context.Context, oldRun *models.Run, newRun *models.Run) error {
-	if !oldRun.ForceCanceled && newRun.ForceCanceled {
-		workspace, err := w.manager.dbClient.Workspaces.GetWorkspaceByID(ctx, newRun.WorkspaceID)
+	if !oldRun.ForceCanceled && !newRun.Speculative() && newRun.ForceCanceled {
+		// Check if this run was force cancelled during the apply stage
+		apply, err := w.manager.dbClient.Applies.GetApply(ctx, newRun.ApplyID)
 		if err != nil {
 			return err
 		}
-		workspace.DirtyState = true
-		_, err = w.manager.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
-		if err != nil {
-			return err
+
+		if apply != nil && apply.Status == models.ApplyCanceled {
+			workspace, err := w.manager.dbClient.Workspaces.GetWorkspaceByID(ctx, newRun.WorkspaceID)
+			if err != nil {
+				return err
+			}
+			// Set workspace state to dirty since this apply was force canceled while in progress and did not exit gracefully
+			workspace.DirtyState = true
+			_, err = w.manager.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

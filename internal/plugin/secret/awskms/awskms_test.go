@@ -150,7 +150,7 @@ func TestGet(t *testing.T) {
 	c := newMockClient(t)
 
 	c.On("Decrypt", ctx, &kms.DecryptInput{
-		KeyId:     &kmsKeyID,
+		KeyId:          &kmsKeyID,
 		CiphertextBlob: variableSecretData,
 		EncryptionContext: map[string]string{
 			"app":           "tharsis",

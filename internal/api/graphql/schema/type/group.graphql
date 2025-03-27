@@ -106,6 +106,7 @@ type Group implements Node, Namespace {
     sort: RunnerSort
   ): RunnerConnection!
   runnerTags: NamespaceRunnerTags!
+  driftDetectionEnabled: NamespaceDriftDetectionEnabled!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
   activityEvents(
@@ -147,6 +148,7 @@ input CreateGroupInput {
   parentPath: String
   description: String!
   runnerTags: NamespaceRunnerTagsInput
+  driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
 }
 
 input UpdateGroupInput {
@@ -156,6 +158,7 @@ input UpdateGroupInput {
   description: String
   metadata: ResourceMetadataInput
   runnerTags: NamespaceRunnerTagsInput
+  driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
 }
 
 input DeleteGroupInput {

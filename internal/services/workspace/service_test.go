@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	namespace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
@@ -181,7 +182,7 @@ func TestCreateWorkspace(t *testing.T) {
 			testLogger, _ := logger.NewForTest()
 			mockCLIService := cli.NewService(testLogger, nil, nil, mockCLIStore, ">= 1.0.0")
 
-			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, mockCLIService, mockActivityEvents)
+			service := NewService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), nil, nil, mockCLIService, mockActivityEvents, nil)
 
 			workspace, err := service.CreateWorkspace(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
@@ -465,7 +466,7 @@ func TestGetWorkspaces(t *testing.T) {
 				test.handleCaller = auth.HandleCaller
 			}
 
-			service := newService(nil, dbClient, nil, nil, nil, nil, nil, test.handleCaller)
+			service := newService(nil, dbClient, nil, nil, nil, nil, nil, nil, test.handleCaller)
 
 			result, err := service.GetWorkspaces(ctx, test.input)
 
@@ -699,7 +700,7 @@ func TestCreateStateVersion(t *testing.T) {
 				Workspaces:     mockWorkspaces,
 			}
 
-			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), &mockArtifactStore, nil, nil, &mockActivityEvents)
+			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), &mockArtifactStore, nil, nil, &mockActivityEvents, nil)
 
 			if !test.authFail {
 				ctx = auth.WithCaller(ctx, &mockCaller)
@@ -864,7 +865,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 				ResourceLimits:        mockResourceLimits,
 			}
 
-			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil, &mockActivityEvents)
+			service := NewService(testLogger, dbClient, limits.NewLimitChecker(dbClient), nil, nil, nil, &mockActivityEvents, nil)
 
 			if !test.authFail {
 				ctx = auth.WithCaller(ctx, &mockCaller)
@@ -1083,7 +1084,7 @@ func TestMigrateWorkspace(t *testing.T) {
 			)
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, &dbClient, limiter, nil, nil, nil, &mockActivityEvents)
+			service := NewService(logger, &dbClient, limiter, nil, nil, nil, &mockActivityEvents, nil)
 
 			migrated, err := service.MigrateWorkspace(auth.WithCaller(ctx, testCaller),
 				test.inputWorkspace.Metadata.ID, test.newParentID)
@@ -1252,6 +1253,201 @@ func TestSubscribeToWorkspaceEvents(t *testing.T) {
 			for i, e := range test.expectedEvents {
 				assert.Equal(t, e, *receivedEvents[i])
 			}
+		})
+	}
+}
+
+func TestGetDriftDetectionEnabledSetting(t *testing.T) {
+	workspace := models.Workspace{
+		Metadata: models.ResourceMetadata{ID: "ws-1"},
+	}
+	// Test cases
+	tests := []struct {
+		expectSetting *namespace.DriftDetectionEnabledSetting
+		name          string
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get setting",
+			expectSetting: &namespace.DriftDetectionEnabledSetting{
+				Value: true,
+			},
+		},
+		{
+			name:          "unauthorized",
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockInheritedSettingsResolver.On("GetDriftDetectionEnabled", mock.Anything, &workspace).Return(test.expectSetting, nil).Maybe()
+
+			svc := service{
+				logger:                    testLogger,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
+			}
+
+			setting, err := svc.GetDriftDetectionEnabledSetting(auth.WithCaller(ctx, mockCaller), &workspace)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}
+
+func TestGetWorkspaceAssessmentByID(t *testing.T) {
+	assessmentID := "assessment-1"
+
+	// Test cases
+	tests := []struct {
+		assessment    *models.WorkspaceAssessment
+		name          string
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get assessment",
+			assessment: &models.WorkspaceAssessment{
+				Metadata:    models.ResourceMetadata{ID: assessmentID},
+				WorkspaceID: "ws-1",
+			},
+		},
+		{
+			name: "unauthorized",
+			assessment: &models.WorkspaceAssessment{
+				Metadata:    models.ResourceMetadata{ID: assessmentID},
+				WorkspaceID: "ws-1",
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaceAssessments := db.NewMockWorkspaceAssessments(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockWorkspaceAssessments.On("GetWorkspaceAssessmentByID", mock.Anything, assessmentID).Return(test.assessment, nil).Maybe()
+
+			dbClient := db.Client{
+				WorkspaceAssessments: mockWorkspaceAssessments,
+			}
+
+			svc := service{
+				logger:   testLogger,
+				dbClient: &dbClient,
+			}
+
+			assessment, err := svc.GetWorkspaceAssessmentByID(auth.WithCaller(ctx, mockCaller), assessmentID)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.assessment, assessment)
+		})
+	}
+}
+
+func TestGetWorkspaceAssessmentsByWorkspaceIDs(t *testing.T) {
+	idList := []string{"ws-1", "ws-2"}
+
+	// Test cases
+	tests := []struct {
+		assessments   []models.WorkspaceAssessment
+		name          string
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get assessment",
+			assessments: []models.WorkspaceAssessment{
+				{
+					Metadata:    models.ResourceMetadata{ID: "assessment-1"},
+					WorkspaceID: "ws-1",
+				},
+				{
+					Metadata:    models.ResourceMetadata{ID: "assessment-2"},
+					WorkspaceID: "ws-2",
+				},
+			},
+		},
+		{
+			name: "unauthorized",
+			assessments: []models.WorkspaceAssessment{
+				{
+					Metadata:    models.ResourceMetadata{ID: "assessment-1"},
+					WorkspaceID: "ws-1",
+				},
+			},
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaceAssessments := db.NewMockWorkspaceAssessments(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockWorkspaceAssessments.On("GetWorkspaceAssessments", mock.Anything, &db.GetWorkspaceAssessmentsInput{
+				Filter: &db.WorkspaceAssessmentFilter{
+					WorkspaceIDs: idList,
+				},
+			}).Return(&db.WorkspaceAssessmentsResult{
+				WorkspaceAssessments: test.assessments,
+			}, nil).Maybe()
+
+			dbClient := db.Client{
+				WorkspaceAssessments: mockWorkspaceAssessments,
+			}
+
+			svc := service{
+				logger:   testLogger,
+				dbClient: &dbClient,
+			}
+
+			assessments, err := svc.GetWorkspaceAssessmentsByWorkspaceIDs(auth.WithCaller(ctx, mockCaller), idList)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.assessments, assessments)
 		})
 	}
 }

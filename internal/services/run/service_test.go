@@ -41,6 +41,7 @@ type mockDBClient struct {
 	MockTransactions          *db.MockTransactions
 	MockManagedIdentities     *db.MockManagedIdentities
 	MockWorkspaces            *db.MockWorkspaces
+	MockWorkspaceAssessments  *db.MockWorkspaceAssessments
 	MockVariables             *db.MockVariables
 	MockVariableVersions      *db.MockVariableVersions
 	MockRuns                  *db.MockRuns
@@ -66,6 +67,9 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 
 	mockWorkspaces := db.MockWorkspaces{}
 	mockWorkspaces.Test(t)
+
+	mockWorkspaceAssessments := db.MockWorkspaceAssessments{}
+	mockWorkspaceAssessments.Test(t)
 
 	mockVariables := db.MockVariables{}
 	mockVariables.Test(t)
@@ -111,6 +115,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 			Transactions:          &mockTransactions,
 			ManagedIdentities:     &mockManagedIdentities,
 			Workspaces:            &mockWorkspaces,
+			WorkspaceAssessments:  &mockWorkspaceAssessments,
 			Variables:             &mockVariables,
 			VariableVersions:      &mockVariableVersions,
 			Runs:                  &mockRuns,
@@ -128,6 +133,7 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockTransactions:          &mockTransactions,
 		MockManagedIdentities:     &mockManagedIdentities,
 		MockWorkspaces:            &mockWorkspaces,
+		MockWorkspaceAssessments:  &mockWorkspaceAssessments,
 		MockVariables:             &mockVariables,
 		MockVariableVersions:      &mockVariableVersions,
 		MockRuns:                  &mockRuns,
@@ -2918,6 +2924,338 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
+	testSubject := "tester"
+	currentTime := time.Now()
+
+	stateVersionID := "sv1"
+	planID := "plan1"
+
+	moduleSource := "mymodule"
+	moduleVersion := "1.0.0"
+	configurationVersionID := "cv1"
+
+	ws := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "ws1",
+		},
+		FullPath:              "groupA/ws1",
+		CurrentStateVersionID: stateVersionID,
+		MaxJobDuration:        ptr.Int32(60),
+		RunnerTags:            []string{},
+	}
+
+	// Test cases
+	tests := []struct {
+		input              *CreateAssessmentRunForWorkspaceInput
+		stateVersion       *models.StateVersion
+		currentRun         *models.Run
+		existingAssessment *models.WorkspaceAssessment
+		expectCreateRun    *models.Run
+		name               string
+		authError          error
+		expectErrorCode    errors.CodeType
+	}{
+		{
+			name: "create assessment run for workspace with no existing assessment",
+			input: &CreateAssessmentRunForWorkspaceInput{
+				WorkspaceID: ws.Metadata.ID,
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: ws.Metadata.ID,
+				RunID:       ptr.String("run1"),
+			},
+			currentRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: "run1",
+				},
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+			},
+			expectCreateRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID:                "run2",
+					CreationTimestamp: &currentTime,
+				},
+				WorkspaceID:     ws.Metadata.ID,
+				ModuleSource:    &moduleSource,
+				ModuleVersion:   &moduleVersion,
+				IsAssessmentRun: true,
+			},
+		},
+		{
+			name: "create assessment run for workspace with existing assessment",
+			input: &CreateAssessmentRunForWorkspaceInput{
+				WorkspaceID:             ws.Metadata.ID,
+				LatestAssessmentVersion: ptr.Int(1),
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: ws.Metadata.ID,
+				RunID:       ptr.String("run1"),
+			},
+			currentRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: "run1",
+				},
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+			},
+			existingAssessment: &models.WorkspaceAssessment{
+				Metadata: models.ResourceMetadata{
+					ID:      "assessment1",
+					Version: 1,
+				},
+				WorkspaceID:          ws.Metadata.ID,
+				StartedAtTimestamp:   currentTime,
+				CompletedAtTimestamp: &currentTime,
+			},
+			expectCreateRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID:                "run2",
+					CreationTimestamp: &currentTime,
+				},
+				WorkspaceID:     ws.Metadata.ID,
+				ModuleSource:    &moduleSource,
+				ModuleVersion:   &moduleVersion,
+				IsAssessmentRun: true,
+			},
+		},
+		{
+			name: "assessment version does not match version specified in the input",
+			input: &CreateAssessmentRunForWorkspaceInput{
+				WorkspaceID:             ws.Metadata.ID,
+				LatestAssessmentVersion: ptr.Int(1),
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: ws.Metadata.ID,
+				RunID:       ptr.String("run1"),
+			},
+			currentRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: "run1",
+				},
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+			},
+			existingAssessment: &models.WorkspaceAssessment{
+				Metadata: models.ResourceMetadata{
+					ID:      "assessment1",
+					Version: 2,
+				},
+				WorkspaceID:          ws.Metadata.ID,
+				StartedAtTimestamp:   currentTime,
+				CompletedAtTimestamp: &currentTime,
+			},
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			name: "assessment run is already in progress",
+			input: &CreateAssessmentRunForWorkspaceInput{
+				WorkspaceID:             ws.Metadata.ID,
+				LatestAssessmentVersion: ptr.Int(1),
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: ws.Metadata.ID,
+				RunID:       ptr.String("run1"),
+			},
+			currentRun: &models.Run{
+				Metadata: models.ResourceMetadata{
+					ID: "run1",
+				},
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+			},
+			existingAssessment: &models.WorkspaceAssessment{
+				Metadata: models.ResourceMetadata{
+					ID:      "assessment1",
+					Version: 1,
+				},
+				WorkspaceID:        ws.Metadata.ID,
+				StartedAtTimestamp: currentTime,
+			},
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			name: "cannot create assessment run if state version was created manually",
+			input: &CreateAssessmentRunForWorkspaceInput{
+				WorkspaceID: ws.Metadata.ID,
+			},
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: ws.Metadata.ID,
+			},
+			expectErrorCode: errors.EConflict,
+		},
+		{
+			name: "expect authorization error",
+			input: &CreateAssessmentRunForWorkspaceInput{
+				WorkspaceID: ws.Metadata.ID,
+			},
+			authError:       errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Setup mocks
+			dbClient := buildDBClientWithMocks(t)
+			mockArtifactStore := workspace.NewMockArtifactStore(t)
+			mockModuleService := moduleregistry.NewMockService(t)
+			mockModuleResolver := NewMockModuleResolver(t)
+			mockActivityEvents := activityevent.NewMockService(t)
+			mockCaller := auth.NewMockCaller(t)
+
+			ctx = auth.WithCaller(ctx, mockCaller)
+
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("GetSubject").Return(testSubject).Maybe()
+
+			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
+			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
+
+			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil).Maybe()
+			dbClient.MockStateVersions.On("GetStateVersion", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
+
+			if test.stateVersion != nil && test.stateVersion.RunID != nil {
+				dbClient.MockRuns.On("GetRun", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil).Maybe()
+			}
+
+			runVariablesJSON, err := json.Marshal([]Variable{
+				{Key: "k1", Value: ptr.String("v1"), Category: models.TerraformVariableCategory},
+			})
+
+			if test.currentRun != nil {
+				require.NoError(t, err)
+				mockArtifactStore.On("GetRunVariables", mock.Anything, test.currentRun).Return(io.NopCloser(bytes.NewReader(runVariablesJSON)), nil).Maybe()
+			}
+
+			dbClient.MockWorkspaceAssessments.On("GetWorkspaceAssessmentByWorkspaceID", mock.Anything, test.input.WorkspaceID).Return(test.existingAssessment, nil).Maybe()
+
+			if test.existingAssessment == nil {
+				dbClient.MockWorkspaceAssessments.On("CreateWorkspaceAssessment", mock.Anything, mock.Anything).Return(nil, nil)
+			} else {
+				matcher := mock.MatchedBy(func(assessment *models.WorkspaceAssessment) bool {
+					return assessment.CompletedAtTimestamp == nil
+				})
+				dbClient.MockWorkspaceAssessments.On("UpdateWorkspaceAssessment", mock.Anything, matcher).Return(nil, nil).Maybe()
+			}
+
+			if test.expectErrorCode == "" {
+				dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+				dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
+					Return([]models.ManagedIdentity{}, nil)
+
+				dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
+					Return(func(_ context.Context, run *models.Run) (*models.Run, error) {
+						run.Metadata.CreationTimestamp = &currentTime
+						run.Metadata.ID = test.expectCreateRun.Metadata.ID
+						return run, nil
+					}, nil)
+				dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+					Return(&db.RunsResult{
+						PageInfo: &pagination.PageInfo{
+							TotalCount: 1,
+						},
+					}, nil)
+				dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
+
+				dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+					Return(&models.ResourceLimit{Value: 10}, nil)
+
+				if test.currentRun.ConfigurationVersionID != nil {
+					dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).
+						Return(&models.ConfigurationVersion{
+							Speculative: false,
+						}, nil)
+				}
+
+				dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
+					Metadata: models.ResourceMetadata{
+						ID: planID,
+					},
+				}, nil)
+
+				dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
+					Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
+						return &models.Job{
+							Metadata: models.ResourceMetadata{
+								ID: "job1",
+							},
+							WorkspaceID: ws.Metadata.ID,
+						}, nil
+					}, nil)
+
+				dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
+
+				matcher := mock.MatchedBy(func(run *models.Run) bool {
+					return run.Metadata.ID == test.expectCreateRun.Metadata.ID
+				})
+				mockArtifactStore.On("UploadRunVariables", mock.Anything, matcher, bytes.NewReader(runVariablesJSON)).Return(nil)
+
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+
+				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
+					Return(&ModuleRegistrySource{}, nil).Maybe()
+
+				mockModuleResolver.On("ResolveModuleVersion", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(moduleVersion, nil).Maybe()
+			}
+
+			// Create test fixture
+			logger, _ := logger.NewForTest()
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				artifactStore:   mockArtifactStore,
+				activityService: mockActivityEvents,
+				moduleService:   mockModuleService,
+				moduleResolver:  mockModuleResolver,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+			}
+
+			// Invoke test method
+			run, err := testService.CreateAssessmentRunForWorkspace(ctx, test.input)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			// Assertions
+			require.NoError(t, err)
+
+			assert.True(t, run.IsAssessmentRun)
+			assert.True(t, run.Speculative())
+			assert.Equal(t, test.expectCreateRun.WorkspaceID, run.WorkspaceID)
+			assert.Equal(t, test.expectCreateRun.ModuleSource, run.ModuleSource)
+			assert.Equal(t, test.expectCreateRun.ModuleVersion, run.ModuleVersion)
+			assert.Equal(t, test.expectCreateRun.ConfigurationVersionID, run.ConfigurationVersionID)
 		})
 	}
 }

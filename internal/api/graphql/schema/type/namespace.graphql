@@ -37,7 +37,8 @@ interface Namespace {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
-  runnerTags: NamespaceRunnerTags
+  runnerTags: NamespaceRunnerTags!
+  driftDetectionEnabled: NamespaceDriftDetectionEnabled!
 }
 
 input NamespaceRunnerTagsInput  {
@@ -45,8 +46,19 @@ input NamespaceRunnerTagsInput  {
   tags: [String!]
 }
 
+input NamespaceDriftDetectionEnabledInput  {
+  inherit: Boolean!
+  enabled: Boolean
+}
+
 type NamespaceRunnerTags {
   inherited: Boolean!
   namespacePath: String!
   value: [String!]!
+}
+
+type NamespaceDriftDetectionEnabled {
+  inherited: Boolean!
+  namespacePath: String!
+  value: Boolean!
 }

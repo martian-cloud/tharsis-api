@@ -79,6 +79,7 @@ func NewGraphQL(
 	loaderCollection := loader.NewCollection()
 	resolver.RegisterGroupLoader(loaderCollection)
 	resolver.RegisterWorkspaceLoader(loaderCollection)
+	resolver.RegisterWorkspaceAssessmentLoader(loaderCollection)
 	resolver.RegisterApplyLoader(loaderCollection)
 	resolver.RegisterPlanLoader(loaderCollection)
 	resolver.RegisterUserLoader(loaderCollection)

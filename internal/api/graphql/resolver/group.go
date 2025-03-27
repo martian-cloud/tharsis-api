@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
@@ -350,17 +351,13 @@ func (r *GroupResolver) Runners(ctx context.Context, args *RunnersConnectionQuer
 }
 
 // RunnerTags resolver
-func (r *GroupResolver) RunnerTags(ctx context.Context) (*NamespaceRunnerTagsResolver, error) {
-	setting, err := getGroupService(ctx).GetRunnerTagsSetting(ctx, r.group)
-	if err != nil {
-		return nil, err
-	}
+func (r *GroupResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTagsSetting, error) {
+	return getGroupService(ctx).GetRunnerTagsSetting(ctx, r.group)
+}
 
-	return &NamespaceRunnerTagsResolver{
-		inherited:     setting.Inherited,
-		namespacePath: setting.NamespacePath,
-		value:         setting.Value,
-	}, nil
+// DriftDetectionEnabled resolver
+func (r *GroupResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
+	return getGroupService(ctx).GetDriftDetectionEnabledSetting(ctx, r.group)
 }
 
 // CreatedBy resolver
@@ -502,21 +499,23 @@ func (r *GroupMutationPayloadResolver) Group() *GroupResolver {
 
 // CreateGroupInput contains the input for creating a new group
 type CreateGroupInput struct {
-	ClientMutationID *string
-	Name             string
-	ParentPath       *string
-	RunnerTags       *NamespaceRunnerTagsInput
-	Description      string
+	ClientMutationID      *string
+	Name                  string
+	ParentPath            *string
+	RunnerTags            *NamespaceRunnerTagsInput
+	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	Description           string
 }
 
 // UpdateGroupInput contains the input for updating a group
 type UpdateGroupInput struct {
-	ClientMutationID *string
-	Metadata         *MetadataInput
-	Description      *string
-	GroupPath        *string
-	ID               *string
-	RunnerTags       *NamespaceRunnerTagsInput
+	ClientMutationID      *string
+	Metadata              *MetadataInput
+	Description           *string
+	GroupPath             *string
+	ID                    *string
+	RunnerTags            *NamespaceRunnerTagsInput
+	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 }
 
 // DeleteGroupInput contains the input for deleting a group
@@ -545,19 +544,29 @@ func handleGroupMutationProblem(e error, clientMutationID *string) (*GroupMutati
 }
 
 func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMutationPayloadResolver, error) {
-	if input.RunnerTags != nil {
-		if err := input.RunnerTags.Validate(); err != nil {
-			return nil, err
-		}
-	}
-
 	groupCreateOptions := models.Group{
 		Name:        input.Name,
 		Description: input.Description,
 	}
 
-	if input.RunnerTags != nil && input.RunnerTags.Tags != nil {
-		groupCreateOptions.RunnerTags = *input.RunnerTags.Tags
+	if input.RunnerTags != nil {
+		if err := input.RunnerTags.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.RunnerTags.Tags != nil {
+			groupCreateOptions.RunnerTags = *input.RunnerTags.Tags
+		}
+	}
+
+	if input.DriftDetectionEnabled != nil {
+		if err := input.DriftDetectionEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.DriftDetectionEnabled.Enabled != nil {
+			groupCreateOptions.EnableDriftDetection = input.DriftDetectionEnabled.Enabled
+		}
 	}
 
 	groupService := getGroupService(ctx)
@@ -623,6 +632,20 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 
 		if input.RunnerTags.Inherit {
 			group.RunnerTags = nil
+		}
+	}
+
+	if input.DriftDetectionEnabled != nil {
+		if err = input.DriftDetectionEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.DriftDetectionEnabled.Enabled != nil {
+			group.EnableDriftDetection = input.DriftDetectionEnabled.Enabled
+		}
+
+		if input.DriftDetectionEnabled.Inherit {
+			group.EnableDriftDetection = nil
 		}
 	}
 

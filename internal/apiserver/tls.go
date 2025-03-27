@@ -67,7 +67,7 @@ func generateSelfSignedCert() (*tls.Certificate, error) {
 	certTemplate := x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
 		Subject: pkix.Name{
-			Organization: []string{"Phobos"},
+			Organization: []string{"Tharsis"},
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10),

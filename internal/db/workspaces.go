@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -62,12 +63,17 @@ func (gs WorkspaceSortableField) getSortDirection() pagination.SortDirection {
 
 // WorkspaceFilter contains the supported fields for filtering Workspace resources
 type WorkspaceFilter struct {
-	GroupID                   *string
-	UserMemberID              *string
-	ServiceAccountMemberID    *string
-	Search                    *string
-	AssignedManagedIdentityID *string
-	WorkspaceIDs              []string
+	GroupID                        *string
+	UserMemberID                   *string
+	ServiceAccountMemberID         *string
+	Search                         *string
+	AssignedManagedIdentityID      *string
+	WorkspaceIDs                   []string
+	PathLessThan                   *string
+	MinDurationSinceLastAssessment *time.Duration
+	Locked                         *bool
+	Dirty                          *bool
+	HasStateVersion                *bool
 }
 
 // GetWorkspacesInput is the input for listing workspaces
@@ -104,6 +110,7 @@ var workspaceFieldList = append(
 	"terraform_version",
 	"prevent_destroy_plan",
 	"runner_tags",
+	"drift_detection_enabled",
 )
 
 // NewWorkspaces returns an instance of the Workspaces interface
@@ -157,6 +164,26 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
 			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
 		}
+
+		if input.Filter.PathLessThan != nil {
+			ex = ex.Append(goqu.I("namespaces.path").Lt(*input.Filter.PathLessThan))
+		}
+
+		if input.Filter.Locked != nil {
+			ex = ex.Append(goqu.I("workspaces.locked").Eq(*input.Filter.Locked))
+		}
+
+		if input.Filter.Dirty != nil {
+			ex = ex.Append(goqu.I("workspaces.dirty_state").Eq(*input.Filter.Dirty))
+		}
+
+		if input.Filter.HasStateVersion != nil {
+			if *input.Filter.HasStateVersion {
+				ex = ex.Append(goqu.I("workspaces.current_state_version_id").IsNotNull())
+			} else {
+				ex = ex.Append(goqu.I("workspaces.current_state_version_id").IsNull())
+			}
+		}
 	}
 
 	query := dialect.From(goqu.T("workspaces")).
@@ -169,6 +196,17 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 		query = query.InnerJoin(goqu.T("workspace_managed_identity_relation"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_managed_identity_relation.workspace_id")}))
 
 		ex = ex.Append(goqu.Ex{"workspace_managed_identity_relation.managed_identity_id": input.Filter.AssignedManagedIdentityID})
+	}
+
+	if input.Filter != nil && input.Filter.MinDurationSinceLastAssessment != nil {
+		query = query.LeftJoin(goqu.T("workspace_assessments"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("workspace_assessments.workspace_id")}))
+
+		maxTime := time.Now().Add(-(*input.Filter.MinDurationSinceLastAssessment))
+
+		ex = ex.Append(goqu.Or(
+			goqu.I("workspace_assessments.id").IsNull(),
+			goqu.I("workspace_assessments.completed_at").Lte(maxTime.UTC()),
+		))
 	}
 
 	query = query.Where(ex)
@@ -255,6 +293,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 				"terraform_version":        workspace.TerraformVersion,
 				"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 				"runner_tags":              runnerTags,
+				"drift_detection_enabled":  workspace.EnableDriftDetection,
 			},
 		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
@@ -333,6 +372,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"terraform_version":        workspace.TerraformVersion,
 			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 			"runner_tags":              runnerTags,
+			"drift_detection_enabled":  workspace.EnableDriftDetection,
 		}).
 		Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
@@ -697,6 +737,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.TerraformVersion,
 		&ws.PreventDestroyPlan,
 		&ws.RunnerTags,
+		&ws.EnableDriftDetection,
 	}
 
 	if withFullPath {

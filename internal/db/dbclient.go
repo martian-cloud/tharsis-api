@@ -92,6 +92,7 @@ type Client struct {
 	SCIMTokens                       SCIMTokens
 	VCSProviders                     VCSProviders
 	WorkspaceVCSProviderLinks        WorkspaceVCSProviderLinks
+	WorkspaceAssessments             WorkspaceAssessments
 	ActivityEvents                   ActivityEvents
 	VCSEvents                        VCSEvents
 	Roles                            Roles
@@ -193,6 +194,7 @@ func NewClient(
 	dbClient.SCIMTokens = NewSCIMTokens(dbClient)
 	dbClient.VCSProviders = NewVCSProviders(dbClient)
 	dbClient.WorkspaceVCSProviderLinks = NewWorkspaceVCSProviderLinks(dbClient)
+	dbClient.WorkspaceAssessments = NewWorkspaceAssessments(dbClient)
 	dbClient.ActivityEvents = NewActivityEvents(dbClient)
 	dbClient.VCSEvents = NewVCSEvents(dbClient)
 	dbClient.Roles = NewRoles(dbClient)

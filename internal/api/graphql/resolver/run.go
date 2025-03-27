@@ -23,8 +23,9 @@ import (
 // RunConnectionQueryArgs are used to query a run connection
 type RunConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	WorkspacePath *string
-	WorkspaceID   *string
+	WorkspacePath       *string
+	WorkspaceID         *string
+	WorkspaceAssessment *bool
 }
 
 // RunQueryArgs are used to query a single run
@@ -169,6 +170,11 @@ func (r *RunResolver) RefreshOnly() bool {
 // Speculative resolver
 func (r *RunResolver) Speculative() bool {
 	return r.run.Speculative()
+}
+
+// Assessment resolver
+func (r *RunResolver) Assessment() bool {
+	return r.run.IsAssessmentRun
 }
 
 // Workspace resolver
@@ -404,7 +410,8 @@ func runsQuery(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectio
 	}
 
 	input := run.GetRunsInput{
-		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		PaginationOptions:   &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		WorkspaceAssessment: args.WorkspaceAssessment,
 	}
 
 	if args.WorkspaceID != nil && args.WorkspacePath != nil {
