@@ -248,6 +248,36 @@ func (_m *MockService) GetCurrentStateVersion(ctx context.Context, workspaceID s
 	return r0, r1
 }
 
+// GetDriftDetectionEnabledSetting provides a mock function with given fields: ctx, workspace
+func (_m *MockService) GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error) {
+	ret := _m.Called(ctx, workspace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDriftDetectionEnabledSetting")
+	}
+
+	var r0 *namespace.DriftDetectionEnabledSetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error)); ok {
+		return rf(ctx, workspace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) *namespace.DriftDetectionEnabledSetting); ok {
+		r0 = rf(ctx, workspace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*namespace.DriftDetectionEnabledSetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Workspace) error); ok {
+		r1 = rf(ctx, workspace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunnerTagsSetting provides a mock function with given fields: ctx, workspace
 func (_m *MockService) GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error) {
 	ret := _m.Called(ctx, workspace)
@@ -476,6 +506,66 @@ func (_m *MockService) GetStateVersionsByIDs(ctx context.Context, idList []strin
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.StateVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, idList)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceAssessmentByID provides a mock function with given fields: ctx, id
+func (_m *MockService) GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceAssessmentByID")
+	}
+
+	var r0 *models.WorkspaceAssessment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceAssessment, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceAssessment); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceAssessment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceAssessmentsByWorkspaceIDs provides a mock function with given fields: ctx, idList
+func (_m *MockService) GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceAssessment, error) {
+	ret := _m.Called(ctx, idList)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceAssessmentsByWorkspaceIDs")
+	}
+
+	var r0 []models.WorkspaceAssessment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]models.WorkspaceAssessment, error)); ok {
+		return rf(ctx, idList)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []models.WorkspaceAssessment); ok {
+		r0 = rf(ctx, idList)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.WorkspaceAssessment)
 		}
 	}
 

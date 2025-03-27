@@ -1,5 +1,7 @@
 package namespace
 
+//go:generate go tool mockery --name InheritedSettingResolver --inpackage --case underscore
+
 import (
 	"context"
 
@@ -13,18 +15,27 @@ type Namespace interface {
 	GetParentID() string
 	ExpandPath() []string
 	GetRunnerTags() []string
+	DriftDetectionEnabled() *bool
 }
 
-// RunnerTagsSetting contains tag settings, inherited or direct, returned to the group and workspace resolvers.
+// RunnerTagsSetting contains the inherited setting for runner tags
 type RunnerTagsSetting struct {
 	Inherited     bool
 	NamespacePath string
 	Value         []string
 }
 
+// DriftDetectionEnabledSetting contains the inherited setting for enabling drift detection
+type DriftDetectionEnabledSetting struct {
+	Inherited     bool
+	NamespacePath string
+	Value         bool
+}
+
 // InheritedSettingResolver is used to resolve inherited settings by searching the group hierarchy
 type InheritedSettingResolver interface {
 	GetRunnerTags(ctx context.Context, namespace Namespace) (*RunnerTagsSetting, error)
+	GetDriftDetectionEnabled(ctx context.Context, namespace Namespace) (*DriftDetectionEnabledSetting, error)
 }
 
 type getSettingFunc func(namespace Namespace) (any, bool)
@@ -61,6 +72,30 @@ func (r *inheritedSettingsResolver) GetRunnerTags(ctx context.Context, namespace
 	}
 
 	return &RunnerTagsSetting{
+		Inherited:     response.inherited,
+		NamespacePath: response.namespacePath,
+		Value:         value,
+	}, nil
+}
+
+func (r *inheritedSettingsResolver) GetDriftDetectionEnabled(ctx context.Context, namespace Namespace) (*DriftDetectionEnabledSetting, error) {
+	response, err := r.getInheritedSetting(ctx, namespace, func(namespace Namespace) (any, bool) {
+		enabled := namespace.DriftDetectionEnabled()
+		if enabled == nil {
+			return false, false
+		}
+		return *enabled, true
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	value := false
+	if response.value != nil {
+		value = response.value.(bool)
+	}
+
+	return &DriftDetectionEnabledSetting{
 		Inherited:     response.inherited,
 		NamespacePath: response.namespacePath,
 		Value:         value,

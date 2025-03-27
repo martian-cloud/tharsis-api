@@ -45,6 +45,7 @@ const (
 	ActivityEventType                   Type = "AE"
 	VCSProviderType                     Type = "VP"
 	WorkspaceVCSProviderLinkType        Type = "WPL"
+	WorkspaceAssessmentType             Type = "WA"
 	VCSEventType                        Type = "VE"
 	RoleType                            Type = "RL"
 	ResourceLimitType                   Type = "RLM"
@@ -87,6 +88,7 @@ func (t Type) IsValid() error {
 		ActivityEventType,
 		VCSProviderType,
 		WorkspaceVCSProviderLinkType,
+		WorkspaceAssessmentType,
 		VCSEventType,
 		RoleType,
 		ResourceLimitType,

@@ -52,6 +52,12 @@ type DestroyWorkspacePayload {
   problems: [Problem!]!
 }
 
+type AssessWorkspacePayload {
+  clientMutationId: String
+  run: Run
+  problems: [Problem!]!
+}
+
 type WorkspaceEvent {
   action: String!
   workspace: Workspace!
@@ -78,6 +84,7 @@ type Workspace implements Node, Namespace {
   dirtyState: Boolean!
   locked: Boolean!
   assignedManagedIdentities: [ManagedIdentity!]!
+  assessment: WorkspaceAssessment
   managedIdentities(
     after: String
     before: String
@@ -141,6 +148,7 @@ type Workspace implements Node, Namespace {
     sort: VCSEventSort
   ): VCSEventConnection!
   runnerTags: NamespaceRunnerTags!
+  driftDetectionEnabled: NamespaceDriftDetectionEnabled!
 }
 
 input CreateWorkspaceInput {
@@ -152,6 +160,7 @@ input CreateWorkspaceInput {
   terraformVersion: String
   preventDestroyPlan: Boolean
   runnerTags: NamespaceRunnerTagsInput
+  driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
 }
 
 input UpdateWorkspaceInput {
@@ -164,6 +173,7 @@ input UpdateWorkspaceInput {
   terraformVersion: String
   preventDestroyPlan: Boolean
   runnerTags: NamespaceRunnerTagsInput
+  driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
 }
 
 input DeleteWorkspaceInput {
@@ -185,6 +195,11 @@ input UnlockWorkspaceInput {
 }
 
 input DestroyWorkspaceInput {
+  clientMutationId: String
+  workspacePath: String!
+}
+
+input AssessWorkspaceInput {
   clientMutationId: String
   workspacePath: String!
 }

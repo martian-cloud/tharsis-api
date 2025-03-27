@@ -31,6 +31,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -57,9 +58,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	workspacesvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -162,7 +164,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
 
-	artifactStore := workspace.NewArtifactStore(pluginCatalog.ObjectStore)
+	artifactStore := workspacesvc.NewArtifactStore(pluginCatalog.ObjectStore)
 	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	cliStore := cli.NewCLIStore(pluginCatalog.ObjectStore)
@@ -179,8 +181,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
 	runStateManager := state.NewRunStateManager(dbClient, logger)
 	eventhandlers.NewErroredRunEmailHandler(logger, dbClient, runStateManager, emailClient).RegisterHandlers()
+	eventhandlers.NewAssessmentRunHandler(logger, dbClient, runStateManager).RegisterHandlers()
 
 	limits := limits.NewLimitChecker(dbClient)
+	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
 
 	// Services.
 	var (
@@ -188,9 +192,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		activityService            = activityevent.NewService(dbClient, logger)
 		userService                = user.NewService(logger, dbClient)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
-		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService)
+		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService, inheritedSettingsResolver)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
-		workspaceService           = workspace.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService)
+		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService, inheritedSettingsResolver)
 		jobService                 = job.NewService(logger, dbClient, tharsisIDP, logStreamManager, eventManager, runStateManager)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
 		saService                  = serviceaccount.NewService(logger, dbClient, limits, tharsisIDP, openIDConfigFetcher, activityService)
@@ -225,6 +229,17 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize vcs service %v", err)
 	}
+
+	// Start workspace assessment scheduler
+	workspace.NewAssessmentScheduler(
+		dbClient,
+		logger,
+		runService,
+		inheritedSettingsResolver,
+		maintenanceMonitor,
+		time.Duration(cfg.WorkspaceAssessmentIntervalHours)*time.Hour,
+		cfg.WorkspaceAssessmentRunLimit,
+	).Start(ctx)
 
 	routeBuilder := api.NewRouteBuilder(
 		middleware.PrometheusMiddleware,
@@ -519,7 +534,7 @@ func (api *APIServer) Start() {
 		err = api.srv.ListenAndServe()
 	}
 
-	if err != nil {
+	if err != nil && err != http.ErrServerClosed {
 		api.logger.Errorf("HTTP server failed to start: %v", err)
 	}
 }

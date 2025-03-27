@@ -82,6 +82,36 @@ func (_m *MockService) CancelRun(ctx context.Context, options *CancelRunInput) (
 	return r0, r1
 }
 
+// CreateAssessmentRunForWorkspace provides a mock function with given fields: ctx, options
+func (_m *MockService) CreateAssessmentRunForWorkspace(ctx context.Context, options *CreateAssessmentRunForWorkspaceInput) (*models.Run, error) {
+	ret := _m.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateAssessmentRunForWorkspace")
+	}
+
+	var r0 *models.Run
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *CreateAssessmentRunForWorkspaceInput) (*models.Run, error)); ok {
+		return rf(ctx, options)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *CreateAssessmentRunForWorkspaceInput) *models.Run); ok {
+		r0 = rf(ctx, options)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Run)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *CreateAssessmentRunForWorkspaceInput) error); ok {
+		r1 = rf(ctx, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateDestroyRunForWorkspace provides a mock function with given fields: ctx, options
 func (_m *MockService) CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error) {
 	ret := _m.Called(ctx, options)

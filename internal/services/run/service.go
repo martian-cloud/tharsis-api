@@ -33,6 +33,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -89,6 +90,8 @@ type GetRunsInput struct {
 	Workspace *models.Workspace
 	// Group filters the runs by the specified group
 	Group *models.Group
+	// WorkspaceAssessment can be used to filter for only assessment runs or to exclude assessment runs
+	WorkspaceAssessment *bool
 }
 
 // CreateRunInput is the input for creating a new run
@@ -111,6 +114,12 @@ type CreateRunInput struct {
 // configuration version or module that is applied.
 type CreateDestroyRunForWorkspaceInput struct {
 	WorkspaceID string
+}
+
+// CreateAssessmentRunForWorkspaceInput is the input for creating an assessment run
+type CreateAssessmentRunForWorkspaceInput struct {
+	WorkspaceID             string
+	LatestAssessmentVersion *int
 }
 
 // Validate attempts to ensure the CreateRunInput structure is in good form and able to be used.
@@ -145,8 +154,8 @@ func (c CreateRunInput) Validate() error {
 	}
 
 	// Don't allow refresh_only in combination with other options that would conflict.
-	if c.RefreshOnly && (c.Refresh || c.IsDestroy) {
-		return fmt.Errorf("refresh_only is not allowed with refresh or destroy")
+	if c.RefreshOnly && c.IsDestroy {
+		return fmt.Errorf("refresh_only is not allowed with destroy")
 	}
 
 	return nil
@@ -172,6 +181,7 @@ type createRunInput struct {
 	IsDestroy              bool
 	Refresh                bool
 	RefreshOnly            bool
+	IsAssessmentRun        bool
 }
 
 // Service encapsulates Terraform Enterprise Support
@@ -183,6 +193,7 @@ type Service interface {
 	ApplyRun(ctx context.Context, runID string, comment *string) (*models.Run, error)
 	CancelRun(ctx context.Context, options *CancelRunInput) (*models.Run, error)
 	GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]Variable, error)
+	CreateAssessmentRunForWorkspace(ctx context.Context, options *CreateAssessmentRunForWorkspaceInput) (*models.Run, error)
 	CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
@@ -388,6 +399,171 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	}()
 
 	return outgoing, nil
+}
+
+func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *CreateAssessmentRunForWorkspaceInput) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateAssessmentRunForWorkspace")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	// Get the workspace
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace with ID %s", options.WorkspaceID, errors.WithSpan(span))
+	}
+
+	if workspace == nil {
+		return nil, errors.New("workspace not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if workspace.CurrentStateVersionID == "" {
+		return nil, errors.New(
+			"assessment run cannot be created because workspace has no current state version",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get the current state version for the workspace
+	stateVersion, err := s.dbClient.StateVersions.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get state version with ID %s", workspace.CurrentStateVersionID, errors.WithSpan(span))
+	}
+
+	if stateVersion == nil {
+		return nil, errors.New("assessment run cannot be created because state version not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if stateVersion.RunID == nil {
+		return nil, errors.New(
+			"cannot create assessment run because state version was created manually and has no module or configuration version associated",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get the run
+	latestRun, err := s.dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run with ID %s", *stateVersion.RunID, errors.WithSpan(span))
+	}
+
+	if latestRun == nil {
+		return nil, errors.New("assessment run cannot be created because run associated with workspace was not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if latestRun.IsDestroy {
+		return nil, errors.New(
+			"cannot create assessment run because latest run is a destroy run",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get run variables
+	variables, err := s.getRunVariables(ctx, latestRun, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run variables for run with ID %s", latestRun.Metadata.ID, errors.WithSpan(span))
+	}
+
+	// Clear namespace path from variables
+	for i := range variables {
+		variables[i].NamespacePath = nil
+	}
+
+	assessment, err := s.dbClient.WorkspaceAssessments.GetWorkspaceAssessmentByWorkspaceID(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace assessment for workspace with ID %s", options.WorkspaceID, errors.WithSpan(span))
+	}
+
+	// Start transaction
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.Errorf("failed to rollback tx for CreateAssessmentRunForWorkspace: %v", txErr)
+		}
+	}()
+
+	if assessment == nil {
+		if options.LatestAssessmentVersion != nil {
+			return nil, errors.New(
+				"cannot create assessment run because latest assessment version is not nil",
+				errors.WithErrorCode(errors.EConflict),
+				errors.WithSpan(span),
+			)
+		}
+		// Create assessment
+		if _, err = s.dbClient.WorkspaceAssessments.CreateWorkspaceAssessment(txContext, &models.WorkspaceAssessment{
+			WorkspaceID:        options.WorkspaceID,
+			StartedAtTimestamp: time.Now().UTC(),
+		}); err != nil {
+			return nil, errors.Wrap(err, "failed to create assessment for workspace %q", options.WorkspaceID, errors.WithSpan(span))
+		}
+	} else {
+		if options.LatestAssessmentVersion != nil && *options.LatestAssessmentVersion != assessment.Metadata.Version {
+			return nil, errors.New(
+				"cannot create assessment run because latest assessment version does not match",
+				errors.WithErrorCode(errors.EConflict),
+				errors.WithSpan(span),
+			)
+		}
+
+		// Check if an assessment is already in progress
+		if assessment.CompletedAtTimestamp == nil {
+			return nil, errors.New(
+				"cannot create assessment run because an assessment is already in progress",
+				errors.WithErrorCode(errors.EConflict),
+				errors.WithSpan(span),
+			)
+		}
+
+		// Update assessment
+		assessment.StartedAtTimestamp = time.Now().UTC()
+		assessment.CompletedAtTimestamp = nil
+		if _, err = s.dbClient.WorkspaceAssessments.UpdateWorkspaceAssessment(txContext, assessment); err != nil {
+			return nil, errors.Wrap(err, "failed to update workspace assessment with ID %q", assessment.Metadata.ID, errors.WithSpan(span))
+		}
+	}
+
+	assessmentRunInput := &createRunInput{
+		IsAssessmentRun:        true,
+		Speculative:            ptr.Bool(true),
+		RefreshOnly:            true,
+		Refresh:                true,
+		WorkspaceID:            options.WorkspaceID,
+		ConfigurationVersionID: latestRun.ConfigurationVersionID,
+		ModuleSource:           latestRun.ModuleSource,
+		ModuleVersion:          latestRun.ModuleVersion,
+		Variables:              variables,
+	}
+
+	run, err := s.createRun(txContext, assessmentRunInput)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return nil, err
+	}
+
+	return run, nil
 }
 
 func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error) {
@@ -731,6 +907,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 		TargetAddresses:        options.TargetAddresses,
 		Refresh:                options.Refresh,
 		RefreshOnly:            options.RefreshOnly,
+		IsAssessmentRun:        options.IsAssessmentRun,
 	}
 
 	if options.Comment != nil {
@@ -1353,7 +1530,9 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 		return nil, err
 	}
 
-	filter := &db.RunFilter{}
+	filter := &db.RunFilter{
+		WorkspaceAssessment: input.WorkspaceAssessment,
+	}
 
 	switch {
 	case input.Workspace != nil:
@@ -2324,10 +2503,6 @@ func (s *service) getJobTags(ctx context.Context, workspace *models.Workspace) (
 	setting, err := namespace.NewInheritedSettingResolver(s.dbClient).GetRunnerTags(ctx, workspace)
 	if err != nil {
 		return nil, err
-	}
-
-	if setting.Value == nil {
-		return []string{}, nil
 	}
 
 	return setting.Value, nil

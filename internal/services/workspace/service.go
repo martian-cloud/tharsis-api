@@ -131,6 +131,8 @@ type Service interface {
 	GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*db.StateVersionsResult, error)
 	GetStateVersionContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error)
 	GetStateVersionsByIDs(ctx context.Context, idList []string) ([]models.StateVersion, error)
+	GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error)
+	GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceAssessment, error)
 	CreateConfigurationVersion(ctx context.Context, options *CreateConfigurationVersionInput) (*models.ConfigurationVersion, error)
 	GetConfigurationVersion(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error)
 	UploadConfigurationVersion(ctx context.Context, configurationVersionID string, reader io.Reader) error
@@ -141,6 +143,7 @@ type Service interface {
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
 	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error)
+	GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error)
 }
 
 type handleCallerFunc func(
@@ -150,14 +153,15 @@ type handleCallerFunc func(
 ) error
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	limitChecker    limits.LimitChecker
-	artifactStore   ArtifactStore
-	eventManager    *events.EventManager
-	cliService      cli.Service
-	activityService activityevent.Service
-	handleCaller    handleCallerFunc
+	logger                    logger.Logger
+	dbClient                  *db.Client
+	limitChecker              limits.LimitChecker
+	artifactStore             ArtifactStore
+	eventManager              *events.EventManager
+	cliService                cli.Service
+	activityService           activityevent.Service
+	inheritedSettingsResolver namespace.InheritedSettingResolver
+	handleCaller              handleCallerFunc
 }
 
 // NewService creates an instance of Service
@@ -169,6 +173,7 @@ func NewService(
 	eventManager *events.EventManager,
 	cliService cli.Service,
 	activityService activityevent.Service,
+	inheritedSettingsResolver namespace.InheritedSettingResolver,
 ) Service {
 	return newService(
 		logger,
@@ -178,6 +183,7 @@ func NewService(
 		eventManager,
 		cliService,
 		activityService,
+		inheritedSettingsResolver,
 		auth.HandleCaller,
 	)
 }
@@ -190,6 +196,7 @@ func newService(
 	eventManager *events.EventManager,
 	cliService cli.Service,
 	activityService activityevent.Service,
+	inheritedSettingsResolver namespace.InheritedSettingResolver,
 	handleCaller handleCallerFunc,
 ) Service {
 	return &service{
@@ -200,6 +207,7 @@ func newService(
 		eventManager,
 		cliService,
 		activityService,
+		inheritedSettingsResolver,
 		handleCaller,
 	}
 }
@@ -1297,6 +1305,65 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 	return result, nil
 }
 
+func (s *service) GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceAssessmentByID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	assessment, err := s.dbClient.WorkspaceAssessments.GetWorkspaceAssessmentByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if assessment == nil {
+		return nil, errors.New("workspace assessment with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	if err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(assessment.WorkspaceID)); err != nil {
+		return nil, err
+	}
+
+	return assessment, nil
+}
+
+func (s *service) GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceAssessment, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceAssessmentsByWorkspaceIDs")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	result, err := s.dbClient.WorkspaceAssessments.GetWorkspaceAssessments(ctx, &db.GetWorkspaceAssessmentsInput{
+		Filter: &db.WorkspaceAssessmentFilter{
+			WorkspaceIDs: idList,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(
+			err,
+			"Failed to get workspace assessments",
+			errors.WithSpan(span),
+		)
+	}
+
+	for _, a := range result.WorkspaceAssessments {
+		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(a.WorkspaceID))
+		if err != nil {
+			tracing.RecordError(span, err, "permission check failed")
+			return nil, err
+		}
+	}
+
+	return result.WorkspaceAssessments, nil
+}
+
 func (s *service) GetStateVersionsByIDs(ctx context.Context,
 	idList []string) ([]models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetStateVersionsByIDs")
@@ -1610,7 +1677,27 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, workspace *models.Wo
 		return nil, err
 	}
 
-	return namespace.NewInheritedSettingResolver(s.dbClient).GetRunnerTags(ctx, workspace)
+	return s.inheritedSettingsResolver.GetRunnerTags(ctx, workspace)
+}
+
+// GetDetectionEnabledSetting returns the (inherited or direct) setting for a group.
+func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetDriftDetectionEnabledSetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.inheritedSettingsResolver.GetDriftDetectionEnabled(ctx, workspace)
 }
 
 func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {

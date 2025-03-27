@@ -40,6 +40,7 @@ type Run struct {
 	Metadata               ResourceMetadata
 	HasChanges             bool
 	IsDestroy              bool
+	IsAssessmentRun        bool
 	ForceCanceled          bool
 	AutoApply              bool
 	Refresh                bool
@@ -54,4 +55,14 @@ func (r *Run) ResolveMetadata(key string) (string, error) {
 // Speculative returns whether this run is speculative.
 func (r *Run) Speculative() bool {
 	return r.ApplyID == ""
+}
+
+// IsComplete returns true if the run is in a completed state
+func (r *Run) IsComplete() bool {
+	switch r.Status {
+	case RunApplied, RunCanceled, RunErrored, RunPlannedAndFinished:
+		return true
+	default:
+		return false
+	}
 }

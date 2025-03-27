@@ -4,13 +4,14 @@ import "strings"
 
 // Group resource
 type Group struct {
-	Name        string
-	Description string
-	ParentID    string
-	FullPath    string
-	CreatedBy   string
-	Metadata    ResourceMetadata
-	RunnerTags  []string
+	Name                 string
+	Description          string
+	ParentID             string
+	FullPath             string
+	CreatedBy            string
+	Metadata             ResourceMetadata
+	RunnerTags           []string
+	EnableDriftDetection *bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -65,6 +66,11 @@ func (g *Group) GetParentID() string {
 // GetRunnerTags returns the runner tags for this group
 func (g *Group) GetRunnerTags() []string {
 	return g.RunnerTags
+}
+
+// DriftDetectionEnabled returns the drift detection enabled setting
+func (g *Group) DriftDetectionEnabled() *bool {
+	return g.EnableDriftDetection
 }
 
 // GetParentPath returns the path for the group's immediate parent.

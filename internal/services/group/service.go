@@ -60,6 +60,8 @@ type Service interface {
 	MigrateGroup(ctx context.Context, groupID string, newParentID *string) (*models.Group, error)
 	// GetRunnerTagsSetting returns the (inherited or direct) runner tags setting for a group.
 	GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*namespace.RunnerTagsSetting, error)
+	// GetDriftDetectionEnabledSetting returns the (inherited or direct) drift detection enabled setting for a group.
+	GetDriftDetectionEnabledSetting(ctx context.Context, group *models.Group) (*namespace.DriftDetectionEnabledSetting, error)
 }
 
 type service struct {
@@ -68,6 +70,7 @@ type service struct {
 	limitChecker               limits.LimitChecker
 	namespaceMembershipService namespacemembership.Service
 	activityService            activityevent.Service
+	inheritedSettingsResolver  namespace.InheritedSettingResolver
 }
 
 // NewService creates an instance of Service
@@ -77,6 +80,7 @@ func NewService(
 	limitChecker limits.LimitChecker,
 	namespaceMembershipService namespacemembership.Service,
 	activityService activityevent.Service,
+	inheritedSettingsResolver namespace.InheritedSettingResolver,
 ) Service {
 	return &service{
 		logger:                     logger,
@@ -84,6 +88,7 @@ func NewService(
 		limitChecker:               limitChecker,
 		namespaceMembershipService: namespaceMembershipService,
 		activityService:            activityService,
+		inheritedSettingsResolver:  inheritedSettingsResolver,
 	}
 }
 
@@ -735,7 +740,27 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group)
 		return nil, err
 	}
 
-	return namespace.NewInheritedSettingResolver(s.dbClient).GetRunnerTags(ctx, group)
+	return s.inheritedSettingsResolver.GetRunnerTags(ctx, group)
+}
+
+// GetDetectionEnabledSetting returns the (inherited or direct) setting for a group.
+func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, group *models.Group) (*namespace.DriftDetectionEnabledSetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetDriftDetectionEnabledsSetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.inheritedSettingsResolver.GetDriftDetectionEnabled(ctx, group)
 }
 
 // checkParentSubgroupLimit checks whether the parent subgroup limit has just been violated.

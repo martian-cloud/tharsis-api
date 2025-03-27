@@ -108,7 +108,7 @@ type GroupsResult struct {
 	Groups   []models.Group
 }
 
-var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags")
+var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags", "drift_detection_enabled")
 
 type groups struct {
 	dbClient *Client
@@ -284,15 +284,16 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	sql, args, err := dialect.Insert("groups").
 		Prepared(true).
 		Rows(goqu.Record{
-			"id":          newResourceID(),
-			"version":     initialResourceVersion,
-			"created_at":  timestamp,
-			"updated_at":  timestamp,
-			"name":        group.Name,
-			"description": nullableString(group.Description),
-			"parent_id":   nullableString(group.ParentID),
-			"created_by":  group.CreatedBy,
-			"runner_tags": runnerTags,
+			"id":                      newResourceID(),
+			"version":                 initialResourceVersion,
+			"created_at":              timestamp,
+			"updated_at":              timestamp,
+			"name":                    group.Name,
+			"description":             nullableString(group.Description),
+			"parent_id":               nullableString(group.ParentID),
+			"created_by":              group.CreatedBy,
+			"runner_tags":             runnerTags,
+			"drift_detection_enabled": group.EnableDriftDetection,
 		}).
 		Returning(groupFieldList...).ToSQL()
 	if err != nil {
@@ -368,10 +369,11 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 		Prepared(true).
 		Set(
 			goqu.Record{
-				"version":     goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":  timestamp,
-				"description": nullableString(group.Description),
-				"runner_tags": runnerTags,
+				"version":                 goqu.L("? + ?", goqu.C("version"), 1),
+				"updated_at":              timestamp,
+				"description":             nullableString(group.Description),
+				"runner_tags":             runnerTags,
+				"drift_detection_enabled": group.EnableDriftDetection,
 			},
 		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
 	if err != nil {
@@ -904,6 +906,7 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 		&parentID,
 		&group.CreatedBy,
 		&group.RunnerTags,
+		&group.EnableDriftDetection,
 	}
 
 	if withFullPath {

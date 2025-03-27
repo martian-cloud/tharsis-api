@@ -18,6 +18,7 @@ type Workspace struct {
 	Locked                bool
 	PreventDestroyPlan    bool
 	RunnerTags            []string
+	EnableDriftDetection  *bool
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -64,6 +65,11 @@ func (w *Workspace) GetParentID() string {
 // GetRunnerTags returns the runner tags for this workspace
 func (w *Workspace) GetRunnerTags() []string {
 	return w.RunnerTags
+}
+
+// DriftDetectionEnabled returns the drift detection enabled setting
+func (w *Workspace) DriftDetectionEnabled() *bool {
+	return w.EnableDriftDetection
 }
 
 // GetGroupPath returns the group path

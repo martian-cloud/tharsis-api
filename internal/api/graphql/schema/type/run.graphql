@@ -73,6 +73,7 @@ type Run implements Node {
   refresh: Boolean!
   refreshOnly: Boolean!
   speculative: Boolean!
+  assessment: Boolean!
 }
 
 type RunEvent {

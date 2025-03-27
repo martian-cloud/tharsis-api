@@ -129,6 +129,12 @@ func (r *NodeResolver) ToWorkspace() (*WorkspaceResolver, bool) {
 	return res, ok
 }
 
+// ToWorkspaceAssessment resolver
+func (r *NodeResolver) ToWorkspaceAssessment() (*WorkspaceAssessmentResolver, bool) {
+	res, ok := r.result.(*WorkspaceAssessmentResolver)
+	return res, ok
+}
+
 // ToTeam resolver
 func (r *NodeResolver) ToTeam() (*TeamResolver, bool) {
 	res, ok := r.result.(*TeamResolver)
@@ -354,6 +360,13 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &WorkspaceResolver{workspace: workspace}
+	case gid.WorkspaceAssessmentType:
+		assessment, err := getWorkspaceService(ctx).GetWorkspaceAssessmentByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &WorkspaceAssessmentResolver{assessment: assessment}
 	case gid.TerraformProviderType:
 		provider, err := getProviderRegistryService(ctx).GetProviderByID(ctx, parsedGlobalID.ID)
 		if err != nil {

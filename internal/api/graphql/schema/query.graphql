@@ -77,6 +77,7 @@ type Query {
     workspacePath: String
     workspaceId: String
     sort: RunSort
+    workspaceAssessment: Boolean
   ): RunConnection!
   namespaceVariableVersion(id: String! includeSensitiveValue: Boolean): NamespaceVariableVersion
   job(id: String!): Job
