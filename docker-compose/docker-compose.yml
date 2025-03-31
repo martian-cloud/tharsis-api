@@ -1,7 +1,7 @@
 services:
   # Tharsis database.
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: tharsis-db
     restart: unless-stopped
     environment:
@@ -16,7 +16,7 @@ services:
 
   # Keycloak database
   kc_postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: keycloak-db
     restart: unless-stopped
     environment:
