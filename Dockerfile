@@ -46,7 +46,11 @@ RUN apk update --no-cache && \
     apk upgrade --no-cache && \
     apk add --no-cache git curl python3 py3-pip jq && \
     adduser tharsis -D && \
-    chown tharsis:tharsis /app
+    chown tharsis:tharsis /app && \
+    # Maintain backward compatibility for users that are installing packages such as the aws cli w/o a virtual env using pip3
+    mkdir -p /etc && \
+    echo "[global]" > /etc/pip.conf && \
+    echo "break-system-packages = true" >> /etc/pip.conf
 USER tharsis
 HEALTHCHECK NONE
 CMD ["./job"]
