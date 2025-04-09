@@ -30,7 +30,7 @@ docker run -d --name ${THARSIS_DB_TEST_INSTANCE_NAME}        	  \
 	-e POSTGRES_USER=${THARSIS_DB_TEST_USERNAME}                  \
 	-e POSTGRES_PASSWORD=${THARSIS_DB_TEST_PASSWORD}              \
 	-p ${THARSIS_DB_TEST_PORT}:${THARSIS_DB_TEST_CONTAINER_PORT}  \
-	postgres
+	postgres:16
 
 LIMIT=40
 SLEEP=1

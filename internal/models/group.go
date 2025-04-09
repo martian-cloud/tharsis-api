@@ -1,6 +1,11 @@
 package models
 
-import "strings"
+import (
+	"strings"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
+)
 
 // Group resource
 type Group struct {
@@ -53,6 +58,16 @@ func (g *Group) GetRootGroupPath() string {
 	return strings.Split(g.FullPath, "/")[0]
 }
 
+// GetID returns the ID for this group
+func (g *Group) GetID() string {
+	return g.Metadata.ID
+}
+
+// GetResourceType returns the group resource type
+func (g *Group) GetResourceType() permissions.ResourceType {
+	return permissions.GroupResourceType
+}
+
 // GetPath returns the full path for this group
 func (g *Group) GetPath() string {
 	return g.FullPath
@@ -94,7 +109,7 @@ func (g *Group) GetDepth() int {
 
 // IsDescendantOfGroup returns true if the group is a descendant of the specified (other/ancestor group) path.
 func (g *Group) IsDescendantOfGroup(otherGroupPath string) bool {
-	return IsDescendantOfPath(g.FullPath, otherGroupPath)
+	return utils.IsDescendantOfPath(g.FullPath, otherGroupPath)
 }
 
 // GetGroupParentPath returns the path for a group's parent based only on the current path.

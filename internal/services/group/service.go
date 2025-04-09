@@ -32,6 +32,8 @@ type GetGroupsInput struct {
 	Search *string
 	// Set RootOnly true to get only root groups returned by the query.
 	RootOnly bool
+	// GroupPath is the path of the group to be used for filtering
+	GroupPath *string
 }
 
 // DeleteGroupInput is the input for deleting a group
@@ -147,6 +149,10 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		Filter: &db.GroupFilter{
 			Search: input.Search,
 		},
+	}
+
+	if input.GroupPath != nil {
+		dbInput.Filter.GroupPaths = []string{*input.GroupPath}
 	}
 
 	if input.ParentGroup != nil {

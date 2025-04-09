@@ -178,19 +178,20 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		return nil, fmt.Errorf("failed to initialize managed identity delegate map %v", err)
 	}
 
-	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
-	runStateManager := state.NewRunStateManager(dbClient, logger)
-	eventhandlers.NewErroredRunEmailHandler(logger, dbClient, runStateManager, emailClient).RegisterHandlers()
-	eventhandlers.NewAssessmentRunHandler(logger, dbClient, runStateManager).RegisterHandlers()
-
 	limits := limits.NewLimitChecker(dbClient)
 	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
+	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
+
+	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
+	runStateManager := state.NewRunStateManager(dbClient, logger)
+	eventhandlers.NewErroredRunEmailHandler(logger, dbClient, runStateManager, emailClient, notificationManager, taskManager).RegisterHandlers()
+	eventhandlers.NewAssessmentRunHandler(logger, dbClient, runStateManager).RegisterHandlers()
 
 	// Services.
 	var (
 		versionService             = version.NewService(dbClient, apiVersion)
 		activityService            = activityevent.NewService(dbClient, logger)
-		userService                = user.NewService(logger, dbClient)
+		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService, inheritedSettingsResolver)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)

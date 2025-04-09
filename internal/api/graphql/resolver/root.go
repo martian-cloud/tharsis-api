@@ -19,6 +19,25 @@ func (r RootResolver) Me(ctx context.Context) (*MeResponseResolver, error) {
 	return meQuery(ctx)
 }
 
+/* User Preferences Queries and Mutations */
+
+// UserPreferences query returns the user preferences for the authenticated subject
+func (r RootResolver) UserPreferences() (*UserPreferencesResolver, error) {
+	return userPreferencesQuery()
+}
+
+// SetUserNotificationPreference sets the notification preference for the authenticated subject
+func (r RootResolver) SetUserNotificationPreference(ctx context.Context, args *struct {
+	Input *SetUserNotificationPreferenceInput
+}) (*UserNotificationPreferenceMutationPayloadResolver, error) {
+	response, err := setUserNotificationPreferenceMutation(ctx, args.Input)
+	if err != nil {
+		return handleUserNotificationPreferenceMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Node query */
 
 // Node query returns a node by ID
