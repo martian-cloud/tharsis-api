@@ -1,5 +1,6 @@
 # The Mutation type represents all of the entry points into the API.
 type Mutation {
+  setUserNotificationPreference(input: SetUserNotificationPreferenceInput!): SetUserNotificationPreferencePayload!
   createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload!
   updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload!
   deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload!

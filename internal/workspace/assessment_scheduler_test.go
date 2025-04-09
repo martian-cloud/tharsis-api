@@ -44,6 +44,20 @@ func TestAssessmentScheduler_execute(t *testing.T) {
 			assessmentsInProgress: runLimit,
 			cursor:                ptr.String("c1"),
 			expectCursor:          ptr.String("c1"),
+			workspaces: []models.Workspace{
+				{
+					Metadata: models.ResourceMetadata{
+						ID: "ws1",
+					},
+					EnableDriftDetection: ptr.Bool(false),
+				},
+				{
+					Metadata: models.ResourceMetadata{
+						ID: "ws2",
+					},
+					EnableDriftDetection: ptr.Bool(false),
+				},
+			},
 		},
 		{
 			name:                  "skip checking workspaces since auto drift detection is disabled for them",
@@ -119,27 +133,12 @@ func TestAssessmentScheduler_execute(t *testing.T) {
 
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
 
-			if !test.inMaintenanceMode {
-				mockWorkspaceAssessments.On("GetWorkspaceAssessments", mock.Anything, &db.GetWorkspaceAssessmentsInput{
-					PaginationOptions: &pagination.Options{
-						First: ptr.Int32(0),
-					},
-					Filter: &db.WorkspaceAssessmentFilter{
-						InProgress: ptr.Bool(true),
-					},
-				}).Return(&db.WorkspaceAssessmentsResult{
-					PageInfo: &pagination.PageInfo{
-						TotalCount: int32(test.assessmentsInProgress),
-					},
-				}, nil).Once()
-			}
-
 			if test.workspaces != nil {
 				workspaceSort := db.WorkspaceSortableFieldFullPathAsc
 				mockWorkspaces.On("GetWorkspaces", mock.Anything, &db.GetWorkspacesInput{
 					Sort: &workspaceSort,
 					PaginationOptions: &pagination.Options{
-						First: ptr.Int32(int32(runLimit)), // Get the next batch of workspaces
+						First: ptr.Int32(workspaceBatchSize), // Get the next batch of workspaces
 						After: test.cursor,
 					},
 					Filter: &db.WorkspaceFilter{
@@ -160,7 +159,7 @@ func TestAssessmentScheduler_execute(t *testing.T) {
 				for _, workspace := range test.workspaces {
 					mockInheritedSettingsResolver.On("GetDriftDetectionEnabled", mock.Anything, &workspace).Return(&namespace.DriftDetectionEnabledSetting{
 						Value: *workspace.EnableDriftDetection,
-					}, nil)
+					}, nil).Maybe()
 
 					var assessment *models.WorkspaceAssessment
 					for _, a := range test.existingAssessments {

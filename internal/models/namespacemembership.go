@@ -1,6 +1,10 @@
 package models
 
-import "strings"
+import (
+	"strings"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
+)
 
 // MembershipNamespace represents a namespace which can be a group or workspace
 type MembershipNamespace struct {
@@ -17,7 +21,7 @@ func (m MembershipNamespace) IsTopLevel() bool {
 
 // IsDescendantOfGroup returns true if the namespace is a descendant of the specified ancestor group path.
 func (m *MembershipNamespace) IsDescendantOfGroup(groupPath string) bool {
-	return IsDescendantOfPath(m.Path, groupPath)
+	return utils.IsDescendantOfPath(m.Path, groupPath)
 }
 
 // NamespaceMembership represents an association between a member and a namespace
@@ -43,9 +47,4 @@ func (nm *NamespaceMembership) ResolveMetadata(key string) (string, error) {
 	}
 
 	return val, nil
-}
-
-// IsDescendantOfPath returns true if the namespace is a descendant of the specified (ancestor group) path.
-func IsDescendantOfPath(descendantPath, ancestorPath string) bool {
-	return strings.HasPrefix(descendantPath, ancestorPath+"/")
 }

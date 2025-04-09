@@ -1,0 +1,75 @@
+enum UserNotificationPreferenceScope {
+  ALL
+  PARTICIPATE
+  CUSTOM
+  NONE
+}
+
+type UserNamespacePreferenceConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [UserNamespacePreferenceEdge]
+}
+
+type UserNamespacePreferenceEdge {
+  cursor: String!
+  node: UserNamespacePreferences!
+}
+
+type UserNamespacePreferences {
+    id: ID!
+    path: String!
+    notificationPreference: UserNotificationPreference!
+}
+
+type UserNotificationPreferenceCustomEvents {
+    failedRun: Boolean!
+}
+
+type UserNotificationPreference {
+    inherited: Boolean!
+    global: Boolean!
+    namespacePath: String
+    scope: UserNotificationPreferenceScope!
+    customEvents: UserNotificationPreferenceCustomEvents
+}
+
+type SetUserNotificationPreferencePayload {
+  clientMutationId: String
+  preference: UserNotificationPreference
+  problems: [Problem!]!
+}
+
+type GlobalUserPreferences {
+    notificationPreference: UserNotificationPreference!
+}
+
+type UserPreferences {
+  globalPreferences: GlobalUserPreferences!
+  groupPreferences(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    path: String
+  ): UserNamespacePreferenceConnection!
+  workspacePreferences(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    path: String
+  ): UserNamespacePreferenceConnection!
+}
+
+input UserNotificationPreferenceCustomEventsInput {
+  failedRun: Boolean!
+}
+
+input SetUserNotificationPreferenceInput {
+  clientMutationId: String
+  inherit: Boolean
+  namespacePath: String
+  scope: UserNotificationPreferenceScope
+  customEvents: UserNotificationPreferenceCustomEventsInput
+}

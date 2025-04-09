@@ -43,6 +43,66 @@ func (_m *MockInheritedSettingResolver) GetDriftDetectionEnabled(ctx context.Con
 	return r0, r1
 }
 
+// GetNotificationPreference provides a mock function with given fields: ctx, userID, namespacePath
+func (_m *MockInheritedSettingResolver) GetNotificationPreference(ctx context.Context, userID string, namespacePath *string) (*NotificationPreferenceSetting, error) {
+	ret := _m.Called(ctx, userID, namespacePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNotificationPreference")
+	}
+
+	var r0 *NotificationPreferenceSetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *string) (*NotificationPreferenceSetting, error)); ok {
+		return rf(ctx, userID, namespacePath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *string) *NotificationPreferenceSetting); ok {
+		r0 = rf(ctx, userID, namespacePath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*NotificationPreferenceSetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *string) error); ok {
+		r1 = rf(ctx, userID, namespacePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetNotificationPreferences provides a mock function with given fields: ctx, userIDs, namespacePath
+func (_m *MockInheritedSettingResolver) GetNotificationPreferences(ctx context.Context, userIDs []string, namespacePath *string) (map[string]*NotificationPreferenceSetting, error) {
+	ret := _m.Called(ctx, userIDs, namespacePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNotificationPreferences")
+	}
+
+	var r0 map[string]*NotificationPreferenceSetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string, *string) (map[string]*NotificationPreferenceSetting, error)); ok {
+		return rf(ctx, userIDs, namespacePath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string, *string) map[string]*NotificationPreferenceSetting); ok {
+		r0 = rf(ctx, userIDs, namespacePath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]*NotificationPreferenceSetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string, *string) error); ok {
+		r1 = rf(ctx, userIDs, namespacePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunnerTags provides a mock function with given fields: ctx, namespace
 func (_m *MockInheritedSettingResolver) GetRunnerTags(ctx context.Context, namespace Namespace) (*RunnerTagsSetting, error) {
 	ret := _m.Called(ctx, namespace)

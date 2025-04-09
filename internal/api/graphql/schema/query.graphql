@@ -10,6 +10,7 @@ union MeResponse = User | ServiceAccount
 # The Query type represents all of the entry points into the API.
 type Query {
   me: MeResponse
+  userPreferences: UserPreferences!
   node(id: String!): Node
   namespace(fullPath: String!): Namespace
   group(fullPath: String!): Group

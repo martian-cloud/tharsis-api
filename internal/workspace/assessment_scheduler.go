@@ -24,6 +24,8 @@ const (
 	maxSleepIntervalSeconds = 600
 	// minSleepIntervalSeconds is the min amount of time that the schedule will sleep
 	minSleepIntervalSeconds = 300
+	// workspaceBatchSize is the number of workspaces to check in a single batch
+	workspaceBatchSize = 100
 )
 
 var (
@@ -104,23 +106,14 @@ func (a *AssessmentScheduler) execute(ctx context.Context, cursor *string) (*str
 		return cursor, nil
 	}
 
-	// Check if we're under the assessment run limit
-	currentCount, underLimit, err := a.checkInProgressAssessmentLimit(ctx, a.assessmentRunLimit)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check in progress assessment limit")
-	}
-	if !underLimit {
-		return cursor, nil
-	}
-
-	nextCursor, err := a.checkWorkspaces(ctx, a.assessmentRunLimit-int(currentCount), cursor)
+	nextCursor, err := a.checkWorkspaces(ctx, cursor)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check workspaces in assessment scheduler")
 	}
 	return nextCursor, nil
 }
 
-func (a *AssessmentScheduler) checkWorkspaces(ctx context.Context, limit int, cursor *string) (*string, error) {
+func (a *AssessmentScheduler) checkWorkspaces(ctx context.Context, cursor *string) (*string, error) {
 	start := time.Now()
 	defer func() {
 		duration := time.Since(start)
@@ -134,7 +127,7 @@ func (a *AssessmentScheduler) checkWorkspaces(ctx context.Context, limit int, cu
 	workspaces, err := a.dbClient.Workspaces.GetWorkspaces(ctx, &db.GetWorkspacesInput{
 		Sort: &workspaceSort,
 		PaginationOptions: &pagination.Options{
-			First: ptr.Int32(int32(limit)), // Get the next batch of workspaces
+			First: ptr.Int32(workspaceBatchSize), // Get the next batch of workspaces
 			After: cursor,
 		},
 		Filter: &db.WorkspaceFilter{
@@ -147,27 +140,56 @@ func (a *AssessmentScheduler) checkWorkspaces(ctx context.Context, limit int, cu
 		return nil, fmt.Errorf("failed to get workspaces: %w", err)
 	}
 
+	settingCache := map[string]bool{}
+
 	for _, workspace := range workspaces.Workspaces {
-		setting, err := a.inheritedSettingsResolver.GetDriftDetectionEnabled(ctx, &workspace)
+		enabled, err := a.isDriftDetectionEnabled(ctx, &workspace, settingCache)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get drift detection enabled %w", err)
 		}
-		if setting.Value {
-			if err := a.startWorkspaceAssessment(ctx, &workspace); err != nil {
+		if enabled {
+			limitExceeded, err := a.startWorkspaceAssessment(ctx, &workspace)
+			if err != nil {
 				a.logger.Errorf("failed to run workspace assessment for workspace %q: %v", workspace.FullPath, err)
 			}
+			if limitExceeded {
+				// If the limit is exceeded, we stop checking workspaces
+				return nextCursor, nil
+			}
 		}
-	}
-
-	if workspaces.PageInfo.HasNextPage {
-		val, err := workspaces.PageInfo.Cursor(&workspaces.Workspaces[len(workspaces.Workspaces)-1])
+		nextCursor, err = workspaces.PageInfo.Cursor(&workspace)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get next cursor in assessment scheduler")
 		}
-		nextCursor = val
+	}
+
+	if !workspaces.PageInfo.HasNextPage {
+		nextCursor = nil
 	}
 
 	return nextCursor, nil
+}
+
+func (a *AssessmentScheduler) isDriftDetectionEnabled(ctx context.Context, workspace *models.Workspace, cache map[string]bool) (bool, error) {
+	if workspace.EnableDriftDetection != nil {
+		return *workspace.EnableDriftDetection, nil
+	}
+
+	// Check if the setting is already cached for parent group path
+	groupPath := workspace.GetGroupPath()
+	if cachedValue, ok := cache[groupPath]; ok {
+		return cachedValue, nil
+	}
+
+	setting, err := a.inheritedSettingsResolver.GetDriftDetectionEnabled(ctx, workspace)
+	if err != nil {
+		return false, fmt.Errorf("failed to get drift detection enabled %w", err)
+	}
+
+	// Add setting to cache
+	cache[setting.NamespacePath] = setting.Value
+
+	return setting.Value, nil
 }
 
 func (a *AssessmentScheduler) checkInProgressAssessmentLimit(ctx context.Context, limit int) (int32, bool, error) {
@@ -185,24 +207,24 @@ func (a *AssessmentScheduler) checkInProgressAssessmentLimit(ctx context.Context
 	return response.PageInfo.TotalCount, int(response.PageInfo.TotalCount) < limit, nil
 }
 
-func (a *AssessmentScheduler) startWorkspaceAssessment(ctx context.Context, workspace *models.Workspace) error {
+func (a *AssessmentScheduler) startWorkspaceAssessment(ctx context.Context, workspace *models.Workspace) (bool, error) {
 	assessment, err := a.dbClient.WorkspaceAssessments.GetWorkspaceAssessmentByWorkspaceID(ctx, workspace.Metadata.ID)
 	if err != nil {
-		return fmt.Errorf("failed to get workspace assessment for workspace %q: %w", workspace.FullPath, err)
+		return false, fmt.Errorf("failed to get workspace assessment for workspace %q: %w", workspace.FullPath, err)
 	}
 
 	var latestAssessmentVersion *int
 	if assessment != nil {
 		// Check if the assessment satisfies the minimum interval since it may have been started manually or by another instance
 		if time.Since(assessment.StartedAtTimestamp) < a.assessmentMinInterval {
-			return nil
+			return false, nil
 		}
 		latestAssessmentVersion = &assessment.Metadata.Version
 	}
 
 	txContext, err := a.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() {
 		if txErr := a.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
@@ -218,25 +240,25 @@ func (a *AssessmentScheduler) startWorkspaceAssessment(ctx context.Context, work
 	if err != nil {
 		if errors.ErrorCode(err) != errors.EInternal {
 			// An error is only returned for internal server errors since other error types are expected
-			return nil
+			return false, nil
 		}
-		return err
+		return false, err
 	}
 
 	// Check if we're still under or equal to the limit after creating a new assessment run
 	_, underLimit, err := a.checkInProgressAssessmentLimit(txContext, a.assessmentRunLimit+1)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if !underLimit {
 		// Return nil to rollback the transaction
-		return nil
+		return true, nil
 	}
 
 	assessmentSchedulerAssessmentCount.Inc()
 
 	a.logger.Infof("assessment scheduler created assessment run for workspace %q", workspace.FullPath)
 
-	return a.dbClient.Transactions.CommitTx(txContext)
+	return false, a.dbClient.Transactions.CommitTx(txContext)
 }

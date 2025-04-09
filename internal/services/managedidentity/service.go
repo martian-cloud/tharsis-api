@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -1646,7 +1647,7 @@ func (s *service) checkDisallowedAliases(ctx context.Context,
 		}
 
 		// If the alias is in a descendant of the target group, then it's a problem.
-		if models.IsDescendantOfPath(alias.GetGroupPath(), targetGroup.FullPath) {
+		if utils.IsDescendantOfPath(alias.GetGroupPath(), targetGroup.FullPath) {
 			return errors.New("managed identity %s is an alias of managed identity %s, which is in a descendant group of the target group %s",
 				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 		}
@@ -1707,7 +1708,7 @@ func (s *service) verifyServiceAccountAccessForGroup(ctx context.Context, servic
 
 		saGroupPath := sa.GetGroupPath()
 
-		if groupPath != saGroupPath && !models.IsDescendantOfPath(groupPath, saGroupPath) {
+		if groupPath != saGroupPath && !utils.IsDescendantOfPath(groupPath, saGroupPath) {
 			return errors.New("service account %s is outside the scope of group %s", sa.ResourcePath, groupPath, errors.WithErrorCode(errors.EInvalid))
 		}
 	}

@@ -1,6 +1,11 @@
 package models
 
-import "strings"
+import (
+	"strings"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
+)
 
 // Workspace represents a terraform workspace
 type Workspace struct {
@@ -52,6 +57,16 @@ func (w *Workspace) Validate() error {
 	return verifyValidRunnerTags(w.RunnerTags)
 }
 
+// GetID returns the ID for this group
+func (w *Workspace) GetID() string {
+	return w.Metadata.ID
+}
+
+// GetResourceType returns the workspace resource type
+func (w *Workspace) GetResourceType() permissions.ResourceType {
+	return permissions.WorkspaceResourceType
+}
+
 // GetPath returns the full path for this workspace
 func (w *Workspace) GetPath() string {
 	return w.FullPath
@@ -94,5 +109,5 @@ func (w *Workspace) ExpandPath() []string {
 
 // IsDescendantOfGroup returns true if the workspace is a descendant of the specified ancestor group path.
 func (w *Workspace) IsDescendantOfGroup(groupPath string) bool {
-	return IsDescendantOfPath(w.FullPath, groupPath)
+	return utils.IsDescendantOfPath(w.FullPath, groupPath)
 }

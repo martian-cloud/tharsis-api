@@ -94,6 +94,8 @@ type GetWorkspacesInput struct {
 	AssignedManagedIdentityID *string
 	// Search is used to search for a workspace by name or namespace path
 	Search *string
+	// WorkspacePath is used to search for a workspace by its full path
+	WorkspacePath *string
 }
 
 // GetStateVersionsInput is the input for querying a list of state versions
@@ -326,6 +328,7 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 		Filter: &db.WorkspaceFilter{
 			Search:                    input.Search,
 			AssignedManagedIdentityID: input.AssignedManagedIdentityID,
+			WorkspacePath:             input.WorkspacePath,
 		},
 	}
 

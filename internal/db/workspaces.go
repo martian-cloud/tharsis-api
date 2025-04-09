@@ -74,6 +74,7 @@ type WorkspaceFilter struct {
 	Locked                         *bool
 	Dirty                          *bool
 	HasStateVersion                *bool
+	WorkspacePath                  *string
 }
 
 // GetWorkspacesInput is the input for listing workspaces
@@ -163,6 +164,10 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
 			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
+		}
+
+		if input.Filter.WorkspacePath != nil {
+			ex = ex.Append(goqu.I("namespaces.path").Eq(*input.Filter.WorkspacePath))
 		}
 
 		if input.Filter.PathLessThan != nil {
