@@ -54,14 +54,14 @@ func (k *k8sRunner) CreateJob(ctx context.Context, job *v1.Job) (*v1.Job, error)
 
 // JobDispatcher uses a kubernetes client to dispatch jobs
 type JobDispatcher struct {
-	logger                logger.Logger
-	client                client
-	image                 string
-	apiURL                string
-	discoveryProtocolHost string
-	memoryRequest         resource.Quantity
-	memoryLimit           resource.Quantity
-	securityContext       *corev1.SecurityContext
+	logger                 logger.Logger
+	client                 client
+	image                  string
+	apiURL                 string
+	discoveryProtocolHosts []string
+	memoryRequest          resource.Quantity
+	memoryLimit            resource.Quantity
+	securityContext        *corev1.SecurityContext
 }
 
 // New creates a JobDispatcher
@@ -134,13 +134,25 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		return nil, fmt.Errorf("failed to parse memory limit for runner jobs: %v", err)
 	}
 
+	discoveryProtocolHosts := []string{}
+
+	if discoveryProtocolHost != "" {
+		discoveryProtocolHosts = append(discoveryProtocolHosts, discoveryProtocolHost)
+	}
+
+	if extraDiscoveryHostsStr, ok := pluginData["extra_service_discovery_hosts"]; ok {
+		for _, host := range strings.Split(extraDiscoveryHostsStr, ",") {
+			discoveryProtocolHosts = append(discoveryProtocolHosts, strings.TrimSpace(host))
+		}
+	}
+
 	return &JobDispatcher{
-		logger:                logger,
-		image:                 pluginData["image"],
-		apiURL:                pluginData["api_url"],
-		discoveryProtocolHost: discoveryProtocolHost,
-		memoryRequest:         memoryRequest,
-		memoryLimit:           memoryLimit,
+		logger:                 logger,
+		image:                  pluginData["image"],
+		apiURL:                 pluginData["api_url"],
+		discoveryProtocolHosts: discoveryProtocolHosts,
+		memoryRequest:          memoryRequest,
+		memoryLimit:            memoryLimit,
 		securityContext: &corev1.SecurityContext{
 			Privileged:               ptr.Bool(false),
 			AllowPrivilegeEscalation: ptr.Bool(false),
@@ -207,8 +219,8 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 									Value: j.apiURL,
 								},
 								{
-									Name:  "DISCOVERY_PROTOCOL_HOST",
-									Value: j.discoveryProtocolHost,
+									Name:  "DISCOVERY_PROTOCOL_HOSTS",
+									Value: strings.Join(j.discoveryProtocolHosts, ","),
 								},
 								{
 									Name:  "MEMORY_LIMIT",

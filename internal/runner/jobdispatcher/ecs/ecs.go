@@ -24,14 +24,14 @@ type client interface {
 
 // JobDispatcher uses the AWS ECS client to dispatch jobs
 type JobDispatcher struct {
-	logger                logger.Logger
-	client                client
-	taskDefinition        string
-	cluster               string
-	launchType            types.LaunchType
-	apiURL                string
-	discoveryProtocolHost string
-	subnets               []string
+	logger                 logger.Logger
+	client                 client
+	taskDefinition         string
+	cluster                string
+	launchType             types.LaunchType
+	apiURL                 string
+	discoveryProtocolHosts []string
+	subnets                []string
 }
 
 // New creates a JobDispatcher
@@ -57,17 +57,29 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		return nil, fmt.Errorf("ECS job dispatcher requires a launch type of ec2 or fargate")
 	}
 
+	discoveryProtocolHosts := []string{}
+
+	if discoveryProtocolHost != "" {
+		discoveryProtocolHosts = append(discoveryProtocolHosts, discoveryProtocolHost)
+	}
+
+	if extraDiscoveryHostsStr, ok := pluginData["extra_service_discovery_hosts"]; ok {
+		for _, host := range strings.Split(extraDiscoveryHostsStr, ",") {
+			discoveryProtocolHosts = append(discoveryProtocolHosts, strings.TrimSpace(host))
+		}
+	}
+
 	client := ecs.NewFromConfig(awsCfg)
 
 	return &JobDispatcher{
-		logger:                logger,
-		taskDefinition:        pluginData["task_definition"],
-		cluster:               pluginData["cluster"],
-		launchType:            launchType,
-		subnets:               strings.Split(pluginData["subnets"], ","),
-		apiURL:                pluginData["api_url"],
-		discoveryProtocolHost: discoveryProtocolHost,
-		client:                client,
+		logger:                 logger,
+		taskDefinition:         pluginData["task_definition"],
+		cluster:                pluginData["cluster"],
+		launchType:             launchType,
+		subnets:                strings.Split(pluginData["subnets"], ","),
+		apiURL:                 pluginData["api_url"],
+		discoveryProtocolHosts: discoveryProtocolHosts,
+		client:                 client,
 	}, nil
 }
 
@@ -91,7 +103,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 						{Name: ptr.String("JOB_ID"), Value: &jobID},
 						{Name: ptr.String("JOB_TOKEN"), Value: &token},
 						{Name: ptr.String("API_URL"), Value: &j.apiURL},
-						{Name: ptr.String("DISCOVERY_PROTOCOL_HOST"), Value: &j.discoveryProtocolHost},
+						{Name: ptr.String("DISCOVERY_PROTOCOL_HOSTS"), Value: ptr.String(strings.Join(j.discoveryProtocolHosts, ","))},
 					},
 				},
 			},

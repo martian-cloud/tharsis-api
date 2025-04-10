@@ -32,17 +32,17 @@ type Authenticator struct {
 	refreshTokenEarlyDuration time.Duration
 	tokenDir                  string
 	apiEndpoint               string
-	discoveryProtocolHost     *string
+	discoveryProtocolHosts    []string
 }
 
 // New creates a new instance of Authenticator
-func New(client jobclient.Client, jobLogger joblogger.Logger, apiEndpoint string, discoveryProtocolHost *string) (*Authenticator, error) {
+func New(client jobclient.Client, jobLogger joblogger.Logger, apiEndpoint string, discoveryProtocolHosts []string) (*Authenticator, error) {
 	tokenDir, err := os.MkdirTemp("", "tharsis-federated-token-*")
 	if err != nil {
 		return nil, err
 	}
 
-	return newAuthenticator(client, jobLogger, 1*time.Minute, tokenDir, apiEndpoint, discoveryProtocolHost)
+	return newAuthenticator(client, jobLogger, 1*time.Minute, tokenDir, apiEndpoint, discoveryProtocolHosts)
 }
 
 func newAuthenticator(
@@ -51,7 +51,7 @@ func newAuthenticator(
 	refreshTokenEarlyDuration time.Duration,
 	tokenDir string,
 	apiEndpoint string,
-	discoveryProtocolHost *string,
+	discoveryProtocolHosts []string,
 ) (*Authenticator, error) {
 	return &Authenticator{
 		client:                    client,
@@ -59,7 +59,7 @@ func newAuthenticator(
 		refreshTokenEarlyDuration: refreshTokenEarlyDuration,
 		tokenDir:                  tokenDir,
 		apiEndpoint:               apiEndpoint,
-		discoveryProtocolHost:     discoveryProtocolHost,
+		discoveryProtocolHosts:    discoveryProtocolHosts,
 	}, nil
 }
 
@@ -156,8 +156,8 @@ func (a *Authenticator) setupHostCredentialFileMapping(hostCredFileMap map[strin
 
 	hostCredFileMap[apiURL.Host] = tokenFilePath
 
-	if a.discoveryProtocolHost != nil && *a.discoveryProtocolHost != "" {
-		hostCredFileMap[*a.discoveryProtocolHost] = tokenFilePath
+	for _, host := range a.discoveryProtocolHosts {
+		hostCredFileMap[host] = tokenFilePath
 	}
 
 	return nil

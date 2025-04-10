@@ -27,7 +27,7 @@ func TestAuthenticate(t *testing.T) {
 		name                             string
 		tokenDir                         string
 		apiEndpoint                      string
-		discoveryProtocolHost            *string
+		discoveryProtocolHosts           []string
 		expectError                      string
 		expectLogWarning                 string
 		createServiceAccountTokenError   string
@@ -41,17 +41,19 @@ func TestAuthenticate(t *testing.T) {
 			name:                             "should configure environment when authenticating and not using service account for terraform cli",
 			tokens:                           []string{},
 			useServiceAccountForTerraformCLI: false,
+			discoveryProtocolHosts:           []string{"tharsis.dev.com"},
 		},
 		{
 			name:                             "should configure environment when authenticating",
 			tokens:                           []string{"expected-token1"},
 			useServiceAccountForTerraformCLI: true,
+			discoveryProtocolHosts:           []string{"tharsis.dev.com"},
 		},
 		{
 			name:                             "should configure environment when authenticating without a discovery protocol host",
 			tokens:                           []string{"expected-token1"},
 			useServiceAccountForTerraformCLI: true,
-			discoveryProtocolHost:            ptr.String(""),
+			discoveryProtocolHosts:           []string{},
 		},
 		{
 			name:                        "should fail if more than one managed identity is provided",
@@ -130,12 +132,7 @@ func TestAuthenticate(t *testing.T) {
 				apiEndpoint = "https://api.tharsis.dev.com"
 			}
 
-			discoveryProtocolHost := test.discoveryProtocolHost
-			if discoveryProtocolHost == nil {
-				discoveryProtocolHost = ptr.String("tharsis.dev.com")
-			}
-
-			authenticator := buildAuthenticator(t, client, tokenDir, jobLogger, apiEndpoint, discoveryProtocolHost)
+			authenticator := buildAuthenticator(t, client, tokenDir, jobLogger, apiEndpoint, test.discoveryProtocolHosts)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -179,9 +176,7 @@ func TestAuthenticate(t *testing.T) {
 			if test.useServiceAccountForTerraformCLI {
 				expectedHosts = append(expectedHosts, "api.tharsis.dev.com")
 
-				if discoveryProtocolHost != nil && *discoveryProtocolHost != "" {
-					expectedHosts = append(expectedHosts, "tharsis.dev.com")
-				}
+				expectedHosts = append(expectedHosts, test.discoveryProtocolHosts...)
 			}
 			verifyHostCredentialFileMapping(tokenDir, t, expectedHosts, response)
 
@@ -208,9 +203,9 @@ func TestClose(t *testing.T) {
 	jobLogger := buildJobLoggerWithStubs(t)
 
 	const apiEndpoint = "https://api.tharsis.dev.com"
-	discoveryProtocolHost := ptr.String("tharsis.dev.com")
+	discoveryProtocolHosts := []string{"tharsis.dev.com"}
 
-	authenticator := buildAuthenticator(t, client, tokenDir, jobLogger, apiEndpoint, discoveryProtocolHost)
+	authenticator := buildAuthenticator(t, client, tokenDir, jobLogger, apiEndpoint, discoveryProtocolHosts)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -256,9 +251,9 @@ func buildAuthenticator(
 	tokenDir string,
 	jobLogger *joblogger.MockLogger,
 	apiEndpoint string,
-	discoveryProtocolHost *string,
+	discoveryProtocolHosts []string,
 ) *Authenticator {
-	authenticator, err := newAuthenticator(client, jobLogger, refreshTokenEarlyDuration, tokenDir, apiEndpoint, discoveryProtocolHost)
+	authenticator, err := newAuthenticator(client, jobLogger, refreshTokenEarlyDuration, tokenDir, apiEndpoint, discoveryProtocolHosts)
 	if err != nil {
 		t.Fatal(err)
 	}

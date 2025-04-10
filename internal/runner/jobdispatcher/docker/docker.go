@@ -34,17 +34,17 @@ type client interface {
 
 // JobDispatcher uses the local docker api to dispatch jobs
 type JobDispatcher struct {
-	logger                logger.Logger
-	client                client
-	image                 string
-	bindPath              string
-	registryUsername      string
-	registryPassword      string
-	apiURL                string
-	discoveryProtocolHost string
-	extraHosts            []string
-	localImage            bool
-	memoryLimit           int64 // in bytes, zero means unlimited
+	logger                 logger.Logger
+	client                 client
+	image                  string
+	bindPath               string
+	registryUsername       string
+	registryPassword       string
+	apiURL                 string
+	discoveryProtocolHosts []string
+	extraHosts             []string
+	localImage             bool
+	memoryLimit            int64 // in bytes, zero means unlimited
 }
 
 // New creates a JobDispatcher
@@ -81,23 +81,35 @@ func New(pluginData map[string]string, discoveryProtocolHost string, logger logg
 		}
 	}
 
+	discoveryProtocolHosts := []string{}
+
+	if discoveryProtocolHost != "" {
+		discoveryProtocolHosts = append(discoveryProtocolHosts, discoveryProtocolHost)
+	}
+
+	if extraDiscoveryHostsStr, ok := pluginData["extra_service_discovery_hosts"]; ok {
+		for _, host := range strings.Split(extraDiscoveryHostsStr, ",") {
+			discoveryProtocolHosts = append(discoveryProtocolHosts, strings.TrimSpace(host))
+		}
+	}
+
 	client, err := dockerclient.NewClientWithOpts(dockerclient.WithHost(pluginData["host"]), dockerclient.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("job dispatcher failed to initialize docker cli: %v", err)
 	}
 
 	return &JobDispatcher{
-		image:                 pluginData["image"],
-		bindPath:              pluginData["bind_path"],
-		apiURL:                pluginData["api_url"],
-		discoveryProtocolHost: discoveryProtocolHost,
-		registryUsername:      pluginData["registry_username"],
-		registryPassword:      pluginData["registry_password"],
-		extraHosts:            extraHosts,
-		localImage:            localImage,
-		client:                client,
-		logger:                logger,
-		memoryLimit:           memoryLimit,
+		image:                  pluginData["image"],
+		bindPath:               pluginData["bind_path"],
+		apiURL:                 pluginData["api_url"],
+		discoveryProtocolHosts: discoveryProtocolHosts,
+		registryUsername:       pluginData["registry_username"],
+		registryPassword:       pluginData["registry_password"],
+		extraHosts:             extraHosts,
+		localImage:             localImage,
+		client:                 client,
+		logger:                 logger,
+		memoryLimit:            memoryLimit,
 	}, nil
 }
 
@@ -139,7 +151,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 			fmt.Sprintf("API_URL=%s", j.apiURL),
 			fmt.Sprintf("JOB_ID=%s", jobID),
 			fmt.Sprintf("JOB_TOKEN=%s", token),
-			fmt.Sprintf("DISCOVERY_PROTOCOL_HOST=%s", j.discoveryProtocolHost),
+			fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", strings.Join(j.discoveryProtocolHosts, ",")),
 			fmt.Sprintf("MEMORY_LIMIT=%d", j.memoryLimit),
 		},
 	}, hostConfig, nil, nil, "")

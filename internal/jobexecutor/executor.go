@@ -38,10 +38,10 @@ type JobHandler interface {
 
 // JobConfig is used to configure the job
 type JobConfig struct {
-	JobID                 string
-	APIEndpoint           string
-	JobToken              string
-	DiscoveryProtocolHost string
+	JobID                  string
+	APIEndpoint            string
+	JobToken               string
+	DiscoveryProtocolHosts []string
 }
 
 // JobExecutor executes a job
