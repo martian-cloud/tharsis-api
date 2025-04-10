@@ -128,7 +128,7 @@ func TestDispatchJob(t *testing.T) {
 					fmt.Sprintf("API_URL=%s", apiURL),
 					fmt.Sprintf("JOB_ID=%s", test.jobID),
 					fmt.Sprintf("JOB_TOKEN=%s", token),
-					fmt.Sprintf("DISCOVERY_PROTOCOL_HOST=%s", discoveryProtocolHost),
+					fmt.Sprintf("DISCOVERY_PROTOCOL_HOSTS=%s", discoveryProtocolHost),
 					fmt.Sprintf("MEMORY_LIMIT=%d", memoryLimit),
 				},
 			}, hostConfig, mock.Anything, mock.Anything, "").Return(test.retOutput, test.containerCreateRetErr)
@@ -136,15 +136,15 @@ func TestDispatchJob(t *testing.T) {
 			client.On("ContainerStart", ctx, test.retOutput.ID, dockercontainer.StartOptions{}).Return(test.containerStartRetErr)
 
 			dispatcher := JobDispatcher{
-				logger:                logger.New(),
-				image:                 image,
-				bindPath:              test.bindPath,
-				localImage:            test.localImage,
-				registryUsername:      test.username,
-				registryPassword:      test.password,
-				apiURL:                apiURL,
-				discoveryProtocolHost: discoveryProtocolHost,
-				client:                &client,
+				logger:                 logger.New(),
+				image:                  image,
+				bindPath:               test.bindPath,
+				localImage:             test.localImage,
+				registryUsername:       test.username,
+				registryPassword:       test.password,
+				apiURL:                 apiURL,
+				discoveryProtocolHosts: []string{discoveryProtocolHost},
+				client:                 &client,
 			}
 
 			taskID, err := dispatcher.DispatchJob(ctx, test.jobID, token)

@@ -134,7 +134,7 @@ func TestDispatchJob(t *testing.T) {
 								{Name: ptr.String("JOB_ID"), Value: &test.jobID},
 								{Name: ptr.String("JOB_TOKEN"), Value: &token},
 								{Name: ptr.String("API_URL"), Value: &apiURL},
-								{Name: ptr.String("DISCOVERY_PROTOCOL_HOST"), Value: &discoveryProtocolHost},
+								{Name: ptr.String("DISCOVERY_PROTOCOL_HOSTS"), Value: &discoveryProtocolHost},
 							},
 						},
 					},
@@ -142,14 +142,14 @@ func TestDispatchJob(t *testing.T) {
 			}).Return(test.retOutput, test.retErr)
 
 			dispatcher := JobDispatcher{
-				logger:                logger.New(),
-				taskDefinition:        taskDefinition,
-				cluster:               cluster,
-				launchType:            launchType,
-				subnets:               subnets,
-				apiURL:                apiURL,
-				discoveryProtocolHost: discoveryProtocolHost,
-				client:                &client,
+				logger:                 logger.New(),
+				taskDefinition:         taskDefinition,
+				cluster:                cluster,
+				launchType:             launchType,
+				subnets:                subnets,
+				apiURL:                 apiURL,
+				discoveryProtocolHosts: []string{discoveryProtocolHost},
+				client:                 &client,
 			}
 
 			taskID, err := dispatcher.DispatchJob(ctx, test.jobID, token)

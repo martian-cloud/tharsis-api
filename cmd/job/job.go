@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
@@ -27,11 +28,18 @@ func main() {
 	apiURL := os.Getenv("API_URL")
 	jobID := os.Getenv("JOB_ID")
 	token := os.Getenv("JOB_TOKEN")
-	discoveryProtocolHost := os.Getenv("DISCOVERY_PROTOCOL_HOST")
 
 	if apiURL == "" || jobID == "" || token == "" {
 		logger.Errorf("API_URL, JOB_ID, and JOB_TOKEN environment variables are required")
 		return
+	}
+
+	discoveryProtocolHosts := []string{}
+	for _, host := range strings.Split(os.Getenv("DISCOVERY_PROTOCOL_HOSTS"), ",") {
+		trimmedHost := strings.TrimSpace(host)
+		if trimmedHost != "" {
+			discoveryProtocolHosts = append(discoveryProtocolHosts, trimmedHost)
+		}
 	}
 
 	client, err := jobclient.NewClient(apiURL, token)
@@ -48,10 +56,10 @@ func main() {
 
 	// Create job config
 	cfg := jobexecutor.JobConfig{
-		JobID:                 jobID,
-		APIEndpoint:           apiURL,
-		JobToken:              token,
-		DiscoveryProtocolHost: discoveryProtocolHost,
+		JobID:                  jobID,
+		APIEndpoint:            apiURL,
+		JobToken:               token,
+		DiscoveryProtocolHosts: discoveryProtocolHosts,
 	}
 
 	// Start the run executor

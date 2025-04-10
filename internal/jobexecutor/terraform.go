@@ -447,7 +447,7 @@ func (t *terraformWorkspace) setBuiltInEnvVars(_ context.Context, hostCredential
 		return err
 	}
 
-	t.setDiscoveryProtocolHostTfTokenEnvVar(hostCredentialFileMapping)
+	t.setDiscoveryProtocolHostTfTokenEnvVars(hostCredentialFileMapping)
 
 	return nil
 }
@@ -473,22 +473,18 @@ func (t *terraformWorkspace) setAPIHostTfTokenEnvVar(hostCredentialFileMapping m
 	return nil
 }
 
-func (t *terraformWorkspace) setDiscoveryProtocolHostTfTokenEnvVar(hostCredentialFileMapping map[string]string) {
-	host := t.jobCfg.DiscoveryProtocolHost
+func (t *terraformWorkspace) setDiscoveryProtocolHostTfTokenEnvVars(hostCredentialFileMapping map[string]string) {
+	for _, host := range t.jobCfg.DiscoveryProtocolHosts {
+		_, hasCredentialFile := hostCredentialFileMapping[host]
+		if hasCredentialFile {
+			continue
+		}
 
-	if host == "" {
-		return
-	}
-
-	_, hasCredentialFile := hostCredentialFileMapping[host]
-	if hasCredentialFile {
-		return
-	}
-
-	if dpEncHost, err := module.BuildTokenEnvVar(host); err == nil {
-		t.fullEnv[dpEncHost] = t.jobCfg.JobToken
-	} else {
-		t.jobLogger.Infof("failed to encode Discovery Protocol Host: %v", err)
+		if dpEncHost, err := module.BuildTokenEnvVar(host); err == nil {
+			t.fullEnv[dpEncHost] = t.jobCfg.JobToken
+		} else {
+			t.jobLogger.Errorf("failed to encode Discovery Protocol Host %q: %v", host, err)
+		}
 	}
 }
 

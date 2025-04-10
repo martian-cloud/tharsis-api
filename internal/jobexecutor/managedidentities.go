@@ -47,7 +47,7 @@ func newManagedIdentities(
 				return azurefederated.New()
 			},
 			types.ManagedIdentityTharsisFederated: func() (managedidentity.Authenticator, error) {
-				return tharsisfederated.New(client, jobLogger, jobCfg.APIEndpoint, &jobCfg.DiscoveryProtocolHost)
+				return tharsisfederated.New(client, jobLogger, jobCfg.APIEndpoint, jobCfg.DiscoveryProtocolHosts)
 			},
 		},
 	}

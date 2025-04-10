@@ -47,12 +47,17 @@ func (l *JobDispatcher) DispatchJob(_ context.Context, jobID string, token strin
 		jobCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		discoveryProtocolHosts := []string{}
+		if l.discoveryProtocolHost != "" {
+			discoveryProtocolHosts = append(discoveryProtocolHosts, l.discoveryProtocolHost)
+		}
+
 		// Create job config
 		cfg := jobexecutor.JobConfig{
-			JobID:                 jobID,
-			APIEndpoint:           l.apiURL,
-			JobToken:              token,
-			DiscoveryProtocolHost: l.discoveryProtocolHost,
+			JobID:                  jobID,
+			APIEndpoint:            l.apiURL,
+			JobToken:               token,
+			DiscoveryProtocolHosts: discoveryProtocolHosts,
 		}
 
 		// Start the job executor
