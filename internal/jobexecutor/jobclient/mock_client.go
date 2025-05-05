@@ -38,6 +38,36 @@ func (_m *MockClient) Close() error {
 	return r0
 }
 
+// CreateFederatedRegistryTokens provides a mock function with given fields: ctx, input
+func (_m *MockClient) CreateFederatedRegistryTokens(ctx context.Context, input *types.CreateFederatedRegistryTokensInput) ([]types.FederatedRegistryToken, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateFederatedRegistryTokens")
+	}
+
+	var r0 []types.FederatedRegistryToken
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateFederatedRegistryTokensInput) ([]types.FederatedRegistryToken, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateFederatedRegistryTokensInput) []types.FederatedRegistryToken); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.FederatedRegistryToken)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.CreateFederatedRegistryTokensInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateManagedIdentityCredentials provides a mock function with given fields: ctx, managedIdentityID
 func (_m *MockClient) CreateManagedIdentityCredentials(ctx context.Context, managedIdentityID string) ([]byte, error) {
 	ret := _m.Called(ctx, managedIdentityID)

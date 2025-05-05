@@ -25,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -257,7 +258,6 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 
 func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name string, system string) (*models.TerraformModule, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetModuleByAddress")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -266,34 +266,10 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 		return nil, err
 	}
 
-	rootGroup, err := s.dbClient.Groups.GetGroupByFullPath(ctx, namespace)
+	module, err := registry.GetModuleByAddress(ctx, s.dbClient, namespace, name, system)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by full path")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get module %s/%s/%s", namespace, name, system, errors.WithSpan(span))
 	}
-
-	if rootGroup == nil {
-		return nil, errors.New("namespace %s not found", namespace, errors.WithErrorCode(errors.ENotFound))
-	}
-
-	moduleResult, err := s.dbClient.TerraformModules.GetModules(ctx, &db.GetModulesInput{
-		PaginationOptions: &pagination.Options{First: ptr.Int32(1)},
-		Filter: &db.TerraformModuleFilter{
-			RootGroupID: &rootGroup.Metadata.ID,
-			Name:        &name,
-			System:      &system,
-		},
-	})
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get modules")
-		return nil, err
-	}
-
-	if len(moduleResult.Modules) == 0 {
-		return nil, errors.New("module with name %s and system %s not found in namespace %s", name, system, namespace, errors.WithErrorCode(errors.ENotFound))
-	}
-
-	module := moduleResult.Modules[0]
 
 	if module.Private {
 		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
@@ -303,7 +279,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 		}
 	}
 
-	return &module, nil
+	return module, nil
 }
 
 func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.ModulesResult, error) {
@@ -1064,7 +1040,6 @@ func (s *service) GetModuleVersions(ctx context.Context, input *GetModuleVersion
 	}
 
 	return s.dbClient.TerraformModuleVersions.GetModuleVersions(ctx, &dbInput)
-
 }
 
 func (s *service) GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]models.TerraformModuleVersion, error) {

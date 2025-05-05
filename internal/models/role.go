@@ -170,6 +170,10 @@ var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
 		permissions.ViewTerraformProviderMirrorPermission,
 		permissions.CreateTerraformProviderMirrorPermission,
 		permissions.DeleteTerraformProviderMirrorPermission,
+		permissions.ViewFederatedRegistryPermission,
+		permissions.CreateFederatedRegistryPermission,
+		permissions.UpdateFederatedRegistryPermission,
+		permissions.DeleteFederatedRegistryPermission,
 	},
 	// Deployer Role.
 	DeployerRoleID: {
@@ -220,6 +224,10 @@ var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
 		permissions.ViewTerraformProviderMirrorPermission,
 		permissions.CreateTerraformProviderMirrorPermission,
 		permissions.DeleteTerraformProviderMirrorPermission,
+		permissions.ViewFederatedRegistryPermission,
+		permissions.CreateFederatedRegistryPermission,
+		permissions.UpdateFederatedRegistryPermission,
+		permissions.DeleteFederatedRegistryPermission,
 	},
 	// Viewer Role.
 	ViewerRoleID: {
@@ -239,5 +247,6 @@ var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
 		permissions.ViewManagedIdentityPermission,
 		permissions.ViewVCSProviderPermission,
 		permissions.ViewTerraformProviderMirrorPermission,
+		permissions.ViewFederatedRegistryPermission,
 	},
 }

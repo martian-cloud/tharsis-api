@@ -1393,3 +1393,63 @@ func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
 func (r RootResolver) NamespaceVariableVersion(ctx context.Context, args *NamesapceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
 	return namespaceVariableVersionQuery(ctx, args)
 }
+
+/* FederatedRegistry mutations */
+
+// CreateFederatedRegistry creates a new federated registry
+func (r RootResolver) CreateFederatedRegistry(ctx context.Context,
+	args *struct {
+		Input *CreateFederatedRegistryInput
+	},
+) (*FederatedRegistryMutationPayloadResolver, error) {
+	response, err := createFederatedRegistryMutation(ctx, args.Input)
+	if err != nil {
+		return handleFederatedRegistryMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// UpdateFederatedRegistry updates an existing federated registry
+func (r RootResolver) UpdateFederatedRegistry(ctx context.Context,
+	args *struct {
+		Input *UpdateFederatedRegistryInput
+	},
+) (*FederatedRegistryMutationPayloadResolver, error) {
+	response, err := updateFederatedRegistryMutation(ctx, args.Input)
+	if err != nil {
+		return handleFederatedRegistryMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteFederatedRegistry deletes a federated registry
+func (r RootResolver) DeleteFederatedRegistry(ctx context.Context,
+	args *struct {
+		Input *DeleteFederatedRegistryInput
+	},
+) (*FederatedRegistryMutationPayloadResolver, error) {
+	response, err := deleteFederatedRegistryMutation(ctx, args.Input)
+	if err != nil {
+		return handleFederatedRegistryMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+/* Federated Registry Mutation */
+
+// CreateFederatedRegistryTokens creates a list of federated registry tokens.
+func (r RootResolver) CreateFederatedRegistryTokens(ctx context.Context,
+	args *struct {
+		Input *CreateFederatedRegistryTokensInput
+	}) (*FederatedRegistryTokensMutationPayloadResolver, error) {
+
+	response, err := createFederatedRegistryTokensMutation(ctx, args.Input)
+	if err != nil {
+		return handleCreateFederatedRegistryTokensMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}

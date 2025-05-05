@@ -25,29 +25,28 @@ func NewAuthenticationMiddleware(
 			ctx := r.Context()
 			var subject string
 
-			caller, err := authenticator.Authenticate(ctx, auth.FindToken(r), true)
-			if err == nil {
-
-				// This request is authenticated.
-				ctx = auth.WithCaller(ctx, caller)
-				subject = caller.GetSubject()
-			} else if errors.ErrorCode(err) != errors.EUnauthorized {
-
-				// Do not return an unauthorized error here since the service layer is responsible for determining
-				// if a request requires an authenticated user
-				respWriter.RespondWithError(w, errors.Wrap(err, "Error finding authentication token"))
-				return
-			} else {
-
+			token := auth.FindToken(r)
+			if token == "" {
 				// This request is NOT authenticated, so use the requester's IP address
 				var ip string
-				ip, err = getSourceIP(r)
+				ip, err := getSourceIP(r)
 				if err != nil {
 					logger.Errorf("Error finding client IP: %v", err)
 					respWriter.RespondWithError(w, errors.Wrap(err, "Error finding client IP", errors.WithErrorCode(errors.EInvalid)))
 					return
 				}
 				subject = fmt.Sprintf("anonymous-%s", ip)
+			} else {
+				// Attempt to authenticate caller using token
+				caller, err := authenticator.Authenticate(ctx, token, true)
+				if err != nil {
+					respWriter.RespondWithError(w, err)
+					return
+				}
+
+				// This request is authenticated.
+				ctx = auth.WithCaller(ctx, caller)
+				subject = caller.GetSubject()
 			}
 
 			ctx = auth.WithSubject(ctx, subject)

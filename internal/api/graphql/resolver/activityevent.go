@@ -454,6 +454,12 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &TerraformProviderVersionMirrorResolver{versionMirror: mirror}}, nil
+	case models.TargetFederatedRegistry:
+		federatedRegistry, err := loadFederatedRegistry(ctx, r.activityEvent.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		return &NodeResolver{result: &FederatedRegistryResolver{federatedRegistry: federatedRegistry}}, nil
 	default:
 		return nil, errors.New("valid TargetType must be specified", errors.WithErrorCode(errors.EInvalid))
 	}

@@ -1,3 +1,4 @@
+// Package run provides the run service for creating and managing runs
 package run
 
 //go:generate go tool mockery --name Service --inpackage --case underscore
@@ -22,14 +23,15 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -221,8 +223,7 @@ type service struct {
 	cliService      cli.Service
 	runStateManager *state.RunStateManager
 	activityService activityevent.Service
-	moduleService   moduleregistry.Service
-	moduleResolver  ModuleResolver
+	moduleResolver  registry.ModuleResolver
 	ruleEnforcer    rules.RuleEnforcer
 	limitChecker    limits.LimitChecker
 	planParser      plan.Parser
@@ -238,8 +239,7 @@ func NewService(
 	jobService job.Service,
 	cliService cli.Service,
 	activityService activityevent.Service,
-	moduleService moduleregistry.Service,
-	moduleResolver ModuleResolver,
+	moduleResolver registry.ModuleResolver,
 	runStateManager *state.RunStateManager,
 	limitChecker limits.LimitChecker,
 	secretManager secret.Manager,
@@ -252,7 +252,6 @@ func NewService(
 		jobService,
 		cliService,
 		activityService,
-		moduleService,
 		moduleResolver,
 		runStateManager,
 		rules.NewRuleEnforcer(dbClient),
@@ -270,8 +269,7 @@ func newService(
 	jobService job.Service,
 	cliService cli.Service,
 	activityService activityevent.Service,
-	moduleService moduleregistry.Service,
-	moduleResolver ModuleResolver,
+	moduleResolver registry.ModuleResolver,
 	runStateManager *state.RunStateManager,
 	ruleEnforcer rules.RuleEnforcer,
 	limitChecker limits.LimitChecker,
@@ -287,7 +285,6 @@ func newService(
 		cliService,
 		runStateManager,
 		activityService,
-		moduleService,
 		moduleResolver,
 		ruleEnforcer,
 		limitChecker,
@@ -721,70 +718,65 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 		}
 	}
 
+	// Retrieve workspace to find Terraform version and max job duration.
+	// ... also to have the workspace path in order to create federated registry tokens.
+	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
+	if err != nil {
+		tracing.RecordError(span, err, "Failed to get workspace associated with run")
+		return nil, errors.Wrap(
+			err,
+			"failed to get workspace (ID %s) associated with run",
+			options.WorkspaceID,
+			errors.WithSpan(span),
+		)
+	}
+
+	if ws == nil {
+		return nil, errors.New(
+			"failed to get workspace associated with run",
+			errors.WithErrorCode(errors.ENotFound))
+	}
+
 	// If a module source (and a registry-style source), resolve the module version.
 	// This requires the run variables in order to have the token(s) for getting version numbers.
 	// Handle the case where the run uses a module source rather than a configuration version.
 	// If this fails, the transaction will be rolled back, so everything is safe.
 	var moduleVersion *string
 	var moduleDigest []byte
-	var moduleRegistrySource *ModuleRegistrySource
+	var moduleRegistrySource registry.ModuleRegistrySource
 	if options.ModuleSource != nil {
-		moduleRegistrySource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *options.ModuleSource)
-		if err != nil {
-			tracing.RecordError(span, err, "failed to parse/resolve module source")
-			return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid))
+		moduleRegistrySource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *options.ModuleSource, getModuleRegistryToken(runEnvVars), getFederatedRegistry(s.dbClient, ws))
+		if err != nil && err != registry.ErrRemoteModuleSource {
+			return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 
 		// registry source will be nil if this is a remote module source that doesn't use the terraform module registry protocol
 		if moduleRegistrySource != nil {
-			var resolvedVersion string
-			resolvedVersion, err = s.moduleResolver.ResolveModuleVersion(ctx, moduleRegistrySource, options.ModuleVersion, runEnvVars)
+			module, err := moduleRegistrySource.LocalRegistryModule(ctx)
 			if err != nil {
-				tracing.RecordError(span, err, "failed to resolve module source")
-				return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid))
+				return nil, err
 			}
+			// If module is not nil and private, verify that the caller has authorization to use it
+			if module != nil && module.Private {
+				err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+				if err != nil {
+					return nil, errors.Wrap(err, "caller not authorized to use module %s", *options.ModuleSource, errors.WithSpan(span))
+				}
+			}
+
+			var resolvedVersion string
+			resolvedVersion, err = moduleRegistrySource.ResolveSemanticVersion(ctx, options.ModuleVersion)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+			}
+
 			moduleVersion = &resolvedVersion
 
-			// If this is a module stored in the local tharsis registry, we need to get the module version digest to pin the run to it to
-			// prevent the module package from changing after the run has been created. This is an additional protection that is only available
-			// for modules in the tharsis module registry
-			if moduleRegistrySource.ModuleID != nil {
-				var versionsResponse *db.ModuleVersionsResult
-				versionsResponse, err = s.moduleService.GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
-					PaginationOptions: &pagination.Options{
-						First: ptr.Int32(1),
-					},
-					ModuleID:        *moduleRegistrySource.ModuleID,
-					SemanticVersion: &resolvedVersion,
-				})
-				if err != nil {
-					tracing.RecordError(span, err, "failed to get module versions")
-					return nil, err
-				}
-
-				if len(versionsResponse.ModuleVersions) == 0 {
-					return nil, errors.New("unable to find the module package for module %s with semantic version %s", *options.ModuleSource, resolvedVersion)
-				}
-
-				moduleDigest = versionsResponse.ModuleVersions[0].SHASum
+			moduleDigest, err = moduleRegistrySource.ResolveDigest(ctx, *moduleVersion)
+			if err != nil {
+				return nil, err
 			}
 		}
-	}
-
-	// Retrieve workspace to find Terraform version and max job duration.
-	ws, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
-	if err != nil {
-		tracing.RecordError(span, err, "Failed to get workspace associated with run")
-		return nil, errors.Wrap(
-			err,
-			"Failed to get workspace associated with run",
-		)
-	}
-
-	if ws == nil {
-		return nil, errors.New(
-			"Failed to get workspace associated with run",
-			errors.WithErrorCode(errors.EInternal))
 	}
 
 	// Check if Terraform version is supported. Use workspace's value by default.
@@ -827,11 +819,8 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 		RunStage:              models.JobPlanType,
 		ModuleDigest:          moduleDigest,
 		CurrentStateVersionID: currentStateVersionID,
-		ModuleSource:          options.ModuleSource,
-	}
-
-	if moduleRegistrySource != nil {
-		runDetails.ModuleID = moduleRegistrySource.ModuleID
+		ModuleSource:          moduleRegistrySource,
+		ModuleSemanticVersion: moduleVersion,
 	}
 
 	// Verify that subject has permission to create a plan for all of the assigned managed identities
@@ -1091,24 +1080,24 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 	}
 
 	if len(managedIdentities) > 0 {
-		runDetails := &rules.RunDetails{
-			RunStage:              models.JobApplyType,
-			ModuleDigest:          run.ModuleDigest,
-			CurrentStateVersionID: currentStateVersionID,
-		}
+		var moduleSource registry.ModuleRegistrySource
 
-		var moduleSource *ModuleRegistrySource
-		if run.ModuleSource != nil {
-			moduleSource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *run.ModuleSource)
+		// Create module source if this is a module and if the module digest is not nil since the module digest is required
+		// for enforcing managed identity rules.
+		if run.ModuleSource != nil && run.ModuleDigest != nil {
+			moduleSource, err = s.moduleResolver.ParseModuleRegistrySource(ctx, *run.ModuleSource, getModuleRegistryToken([]Variable{}), getFederatedRegistry(s.dbClient, ws))
 			if err != nil {
 				tracing.RecordError(span, err, "failed to parse module registry source")
 				return nil, err
 			}
+		}
 
-			if moduleSource != nil {
-				runDetails.ModuleID = moduleSource.ModuleID
-				runDetails.ModuleSource = run.ModuleSource
-			}
+		runDetails := &rules.RunDetails{
+			RunStage:              models.JobApplyType,
+			ModuleDigest:          run.ModuleDigest,
+			CurrentStateVersionID: currentStateVersionID,
+			ModuleSource:          moduleSource,
+			ModuleSemanticVersion: run.ModuleVersion,
 		}
 
 		// Verify that subject has permission to create a plan for all of the assigned managed identities
@@ -2518,4 +2507,38 @@ func truncateErrorMessage(errorMessage string) *string {
 		return &truncatedMessage
 	}
 	return &errorMessage
+}
+
+func getModuleRegistryToken(envVars []Variable) registry.TokenGetterFunc {
+	return func(_ context.Context, hostname string) (string, error) {
+		seeking, err := module.BuildTokenEnvVar(hostname)
+		if err == nil {
+			for _, variable := range envVars {
+				if variable.Key == seeking {
+					return *variable.Value, nil
+				}
+			}
+		}
+		return "", nil
+	}
+}
+
+func getFederatedRegistry(dbClient *db.Client, workspace *models.Workspace) registry.FederatedRegistryGetterFunc {
+	// Search all parent group paths for a federated registry that matches this host
+	return func(ctx context.Context, hostname string) (*models.FederatedRegistry, error) {
+		federatedRegistries, err := registry.GetFederatedRegistries(ctx, &registry.GetFederatedRegistriesInput{
+			DBClient:  dbClient,
+			GroupPath: workspace.GetGroupPath(),
+			Hostname:  &hostname,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get federated registries")
+		}
+
+		if len(federatedRegistries) > 0 {
+			return federatedRegistries[0], nil
+		}
+
+		return nil, nil
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
@@ -431,6 +432,27 @@ func (r *GroupResolver) TerraformProviderMirrors(
 	}
 
 	return NewTerraformProviderVersionMirrorConnectionResolver(ctx, input)
+}
+
+// FederatedRegistries resolver
+func (r GroupResolver) FederatedRegistries(ctx context.Context,
+	args *FederatedRegistryConnectionQueryArgs,
+) (*FederatedRegistryConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := federatedregistry.GetFederatedRegistriesInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		GroupPath:         &r.group.FullPath,
+	}
+
+	if args.Sort != nil {
+		sort := db.FederatedRegistrySortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewFederatedRegistryConnectionResolver(ctx, &input)
 }
 
 func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {

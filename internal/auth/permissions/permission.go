@@ -82,6 +82,11 @@ var (
 	ViewTerraformProviderMirrorPermission   = Permission{ResourceType: TerraformProviderMirrorResourceType, Action: ViewAction}
 	CreateTerraformProviderMirrorPermission = Permission{ResourceType: TerraformProviderMirrorResourceType, Action: CreateAction}
 	DeleteTerraformProviderMirrorPermission = Permission{ResourceType: TerraformProviderMirrorResourceType, Action: DeleteAction}
+	ViewFederatedRegistryPermission         = Permission{ResourceType: FederatedRegistryResourceType, Action: ViewAction}
+	CreateFederatedRegistryPermission       = Permission{ResourceType: FederatedRegistryResourceType, Action: CreateAction}
+	UpdateFederatedRegistryPermission       = Permission{ResourceType: FederatedRegistryResourceType, Action: UpdateAction}
+	DeleteFederatedRegistryPermission       = Permission{ResourceType: FederatedRegistryResourceType, Action: DeleteAction}
+	CreateFederatedRegistryTokenPermission  = Permission{ResourceType: FederatedRegistryResourceType, Action: CreateAction}
 )
 
 // assignablePermissions contains all the permissions that
@@ -146,6 +151,10 @@ var assignablePermissions = map[Permission]struct{}{
 	ViewTerraformProviderMirrorPermission:   {},
 	CreateTerraformProviderMirrorPermission: {},
 	DeleteTerraformProviderMirrorPermission: {},
+	ViewFederatedRegistryPermission:         {},
+	CreateFederatedRegistryPermission:       {},
+	UpdateFederatedRegistryPermission:       {},
+	DeleteFederatedRegistryPermission:       {},
 }
 
 // Action is an enum representing a CRUD action.

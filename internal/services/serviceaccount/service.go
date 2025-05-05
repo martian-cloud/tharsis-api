@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -88,13 +86,13 @@ type Service interface {
 }
 
 type service struct {
-	logger              logger.Logger
-	dbClient            *db.Client
-	limitChecker        limits.LimitChecker
-	idp                 *auth.IdentityProvider
-	openIDConfigFetcher *auth.OpenIDConfigFetcher
-	getKeySetFunc       func(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error)
-	activityService     activityevent.Service
+	logger                 logger.Logger
+	dbClient               *db.Client
+	limitChecker           limits.LimitChecker
+	idp                    auth.IdentityProvider
+	openIDConfigFetcher    auth.OpenIDConfigFetcher
+	activityService        activityevent.Service
+	buildOIDCTokenVerifier func(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier
 }
 
 // NewService creates an instance of Service
@@ -102,8 +100,8 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp *auth.IdentityProvider,
-	openIDConfigFetcher *auth.OpenIDConfigFetcher,
+	idp auth.IdentityProvider,
+	openIDConfigFetcher auth.OpenIDConfigFetcher,
 	activityService activityevent.Service,
 ) Service {
 	return newService(
@@ -112,8 +110,8 @@ func NewService(
 		limitChecker,
 		idp,
 		openIDConfigFetcher,
-		getKeySet,
 		activityService,
+		buildOIDCTokenVerifier,
 	)
 }
 
@@ -121,19 +119,19 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp *auth.IdentityProvider,
-	openIDConfigFetcher *auth.OpenIDConfigFetcher,
-	getKeySetFunc func(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error),
+	idp auth.IdentityProvider,
+	openIDConfigFetcher auth.OpenIDConfigFetcher,
 	activityService activityevent.Service,
+	buildOIDCTokenVerifier func(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier,
 ) Service {
 	return &service{
-		logger:              logger,
-		dbClient:            dbClient,
-		limitChecker:        limitChecker,
-		idp:                 idp,
-		openIDConfigFetcher: openIDConfigFetcher,
-		getKeySetFunc:       getKeySetFunc,
-		activityService:     activityService,
+		logger:                 logger,
+		dbClient:               dbClient,
+		limitChecker:           limitChecker,
+		idp:                    idp,
+		openIDConfigFetcher:    openIDConfigFetcher,
+		activityService:        activityService,
+		buildOIDCTokenVerifier: buildOIDCTokenVerifier,
 	}
 }
 
@@ -552,7 +550,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	mismatchesFound := []string{}
 	for _, trustPolicy := range trustPolicies {
 
-		err := s.verifyOneTrustPolicy(ctx, input.Token, trustPolicy, serviceAccount)
+		err := s.verifyOneTrustPolicy(ctx, input.Token, trustPolicy)
 		if err != nil {
 
 			// Catch bubbled-up invalid token signature errors here.
@@ -633,62 +631,20 @@ func (s *service) findMatchingTrustPolicies(issuer string, policies []models.OID
 	return result
 }
 
-func getKeySet(ctx context.Context, issuer string, configFetcher *auth.OpenIDConfigFetcher) (jwk.Set, error) {
-	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	oidcConfig, err := configFetcher.GetOpenIDConfig(fetchCtx, issuer)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get OIDC discovery document for issuer %s", issuer)
-	}
-
-	fetchCtx, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Get issuer JWK response
-	keySet, err := jwk.Fetch(fetchCtx, oidcConfig.JwksURI)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to query JWK URL %s", oidcConfig.JwksURI)
-	}
-
-	return keySet, nil
-}
-
 // verifyOneTrustPolicy verifies a token vs. one trust policy.
-func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, trustPolicy models.OIDCTrustPolicy,
-	_ *models.ServiceAccount,
-) error {
-	// Get issuer JWK response
-	keySet, err := s.getKeySetFunc(ctx, trustPolicy.Issuer, s.openIDConfigFetcher)
-	if err != nil {
-		return err
-	}
+func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, trustPolicy models.OIDCTrustPolicy) error {
+	verifier := s.buildOIDCTokenVerifier(ctx, []string{trustPolicy.Issuer}, s.openIDConfigFetcher)
 
-	// Set default key to RS256 if it's not specified in JWK set
-	iter := keySet.Keys(ctx)
-	for iter.Next(ctx) {
-		key := iter.Pair().Value.(jwk.Key)
-		if err = key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
-			return err
-		}
-	}
-
-	options := []jwt.ParseOption{
-		jwt.WithVerify(true),
-		jwt.WithKeySet(keySet),
-		jwt.WithValidate(true),
-	}
+	options := []jwt.ValidateOption{}
 	for k, v := range trustPolicy.BoundClaims {
 		options = append(options, jwt.WithValidator(newClaimValueValidator(k, v, trustPolicy.BoundClaimsType == models.BoundClaimsTypeGlob)))
 	}
 
-	// Parse and Verify token
-	if _, err = jwt.Parse(inputToken, options...); err != nil {
-		return errors.New(
-			fmt.Sprintf("Failed to verify token %v", err),
-			errors.WithErrorCode(errors.EUnauthorized),
-		)
-	}
+	_, err := verifier.VerifyToken(ctx, string(inputToken), options)
+	return err
+}
 
-	return nil
+func buildOIDCTokenVerifier(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier {
+	oidcTokenVerifier := auth.NewOIDCTokenVerifier(ctx, issuers, oidcConfigFetcher, false)
+	return oidcTokenVerifier
 }

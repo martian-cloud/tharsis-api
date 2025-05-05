@@ -1,6 +1,8 @@
 // Package auth package
 package auth
 
+//go:generate go tool mockery --name tokenAuthenticator --inpackage --case underscore
+
 import (
 	"context"
 	"fmt"
@@ -25,153 +27,184 @@ var (
 // issued by Tharsis.
 // #nosec: G101 -- false flag.
 const (
-	JobTokenType              string = "job"
-	ServiceAccountTokenType   string = "service_account"
-	SCIMTokenType             string = "scim"
-	VCSWorkspaceLinkTokenType string = "vcs_workspace_link"
+	JobTokenType               string = "job"
+	ServiceAccountTokenType    string = "service_account"
+	SCIMTokenType              string = "scim"
+	VCSWorkspaceLinkTokenType  string = "vcs_workspace_link"
+	FederatedRegistryTokenType string = "federated_registry"
 )
+
+type tokenAuthenticator interface {
+	Use(token jwt.Token) bool
+	Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error)
+}
 
 // Authenticator is used to authenticate JWT tokens
 type Authenticator struct {
-	userAuth           *UserAuth
-	idp                *IdentityProvider
-	dbClient           *db.Client
-	maintenanceMonitor maintenance.Monitor
-	issuerURL          string
+	tokenAuthenticators []tokenAuthenticator
 }
 
 // NewAuthenticator creates a new Authenticator instance
 func NewAuthenticator(
 	userAuth *UserAuth,
-	idp *IdentityProvider,
+	federatedRegistryAuth *FederatedRegistryAuth,
+	idp IdentityProvider,
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
 	issuerURL string,
 ) *Authenticator {
+	return newAuthenticator(
+		[]tokenAuthenticator{
+			&tharsisIDPTokenAuthenticator{
+				issuerURL:          issuerURL,
+				idp:                idp,
+				dbClient:           dbClient,
+				maintenanceMonitor: maintenanceMonitor,
+			},
+			userAuth,
+			federatedRegistryAuth,
+		},
+	)
+}
+
+func newAuthenticator(
+	tokenAuthenticators []tokenAuthenticator,
+) *Authenticator {
 	return &Authenticator{
-		userAuth:           userAuth,
-		idp:                idp,
-		dbClient:           dbClient,
-		maintenanceMonitor: maintenanceMonitor,
-		issuerURL:          issuerURL,
+		tokenAuthenticators: tokenAuthenticators,
 	}
 }
 
 // Authenticate verifies the token and returns a Caller
 func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
 	if tokenString == "" {
-		return nil, errors.New("Authentication token is missing", errors.WithErrorCode(errors.EUnauthorized))
+		return nil, errors.New("authentication token is missing", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	decodedToken, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
+	tokenBytes := []byte(tokenString)
+	decodedToken, err := jwt.Parse(tokenBytes, jwt.WithVerify(false))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode token", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	if decodedToken.Issuer() == a.issuerURL {
-		// This is a service account token
-		output, vtErr := a.idp.VerifyToken(ctx, tokenString)
-		if vtErr != nil {
-			return nil, errors.New(errorReason(vtErr), errors.WithErrorCode(errors.EUnauthorized))
-		}
-
-		tokenType, ok := output.PrivateClaims["type"]
-		if !ok {
-			return nil, fmt.Errorf("failed to get token type")
-		}
-
-		switch tokenType {
-		case ServiceAccountTokenType:
-			serviceAccountID := gid.FromGlobalID(output.PrivateClaims["service_account_id"])
-			return NewServiceAccountCaller(
-				serviceAccountID,
-				output.PrivateClaims["service_account_path"],
-				newNamespaceMembershipAuthorizer(a.dbClient, nil, &serviceAccountID, useCache),
-				a.dbClient,
-				a.maintenanceMonitor,
-			), nil
-		case JobTokenType:
-			return &JobCaller{
-				JobID:       gid.FromGlobalID(output.PrivateClaims["job_id"]),
-				RunID:       gid.FromGlobalID(output.PrivateClaims["run_id"]),
-				WorkspaceID: gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
-				dbClient:    a.dbClient,
-			}, nil
-		case SCIMTokenType:
-			scimCaller, sErr := a.verifySCIMTokenClaim(ctx, output.Token)
-			if sErr != nil {
-				return nil, errors.New(errorReason(sErr), errors.WithErrorCode(errors.EUnauthorized))
+	for _, authenticator := range a.tokenAuthenticators {
+		if authenticator.Use(decodedToken) {
+			caller, err := authenticator.Authenticate(ctx, tokenString, useCache)
+			if err != nil {
+				return nil, err
 			}
-			return scimCaller, nil
-		case VCSWorkspaceLinkTokenType:
-			vcsCaller, sErr := a.verifyVCSToken(ctx, output)
-			if sErr != nil {
-				return nil, errors.New(errorReason(sErr), errors.WithErrorCode(errors.EUnauthorized))
-			}
-			return vcsCaller, nil
-		default:
-			return nil, errors.New("Unsupported token type received")
+			return caller, nil
 		}
 	}
 
-	// This is a user token
-	caller, err := a.userAuth.Authenticate(ctx, tokenString, useCache)
-	if err != nil {
-		return nil, errors.New(errorReason(err), errors.WithErrorCode(errors.EUnauthorized))
+	return nil, errors.New("token issuer %s is not allowed", decodedToken.Issuer(), errors.WithErrorCode(errors.EUnauthorized))
+}
+
+type tharsisIDPTokenAuthenticator struct {
+	issuerURL          string
+	idp                IdentityProvider
+	dbClient           *db.Client
+	maintenanceMonitor maintenance.Monitor
+}
+
+func (t *tharsisIDPTokenAuthenticator) Use(token jwt.Token) bool {
+	return token.Issuer() == t.issuerURL
+}
+
+func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
+	output, vtErr := t.idp.VerifyToken(ctx, tokenString)
+	if vtErr != nil {
+		return nil, errors.New(errorReason(vtErr), errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	return caller, nil
+	tokenType, ok := output.PrivateClaims["type"]
+	if !ok {
+		return nil, errors.New("failed to get token type", errors.WithErrorCode(errors.EUnauthorized))
+	}
+
+	switch tokenType {
+	case ServiceAccountTokenType:
+		serviceAccountID := gid.FromGlobalID(output.PrivateClaims["service_account_id"])
+		return NewServiceAccountCaller(
+			serviceAccountID,
+			output.PrivateClaims["service_account_path"],
+			newNamespaceMembershipAuthorizer(t.dbClient, nil, &serviceAccountID, useCache),
+			t.dbClient,
+			t.maintenanceMonitor,
+		), nil
+	case JobTokenType:
+		return &JobCaller{
+			JobID:       gid.FromGlobalID(output.PrivateClaims["job_id"]),
+			RunID:       gid.FromGlobalID(output.PrivateClaims["run_id"]),
+			WorkspaceID: gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
+			dbClient:    t.dbClient,
+		}, nil
+	case SCIMTokenType:
+		scimCaller, sErr := t.verifySCIMTokenClaim(ctx, output.Token)
+		if sErr != nil {
+			return nil, sErr
+		}
+		return scimCaller, nil
+	case VCSWorkspaceLinkTokenType:
+		vcsCaller, sErr := t.verifyVCSToken(ctx, output)
+		if sErr != nil {
+			return nil, sErr
+		}
+		return vcsCaller, nil
+	default:
+		return nil, errors.New("unsupported token type received", errors.WithErrorCode(errors.EUnauthorized))
+	}
 }
 
 // verifySCIMToken verifies the JwtID field is known.
-func (a *Authenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Token) (*SCIMCaller, error) {
+func (t *tharsisIDPTokenAuthenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Token) (*SCIMCaller, error) {
 	// Get the token claim to verify it is known.
-	tokenClaim, err := a.dbClient.SCIMTokens.GetTokenByNonce(ctx, token.JwtID())
+	tokenClaim, err := t.dbClient.SCIMTokens.GetTokenByNonce(ctx, token.JwtID())
 	if err != nil {
 		return nil, err
 	}
 
 	if tokenClaim == nil {
-		return nil, fmt.Errorf("scim token has an invalid jti claim")
+		return nil, errors.New("scim token has an invalid jti claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	return NewSCIMCaller(a.dbClient, a.maintenanceMonitor), nil
+	return NewSCIMCaller(t.dbClient, t.maintenanceMonitor), nil
 }
 
 // verifyVCSToken verifies a VCS token is known.
-func (a *Authenticator) verifyVCSToken(ctx context.Context, output *VerifyTokenOutput) (*VCSWorkspaceLinkCaller, error) {
+func (t *tharsisIDPTokenAuthenticator) verifyVCSToken(ctx context.Context, output *VerifyTokenOutput) (*VCSWorkspaceLinkCaller, error) {
 	linkID, ok := output.PrivateClaims["link_id"]
 	if !ok {
-		return nil, fmt.Errorf("failed to get provider link id token claim")
+		return nil, errors.New("failed to get provider link id token claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	link, err := a.dbClient.WorkspaceVCSProviderLinks.GetLinkByID(ctx, gid.FromGlobalID(linkID))
+	link, err := t.dbClient.WorkspaceVCSProviderLinks.GetLinkByID(ctx, gid.FromGlobalID(linkID))
 	if err != nil {
 		return nil, err
 	}
 
 	if link == nil {
-		return nil, fmt.Errorf("vcs token has invalid vcs provider link id")
+		return nil, errors.New("vcs token has invalid vcs provider link id", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
 	if link.TokenNonce != output.Token.JwtID() {
-		return nil, fmt.Errorf("vcs token has an invalid jti claim")
+		return nil, errors.New("vcs token has an invalid jti claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	provider, err := a.dbClient.VCSProviders.GetProviderByID(ctx, link.ProviderID)
+	provider, err := t.dbClient.VCSProviders.GetProviderByID(ctx, link.ProviderID)
 	if err != nil {
 		return nil, err
 	}
 
 	if provider == nil {
-		return nil, fmt.Errorf("failed to get provider")
+		return nil, fmt.Errorf("failed to get vcs provider associated with link %s", link.Metadata.ID)
 	}
 
 	return NewVCSWorkspaceLinkCaller(
 		provider,
 		link,
-		a.dbClient,
-		a.maintenanceMonitor,
+		t.dbClient,
+		t.maintenanceMonitor,
 	), nil
 }
 

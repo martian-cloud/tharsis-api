@@ -42,6 +42,7 @@ type Client interface {
 	Close() error
 	CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, token string) (string, *time.Duration, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error
+	CreateFederatedRegistryTokens(ctx context.Context, input *types.CreateFederatedRegistryTokensInput) ([]types.FederatedRegistryToken, error)
 }
 
 var _ Client = (*client)(nil)
@@ -321,4 +322,16 @@ func (c *client) SetVariablesIncludedInTFConfig(ctx context.Context, runID strin
 		RunID:        runID,
 		VariableKeys: variableKeys,
 	})
+}
+
+// CreateFederatedRegistryTokens creates one or more federated registry tokens pursuant to the federated registry feature.
+func (c *client) CreateFederatedRegistryTokens(ctx context.Context,
+	input *types.CreateFederatedRegistryTokensInput,
+) ([]types.FederatedRegistryToken, error) {
+	tokens, err := c.tharsisClient.FederatedRegistry.CreateFederatedRegistryTokens(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
 }

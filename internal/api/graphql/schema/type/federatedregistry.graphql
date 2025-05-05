@@ -1,0 +1,64 @@
+enum FederatedRegistrySort {
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+type FederatedRegistryConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [FederatedRegistryEdge]
+}
+
+type FederatedRegistryEdge {
+  cursor: String!
+  node: FederatedRegistry
+}
+
+type FederatedRegistryMutationPayload {
+  clientMutationId: String
+  federatedRegistry: FederatedRegistry
+  problems: [Problem!]!
+}
+
+type FederatedRegistryToken {
+  hostname: String!
+  token: String!
+}
+
+type CreateFederatedRegistryTokensPayload {
+  clientMutationId: String
+  tokens: [FederatedRegistryToken!]!
+  problems: [Problem!]!
+}
+
+type FederatedRegistry implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  hostname: String!
+  audience: String!
+  group: Group!
+}
+
+input CreateFederatedRegistryInput {
+  clientMutationId: String
+  hostname: String!
+  audience: String!
+  groupPath: String!
+}
+
+input UpdateFederatedRegistryInput {
+  clientMutationId: String
+  id: String!
+  hostname: String
+  audience: String
+}
+
+input DeleteFederatedRegistryInput {
+  clientMutationId: String
+  id: String!
+}
+
+input CreateFederatedRegistryTokensInput {
+  clientMutationId: String
+  jobId: String!
+}

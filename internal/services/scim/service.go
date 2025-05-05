@@ -101,14 +101,14 @@ type Service interface {
 type service struct {
 	logger   logger.Logger
 	dbClient *db.Client
-	idp      *auth.IdentityProvider
+	idp      auth.IdentityProvider
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	idp *auth.IdentityProvider,
+	idp auth.IdentityProvider,
 ) Service {
 	return &service{
 		logger,

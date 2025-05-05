@@ -48,6 +48,7 @@ const (
 	TargetVCSProvider                    ActivityEventTargetType = "VCS_PROVIDER"
 	TargetWorkspace                      ActivityEventTargetType = "WORKSPACE"
 	TargetRole                           ActivityEventTargetType = "ROLE"
+	TargetFederatedRegistry              ActivityEventTargetType = "FEDERATED_REGISTRY"
 )
 
 // ActivityEventCreateNamespaceMembershipPayload helps with custom
