@@ -10,13 +10,13 @@ type NotificationPreferenceScope string
 // NotificationPreferenceScope Types
 const (
 	// NotificationPreferenceScopeAll is used to get all notifications
-	NotificationPreferenceScopeAll         NotificationPreferenceScope = "ALL"
+	NotificationPreferenceScopeAll NotificationPreferenceScope = "ALL"
 	// NotificationPreferenceScopeParticipate is used to get notifications only for events the user participates in
 	NotificationPreferenceScopeParticipate NotificationPreferenceScope = "PARTICIPATE"
 	// NotificationPreferenceScopeCustom is used to get notifications for a custom list of events
-	NotificationPreferenceScopeCustom      NotificationPreferenceScope = "CUSTOM"
+	NotificationPreferenceScopeCustom NotificationPreferenceScope = "CUSTOM"
 	// NotificationPreferenceScopeNone is used to not get any notifications
-	NotificationPreferenceScopeNone        NotificationPreferenceScope = "NONE"
+	NotificationPreferenceScopeNone NotificationPreferenceScope = "NONE"
 )
 
 // Valid checks if the NotificationPreferenceScope is valid

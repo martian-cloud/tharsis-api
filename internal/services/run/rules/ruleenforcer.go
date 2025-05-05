@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -21,7 +20,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // RuleEnforcer is used to enforce managed identity access rules
@@ -33,11 +33,11 @@ type ruleTypeHandler func(ctx context.Context, dbClient *db.Client, rule *models
 
 // RunDetails is the input for enforcing rules
 type RunDetails struct {
-	ModuleID              *string
-	ModuleSource          *string
+	ModuleSource          registry.ModuleRegistrySource
 	CurrentStateVersionID *string
 	RunStage              models.JobType
 	ModuleDigest          []byte
+	ModuleSemanticVersion *string
 }
 
 type ruleEnforcer struct {
@@ -46,7 +46,9 @@ type ruleEnforcer struct {
 }
 
 // NewRuleEnforcer returns a new RuleEnforcer instance
-func NewRuleEnforcer(dbClient *db.Client) RuleEnforcer {
+func NewRuleEnforcer(
+	dbClient *db.Client,
+) RuleEnforcer {
 	handlerMap := map[models.ManagedIdentityAccessRuleType]ruleTypeHandler{
 		models.ManagedIdentityAccessRuleEligiblePrincipals: enforceEligiblePrincipalsRuleType,
 		models.ManagedIdentityAccessRuleModuleAttestation:  enforceModuleAttestationRuleType,
@@ -120,20 +122,25 @@ func (r *ruleEnforcer) enforceRules(ctx context.Context, managedIdentity *models
 		// rule was not satisfied
 		if i == (len(rules) - 1) {
 			// this is the last rule
-			return terrors.New(
+			return errors.New(
 				"managed identity rule for %s not satisfied for run stage %s and managed identity %s: %s",
 				rule.Type,
 				rule.RunStage,
 				managedIdentity.ResourcePath,
 				strings.Join(diagnostics, ": "),
-				terrors.WithErrorCode(terrors.EForbidden),
+				errors.WithErrorCode(errors.EForbidden),
 			)
 		}
 	}
 	return nil
 }
 
-func enforceEligiblePrincipalsRuleType(ctx context.Context, _ *db.Client, rule *models.ManagedIdentityAccessRule, _ *RunDetails) (string, error) {
+func enforceEligiblePrincipalsRuleType(
+	ctx context.Context,
+	_ *db.Client,
+	rule *models.ManagedIdentityAccessRule,
+	_ *RunDetails,
+) (string, error) {
 	// Check if subject is allowed to use this managed identity
 	if err := auth.HandleCaller(
 		ctx,
@@ -191,12 +198,16 @@ func enforceEligiblePrincipalsRuleType(ctx context.Context, _ *db.Client, rule *
 }
 
 func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, rule *models.ManagedIdentityAccessRule, input *RunDetails) (string, error) {
-	if input.ModuleID == nil {
-		return "managed identity module attestation rule only allows modules in the Tharsis registry", nil
+	if input.ModuleSource == nil || !input.ModuleSource.IsTharsisModule() {
+		return "managed identity module attestation rule is only supported for modules in a tharsis registry", nil
 	}
 
 	if input.ModuleDigest == nil {
 		return "", errors.New("module digest must be defined when checking module attestation rules for a module in the Tharsis registry")
+	}
+
+	if input.ModuleSemanticVersion == nil {
+		return "", errors.New("module semantic version must be defined when checking module attestation rules for a module in the Tharsis registry")
 	}
 
 	// Perform some additional checks with the state version to ensure it hasn't been altered
@@ -224,19 +235,14 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 			return "", fmt.Errorf("failed to get run with ID %s associated with state version %s", *stateVersion.RunID, *input.CurrentStateVersionID)
 		}
 
-		if !run.IsDestroy && (run.ModuleSource == nil || *run.ModuleSource != *input.ModuleSource) {
+		if !run.IsDestroy && (run.ModuleSource == nil || *run.ModuleSource != input.ModuleSource.Source()) {
 			return "workspace's current state version was either not created by a module source or a different module source than expected, and the verify state lineage setting is set to true", nil
 		}
 	}
 
 	moduleDigest := hex.EncodeToString(input.ModuleDigest)
 
-	attestations, err := dbClient.TerraformModuleAttestations.GetModuleAttestations(ctx, &db.GetModuleAttestationsInput{
-		Filter: &db.TerraformModuleAttestationFilter{
-			ModuleID: input.ModuleID,
-			Digest:   &moduleDigest,
-		},
-	})
+	attestations, err := input.ModuleSource.GetAttestations(ctx, *input.ModuleSemanticVersion, moduleDigest)
 	if err != nil {
 		return "", err
 	}
@@ -257,8 +263,8 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 			return "", err
 		}
 
-		for _, attestation := range attestations.ModuleAttestations {
-			decodedSig, err := base64.StdEncoding.DecodeString(attestation.Data)
+		for _, attestation := range attestations {
+			decodedSig, err := base64.StdEncoding.DecodeString(attestation)
 			if err != nil {
 				return "", fmt.Errorf("failed to decode attestation signature: %v", err)
 			}

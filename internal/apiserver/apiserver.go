@@ -33,9 +33,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
@@ -94,23 +96,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		return nil, fmt.Errorf("failed to load TLS config: %w", err)
 	}
 
-	var oauthProviders []auth.IdentityProviderConfig
-	for _, idpConfig := range cfg.OauthProviders {
-		idp, err := openIDConfigFetcher.GetOpenIDConfig(ctx, idpConfig.IssuerURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get OIDC config for issuer %s %v", idpConfig.IssuerURL, err)
-		}
-
-		oauthProviders = append(oauthProviders, auth.IdentityProviderConfig{
-			Issuer:        idp.Issuer,
-			TokenEndpoint: idp.TokenEndpoint,
-			AuthEndpoint:  idp.AuthEndpoint,
-			JwksURI:       idp.JwksURI,
-			ClientID:      idpConfig.ClientID,
-			UsernameClaim: idpConfig.UsernameClaim,
-		})
-	}
-
 	// Initialize a trace provider.
 	traceProviderShutdown, err := tracing.NewProvider(ctx,
 		&tracing.NewProviderInput{
@@ -156,9 +141,10 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	maintenanceMonitor := maintenance.NewMonitor(logger, dbClient, eventManager)
 	maintenanceMonitor.Start(ctx)
 
-	tharsisIDP := auth.NewIdentityProvider(pluginCatalog.JWSProvider, cfg.ServiceAccountIssuerURL)
-	userAuth := auth.NewUserAuth(ctx, oauthProviders, logger, dbClient, maintenanceMonitor)
-	authenticator := auth.NewAuthenticator(userAuth, tharsisIDP, dbClient, maintenanceMonitor, cfg.ServiceAccountIssuerURL)
+	tharsisIDP := auth.NewIdentityProvider(pluginCatalog.JWSProvider, cfg.JWTIssuerURL)
+	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher)
+	federatedRegistryAuth := auth.NewFederatedRegistryAuth(ctx, cfg.FederatedRegistryTrustPolicies, logger, openIDConfigFetcher, dbClient)
+	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, tharsisIDP, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
 
 	respWriter := response.NewWriter(logger)
 
@@ -181,6 +167,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	limits := limits.NewLimitChecker(dbClient)
 	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
+	federatedRegistryClient := registry.NewFederatedRegistryClient(tharsisIDP)
 
 	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
 	runStateManager := state.NewRunStateManager(dbClient, logger)
@@ -205,7 +192,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, activityService, taskManager)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
 		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleRegistryService, run.NewModuleResolver(moduleRegistryService, httpClient, logger, cfg.TharsisAPIURL), runStateManager, limits, pluginCatalog.SecretManager)
+		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, activityService, tharsisIDP)
+		moduleResolver             = registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, tharsisIDP)
+		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleResolver, runStateManager, limits, pluginCatalog.SecretManager)
 		runnerService              = runner.NewService(logger, dbClient, limits, activityService, logStreamManager, eventManager)
 		roleService                = role.NewService(logger, dbClient, activityService)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
@@ -285,9 +274,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	}
 
 	if cfg.TFELoginEnabled {
-		var loginIdp *auth.IdentityProviderConfig
+		var loginIdp *config.IdpConfig
 		// Find IDP that matches client ID
-		for _, idp := range oauthProviders {
+		for _, idp := range cfg.OauthProviders {
 			if idp.ClientID == cfg.TFELoginClientID {
 				idp := idp
 				loginIdp = &idp
@@ -299,7 +288,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 			return nil, errors.New("OIDC Identity Provider not found for TFE login")
 		}
 
-		tfeHandler, sdErr := tfe.BuildTFEServiceDiscoveryHandler(logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL, tfeBasePath)
+		tfeHandler, sdErr := tfe.BuildTFEServiceDiscoveryHandler(ctx, logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL, tfeBasePath, openIDConfigFetcher)
 		if sdErr != nil {
 			return nil, fmt.Errorf("failed to build TFE discovery document handler %v", sdErr)
 		}
@@ -339,6 +328,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		ProviderMirrorService:      providerMirrorService,
 		MaintenanceModeService:     maintenanceModeService,
 		VersionService:             versionService,
+		FederatedRegistryService:   federatedRegistryService,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)

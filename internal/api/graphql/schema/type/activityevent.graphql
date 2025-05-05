@@ -50,6 +50,7 @@ enum ActivityEventTargetType {
   WORKSPACE
   ROLE
   RUNNER
+  FEDERATED_REGISTRY
 }
 
 type ActivityEventConnection {

@@ -145,7 +145,10 @@ func (p *PlanHandler) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	p.jobLogger.Write([]byte("\nPreparing plan output...\n"))
+	_, err = p.jobLogger.Write([]byte("\nPreparing plan output...\n"))
+	if err != nil {
+		return err
+	}
 
 	tf.SetStdout(nil)
 

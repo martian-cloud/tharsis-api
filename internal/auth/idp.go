@@ -1,5 +1,7 @@
 package auth
 
+//go:generate go tool mockery --name IdentityProvider --inpackage --case underscore
+
 import (
 	"context"
 	"fmt"
@@ -18,6 +20,8 @@ type TokenInput struct {
 	Claims     map[string]string
 	Subject    string
 	JwtID      string
+	Typ        string
+	Audience   string
 }
 
 // VerifyTokenOutput is the response from verifying a token
@@ -26,22 +30,29 @@ type VerifyTokenOutput struct {
 	PrivateClaims map[string]string
 }
 
-// IdentityProvider is used to create and verify service account tokens
-type IdentityProvider struct {
+// IdentityProvider is an interface for generating and verifying JWT tokens
+type IdentityProvider interface {
+	// GenerateToken creates a new JWT token
+	GenerateToken(ctx context.Context, input *TokenInput) ([]byte, error)
+	// VerifyToken verifies that the token is valid
+	VerifyToken(ctx context.Context, token string) (*VerifyTokenOutput, error)
+}
+
+type identityProvider struct {
 	jwsPlugin jws.Provider
 	issuerURL string
 }
 
 // NewIdentityProvider initializes the IdentityProvider type
-func NewIdentityProvider(jwsPlugin jws.Provider, issuerURL string) *IdentityProvider {
-	return &IdentityProvider{
+func NewIdentityProvider(jwsPlugin jws.Provider, issuerURL string) IdentityProvider {
+	return &identityProvider{
 		jwsPlugin: jwsPlugin,
 		issuerURL: issuerURL,
 	}
 }
 
 // GenerateToken creates a new service account token
-func (s *IdentityProvider) GenerateToken(ctx context.Context, input *TokenInput) ([]byte, error) {
+func (s *identityProvider) GenerateToken(ctx context.Context, input *TokenInput) ([]byte, error) {
 	currentTimestamp := time.Now().Unix()
 
 	token := jwt.New()
@@ -63,11 +74,21 @@ func (s *IdentityProvider) GenerateToken(ctx context.Context, input *TokenInput)
 	if err := token.Set(jwt.SubjectKey, input.Subject); err != nil {
 		return nil, err
 	}
-	if err := token.Set(jwt.AudienceKey, "tharsis"); err != nil {
+
+	aud := input.Audience
+	if aud == "" {
+		aud = "tharsis"
+	}
+	if err := token.Set(jwt.AudienceKey, aud); err != nil {
 		return nil, err
 	}
 	if input.JwtID != "" {
 		if err := token.Set(jwt.JwtIDKey, input.JwtID); err != nil {
+			return nil, err
+		}
+	}
+	if input.Typ != "" {
+		if err := token.Set("typ", input.Typ); err != nil {
 			return nil, err
 		}
 	}
@@ -88,7 +109,7 @@ func (s *IdentityProvider) GenerateToken(ctx context.Context, input *TokenInput)
 }
 
 // VerifyToken verifies that the token is a valid service account token
-func (s *IdentityProvider) VerifyToken(ctx context.Context, token string) (*VerifyTokenOutput, error) {
+func (s *identityProvider) VerifyToken(ctx context.Context, token string) (*VerifyTokenOutput, error) {
 	tokenBytes := []byte(token)
 
 	// Verify token signature
@@ -109,7 +130,7 @@ func (s *IdentityProvider) VerifyToken(ctx context.Context, token string) (*Veri
 }
 
 // GetPrivateClaims returns a map of the token's private claims
-func (s *IdentityProvider) getPrivateClaims(token jwt.Token) map[string]string {
+func (s *identityProvider) getPrivateClaims(token jwt.Token) map[string]string {
 	claimsMap := make(map[string]string)
 
 	privClaims := token.PrivateClaims()

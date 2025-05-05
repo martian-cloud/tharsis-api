@@ -2,7 +2,7 @@
 package config
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,6 +11,7 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/qiangxue/go-env"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gopkg.in/yaml.v2"
 )
@@ -19,6 +20,7 @@ const (
 	defaultServerPort                       = "8000"
 	envOidcProviderConfigPrefix             = "THARSIS_OAUTH_PROVIDERS_"
 	envRunnerConfigPrefix                   = "THARSIS_INTERNAL_RUNNERS_"
+	envFederatedRegistryTrustPolicyName     = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
 	defaultMaxGraphQLComplexity             = 0
 	defaultRateLimitStorePluginType         = "memory"
 	defaultModuleRegistryMaxUploadSize      = 1024 * 1024 * 128 // 128 MiB
@@ -46,6 +48,14 @@ type RunnerConfig struct {
 	JobDispatcherData map[string]string `yaml:"job_dispatcher_data"`
 	Name              string            `yaml:"name"`
 	JobDispatcherType string            `yaml:"job_dispatcher_type"`
+}
+
+// FederatedRegistryTrustPolicy contains the config fields to allow federated registry access to this Tharsis instance.
+type FederatedRegistryTrustPolicy struct {
+	IssuerURL         string   `yaml:"issuer_url" json:"issuer_url"`
+	Subject           *string  `yaml:"subject" json:"subject"`
+	Audience          *string  `yaml:"audience" json:"audience"`
+	GroupGlobPatterns []string `yaml:"group_glob_patterns" json:"group_glob_patterns"` // list of groups with potential wildcard in path for access to private modules and providers
 }
 
 // Config represents an application configuration.
@@ -83,7 +93,7 @@ type Config struct {
 	// the server port. Defaults to 8000
 	ServerPort string `yaml:"server_port" env:"SERVER_PORT"`
 
-	ServiceAccountIssuerURL string `yaml:"service_account_issuer_url" env:"SERVICE_ACCOUNT_ISSUER_URL"`
+	JWTIssuerURL string `yaml:"JWT_ISSUER_URL" env:"JWT_ISSUER_URL"`
 
 	// the url for connecting to the database. required.
 	DBHost     string `yaml:"db_host" env:"DB_HOST"`
@@ -112,6 +122,9 @@ type Config struct {
 	// The OIDC identity providers
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 
+	// Federated Registry Trust Policies.
+	FederatedRegistryTrustPolicies []FederatedRegistryTrustPolicy `yaml:"federated_registry_trust_policies"`
+
 	InternalRunners []RunnerConfig `yaml:"internal_runners"`
 
 	// Database Configuration
@@ -123,7 +136,7 @@ type Config struct {
 	// Max upload size when uploading a module to the module registry
 	ModuleRegistryMaxUploadSize int `yaml:"module_registry_max_upload_size" env:"MODULE_REGISTRY_MAX_UPLOAD_SIZE"`
 
-	// Timout for async background tasks
+	// Timeout for async background tasks
 	AsyncTaskTimeout int `yaml:"async_task_timeout" env:"ASYNC_TASK_TIMEOUT"`
 
 	// VCS repository size limit
@@ -211,6 +224,16 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		c.OauthProviders = oauthProviders
 	}
 
+	// Load Federated Registry trust policies from environment if available
+	federatedRegistryTrustPolicies, err := loadFederatedRegistryTrustPoliciesFromEnvironment()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load federated registry trust policies from env variable: %w", err)
+	}
+
+	if len(federatedRegistryTrustPolicies) > 0 {
+		c.FederatedRegistryTrustPolicies = federatedRegistryTrustPolicies
+	}
+
 	runners, err := loadRunnerConfigFromEnvironment()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load runner env variables %w", err)
@@ -264,9 +287,9 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		c.EmailClientPluginData[k] = v
 	}
 
-	// Default ServiceAccountIssuerURL to TharsisURL
-	if c.ServiceAccountIssuerURL == "" {
-		c.ServiceAccountIssuerURL = c.TharsisAPIURL
+	// Default JWTIssuerURL to TharsisURL
+	if c.JWTIssuerURL == "" {
+		c.JWTIssuerURL = c.TharsisAPIURL
 	}
 
 	// validation
@@ -335,6 +358,19 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 		}
 	}
 	return idpConfigs, nil
+}
+
+func loadFederatedRegistryTrustPoliciesFromEnvironment() ([]FederatedRegistryTrustPolicy, error) {
+	var federatedRegistryTrustPolicies []FederatedRegistryTrustPolicy
+
+	val, ok := os.LookupEnv(envFederatedRegistryTrustPolicyName)
+	if ok {
+		if err := json.Unmarshal([]byte(val), &federatedRegistryTrustPolicies); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal federated registry trust policies")
+		}
+	}
+
+	return federatedRegistryTrustPolicies, nil
 }
 
 func loadRunnerConfigFromEnvironment() ([]RunnerConfig, error) {

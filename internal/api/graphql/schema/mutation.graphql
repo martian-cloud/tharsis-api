@@ -213,4 +213,16 @@ type Mutation {
   updateUserAdminStatus(
     input: UpdateUserAdminStatusInput!
   ): UpdateUserAdminStatusPayload!
+  createFederatedRegistry(
+    input: CreateFederatedRegistryInput!
+  ): FederatedRegistryMutationPayload!
+  updateFederatedRegistry(
+    input: UpdateFederatedRegistryInput!
+  ): FederatedRegistryMutationPayload!
+  deleteFederatedRegistry(
+    input: DeleteFederatedRegistryInput!
+  ): FederatedRegistryMutationPayload!
+  createFederatedRegistryTokens(
+    input: CreateFederatedRegistryTokensInput!
+  ): CreateFederatedRegistryTokensPayload!
 }

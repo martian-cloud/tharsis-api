@@ -122,6 +122,7 @@ var activityEventFieldList = append(metadataFieldList,
 	"role_target_id",
 	"runner_target_id",
 	"terraform_provider_version_mirror_target_id",
+	"federated_registry_target_id",
 )
 
 // NewActivityEvents returns an instance of the ActivityEvents interface
@@ -287,6 +288,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		roleTargetID                           *string
 		runnerTargetID                         *string
 		terraformProviderVersionMirrorTargetID *string
+		federatedRegistryTargetID              *string
 	)
 
 	switch input.TargetType {
@@ -328,6 +330,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		runnerTargetID = &input.TargetID
 	case models.TargetTerraformProviderVersionMirror:
 		terraformProviderVersionMirrorTargetID = &input.TargetID
+	case models.TargetFederatedRegistry:
+		federatedRegistryTargetID = &input.TargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		tracing.RecordError(span, nil, "invalid target type: %s", input.TargetType)
@@ -370,6 +374,7 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 		"role_target_id":                       roleTargetID,
 		"runner_target_id":                     runnerTargetID,
 		"terraform_provider_version_mirror_target_id": terraformProviderVersionMirrorTargetID,
+		"federated_registry_target_id":                federatedRegistryTargetID,
 	}
 
 	sql, args, err := dialect.Insert("activity_events").
@@ -452,6 +457,8 @@ func (m *activityEvents) CreateActivityEvent(ctx context.Context, input *models.
 				case "fk_activity_events_terraform_provider_version_mirror_target_id":
 					tracing.RecordError(span, nil, "terraform provider version mirror does not exist")
 					return nil, errors.New("terraform provider version mirror does not exist", errors.WithErrorCode(errors.ENotFound))
+				case "fk_activity_events_federated_registry_target_id":
+					return nil, errors.New("federated registry does not exist", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 				}
 			}
 		}
@@ -503,6 +510,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		roleTargetID                           *string
 		runnerTargetID                         *string
 		terraformProviderVersionMirrorTargetID *string
+		federatedRegistryTargetID              *string
 	)
 
 	fields := []interface{}{
@@ -534,6 +542,7 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		&roleTargetID,
 		&runnerTargetID,
 		&terraformProviderVersionMirrorTargetID,
+		&federatedRegistryTargetID,
 	}
 
 	// Balance the number of selected fields and fields to scan out.
@@ -585,6 +594,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 		activityEvent.TargetID = *runnerTargetID
 	case models.TargetTerraformProviderVersionMirror:
 		activityEvent.TargetID = *terraformProviderVersionMirrorTargetID
+	case models.TargetFederatedRegistry:
+		activityEvent.TargetID = *federatedRegistryTargetID
 	default:
 		// theoretically cannot happen, but in case of a rainy day
 		return nil, fmt.Errorf("invalid target type: %s", activityEvent.TargetType)

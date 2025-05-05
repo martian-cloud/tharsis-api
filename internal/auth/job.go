@@ -324,19 +324,20 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.ViewWorkspacePermission:            j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewConfigurationVersionPermission: j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewStateVersionPermission:         j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewManagedIdentityPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewVariablePermission:             j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewStateVersionDataPermission:     j.requireAccessToJobWorkspace,
-		permissions.CreateStateVersionPermission:       j.requireAccessToJobWorkspace,
-		permissions.ViewVariableValuePermission:        j.requireAccessToJobWorkspace,
-		permissions.ViewRunPermission:                  j.requireRunAccess, // View is automatically granted if action != View.
-		permissions.ViewJobPermission:                  j.requireJobAccess, // View is automatically granted if action != View.
-		permissions.UpdateJobPermission:                j.requireJobAccess,
-		permissions.UpdatePlanPermission:               j.requirePlanWriteAccess,
-		permissions.UpdateApplyPermission:              j.requireApplyWriteAccess,
+		permissions.ViewWorkspacePermission:                j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewConfigurationVersionPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewStateVersionPermission:             j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewManagedIdentityPermission:          j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewVariablePermission:                 j.requireAccessToWorkspacesInGroupHierarchy,
+		permissions.ViewStateVersionDataPermission:         j.requireAccessToJobWorkspace,
+		permissions.CreateStateVersionPermission:           j.requireAccessToJobWorkspace,
+		permissions.ViewVariableValuePermission:            j.requireAccessToJobWorkspace,
+		permissions.ViewRunPermission:                      j.requireRunAccess, // View is automatically granted if action != View.
+		permissions.ViewJobPermission:                      j.requireJobAccess, // View is automatically granted if action != View.
+		permissions.UpdateJobPermission:                    j.requireJobAccess,
+		permissions.CreateFederatedRegistryTokenPermission: j.requireJobAccess,
+		permissions.UpdatePlanPermission:                   j.requirePlanWriteAccess,
+		permissions.UpdateApplyPermission:                  j.requireApplyWriteAccess,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

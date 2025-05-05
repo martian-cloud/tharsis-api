@@ -21,4 +21,3 @@ func ExpandPath(path string) []string {
 func IsDescendantOfPath(descendantPath, ancestorPath string) bool {
 	return strings.HasPrefix(descendantPath, ancestorPath+"/")
 }
-

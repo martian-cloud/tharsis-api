@@ -105,6 +105,7 @@ type Client struct {
 	RunnerSessions                   RunnerSessions
 	SchemaMigrations                 SchemaMigrations
 	NotificationPreferences          NotificationPreferences
+	FederatedRegistries              FederatedRegistries
 }
 
 // NewClient creates a new Client
@@ -208,6 +209,7 @@ func NewClient(
 	dbClient.RunnerSessions = NewRunnerSessions(dbClient)
 	dbClient.SchemaMigrations = NewSchemaMigrations(dbClient)
 	dbClient.NotificationPreferences = NewNotificationPreferences(dbClient)
+	dbClient.FederatedRegistries = NewFederatedRegistries(dbClient)
 
 	return dbClient, nil
 }

@@ -231,6 +231,12 @@ func (r *NodeResolver) ToTerraformProviderPlatformMirror() (*TerraformProviderPl
 	return res, ok
 }
 
+// ToFederatedRegistry resolver
+func (r *NodeResolver) ToFederatedRegistry() (*FederatedRegistryResolver, bool) {
+	res, ok := r.result.(*FederatedRegistryResolver)
+	return res, ok
+}
+
 func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 	parsedGlobalID, err := gid.ParseGlobalID(globalID)
 	if err != nil {
@@ -472,6 +478,13 @@ func node(ctx context.Context, globalID string) (*NodeResolver, error) {
 			break
 		}
 		resolver = &TerraformProviderPlatformMirrorResolver{platformMirror: mirror}
+	case gid.FederatedRegistryType:
+		registry, err := getFederatedRegistryService(ctx).GetFederatedRegistryByID(ctx, parsedGlobalID.ID)
+		if err != nil {
+			retErr = err
+			break
+		}
+		resolver = &FederatedRegistryResolver{federatedRegistry: registry}
 	default:
 		return nil, fmt.Errorf("node query doesn't support type %s", parsedGlobalID.Type)
 	}

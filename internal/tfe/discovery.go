@@ -2,21 +2,25 @@
 package tfe
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 // BuildTFEServiceDiscoveryHandler builds a handler function which returns the TFE discovery document
 func BuildTFEServiceDiscoveryHandler(
+	ctx context.Context,
 	logger logger.Logger,
-	idp *auth.IdentityProviderConfig,
+	idp *config.IdpConfig,
 	loginScopes string,
 	apiEndpoint string,
 	tfeBasePath string,
+	oidcConfigFetcher auth.OpenIDConfigFetcher,
 ) (http.HandlerFunc, error) {
 	// Build response
 	resp := map[string]interface{}{
@@ -29,12 +33,17 @@ func BuildTFEServiceDiscoveryHandler(
 	}
 
 	if idp != nil {
+		cfg, err := oidcConfigFetcher.GetOpenIDConfig(ctx, idp.IssuerURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get OIDC config for issuer %s %v", idp.IssuerURL, err)
+		}
+
 		resp["login.v1"] = map[string]interface{}{
 			"client":      idp.ClientID,
 			"grant_types": []string{"authz_code"},
 			"scopes":      []string{loginScopes},
-			"authz":       idp.AuthEndpoint,
-			"token":       idp.TokenEndpoint,
+			"authz":       cfg.AuthEndpoint,
+			"token":       cfg.TokenEndpoint,
 		}
 	}
 

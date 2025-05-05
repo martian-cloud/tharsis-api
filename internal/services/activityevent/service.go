@@ -166,5 +166,3 @@ func (s *service) CreateActivityEvent(ctx context.Context, input *CreateActivity
 
 	return activityEvent, nil
 }
-
-// The End.

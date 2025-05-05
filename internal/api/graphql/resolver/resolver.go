@@ -7,6 +7,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
@@ -65,6 +66,7 @@ type State struct {
 	ProviderMirrorService      providermirror.Service
 	MaintenanceModeService     maintenance.Service
 	VersionService             version.Service
+	FederatedRegistryService   federatedregistry.Service
 }
 
 // Attach is used to attach the resolver state to the context
@@ -185,4 +187,8 @@ func getMaintenanceModeService(ctx context.Context) maintenance.Service {
 
 func getVersionService(ctx context.Context) version.Service {
 	return extract(ctx).VersionService
+}
+
+func getFederatedRegistryService(ctx context.Context) federatedregistry.Service {
+	return extract(ctx).FederatedRegistryService
 }

@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
-	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
@@ -194,16 +192,6 @@ func (u *UserCaller) GetTeams(ctx context.Context) ([]models.Team, error) {
 	return result, nil
 }
 
-// IdentityProviderConfig encompasses the information for an identity provider
-type IdentityProviderConfig struct {
-	Issuer        string
-	ClientID      string
-	UsernameClaim string
-	JwksURI       string
-	TokenEndpoint string
-	AuthEndpoint  string
-}
-
 type externalIdentity struct {
 	ID       string
 	Issuer   string
@@ -213,67 +201,39 @@ type externalIdentity struct {
 
 // UserAuth implements JWT authentication
 type UserAuth struct {
-	idpMap             map[string]IdentityProviderConfig
-	jwkRegistry        *jwk.Cache
+	idpMap             map[string]config.IdpConfig
+	oidcTokenVerifier  OIDCTokenVerifier
 	logger             logger.Logger
 	dbClient           *db.Client
 	maintenanceMonitor maintenance.Monitor
 }
 
-const (
-	defaultKeyAlgorithm         = jwa.RS256
-	jwtRefreshIntervalInMinutes = 60
-)
-
 // NewUserAuth creates an instance of UserAuth
 func NewUserAuth(
 	ctx context.Context,
-	identityProviders []IdentityProviderConfig,
+	identityProviders []config.IdpConfig,
 	logger logger.Logger,
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
+	oidcConfigFetcher OpenIDConfigFetcher,
 ) *UserAuth {
-	idpMap := make(map[string]IdentityProviderConfig)
-
-	jwkRegistry := jwk.NewCache(ctx)
+	idpMap := make(map[string]config.IdpConfig)
+	issuers := []string{}
 
 	for _, idp := range identityProviders {
-		idpMap[idp.Issuer] = idp
-
-		jwkRegistry.Register(idp.JwksURI, jwk.WithMinRefreshInterval(jwtRefreshIntervalInMinutes*time.Minute))
-
-		_, err := jwkRegistry.Refresh(ctx, idp.JwksURI)
-		if err != nil {
-			logger.Errorf("Failed to load keyset for IDP %s: %s", idp.Issuer, err)
-		}
+		idpMap[idp.IssuerURL] = idp
+		issuers = append(issuers, idp.IssuerURL)
 	}
 
-	return &UserAuth{idpMap, jwkRegistry, logger, dbClient, maintenanceMonitor}
+	oidcTokenVerifier := NewOIDCTokenVerifier(ctx, issuers, oidcConfigFetcher, true)
+
+	return &UserAuth{idpMap, oidcTokenVerifier, logger, dbClient, maintenanceMonitor}
 }
 
-func (u *UserAuth) getKey(ctx context.Context, kid string, idp IdentityProviderConfig) (jwk.Key, error) {
-	keyset, err := u.jwkRegistry.Get(ctx, idp.JwksURI)
-	if err != nil {
-		return nil, errors.New("Failed to load key set for identity provider " + idp.Issuer)
-	}
-
-	key, found := keyset.LookupKeyID(kid)
-	if !found {
-		// Attempt to refresh the keyset for the IDP because the keys may have been updated
-		keyset, err := u.jwkRegistry.Refresh(ctx, idp.JwksURI)
-		if err != nil {
-			return nil, errors.New("Failed to load key set for identity provider " + idp.Issuer)
-		}
-
-		key, found = keyset.LookupKeyID(kid)
-		if !found {
-			return nil, errors.New("Failed to load key set for identity provider " + idp.Issuer)
-		}
-
-		return key, nil
-	}
-
-	return key, nil
+// Use checks if the UserAuth instance can handle the given issuer URL
+func (u *UserAuth) Use(token jwt.Token) bool {
+	_, ok := u.idpMap[token.Issuer()]
+	return ok
 }
 
 // GetUsernameClaim returns the username from a JWT token
@@ -285,63 +245,29 @@ func (u *UserAuth) GetUsernameClaim(token jwt.Token) (string, error) {
 
 	username, ok := token.Get(idp.UsernameClaim)
 	if !ok {
-		return "", errors.New("Token with issuer " + token.Issuer() + " is missing " + idp.UsernameClaim + " field")
+		return "", terrors.New("Token with issuer "+token.Issuer()+" is missing "+idp.UsernameClaim+" field", terrors.WithErrorCode(terrors.EUnauthorized))
 	}
 
 	return username.(string), nil
 }
 
 // Authenticate validates a user JWT and returns a UserCaller
-func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCache bool) (*UserCaller, error) {
-	tokenBytes := []byte(tokenString)
-
-	// Parse token headers
-	msg, err := jws.Parse(tokenBytes)
+func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
+	decodedToken, err := u.oidcTokenVerifier.VerifyToken(ctx, tokenString, []jwt.ValidateOption{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse token headers %w", err)
+		return nil, terrors.New(errorReason(err), terrors.WithErrorCode(terrors.EUnauthorized))
 	}
 
-	signatures := msg.Signatures()
-	if len(signatures) < 1 {
-		return nil, errors.New("token is missing signature")
+	issuer := decodedToken.Issuer()
+	idp, ok := u.idpMap[issuer]
+	if !ok {
+		// This should never happen because the token will be invalid if the issuer isn't supported but we'll check just
+		// in case
+		return nil, fmt.Errorf("identity provider not found for issuer %s", issuer)
 	}
 
-	// Parse jwt
-	decodedToken, err := jwt.Parse(tokenBytes, jwt.WithVerify(false))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode token %w", err)
-	}
-
-	kid := signatures[0].ProtectedHeaders().KeyID()
-	idp := u.idpMap[decodedToken.Issuer()]
-
-	key, err := u.getKey(ctx, kid, idp)
-	if err != nil {
-		return nil, err
-	}
-
-	alg := key.Algorithm()
-	if alg.String() == "" {
-		alg = defaultKeyAlgorithm
-	}
-
-	if err = key.Set(jwk.AlgorithmKey, alg); err != nil {
-		return nil, err
-	}
-
-	keySet := jwk.NewSet()
-	if err = keySet.AddKey(key); err != nil {
-		return nil, err
-	}
-
-	// Verify Token Signature
-	if _, vErr := jws.Verify(tokenBytes, jws.WithKeySet(keySet)); vErr != nil {
-		return nil, vErr
-	}
-
-	// Validate claims
-	if vErr := jwt.Validate(decodedToken, jwt.WithAudience(idp.ClientID), jwt.WithIssuer(idp.Issuer)); vErr != nil {
-		return nil, vErr
+	if !slices.Contains(decodedToken.Audience(), idp.ClientID) {
+		return nil, terrors.New("token from issuer %s missing required aud %s", issuer, idp.ClientID, terrors.WithErrorCode(terrors.EUnauthorized))
 	}
 
 	username, err := u.GetUsernameClaim(decodedToken)
@@ -350,7 +276,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 	}
 
 	// Get user from DB, user will be created if this is the first login
-	userModel, err := u.getUserWithExternalID(ctx, decodedToken.Issuer(), decodedToken.Subject())
+	userModel, err := u.getUserWithExternalID(ctx, issuer, decodedToken.Subject())
 	if err != nil {
 		return nil, err
 	}
@@ -358,18 +284,18 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 	if userModel == nil {
 		email, ok := decodedToken.Get("email")
 		if !ok {
-			return nil, fmt.Errorf("email claim missing from token")
+			return nil, terrors.New("email claim missing from token", terrors.WithErrorCode(terrors.EUnauthorized))
 		}
 
 		userModel, err = u.createUser(ctx, &externalIdentity{
-			Issuer:   decodedToken.Issuer(),
+			Issuer:   issuer,
 			ID:       decodedToken.Subject(),
 			Username: ParseUsername(username),
 			Email:    strings.ToLower(email.(string)),
 		})
 		if err != nil {
 			u.logger.Errorf("Failed to create user in db: %v", err)
-			return nil, err
+			return nil, terrors.Wrap(err, "failed to create user in db")
 		}
 	}
 

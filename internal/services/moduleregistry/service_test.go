@@ -535,7 +535,8 @@ func TestGetModules(t *testing.T) {
 			}
 
 			if test.namespaceAccessPolicy != nil {
-				mockCaller.On("GetNamespaceAccessPolicy", mock.Anything).Return(test.namespaceAccessPolicy, nil)
+				mockCaller.On("GetNamespaceAccessPolicy", mock.Anything, mock.Anything).
+					Return(test.namespaceAccessPolicy, nil)
 			}
 
 			mockModules := db.NewMockTerraformModules(t)

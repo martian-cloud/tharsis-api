@@ -26,4 +26,5 @@ const (
 	ManagedIdentityResourceType         ResourceType = "managed_identity"
 	VCSProviderResourceType             ResourceType = "vcs_provider"
 	TerraformProviderMirrorResourceType ResourceType = "terraform_provider_mirror"
+	FederatedRegistryResourceType       ResourceType = "federated_registry"
 )

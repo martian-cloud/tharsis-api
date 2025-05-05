@@ -121,7 +121,7 @@ type Service interface {
 type service struct {
 	logger           logger.Logger
 	dbClient         *db.Client
-	idp              *auth.IdentityProvider
+	idp              auth.IdentityProvider
 	logStreamManager logstream.Manager
 	eventManager     *events.EventManager
 	runStateManager  *state.RunStateManager
@@ -131,7 +131,7 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	idp *auth.IdentityProvider,
+	idp auth.IdentityProvider,
 	logStreamManager logstream.Manager,
 	eventManager *events.EventManager,
 	runStateManager *state.RunStateManager,

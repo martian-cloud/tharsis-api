@@ -140,6 +140,13 @@ type Group implements Node, Namespace {
     includeInherited: Boolean
     sort: TerraformProviderVersionMirrorSort
   ): TerraformProviderVersionMirrorConnection!
+  federatedRegistries(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: FederatedRegistrySort
+  ): FederatedRegistryConnection!
 }
 
 input CreateGroupInput {

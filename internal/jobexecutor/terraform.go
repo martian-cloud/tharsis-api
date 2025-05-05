@@ -144,7 +144,6 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		if err = t.downloadConfigurationVersion(ctx); err != nil {
 			return nil, err
 		}
-
 	}
 
 	// Handle a possible module source (and maybe version).
@@ -162,17 +161,41 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 				}
 			}
 
+			// If the above set any tokens for a federated registry remote host, potentially replace the tokens.
+			federatedRegistryTokens, err := t.client.CreateFederatedRegistryTokens(ctx, &types.CreateFederatedRegistryTokensInput{
+				JobID: t.jobCfg.JobID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create federated registry tokens: %v", err)
+			}
+
+			for _, token := range federatedRegistryTokens {
+				encHost, bErr := module.BuildTokenEnvVar(token.Hostname)
+				if bErr != nil {
+					return nil, fmt.Errorf("failed to encode host %s for environment variable: %v",
+						token.Hostname, bErr)
+				}
+
+				// Add federated registry tokens to the host map
+				hostTokenMap[encHost] = token.Token
+
+				// Set the federated token on the environment since Terraform CLI will need to use
+				// it for pulling down any child modules and providers from the federated registry.
+				t.fullEnv[encHost] = token.Token
+			}
+
 			// Add service account tokens to the host map
 			for k, v := range managedIdentitiesResponse.HostCredentialFileMapping {
 				// Read the service account token data from the file
-				tokenData, err := os.ReadFile(v)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read service account token data from file %s: %v", v, err)
+				tokenData, rErr := os.ReadFile(v)
+				if rErr != nil {
+					return nil, fmt.Errorf("failed to read service account token data from file %s: %v", v, rErr)
 				}
-				encodedHost, err := module.BuildTokenEnvVar(k)
-				if err != nil {
-					return nil, fmt.Errorf("failed to encode host %s for environment variable: %v", k, err)
+				encodedHost, rErr := module.BuildTokenEnvVar(k)
+				if rErr != nil {
+					return nil, fmt.Errorf("failed to encode host %s for environment variable: %v", k, rErr)
 				}
+
 				hostTokenMap[encodedHost] = string(tokenData)
 			}
 

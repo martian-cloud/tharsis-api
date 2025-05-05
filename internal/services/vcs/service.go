@@ -252,7 +252,7 @@ type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
 	limitChecker        limits.LimitChecker
-	idp                 *auth.IdentityProvider
+	idp                 auth.IdentityProvider
 	vcsProviderMap      map[models.VCSProviderType]Provider
 	activityService     activityevent.Service
 	runService          run.Service
@@ -269,7 +269,7 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp *auth.IdentityProvider,
+	idp auth.IdentityProvider,
 	httpClient *http.Client,
 	activityService activityevent.Service,
 	runService run.Service,
@@ -303,7 +303,7 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp *auth.IdentityProvider,
+	idp auth.IdentityProvider,
 	vcsProviderMap map[models.VCSProviderType]Provider,
 	activityService activityevent.Service,
 	runService run.Service,

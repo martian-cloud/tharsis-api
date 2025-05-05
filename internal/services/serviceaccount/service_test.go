@@ -231,7 +231,6 @@ func TestCreateServiceAccount(t *testing.T) {
 
 func TestCreateToken(t *testing.T) {
 	validKeyPair := createKeyPair(t)
-	invalidKeyPair := createKeyPair(t)
 
 	keyID := validKeyPair.pub.KeyID()
 	serviceAccountID := "d4a94ff5-154e-4758-8039-55e2147fa154"
@@ -256,71 +255,45 @@ func TestCreateToken(t *testing.T) {
 		policy         []models.OIDCTrustPolicy
 		token          []byte
 	}{
-		// {
-		// 	name:           "create service account token with service account resource path",
-		// 	serviceAccount: "groupA/serviceAccount1",
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
-		// 	policy:         basicPolicy,
-		// },
-		// {
-		// 	name:           "create service account token with service account ID",
-		// 	serviceAccount: serviceAccountID,
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
-		// 	policy:         basicPolicy,
-		// },
-		// {
-		// 	name:           "subject claim doesn't match",
-		// 	serviceAccount: serviceAccountID,
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(time.Minute)),
-		// 	policy:         basicPolicy,
-		// 	expectErr:      errors.New("of the trust policies for issuer https://test.tharsis, none was satisfied"),
-		// },
-		// {
-		// 	name:           "expired token",
-		// 	serviceAccount: serviceAccountID,
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(-time.Minute)),
-		// 	policy:         basicPolicy,
-		// 	expectErr:      terrs.Wrap(jwt.ErrTokenExpired(), "failed to decode token", terrs.WithErrorCode(terrs.EUnauthorized)),
-		// },
-		// {
-		// 	name:           "no matching trust policy",
-		// 	serviceAccount: serviceAccountID,
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
-		// 	policy: []models.OIDCTrustPolicy{
-		// 		{
-		// 			Issuer:      "https://notavalidissuer",
-		// 			BoundClaims: map[string]string{},
-		// 		},
-		// 	},
-		// 	expectErr: errFailedCreateToken,
-		// },
-		// {
-		// 	name:           "empty trust policy",
-		// 	serviceAccount: serviceAccountID,
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
-		// 	policy:         []models.OIDCTrustPolicy{},
-		// 	expectErr:      errFailedCreateToken,
-		// },
-		// {
-		// 	name:           "invalid token",
-		// 	serviceAccount: "groupA/serviceAccount1",
-		// 	token:          []byte("invalidtoken"),
-		// 	policy:         basicPolicy,
-		// 	expectErr:      errors.New("failed to decode token: invalid JWT"),
-		// },
-		// {
-		// 	name:           "missing issuer",
-		// 	serviceAccount: "groupA/serviceAccount1",
-		// 	token:          createJWT(t, validKeyPair.priv, keyID, "", sub, time.Now().Add(time.Minute)),
-		// 	policy:         basicPolicy,
-		// 	expectErr:      errors.New("JWT is missing issuer claim"),
-		// },
 		{
-			name:           "invalid token signature",
-			serviceAccount: "groupA/serviceAccount1",
-			token:          createJWT(t, invalidKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			name:           "subject claim doesn't match",
+			serviceAccount: serviceAccountID,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
+			expectErr:      errors.New("of the trust policies for issuer https://test.tharsis, none was satisfied"),
+		},
+		{
+			name:           "no matching trust policy",
+			serviceAccount: serviceAccountID,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy: []models.OIDCTrustPolicy{
+				{
+					Issuer:      "https://notavalidissuer",
+					BoundClaims: map[string]string{},
+				},
+			},
+			expectErr: errFailedCreateToken,
+		},
+		{
+			name:           "empty trust policy",
+			serviceAccount: serviceAccountID,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy:         []models.OIDCTrustPolicy{},
 			expectErr:      errFailedCreateToken,
+		},
+		{
+			name:           "invalid token",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          []byte("invalidtoken"),
+			policy:         basicPolicy,
+			expectErr:      errors.New("failed to decode token: invalid JWT"),
+		},
+		{
+			name:           "missing issuer",
+			serviceAccount: "groupA/serviceAccount1",
+			token:          createJWT(t, validKeyPair.priv, keyID, "", sub, time.Now().Add(time.Minute)),
+			policy:         basicPolicy,
+			expectErr:      errors.New("JWT is missing issuer claim"),
 		},
 		{
 			name:           "negative: multiple trust policies with same issuer: all mismatch",
@@ -403,14 +376,12 @@ func TestCreateToken(t *testing.T) {
 				OIDCTrustPolicies: test.policy,
 			}
 
-			mockServiceAccounts := db.MockServiceAccounts{}
-			mockServiceAccounts.Test(t)
+			mockServiceAccounts := db.NewMockServiceAccounts(t)
 
-			mockServiceAccounts.On("GetServiceAccountByPath", mock.Anything, test.serviceAccount).Return(&sa, nil)
-			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, test.serviceAccount).Return(&sa, nil)
+			mockServiceAccounts.On("GetServiceAccountByPath", mock.Anything, test.serviceAccount).Return(&sa, nil).Maybe()
+			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, test.serviceAccount).Return(&sa, nil).Maybe()
 
-			mockJWSProvider := jwsprovider.MockProvider{}
-			mockJWSProvider.Test(t)
+			mockJWSProvider := jwsprovider.NewMockProvider(t)
 
 			mockJWSProvider.On("Sign", mock.Anything, mock.MatchedBy(func(payload []byte) bool {
 				parsedToken, err := jwt.Parse(payload, jwt.WithVerify(false))
@@ -425,33 +396,49 @@ func TestCreateToken(t *testing.T) {
 				return privClaims["tharsis_service_account_id"] == gid.ToGlobalID(gid.ServiceAccountType, sa.Metadata.ID) &&
 					privClaims["tharsis_service_account_name"] == sa.Name &&
 					privClaims["tharsis_service_account_path"] == sa.ResourcePath
-			})).Return([]byte("signedtoken"), nil)
+			})).Return([]byte("signedtoken"), nil).Maybe()
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
 			dbClient := db.Client{
-				ServiceAccounts: &mockServiceAccounts,
+				ServiceAccounts: mockServiceAccounts,
 				ResourceLimits:  mockResourceLimits,
 			}
 
-			serviceAccountAuth := auth.NewIdentityProvider(&mockJWSProvider, "https://tharsis.io")
+			serviceAccountAuth := auth.NewIdentityProvider(mockJWSProvider, "https://tharsis.io")
 
-			configFetcher := auth.NewOpenIDConfigFetcher()
+			mockConfigFetcher := auth.NewMockOpenIDConfigFetcher(t)
 
-			getKeySetFunc := func(_ context.Context, _ string, _ *auth.OpenIDConfigFetcher) (jwk.Set, error) {
-				set := jwk.NewSet()
-				if err := set.AddKey(validKeyPair.pub); err != nil {
-					return nil, err
-				}
-				return set, nil
-			}
+			mockActivityEvents := activityevent.NewMockService(t)
+			mockTokenVerifier := auth.NewMockOIDCTokenVerifier(t)
 
-			mockActivityEvents := activityevent.MockService{}
-			mockActivityEvents.Test(t)
+			mockTokenVerifier.On("VerifyToken", mock.Anything, string(test.token), mock.Anything).Return(
+				nil,
+				func(_ context.Context, token string, validationOptions []jwt.ValidateOption) error {
+					parseOptions := []jwt.ParseOption{
+						jwt.WithVerify(false),
+						jwt.WithValidate(true),
+					}
+					for _, o := range validationOptions {
+						parseOptions = append(parseOptions, o)
+					}
+					_, err := jwt.Parse([]byte(token), parseOptions...)
+					return err
+				},
+			).Maybe()
 
 			testLogger, _ := logger.NewForTest()
 
-			service := newService(testLogger, &dbClient, limits.NewLimitChecker(&dbClient), serviceAccountAuth, configFetcher, getKeySetFunc, &mockActivityEvents)
+			service := newService(
+				testLogger,
+				&dbClient,
+				limits.NewLimitChecker(&dbClient),
+				serviceAccountAuth,
+				mockConfigFetcher,
+				mockActivityEvents,
+				func(_ context.Context, _ []string, _ auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier {
+					return mockTokenVerifier
+				})
 
 			resp, err := service.CreateToken(ctx, &CreateTokenInput{ServiceAccount: test.serviceAccount, Token: test.token})
 			if err != nil && test.expectErr == nil {

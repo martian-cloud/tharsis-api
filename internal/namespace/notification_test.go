@@ -87,11 +87,11 @@ func TestGetUsersToNotify(t *testing.T) {
 		{
 			name: "no users to notify",
 			input: &GetUsersToNotifyInput{
-				NamespacePath:      "test/namespace",
+				NamespacePath: "test/namespace",
 			},
-			memberships: []models.NamespaceMembership{},
+			memberships:        []models.NamespaceMembership{},
 			preferencesPerUser: map[string]*NotificationPreferenceSetting{},
-			expectResponse: []string{},
+			expectResponse:     []string{},
 		},
 	}
 

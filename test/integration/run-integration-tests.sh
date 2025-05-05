@@ -51,6 +51,10 @@ if [ -z "${READY}" ]; then
 fi
 
 go test -count=1 -tags=integration --ldflags "-X ${ldflagVarPrefix}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${ldflagVarPrefix}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${ldflagVarPrefix}.TestDBName=${THARSIS_DB_TEST_NAME} -X ${ldflagVarPrefix}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${ldflagVarPrefix}.TestDBUser=${THARSIS_DB_TEST_USERNAME} -X ${ldflagVarPrefix}.TestDBPass=${THARSIS_DB_TEST_PASSWORD}" ./...
+returnStatus=$?
 
 # Clean up the container.
 cleanup
+
+# Return the status of the test.
+exit "${returnStatus}"

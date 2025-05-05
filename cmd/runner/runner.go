@@ -43,7 +43,7 @@ func main() {
 
 	dispatcherType := os.Getenv("THARSIS_JOB_DISPATCHER_TYPE")
 	if dispatcherType == "" {
-		logger.Errorf("THARSIS_DISPATCHER_TYPE environment variable is required")
+		logger.Errorf("THARSIS_JOB_DISPATCHER_TYPE environment variable is required")
 		return
 	}
 

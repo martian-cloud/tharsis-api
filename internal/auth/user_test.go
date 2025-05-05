@@ -227,5 +227,3 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 		})
 	}
 }
-
-// The End.

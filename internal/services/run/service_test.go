@@ -26,8 +26,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/rules"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -482,29 +482,23 @@ func TestCreateRunWithSensitiveVariables(t *testing.T) {
 
 	mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-	mockModuleService := moduleregistry.NewMockService(t)
-	mockModuleResolver := NewMockModuleResolver(t)
+	mockModuleResolver := registry.NewMockModuleResolver(t)
 	ruleEnforcer := rules.NewMockRuleEnforcer(t)
 
 	logger, _ := logger.NewForTest()
-	service := newService(
-		logger,
-		dbClient.Client,
-		&mockArtifactStore,
-		nil,
-		nil,
-		nil,
-		&mockActivityEvents,
-		mockModuleService,
-		mockModuleResolver,
-		nil,
-		ruleEnforcer,
-		limits.NewLimitChecker(dbClient.Client),
-		nil,
-		mockSecretManager,
-	)
 
-	_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
+	testService := service{
+		logger:          logger,
+		dbClient:        dbClient.Client,
+		artifactStore:   &mockArtifactStore,
+		activityService: &mockActivityEvents,
+		moduleResolver:  mockModuleResolver,
+		limitChecker:    limits.NewLimitChecker(dbClient.Client),
+		secretManager:   mockSecretManager,
+		ruleEnforcer:    ruleEnforcer,
+	}
+
+	_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
 		WorkspaceID:            ws.Metadata.ID,
 		ConfigurationVersionID: &configurationVersionID,
 	})
@@ -683,8 +677,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-			mockModuleService := moduleregistry.NewMockService(t)
-			mockModuleResolver := NewMockModuleResolver(t)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
 			ruleEnforcer := rules.NewMockRuleEnforcer(t)
 
 			for _, mi := range test.managedIdentities {
@@ -693,24 +686,19 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(
-				logger,
-				dbClient.Client,
-				&mockArtifactStore,
-				nil,
-				nil,
-				nil,
-				&mockActivityEvents,
-				mockModuleService,
-				mockModuleResolver,
-				nil,
-				ruleEnforcer,
-				limits.NewLimitChecker(dbClient.Client),
-				nil,
-				mockSecretManager,
-			)
 
-			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				artifactStore:   &mockArtifactStore,
+				activityService: &mockActivityEvents,
+				moduleResolver:  mockModuleResolver,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				secretManager:   mockSecretManager,
+				ruleEnforcer:    ruleEnforcer,
+			}
+
+			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
 				WorkspaceID:            ws.Metadata.ID,
 				ConfigurationVersionID: &configurationVersionID,
 			})
@@ -951,22 +939,16 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := NewService(
-				logger,
-				dbClient.Client,
-				&mockArtifactStore,
-				nil,
-				nil,
-				nil,
-				&mockActivityEvents,
-				nil,
-				nil,
-				nil,
-				limits.NewLimitChecker(dbClient.Client),
-				mockSecretManager,
-			)
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				artifactStore:   &mockArtifactStore,
+				activityService: &mockActivityEvents,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				secretManager:   mockSecretManager,
+			}
 
-			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
+			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
@@ -979,7 +961,6 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 func TestCreateRunWithSpeculativeOption(t *testing.T) {
 	configurationVersionID := "configuration-version-id-1"
 	moduleSource := "module-source-1"
-	moduleVersion := "1.2.3"
 	createdBySubject := "mock-caller"
 	groupName := "groupA"
 	planID := "plan1"
@@ -1009,19 +990,17 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 		{
 			name: "module source, speculative not specified; expect false",
 			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				Speculative:   nil,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				Speculative:  nil,
 			},
 			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       applyID,
-				Status:        models.RunPlanQueued,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				CreatedBy:    createdBySubject,
+				PlanID:       planID,
+				ApplyID:      applyID,
+				Status:       models.RunPlanQueued,
 			},
 			limit:                  4,
 			injectRunsPerWorkspace: 4,
@@ -1029,19 +1008,17 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 		{
 			name: "module source, speculative specified true; expect true",
 			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				Speculative:   &isTrue,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				Speculative:  &isTrue,
 			},
 			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       "",
-				Status:        models.RunPlanQueued,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				CreatedBy:    createdBySubject,
+				PlanID:       planID,
+				ApplyID:      "",
+				Status:       models.RunPlanQueued,
 			},
 			limit:                  4,
 			injectRunsPerWorkspace: 4,
@@ -1049,19 +1026,17 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 		{
 			name: "module source, speculative specified false; expect false",
 			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				Speculative:   &isFalse,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				Speculative:  &isFalse,
 			},
 			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       applyID,
-				Status:        models.RunPlanQueued,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				CreatedBy:    createdBySubject,
+				PlanID:       planID,
+				ApplyID:      applyID,
+				Status:       models.RunPlanQueued,
 			},
 			limit:                  4,
 			injectRunsPerWorkspace: 4,
@@ -1174,19 +1149,17 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 		{
 			name: "exceeds limit",
 			input: &CreateRunInput{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				Speculative:   nil,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				Speculative:  nil,
 			},
 			expectCreateRun: &models.Run{
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
-				CreatedBy:     createdBySubject,
-				PlanID:        planID,
-				ApplyID:       applyID,
-				Status:        models.RunPlanQueued,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
+				CreatedBy:    createdBySubject,
+				PlanID:       planID,
+				ApplyID:      applyID,
+				Status:       models.RunPlanQueued,
 			},
 			limit:                  4,
 			injectRunsPerWorkspace: 5,
@@ -1290,37 +1263,216 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 			mockActivityEvents.Test(t)
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
 
-			mockModuleService := moduleregistry.NewMockService(t)
-			mockModuleResolver := NewMockModuleResolver(t)
-
-			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
-				Return(&ModuleRegistrySource{}, nil).Maybe()
-
-			mockModuleResolver.On("ResolveModuleVersion", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-				Return(moduleVersion, nil).Maybe()
+			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, ptr.ToString(test.input.ModuleSource), mock.Anything, mock.Anything).
+				Return(nil, registry.ErrRemoteModuleSource).Maybe()
 
 			mockSecretManager := secret.NewMockManager(t)
 
 			logger, _ := logger.NewForTest()
-			service := newService(
-				logger,
-				dbClient.Client,
-				&mockArtifactStore,
-				nil,
-				nil,
-				nil,
-				&mockActivityEvents,
-				mockModuleService,
-				mockModuleResolver,
-				nil,
-				nil,
-				limits.NewLimitChecker(dbClient.Client),
-				nil,
-				mockSecretManager,
-			)
 
-			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				artifactStore:   &mockArtifactStore,
+				activityService: &mockActivityEvents,
+				moduleResolver:  mockModuleResolver,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				secretManager:   mockSecretManager,
+			}
+
+			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestCreateRunWithTharsisModule(t *testing.T) {
+	moduleSource := "module-source-1"
+	moduleVersion := "1.0.0"
+	moduleDigest := []byte("digest")
+	createdBySubject := "mock-caller"
+	groupName := "groupA"
+	planID := "plan1"
+	applyID := "apply1"
+	currentTime := time.Now().UTC()
+
+	ws := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID: "ws1",
+		},
+		FullPath:       "groupA/ws1",
+		MaxJobDuration: ptr.Int32(60),
+	}
+
+	// Test cases
+	tests := []struct {
+		input           *CreateRunInput
+		expectCreateRun *models.Run
+		name            string
+		moduleAuthError error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "create run with tharsis module source",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       applyID,
+				Status:        models.RunPlanQueued,
+				ModuleVersion: &moduleVersion,
+				ModuleDigest:  moduleDigest,
+			},
+		},
+		{
+			name: "return unauthorized error when caller is not authorized to use module",
+			input: &CreateRunInput{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				ModuleVersion: &moduleVersion,
+			},
+			moduleAuthError: errors.New("unauthorized", errors.WithErrorCode(errors.EUnauthorized)),
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dbClient := buildDBClientWithMocks(t)
+
+			mockCaller := auth.NewMockCaller(t)
+			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			dbClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil)
+
+			dbClient.MockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, ws.Metadata.ID).
+				Return([]models.ManagedIdentity{}, nil)
+
+			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil)
+
+			dbClient.MockVariables.On("GetVariables", mock.Anything, mock.Anything).Return(&db.VariableResult{
+				Variables: []models.Variable{},
+			}, nil)
+
+			dbClient.MockRuns.On("CreateRun", mock.Anything, test.expectCreateRun).
+				Return(func(ctx context.Context, run *models.Run) (*models.Run, error) {
+					_ = ctx
+
+					if run != nil {
+						// Must inject creation timestamp so limit check won't hit a nil pointer.
+						runWithTimestamp := *run
+						runWithTimestamp.Metadata.CreationTimestamp = &currentTime
+						return &runWithTimestamp, nil
+					}
+					return nil, nil
+				})
+			dbClient.MockRuns.On("GetRuns", mock.Anything, mock.Anything).
+				Return(&db.RunsResult{
+					PageInfo: &pagination.PageInfo{
+						TotalCount: 1,
+					},
+				}, nil)
+			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(test.expectCreateRun, nil)
+
+			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
+				Return(&models.ResourceLimit{Value: 10}, nil)
+
+			dbClient.MockPlans.On("CreatePlan", mock.Anything, mock.Anything).Return(&models.Plan{
+				Metadata: models.ResourceMetadata{
+					ID: planID,
+				},
+			}, nil)
+
+			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
+				Metadata: models.ResourceMetadata{
+					ID: applyID,
+				},
+			}, nil)
+
+			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
+				Groups: []models.Group{
+					{
+						Metadata: models.ResourceMetadata{
+							ID: groupName,
+						},
+						Name: groupName,
+					},
+				},
+			}, nil)
+
+			dbClient.MockJobs.On("CreateJob", mock.Anything, mock.Anything).
+				Return(func(_ context.Context, _ *models.Job) (*models.Job, error) {
+					return &models.Job{
+						Metadata: models.ResourceMetadata{
+							ID: "job1",
+						},
+						WorkspaceID: ws.Metadata.ID,
+					}, nil
+				}, nil)
+
+			dbClient.MockLogStreams.On("CreateLogStream", mock.Anything, mock.Anything).Return(&models.LogStream{}, nil)
+
+			mockArtifactStore := workspace.MockArtifactStore{}
+			mockArtifactStore.Test(t)
+
+			mockArtifactStore.On("UploadRunVariables", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			mockActivityEvents := activityevent.MockService{}
+			mockActivityEvents.Test(t)
+
+			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
+
+			mockModuleRegistrySource := registry.NewMockModuleRegistrySource(t)
+			mockModuleRegistrySource.On("LocalRegistryModule", mock.Anything).Return(&models.TerraformModule{
+				GroupID: "test-group-id",
+				Private: true,
+			}, nil)
+
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.moduleAuthError)
+
+			if test.moduleAuthError == nil {
+				mockModuleRegistrySource.On("ResolveSemanticVersion", mock.Anything, &moduleVersion).Return(moduleVersion, nil)
+
+				mockModuleRegistrySource.On("ResolveDigest", mock.Anything, moduleVersion).Return(moduleDigest, nil)
+			}
+
+			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, ptr.ToString(test.input.ModuleSource), mock.Anything, mock.Anything).
+				Return(mockModuleRegistrySource, nil)
+
+			mockSecretManager := secret.NewMockManager(t)
+
+			logger, _ := logger.NewForTest()
+
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				artifactStore:   &mockArtifactStore,
+				activityService: &mockActivityEvents,
+				moduleResolver:  mockModuleResolver,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				secretManager:   mockSecretManager,
+			}
+
+			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
@@ -1566,33 +1718,25 @@ func TestCreateRunWithJobTags(t *testing.T) {
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
 				Return(&models.ActivityEvent{}, nil)
 
-			mockModuleService := moduleregistry.NewMockService(t)
-			mockModuleResolver := NewMockModuleResolver(t)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
 
-			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
-				Return(&ModuleRegistrySource{}, nil).Maybe()
+			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(nil, registry.ErrRemoteModuleSource).Maybe()
 
 			mockSecretManager := secret.NewMockManager(t)
-
 			logger, _ := logger.NewForTest()
-			service := newService(
-				logger,
-				dbClient.Client,
-				&mockArtifactStore,
-				nil,
-				nil,
-				nil,
-				&mockActivityEvents,
-				mockModuleService,
-				mockModuleResolver,
-				nil,
-				nil,
-				limits.NewLimitChecker(dbClient.Client),
-				nil,
-				mockSecretManager,
-			)
 
-			_, err := service.CreateRun(auth.WithCaller(ctx, mockCaller), test.createRunInputs)
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				artifactStore:   &mockArtifactStore,
+				activityService: &mockActivityEvents,
+				moduleResolver:  mockModuleResolver,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				secretManager:   mockSecretManager,
+			}
+
+			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.createRunInputs)
 			assert.Nil(t, err)
 
 			// The expected job tags are checked by the inputs to CreateJob.
@@ -1719,8 +1863,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-			mockModuleService := moduleregistry.NewMockService(t)
-			mockModuleResolver := NewMockModuleResolver(t)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
 			ruleEnforcer := rules.NewMockRuleEnforcer(t)
 
 			for _, mi := range test.managedIdentities {
@@ -1729,24 +1872,19 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(
-				logger,
-				dbClient.Client,
-				nil,
-				nil,
-				nil,
-				nil,
-				&mockActivityEvents,
-				mockModuleService,
-				mockModuleResolver,
-				state.NewRunStateManager(dbClient.Client, logger),
-				ruleEnforcer,
-				limits.NewLimitChecker(dbClient.Client),
-				nil,
-				mockSecretManager,
-			)
 
-			_, err := service.ApplyRun(ctx, run.Metadata.ID, nil)
+			testService := service{
+				logger:          logger,
+				dbClient:        dbClient.Client,
+				activityService: &mockActivityEvents,
+				moduleResolver:  mockModuleResolver,
+				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				secretManager:   mockSecretManager,
+				ruleEnforcer:    ruleEnforcer,
+				runStateManager: state.NewRunStateManager(dbClient.Client, logger),
+			}
+
+			_, err := testService.ApplyRun(ctx, run.Metadata.ID, nil)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 			} else if err != nil {
@@ -1880,8 +2018,7 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 			// Setup mocks
 			dbClient := buildDBClientWithMocks(t)
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
-			mockModuleService := moduleregistry.NewMockService(t)
-			mockModuleResolver := NewMockModuleResolver(t)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 			mockCaller := auth.NewMockCaller(t)
 
@@ -1963,11 +2100,8 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
-					Return(&ModuleRegistrySource{}, nil).Maybe()
-
-				mockModuleResolver.On("ResolveModuleVersion", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(moduleVersion, nil).Maybe()
+				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, registry.ErrRemoteModuleSource).Maybe()
 			}
 
 			// Create test fixture
@@ -1977,7 +2111,6 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 				dbClient:        dbClient.Client,
 				artifactStore:   mockArtifactStore,
 				activityService: mockActivityEvents,
-				moduleService:   mockModuleService,
 				moduleResolver:  mockModuleResolver,
 				limitChecker:    limits.NewLimitChecker(dbClient.Client),
 			}
@@ -2936,7 +3069,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 	planID := "plan1"
 
 	moduleSource := "mymodule"
-	moduleVersion := "1.0.0"
 	configurationVersionID := "cv1"
 
 	ws := &models.Workspace{
@@ -2978,7 +3110,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				},
 				WorkspaceID:   ws.Metadata.ID,
 				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
 			},
 			expectCreateRun: &models.Run{
 				Metadata: models.ResourceMetadata{
@@ -2987,7 +3118,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				},
 				WorkspaceID:     ws.Metadata.ID,
 				ModuleSource:    &moduleSource,
-				ModuleVersion:   &moduleVersion,
 				IsAssessmentRun: true,
 			},
 		},
@@ -3010,7 +3140,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				},
 				WorkspaceID:   ws.Metadata.ID,
 				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
 			},
 			existingAssessment: &models.WorkspaceAssessment{
 				Metadata: models.ResourceMetadata{
@@ -3028,7 +3157,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				},
 				WorkspaceID:     ws.Metadata.ID,
 				ModuleSource:    &moduleSource,
-				ModuleVersion:   &moduleVersion,
 				IsAssessmentRun: true,
 			},
 		},
@@ -3051,7 +3179,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				},
 				WorkspaceID:   ws.Metadata.ID,
 				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
 			},
 			existingAssessment: &models.WorkspaceAssessment{
 				Metadata: models.ResourceMetadata{
@@ -3083,7 +3210,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				},
 				WorkspaceID:   ws.Metadata.ID,
 				ModuleSource:  &moduleSource,
-				ModuleVersion: &moduleVersion,
 			},
 			existingAssessment: &models.WorkspaceAssessment{
 				Metadata: models.ResourceMetadata{
@@ -3126,8 +3252,7 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 			// Setup mocks
 			dbClient := buildDBClientWithMocks(t)
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
-			mockModuleService := moduleregistry.NewMockService(t)
-			mockModuleResolver := NewMockModuleResolver(t)
+			mockModuleResolver := registry.NewMockModuleResolver(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 			mockCaller := auth.NewMockCaller(t)
 
@@ -3221,11 +3346,8 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
-				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything).
-					Return(&ModuleRegistrySource{}, nil).Maybe()
-
-				mockModuleResolver.On("ResolveModuleVersion", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(moduleVersion, nil).Maybe()
+				mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, registry.ErrRemoteModuleSource).Maybe()
 			}
 
 			// Create test fixture
@@ -3235,7 +3357,6 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				dbClient:        dbClient.Client,
 				artifactStore:   mockArtifactStore,
 				activityService: mockActivityEvents,
-				moduleService:   mockModuleService,
 				moduleResolver:  mockModuleResolver,
 				limitChecker:    limits.NewLimitChecker(dbClient.Client),
 			}
