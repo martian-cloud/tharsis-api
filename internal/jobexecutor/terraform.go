@@ -146,58 +146,55 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		}
 	}
 
+	// If the above set any tokens for a federated registry remote host, potentially replace the tokens.
+	federatedRegistryTokens, err := t.client.CreateFederatedRegistryTokens(ctx, &types.CreateFederatedRegistryTokensInput{
+		JobID: t.jobCfg.JobID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create federated registry tokens: %v", err)
+	}
+
+	for _, token := range federatedRegistryTokens {
+		encHost, bErr := module.BuildTokenEnvVar(token.Hostname)
+		if bErr != nil {
+			return nil, fmt.Errorf("failed to encode host %s for environment variable: %v",
+				token.Hostname, bErr)
+		}
+		// Set the federated token on the environment since Terraform CLI will need to use
+		// it for pulling down any child modules and providers from the federated registry.
+		t.fullEnv[encHost] = token.Token
+	}
+
+	// Add service account tokens to the host map
+	for k, v := range managedIdentitiesResponse.HostCredentialFileMapping {
+		// Read the service account token data from the file
+		tokenData, rErr := os.ReadFile(v)
+		if rErr != nil {
+			return nil, fmt.Errorf("failed to read service account token data from file %s: %v", v, rErr)
+		}
+		encodedHost, rErr := module.BuildTokenEnvVar(k)
+		if rErr != nil {
+			return nil, fmt.Errorf("failed to encode host %s for environment variable: %v", k, rErr)
+		}
+
+		t.fullEnv[encodedHost] = string(tokenData)
+	}
+
+	hostTokenMap := map[string]string{}
+	for k, v := range t.fullEnv {
+		// Add env variables that start with the TF_TOKEN_ prefix to the hostTokenMap
+		if strings.HasPrefix(k, tfTokenVarPrefix) {
+			hostTokenMap[k] = v
+			t.jobLogger.Infof("Setting env variable %s", k)
+		}
+	}
+
 	// Handle a possible module source (and maybe version).
 	var resolvedModuleSource *string
 	if t.run.ModuleSource != nil {
 		if t.run.ModuleVersion != nil {
 			// Registry-style module source; version is always defined in this case
 			t.jobLogger.Infof("Resolving module version %s/%s", *t.run.ModuleSource, *t.run.ModuleVersion)
-
-			hostTokenMap := map[string]string{}
-			for k, v := range t.fullEnv {
-				// Add env variables that start with the TF_TOKEN_ prefix to the hostTokenMap
-				if strings.HasPrefix(k, tfTokenVarPrefix) {
-					hostTokenMap[k] = v
-				}
-			}
-
-			// If the above set any tokens for a federated registry remote host, potentially replace the tokens.
-			federatedRegistryTokens, err := t.client.CreateFederatedRegistryTokens(ctx, &types.CreateFederatedRegistryTokensInput{
-				JobID: t.jobCfg.JobID,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to create federated registry tokens: %v", err)
-			}
-
-			for _, token := range federatedRegistryTokens {
-				encHost, bErr := module.BuildTokenEnvVar(token.Hostname)
-				if bErr != nil {
-					return nil, fmt.Errorf("failed to encode host %s for environment variable: %v",
-						token.Hostname, bErr)
-				}
-
-				// Add federated registry tokens to the host map
-				hostTokenMap[encHost] = token.Token
-
-				// Set the federated token on the environment since Terraform CLI will need to use
-				// it for pulling down any child modules and providers from the federated registry.
-				t.fullEnv[encHost] = token.Token
-			}
-
-			// Add service account tokens to the host map
-			for k, v := range managedIdentitiesResponse.HostCredentialFileMapping {
-				// Read the service account token data from the file
-				tokenData, rErr := os.ReadFile(v)
-				if rErr != nil {
-					return nil, fmt.Errorf("failed to read service account token data from file %s: %v", v, rErr)
-				}
-				encodedHost, rErr := module.BuildTokenEnvVar(k)
-				if rErr != nil {
-					return nil, fmt.Errorf("failed to encode host %s for environment variable: %v", k, rErr)
-				}
-
-				hostTokenMap[encodedHost] = string(tokenData)
-			}
 
 			presignedURL, rErr := resolveModuleSource(*t.run.ModuleSource, *t.run.ModuleVersion, hostTokenMap)
 			if rErr != nil {
