@@ -374,12 +374,12 @@ func loadFederatedRegistry(ctx context.Context, id string) (*models.FederatedReg
 		return nil, err
 	}
 
-	ws, ok := data.(models.FederatedRegistry)
+	registry, ok := data.(*models.FederatedRegistry)
 	if !ok {
 		return nil, errors.New("Wrong type")
 	}
 
-	return &ws, nil
+	return registry, nil
 }
 
 func federatedRegistryBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
