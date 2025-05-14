@@ -116,7 +116,7 @@ type oidcTokenVerifier struct {
 func NewOIDCTokenVerifier(ctx context.Context, issuers []string, oidcConfigFetcher OpenIDConfigFetcher, enableCache bool) OIDCTokenVerifier {
 	issuerMap := map[string]struct{}{}
 	for _, issuer := range issuers {
-		issuerMap[issuer] = struct{}{}
+		issuerMap[NormalizeOIDCIssuer(issuer)] = struct{}{}
 	}
 
 	var cache *jwk.Cache
@@ -142,8 +142,13 @@ func (o *oidcTokenVerifier) VerifyToken(ctx context.Context, token string, valid
 	}
 
 	issuer := decodedToken.Issuer()
+	normalizedIssuer := NormalizeOIDCIssuer(issuer)
 
-	oidcCfg, err := o.loadOIDCConfig(ctx, issuer)
+	if _, ok := o.issuerMap[normalizedIssuer]; !ok {
+		return nil, fmt.Errorf("invalid issuer %s", issuer)
+	}
+
+	oidcCfg, err := o.loadOIDCConfig(ctx, normalizedIssuer)
 	if err != nil {
 		return nil, err
 	}
@@ -171,10 +176,6 @@ func (o *oidcTokenVerifier) VerifyToken(ctx context.Context, token string, valid
 }
 
 func (o *oidcTokenVerifier) loadOIDCConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error) {
-	if _, ok := o.issuerMap[issuer]; !ok {
-		return nil, fmt.Errorf("invalid issuer %s", issuer)
-	}
-
 	if cfg, ok := o.getOIDCConfigFromCache(issuer); ok {
 		return cfg, nil
 	}
@@ -184,13 +185,13 @@ func (o *oidcTokenVerifier) loadOIDCConfig(ctx context.Context, issuer string) (
 
 	cfg, err := o.oidcConfigFetcher.GetOpenIDConfig(ctx, issuer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get OIDC config for issuer %s: %w", issuer, err)
+		return nil, fmt.Errorf("failed to get OIDC config for issuer url %s: %w", issuer, err)
 	}
 
 	if o.cache != nil {
 		err := o.cache.Register(cfg.JwksURI, jwk.WithRefreshInterval(jwtRefreshIntervalInMinutes*time.Minute))
 		if err != nil {
-			return nil, fmt.Errorf("failed to register OIDC config for issuer %s: %w", issuer, err)
+			return nil, fmt.Errorf("failed to register OIDC config for issuer url %s: %w", issuer, err)
 		}
 	}
 
@@ -292,4 +293,13 @@ func (o *oidcTokenVerifier) getKey(ctx context.Context, token []byte, jwksURI st
 	}
 
 	return key, nil
+}
+
+// NormalizeOIDCIssuer normalizes the OIDC issuer URL by adding "https://" prefix if not present and removing the trailing slash
+func NormalizeOIDCIssuer(issuer string) string {
+	normalizedIssuer := issuer
+	if !strings.HasPrefix(issuer, "http://") && !strings.HasPrefix(issuer, "https://") {
+		normalizedIssuer = fmt.Sprintf("https://%s", issuer)
+	}
+	return strings.TrimSuffix(normalizedIssuer, "/")
 }
