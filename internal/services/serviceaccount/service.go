@@ -618,13 +618,9 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 // Claims are not checked.
 func (s *service) findMatchingTrustPolicies(issuer string, policies []models.OIDCTrustPolicy) []models.OIDCTrustPolicy {
 	result := []models.OIDCTrustPolicy{}
-	normalizedIssuer := issuer
-	if !strings.HasPrefix(issuer, "http://") && !strings.HasPrefix(issuer, "https://") {
-		normalizedIssuer = fmt.Sprintf("https://%s", issuer)
-	}
-	normalizedIssuer = strings.TrimSuffix(normalizedIssuer, "/")
+	normalizedIssuer := auth.NormalizeOIDCIssuer(issuer)
 	for _, p := range policies {
-		if normalizedIssuer == strings.TrimSuffix(p.Issuer, "/") {
+		if normalizedIssuer == auth.NormalizeOIDCIssuer(p.Issuer) {
 			result = append(result, p)
 		}
 	}

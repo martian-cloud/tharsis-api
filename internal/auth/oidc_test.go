@@ -125,19 +125,34 @@ func TestOIDCTokenVerifier_VerifyToken(t *testing.T) {
 	err = pubKeySet.AddKey(pubKey)
 	require.NoError(t, err)
 
-	// Create a valid token
-	validToken := jwt.New()
-	err = validToken.Set(jwt.IssuerKey, "https://example.com")
+	// Create a valid token 1
+	validToken1 := jwt.New()
+	err = validToken1.Set(jwt.IssuerKey, "https://example.com")
 	require.NoError(t, err)
-	err = validToken.Set(jwt.SubjectKey, "test-subject")
+	err = validToken1.Set(jwt.SubjectKey, "test-subject")
 	require.NoError(t, err)
-	err = validToken.Set(jwt.AudienceKey, []string{"test-audience"})
+	err = validToken1.Set(jwt.AudienceKey, []string{"test-audience"})
 	require.NoError(t, err)
-	err = validToken.Set(jwt.ExpirationKey, time.Now().Add(time.Hour).Unix())
+	err = validToken1.Set(jwt.ExpirationKey, time.Now().Add(time.Hour).Unix())
 	require.NoError(t, err)
 
-	// Sign the token
-	signedToken, err := jwt.Sign(validToken, jwt.WithKey(jwa.RS256, key))
+	// Sign the token 1
+	signedToken1, err := jwt.Sign(validToken1, jwt.WithKey(jwa.RS256, key))
+	require.NoError(t, err)
+
+	// Create a valid token 2
+	validToken2 := jwt.New()
+	err = validToken2.Set(jwt.IssuerKey, "example.com")
+	require.NoError(t, err)
+	err = validToken2.Set(jwt.SubjectKey, "test-subject")
+	require.NoError(t, err)
+	err = validToken2.Set(jwt.AudienceKey, []string{"test-audience"})
+	require.NoError(t, err)
+	err = validToken2.Set(jwt.ExpirationKey, time.Now().Add(time.Hour).Unix())
+	require.NoError(t, err)
+
+	// Sign the token 2
+	signedToken2, err := jwt.Sign(validToken2, jwt.WithKey(jwa.RS256, key))
 	require.NoError(t, err)
 
 	// Create an expired token
@@ -172,8 +187,38 @@ func TestOIDCTokenVerifier_VerifyToken(t *testing.T) {
 		expectErrorMessage string
 	}{
 		{
-			name:   "valid token",
-			token:  string(signedToken),
+			name:   "valid token with exact issuer",
+			token:  string(signedToken1),
+			issuer: "https://example.com",
+			setupMocks: func(mockFetcher *MockOpenIDConfigFetcher) {
+				mockFetcher.On("GetOpenIDConfig", mock.Anything, "https://example.com").Return(
+					&OIDCConfiguration{
+						Issuer:  "https://example.com",
+						JwksURI: jwksServer.URL,
+					}, nil)
+			},
+			validationOptions: []jwt.ValidateOption{
+				jwt.WithAudience("test-audience"),
+			},
+		},
+		{
+			name:   "valid token with issuer that ends with a slash",
+			token:  string(signedToken1),
+			issuer: "https://example.com/",
+			setupMocks: func(mockFetcher *MockOpenIDConfigFetcher) {
+				mockFetcher.On("GetOpenIDConfig", mock.Anything, "https://example.com").Return(
+					&OIDCConfiguration{
+						Issuer:  "https://example.com",
+						JwksURI: jwksServer.URL,
+					}, nil)
+			},
+			validationOptions: []jwt.ValidateOption{
+				jwt.WithAudience("test-audience"),
+			},
+		},
+		{
+			name:   "valid token with issuer as hostname instead of URL",
+			token:  string(signedToken2),
 			issuer: "https://example.com",
 			setupMocks: func(mockFetcher *MockOpenIDConfigFetcher) {
 				mockFetcher.On("GetOpenIDConfig", mock.Anything, "https://example.com").Return(
@@ -188,7 +233,7 @@ func TestOIDCTokenVerifier_VerifyToken(t *testing.T) {
 		},
 		{
 			name:   "invalid audience",
-			token:  string(signedToken),
+			token:  string(signedToken1),
 			issuer: "https://example.com",
 			setupMocks: func(mockFetcher *MockOpenIDConfigFetcher) {
 				mockFetcher.On("GetOpenIDConfig", mock.Anything, "https://example.com").Return(
@@ -216,13 +261,19 @@ func TestOIDCTokenVerifier_VerifyToken(t *testing.T) {
 		},
 		{
 			name:               "invalid issuer",
-			token:              string(signedToken),
+			token:              string(signedToken1),
 			issuer:             "https://invalid.com",
 			expectErrorMessage: "invalid issuer",
 		},
 		{
+			name:               "invalid issuer for token with hostname as issuer",
+			token:              string(signedToken2),
+			issuer:             "invalid.com",
+			expectErrorMessage: "invalid issuer",
+		},
+		{
 			name:   "error fetching OIDC config",
-			token:  string(signedToken),
+			token:  string(signedToken1),
 			issuer: "https://example.com",
 			setupMocks: func(mockFetcher *MockOpenIDConfigFetcher) {
 				mockFetcher.On("GetOpenIDConfig", mock.Anything, "https://example.com").Return(
@@ -254,7 +305,7 @@ func TestOIDCTokenVerifier_VerifyToken(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, token)
-				assert.Equal(t, test.issuer, token.Issuer())
+				assert.Equal(t, NormalizeOIDCIssuer(test.issuer), NormalizeOIDCIssuer(token.Issuer()))
 			}
 		})
 	}
@@ -294,12 +345,6 @@ func TestOIDCTokenVerifier_loadOIDCConfig(t *testing.T) {
 					}, nil)
 			},
 			enableCache: false,
-		},
-		{
-			name:               "invalid issuer",
-			issuer:             "https://invalid.com",
-			issuers:            []string{"https://example.com"},
-			expectErrorMessage: "invalid issuer",
 		},
 		{
 			name:    "error fetching OIDC config",
@@ -438,7 +483,6 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 	tests := []struct {
 		name               string
 		token              []byte
-		jwksURI            string
 		setupMocks         func() *httptest.Server
 		enableCache        bool
 		expectErrorMessage string
@@ -446,7 +490,6 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 		{
 			name:    "successful key set fetch without cache",
 			token:   signedToken,
-			jwksURI: "https://example.com/jwks",
 			setupMocks: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					keySetJSON, _ := json.Marshal(keySet)
@@ -459,7 +502,6 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 		{
 			name:    "error fetching key set",
 			token:   signedToken,
-			jwksURI: "https://example.com/jwks",
 			setupMocks: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
@@ -479,7 +521,6 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 			if test.setupMocks != nil {
 				jwksServer = test.setupMocks()
 				defer jwksServer.Close()
-				test.jwksURI = jwksServer.URL
 			}
 
 			// Create the token verifier
@@ -487,7 +528,7 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 			oidcVerifier := verifier.(*oidcTokenVerifier)
 
 			// Call getKeySet
-			keySet, err := oidcVerifier.getKeySet(ctx, test.token, test.jwksURI)
+			keySet, err := oidcVerifier.getKeySet(ctx, test.token, jwksServer.URL)
 
 			if test.expectErrorMessage != "" {
 				assert.Error(t, err)
