@@ -13,7 +13,9 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -22,6 +24,7 @@ import (
 // Jobs encapsulates the logic to access jobs from the database
 type Jobs interface {
 	GetJobByID(ctx context.Context, id string) (*models.Job, error)
+	GetJobByTRN(ctx context.Context, trn string) (*models.Job, error)
 	GetLatestJobByType(ctx context.Context, runID string, jobType models.JobType) (*models.Job, error)
 	GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, error)
 	UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error)
@@ -112,6 +115,29 @@ func (j *jobs) GetJobByID(ctx context.Context, id string) (*models.Job, error) {
 	return j.getJob(ctx, goqu.Ex{"jobs.id": id})
 }
 
+func (j *jobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "db.GetJobByTRN")
+	defer span.End()
+
+	path, err := types.JobModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a job TRN must have the workspace path and job GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return j.getJob(ctx, goqu.Ex{
+		"jobs.id":         gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path": path[:lastSlashIndex],
+	})
+}
+
 func (j *jobs) GetLatestJobByType(ctx context.Context, runID string, jobType models.JobType) (*models.Job, error) {
 	ctx, span := tracer.Start(ctx, "db.GetLatestJobByType")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -186,7 +212,8 @@ func (j *jobs) GetJobs(ctx context.Context, input *GetJobsInput) (*JobsResult, e
 	}
 
 	query := dialect.From(goqu.T("jobs")).
-		Select(jobFieldList...).
+		Select(j.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -253,27 +280,33 @@ func (j *jobs) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("jobs").
+	sql, args, err := dialect.From("jobs").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":             goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":          timestamp,
-				"status":              job.Status,
-				"type":                job.Type,
-				"workspace_id":        job.WorkspaceID,
-				"run_id":              job.RunID,
-				"cancel_requested":    job.CancelRequested,
-				"cancel_requested_at": job.CancelRequestedTimestamp,
-				"queued_at":           job.Timestamps.QueuedTimestamp,
-				"pending_at":          job.Timestamps.PendingTimestamp,
-				"running_at":          job.Timestamps.RunningTimestamp,
-				"finished_at":         job.Timestamps.FinishedTimestamp,
-				"runner_id":           job.RunnerID,
-				"runner_path":         job.RunnerPath,
-				"tags":                tags,
-			},
-		).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).Returning(jobFieldList...).ToSQL()
+		With("jobs",
+			dialect.Update("jobs").
+				Set(
+					goqu.Record{
+						"version":             goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":          timestamp,
+						"status":              job.Status,
+						"type":                job.Type,
+						"workspace_id":        job.WorkspaceID,
+						"run_id":              job.RunID,
+						"cancel_requested":    job.CancelRequested,
+						"cancel_requested_at": job.CancelRequestedTimestamp,
+						"queued_at":           job.Timestamps.QueuedTimestamp,
+						"pending_at":          job.Timestamps.PendingTimestamp,
+						"running_at":          job.Timestamps.RunningTimestamp,
+						"finished_at":         job.Timestamps.FinishedTimestamp,
+						"runner_id":           job.RunnerID,
+						"runner_path":         job.RunnerPath,
+						"tags":                tags,
+					},
+				).Where(goqu.Ex{"id": job.Metadata.ID, "version": job.Metadata.Version}).
+				Returning("*"),
+		).Select(j.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -306,30 +339,33 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("jobs").
+	sql, args, err := dialect.From("jobs").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                  newResourceID(),
-			"version":             initialResourceVersion,
-			"created_at":          timestamp,
-			"updated_at":          timestamp,
-			"status":              job.Status,
-			"type":                job.Type,
-			"workspace_id":        job.WorkspaceID,
-			"run_id":              job.RunID,
-			"cancel_requested":    job.CancelRequested,
-			"cancel_requested_at": job.CancelRequestedTimestamp,
-			"queued_at":           job.Timestamps.QueuedTimestamp,
-			"pending_at":          job.Timestamps.PendingTimestamp,
-			"running_at":          job.Timestamps.RunningTimestamp,
-			"finished_at":         job.Timestamps.FinishedTimestamp,
-			"max_job_duration":    job.MaxJobDuration,
-			"runner_id":           job.RunnerID,
-			"runner_path":         job.RunnerPath,
-			"tags":                tags,
-		}).
-		Returning(jobFieldList...).ToSQL()
-
+		With("jobs",
+			dialect.Insert("jobs").
+				Rows(goqu.Record{
+					"id":                  newResourceID(),
+					"version":             initialResourceVersion,
+					"created_at":          timestamp,
+					"updated_at":          timestamp,
+					"status":              job.Status,
+					"type":                job.Type,
+					"workspace_id":        job.WorkspaceID,
+					"run_id":              job.RunID,
+					"cancel_requested":    job.CancelRequested,
+					"cancel_requested_at": job.CancelRequestedTimestamp,
+					"queued_at":           job.Timestamps.QueuedTimestamp,
+					"pending_at":          job.Timestamps.PendingTimestamp,
+					"running_at":          job.Timestamps.RunningTimestamp,
+					"finished_at":         job.Timestamps.FinishedTimestamp,
+					"max_job_duration":    job.MaxJobDuration,
+					"runner_id":           job.RunnerID,
+					"runner_path":         job.RunnerPath,
+					"tags":                tags,
+				}).Returning("*"),
+		).Select(j.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -379,7 +415,8 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 
 	query := dialect.From(goqu.T("jobs")).
 		Prepared(true).
-		Select(jobFieldList...).
+		Select(j.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -394,11 +431,28 @@ func (j *jobs) getJob(ctx context.Context, exp goqu.Ex) (*models.Job, error) {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
 
 	return job, nil
+}
+
+func (j *jobs) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range jobFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("jobs.%s", field))
+	}
+	selectFields = append(selectFields, "namespaces.path")
+
+	return selectFields
 }
 
 func scanJob(row scanner) (*models.Job, error) {
@@ -407,6 +461,7 @@ func scanJob(row scanner) (*models.Job, error) {
 	var pendingAt sql.NullTime
 	var runningAt sql.NullTime
 	var finishedAt sql.NullTime
+	var workspacePath string
 
 	job := &models.Job{}
 
@@ -429,6 +484,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&finishedAt,
 		&job.MaxJobDuration,
 		&job.Tags,
+		&workspacePath,
 	}
 
 	err := row.Scan(fields...)
@@ -456,6 +512,8 @@ func scanJob(row scanner) (*models.Job, error) {
 	if finishedAt.Valid {
 		job.Timestamps.FinishedTimestamp = &finishedAt.Time
 	}
+
+	job.Metadata.TRN = types.JobModelType.BuildTRN(workspacePath, job.GetGlobalID())
 
 	return job, nil
 }

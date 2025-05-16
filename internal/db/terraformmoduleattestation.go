@@ -13,6 +13,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -21,6 +22,7 @@ import (
 // TerraformModuleAttestations encapsulates the logic to access terraform module attestationsfrom the database
 type TerraformModuleAttestations interface {
 	GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error)
+	GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error)
 	GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*ModuleAttestationsResult, error)
 	CreateModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error)
 	UpdateModuleAttestation(ctx context.Context, moduleAttestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error)
@@ -99,6 +101,32 @@ func (t *terraformModuleAttestations) GetModuleAttestationByID(ctx context.Conte
 	return t.getModuleAttestation(ctx, goqu.Ex{"terraform_module_attestations.id": id})
 }
 
+func (t *terraformModuleAttestations) GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleAttestationByTRN")
+	defer span.End()
+
+	path, err := types.TerraformModuleAttestationModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 4 {
+		return nil, errors.New("a Terraform module attestation must have group path, module name, system, and shasum separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return t.getModuleAttestation(ctx, goqu.Ex{
+		"terraform_module_attestations.data_sha_sum": parts[len(parts)-1],
+		"terraform_modules.system":                   parts[len(parts)-2],
+		"terraform_modules.name":                     parts[len(parts)-3],
+		"namespaces.path":                            strings.Join(parts[:len(parts)-3], "/"),
+	})
+}
+
 func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*ModuleAttestationsResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetModuleAttestations")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -124,6 +152,8 @@ func (t *terraformModuleAttestations) GetModuleAttestations(ctx context.Context,
 
 	query := dialect.From(goqu.T("terraform_module_attestations")).
 		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -191,23 +221,28 @@ func (t *terraformModuleAttestations) CreateModuleAttestation(ctx context.Contex
 		return nil, err
 	}
 
-	sql, args, err := dialect.Insert("terraform_module_attestations").
+	sql, args, err := dialect.From("terraform_module_attestations").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":             newResourceID(),
-			"version":        initialResourceVersion,
-			"created_at":     timestamp,
-			"updated_at":     timestamp,
-			"module_id":      moduleAttestation.ModuleID,
-			"description":    nullableString(moduleAttestation.Description),
-			"data":           moduleAttestation.Data,
-			"data_sha_sum":   moduleAttestation.DataSHASum,
-			"schema_type":    moduleAttestation.SchemaType,
-			"predicate_type": moduleAttestation.PredicateType,
-			"digests":        digests,
-			"created_by":     moduleAttestation.CreatedBy,
-		}).
-		Returning(moduleAttestationFieldList...).ToSQL()
+		With("terraform_module_attestations",
+			dialect.Insert("terraform_module_attestations").
+				Rows(goqu.Record{
+					"id":             newResourceID(),
+					"version":        initialResourceVersion,
+					"created_at":     timestamp,
+					"updated_at":     timestamp,
+					"module_id":      moduleAttestation.ModuleID,
+					"description":    nullableString(moduleAttestation.Description),
+					"data":           moduleAttestation.Data,
+					"data_sha_sum":   moduleAttestation.DataSHASum,
+					"schema_type":    moduleAttestation.SchemaType,
+					"predicate_type": moduleAttestation.PredicateType,
+					"digests":        digests,
+					"created_by":     moduleAttestation.CreatedBy,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -249,10 +284,17 @@ func (t *terraformModuleAttestations) UpdateModuleAttestation(ctx context.Contex
 		"description": nullableString(moduleAttestation.Description),
 	}
 
-	sql, args, err := dialect.Update("terraform_module_attestations").
+	sql, args, err := dialect.From("terraform_module_attestations").
 		Prepared(true).
-		Set(record).
-		Where(goqu.Ex{"id": moduleAttestation.Metadata.ID, "version": moduleAttestation.Metadata.Version}).Returning(moduleAttestationFieldList...).ToSQL()
+		With("terraform_module_attestations",
+			dialect.Update("terraform_module_attestations").
+				Set(record).
+				Where(goqu.Ex{"id": moduleAttestation.Metadata.ID, "version": moduleAttestation.Metadata.Version}).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -277,14 +319,20 @@ func (t *terraformModuleAttestations) DeleteModuleAttestation(ctx context.Contex
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("terraform_module_attestations").
+	sql, args, err := dialect.From("terraform_module_attestations").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      moduleAttestation.Metadata.ID,
-				"version": moduleAttestation.Metadata.Version,
-			},
-		).Returning(moduleAttestationFieldList...).ToSQL()
+		With("terraform_module_attestations",
+			dialect.Delete("terraform_module_attestations").
+				Where(
+					goqu.Ex{
+						"id":      moduleAttestation.Metadata.ID,
+						"version": moduleAttestation.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -307,6 +355,8 @@ func (t *terraformModuleAttestations) getModuleAttestation(ctx context.Context, 
 	query := dialect.From(goqu.T("terraform_module_attestations")).
 		Prepared(true).
 		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_attestations.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("terraform_modules.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -319,6 +369,13 @@ func (t *terraformModuleAttestations) getModuleAttestation(ctx context.Context, 
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -331,12 +388,18 @@ func (t *terraformModuleAttestations) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("terraform_module_attestations.%s", field))
 	}
 
+	selectFields = append(selectFields,
+		"terraform_modules.name",
+		"terraform_modules.system",
+		"namespaces.path",
+	)
+
 	return selectFields
 }
 
 func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttestation, error) {
 	var description sql.NullString
-
+	var moduleName, moduleSystem, groupPath string
 	moduleAttestation := &models.TerraformModuleAttestation{
 		Digests: []string{},
 	}
@@ -354,6 +417,9 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 		&moduleAttestation.PredicateType,
 		&moduleAttestation.Digests,
 		&moduleAttestation.CreatedBy,
+		&moduleName,
+		&moduleSystem,
+		&groupPath,
 	}
 
 	err := row.Scan(fields...)
@@ -364,6 +430,13 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 	if description.Valid {
 		moduleAttestation.Description = description.String
 	}
+
+	moduleAttestation.Metadata.TRN = types.TerraformModuleAttestationModelType.BuildTRN(
+		groupPath,
+		moduleName,
+		moduleSystem,
+		string(moduleAttestation.DataSHASum),
+	)
 
 	return moduleAttestation, nil
 }

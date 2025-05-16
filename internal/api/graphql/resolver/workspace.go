@@ -2,13 +2,12 @@ package resolver
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -18,6 +17,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
@@ -27,11 +27,13 @@ import (
 // WorkspaceConnectionQueryArgs are used to query a workspace connection
 type WorkspaceConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	GroupPath *string
+	GroupPath *string // DEPRECATED: use GroupID instead with a TRN
+	GroupID   *string
 	Search    *string
 }
 
 // WorkspaceQueryArgs are used to query a single workspace
+// DEPRECATED: use node query instead with a TRN
 type WorkspaceQueryArgs struct {
 	FullPath string
 }
@@ -68,7 +70,7 @@ type WorkspaceConnectionResolver struct {
 
 // NewWorkspaceConnectionResolver creates a new WorkspaceConnectionResolver
 func NewWorkspaceConnectionResolver(ctx context.Context, input *workspace.GetWorkspacesInput) (*WorkspaceConnectionResolver, error) {
-	workspaceService := getWorkspaceService(ctx)
+	workspaceService := getServiceCatalog(ctx).WorkspaceService
 
 	result, err := workspaceService.GetWorkspaces(ctx, input)
 	if err != nil {
@@ -136,7 +138,7 @@ type WorkspaceResolver struct {
 
 // ID resolver
 func (r *WorkspaceResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.WorkspaceType, r.workspace.Metadata.ID))
+	return graphql.ID(r.workspace.GetGlobalID())
 }
 
 // Name resolver
@@ -179,7 +181,7 @@ func (r *WorkspaceResolver) Group(ctx context.Context) (*GroupResolver, error) {
 func (r *WorkspaceResolver) Memberships(ctx context.Context) ([]*NamespaceMembershipResolver, error) {
 	resolvers := []*NamespaceMembershipResolver{}
 
-	result, err := getNamespaceMembershipService(ctx).GetNamespaceMembershipsForNamespace(ctx, r.workspace.FullPath)
+	result, err := getServiceCatalog(ctx).NamespaceMembershipService.GetNamespaceMembershipsForNamespace(ctx, r.workspace.FullPath)
 	if err != nil {
 		return nil, err
 	}
@@ -199,9 +201,7 @@ func (r *WorkspaceResolver) Variables(ctx context.Context) ([]*NamespaceVariable
 
 // AssignedManagedIdentities resolver
 func (r *WorkspaceResolver) AssignedManagedIdentities(ctx context.Context) ([]*ManagedIdentityResolver, error) {
-	service := getManagedIdentityService(ctx)
-
-	identities, err := service.GetManagedIdentitiesForWorkspace(ctx, r.workspace.Metadata.ID)
+	identities, err := getServiceCatalog(ctx).ManagedIdentityService.GetManagedIdentitiesForWorkspace(ctx, r.workspace.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -388,9 +388,7 @@ func (r *WorkspaceResolver) VCSProviders(ctx context.Context, args *VCSProviderC
 
 // WorkspaceVCSProviderLink resolver
 func (r *WorkspaceResolver) WorkspaceVCSProviderLink(ctx context.Context) (*WorkspaceVCSProviderLinkResolver, error) {
-	service := getVCSService(ctx)
-
-	link, err := service.GetWorkspaceVCSProviderLinkByWorkspaceID(ctx, r.workspace.Metadata.ID)
+	link, err := getServiceCatalog(ctx).VCSService.GetWorkspaceVCSProviderLinkByWorkspaceID(ctx, r.workspace.Metadata.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -427,18 +425,17 @@ func (r *WorkspaceResolver) VCSEvents(ctx context.Context, args *VCSEventConnect
 
 // RunnerTags resolver
 func (r *WorkspaceResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTagsSetting, error) {
-	return getWorkspaceService(ctx).GetRunnerTagsSetting(ctx, r.workspace)
+	return getServiceCatalog(ctx).WorkspaceService.GetRunnerTagsSetting(ctx, r.workspace)
 }
 
 // DriftDetectionEnabled resolver
 func (r *WorkspaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
-	return getWorkspaceService(ctx).GetDriftDetectionEnabledSetting(ctx, r.workspace)
+	return getServiceCatalog(ctx).WorkspaceService.GetDriftDetectionEnabledSetting(ctx, r.workspace)
 }
 
+// DEPRECATED: use node query instead
 func workspaceQuery(ctx context.Context, args *WorkspaceQueryArgs) (*WorkspaceResolver, error) {
-	workspaceService := getWorkspaceService(ctx)
-
-	ws, err := workspaceService.GetWorkspaceByFullPath(ctx, args.FullPath)
+	ws, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(args.FullPath))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -459,16 +456,24 @@ func workspacesQuery(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*
 		Search:            args.Search,
 	}
 
-	if args.GroupPath != nil {
-		// Find group with path
-		groupService := getGroupService(ctx)
+	if args.GroupID != nil && args.GroupPath != nil {
+		return nil, errors.New("either groupId or groupPath must be specified, not both", errors.WithErrorCode(errors.EInvalid))
+	}
 
-		group, err := groupService.GetGroupByFullPath(ctx, *args.GroupPath)
+	var groupValueToResolve *string
+	if args.GroupID != nil {
+		groupValueToResolve = args.GroupID
+	} else if args.GroupPath != nil {
+		groupValueToResolve = ptr.String(types.GroupModelType.BuildTRN(*args.GroupPath))
+	}
+
+	if groupValueToResolve != nil {
+		groupID, err := getServiceCatalog(ctx).FetchModelID(ctx, *groupValueToResolve)
 		if err != nil {
 			return nil, err
 		}
 
-		input.Group = group
+		input.GroupID = &groupID
 	}
 
 	if args.Sort != nil {
@@ -509,7 +514,8 @@ type CreateWorkspaceInput struct {
 	PreventDestroyPlan    *bool
 	RunnerTags            *NamespaceRunnerTagsInput
 	Name                  string
-	GroupPath             string
+	GroupID               *string
+	GroupPath             *string // DEPRECATED: use GroupID instead with a TRN
 	Description           string
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 }
@@ -524,7 +530,7 @@ type UpdateWorkspaceInput struct {
 	TerraformVersion      *string
 	Description           *string
 	PreventDestroyPlan    *bool
-	WorkspacePath         *string
+	WorkspacePath         *string // DEPRECATED: use ID instead with a TRN
 	ID                    *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
@@ -535,39 +541,45 @@ type DeleteWorkspaceInput struct {
 	ClientMutationID *string
 	Force            *bool
 	Metadata         *MetadataInput
-	WorkspacePath    *string
+	WorkspacePath    *string // DEPRECATED: use ID instead with a TRN
 	ID               *string
 }
 
 // LockWorkspaceInput contains the input for locking a workspace
 type LockWorkspaceInput struct {
 	ClientMutationID *string
-	WorkspacePath    string
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID      *string
 }
 
 // UnlockWorkspaceInput contains the input for unlocking a workspace
 type UnlockWorkspaceInput struct {
 	ClientMutationID *string
-	WorkspacePath    string
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID      *string
 }
 
 // DestroyWorkspaceInput contains the input for destroying a workspace
 type DestroyWorkspaceInput struct {
 	ClientMutationID *string
-	WorkspacePath    string
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID      *string
 }
 
 // AssessWorkspaceInput contains the input for running a workspace assessment
 type AssessWorkspaceInput struct {
 	ClientMutationID *string
-	WorkspacePath    string
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID      *string
 }
 
 // MigrateWorkspaceInput contains the input for migrating a workspace
 type MigrateWorkspaceInput struct {
 	ClientMutationID *string
-	NewGroupPath     string
-	WorkspacePath    string
+	NewGroupPath     *string // DEPRECATED: use NewGroupID instead with a TRN
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID      *string
+	NewGroupID       *string
 }
 
 func handleWorkspaceMutationProblem(e error, clientMutationID *string) (*WorkspaceMutationPayloadResolver, error) {
@@ -580,11 +592,10 @@ func handleWorkspaceMutationProblem(e error, clientMutationID *string) (*Workspa
 }
 
 func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
-	groupID := group.Metadata.ID
 
 	var terraformVersion string
 	if input.TerraformVersion != nil {
@@ -626,7 +637,7 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		}
 	}
 
-	createdWorkspace, err := getWorkspaceService(ctx).CreateWorkspace(ctx, &wsCreateOptions)
+	createdWorkspace, err := getServiceCatalog(ctx).WorkspaceService.CreateWorkspace(ctx, &wsCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -636,18 +647,14 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 }
 
 func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
-	wsService := getWorkspaceService(ctx)
-
-	var ws *models.Workspace
-	var err error
-	switch {
-	case input.WorkspacePath != nil:
-		ws, err = wsService.GetWorkspaceByFullPath(ctx, *input.WorkspacePath)
-	case input.ID != nil:
-		ws, err = wsService.GetWorkspaceByID(ctx, gid.FromGlobalID(*input.ID))
-	default:
-		err = fmt.Errorf("must specify either WorkspacePath or ID")
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.ID, types.WorkspaceModelType)
+	if err != nil {
+		return nil, err
 	}
+
+	wsService := getServiceCatalog(ctx).WorkspaceService
+
+	ws, err := wsService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -719,18 +726,14 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 }
 
 func deleteWorkspaceMutation(ctx context.Context, input *DeleteWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
-	wsService := getWorkspaceService(ctx)
-
-	var ws *models.Workspace
-	var err error
-	switch {
-	case input.WorkspacePath != nil:
-		ws, err = wsService.GetWorkspaceByFullPath(ctx, *input.WorkspacePath)
-	case input.ID != nil:
-		ws, err = wsService.GetWorkspaceByID(ctx, gid.FromGlobalID(*input.ID))
-	default:
-		err = fmt.Errorf("must specify either WorkspacePath or ID")
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.ID, types.WorkspaceModelType)
+	if err != nil {
+		return nil, err
 	}
+
+	wsService := getServiceCatalog(ctx).WorkspaceService
+
+	ws, err := wsService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -759,9 +762,14 @@ func deleteWorkspaceMutation(ctx context.Context, input *DeleteWorkspaceInput) (
 }
 
 func lockWorkspaceMutation(ctx context.Context, input *LockWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
-	wsService := getWorkspaceService(ctx)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	ws, err := wsService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	wsService := getServiceCatalog(ctx).WorkspaceService
+
+	ws, err := wsService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -776,9 +784,14 @@ func lockWorkspaceMutation(ctx context.Context, input *LockWorkspaceInput) (*Wor
 }
 
 func unlockWorkspaceMutation(ctx context.Context, input *UnlockWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
-	wsService := getWorkspaceService(ctx)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	ws, err := wsService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	wsService := getServiceCatalog(ctx).WorkspaceService
+
+	ws, err := wsService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -793,13 +806,13 @@ func unlockWorkspaceMutation(ctx context.Context, input *UnlockWorkspaceInput) (
 }
 
 func destroyWorkspaceMutation(ctx context.Context, input *DestroyWorkspaceInput) (*RunMutationPayloadResolver, error) {
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	run, err := getRunService(ctx).CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
-		WorkspaceID: ws.Metadata.ID,
+	run, err := getServiceCatalog(ctx).RunService.CreateDestroyRunForWorkspace(ctx, &run.CreateDestroyRunForWorkspaceInput{
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		return nil, err
@@ -810,13 +823,13 @@ func destroyWorkspaceMutation(ctx context.Context, input *DestroyWorkspaceInput)
 }
 
 func assessWorkspaceMutation(ctx context.Context, input *AssessWorkspaceInput) (*RunMutationPayloadResolver, error) {
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	run, err := getRunService(ctx).CreateAssessmentRunForWorkspace(ctx, &run.CreateAssessmentRunForWorkspaceInput{
-		WorkspaceID: ws.Metadata.ID,
+	run, err := getServiceCatalog(ctx).RunService.CreateAssessmentRunForWorkspace(ctx, &run.CreateAssessmentRunForWorkspaceInput{
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		return nil, err
@@ -827,22 +840,17 @@ func assessWorkspaceMutation(ctx context.Context, input *AssessWorkspaceInput) (
 }
 
 func migrateWorkspaceMutation(ctx context.Context, input *MigrateWorkspaceInput) (*WorkspaceMutationPayloadResolver, error) {
-	groupService := getGroupService(ctx)
-	workspaceService := getWorkspaceService(ctx)
-
-	workspace, err := workspaceService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the new parent group.
-	newParent, err := groupService.GetGroupByFullPath(ctx, input.NewGroupPath)
+	groupID, err := toModelID(ctx, input.NewGroupPath, input.NewGroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
-	newParentID := newParent.Metadata.ID
 
-	workspace, err = workspaceService.MigrateWorkspace(ctx, workspace.Metadata.ID, newParentID)
+	workspace, err := getServiceCatalog(ctx).WorkspaceService.MigrateWorkspace(ctx, workspaceID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -870,19 +878,18 @@ func (r *WorkspaceEventResolver) Workspace() *WorkspaceResolver {
 
 // WorkspaceSubscriptionInput is the input for subscribing to workspace events
 type WorkspaceSubscriptionInput struct {
-	WorkspacePath string
+	WorkspacePath *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID   *string
 }
 
 func (r RootResolver) workspaceEventsSubscription(ctx context.Context, input *WorkspaceSubscriptionInput) (<-chan *WorkspaceEventResolver, error) {
-	service := getWorkspaceService(ctx)
-
-	ws, err := service.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	events, err := service.SubscribeToWorkspaceEvents(ctx, &workspace.EventSubscriptionOptions{
-		WorkspaceID: ws.Metadata.ID,
+	events, err := getServiceCatalog(ctx).WorkspaceService.SubscribeToWorkspaceEvents(ctx, &workspace.EventSubscriptionOptions{
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		return nil, err
@@ -933,9 +940,7 @@ func loadWorkspace(ctx context.Context, id string) (*models.Workspace, error) {
 }
 
 func workspaceBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	wsService := getWorkspaceService(ctx)
-
-	workspaces, err := wsService.GetWorkspacesByIDs(ctx, ids)
+	workspaces, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspacesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

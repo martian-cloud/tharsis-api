@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -19,6 +20,7 @@ import (
 // FederatedRegistries encapsulates the logic to access federatedRegistries from the database
 type FederatedRegistries interface {
 	GetFederatedRegistryByID(ctx context.Context, id string) (*models.FederatedRegistry, error)
+	GetFederatedRegistryByTRN(ctx context.Context, trn string) (*models.FederatedRegistry, error)
 	GetFederatedRegistries(ctx context.Context, input *GetFederatedRegistriesInput) (*FederatedRegistriesResult, error)
 	CreateFederatedRegistry(ctx context.Context, federatedRegistry *models.FederatedRegistry) (*models.FederatedRegistry, error)
 	UpdateFederatedRegistry(ctx context.Context, federatedRegistry *models.FederatedRegistry) (*models.FederatedRegistry, error)
@@ -92,6 +94,28 @@ func (p *federatedRegistries) GetFederatedRegistryByID(ctx context.Context,
 	defer span.End()
 
 	return p.getFederatedRegistry(ctx, goqu.Ex{"federated_registries.id": id})
+}
+
+func (p *federatedRegistries) GetFederatedRegistryByTRN(ctx context.Context, trn string) (*models.FederatedRegistry, error) {
+	ctx, span := tracer.Start(ctx, "db.GetFederatedRegistryByTRN")
+	defer span.End()
+
+	path, err := types.FederatedRegistryModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a federated registry trn must have the group path and registry hostname separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span),
+		)
+	}
+
+	return p.getFederatedRegistry(ctx, goqu.Ex{
+		"federated_registries.hostname": path[lastSlashIndex+1:],
+		"namespaces.path":               path[:lastSlashIndex],
+	})
 }
 
 func (p *federatedRegistries) GetFederatedRegistries(ctx context.Context,
@@ -178,18 +202,22 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("federated_registries").
+	sql, args, err := dialect.From("federated_registries").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":         newResourceID(),
-			"version":    initialResourceVersion,
-			"created_at": timestamp,
-			"updated_at": timestamp,
-			"hostname":   input.Hostname,
-			"group_id":   input.GroupID,
-			"audience":   input.Audience,
-		}).
-		Returning(federatedRegistryFieldList...).ToSQL()
+		With("federated_registries",
+			dialect.Insert("federated_registries").
+				Rows(goqu.Record{
+					"id":         newResourceID(),
+					"version":    initialResourceVersion,
+					"created_at": timestamp,
+					"updated_at": timestamp,
+					"hostname":   input.Hostname,
+					"group_id":   input.GroupID,
+					"audience":   input.Audience,
+				}).Returning("*"),
+		).Select(p.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -203,7 +231,7 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 				return nil, errors.Wrap(err,
 					"federated registry with registry endpoint %s and group ID %s already exists",
 					input.Hostname,
-					gid.ToGlobalID(gid.FederatedRegistryType, input.GroupID),
+					gid.ToGlobalID(types.GroupModelType, input.GroupID),
 					errors.WithErrorCode(errors.EConflict),
 					errors.WithSpan(span))
 			}
@@ -222,17 +250,22 @@ func (p *federatedRegistries) UpdateFederatedRegistry(ctx context.Context,
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("federated_registries").
+	sql, args, err := dialect.From("federated_registries").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"hostname":   federatedRegistry.Hostname,
-				"audience":   federatedRegistry.Audience,
-			},
-		).Where(goqu.Ex{"id": federatedRegistry.Metadata.ID, "version": federatedRegistry.Metadata.Version}).
-		Returning(federatedRegistryFieldList...).ToSQL()
+		With("federated_registries",
+			dialect.Update("federated_registries").
+				Set(
+					goqu.Record{
+						"version":    goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at": timestamp,
+						"hostname":   federatedRegistry.Hostname,
+						"audience":   federatedRegistry.Audience,
+					},
+				).Where(goqu.Ex{"id": federatedRegistry.Metadata.ID, "version": federatedRegistry.Metadata.Version}).
+				Returning("*"),
+		).Select(p.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -247,13 +280,9 @@ func (p *federatedRegistries) UpdateFederatedRegistry(ctx context.Context,
 		}
 
 		if pgErr := asPgError(err); pgErr != nil {
-			if isInvalidIDViolation(pgErr) {
-				return nil, errors.Wrap(pgErr, "invalid ID; %s", pgErr.Message, errors.WithSpan(span), errors.WithErrorCode(errors.EInvalid))
-			}
-
 			if isUniqueViolation(pgErr) {
 				return nil, errors.New("federated registry with group ID  %s and registry endpoint %s already exists",
-					gid.ToGlobalID(gid.FederatedRegistryType, federatedRegistry.GroupID),
+					gid.ToGlobalID(types.GroupModelType, federatedRegistry.GroupID),
 					federatedRegistry.Hostname, errors.WithErrorCode(errors.EConflict), errors.WithSpan(span))
 			}
 		}
@@ -268,14 +297,19 @@ func (p *federatedRegistries) DeleteFederatedRegistry(ctx context.Context, input
 	ctx, span := tracer.Start(ctx, "db.DeleteFederatedRegistry")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("federated_registries").
+	sql, args, err := dialect.From("federated_registries").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      input.Metadata.ID,
-				"version": input.Metadata.Version,
-			},
-		).Returning(federatedRegistryFieldList...).ToSQL()
+		With("federated_registries",
+			dialect.Delete("federated_registries").
+				Where(
+					goqu.Ex{
+						"id":      input.Metadata.ID,
+						"version": input.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(p.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -286,13 +320,6 @@ func (p *federatedRegistries) DeleteFederatedRegistry(ctx context.Context, input
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
-		}
-
-		if pgErr := asPgError(err); pgErr != nil {
-			if isInvalidIDViolation(pgErr) {
-				return errors.Wrap(pgErr, "invalid ID; %s",
-					pgErr.Message, errors.WithSpan(span), errors.WithErrorCode(errors.EInvalid))
-			}
 		}
 
 		tracing.RecordError(span, err, "failed to execute query")
@@ -308,7 +335,8 @@ func (p *federatedRegistries) getFederatedRegistry(ctx context.Context, exp goqu
 
 	query := dialect.From(goqu.T("federated_registries")).
 		Prepared(true).
-		Select(federatedRegistryFieldList...).
+		Select(p.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -324,7 +352,7 @@ func (p *federatedRegistries) getFederatedRegistry(ctx context.Context, exp goqu
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isInvalidIDViolation(pgErr) {
-				return nil, errors.Wrap(pgErr, "invalid ID; %s", pgErr.Message, errors.WithSpan(span), errors.WithErrorCode(errors.EInvalid))
+				return nil, ErrInvalidID
 			}
 		}
 
@@ -340,10 +368,13 @@ func (p *federatedRegistries) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("federated_registries.%s", field))
 	}
 
+	selectFields = append(selectFields, "namespaces.path")
+
 	return selectFields
 }
 
 func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
+	var groupPath string
 	federatedRegistry := &models.FederatedRegistry{}
 
 	fields := []interface{}{
@@ -354,12 +385,15 @@ func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
 		&federatedRegistry.Hostname,
 		&federatedRegistry.GroupID,
 		&federatedRegistry.Audience,
+		&groupPath,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
 	}
+
+	federatedRegistry.Metadata.TRN = types.FederatedRegistryModelType.BuildTRN(groupPath, federatedRegistry.Hostname)
 
 	return federatedRegistry, nil
 }

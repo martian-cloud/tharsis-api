@@ -54,7 +54,7 @@ func (c *stateController) RegisterRoutes(router chi.Router) {
 func (c *stateController) GetStateVersion(w http.ResponseWriter, r *http.Request) {
 	stateVersionID := gid.FromGlobalID(chi.URLParam(r, "stateVersionId"))
 
-	sv, err := c.workspaceService.GetStateVersion(r.Context(), stateVersionID)
+	sv, err := c.workspaceService.GetStateVersionByID(r.Context(), stateVersionID)
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return

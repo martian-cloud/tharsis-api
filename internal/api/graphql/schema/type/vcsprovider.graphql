@@ -67,7 +67,11 @@ input CreateVCSProviderInput {
   clientMutationId: String
   name: String!
   description: String!
-  groupPath: String!
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  groupId: String
   url: String
   oAuthClientId: String!
   oAuthClientSecret: String!

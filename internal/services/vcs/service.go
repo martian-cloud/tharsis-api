@@ -20,11 +20,10 @@ import (
 	"github.com/hashicorp/go-slug"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	mtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
@@ -229,17 +228,20 @@ type createUploadConfigurationVersionInput struct {
 // Service implements all the functionality related to version control providers.
 type Service interface {
 	GetVCSProviderByID(ctx context.Context, id string) (*models.VCSProvider, error)
+	GetVCSProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error)
 	GetVCSProviders(ctx context.Context, input *GetVCSProvidersInput) (*db.VCSProvidersResult, error)
 	GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]models.VCSProvider, error)
 	CreateVCSProvider(ctx context.Context, input *CreateVCSProviderInput) (*CreateVCSProviderResponse, error)
 	UpdateVCSProvider(ctx context.Context, input *UpdateVCSProviderInput) (*models.VCSProvider, error)
 	DeleteVCSProvider(ctx context.Context, input *DeleteVCSProviderInput) error
 	GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string) (*models.WorkspaceVCSProviderLink, error)
+	GetWorkspaceVCSProviderLinkByTRN(ctx context.Context, trn string) (*models.WorkspaceVCSProviderLink, error)
 	GetWorkspaceVCSProviderLinkByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceVCSProviderLink, error)
 	CreateWorkspaceVCSProviderLink(ctx context.Context, input *CreateWorkspaceVCSProviderLinkInput) (*CreateWorkspaceVCSProviderLinkResponse, error)
 	UpdateWorkspaceVCSProviderLink(ctx context.Context, input *UpdateWorkspaceVCSProviderLinkInput) (*models.WorkspaceVCSProviderLink, error)
 	DeleteWorkspaceVCSProviderLink(ctx context.Context, input *DeleteWorkspaceVCSProviderLinkInput) error
 	GetVCSEventByID(ctx context.Context, id string) (*models.VCSEvent, error)
+	GetVCSEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error)
 	GetVCSEvents(ctx context.Context, input *GetVCSEventsInput) (*db.VCSEventsResult, error)
 	GetVCSEventsByIDs(ctx context.Context, idList []string) ([]models.VCSEvent, error)
 	CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) error
@@ -351,7 +353,37 @@ func (s *service) GetVCSProviderByID(ctx context.Context, id string) (*models.VC
 		return nil, errors.New("VCS provider with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return provider, nil
+}
+
+func (s *service) GetVCSProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVCSProviderByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	provider, err := s.dbClient.VCSProviders.GetProviderByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider by TRN")
+		return nil, err
+	}
+
+	if provider == nil {
+		tracing.RecordError(span, nil, "VCS provider with TRN %s not found", trn)
+		return nil, errors.New("VCS provider with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -371,7 +403,7 @@ func (s *service) GetVCSProviders(ctx context.Context, input *GetVCSProvidersInp
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithNamespacePath(input.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -438,7 +470,7 @@ func (s *service) GetVCSProvidersByIDs(ctx context.Context, idList []string) ([]
 	}
 
 	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.VCSProviderResourceType, auth.WithNamespacePaths(namespacePaths))
+		err = caller.RequireAccessToInheritableResource(ctx, mtypes.VCSProviderModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -459,7 +491,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateVCSProviderPermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateVCSProviderPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -601,7 +633,7 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -669,7 +701,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteVCSProviderPermission, auth.WithGroupID(input.Provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -778,7 +810,7 @@ func (s *service) GetWorkspaceVCSProviderLinkByWorkspaceID(ctx context.Context, 
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -820,7 +852,37 @@ func (s *service) GetWorkspaceVCSProviderLinkByID(ctx context.Context, id string
 		return nil, errors.New("workspace vcs provider link with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return link, nil
+}
+
+func (s *service) GetWorkspaceVCSProviderLinkByTRN(ctx context.Context, trn string) (*models.WorkspaceVCSProviderLink, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceVCSProviderLinkByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	link, err := s.dbClient.WorkspaceVCSProviderLinks.GetLinkByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get link by TRN")
+		return nil, err
+	}
+
+	if link == nil {
+		tracing.RecordError(span, nil, "workspace vcs provider link with TRN %s not found", trn)
+		return nil, errors.New("workspace vcs provider link with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(link.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -840,7 +902,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -859,13 +921,14 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	}
 
 	// Get the group path.
-	groupPath := vp.ResourcePath[:strings.LastIndex(vp.ResourcePath, "/")+1]
+	providerResourcePath := vp.GetResourcePath()
+	groupPath := providerResourcePath[:strings.LastIndex(providerResourcePath, "/")+1]
 
 	// Verify that the vcs provider's group is in the same hierarchy as the workspace.
 	if !strings.HasPrefix(input.Workspace.FullPath, groupPath) {
 		tracing.RecordError(span, nil,
-			"VCS provider %s is not available to workspace %s", vp.ResourcePath, input.Workspace.FullPath)
-		return nil, errors.New("VCS provider %s is not available to workspace %s", vp.ResourcePath, input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid))
+			"VCS provider %s is not available to workspace %s", providerResourcePath, input.Workspace.FullPath)
+		return nil, errors.New("VCS provider %s is not available to workspace %s", providerResourcePath, input.Workspace.FullPath, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Make sure the token is there, otherwise user forgot to complete
@@ -963,11 +1026,11 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 	// Create the token and configure webhook if using them.
 	// Generate a token with a UUID claim.
 	token, gErr := s.idp.GenerateToken(ctx, &auth.TokenInput{
-		Subject: vp.ResourcePath,
+		Subject: vp.GetResourcePath(),
 		JwtID:   createdLink.TokenNonce,
 		Claims: map[string]string{
 			"type":    auth.VCSWorkspaceLinkTokenType,
-			"link_id": gid.ToGlobalID(gid.WorkspaceVCSProviderLinkType, createdLink.Metadata.ID),
+			"link_id": createdLink.GetGlobalID(),
 		},
 	})
 	if gErr != nil {
@@ -1030,7 +1093,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		"caller", caller.GetSubject(),
 		"workspacePath", input.Workspace.FullPath,
 		"linkID", createdLink.Metadata.ID,
-		"providerPath", vp.ResourcePath,
+		"providerTRN", vp.Metadata.TRN,
 	)
 
 	return response, nil
@@ -1047,7 +1110,7 @@ func (s *service) UpdateWorkspaceVCSProviderLink(ctx context.Context, input *Upd
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1078,7 +1141,7 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(input.Link.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1159,7 +1222,38 @@ func (s *service) GetVCSEventByID(ctx context.Context, id string) (*models.VCSEv
 		return nil, errors.New("vcs event with id %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return event, nil
+}
+
+func (s *service) GetVCSEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVCSEventByTRN")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	event, err := s.dbClient.VCSEvents.GetEventByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get event by TRN")
+		return nil, err
+	}
+
+	if event == nil {
+		tracing.RecordError(span, nil, "vcs event with TRN %s not found", trn)
+		return nil, errors.New("vcs event with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(event.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1179,7 +1273,7 @@ func (s *service) GetVCSEvents(ctx context.Context, input *GetVCSEventsInput) (*
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(input.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(input.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1218,7 +1312,7 @@ func (s *service) GetVCSEventsByIDs(ctx context.Context, idList []string) ([]mod
 	}
 
 	for _, ve := range result.VCSEvents {
-		err = caller.RequirePermission(ctx, permissions.ViewVCSProviderPermission, auth.WithWorkspaceID(ve.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewVCSProviderPermission, auth.WithWorkspaceID(ve.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1239,7 +1333,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1392,7 +1486,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	}
 
 	// Require permission for creating plan runs.
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(vcsCaller.Link.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(vcsCaller.Link.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1541,7 +1635,7 @@ func (s *service) ResetVCSProviderOAuthToken(ctx context.Context, input *ResetVC
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateVCSProviderPermission, auth.WithGroupID(input.VCSProvider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateVCSProviderPermission, auth.WithGroupID(input.VCSProvider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1640,7 +1734,7 @@ func (s *service) ProcessOAuth(ctx context.Context, input *ProcessOAuthInput) er
 	}
 
 	// Require UpdateVCSProviderPermission since we're updating the provider's values.
-	err = caller.RequirePermission(ctx, permissions.UpdateVCSProviderPermission, auth.WithGroupID(vp.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateVCSProviderPermission, auth.WithGroupID(vp.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1988,7 +2082,7 @@ func (s *service) createUploadConfigurationVersion(ctx context.Context,
 	// Wait for the upload to complete.
 	var updatedConfigurationVersion *models.ConfigurationVersion
 	for {
-		updatedConfigurationVersion, err = s.workspaceService.GetConfigurationVersion(ctx, cv.Metadata.ID)
+		updatedConfigurationVersion, err = s.workspaceService.GetConfigurationVersionByID(ctx, cv.Metadata.ID)
 		if err != nil {
 			return "", fmt.Errorf("failed to check for completion of configuration upload: %s", err)
 		}

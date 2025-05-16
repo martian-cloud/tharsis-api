@@ -13,6 +13,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -21,6 +22,7 @@ import (
 // TerraformModuleVersions encapsulates the logic to access terraform module versions from the database
 type TerraformModuleVersions interface {
 	GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error)
+	GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error)
 	GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*ModuleVersionsResult, error)
 	CreateModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (*models.TerraformModuleVersion, error)
 	UpdateModuleVersion(ctx context.Context, moduleVersion *models.TerraformModuleVersion) (*models.TerraformModuleVersion, error)
@@ -116,6 +118,32 @@ func (t *terraformModuleVersions) GetModuleVersionByID(ctx context.Context, id s
 	return t.getModuleVersion(ctx, goqu.Ex{"terraform_module_versions.id": id})
 }
 
+func (t *terraformModuleVersions) GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleVersionByTRN")
+	defer span.End()
+
+	path, err := types.TerraformModuleVersionModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 4 {
+		return nil, errors.New("a Terraform module version TRN must have group path, module name, system, and semver separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return t.getModuleVersion(ctx, goqu.Ex{
+		"terraform_module_versions.semantic_version": parts[len(parts)-1],
+		"terraform_modules.system":                   parts[len(parts)-2],
+		"terraform_modules.name":                     parts[len(parts)-3],
+		"namespaces.path":                            strings.Join(parts[:len(parts)-3], "/"),
+	})
+}
+
 func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*ModuleVersionsResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetModuleVersions")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -152,7 +180,9 @@ func (t *terraformModuleVersions) GetModuleVersions(ctx context.Context, input *
 	}
 
 	query := dialect.From(goqu.T("terraform_module_versions")).
-		Select(moduleVersionFieldList...).
+		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -244,10 +274,15 @@ func (t *terraformModuleVersions) CreateModuleVersion(ctx context.Context, modul
 		"latest":            moduleVersion.Latest,
 	}
 
-	sql, args, err := dialect.Insert("terraform_module_versions").
+	sql, args, err := dialect.From("terraform_module_versions").
 		Prepared(true).
-		Rows(record).
-		Returning(moduleVersionFieldList...).
+		With("terraform_module_versions",
+			dialect.Insert("terraform_module_versions").
+				Rows(record).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
 		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -313,10 +348,17 @@ func (t *terraformModuleVersions) UpdateModuleVersion(ctx context.Context, modul
 		"latest":            moduleVersion.Latest,
 	}
 
-	sql, args, err := dialect.Update("terraform_module_versions").
+	sql, args, err := dialect.From("terraform_module_versions").
 		Prepared(true).
-		Set(record).
-		Where(goqu.Ex{"id": moduleVersion.Metadata.ID, "version": moduleVersion.Metadata.Version}).Returning(moduleVersionFieldList...).ToSQL()
+		With("terraform_module_versions",
+			dialect.Update("terraform_module_versions").
+				Set(record).
+				Where(goqu.Ex{"id": moduleVersion.Metadata.ID, "version": moduleVersion.Metadata.Version}).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -356,14 +398,18 @@ func (t *terraformModuleVersions) DeleteModuleVersion(ctx context.Context, modul
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("terraform_module_versions").
+	sql, args, err := dialect.From("terraform_module_versions").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      moduleVersion.Metadata.ID,
-				"version": moduleVersion.Metadata.Version,
-			},
-		).Returning(moduleVersionFieldList...).ToSQL()
+		With("terraform_module_versions",
+			dialect.Delete("terraform_module_versions").
+				Where(goqu.Ex{
+					"id":      moduleVersion.Metadata.ID,
+					"version": moduleVersion.Metadata.Version,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -386,6 +432,8 @@ func (t *terraformModuleVersions) getModuleVersion(ctx context.Context, exp goqu
 	query := dialect.From(goqu.T("terraform_module_versions")).
 		Prepared(true).
 		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_modules"), goqu.On(goqu.I("terraform_modules.id").Eq(goqu.I("terraform_module_versions.module_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -398,6 +446,13 @@ func (t *terraformModuleVersions) getModuleVersion(ctx context.Context, exp goqu
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -410,6 +465,12 @@ func (t *terraformModuleVersions) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("terraform_module_versions.%s", field))
 	}
 
+	selectFields = append(selectFields,
+		"namespaces.path",
+		"terraform_modules.name",
+		"terraform_modules.system",
+	)
+
 	return selectFields
 }
 
@@ -420,6 +481,9 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 	moduleVersion.Examples = []string{}
 	var errorMessage, diagnostics sql.NullString
 	var uploadStartedAt sql.NullTime
+	var groupPath string
+	var moduleName string
+	var moduleSystem string
 
 	fields := []interface{}{
 		&moduleVersion.Metadata.ID,
@@ -437,6 +501,9 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 		&moduleVersion.Examples,
 		&moduleVersion.Latest,
 		&moduleVersion.CreatedBy,
+		&groupPath,
+		&moduleName,
+		&moduleSystem,
 	}
 
 	err := row.Scan(fields...)
@@ -455,6 +522,13 @@ func scanTerraformModuleVersion(row scanner) (*models.TerraformModuleVersion, er
 	if uploadStartedAt.Valid {
 		moduleVersion.UploadStartedTimestamp = &uploadStartedAt.Time
 	}
+
+	moduleVersion.Metadata.TRN = types.TerraformModuleVersionModelType.BuildTRN(
+		groupPath,
+		moduleName,
+		moduleSystem,
+		moduleVersion.SemanticVersion,
+	)
 
 	return moduleVersion, nil
 }

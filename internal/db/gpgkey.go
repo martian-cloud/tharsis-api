@@ -10,14 +10,17 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // GPGKeys encapsulates the logic to access gpg keys from the database
 type GPGKeys interface {
 	GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey, error)
+	GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error)
 	GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*GPGKeysResult, error)
 	CreateGPGKey(ctx context.Context, gpgKey *models.GPGKey) (*models.GPGKey, error)
 	DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
@@ -105,6 +108,31 @@ func (t *terraformGPGKeys) GetGPGKeyByID(ctx context.Context, id string) (*model
 	return t.getGPGKey(ctx, goqu.Ex{"gpg_keys.id": id})
 }
 
+func (t *terraformGPGKeys) GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error) {
+	ctx, span := tracer.Start(ctx, "db.GetGPGKeyByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
+	defer span.End()
+
+	path, err := types.GPGKeyModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	lastSlashIndex := strings.LastIndex(path, "/")
+
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a GPG key TRN must have the group path and key fingerprint separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return t.getGPGKey(ctx, goqu.Ex{
+		"gpg_keys.fingerprint": path[lastSlashIndex+1:],
+		"namespaces.path":      path[:lastSlashIndex],
+	})
+}
+
 func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*GPGKeysResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetGPGKeys")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -164,7 +192,7 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 	// Scan rows
 	results := []models.GPGKey{}
 	for rows.Next() {
-		item, err := scanGPGKey(rows, true)
+		item, err := scanGPGKey(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -193,40 +221,32 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx for CreateGPGKey: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Insert("gpg_keys").
+	sql, args, err := dialect.From("gpg_keys").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":          newResourceID(),
-			"version":     initialResourceVersion,
-			"created_at":  timestamp,
-			"updated_at":  timestamp,
-			"group_id":    gpgKey.GroupID,
-			"gpg_key_id":  gpgKey.GPGKeyID,
-			"fingerprint": gpgKey.Fingerprint,
-			"ascii_armor": gpgKey.ASCIIArmor,
-			"created_by":  gpgKey.CreatedBy,
-		}).
-		Returning(gpgKeyFieldList...).ToSQL()
+		With("gpg_keys",
+			dialect.Insert("gpg_keys").
+				Rows(
+					goqu.Record{
+						"id":          newResourceID(),
+						"version":     initialResourceVersion,
+						"created_at":  timestamp,
+						"updated_at":  timestamp,
+						"group_id":    gpgKey.GroupID,
+						"gpg_key_id":  gpgKey.GPGKeyID,
+						"fingerprint": gpgKey.Fingerprint,
+						"ascii_armor": gpgKey.ASCIIArmor,
+						"created_by":  gpgKey.CreatedBy,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdKey, err := scanGPGKey(tx.QueryRow(ctx, sql, args...), false)
+	createdKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -242,21 +262,6 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, createdKey.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	// The fingerprint is guaranteed to be unique.
-	createdKey.ResourcePath = buildGPGKeyResourcePath(namespace.path, createdKey.Fingerprint)
-
 	return createdKey, nil
 }
 
@@ -265,21 +270,25 @@ func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGK
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("gpg_keys").
+	sql, args, err := dialect.From("gpg_keys").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      gpgKey.Metadata.ID,
-				"version": gpgKey.Metadata.Version,
-			},
-		).Returning(gpgKeyFieldList...).ToSQL()
+		With("gpg_keys",
+			dialect.Delete("gpg_keys").
+				Where(
+					goqu.Ex{
+						"id":      gpgKey.Metadata.ID,
+						"version": gpgKey.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"gpg_keys.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	_, err = scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
-	if err != nil {
+	if _, err = scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
@@ -292,6 +301,9 @@ func (t *terraformGPGKeys) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGK
 }
 
 func (t *terraformGPGKeys) getGPGKey(ctx context.Context, exp goqu.Ex) (*models.GPGKey, error) {
+	ctx, span := tracer.Start(ctx, "db.getGPGKey")
+	defer span.End()
+
 	query := dialect.From(goqu.T("gpg_keys")).
 		Prepared(true).
 		Select(t.getSelectFields()...).
@@ -300,15 +312,22 @@ func (t *terraformGPGKeys) getGPGKey(ctx context.Context, exp goqu.Ex) (*models.
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	gpgKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	gpgKey, err := scanGPGKey(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return gpgKey, nil
@@ -325,11 +344,8 @@ func (t *terraformGPGKeys) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func buildGPGKeyResourcePath(groupPath string, keyFingerprint string) string {
-	return fmt.Sprintf("%s/%s", groupPath, keyFingerprint)
-}
-
-func scanGPGKey(row scanner, withResourcePath bool) (*models.GPGKey, error) {
+func scanGPGKey(row scanner) (*models.GPGKey, error) {
+	var groupPath string
 	gpgKey := &models.GPGKey{}
 
 	fields := []interface{}{
@@ -342,10 +358,7 @@ func scanGPGKey(row scanner, withResourcePath bool) (*models.GPGKey, error) {
 		&gpgKey.Fingerprint,
 		&gpgKey.ASCIIArmor,
 		&gpgKey.CreatedBy,
-	}
-	var path string
-	if withResourcePath {
-		fields = append(fields, &path)
+		&groupPath,
 	}
 
 	err := row.Scan(fields...)
@@ -353,9 +366,7 @@ func scanGPGKey(row scanner, withResourcePath bool) (*models.GPGKey, error) {
 		return nil, err
 	}
 
-	if withResourcePath {
-		gpgKey.ResourcePath = buildGPGKeyResourcePath(path, gpgKey.Fingerprint)
-	}
+	gpgKey.Metadata.TRN = types.GPGKeyModelType.BuildTRN(groupPath, gpgKey.Fingerprint)
 
 	return gpgKey, nil
 }

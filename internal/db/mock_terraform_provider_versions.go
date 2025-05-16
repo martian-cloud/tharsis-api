@@ -92,6 +92,36 @@ func (_m *MockTerraformProviderVersions) GetProviderVersionByID(ctx context.Cont
 	return r0, r1
 }
 
+// GetProviderVersionByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockTerraformProviderVersions) GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderVersionByTRN")
+	}
+
+	var r0 *models.TerraformProviderVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformProviderVersion, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformProviderVersion); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformProviderVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderVersions provides a mock function with given fields: ctx, input
 func (_m *MockTerraformProviderVersions) GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error) {
 	ret := _m.Called(ctx, input)

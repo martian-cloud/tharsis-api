@@ -2,6 +2,7 @@ type ResourceMetadata {
   version: String!
   createdAt: Time!
   updatedAt: Time!
+  trn: String!
 }
 
 input ResourceMetadataInput {

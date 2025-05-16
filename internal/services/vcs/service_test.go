@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	mtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	types "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
@@ -118,6 +118,83 @@ func TestGetVCSProviderByID(t *testing.T) {
 	}
 }
 
+func TestGetVCSProviderByTRN(t *testing.T) {
+	sampleProvider := &models.VCSProvider{
+		Metadata: models.ResourceMetadata{
+			ID:  "provider-1",
+			TRN: mtypes.VCSProviderModelType.BuildTRN("provider-gid-1"),
+		},
+		Name:               "test-provider",
+		OAuthClientID:      "client-id",
+		OAuthClientSecret:  "client-secret",
+		Type:               models.GitHubProviderType,
+		URL:                sampleProviderURL,
+		AutoCreateWebhooks: true,
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		provider        *models.VCSProvider
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "successfully get provider by trn",
+			provider: sampleProvider,
+		},
+		{
+			name:            "provider not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view provider",
+			provider: &models.VCSProvider{
+				Metadata:          sampleProvider.Metadata,
+				Name:              sampleProvider.Name,
+				OAuthClientID:     sampleProvider.OAuthClientID,
+				OAuthClientSecret: sampleProvider.OAuthClientSecret,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVCSProviders := db.NewMockVCSProviders(t)
+
+			mockVCSProviders.On("GetProviderByTRN", mock.Anything, sampleProvider.Metadata.TRN).Return(test.provider, nil)
+
+			if test.provider != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVCSProviderPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				VCSProviders: mockVCSProviders,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualProvider, err := service.GetVCSProviderByTRN(auth.WithCaller(ctx, mockCaller), sampleProvider.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.provider, actualProvider)
+		})
+	}
+}
+
 func TestGetVCSProviders(t *testing.T) {
 	sampleProvider := models.VCSProvider{
 		Metadata: models.ResourceMetadata{
@@ -207,10 +284,10 @@ func TestGetVCSProviders(t *testing.T) {
 func TestGetVCSProvidersByIDs(t *testing.T) {
 	sampleProvider := models.VCSProvider{
 		Metadata: models.ResourceMetadata{
-			ID: resourceUUID,
+			ID:  resourceUUID,
+			TRN: mtypes.VCSProviderModelType.BuildTRN("some-group/expected-name"),
 		},
-		Name:         "expected-name",
-		ResourcePath: "some-group/expected-name",
+		Name: "expected-name",
 	}
 
 	// a sample DB result object.
@@ -276,6 +353,148 @@ func TestGetVCSProvidersByIDs(t *testing.T) {
 	}
 }
 
+func TestGetVCSEventByID(t *testing.T) {
+	sampleEvent := &models.VCSEvent{
+		Metadata: models.ResourceMetadata{
+			ID:  "event-1",
+			TRN: mtypes.VCSEventModelType.BuildTRN("event-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		event           *models.VCSEvent
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully get event by id",
+			event: sampleEvent,
+		},
+		{
+			name:            "event not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view event",
+			event: &models.VCSEvent{
+				Metadata:    sampleEvent.Metadata,
+				WorkspaceID: sampleEvent.WorkspaceID,
+				Type:        sampleEvent.Type,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVCSEvents := db.NewMockVCSEvents(t)
+
+			mockVCSEvents.On("GetEventByID", mock.Anything, sampleEvent.Metadata.ID).Return(test.event, nil)
+
+			if test.event != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVCSProviderPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				VCSEvents: mockVCSEvents,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualEvent, err := service.GetVCSEventByID(auth.WithCaller(ctx, mockCaller), sampleEvent.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.event, actualEvent)
+		})
+	}
+}
+
+func TestGetVCSEventByTRN(t *testing.T) {
+	sampleEvent := &models.VCSEvent{
+		Metadata: models.ResourceMetadata{
+			ID:  "event-1",
+			TRN: mtypes.VCSEventModelType.BuildTRN("event-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		event           *models.VCSEvent
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully get event by trn",
+			event: sampleEvent,
+		},
+		{
+			name:            "event not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view event",
+			event: &models.VCSEvent{
+				Metadata:    sampleEvent.Metadata,
+				WorkspaceID: sampleEvent.WorkspaceID,
+				Type:        sampleEvent.Type,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVCSEvents := db.NewMockVCSEvents(t)
+
+			mockVCSEvents.On("GetEventByTRN", mock.Anything, sampleEvent.Metadata.TRN).Return(test.event, nil)
+
+			if test.event != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVCSProviderPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				VCSEvents: mockVCSEvents,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualEvent, err := service.GetVCSEventByTRN(auth.WithCaller(ctx, mockCaller), sampleEvent.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.event, actualEvent)
+		})
+	}
+}
+
 func TestCreateVCSProvider(t *testing.T) {
 	sampleOAuthState, err := uuid.NewRandom()
 	assert.Nil(t, err)
@@ -333,12 +552,12 @@ func TestCreateVCSProvider(t *testing.T) {
 			},
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
+					ID:  resourceUUID,
+					TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
 				},
 				Name:               "a-sample-gitlab-provider",
 				Description:        "",
 				GroupID:            "group-id",
-				ResourcePath:       "a/resource/path",
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -389,12 +608,12 @@ func TestCreateVCSProvider(t *testing.T) {
 			},
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
+					ID:  resourceUUID,
+					TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
 				},
 				Name:               "a-sample-github-provider",
 				Description:        "",
 				GroupID:            "group-id",
-				ResourcePath:       "a/resource/path",
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -474,12 +693,12 @@ func TestCreateVCSProvider(t *testing.T) {
 			},
 			expectedProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: resourceUUID,
+					ID:  resourceUUID,
+					TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
 				},
 				Name:               "a-sample-gitlab-provider",
 				Description:        "",
 				GroupID:            "group-id",
-				ResourcePath:       "a/resource/path",
 				OAuthClientID:      "a-sample-client-id",
 				OAuthClientSecret:  "a-sample-client-secret",
 				OAuthState:         ptr.String(sampleOAuthState.String()),
@@ -595,12 +814,12 @@ func TestUpdateVCSProvider(t *testing.T) {
 			input: &UpdateVCSProviderInput{
 				&models.VCSProvider{
 					Metadata: models.ResourceMetadata{
-						ID: resourceUUID,
+						ID:  resourceUUID,
+						TRN: mtypes.VCSProviderModelType.BuildTRN("a/resource/path"),
 					},
 					Name:               "a-sample-github-provider",
 					Description:        "this-is-the-new-description",
 					GroupID:            "group-id",
-					ResourcePath:       "a/resource/path",
 					OAuthClientID:      "a-sample-client-id",
 					OAuthClientSecret:  "a-sample-client-secret",
 					OAuthState:         ptr.String("sample-state"),
@@ -675,6 +894,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID:      resourceUUID,
 			Version: 1,
+			TRN:     mtypes.VCSProviderModelType.BuildTRN(groupPath + "/some-provider"),
 		},
 		URL:                sampleProviderURL,
 		OAuthClientID:      "a-sample-client-id",
@@ -683,7 +903,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 		OAuthAccessToken:   &sampleOAuthAccessToken, // GitHub only supports AccessToken.
 		Type:               models.GitHubProviderType,
 		GroupID:            "group-id",
-		ResourcePath:       groupPath + "/some-provider",
 		AutoCreateWebhooks: true, // Automatically configured.
 	}
 
@@ -692,6 +911,7 @@ func TestDeleteVCSProvider(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID:      resourceUUID,
 			Version: 1,
+			TRN:     mtypes.VCSProviderModelType.BuildTRN(groupPath + "/some-provider"),
 		},
 		URL:                sampleProviderURL,
 		OAuthClientID:      "a-sample-client-id",
@@ -700,7 +920,6 @@ func TestDeleteVCSProvider(t *testing.T) {
 		OAuthAccessToken:   &sampleOAuthAccessToken,
 		Type:               models.GitHubProviderType,
 		GroupID:            "group-id",
-		ResourcePath:       groupPath + "/some-provider",
 		AutoCreateWebhooks: false, // Manually configured.
 	}
 
@@ -934,7 +1153,7 @@ func TestGetVCSProviderLinkByWorkspaceID(t *testing.T) {
 	}
 }
 
-func TestGetVCSProviderLinkByID(t *testing.T) {
+func TestGetWorkspaceVCSProviderLinkByID(t *testing.T) {
 	sampleProviderLink := &models.WorkspaceVCSProviderLink{
 		Metadata: models.ResourceMetadata{
 			ID: resourceUUID,
@@ -995,6 +1214,83 @@ func TestGetVCSProviderLinkByID(t *testing.T) {
 	}
 }
 
+func TestGetWorkspaceVCSProviderLinkByTRN(t *testing.T) {
+	sampleLink := &models.WorkspaceVCSProviderLink{
+		Metadata: models.ResourceMetadata{
+			ID:  "link-1",
+			TRN: mtypes.WorkspaceVCSProviderLinkModelType.BuildTRN("link-gid-1"),
+		},
+		WorkspaceID:     "workspace-1",
+		ProviderID:      "provider-1",
+		RepositoryPath:  "owner/repo",
+		Branch:          "main",
+		WebhookID:       "webhook-1",
+		WebhookDisabled: false,
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		link            *models.WorkspaceVCSProviderLink
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get link by trn",
+			link: sampleLink,
+		},
+		{
+			name:            "link not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view link",
+			link: &models.WorkspaceVCSProviderLink{
+				Metadata:       sampleLink.Metadata,
+				WorkspaceID:    sampleLink.WorkspaceID,
+				ProviderID:     sampleLink.ProviderID,
+				RepositoryPath: sampleLink.RepositoryPath,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaceVCSProviderLinks := db.NewMockWorkspaceVCSProviderLinks(t)
+
+			mockWorkspaceVCSProviderLinks.On("GetLinkByTRN", mock.Anything, sampleLink.Metadata.TRN).Return(test.link, nil)
+
+			if test.link != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				WorkspaceVCSProviderLinks: mockWorkspaceVCSProviderLinks,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualLink, err := service.GetWorkspaceVCSProviderLinkByTRN(auth.WithCaller(ctx, mockCaller), sampleLink.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.link, actualLink)
+		})
+	}
+}
+
 func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 	sampleOAuthState, err := uuid.NewRandom()
 	assert.Nil(t, err)
@@ -1049,7 +1345,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSEventModelType.BuildTRN("full/path/to/provider"),
 				},
 				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
@@ -1126,7 +1423,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSEventModelType.BuildTRN("full/path/to/provider"),
 				},
 				URL:                sampleProviderURL,
 				OAuthClientID:      "a-sample-client-id",
@@ -1174,9 +1472,9 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSProviderModelType.BuildTRN("some/resource/path"), // Different from workspace.
 				},
-				ResourcePath: "some/resource/path", // Different from workspace.
 			},
 			expectedErrorCode: errors.EInvalid,
 		},
@@ -1188,7 +1486,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1202,7 +1501,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1216,7 +1516,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1231,7 +1532,8 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			},
 			existingProvider: &models.VCSProvider{
 				Metadata: models.ResourceMetadata{
-					ID: "provider-id",
+					ID:  "provider-id",
+					TRN: mtypes.VCSEventModelType.BuildTRN("path/provider"),
 				},
 			},
 			expectedErrorCode: errors.EInvalid,
@@ -1255,7 +1557,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockWorkspaceVCSProviderLinks.Test(t)
 
 			mockCaller.On("GetSubject").Return("testsubject")
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(nil)
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 
 			createAccessTokenInput := &types.CreateAccessTokenInput{
@@ -2611,7 +2913,7 @@ func Test_handleEvent(t *testing.T) {
 
 			mockRunService.On("CreateRun", mock.Anything, runInput).Return(&models.Run{}, nil)
 
-			mockWorkspaceService.On("GetConfigurationVersion", mock.Anything, createdCV.Metadata.ID).Return(test.updatedCV, nil)
+			mockWorkspaceService.On("GetConfigurationVersionByID", mock.Anything, createdCV.Metadata.ID).Return(test.updatedCV, nil)
 			mockWorkspaceService.On("CreateConfigurationVersion", mock.Anything, cvInput).Return(createdCV, nil)
 			mockWorkspaceService.On("UploadConfigurationVersion", mock.Anything, createdCV.Metadata.ID, mock.Anything).Return(nil)
 

@@ -3,8 +3,8 @@ package resolver
 import (
 	"context"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
@@ -51,7 +51,7 @@ type TerraformModuleAttestationConnectionResolver struct {
 
 // NewTerraformModuleAttestationConnectionResolver creates a new TerraformModuleAttestationConnectionResolver
 func NewTerraformModuleAttestationConnectionResolver(ctx context.Context, input *moduleregistry.GetModuleAttestationsInput) (*TerraformModuleAttestationConnectionResolver, error) {
-	service := getModuleRegistryService(ctx)
+	service := getServiceCatalog(ctx).TerraformModuleRegistryService
 
 	result, err := service.GetModuleAttestations(ctx, input)
 	if err != nil {
@@ -119,7 +119,7 @@ type TerraformModuleAttestationResolver struct {
 
 // ID resolver
 func (r *TerraformModuleAttestationResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformModuleAttestationType, r.moduleAttestation.Metadata.ID))
+	return graphql.ID(r.moduleAttestation.GetGlobalID())
 }
 
 // Metadata resolver
@@ -191,7 +191,8 @@ func (r *TerraformModuleAttestationMutationPayloadResolver) ModuleAttestation() 
 // CreateTerraformModuleAttestationInput contains the input for creating a moduleAttestation
 type CreateTerraformModuleAttestationInput struct {
 	ClientMutationID *string
-	ModulePath       string
+	ModuleID         *string
+	ModulePath       *string // DEPRECATED: use ModuleID instead with a TRN
 	Description      *string
 	AttestationData  string
 }
@@ -219,9 +220,14 @@ func handleTerraformModuleAttestationMutationProblem(e error, clientMutationID *
 }
 
 func createTerraformModuleAttestationMutation(ctx context.Context, input *CreateTerraformModuleAttestationInput) (*TerraformModuleAttestationMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	moduleID, err := toModelID(ctx, input.ModulePath, input.ModuleID, types.TerraformModuleModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	module, err := service.GetModuleByPath(ctx, input.ModulePath)
+	service := getServiceCatalog(ctx).TerraformModuleRegistryService
+
+	module, err := service.GetModuleByID(ctx, moduleID)
 	if err != nil {
 		return nil, err
 	}
@@ -245,16 +251,21 @@ func createTerraformModuleAttestationMutation(ctx context.Context, input *Create
 }
 
 func updateTerraformModuleAttestationMutation(ctx context.Context, input *UpdateTerraformModuleAttestationInput) (*TerraformModuleAttestationMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	attestation, err := service.GetModuleAttestationByID(ctx, gid.FromGlobalID(input.ID))
+	attestationID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	attestation, err := serviceCatalog.TerraformModuleRegistryService.GetModuleAttestationByID(ctx, attestationID)
 	if err != nil {
 		return nil, err
 	}
 
 	attestation.Description = input.Description
 
-	updatedModuleAttestation, err := service.UpdateModuleAttestation(ctx, attestation)
+	updatedModuleAttestation, err := serviceCatalog.TerraformModuleRegistryService.UpdateModuleAttestation(ctx, attestation)
 	if err != nil {
 		return nil, err
 	}
@@ -264,14 +275,19 @@ func updateTerraformModuleAttestationMutation(ctx context.Context, input *Update
 }
 
 func deleteTerraformModuleAttestationMutation(ctx context.Context, input *DeleteTerraformModuleAttestationInput) (*TerraformModuleAttestationMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	moduleAttestation, err := service.GetModuleAttestationByID(ctx, gid.FromGlobalID(input.ID))
+	attestationID, err := serviceCatalog.FetchModelID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := service.DeleteModuleAttestation(ctx, moduleAttestation); err != nil {
+	moduleAttestation, err := serviceCatalog.TerraformModuleRegistryService.GetModuleAttestationByID(ctx, attestationID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := serviceCatalog.TerraformModuleRegistryService.DeleteModuleAttestation(ctx, moduleAttestation); err != nil {
 		return nil, err
 	}
 

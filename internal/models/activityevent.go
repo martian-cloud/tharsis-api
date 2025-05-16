@@ -1,6 +1,14 @@
 // Package models package
 package models
 
+import (
+	"github.com/aws/smithy-go/ptr"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+)
+
+var _ Model = (*ActivityEvent)(nil)
+
 // ActivityEventAction represents the type of action.
 type ActivityEventAction string
 
@@ -128,17 +136,32 @@ type ActivityEvent struct {
 	Metadata         ResourceMetadata
 }
 
+// GetID returns the Metadata ID.
+func (a *ActivityEvent) GetID() string {
+	return a.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (a *ActivityEvent) GetGlobalID() string {
+	return gid.ToGlobalID(a.GetModelType(), a.Metadata.ID)
+}
+
+// GetModelType returns the Model's type
+func (a *ActivityEvent) GetModelType() types.ModelType {
+	return types.ActivityEventModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (a *ActivityEvent) ResolveMetadata(key string) (string, error) {
 	val, err := a.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "user_id":
-			val = a.stringPtrToString(a.UserID)
+			val = ptr.ToString(a.UserID)
 		case "service_account_id":
-			val = a.stringPtrToString(a.ServiceAccountID)
+			val = ptr.ToString(a.ServiceAccountID)
 		case "namespace_path":
-			val = a.stringPtrToString(a.NamespacePath)
+			val = ptr.ToString(a.NamespacePath)
 		case "action":
 			val = string(a.Action)
 		case "target_type":
@@ -151,10 +174,7 @@ func (a *ActivityEvent) ResolveMetadata(key string) (string, error) {
 	return val, nil
 }
 
-// stringPtrToString returns empty string for nil pointer.
-func (*ActivityEvent) stringPtrToString(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
+// Validate validates the resource.
+func (a *ActivityEvent) Validate() error {
+	return nil
 }

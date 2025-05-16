@@ -9,10 +9,10 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -75,7 +75,9 @@ type SetVariablesInput struct {
 type Service interface {
 	GetVariables(ctx context.Context, namespacePath string) ([]models.Variable, error)
 	GetVariableByID(ctx context.Context, id string) (*models.Variable, error)
+	GetVariableByTRN(ctx context.Context, trn string) (*models.Variable, error)
 	GetVariableVersionByID(ctx context.Context, id string, includeSensitiveValue bool) (*models.VariableVersion, error)
+	GetVariableVersionByTRN(ctx context.Context, trn string, includeSensitiveValue bool) (*models.VariableVersion, error)
 	GetVariablesByIDs(ctx context.Context, ids []string) ([]models.Variable, error)
 	SetVariables(ctx context.Context, input *SetVariablesInput) error
 	CreateVariable(ctx context.Context, input *CreateVariableInput) (*models.Variable, error)
@@ -135,7 +137,47 @@ func (s *service) GetVariableVersionByID(ctx context.Context, id string, include
 		return nil, errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	if err != nil {
+		return nil, err
+	}
+
+	if variable.Sensitive && includeSensitiveValue {
+		// Get the secret value from the secret manager plugin
+		secret, err := s.secretManager.Get(ctx, version.Key, version.SecretData)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get secret value for variable version %q", version.Metadata.ID, errors.WithSpan(span))
+		}
+		version.Value = &secret
+	}
+
+	return version, nil
+}
+
+func (s *service) GetVariableVersionByTRN(ctx context.Context, trn string, includeSensitiveValue bool) (*models.VariableVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVariableVersionByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := s.dbClient.VariableVersions.GetVariableVersionByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get variable version by TRN", errors.WithSpan(span))
+	}
+
+	if version == nil {
+		return nil, errors.New("variable version with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	variable, err := s.getVariableByID(ctx, version.VariableID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +209,7 @@ func (s *service) GetVariableVersions(ctx context.Context, input *GetVariableVer
 		return nil, errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
 	}
 
-	if err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath)); err != nil {
+	if err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath)); err != nil {
 		return nil, err
 	}
 
@@ -199,9 +241,9 @@ func (s *service) GetVariables(ctx context.Context, namespacePath string) ([]mod
 
 	// Only include variable values if the caller has ViewVariableValuePermission on workspace.
 	hasViewVariableValuePerm := false
-	if err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath)); err == nil {
+	if err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath)); err == nil {
 		hasViewVariableValuePerm = true
-	} else if err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
+	} else if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(namespacePath)); err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
@@ -276,7 +318,36 @@ func (s *service) GetVariableByID(ctx context.Context, id string) (*models.Varia
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return variable, nil
+}
+
+func (s *service) GetVariableByTRN(ctx context.Context, trn string) (*models.Variable, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetVariableByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	variable, err := s.dbClient.Variables.GetVariableByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get variable by TRN")
+		return nil, err
+	}
+
+	if variable == nil {
+		return nil, errors.New("variable with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -315,9 +386,9 @@ func (s *service) GetVariablesByIDs(ctx context.Context, ids []string) ([]models
 	namespacesAllowedToViewValue := map[string]struct{}{}
 
 	for _, namespacePath := range namespacePaths {
-		err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath))
+		err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithNamespacePath(namespacePath))
 		if err != nil {
-			err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithNamespacePath(namespacePath))
+			err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithNamespacePath(namespacePath))
 			if err != nil {
 				tracing.RecordError(span, err, "permission check failed")
 				return nil, err
@@ -346,7 +417,7 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
+	err = caller.RequirePermission(ctx, models.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
 		return err
 	}
@@ -522,7 +593,7 @@ func (s *service) CreateVariable(ctx context.Context, input *CreateVariableInput
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
+	err = caller.RequirePermission(ctx, models.CreateVariablePermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
 		return nil, err
 	}
@@ -650,7 +721,7 @@ func (s *service) UpdateVariable(ctx context.Context, input *UpdateVariableInput
 		return nil, errors.Wrap(err, "failed to query variable", errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.UpdateVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		return nil, err
 	}
@@ -766,7 +837,7 @@ func (s *service) DeleteVariable(ctx context.Context, input *DeleteVariableInput
 		return errors.Wrap(err, "failed to get variable by ID", errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
+	err = caller.RequirePermission(ctx, models.DeleteVariablePermission, auth.WithNamespacePath(variable.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -833,12 +904,12 @@ func (s *service) getTargetTypeID(ctx context.Context,
 ) (models.ActivityEventTargetType, string, error) {
 	var targetType models.ActivityEventTargetType
 	targetID := ""
-	group, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, namespacePath)
+	group, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
 	if (gErr == nil) && (group != nil) {
 		targetType = models.TargetGroup
 		targetID = group.Metadata.ID
 	} else {
-		workspace, wErr := s.dbClient.Workspaces.GetWorkspaceByFullPath(ctx, namespacePath)
+		workspace, wErr := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(namespacePath))
 		if (wErr == nil) && (workspace != nil) {
 			targetType = models.TargetWorkspace
 			targetID = workspace.Metadata.ID

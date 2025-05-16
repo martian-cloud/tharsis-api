@@ -10,10 +10,10 @@ import (
 	"github.com/aws/smithy-go/ptr"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -42,6 +42,7 @@ type GetGPGKeysInput struct {
 // Service implements all gpg key related functionality
 type Service interface {
 	GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey, error)
+	GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error)
 	GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*db.GPGKeysResult, error)
 	GetGPGKeysByIDs(ctx context.Context, idList []string) ([]models.GPGKey, error)
 	CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*models.GPGKey, error)
@@ -95,7 +96,7 @@ func (s *service) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*db.G
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewGPGKeyPermission, auth.WithNamespacePath(input.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewGPGKeyPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -159,7 +160,7 @@ func (s *service) GetGPGKeysByIDs(ctx context.Context, idList []string) ([]model
 	}
 
 	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.GPGKeyResourceType, auth.WithNamespacePaths(namespacePaths))
+		err = caller.RequireAccessToInheritableResource(ctx, types.GPGKeyModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
 			tracing.RecordError(span, err, "inherited resource access check failed")
 			return nil, err
@@ -180,7 +181,7 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteGPGKeyPermission, auth.WithGroupID(gpgKey.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteGPGKeyPermission, auth.WithGroupID(gpgKey.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -262,7 +263,38 @@ func (s *service) GetGPGKeyByID(ctx context.Context, id string) (*models.GPGKey,
 		return nil, errors.New("gpg key with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.GPGKeyResourceType, auth.WithGroupID(gpgKey.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.GPGKeyModelType, auth.WithGroupID(gpgKey.GroupID))
+	if err != nil {
+		tracing.RecordError(span, err, "inheritable resource permission check failed")
+		return nil, err
+	}
+
+	return gpgKey, nil
+}
+
+func (s *service) GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetGPGKeyByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	// Get gpgKey from DB
+	gpgKey, err := s.dbClient.GPGKeys.GetGPGKeyByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get GPG key by TRN")
+		return nil, err
+	}
+
+	if gpgKey == nil {
+		tracing.RecordError(span, nil, "gpg key with TRN %s not found", trn)
+		return nil, errors.New("gpg key with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequireAccessToInheritableResource(ctx, types.GPGKeyModelType, auth.WithGroupID(gpgKey.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource permission check failed")
 		return nil, err
@@ -282,7 +314,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateGPGKeyPermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateGPGKeyPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err

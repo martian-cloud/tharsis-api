@@ -44,12 +44,12 @@ func (_m *MockPlans) CreatePlan(ctx context.Context, plan *models.Plan) (*models
 	return r0, r1
 }
 
-// GetPlan provides a mock function with given fields: ctx, id
-func (_m *MockPlans) GetPlan(ctx context.Context, id string) (*models.Plan, error) {
+// GetPlanByID provides a mock function with given fields: ctx, id
+func (_m *MockPlans) GetPlanByID(ctx context.Context, id string) (*models.Plan, error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetPlan")
+		panic("no return value specified for GetPlanByID")
 	}
 
 	var r0 *models.Plan
@@ -67,6 +67,36 @@ func (_m *MockPlans) GetPlan(ctx context.Context, id string) (*models.Plan, erro
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPlanByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockPlans) GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPlanByTRN")
+	}
+
+	var r0 *models.Plan
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Plan, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Plan); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Plan)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -32,3 +32,8 @@ func (r *MetadataResolver) CreatedAt() graphql.Time {
 func (r *MetadataResolver) UpdatedAt() graphql.Time {
 	return graphql.Time{Time: *r.metadata.LastUpdatedTimestamp}
 }
+
+// TRN resolver
+func (r *MetadataResolver) TRN() string {
+	return r.metadata.TRN
+}

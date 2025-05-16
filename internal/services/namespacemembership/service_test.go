@@ -7,14 +7,87 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
+
+func TestGetNamespaceMembershipByTRN(t *testing.T) {
+	sampleMembership := &models.NamespaceMembership{
+		Metadata: models.ResourceMetadata{
+			ID:  "membership-1",
+			TRN: types.NamespaceMembershipModelType.BuildTRN("group-1/membership-1"),
+		},
+		Namespace: models.MembershipNamespace{
+			Path:    "group-1",
+			GroupID: ptr.String("group-1"),
+		},
+		RoleID: models.OwnerRoleID.String(),
+		UserID: ptr.String("user-1"),
+	}
+
+	type testCase struct {
+		name          string
+		membership    *models.NamespaceMembership
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get namespace membership by TRN",
+			membership: sampleMembership,
+		},
+		{
+			name:          "subject does not have access to namespace membership",
+			membership:    sampleMembership,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "namespace membership not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockNamespaceMemberships := db.NewMockNamespaceMemberships(t)
+
+			mockNamespaceMemberships.On("GetNamespaceMembershipByTRN", mock.Anything, sampleMembership.Metadata.TRN).Return(test.membership, nil)
+
+			if test.membership != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewNamespaceMembershipPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				NamespaceMemberships: mockNamespaceMemberships,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			membership, err := service.GetNamespaceMembershipByTRN(auth.WithCaller(ctx, mockCaller), sampleMembership.Metadata.TRN)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.membership, membership)
+		})
+	}
+}
 
 func TestCreateNamespaceMembership(t *testing.T) {
 	// Test cases
@@ -48,8 +121,10 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				NamespacePath: "ns1/ns11/ns111",
 				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
-					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
-					ResourcePath: "ns1/ns11/serviceAccount",
+					Metadata: models.ResourceMetadata{
+						ID:  "serviceAccount1",
+						TRN: types.ServiceAccountModelType.BuildTRN("ns1/ns11/serviceAccount"),
+					},
 				},
 			},
 			expectNamespaceMembership: &models.NamespaceMembership{
@@ -68,8 +143,10 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				NamespacePath: "ns1",
 				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
-					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
-					ResourcePath: "ns1/serviceAccount",
+					Metadata: models.ResourceMetadata{
+						ID:  "serviceAccount1",
+						TRN: types.ServiceAccountModelType.BuildTRN("ns1/serviceAccount"),
+					},
 				},
 			},
 			expectNamespaceMembership: &models.NamespaceMembership{
@@ -118,8 +195,10 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				NamespacePath: "ns1",
 				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
-					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
-					ResourcePath: "ns2/serviceAccount",
+					Metadata: models.ResourceMetadata{
+						ID:  "serviceAccount1",
+						TRN: types.ServiceAccountModelType.BuildTRN("ns2/serviceAccount"),
+					},
 				},
 			},
 			hasOwnerRole:    true,
@@ -131,8 +210,10 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				NamespacePath: "ns1",
 				RoleID:        models.OwnerRoleID.String(),
 				ServiceAccount: &models.ServiceAccount{
-					Metadata:     models.ResourceMetadata{ID: "serviceAccount1"},
-					ResourcePath: "ns1/ns11/serviceAccount",
+					Metadata: models.ResourceMetadata{
+						ID:  "serviceAccount1",
+						TRN: types.ServiceAccountModelType.BuildTRN("ns1/ns11/serviceAccount"),
+					},
 				},
 			},
 			hasOwnerRole:    true,
@@ -155,7 +236,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			if !test.hasOwnerRole {
 				authError = errors.New("not authorized", errors.WithErrorCode(errors.EForbidden))
 			}
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateNamespaceMembershipPermission, mock.Anything).Return(authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateNamespaceMembershipPermission, mock.Anything).Return(authError)
 
 			var userID, serviceAccountID *string
 			if test.input.User != nil {
@@ -354,7 +435,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				authError = errors.New("not authorized", errors.WithErrorCode(errors.EForbidden))
 			}
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateNamespaceMembershipPermission, mock.Anything).Return(authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateNamespaceMembershipPermission, mock.Anything).Return(authError)
 
 			mockNamespaceMemberships.On("GetNamespaceMembershipByID", mock.Anything, test.input.Metadata.ID).Return(test.current, nil)
 
@@ -505,7 +586,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 				authError = errors.New("not authorized", errors.WithErrorCode(errors.EForbidden))
 			}
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteNamespaceMembershipPermission, mock.Anything).Return(authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteNamespaceMembershipPermission, mock.Anything).Return(authError)
 
 			getNamespaceMembershipsInput := &db.GetNamespaceMembershipsInput{
 				Filter: &db.NamespaceMembershipFilter{

@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
@@ -54,9 +54,9 @@ type GPGKeyConnectionResolver struct {
 
 // NewGPGKeyConnectionResolver creates a new GPGKeyConnectionResolver
 func NewGPGKeyConnectionResolver(ctx context.Context, input *gpgkey.GetGPGKeysInput) (*GPGKeyConnectionResolver, error) {
-	service := getGPGKeyService(ctx)
+	gpgKeyService := getServiceCatalog(ctx).GPGKeyService
 
-	result, err := service.GetGPGKeys(ctx, input)
+	result, err := gpgKeyService.GetGPGKeys(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ type GPGKeyResolver struct {
 
 // ID resolver
 func (r *GPGKeyResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.GPGKeyType, r.gpgKey.Metadata.ID))
+	return graphql.ID(r.gpgKey.GetGlobalID())
 }
 
 // GPGKeyID resolver
@@ -167,7 +167,7 @@ func (r *GPGKeyResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *GPGKeyResolver) ResourcePath() string {
-	return r.gpgKey.ResourcePath
+	return r.gpgKey.GetResourcePath()
 }
 
 /* GPGKey Mutation Resolvers */
@@ -195,7 +195,8 @@ func (r *GPGKeyMutationPayloadResolver) GPGKey() *GPGKeyResolver {
 // CreateGPGKeyInput contains the input for creating a new gpgKey
 type CreateGPGKeyInput struct {
 	ClientMutationID *string
-	GroupPath        string
+	GroupID          *string
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
 	ASCIIArmor       string
 }
 
@@ -216,15 +217,13 @@ func handleGPGKeyMutationProblem(e error, clientMutationID *string) (*GPGKeyMuta
 }
 
 func createGPGKeyMutation(ctx context.Context, input *CreateGPGKeyInput) (*GPGKeyMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	service := getGPGKeyService(ctx)
-
-	createdGPGKey, err := service.CreateGPGKey(ctx, &gpgkey.CreateGPGKeyInput{
-		GroupID:    group.Metadata.ID,
+	createdGPGKey, err := getServiceCatalog(ctx).GPGKeyService.CreateGPGKey(ctx, &gpgkey.CreateGPGKeyInput{
+		GroupID:    groupID,
 		ASCIIArmor: input.ASCIIArmor,
 	})
 	if err != nil {
@@ -236,9 +235,14 @@ func createGPGKeyMutation(ctx context.Context, input *CreateGPGKeyInput) (*GPGKe
 }
 
 func deleteGPGKeyMutation(ctx context.Context, input *DeleteGPGKeyInput) (*GPGKeyMutationPayloadResolver, error) {
-	service := getGPGKeyService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	gpgKey, err := service.GetGPGKeyByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	gpgKey, err := serviceCatalog.GPGKeyService.GetGPGKeyByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +257,7 @@ func deleteGPGKeyMutation(ctx context.Context, input *DeleteGPGKeyInput) (*GPGKe
 		gpgKey.Metadata.Version = v
 	}
 
-	if err := service.DeleteGPGKey(ctx, gpgKey); err != nil {
+	if err := serviceCatalog.GPGKeyService.DeleteGPGKey(ctx, gpgKey); err != nil {
 		return nil, err
 	}
 
@@ -290,7 +294,7 @@ func loadGPGKey(ctx context.Context, id string) (*models.GPGKey, error) {
 }
 
 func gpgKeyBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	gpgKeys, err := getGPGKeyService(ctx).GetGPGKeysByIDs(ctx, ids)
+	gpgKeys, err := getServiceCatalog(ctx).GPGKeyService.GetGPGKeysByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -14,7 +14,6 @@
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
     "files.trimTrailingWhitespace": true,
-    "go.autocompleteUnimportedPackages": true,
     "go.lintOnSave": "package",
     "go.lintTool": "golangci-lint",
     "go.lintFlags": [
@@ -23,11 +22,27 @@
     ],
     "go.toolsManagement.autoUpdate": true,
     "go.useLanguageServer": true,
+    "go.buildTags": "integration",
+    "go.buildFlags": [
+        "-tags=integration -ldflags='-X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBHost=localhost -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBPort=5432 -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBName=tharsis-test -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBMode=disable -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBUser=postgres -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBPass=postgres'"
+    ],
+    "go.coverOnSave": false,
+    "go.coverageDecorator": {
+        "type": "highlight",
+        "coveredHighlightColor": "rgba(64,128,128,0.4)",
+        "uncoveredHighlightColor": "rgba(128,64,64,0.4)",
+        "coveredGutterStyle": "blockgreen",
+        "uncoveredGutterStyle": "blockred"
+    },
+    "go.coverOnSingleTest": true,
+    "go.coverageOptions": "showBothCoveredAndUncoveredCode",
+    "go.coverOnTestPackage": true,
     "gopls": {
         "ui.completion.usePlaceholders": true, // add parameter placeholders when completing a function
         "ui.diagnostic.staticcheck": true,
         "ui.codelenses": {
-            "gc_details": true
+            "gc_details": true,
+            "test": true
         },
         "ui.diagnostic.analyses": {
             "nilness": true,

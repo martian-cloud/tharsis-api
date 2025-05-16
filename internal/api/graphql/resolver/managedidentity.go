@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -23,12 +24,12 @@ import (
 // ManagedIdentityConnectionQueryArgs are used to query a managedIdentity connection
 type ManagedIdentityConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	GroupPath        *string
 	IncludeInherited *bool
 	Search           *string
 }
 
 // ManagedIdentityQueryArgs are used to query a single managedIdentity
+// DEPRECATED: use node query instead
 type ManagedIdentityQueryArgs struct {
 	ID   *string
 	Path *string
@@ -71,7 +72,7 @@ type ManagedIdentityConnectionResolver struct {
 
 // NewManagedIdentityConnectionResolver creates a new ManagedIdentityConnectionResolver
 func NewManagedIdentityConnectionResolver(ctx context.Context, input *managedidentity.GetManagedIdentitiesInput) (*ManagedIdentityConnectionResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
+	managedIdentityService := getServiceCatalog(ctx).ManagedIdentityService
 
 	result, err := managedIdentityService.GetManagedIdentities(ctx, input)
 	if err != nil {
@@ -139,7 +140,7 @@ type ManagedIdentityAccessRuleResolver struct {
 
 // ID resolver
 func (r *ManagedIdentityAccessRuleResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ManagedIdentityAccessRuleType, r.rule.Metadata.ID))
+	return graphql.ID(r.rule.GetGlobalID())
 }
 
 // Metadata resolver
@@ -231,7 +232,7 @@ type ManagedIdentityResolver struct {
 
 // ID resolver
 func (r *ManagedIdentityResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ManagedIdentityType, r.managedIdentity.Metadata.ID))
+	return graphql.ID(r.managedIdentity.GetGlobalID())
 }
 
 // GroupPath resolver
@@ -241,7 +242,7 @@ func (r *ManagedIdentityResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *ManagedIdentityResolver) ResourcePath() string {
-	return r.managedIdentity.ResourcePath
+	return r.managedIdentity.GetResourcePath()
 }
 
 // Name resolver
@@ -283,7 +284,7 @@ func (r *ManagedIdentityResolver) Group(ctx context.Context) (*GroupResolver, er
 func (r *ManagedIdentityResolver) AccessRules(ctx context.Context) ([]*ManagedIdentityAccessRuleResolver, error) {
 	resolvers := []*ManagedIdentityAccessRuleResolver{}
 
-	rules, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRules(ctx, r.managedIdentity)
+	rules, err := getServiceCatalog(ctx).ManagedIdentityService.GetManagedIdentityAccessRules(ctx, r.managedIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +308,7 @@ func (r *ManagedIdentityResolver) AliasSourceID() *string {
 		return nil
 	}
 
-	aliasID := gid.ToGlobalID(gid.ManagedIdentityType, *r.managedIdentity.AliasSourceID)
+	aliasID := gid.ToGlobalID(types.ManagedIdentityModelType, *r.managedIdentity.AliasSourceID)
 	return &aliasID
 }
 
@@ -378,24 +379,31 @@ func (r *ManagedIdentityCredentialsResolver) Data() string {
 	return string(r.managedIdentityCredentials.Data)
 }
 
+// DEPRECATED: use node query instead since it supports both TRN and GID
 func managedIdentityQuery(ctx context.Context, args *ManagedIdentityQueryArgs) (*ManagedIdentityResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
-	var managedIdentity *models.ManagedIdentity
-	var err error
-
+	var valueToResolve string
 	switch {
+	case args.ID != nil && args.Path != nil:
+		return nil, errors.New("cannot specify both id and path", errors.WithErrorCode(errors.EInvalid))
 	case args.ID != nil:
-		managedIdentity, err = managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(*args.ID))
+		valueToResolve = *args.ID
 	case args.Path != nil:
-		managedIdentity, err = managedIdentityService.GetManagedIdentityByPath(ctx, *args.Path)
+		valueToResolve = types.ManagedIdentityModelType.BuildTRN(*args.Path)
 	default:
-		return nil, errors.New("Either id or path is required", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("must specify either id or path", errors.WithErrorCode(errors.EInvalid))
 	}
+
+	model, err := getServiceCatalog(ctx).FetchModel(ctx, valueToResolve)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	managedIdentity, ok := model.(*models.ManagedIdentity)
+	if !ok {
+		return nil, errors.New("expected managed identity type, got %T", model)
 	}
 
 	return &ManagedIdentityResolver{managedIdentity: managedIdentity}, nil
@@ -486,10 +494,13 @@ func (r *ManagedIdentityCredentialsMutationPayloadResolver) ManagedIdentityCrede
 // CreateManagedIdentityAccessRuleInput is the input for creating a new access rule
 type CreateManagedIdentityAccessRuleInput struct {
 	ClientMutationID          *string
-	AllowedTeams              *[]string
+	AllowedUserIDs            *[]string
+	AllowedServiceAccountIDs  *[]string
+	AllowedTeamIDs            *[]string
+	AllowedTeams              *[]string // DEPRECATED: use AllowedTeamIDs instead
 	ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
-	AllowedUsers              *[]string
-	AllowedServiceAccounts    *[]string
+	AllowedUsers              *[]string // DEPRECATED: use AllowedUserIDs instead
+	AllowedServiceAccounts    *[]string // DEPRECATED: use AllowServiceAccountIDs instead
 	VerifyStateLineage        *bool
 	Type                      models.ManagedIdentityAccessRuleType
 	RunStage                  models.JobType
@@ -500,9 +511,12 @@ type CreateManagedIdentityAccessRuleInput struct {
 type UpdateManagedIdentityAccessRuleInput struct {
 	ClientMutationID          *string
 	ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
-	AllowedUsers              *[]string
-	AllowedServiceAccounts    *[]string
-	AllowedTeams              *[]string
+	AllowedUserIDs            *[]string
+	AllowedServiceAccountIDs  *[]string
+	AllowedTeamIDs            *[]string
+	AllowedUsers              *[]string // DEPRECATED: use AllowedUserIDs instead
+	AllowedServiceAccounts    *[]string // DEPRECATED: use AllowedServiceAccountIDs instead
+	AllowedTeams              *[]string // DEPRECATED: use AllowedTeamIDs instead
 	VerifyStateLineage        *bool
 	ID                        string
 	RunStage                  models.JobType
@@ -519,9 +533,12 @@ type CreateManagedIdentityInput struct {
 	ClientMutationID *string
 	AccessRules      *[]struct {
 		ModuleAttestationPolicies *[]models.ManagedIdentityAccessRuleModuleAttestationPolicy
-		AllowedUsers              *[]string
-		AllowedServiceAccounts    *[]string
-		AllowedTeams              *[]string
+		AllowedUserIDs            *[]string
+		AllowedServiceAccountIDs  *[]string
+		AllowedTeamIDs            *[]string
+		AllowedUsers              *[]string // DEPRECATED: use AllowedUserIDs instead
+		AllowedServiceAccounts    *[]string // DEPRECATED: use AllowedServiceAccountIDs instead
+		AllowedTeams              *[]string // DEPRECATED: use AllowedTeamIDs instead
 		VerifyStateLineage        *bool
 		Type                      models.ManagedIdentityAccessRuleType
 		RunStage                  models.JobType
@@ -529,7 +546,8 @@ type CreateManagedIdentityInput struct {
 	Type        string
 	Name        string
 	Description string
-	GroupPath   string
+	GroupPath   *string // DEPRECATED: use GroupID instead with a TRN
+	GroupID     *string
 	Data        string
 }
 
@@ -554,8 +572,9 @@ type DeleteManagedIdentityInput struct {
 type AssignManagedIdentityInput struct {
 	ClientMutationID    *string
 	ManagedIdentityID   *string
-	ManagedIdentityPath *string
-	WorkspacePath       string
+	ManagedIdentityPath *string // DEPRECATED: use ManagedIdentityID instead with a TRN
+	WorkspaceID         *string
+	WorkspacePath       *string // DEPRECATED: use WorkspaceID instead with a TRN
 }
 
 // CreateManagedIdentityCredentialsInput is for creating credentials for a managed identity.
@@ -569,15 +588,17 @@ type CreateManagedIdentityAliasInput struct {
 	ClientMutationID *string
 	Name             string
 	AliasSourceID    *string
-	AliasSourcePath  *string
-	GroupPath        string
+	AliasSourcePath  *string // DEPRECATED: use AliasSourceID instead with a TRN
+	GroupID          *string
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
 }
 
 // MoveManagedIdentityInput is the input for moving a managed identity to another parent group.
 type MoveManagedIdentityInput struct {
 	ClientMutationID  *string
 	ManagedIdentityID string
-	NewParentPath     string
+	NewParentPath     *string // DEPRECATED: use NewParentID instead with a TRN
+	NewParentID       *string
 }
 
 func handleManagedIdentityAccessRuleMutationProblem(e error, clientMutationID *string) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
@@ -623,7 +644,15 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 
 	switch input.Type {
 	case models.ManagedIdentityAccessRuleEligiblePrincipals:
-		if input.AllowedUsers != nil {
+		if input.AllowedUserIDs != nil && input.AllowedUsers != nil {
+			return nil, errors.New("cannot specify both allowedUserIDs and allowedUsers", errors.WithErrorCode(errors.EInvalid))
+		}
+		if input.AllowedUserIDs != nil {
+			allowedUserIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *input.AllowedUserIDs)
+			if err != nil {
+				return nil, err
+			}
+		} else if input.AllowedUsers != nil {
 			allowedUserIDs, err = getManagedIdentityAllowedUserIDs(ctx, *input.AllowedUsers)
 			if err != nil {
 				return nil, err
@@ -632,7 +661,15 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 			allowedUserIDs = []string{}
 		}
 
-		if input.AllowedServiceAccounts != nil {
+		if input.AllowedServiceAccountIDs != nil && input.AllowedServiceAccounts != nil {
+			return nil, errors.New("cannot specify both allowedServiceAccountIDs and allowedServiceAccounts", errors.WithErrorCode(errors.EInvalid))
+		}
+		if input.AllowedServiceAccountIDs != nil {
+			allowedServiceAccountIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *input.AllowedServiceAccountIDs)
+			if err != nil {
+				return nil, err
+			}
+		} else if input.AllowedServiceAccounts != nil {
 			allowedServiceAccountIDs, err = getManagedIdentityAllowedServiceAccountIDs(ctx, *input.AllowedServiceAccounts)
 			if err != nil {
 				return nil, err
@@ -641,7 +678,15 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 			allowedServiceAccountIDs = []string{}
 		}
 
-		if input.AllowedTeams != nil {
+		if input.AllowedTeamIDs != nil && input.AllowedTeams != nil {
+			return nil, errors.New("cannot specify both allowedTeamIDs and allowedTeams", errors.WithErrorCode(errors.EInvalid))
+		}
+		if input.AllowedTeamIDs != nil {
+			allowedTeamIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *input.AllowedTeamIDs)
+			if err != nil {
+				return nil, err
+			}
+		} else if input.AllowedTeams != nil {
 			allowedTeamIDs, err = getManagedIdentityAllowedTeamIDs(ctx, *input.AllowedTeams)
 			if err != nil {
 				return nil, err
@@ -657,13 +702,20 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 		return nil, errors.New("invalid managed identity rule type: %s", input.Type, errors.WithErrorCode(errors.EInvalid))
 	}
 
+	serviceCatalog := getServiceCatalog(ctx)
+
+	managedIdentityID, err := serviceCatalog.FetchModelID(ctx, input.ManagedIdentityID)
+	if err != nil {
+		return nil, err
+	}
+
 	var verifyStateLineage bool
 	if input.VerifyStateLineage != nil {
 		verifyStateLineage = *input.VerifyStateLineage
 	}
 
 	rule := models.ManagedIdentityAccessRule{
-		ManagedIdentityID:         gid.FromGlobalID(input.ManagedIdentityID),
+		ManagedIdentityID:         managedIdentityID,
 		Type:                      input.Type,
 		RunStage:                  input.RunStage,
 		ModuleAttestationPolicies: moduleAttestationPolicies,
@@ -673,7 +725,7 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 		VerifyStateLineage:        verifyStateLineage,
 	}
 
-	createdRule, err := getManagedIdentityService(ctx).CreateManagedIdentityAccessRule(ctx, &rule)
+	createdRule, err := serviceCatalog.ManagedIdentityService.CreateManagedIdentityAccessRule(ctx, &rule)
 	if err != nil {
 		return nil, err
 	}
@@ -685,16 +737,30 @@ func createManagedIdentityAccessRuleMutation(ctx context.Context, input *CreateM
 func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateManagedIdentityAccessRuleInput) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
 	var allowedUserIDs, allowedServiceAccountIDs, allowedTeamIDs []string
 	var moduleAttestationPolicies []models.ManagedIdentityAccessRuleModuleAttestationPolicy
-	var err error
 
-	rule, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRule(ctx, gid.FromGlobalID(input.ID))
+	serviceCatalog := getServiceCatalog(ctx)
+
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	rule, err := serviceCatalog.ManagedIdentityService.GetManagedIdentityAccessRuleByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	switch rule.Type {
 	case models.ManagedIdentityAccessRuleEligiblePrincipals:
-		if input.AllowedUsers != nil {
+		if input.AllowedUserIDs != nil && input.AllowedUsers != nil {
+			return nil, errors.New("cannot specify both allowedUserIDs and allowedUsers", errors.WithErrorCode(errors.EInvalid))
+		}
+		if input.AllowedUserIDs != nil {
+			allowedUserIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *input.AllowedUserIDs)
+			if err != nil {
+				return nil, err
+			}
+		} else if input.AllowedUsers != nil {
 			allowedUserIDs, err = getManagedIdentityAllowedUserIDs(ctx, *input.AllowedUsers)
 			if err != nil {
 				return nil, err
@@ -703,7 +769,15 @@ func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateM
 			allowedUserIDs = []string{}
 		}
 
-		if input.AllowedServiceAccounts != nil {
+		if input.AllowedServiceAccountIDs != nil && input.AllowedServiceAccounts != nil {
+			return nil, errors.New("cannot specify both allowedServiceAccountIDs and allowedServiceAccounts", errors.WithErrorCode(errors.EInvalid))
+		}
+		if input.AllowedServiceAccountIDs != nil {
+			allowedServiceAccountIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *input.AllowedServiceAccountIDs)
+			if err != nil {
+				return nil, err
+			}
+		} else if input.AllowedServiceAccounts != nil {
 			allowedServiceAccountIDs, err = getManagedIdentityAllowedServiceAccountIDs(ctx, *input.AllowedServiceAccounts)
 			if err != nil {
 				return nil, err
@@ -712,7 +786,15 @@ func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateM
 			allowedServiceAccountIDs = []string{}
 		}
 
-		if input.AllowedTeams != nil {
+		if input.AllowedTeamIDs != nil && input.AllowedTeams != nil {
+			return nil, errors.New("cannot specify both allowedTeamIDs and allowedTeams", errors.WithErrorCode(errors.EInvalid))
+		}
+		if input.AllowedTeamIDs != nil {
+			allowedTeamIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *input.AllowedTeamIDs)
+			if err != nil {
+				return nil, err
+			}
+		} else if input.AllowedTeams != nil {
 			allowedTeamIDs, err = getManagedIdentityAllowedTeamIDs(ctx, *input.AllowedTeams)
 			if err != nil {
 				return nil, err
@@ -740,7 +822,7 @@ func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateM
 	}
 	rule.VerifyStateLineage = verifyStateLineage
 
-	updatedRule, err := getManagedIdentityService(ctx).UpdateManagedIdentityAccessRule(ctx, rule)
+	updatedRule, err := serviceCatalog.ManagedIdentityService.UpdateManagedIdentityAccessRule(ctx, rule)
 	if err != nil {
 		return nil, err
 	}
@@ -750,12 +832,19 @@ func updateManagedIdentityAccessRuleMutation(ctx context.Context, input *UpdateM
 }
 
 func deleteManagedIdentityAccessRuleMutation(ctx context.Context, input *DeleteManagedIdentityAccessRuleInput) (*ManagedIdentityAccessRuleMutationPayloadResolver, error) {
-	rule, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRule(ctx, gid.FromGlobalID(input.ID))
+	serviceCatalog := getServiceCatalog(ctx)
+
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := getManagedIdentityService(ctx).DeleteManagedIdentityAccessRule(ctx, rule); err != nil {
+	rule, err := serviceCatalog.ManagedIdentityService.GetManagedIdentityAccessRuleByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := serviceCatalog.ManagedIdentityService.DeleteManagedIdentityAccessRule(ctx, rule); err != nil {
 		return nil, err
 	}
 
@@ -764,35 +853,23 @@ func deleteManagedIdentityAccessRuleMutation(ctx context.Context, input *DeleteM
 }
 
 func createManagedIdentityAliasMutation(ctx context.Context, input *CreateManagedIdentityAliasInput) (*ManagedIdentityMutationPayloadResolver, error) {
-	identityService := getManagedIdentityService(ctx)
-	groupService := getGroupService(ctx)
-
-	group, err := groupService.GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	var identityID string
-	if input.AliasSourceID != nil && *input.AliasSourceID != "" {
-		identityID = gid.FromGlobalID(*input.AliasSourceID)
-	} else if input.AliasSourcePath != nil {
-		id, gErr := getManagedIdentityIDByPath(ctx, *input.AliasSourcePath)
-		if gErr != nil {
-			return nil, gErr
-		}
-
-		identityID = id
-	} else {
-		return nil, errors.New("Either aliasSourceId or aliasSourcePath is required", errors.WithErrorCode(errors.EInvalid))
+	aliasSourceID, err := toModelID(ctx, input.AliasSourcePath, input.AliasSourceID, types.ManagedIdentityModelType)
+	if err != nil {
+		return nil, err
 	}
 
 	createOptions := &managedidentity.CreateManagedIdentityAliasInput{
 		Name:          input.Name,
-		Group:         group,
-		AliasSourceID: identityID,
+		GroupID:       groupID,
+		AliasSourceID: aliasSourceID,
 	}
 
-	createdManagedIdentity, err := identityService.CreateManagedIdentityAlias(ctx, createOptions)
+	createdManagedIdentity, err := getServiceCatalog(ctx).ManagedIdentityService.CreateManagedIdentityAlias(ctx, createOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -802,9 +879,14 @@ func createManagedIdentityAliasMutation(ctx context.Context, input *CreateManage
 }
 
 func deleteManagedIdentityAliasMutation(ctx context.Context, input *DeleteManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	mi, err := managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	mi, err := serviceCatalog.ManagedIdentityService.GetManagedIdentityByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -827,7 +909,7 @@ func deleteManagedIdentityAliasMutation(ctx context.Context, input *DeleteManage
 		deleteOptions.Force = *input.Force
 	}
 
-	if err := managedIdentityService.DeleteManagedIdentityAlias(ctx, &deleteOptions); err != nil {
+	if err := serviceCatalog.ManagedIdentityService.DeleteManagedIdentityAlias(ctx, &deleteOptions); err != nil {
 		return nil, err
 	}
 
@@ -836,11 +918,10 @@ func deleteManagedIdentityAliasMutation(ctx context.Context, input *DeleteManage
 }
 
 func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
-	groupID := group.Metadata.ID
 
 	managedIdentityCreateOptions := managedidentity.CreateManagedIdentityInput{
 		Type:        models.ManagedIdentityType(input.Type),
@@ -866,7 +947,15 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 
 			switch r.Type {
 			case models.ManagedIdentityAccessRuleEligiblePrincipals:
-				if r.AllowedUsers != nil {
+				if r.AllowedUserIDs != nil && r.AllowedUsers != nil {
+					return nil, errors.New("cannot specify both allowedUserIDs and allowedUsers", errors.WithErrorCode(errors.EInvalid))
+				}
+				if r.AllowedUserIDs != nil {
+					allowedUserIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *r.AllowedUserIDs)
+					if err != nil {
+						return nil, err
+					}
+				} else if r.AllowedUsers != nil {
 					allowedUserIDs, err = getManagedIdentityAllowedUserIDs(ctx, *r.AllowedUsers)
 					if err != nil {
 						return nil, err
@@ -875,7 +964,15 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 					allowedUserIDs = []string{}
 				}
 
-				if r.AllowedServiceAccounts != nil {
+				if r.AllowedServiceAccountIDs != nil && r.AllowedServiceAccounts != nil {
+					return nil, errors.New("cannot specify both allowedServiceAccountIDs and allowedServiceAccounts", errors.WithErrorCode(errors.EInvalid))
+				}
+				if r.AllowedServiceAccountIDs != nil {
+					allowedServiceAccountIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *r.AllowedServiceAccountIDs)
+					if err != nil {
+						return nil, err
+					}
+				} else if r.AllowedServiceAccounts != nil {
 					allowedServiceAccountIDs, err = getManagedIdentityAllowedServiceAccountIDs(ctx, *r.AllowedServiceAccounts)
 					if err != nil {
 						return nil, err
@@ -884,7 +981,15 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 					allowedServiceAccountIDs = []string{}
 				}
 
-				if r.AllowedTeams != nil {
+				if r.AllowedTeamIDs != nil && r.AllowedTeams != nil {
+					return nil, errors.New("cannot specify both allowedTeamIDs and allowedTeams", errors.WithErrorCode(errors.EInvalid))
+				}
+				if r.AllowedTeamIDs != nil {
+					allowedTeamIDs, err = resolveManagedIdentityAllowedPrincipalIDs(ctx, *r.AllowedTeamIDs)
+					if err != nil {
+						return nil, err
+					}
+				} else if r.AllowedTeams != nil {
 					allowedTeamIDs, err = getManagedIdentityAllowedTeamIDs(ctx, *r.AllowedTeams)
 					if err != nil {
 						return nil, err
@@ -927,9 +1032,7 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 		}
 	}
 
-	managedIdentityService := getManagedIdentityService(ctx)
-
-	createdManagedIdentity, err := managedIdentityService.CreateManagedIdentity(ctx, &managedIdentityCreateOptions)
+	createdManagedIdentity, err := getServiceCatalog(ctx).ManagedIdentityService.CreateManagedIdentity(ctx, &managedIdentityCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -939,10 +1042,15 @@ func createManagedIdentityMutation(ctx context.Context, input *CreateManagedIden
 }
 
 func updateManagedIdentityMutation(ctx context.Context, input *UpdateManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	managedIdentity, err := managedIdentityService.UpdateManagedIdentity(ctx, &managedidentity.UpdateManagedIdentityInput{
-		ID:          gid.FromGlobalID(input.ID),
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	managedIdentity, err := serviceCatalog.ManagedIdentityService.UpdateManagedIdentity(ctx, &managedidentity.UpdateManagedIdentityInput{
+		ID:          id,
 		Description: input.Description,
 		Data:        []byte(input.Data),
 	})
@@ -955,9 +1063,14 @@ func updateManagedIdentityMutation(ctx context.Context, input *UpdateManagedIden
 }
 
 func deleteManagedIdentityMutation(ctx context.Context, input *DeleteManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	mi, err := managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	mi, err := serviceCatalog.ManagedIdentityService.GetManagedIdentityByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -980,7 +1093,7 @@ func deleteManagedIdentityMutation(ctx context.Context, input *DeleteManagedIden
 		deleteOptions.Force = *input.Force
 	}
 
-	if err := managedIdentityService.DeleteManagedIdentity(ctx, &deleteOptions); err != nil {
+	if err := serviceCatalog.ManagedIdentityService.DeleteManagedIdentity(ctx, &deleteOptions); err != nil {
 		return nil, err
 	}
 
@@ -989,29 +1102,24 @@ func deleteManagedIdentityMutation(ctx context.Context, input *DeleteManagedIden
 }
 
 func assignManagedIdentityMutation(ctx context.Context, input *AssignManagedIdentityInput) (*AssignManagedIdentityMutationPayloadResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
-	workspaceService := getWorkspaceService(ctx)
-
-	var identityID string
-	workspace, err := workspaceService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	if input.ManagedIdentityID != nil && *input.ManagedIdentityID != "" {
-		identityID = gid.FromGlobalID(*input.ManagedIdentityID)
-	} else if input.ManagedIdentityPath != nil {
-		id, err := getManagedIdentityIDByPath(ctx, *input.ManagedIdentityPath)
-		if err != nil {
-			return nil, err
-		}
-
-		identityID = id
-	} else {
-		return nil, errors.New("Either managedIdentityId or managedIdentityPath is required", errors.WithErrorCode(errors.EInvalid))
+	identityID, err := toModelID(ctx, input.ManagedIdentityPath, input.ManagedIdentityID, types.ManagedIdentityModelType)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := managedIdentityService.AddManagedIdentityToWorkspace(ctx, identityID, workspace.Metadata.ID); err != nil {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	if err = serviceCatalog.ManagedIdentityService.AddManagedIdentityToWorkspace(ctx, identityID, workspaceID); err != nil {
+		return nil, err
+	}
+
+	workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -1020,29 +1128,24 @@ func assignManagedIdentityMutation(ctx context.Context, input *AssignManagedIden
 }
 
 func unassignManagedIdentityMutation(ctx context.Context, input *AssignManagedIdentityInput) (*AssignManagedIdentityMutationPayloadResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
-	workspaceService := getWorkspaceService(ctx)
-
-	var identityID string
-	workspace, err := workspaceService.GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	if input.ManagedIdentityID != nil && *input.ManagedIdentityID != "" {
-		identityID = gid.FromGlobalID(*input.ManagedIdentityID)
-	} else if input.ManagedIdentityPath != nil {
-		id, err := getManagedIdentityIDByPath(ctx, *input.ManagedIdentityPath)
-		if err != nil {
-			return nil, err
-		}
-
-		identityID = id
-	} else {
-		return nil, errors.New("Either managedIdentityId or managedIdentityPath is required", errors.WithErrorCode(errors.EInvalid))
+	identityID, err := toModelID(ctx, input.ManagedIdentityPath, input.ManagedIdentityID, types.ManagedIdentityModelType)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := managedIdentityService.RemoveManagedIdentityFromWorkspace(ctx, identityID, workspace.Metadata.ID); err != nil {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	if err = serviceCatalog.ManagedIdentityService.RemoveManagedIdentityFromWorkspace(ctx, identityID, workspaceID); err != nil {
+		return nil, err
+	}
+
+	workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByID(ctx, workspaceID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -1053,14 +1156,19 @@ func unassignManagedIdentityMutation(ctx context.Context, input *AssignManagedId
 func createManagedIdentityCredentialsMutation(ctx context.Context,
 	input *CreateManagedIdentityCredentialsInput,
 ) (*ManagedIdentityCredentialsMutationPayloadResolver, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	managedIdentity, err := managedIdentityService.GetManagedIdentityByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	credentials, err := managedIdentityService.CreateCredentials(ctx, managedIdentity)
+	managedIdentity, err := serviceCatalog.ManagedIdentityService.GetManagedIdentityByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	credentials, err := serviceCatalog.ManagedIdentityService.CreateCredentials(ctx, managedIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -1075,18 +1183,22 @@ func createManagedIdentityCredentialsMutation(ctx context.Context,
 }
 
 func moveManagedIdentityMutation(ctx context.Context, input *MoveManagedIdentityInput) (*ManagedIdentityMutationPayloadResolver, error) {
-	groupService := getGroupService(ctx)
-	managedIdentityService := getManagedIdentityService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	// Get the new parent group.
-	newParent, iErr := groupService.GetGroupByFullPath(ctx, input.NewParentPath)
-	if iErr != nil {
-		return nil, iErr
+	managedIdentityID, err := serviceCatalog.FetchModelID(ctx, input.ManagedIdentityID)
+	if err != nil {
+		return nil, err
 	}
 
-	managedIdentity, err := managedIdentityService.MoveManagedIdentity(ctx, &managedidentity.MoveManagedIdentityInput{
-		ManagedIdentityID: gid.FromGlobalID(input.ManagedIdentityID),
-		NewGroupID:        newParent.Metadata.ID,
+	// Get the new parent group's ID.
+	newParentID, err := toModelID(ctx, input.NewParentPath, input.NewParentID, types.GroupModelType)
+	if err != nil {
+		return nil, err
+	}
+
+	managedIdentity, err := serviceCatalog.ManagedIdentityService.MoveManagedIdentity(ctx, &managedidentity.MoveManagedIdentityInput{
+		ManagedIdentityID: managedIdentityID,
+		NewGroupID:        newParentID,
 	})
 	if err != nil {
 		return nil, err
@@ -1100,22 +1212,13 @@ func moveManagedIdentityMutation(ctx context.Context, input *MoveManagedIdentity
 	return &ManagedIdentityMutationPayloadResolver{ManagedIdentityMutationPayload: payload}, nil
 }
 
-func getManagedIdentityIDByPath(ctx context.Context, path string) (string, error) {
-	managedIdentityService := getManagedIdentityService(ctx)
-	identity, err := managedIdentityService.GetManagedIdentityByPath(ctx, path)
-	if err != nil {
-		return "", err
-	}
-
-	return identity.Metadata.ID, nil
-}
-
+// DEPRECATED: replaced by resolveManagedIdentityAllowedPrincipalIDs
 func getManagedIdentityAllowedUserIDs(ctx context.Context, usernames []string) ([]string, error) {
-	userService := getUserService(ctx)
+	userService := getServiceCatalog(ctx).UserService
 	response := []string{}
 
 	for _, username := range usernames {
-		user, err := userService.GetUserByUsername(ctx, username)
+		user, err := userService.GetUserByTRN(ctx, types.UserModelType.BuildTRN(username))
 		if err != nil {
 			return nil, err
 		}
@@ -1125,12 +1228,13 @@ func getManagedIdentityAllowedUserIDs(ctx context.Context, usernames []string) (
 	return response, nil
 }
 
+// DEPRECATED: replaced by resolveManagedIdentityAllowedPrincipalIDs
 func getManagedIdentityAllowedServiceAccountIDs(ctx context.Context, serviceAccountPaths []string) ([]string, error) {
-	saService := getSAService(ctx)
+	saService := getServiceCatalog(ctx).ServiceAccountService
 	response := []string{}
 
 	for _, path := range serviceAccountPaths {
-		sa, err := saService.GetServiceAccountByPath(ctx, path)
+		sa, err := saService.GetServiceAccountByTRN(ctx, types.ServiceAccountModelType.BuildTRN(path))
 		if err != nil {
 			return nil, err
 		}
@@ -1140,16 +1244,32 @@ func getManagedIdentityAllowedServiceAccountIDs(ctx context.Context, serviceAcco
 	return response, nil
 }
 
+// DEPRECATED: replaced by resolveManagedIdentityAllowedPrincipalIDs
 func getManagedIdentityAllowedTeamIDs(ctx context.Context, teamNames []string) ([]string, error) {
-	teamService := getTeamService(ctx)
+	teamService := getServiceCatalog(ctx).TeamService
 	response := []string{}
 
 	for _, teamName := range teamNames {
-		team, err := teamService.GetTeamByName(ctx, teamName)
+		team, err := teamService.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(teamName))
 		if err != nil {
 			return nil, err
 		}
 		response = append(response, team.Metadata.ID)
+	}
+
+	return response, nil
+}
+
+func resolveManagedIdentityAllowedPrincipalIDs(ctx context.Context, ids []string) ([]string, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+	response := []string{}
+
+	for _, id := range ids {
+		resolvedID, err := serviceCatalog.FetchModelID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		response = append(response, resolvedID)
 	}
 
 	return response, nil
@@ -1184,7 +1304,7 @@ func loadManagedIdentity(ctx context.Context, id string) (*models.ManagedIdentit
 }
 
 func managedIdentityBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	managedIdentities, err := getManagedIdentityService(ctx).GetManagedIdentitiesByIDs(ctx, ids)
+	managedIdentities, err := getServiceCatalog(ctx).ManagedIdentityService.GetManagedIdentitiesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -1227,7 +1347,7 @@ func loadManagedIdentityAccessRule(ctx context.Context, id string) (*models.Mana
 }
 
 func managedIdentityAccessRuleBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	rules, err := getManagedIdentityService(ctx).GetManagedIdentityAccessRulesByIDs(ctx, ids)
+	rules, err := getServiceCatalog(ctx).ManagedIdentityService.GetManagedIdentityAccessRulesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

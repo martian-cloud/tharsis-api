@@ -44,12 +44,12 @@ func (_m *MockStateVersions) CreateStateVersion(ctx context.Context, stateVersio
 	return r0, r1
 }
 
-// GetStateVersion provides a mock function with given fields: ctx, id
-func (_m *MockStateVersions) GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error) {
+// GetStateVersionByID provides a mock function with given fields: ctx, id
+func (_m *MockStateVersions) GetStateVersionByID(ctx context.Context, id string) (*models.StateVersion, error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetStateVersion")
+		panic("no return value specified for GetStateVersionByID")
 	}
 
 	var r0 *models.StateVersion
@@ -67,6 +67,36 @@ func (_m *MockStateVersions) GetStateVersion(ctx context.Context, id string) (*m
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStateVersionByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockStateVersions) GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateVersionByTRN")
+	}
+
+	var r0 *models.StateVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.StateVersion, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.StateVersion); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.StateVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

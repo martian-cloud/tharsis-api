@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -71,7 +73,7 @@ func TestGetModuleVersionByID(t *testing.T) {
 		{
 			name:      "returns an error because the module version ID is invalid",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -87,6 +89,90 @@ func TestGetModuleVersionByID(t *testing.T) {
 				assert.Equal(t, test.expectTerraformModuleVersion, actualTerraformModuleVersion)
 			} else {
 				assert.Nil(t, actualTerraformModuleVersion)
+			}
+		})
+	}
+}
+
+func TestGetModuleVersionByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module",
+		System:      "aws",
+		RootGroupID: group.Metadata.ID,
+		GroupID:     group.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	moduleVersion, err := testClient.client.TerraformModuleVersions.CreateModuleVersion(ctx, &models.TerraformModuleVersion{
+		ModuleID:        module.Metadata.ID,
+		SemanticVersion: "1.0.0",
+		Status:          models.TerraformModuleVersionStatusUploaded,
+		SHASum:          []byte("9ecb4d0fff7208208a11a432001e44eb6fb2dbb58cc4fdec87e3f29dbe35fa11"),
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectVersion   bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "get module version by TRN",
+			trn:           moduleVersion.Metadata.TRN,
+			expectVersion: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.TerraformModuleVersionModelType.BuildTRN(group.FullPath, module.Name, module.System, "1.0.1"),
+		},
+		{
+			name:            "module version TRN has less than 4 parts",
+			trn:             types.TerraformModuleVersionModelType.BuildTRN("test-group"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualVersion, err := testClient.client.TerraformModuleVersions.GetModuleVersionByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectVersion {
+				require.NotNil(t, actualVersion)
+				assert.Equal(t,
+					types.TerraformModuleVersionModelType.BuildTRN(
+						group.FullPath,
+						module.Name,
+						module.System,
+						moduleVersion.SemanticVersion,
+					),
+					actualVersion.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualVersion)
 			}
 		})
 	}
@@ -831,6 +917,7 @@ func compareTerraformModuleVersions(t *testing.T, expected, actual *models.Terra
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

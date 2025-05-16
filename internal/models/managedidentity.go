@@ -4,7 +4,14 @@ import (
 	"strings"
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
+var (
+	_ Model = (*ManagedIdentity)(nil)
+	_ Model = (*ManagedIdentityAccessRule)(nil)
 )
 
 // ManagedIdentityType represents the supported managed identity types
@@ -47,6 +54,21 @@ type ManagedIdentityAccessRule struct {
 	VerifyStateLineage        bool
 }
 
+// GetID returns the Metadata ID.
+func (m *ManagedIdentityAccessRule) GetID() string {
+	return m.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (m *ManagedIdentityAccessRule) GetGlobalID() string {
+	return gid.ToGlobalID(m.GetModelType(), m.Metadata.ID)
+}
+
+// GetModelType returns the model type.
+func (m *ManagedIdentityAccessRule) GetModelType() types.ModelType {
+	return types.ManagedIdentityAccessRuleModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (m *ManagedIdentityAccessRule) ResolveMetadata(key string) (string, error) {
 	return m.Metadata.resolveFieldValue(key)
@@ -86,7 +108,6 @@ func (m *ManagedIdentityAccessRule) Validate() error {
 // ManagedIdentity is used to provide identities to terraform providers
 type ManagedIdentity struct {
 	Type          ManagedIdentityType
-	ResourcePath  string
 	Name          string
 	Description   string
 	GroupID       string
@@ -94,6 +115,21 @@ type ManagedIdentity struct {
 	AliasSourceID *string
 	Metadata      ResourceMetadata
 	Data          []byte
+}
+
+// GetID returns the Metadata ID.
+func (m *ManagedIdentity) GetID() string {
+	return m.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (m *ManagedIdentity) GetGlobalID() string {
+	return gid.ToGlobalID(m.GetModelType(), m.Metadata.ID)
+}
+
+// GetModelType returns the model type.
+func (m *ManagedIdentity) GetModelType() types.ModelType {
+	return types.ManagedIdentityModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -122,9 +158,15 @@ func (m *ManagedIdentity) Validate() error {
 	return verifyValidDescription(m.Description)
 }
 
+// GetResourcePath returns the resource path
+func (m *ManagedIdentity) GetResourcePath() string {
+	return strings.Split(m.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+}
+
 // GetGroupPath returns the group path
 func (m *ManagedIdentity) GetGroupPath() string {
-	return m.ResourcePath[:strings.LastIndex(m.ResourcePath, "/")]
+	resourcePath := m.GetResourcePath()
+	return resourcePath[:strings.LastIndex(resourcePath, "/")]
 }
 
 // IsAlias returns true is managed identity is an alias.

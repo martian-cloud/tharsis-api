@@ -14,7 +14,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
@@ -90,7 +89,7 @@ func TestSetManagedIdentityData(t *testing.T) {
 				}
 
 				assert.Equal(t, test.expectRole, decodedData.Role)
-				assert.Equal(t, gid.ToGlobalID(gid.ManagedIdentityType, managedIdentity.Metadata.ID), decodedData.Subject)
+				assert.Equal(t, managedIdentity.GetGlobalID(), decodedData.Subject)
 			}
 		})
 	}

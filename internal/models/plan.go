@@ -1,8 +1,12 @@
 package models
 
 import (
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+var _ Model = (*Plan)(nil)
 
 // PlanStatus represents the various states for a Plan resource
 type PlanStatus string
@@ -38,6 +42,21 @@ type Plan struct {
 	PlanDiffSize int
 	Summary      PlanSummary
 	HasChanges   bool
+}
+
+// GetID returns the Metadata ID.
+func (p *Plan) GetID() string {
+	return p.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (p *Plan) GetGlobalID() string {
+	return gid.ToGlobalID(p.GetModelType(), p.Metadata.ID)
+}
+
+// GetModelType returns the model type
+func (p *Plan) GetModelType() types.ModelType {
+	return types.PlanModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination

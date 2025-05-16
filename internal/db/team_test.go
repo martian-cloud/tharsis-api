@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -33,6 +35,116 @@ type teamInfoUpdateSlice []teamInfo
 
 // teamInfoNameSlice makes a slice of teamInfo sortable by name
 type teamInfoNameSlice []teamInfo
+
+func TestGetTeamByID(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name: "test-team",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		id              string
+		expectTeam      bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get team by ID",
+			id:         team.Metadata.ID,
+			expectTeam: true,
+		},
+		{
+			name: "resource with ID not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid ID will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualTeam, err := testClient.client.Teams.GetTeamByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectTeam {
+				require.NotNil(t, actualTeam)
+				assert.Equal(t, test.id, actualTeam.Metadata.ID)
+			} else {
+				assert.Nil(t, actualTeam)
+			}
+		})
+	}
+}
+
+func TestGetTeamByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name: "test-team",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectTeam      bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get team by TRN",
+			trn:        team.Metadata.TRN,
+			expectTeam: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.TeamModelType.BuildTRN("unknown"),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualTeam, err := testClient.client.Teams.GetTeamByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectTeam {
+				require.NotNil(t, actualTeam)
+				assert.Equal(t, test.trn, actualTeam.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualTeam)
+			}
+		})
+	}
+}
 
 func TestCreateTeams(t *testing.T) {
 	ctx := context.Background()
@@ -153,7 +265,7 @@ func TestGetTeamBySCIMExternalID(t *testing.T) {
 		testCase{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	)
 
@@ -961,6 +1073,7 @@ func compareTeams(t *testing.T, expected, actual *models.Team,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

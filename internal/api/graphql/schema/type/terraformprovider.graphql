@@ -58,7 +58,11 @@ type TerraformProvider implements Node {
 
 input CreateTerraformProviderInput {
   clientMutationId: String
-  groupPath: String!
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  groupId: String
   name: String!
   private: Boolean
   repositoryUrl: String

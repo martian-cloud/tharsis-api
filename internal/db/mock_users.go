@@ -182,21 +182,21 @@ func (_m *MockUsers) GetUserBySCIMExternalID(ctx context.Context, scimExternalID
 	return r0, r1
 }
 
-// GetUserByUsername provides a mock function with given fields: ctx, username
-func (_m *MockUsers) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
-	ret := _m.Called(ctx, username)
+// GetUserByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockUsers) GetUserByTRN(ctx context.Context, trn string) (*models.User, error) {
+	ret := _m.Called(ctx, trn)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetUserByUsername")
+		panic("no return value specified for GetUserByTRN")
 	}
 
 	var r0 *models.User
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.User, error)); ok {
-		return rf(ctx, username)
+		return rf(ctx, trn)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.User); ok {
-		r0 = rf(ctx, username)
+		r0 = rf(ctx, trn)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.User)
@@ -204,7 +204,7 @@ func (_m *MockUsers) GetUserByUsername(ctx context.Context, username string) (*m
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, username)
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

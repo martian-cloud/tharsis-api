@@ -19,7 +19,7 @@ func (r *TerraformCLIVersionsResolver) Versions() []string {
 }
 
 func terraformCLIVersionsQuery(ctx context.Context) (*TerraformCLIVersionsResolver, error) {
-	cliVersions, err := getCLIService(ctx).GetTerraformCLIVersions(ctx)
+	cliVersions, err := getServiceCatalog(ctx).CLIService.GetTerraformCLIVersions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func createTerraformCLIDownloadURLMutation(ctx context.Context,
 		Architecture: input.Architecture,
 	}
 
-	downloadURL, err := getCLIService(ctx).CreateTerraformCLIDownloadURL(ctx, downloadInput)
+	downloadURL, err := getServiceCatalog(ctx).CLIService.CreateTerraformCLIDownloadURL(ctx, downloadInput)
 	if err != nil {
 		return nil, err
 	}

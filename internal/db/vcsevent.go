@@ -9,7 +9,9 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -18,6 +20,7 @@ import (
 // VCSEvents encapsulates the logic for accessing vcs events form the database.
 type VCSEvents interface {
 	GetEventByID(ctx context.Context, id string) (*models.VCSEvent, error)
+	GetEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error)
 	GetEvents(ctx context.Context, input *GetVCSEventsInput) (*VCSEventsResult, error)
 	CreateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error)
 	UpdateEvent(ctx context.Context, event *models.VCSEvent) (*models.VCSEvent, error)
@@ -102,6 +105,29 @@ func (ve *vcsEvents) GetEventByID(ctx context.Context, id string) (*models.VCSEv
 	return ve.getEvent(ctx, goqu.Ex{"vcs_events.id": id})
 }
 
+func (ve *vcsEvents) GetEventByTRN(ctx context.Context, trn string) (*models.VCSEvent, error) {
+	ctx, span := tracer.Start(ctx, "db.GetEventByTRN")
+	defer span.End()
+
+	path, err := types.VCSEventModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a vcs event TRN must have the workspace path, and event GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return ve.getEvent(ctx, goqu.Ex{
+		"vcs_events.id":   gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path": path[:lastSlashIndex],
+	})
+}
+
 func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*VCSEventsResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetEvents")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -120,6 +146,7 @@ func (ve *vcsEvents) GetEvents(ctx context.Context, input *GetVCSEventsInput) (*
 
 	query := dialect.From("vcs_events").
 		Select(ve.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -181,22 +208,27 @@ func (ve *vcsEvents) CreateEvent(ctx context.Context, event *models.VCSEvent) (*
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("vcs_events").
+	sql, args, err := dialect.From("vcs_events").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                    newResourceID(),
-			"version":               initialResourceVersion,
-			"created_at":            timestamp,
-			"updated_at":            timestamp,
-			"commit_id":             event.CommitID,
-			"source_reference_name": event.SourceReferenceName,
-			"workspace_id":          event.WorkspaceID,
-			"type":                  event.Type,
-			"status":                event.Status,
-			"repository_url":        event.RepositoryURL,
-			"error_message":         event.ErrorMessage,
-		}).
-		Returning(vcsEventsFieldList...).ToSQL()
+		With("vcs_events",
+			dialect.Insert("vcs_events").
+				Rows(goqu.Record{
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"commit_id":             event.CommitID,
+					"source_reference_name": event.SourceReferenceName,
+					"workspace_id":          event.WorkspaceID,
+					"type":                  event.Type,
+					"status":                event.Status,
+					"repository_url":        event.RepositoryURL,
+					"error_message":         event.ErrorMessage,
+				}).
+				Returning("*"),
+		).Select(ve.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -227,18 +259,22 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("vcs_events").
+	sql, args, err := dialect.From("vcs_events").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":       goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":    timestamp,
-				"status":        event.Status,
-				"error_message": event.ErrorMessage,
-			},
-		).Where(goqu.Ex{"id": event.Metadata.ID, "version": event.Metadata.Version}).
-		Returning(vcsEventsFieldList...).ToSQL()
-
+		With("vcs_events",
+			dialect.Update("vcs_events").
+				Set(
+					goqu.Record{
+						"version":       goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":    timestamp,
+						"status":        event.Status,
+						"error_message": event.ErrorMessage,
+					},
+				).Where(goqu.Ex{"id": event.Metadata.ID, "version": event.Metadata.Version}).
+				Returning("*"),
+		).Select(ve.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -259,9 +295,10 @@ func (ve *vcsEvents) UpdateEvent(ctx context.Context, event *models.VCSEvent) (*
 }
 
 func (ve *vcsEvents) getEvent(ctx context.Context, exp goqu.Ex) (*models.VCSEvent, error) {
-	sql, args, err := dialect.From(goqu.T("vcs_events")).
+	sql, args, err := dialect.From("vcs_events").
 		Prepared(true).
 		Select(ve.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_events.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(exp).
 		ToSQL()
 
@@ -274,6 +311,13 @@ func (ve *vcsEvents) getEvent(ctx context.Context, exp goqu.Ex) (*models.VCSEven
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -286,10 +330,13 @@ func (ve *vcsEvents) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("vcs_events.%s", field))
 	}
 
+	selectFields = append(selectFields, "namespaces.path")
+
 	return selectFields
 }
 
 func scanVCSEvent(row scanner) (*models.VCSEvent, error) {
+	var workspacePath string
 	ve := &models.VCSEvent{}
 
 	fields := []interface{}{
@@ -304,6 +351,7 @@ func scanVCSEvent(row scanner) (*models.VCSEvent, error) {
 		&ve.Status,
 		&ve.RepositoryURL,
 		&ve.ErrorMessage,
+		&workspacePath,
 	}
 
 	err := row.Scan(fields...)
@@ -311,6 +359,8 @@ func scanVCSEvent(row scanner) (*models.VCSEvent, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	ve.Metadata.TRN = types.VCSEventModelType.BuildTRN(workspacePath, ve.GetGlobalID())
 
 	return ve, nil
 }

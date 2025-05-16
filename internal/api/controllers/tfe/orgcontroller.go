@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -68,7 +69,7 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 
 	groupPath := convertOrgToGroupPath(org)
 
-	group, err := c.groupService.GetGroupByFullPath(r.Context(), groupPath)
+	group, err := c.groupService.GetGroupByTRN(r.Context(), types.GroupModelType.BuildTRN(groupPath))
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return

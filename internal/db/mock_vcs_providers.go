@@ -122,6 +122,36 @@ func (_m *MockVCSProviders) GetProviderByOAuthState(ctx context.Context, state s
 	return r0, r1
 }
 
+// GetProviderByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockVCSProviders) GetProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderByTRN")
+	}
+
+	var r0 *models.VCSProvider
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.VCSProvider, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.VCSProvider); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.VCSProvider)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviders provides a mock function with given fields: ctx, input
 func (_m *MockVCSProviders) GetProviders(ctx context.Context, input *GetVCSProvidersInput) (*VCSProvidersResult, error) {
 	ret := _m.Called(ctx, input)

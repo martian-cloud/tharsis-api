@@ -15,13 +15,14 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	terrs "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
@@ -32,6 +33,144 @@ import (
 type keyPair struct {
 	priv jwk.Key
 	pub  jwk.Key
+}
+
+func TestGetServiceAccountByID(t *testing.T) {
+	sampleServiceAccount := &models.ServiceAccount{
+		Metadata: models.ResourceMetadata{
+			ID:  "service-account-id-1",
+			TRN: types.ServiceAccountModelType.BuildTRN("my-group/service-account-1"),
+		},
+		Name:        "service-account-1",
+		GroupID:     "group-1",
+		Description: "test service account",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		serviceAccount  *models.ServiceAccount
+		expectErrorCode terrs.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:           "successfully get service account by ID",
+			serviceAccount: sampleServiceAccount,
+		},
+		{
+			name:            "service account not found",
+			expectErrorCode: terrs.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view service account",
+			serviceAccount:  sampleServiceAccount,
+			authError:       terrs.New("Forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			expectErrorCode: terrs.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockServiceAccounts := db.NewMockServiceAccounts(t)
+
+			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(test.serviceAccount, nil)
+
+			if test.serviceAccount != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				ServiceAccounts: mockServiceAccounts,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualServiceAccount, err := service.GetServiceAccountByID(auth.WithCaller(ctx, mockCaller), sampleServiceAccount.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, terrs.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.serviceAccount, actualServiceAccount)
+		})
+	}
+}
+
+func TestGetServiceAccountByTRN(t *testing.T) {
+	sampleServiceAccount := &models.ServiceAccount{
+		Metadata: models.ResourceMetadata{
+			ID:  "service-account-id-1",
+			TRN: types.ServiceAccountModelType.BuildTRN("my-group/service-account-1"),
+		},
+		Name:        "service-account-1",
+		GroupID:     "group-1",
+		Description: "test service account",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		serviceAccount  *models.ServiceAccount
+		expectErrorCode terrs.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:           "successfully get service account by trn",
+			serviceAccount: sampleServiceAccount,
+		},
+		{
+			name:            "service account not found",
+			expectErrorCode: terrs.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view service account",
+			serviceAccount:  sampleServiceAccount,
+			authError:       terrs.New("Forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			expectErrorCode: terrs.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockServiceAccounts := db.NewMockServiceAccounts(t)
+
+			mockServiceAccounts.On("GetServiceAccountByTRN", mock.Anything, sampleServiceAccount.Metadata.TRN).Return(test.serviceAccount, nil)
+
+			if test.serviceAccount != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				ServiceAccounts: mockServiceAccounts,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualServiceAccount, err := service.GetServiceAccountByTRN(auth.WithCaller(ctx, mockCaller), sampleServiceAccount.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, terrs.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.serviceAccount, actualServiceAccount)
+		})
+	}
 }
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -72,12 +211,14 @@ func TestCreateServiceAccount(t *testing.T) {
 				},
 			},
 			expectCreatedServiceAccount: &models.ServiceAccount{
-				Metadata:     models.ResourceMetadata{ID: groupID},
-				ResourcePath: resourcePath,
-				Name:         serviceAccountName,
-				Description:  serviceAccountDescription,
-				GroupID:      groupID,
-				CreatedBy:    createdBy,
+				Metadata: models.ResourceMetadata{
+					ID:  groupID,
+					TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+				},
+				Name:        serviceAccountName,
+				Description: serviceAccountDescription,
+				GroupID:     groupID,
+				CreatedBy:   createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
 						Issuer:          issuer,
@@ -123,12 +264,14 @@ func TestCreateServiceAccount(t *testing.T) {
 				},
 			},
 			expectCreatedServiceAccount: &models.ServiceAccount{
-				Metadata:     models.ResourceMetadata{ID: groupID},
-				ResourcePath: resourcePath,
-				Name:         serviceAccountName,
-				Description:  serviceAccountDescription,
-				GroupID:      groupID,
-				CreatedBy:    createdBy,
+				Metadata: models.ResourceMetadata{
+					ID:  groupID,
+					TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+				},
+				Name:        serviceAccountName,
+				Description: serviceAccountDescription,
+				GroupID:     groupID,
+				CreatedBy:   createdBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
 						Issuer:          issuer,
@@ -153,7 +296,7 @@ func TestCreateServiceAccount(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateServiceAccountPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 
@@ -234,6 +377,8 @@ func TestCreateToken(t *testing.T) {
 
 	keyID := validKeyPair.pub.KeyID()
 	serviceAccountID := "d4a94ff5-154e-4758-8039-55e2147fa154"
+	serviceAccountGID := gid.ToGlobalID(types.ServiceAccountModelType, serviceAccountID)
+	serviceAccountTRN := types.ServiceAccountModelType.BuildTRN("groupA/serviceAccount1")
 	issuer := "https://test.tharsis"
 	sub := "testSubject1"
 
@@ -254,6 +399,7 @@ func TestCreateToken(t *testing.T) {
 		serviceAccount string
 		policy         []models.OIDCTrustPolicy
 		token          []byte
+		isTRN          bool
 	}{
 		{
 			name:           "subject claim doesn't match",
@@ -294,6 +440,26 @@ func TestCreateToken(t *testing.T) {
 			token:          createJWT(t, validKeyPair.priv, keyID, "", sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
 			expectErr:      errors.New("JWT is missing issuer claim"),
+		},
+		{
+			name:           "empty service account ID",
+			serviceAccount: "",
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy:         basicPolicy,
+			expectErr:      errFailedCreateToken,
+		},
+		{
+			name:           "using TRN as service account ID",
+			serviceAccount: serviceAccountTRN,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy:         basicPolicy,
+			isTRN:          true,
+		},
+		{
+			name:           "using GID as service account ID",
+			serviceAccount: serviceAccountGID,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy:         basicPolicy,
 		},
 		{
 			name:           "negative: multiple trust policies with same issuer: all mismatch",
@@ -370,16 +536,24 @@ func TestCreateToken(t *testing.T) {
 			defer cancel()
 
 			sa := models.ServiceAccount{
-				Metadata:          models.ResourceMetadata{ID: serviceAccountID},
+				Metadata: models.ResourceMetadata{
+					ID:  serviceAccountID,
+					TRN: serviceAccountTRN,
+				},
 				Name:              "serviceAccount1",
-				ResourcePath:      "groupA/serviceAccount1",
 				OIDCTrustPolicies: test.policy,
 			}
 
 			mockServiceAccounts := db.NewMockServiceAccounts(t)
 
-			mockServiceAccounts.On("GetServiceAccountByPath", mock.Anything, test.serviceAccount).Return(&sa, nil).Maybe()
-			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, test.serviceAccount).Return(&sa, nil).Maybe()
+			// Set up the appropriate mock based on whether we're testing with a TRN or GID
+			if test.serviceAccount != "" {
+				if test.isTRN {
+					mockServiceAccounts.On("GetServiceAccountByTRN", mock.Anything, test.serviceAccount).Return(&sa, nil)
+				} else {
+					mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).Return(&sa, nil).Maybe()
+				}
+			}
 
 			mockJWSProvider := jwsprovider.NewMockProvider(t)
 
@@ -388,14 +562,14 @@ func TestCreateToken(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if parsedToken.Subject() != sa.ResourcePath {
+				if parsedToken.Subject() != sa.GetResourcePath() {
 					return false
 				}
 				privClaims := parsedToken.PrivateClaims()
 
-				return privClaims["tharsis_service_account_id"] == gid.ToGlobalID(gid.ServiceAccountType, sa.Metadata.ID) &&
+				return privClaims["tharsis_service_account_id"] == gid.ToGlobalID(types.ServiceAccountModelType, sa.Metadata.ID) &&
 					privClaims["tharsis_service_account_name"] == sa.Name &&
-					privClaims["tharsis_service_account_path"] == sa.ResourcePath
+					privClaims["tharsis_service_account_path"] == sa.GetResourcePath()
 			})).Return([]byte("signedtoken"), nil).Maybe()
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
@@ -440,7 +614,7 @@ func TestCreateToken(t *testing.T) {
 					return mockTokenVerifier
 				})
 
-			resp, err := service.CreateToken(ctx, &CreateTokenInput{ServiceAccount: test.serviceAccount, Token: test.token})
+			resp, err := service.CreateToken(ctx, &CreateTokenInput{ServiceAccountPublicID: test.serviceAccount, Token: test.token})
 			if err != nil && test.expectErr == nil {
 				t.Fatal(err)
 			}

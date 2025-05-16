@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -26,8 +25,8 @@ type GetGroupsInput struct {
 	Sort *db.GroupSortableField
 	// PaginationOptions supports cursor based pagination
 	PaginationOptions *pagination.Options
-	// ParentGroup filters the groups by the parent group
-	ParentGroup *models.Group
+	// ParentGroupID filters the groups by the parent group
+	ParentGroupID *string
 	// Search is used to search for a group by name or namespace path
 	Search *string
 	// Set RootOnly true to get only root groups returned by the query.
@@ -46,8 +45,8 @@ type DeleteGroupInput struct {
 type Service interface {
 	// GetGroupByID returns a group by ID
 	GetGroupByID(ctx context.Context, id string) (*models.Group, error)
-	// GetGroupByFullPath returns a group by full path
-	GetGroupByFullPath(ctx context.Context, path string) (*models.Group, error)
+	// GetGroupByTRN returns a group by TRN
+	GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error)
 	// GetGroupByIDs returns a list of groups by IDs
 	GetGroupsByIDs(ctx context.Context, idList []string) ([]models.Group, error)
 	// GetGroups returns a list of groups
@@ -118,7 +117,7 @@ func (s *service) GetGroupsByIDs(ctx context.Context, idList []string) ([]models
 
 	// Verify user has access to all returned groups
 	if len(paths) > 0 {
-		err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePaths(paths))
+		err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePaths(paths))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -139,7 +138,7 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		return nil, err
 	}
 
-	if input.ParentGroup != nil && input.RootOnly {
+	if input.ParentGroupID != nil && input.RootOnly {
 		return nil, errors.New("RootOnly cannot be true when ParentGroup is specified")
 	}
 
@@ -155,14 +154,14 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		dbInput.Filter.GroupPaths = []string{*input.GroupPath}
 	}
 
-	if input.ParentGroup != nil {
+	if input.ParentGroupID != nil {
 		// Since parent group is specified we will authorize access based on the parent group
-		err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(input.ParentGroup.FullPath))
+		err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithGroupID(*input.ParentGroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
-		dbInput.Filter.ParentID = &input.ParentGroup.Metadata.ID
+		dbInput.Filter.ParentID = input.ParentGroupID
 	} else {
 		// Only return groups that the caller is a member of
 		policy, err := caller.GetNamespaceAccessPolicy(ctx)
@@ -224,7 +223,7 @@ func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, e
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -233,8 +232,8 @@ func (s *service) GetGroupByID(ctx context.Context, id string) (*models.Group, e
 	return group, nil
 }
 
-func (s *service) GetGroupByFullPath(ctx context.Context, path string) (*models.Group, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetGroupByFullPath")
+func (s *service) GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetGroupByTRN")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -244,20 +243,20 @@ func (s *service) GetGroupByFullPath(ctx context.Context, path string) (*models.
 		return nil, err
 	}
 
-	group, err := s.dbClient.Groups.GetGroupByFullPath(ctx, path)
+	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by full path")
+		tracing.RecordError(span, err, "failed to get group by trn")
 		return nil, err
 	}
 
 	if group == nil {
-		tracing.RecordError(span, nil, "Group with path %s not found", path)
+		tracing.RecordError(span, nil, "Group with trn %s not found", trn)
 		return nil, errors.New(
-			"Group with path %s not found", path,
+			"Group with trn %s not found", trn,
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -277,7 +276,7 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteGroupPermission, auth.WithGroupID(input.Group.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.DeleteGroupPermission, auth.WithGroupID(input.Group.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -383,7 +382,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 	}
 
 	if input.ParentID != "" {
-		err = caller.RequirePermission(ctx, permissions.CreateGroupPermission, auth.WithGroupID(input.ParentID))
+		err = caller.RequirePermission(ctx, models.CreateGroupPermission, auth.WithGroupID(input.ParentID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -496,7 +495,7 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateGroupPermission, auth.WithGroupID(group.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateGroupPermission, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -576,7 +575,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	}
 
 	// Caller must have DeleteGroupPermission in the group being moved.
-	err = caller.RequirePermission(ctx, permissions.DeleteGroupPermission, auth.WithNamespacePath(group.FullPath))
+	err = caller.RequirePermission(ctx, models.DeleteGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -620,7 +619,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 		}
 
 		// If there is a new parent, the caller must have CreateGroupPermission in the new parent.
-		err = caller.RequirePermission(ctx, permissions.CreateGroupPermission, auth.WithNamespacePath(newParent.FullPath))
+		err = caller.RequirePermission(ctx, models.CreateGroupPermission, auth.WithNamespacePath(newParent.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -740,7 +739,7 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, group *models.Group)
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -760,7 +759,7 @@ func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, group *mo
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err

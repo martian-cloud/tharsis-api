@@ -5,19 +5,26 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Applies encapsulates the logic to access applies from the database
 type Applies interface {
-	// GetApply returns a apply by ID
-	GetApply(ctx context.Context, id string) (*models.Apply, error)
+	// GetApplyByID returns a apply by ID
+	GetApplyByID(ctx context.Context, id string) (*models.Apply, error)
+	// GetApplyByTRN returns a apply by TRN
+	GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error)
 	// GetApplies returns a list of applies
 	GetApplies(ctx context.Context, input *GetAppliesInput) (*AppliesResult, error)
 	// CreateApply will create a new apply
@@ -83,31 +90,36 @@ func NewApplies(dbClient *Client) Applies {
 	return &applies{dbClient: dbClient}
 }
 
-func (a *applies) GetApply(ctx context.Context, id string) (*models.Apply, error) {
-	ctx, span := tracer.Start(ctx, "db.GetApply")
+func (a *applies) GetApplyByID(ctx context.Context, id string) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "db.GetApplyByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("applies").
-		Prepared(true).
-		Select(applyFieldList...).
-		Where(goqu.Ex{"id": id}).ToSQL()
+	return a.getApply(ctx, goqu.Ex{"applies.id": id})
+}
 
+func (a *applies) GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "db.GetApplyByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
+	defer span.End()
+
+	path, err := types.ApplyModelType.ResourcePathFromTRN(trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	apply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a apply TRN must have the workspace path and apply GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
-	return apply, nil
+
+	return a.getApply(ctx, goqu.Ex{
+		"applies.id":      gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path": path[:lastSlashIndex],
+	})
 }
 
 func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*AppliesResult, error) {
@@ -124,7 +136,8 @@ func (a *applies) GetApplies(ctx context.Context, input *GetAppliesInput) (*Appl
 	}
 
 	query := dialect.From("applies").
-		Select(applyFieldList...).
+		Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -186,20 +199,24 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("applies").
+	sql, args, err := dialect.From("applies").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":            newResourceID(),
-			"version":       initialResourceVersion,
-			"created_at":    timestamp,
-			"updated_at":    timestamp,
-			"workspace_id":  apply.WorkspaceID,
-			"status":        apply.Status,
-			"error_message": apply.ErrorMessage,
-			"comment":       apply.Comment,
-			"triggered_by":  nullableString(apply.TriggeredBy),
-		}).
-		Returning(applyFieldList...).ToSQL()
+		With("applies",
+			dialect.Insert("applies").
+				Rows(goqu.Record{
+					"id":            newResourceID(),
+					"version":       initialResourceVersion,
+					"created_at":    timestamp,
+					"updated_at":    timestamp,
+					"workspace_id":  apply.WorkspaceID,
+					"status":        apply.Status,
+					"error_message": apply.ErrorMessage,
+					"comment":       apply.Comment,
+					"triggered_by":  nullableString(apply.TriggeredBy),
+				}).Returning("*"),
+		).Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -223,18 +240,24 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("applies").
+	sql, args, err := dialect.From("applies").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":       goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":    timestamp,
-				"status":        apply.Status,
-				"error_message": apply.ErrorMessage,
-				"comment":       apply.Comment,
-				"triggered_by":  nullableString(apply.TriggeredBy),
-			},
-		).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).Returning(applyFieldList...).ToSQL()
+		With("applies",
+			dialect.Update("applies").
+				Set(
+					goqu.Record{
+						"version":       goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":    timestamp,
+						"status":        apply.Status,
+						"error_message": apply.ErrorMessage,
+						"comment":       apply.Comment,
+						"triggered_by":  nullableString(apply.TriggeredBy),
+					},
+				).Where(goqu.Ex{"id": apply.Metadata.ID, "version": apply.Metadata.Version}).
+				Returning("*"),
+		).Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -255,8 +278,52 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 	return updatedApply, nil
 }
 
+func (a *applies) getApply(ctx context.Context, ex goqu.Ex) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "db.getApply")
+	defer span.End()
+
+	sql, args, err := dialect.From("applies").
+		Prepared(true).
+		Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"applies.workspace_id": goqu.I("namespaces.workspace_id")})).
+		Where(ex).
+		ToSQL()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	apply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return apply, nil
+}
+
+func (a *applies) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range applyFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("applies.%s", field))
+	}
+	selectFields = append(selectFields, "namespaces.path")
+
+	return selectFields
+}
+
 func scanApply(row scanner) (*models.Apply, error) {
 	var triggeredBy sql.NullString
+	var workspacePath string
 
 	apply := &models.Apply{}
 
@@ -270,6 +337,7 @@ func scanApply(row scanner) (*models.Apply, error) {
 		&apply.ErrorMessage,
 		&apply.Comment,
 		&triggeredBy,
+		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
@@ -278,6 +346,8 @@ func scanApply(row scanner) (*models.Apply, error) {
 	if triggeredBy.Valid {
 		apply.TriggeredBy = triggeredBy.String
 	}
+
+	apply.Metadata.TRN = types.ApplyModelType.BuildTRN(workspacePath, apply.GetGlobalID())
 
 	return apply, nil
 }

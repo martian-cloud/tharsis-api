@@ -64,7 +64,11 @@ type WorkspaceEvent {
 }
 
 input WorkspaceSubscriptionInput {
-  workspacePath: String!
+  workspaceId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 type MigrateWorkspacePayload {
@@ -121,8 +125,16 @@ type Workspace implements Node, Namespace {
     before: String
     first: Int
     last: Int
+    userId: String
+    serviceAccountId: String
     username: String
+      @deprecated(
+        reason: "Use userId field instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     serviceAccountPath: String
+      @deprecated(
+        reason: "Use serviceAccountId field instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     includeNested: Boolean
     timeRangeStart: Time
     timeRangeEnd: Time
@@ -155,7 +167,11 @@ input CreateWorkspaceInput {
   clientMutationId: String
   name: String!
   description: String!
-  groupPath: String!
+  groupId: String
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   maxJobDuration: Int
   terraformVersion: String
   preventDestroyPlan: Boolean
@@ -166,6 +182,9 @@ input CreateWorkspaceInput {
 input UpdateWorkspaceInput {
   clientMutationId: String
   workspacePath: String
+    @deprecated(
+      reason: "Use id field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   id: String
   metadata: ResourceMetadataInput
   description: String
@@ -179,6 +198,9 @@ input UpdateWorkspaceInput {
 input DeleteWorkspaceInput {
   clientMutationId: String
   workspacePath: String
+    @deprecated(
+      reason: "Use id field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   id: String
   force: Boolean
   metadata: ResourceMetadataInput
@@ -186,26 +208,50 @@ input DeleteWorkspaceInput {
 
 input LockWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
+  workspaceId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input UnlockWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
+  workspaceId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input DestroyWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
+  workspaceId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input AssessWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
+  workspaceId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input MigrateWorkspaceInput {
   clientMutationId: String
-  workspacePath: String!
-  newGroupPath: String!
+  workspaceId: String
+  newGroupId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  newGroupPath: String
+    @deprecated(
+      reason: "Use newGroupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }

@@ -261,7 +261,7 @@ func TestAssessmentRunHandler_handleRunEvent(t *testing.T) {
 			}
 
 			if test.stateVersion != nil && test.workspace != nil {
-				mockStateVersions.On("GetStateVersion", mock.Anything, test.workspace.CurrentStateVersionID).Return(test.stateVersion, nil).Maybe()
+				mockStateVersions.On("GetStateVersionByID", mock.Anything, test.workspace.CurrentStateVersionID).Return(test.stateVersion, nil).Maybe()
 			}
 
 			if test.stateVersion != nil && test.stateVersion.RunID != nil && *test.stateVersion.RunID == test.run.Metadata.ID {
@@ -269,7 +269,7 @@ func TestAssessmentRunHandler_handleRunEvent(t *testing.T) {
 			}
 
 			if test.plan != nil {
-				mockPlans.On("GetPlan", mock.Anything, test.run.PlanID).
+				mockPlans.On("GetPlanByID", mock.Anything, test.run.PlanID).
 					Return(test.plan, nil).Maybe()
 			}
 

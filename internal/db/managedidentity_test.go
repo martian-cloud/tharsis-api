@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -99,7 +100,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -124,80 +125,67 @@ func TestGetManagedIdentityByID(t *testing.T) {
 	}
 }
 
-func TestGetManagedIdentityByPath(t *testing.T) {
-	ctx := context.Background()
+func TestGetManagedIdentityByTRN(t *testing.T) {
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := currentTime()
-
-	group1, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Description: "top level group 0 for testing managed identity functions",
-		FullPath:    "top-level-group-0-for-managed-identities",
-		CreatedBy:   "someone-g0",
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	managedIdentity1, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
-		Name:        "1-managed-identity-0",
-		Description: "managed identity 0 for testing managed identities",
-		GroupID:     group1.Metadata.ID,
-		CreatedBy:   "someone-sa0",
-		Type:        models.ManagedIdentityAWSFederated,
-		Data:        []byte("managed-identity-0-data"),
+	managedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:    "test-managed-identity",
+		GroupID: group.Metadata.ID,
+		Type:    models.ManagedIdentityAWSFederated,
+		Data:    []byte("test-data"),
 	})
-	require.Nil(t, err)
-
-	createdAlias, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
-		Name:          "an-alias-created-for-testing",
-		GroupID:       group1.Metadata.ID,
-		CreatedBy:     "someone-ma1",
-		AliasSourceID: &managedIdentity1.Metadata.ID,
-	})
-	require.Nil(t, err)
-
-	createdHigh := currentTime()
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectManagedIdentity *models.ManagedIdentity
-		expectMsg             *string
 		name                  string
-		searchID              string
+		trn                   string
+		expectManagedIdentity bool
+		expectErrorCode       errors.CodeType
 	}
 
-	// Do only one positive test case, because the logic is theoretically the same for all managed identities.
 	testCases := []testCase{
 		{
-			name:                  "positive",
-			searchID:              managedIdentity1.ResourcePath,
-			expectManagedIdentity: managedIdentity1,
+			name:                  "get resource by TRN",
+			trn:                   managedIdentity.Metadata.TRN,
+			expectManagedIdentity: true,
 		},
 		{
-			name:                  "positive: successfully retrieve a managed identity alias",
-			searchID:              createdAlias.ResourcePath,
-			expectManagedIdentity: createdAlias,
+			name: "resource with TRN not found",
+			trn:  types.ManagedIdentityModelType.BuildTRN(group.FullPath, "unknown"),
 		},
 		{
-			name:     "negative, non-existent ID",
-			searchID: "even-non-existent-search-paths/must-contain-a-slash",
-			// expect managed identity and error to be nil
+			name:            "managed identity trn must have two parts",
+			trn:             types.ManagedIdentityModelType.BuildTRN("unknown"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualManagedIdentity, err := testClient.client.ManagedIdentities.GetManagedIdentityByPath(ctx, test.searchID)
+			actualManagedIdentity, err := testClient.client.ManagedIdentities.GetManagedIdentityByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectManagedIdentity != nil {
+			require.NoError(t, err)
+
+			if test.expectManagedIdentity {
 				require.NotNil(t, actualManagedIdentity)
-				compareManagedIdentities(t, test.expectManagedIdentity, actualManagedIdentity, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
+				assert.Equal(t, types.ManagedIdentityModelType.BuildTRN(group.FullPath, managedIdentity.Name), actualManagedIdentity.Metadata.TRN)
 			} else {
 				assert.Nil(t, actualManagedIdentity)
 			}
@@ -600,12 +588,12 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.ManagedIdentityModelType.BuildTRN(group1.FullPath + "/positive-create-managed-identity-nearly-empty"),
 				},
-				Name:         "positive-create-managed-identity-nearly-empty",
-				GroupID:      group1.Metadata.ID,
-				ResourcePath: group1.FullPath + "/positive-create-managed-identity-nearly-empty",
-				Type:         models.ManagedIdentityAWSFederated,
-				Data:         []byte("some-data"),
+				Name:    "positive-create-managed-identity-nearly-empty",
+				GroupID: group1.Metadata.ID,
+				Type:    models.ManagedIdentityAWSFederated,
+				Data:    []byte("some-data"),
 			},
 		},
 
@@ -624,14 +612,14 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.ManagedIdentityModelType.BuildTRN(group1.FullPath + "/positive-create-managed-identity-full"),
 				},
-				Type:         models.ManagedIdentityAWSFederated,
-				ResourcePath: group1.FullPath + "/positive-create-managed-identity-full",
-				Name:         "positive-create-managed-identity-full",
-				Description:  "positive create managed identity",
-				GroupID:      group1.Metadata.ID,
-				Data:         []byte("this is a test of a full managed identity"),
-				CreatedBy:    "creator-of-managed-identities",
+				Type:        models.ManagedIdentityAWSFederated,
+				Name:        "positive-create-managed-identity-full",
+				Description: "positive create managed identity",
+				GroupID:     group1.Metadata.ID,
+				Data:        []byte("this is a test of a full managed identity"),
+				CreatedBy:   "creator-of-managed-identities",
 			},
 		},
 
@@ -647,9 +635,9 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.ManagedIdentityModelType.BuildTRN(aliasGroup.FullPath + "/positive-create-managed-identity-alias"),
 				},
 				Type:          aliasSourceIdentity.Type,
-				ResourcePath:  aliasGroup.FullPath + "/positive-create-managed-identity-alias",
 				Name:          "positive-create-managed-identity-alias",
 				Description:   aliasSourceIdentity.Description,
 				GroupID:       aliasGroup.Metadata.ID,
@@ -782,14 +770,14 @@ func TestUpdateManagedIdentity(t *testing.T) {
 					Version:              managedIdentity1.Metadata.Version + 1,
 					CreationTimestamp:    managedIdentity1.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
+					TRN:                  types.ManagedIdentityModelType.BuildTRN(otherGroup.FullPath + "/" + managedIdentity1.Name),
 				},
-				ResourcePath: otherGroup.FullPath + "/" + managedIdentity1.Name,
-				Name:         "1-managed-identity-0",
-				Description:  "updated description",
-				Type:         managedIdentity1.Type,
-				Data:         []byte("updated data"),
-				GroupID:      otherGroup.Metadata.ID, // to move the managed identity to another group
-				CreatedBy:    managedIdentity1.CreatedBy,
+				Name:        "1-managed-identity-0",
+				Description: "updated description",
+				Type:        managedIdentity1.Type,
+				Data:        []byte("updated data"),
+				GroupID:     otherGroup.Metadata.ID, // to move the managed identity to another group
+				CreatedBy:   managedIdentity1.CreatedBy,
 			},
 		},
 		{
@@ -1410,7 +1398,7 @@ func TestGetManagedIdentities(t *testing.T) {
 			input: &GetManagedIdentitiesInput{
 				Sort: ptrManagedIdentitySortableField(ManagedIdentitySortableFieldCreatedAtAsc),
 				Filter: &ManagedIdentityFilter{
-					Search: &createdAlias.ResourcePath,
+					Search: ptr.String(createdAlias.GetResourcePath()),
 				},
 			},
 			expectManagedIdentityIDs: []string{createdAlias.Metadata.ID},
@@ -1614,7 +1602,6 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	require.Nil(t, err)
 
 	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0 for testing managed identities",
 		GroupID:           group1.Metadata.ID,
@@ -1707,7 +1694,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 	}
 }
 
-func TestGetManagedIdentityAccessRule(t *testing.T) {
+func TestGetManagedIdentityAccessRuleByID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -1739,7 +1726,6 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 	require.Nil(t, err)
 
 	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0 for testing managed identities",
 		GroupID:           group1.Metadata.ID,
@@ -1789,13 +1775,13 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualManagedIdentityAccessRule, err := testClient.client.ManagedIdentities.GetManagedIdentityAccessRule(ctx, test.searchID)
+			actualManagedIdentityAccessRule, err := testClient.client.ManagedIdentities.GetManagedIdentityAccessRuleByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -1811,6 +1797,83 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 					})
 			} else {
 				assert.Nil(t, actualManagedIdentityAccessRule)
+			}
+		})
+	}
+}
+
+func TestGetManagedIdentityAccessRuleByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	managedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
+		Name:    "test-managed-identity",
+		GroupID: group.Metadata.ID,
+		Type:    models.ManagedIdentityAWSFederated,
+		Data:    []byte("test-data"),
+	})
+	require.NoError(t, err)
+
+	accessRule, err := testClient.client.ManagedIdentities.CreateManagedIdentityAccessRule(ctx, &models.ManagedIdentityAccessRule{
+		RunStage:          models.JobPlanType,
+		ManagedIdentityID: managedIdentity.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name             string
+		trn              string
+		expectAccessRule bool
+		expectErrorCode  errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:             "get resource by TRN",
+			trn:              accessRule.Metadata.TRN,
+			expectAccessRule: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.ManagedIdentityAccessRuleModelType.BuildTRN(group.FullPath, managedIdentity.Name, nonExistentGlobalID),
+		},
+		{
+			name:            "managed identity rule TRN cannot have less than three parts",
+			trn:             types.ManagedIdentityAccessRuleModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualAccessRule, err := testClient.client.ManagedIdentities.GetManagedIdentityAccessRuleByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectAccessRule {
+				require.NotNil(t, actualAccessRule)
+				assert.Equal(t,
+					types.ManagedIdentityAccessRuleModelType.BuildTRN(group.FullPath, managedIdentity.Name, accessRule.GetGlobalID()),
+					actualAccessRule.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualAccessRule)
 			}
 		})
 	}
@@ -1846,7 +1909,6 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	require.Nil(t, err)
 
 	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0 for testing managed identities",
 		GroupID:           group1.Metadata.ID,
@@ -1993,7 +2055,6 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	require.Nil(t, err)
 
 	serviceAccount0, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0 for testing managed identities",
 		GroupID:           group0.Metadata.ID,
@@ -2003,7 +2064,6 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	require.Nil(t, err)
 
 	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		ResourcePath:      "sa-resource-path-1",
 		Name:              "service-account-1",
 		Description:       "service account 1 for testing managed identities",
 		GroupID:           group0.Metadata.ID,
@@ -2151,7 +2211,6 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 	require.Nil(t, err)
 
 	serviceAccount1, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0 for testing managed identities",
 		GroupID:           group1.Metadata.ID,
@@ -2310,7 +2369,6 @@ func compareManagedIdentities(t *testing.T, expected, actual *models.ManagedIden
 	checkID bool, times *timeBounds,
 ) {
 	assert.Equal(t, expected.Type, actual.Type)
-	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Description, actual.Description)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
@@ -2321,6 +2379,7 @@ func compareManagedIdentities(t *testing.T, expected, actual *models.ManagedIden
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {
@@ -2348,6 +2407,7 @@ func compareManagedIdentityAccessRules(t *testing.T, expected, actual *models.Ma
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

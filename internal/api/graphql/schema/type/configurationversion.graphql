@@ -16,6 +16,10 @@ type ConfigurationVersionMutationPayload {
 
 input CreateConfigurationVersionInput {
   clientMutationId: String
-  workspacePath: String!
+  workspaceId: String
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   speculative: Boolean
 }

@@ -43,7 +43,11 @@ type GPGKey implements Node {
 input CreateGPGKeyInput {
   clientMutationId: String
   asciiArmor: String!
-  groupPath: String!
+  groupId: String
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input DeleteGPGKeyInput {

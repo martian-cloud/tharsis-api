@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // Some constants and pseudo-constants are declared/defined in dbclient_test.go.
@@ -24,6 +26,166 @@ type warmupStateVersionOutputs struct {
 	runs                []models.Run
 	stateVersions       []models.StateVersion
 	stateVersionOutputs []models.StateVersionOutput
+}
+
+func TestGetStateVersionOutputByID(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(20),
+	})
+	require.NoError(t, err)
+
+	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "test-user",
+	})
+	require.NoError(t, err)
+
+	stateVersionOutput, err := testClient.client.StateVersionOutputs.CreateStateVersionOutput(ctx, &models.StateVersionOutput{
+		Name:           "test-output",
+		Value:          []byte("test-value"),
+		Type:           []byte("string"),
+		StateVersionID: stateVersion.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		id              string
+		expectOutput    bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:         "get state version output by ID",
+			id:           stateVersionOutput.Metadata.ID,
+			expectOutput: true,
+		},
+		{
+			name: "resource with ID not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid ID will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualOutput, err := testClient.client.StateVersionOutputs.GetStateVersionOutputByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectOutput {
+				require.NotNil(t, actualOutput)
+				assert.Equal(t, test.id, actualOutput.Metadata.ID)
+			} else {
+				assert.Nil(t, actualOutput)
+			}
+		})
+	}
+}
+
+func TestGetStateVersionOutputByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(20),
+	})
+	require.NoError(t, err)
+
+	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "test-user",
+	})
+	require.NoError(t, err)
+
+	stateVersionOutput, err := testClient.client.StateVersionOutputs.CreateStateVersionOutput(ctx, &models.StateVersionOutput{
+		Name:           "test-output",
+		Value:          []byte("test-value"),
+		Type:           []byte("string"),
+		StateVersionID: stateVersion.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectOutput    bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:         "get state version output by TRN",
+			trn:          stateVersionOutput.Metadata.TRN,
+			expectOutput: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.StateVersionOutputModelType.BuildTRN(workspace.FullPath, stateVersion.GetGlobalID(), "unknown"),
+		},
+		{
+			name:            "state version outputs TRN cannot have less than three parts",
+			trn:             types.StateVersionOutputModelType.BuildTRN("unknown"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualOutput, err := testClient.client.StateVersionOutputs.GetStateVersionOutputByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectOutput {
+				require.NotNil(t, actualOutput)
+				assert.Equal(t,
+					types.StateVersionOutputModelType.BuildTRN(workspace.FullPath, stateVersion.GetGlobalID(), stateVersionOutput.Name),
+					actualOutput.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualOutput)
+			}
+		})
+	}
 }
 
 func TestCreateStateVersionOutput(t *testing.T) {
@@ -186,83 +348,6 @@ func TestGetStateVersionOutputs(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, actualOutputs)
-			}
-		})
-	}
-}
-
-func TestGetStateVersionOutputByName(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdLow := currentTime()
-	warmupItems, err := createWarmupStateVersionOutputs(ctx, testClient, warmupStateVersionOutputs{
-		groups:              standardWarmupGroupsForStateVersionOutputs,
-		workspaces:          standardWarmupWorkspacesForStateVersionOutputs,
-		runs:                standardWarmupRunsForStateVersionOutputs,
-		stateVersions:       standardWarmupStateVersionsForStateVersionOutputs,
-		stateVersionOutputs: standardWarmupStateVersionOutputs,
-	})
-	createdHigh := currentTime()
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg                *string
-		expectStateVersionOutput *models.StateVersionOutput
-		name                     string
-		searchID                 string
-		searchName               string
-	}
-
-	testCases := []testCase{
-		{
-			name:                     "positive",
-			searchID:                 warmupItems.stateVersions[0].Metadata.ID,
-			searchName:               warmupItems.stateVersionOutputs[0].Name,
-			expectStateVersionOutput: &warmupItems.stateVersionOutputs[0],
-		},
-
-		{
-			name:       "negative, non-existent state version ID",
-			searchID:   nonExistentID,
-			searchName: "irrelevant",
-			expectMsg:  ptr.String("no rows in result set"),
-		},
-
-		{
-			name:       "defective-ID",
-			searchID:   invalidID,
-			searchName: "irrelevant",
-			expectMsg:  invalidUUIDMsg1,
-		},
-
-		{
-			name:       "negative, non-existent output name",
-			searchID:   nonExistentID,
-			searchName: "this-name-does-not-exist",
-			expectMsg:  ptr.String("no rows in result set"),
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualOutput, err := testClient.client.StateVersionOutputs.GetStateVersionOutputByName(ctx,
-				test.searchID, test.searchName)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectStateVersionOutput != nil {
-				require.NotNil(t, actualOutput)
-				compareStateVersionOutputs(t, test.expectStateVersionOutput, actualOutput,
-					false, &timeBounds{
-						createLow:  &createdLow,
-						createHigh: &createdHigh,
-						updateLow:  &createdLow,
-						updateHigh: &createdHigh,
-					})
-			} else {
-				assert.Nil(t, actualOutput)
 			}
 		})
 	}
@@ -436,6 +521,7 @@ func compareStateVersionOutputs(t *testing.T, expected, actual *models.StateVers
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

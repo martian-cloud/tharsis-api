@@ -7,8 +7,8 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -52,7 +52,7 @@ type VCSProviderConnectionResolver struct {
 
 // NewVCSProviderConnectionResolver creates a new VCSProviderConnectionResolver
 func NewVCSProviderConnectionResolver(ctx context.Context, input *vcs.GetVCSProvidersInput) (*VCSProviderConnectionResolver, error) {
-	vcsService := getVCSService(ctx)
+	vcsService := getServiceCatalog(ctx).VCSService
 
 	result, err := vcsService.GetVCSProviders(ctx, input)
 	if err != nil {
@@ -120,7 +120,7 @@ type VCSProviderResolver struct {
 
 // ID resolver
 func (r *VCSProviderResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.VCSProviderType, r.vcsProvider.Metadata.ID))
+	return graphql.ID(r.vcsProvider.GetGlobalID())
 }
 
 // GroupPath resolver
@@ -130,7 +130,7 @@ func (r *VCSProviderResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *VCSProviderResolver) ResourcePath() string {
-	return r.vcsProvider.ResourcePath
+	return r.vcsProvider.GetResourcePath()
 }
 
 // Name resolver
@@ -238,7 +238,8 @@ type CreateVCSProviderInput struct {
 	URL                *string
 	Name               string
 	Description        string
-	GroupPath          string
+	GroupPath          *string // DEPRECATED: use GroupID instead with a TRN
+	GroupID            *string
 	OAuthClientID      string
 	OAuthClientSecret  string
 	Type               models.VCSProviderType
@@ -284,14 +285,19 @@ func handleResetVCSProviderOAuthTokenMutationProblem(e error, clientMutationID *
 }
 
 func resetVCSProviderOAuthTokenMutation(ctx context.Context, input *ResetVCSProviderOAuthTokenInput) (*ResetVCSProviderOAuthTokenMutationPayloadResolver, error) {
-	service := getVCSService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	provider, err := service.GetVCSProviderByID(ctx, gid.FromGlobalID(input.ProviderID))
+	providerID, err := serviceCatalog.FetchModelID(ctx, input.ProviderID)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := service.ResetVCSProviderOAuthToken(ctx, &vcs.ResetVCSProviderOAuthTokenInput{
+	provider, err := serviceCatalog.VCSService.GetVCSProviderByID(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := serviceCatalog.VCSService.ResetVCSProviderOAuthToken(ctx, &vcs.ResetVCSProviderOAuthTokenInput{
 		VCSProvider: provider,
 	})
 	if err != nil {
@@ -308,7 +314,7 @@ func resetVCSProviderOAuthTokenMutation(ctx context.Context, input *ResetVCSProv
 }
 
 func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInput) (*VCSProviderMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +322,7 @@ func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInpu
 	vcsProviderCreateOptions := &vcs.CreateVCSProviderInput{
 		Name:               input.Name,
 		Description:        input.Description,
-		GroupID:            group.Metadata.ID,
+		GroupID:            groupID,
 		URL:                input.URL,
 		OAuthClientID:      input.OAuthClientID,
 		OAuthClientSecret:  input.OAuthClientSecret,
@@ -324,9 +330,7 @@ func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInpu
 		AutoCreateWebhooks: input.AutoCreateWebhooks,
 	}
 
-	vcsService := getVCSService(ctx)
-
-	response, err := vcsService.CreateVCSProvider(ctx, vcsProviderCreateOptions)
+	response, err := getServiceCatalog(ctx).VCSService.CreateVCSProvider(ctx, vcsProviderCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -341,9 +345,14 @@ func createVCSProviderMutation(ctx context.Context, input *CreateVCSProviderInpu
 }
 
 func updateVCSProviderMutation(ctx context.Context, input *UpdateVCSProviderInput) (*VCSProviderMutationPayloadResolver, error) {
-	vcsService := getVCSService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	vcsProvider, err := vcsService.GetVCSProviderByID(ctx, gid.FromGlobalID(input.ID))
+	providerID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	vcsProvider, err := serviceCatalog.VCSService.GetVCSProviderByID(ctx, providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +379,7 @@ func updateVCSProviderMutation(ctx context.Context, input *UpdateVCSProviderInpu
 		vcsProvider.OAuthClientSecret = *input.OAuthClientSecret
 	}
 
-	updatedProvider, err := vcsService.UpdateVCSProvider(ctx, &vcs.UpdateVCSProviderInput{Provider: vcsProvider})
+	updatedProvider, err := serviceCatalog.VCSService.UpdateVCSProvider(ctx, &vcs.UpdateVCSProviderInput{Provider: vcsProvider})
 	if err != nil {
 		return nil, err
 	}
@@ -380,9 +389,14 @@ func updateVCSProviderMutation(ctx context.Context, input *UpdateVCSProviderInpu
 }
 
 func deleteVCSProviderMutation(ctx context.Context, input *DeleteVCSProviderInput) (*VCSProviderMutationPayloadResolver, error) {
-	vcsService := getVCSService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	vcsProvider, err := vcsService.GetVCSProviderByID(ctx, gid.FromGlobalID(input.ID))
+	providerID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	vcsProvider, err := serviceCatalog.VCSService.GetVCSProviderByID(ctx, providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +419,7 @@ func deleteVCSProviderMutation(ctx context.Context, input *DeleteVCSProviderInpu
 		deleteOptions.Force = *input.Force
 	}
 
-	if err := vcsService.DeleteVCSProvider(ctx, &deleteOptions); err != nil {
+	if err := serviceCatalog.VCSService.DeleteVCSProvider(ctx, &deleteOptions); err != nil {
 		return nil, err
 	}
 
@@ -442,9 +456,7 @@ func loadVCSProvider(ctx context.Context, id string) (*models.VCSProvider, error
 }
 
 func vcsProviderBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getVCSService(ctx)
-
-	providers, err := service.GetVCSProvidersByIDs(ctx, ids)
+	providers, err := getServiceCatalog(ctx).VCSService.GetVCSProvidersByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

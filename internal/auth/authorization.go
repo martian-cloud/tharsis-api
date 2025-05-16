@@ -8,16 +8,16 @@ import (
 	"strings"
 	"sync"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
 
 // Authorizer is used to authorize access to namespaces
 type Authorizer interface {
 	GetRootNamespaces(ctx context.Context) ([]models.MembershipNamespace, error)
-	RequireAccess(ctx context.Context, perms []permissions.Permission, checks ...func(*constraints)) error
-	RequireAccessToInheritableResource(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error
+	RequireAccess(ctx context.Context, perms []models.Permission, checks ...func(*constraints)) error
+	RequireAccessToInheritableResource(ctx context.Context, modelTypes []types.ModelType, checks ...func(*constraints)) error
 }
 
 type cacheKey struct {
@@ -42,7 +42,7 @@ type authorizer struct {
 	dbClient                 *db.Client
 	userID                   *string
 	serviceAccountID         *string
-	rolePermissionCache      map[string][]permissions.Permission
+	rolePermissionCache      map[string][]models.Permission
 	namespaceMembershipCache map[string]map[string]struct{}
 	lock                     sync.RWMutex
 	useCache                 bool
@@ -54,7 +54,7 @@ func newNamespaceMembershipAuthorizer(dbClient *db.Client, userID *string, servi
 		userID:                   userID,
 		serviceAccountID:         serviceAccountID,
 		useCache:                 useCache,
-		rolePermissionCache:      map[string][]permissions.Permission{},
+		rolePermissionCache:      map[string][]models.Permission{},
 		namespaceMembershipCache: map[string]map[string]struct{}{},
 	}
 }
@@ -96,7 +96,7 @@ func (a *authorizer) GetRootNamespaces(ctx context.Context) ([]models.Membership
 	return rootNamespaces, nil
 }
 
-func (a *authorizer) RequireAccess(ctx context.Context, perms []permissions.Permission, checks ...func(*constraints)) error {
+func (a *authorizer) RequireAccess(ctx context.Context, perms []models.Permission, checks ...func(*constraints)) error {
 	c := getConstraints(checks...)
 
 	if (len(perms) == 0) || !a.hasConstraints(c, true) {
@@ -125,16 +125,16 @@ func (a *authorizer) RequireAccess(ctx context.Context, perms []permissions.Perm
 	return nil
 }
 
-func (a *authorizer) RequireAccessToInheritableResource(ctx context.Context, resourceTypes []permissions.ResourceType, checks ...func(*constraints)) error {
+func (a *authorizer) RequireAccessToInheritableResource(ctx context.Context, modelTypes []types.ModelType, checks ...func(*constraints)) error {
 	c := getConstraints(checks...)
 
 	// Must specify at least one resource type and constraint.
-	if (len(resourceTypes) == 0) || !a.hasConstraints(c, false) {
+	if (len(modelTypes) == 0) || !a.hasConstraints(c, false) {
 		return errMissingConstraints
 	}
 
-	for _, rt := range resourceTypes {
-		perm := &permissions.Permission{Action: permissions.ViewAction, ResourceType: rt}
+	for _, mt := range modelTypes {
+		perm := &models.Permission{Action: models.ViewAction, ResourceType: mt.Name()}
 		if c.groupID != nil {
 			if err := a.requireAccessToInheritedGroupResource(ctx, *c.groupID, perm); err != nil {
 				return err
@@ -150,7 +150,7 @@ func (a *authorizer) RequireAccessToInheritableResource(ctx context.Context, res
 	return nil
 }
 
-func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, perm *models.Permission) error {
 	// Check cache
 	if a.checkCache(&cacheKey{groupID: &groupID}, perm) {
 		return nil
@@ -168,7 +168,7 @@ func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, p
 	return a.requireAccessToNamespace(ctx, group.FullPath, perm)
 }
 
-func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID string, perm *models.Permission) error {
 	// Check cache
 	if a.checkCache(&cacheKey{workspaceID: &workspaceID}, perm) {
 		return nil
@@ -186,7 +186,7 @@ func (a *authorizer) requireAccessToWorkspace(ctx context.Context, workspaceID s
 	return a.requireAccessToNamespace(ctx, ws.FullPath, perm)
 }
 
-func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath string, perm *models.Permission) error {
 	// Check cache
 	if a.checkCache(&cacheKey{path: &namespacePath}, perm) {
 		return nil
@@ -231,7 +231,7 @@ func (a *authorizer) requireAccessToNamespace(ctx context.Context, namespacePath
 	return a.requirePermission(ctx, filteredMemberships, perm)
 }
 
-func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, groupID string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, groupID string, perm *models.Permission) error {
 	// Check cache
 	if a.checkCache(&cacheKey{groupID: &groupID}, perm) {
 		return nil
@@ -249,7 +249,7 @@ func (a *authorizer) requireAccessToInheritedGroupResource(ctx context.Context, 
 	return a.requireAccessToInheritedNamespaceResource(ctx, group.FullPath, perm)
 }
 
-func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Context, namespace string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Context, namespace string, perm *models.Permission) error {
 	// Check cache
 	if a.checkCache(&cacheKey{path: &namespace}, perm) {
 		return nil
@@ -287,7 +287,7 @@ func (a *authorizer) requireAccessToInheritedNamespaceResource(ctx context.Conte
 	return a.requirePermission(ctx, memberships, perm)
 }
 
-func (a *authorizer) requireAccessToInheritedNamespaceResources(ctx context.Context, requiredNamespaces []string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToInheritedNamespaceResources(ctx context.Context, requiredNamespaces []string, perm *models.Permission) error {
 	for _, ns := range requiredNamespaces {
 		if err := a.requireAccessToInheritedNamespaceResource(ctx, ns, perm); err != nil {
 			return err
@@ -298,7 +298,7 @@ func (a *authorizer) requireAccessToInheritedNamespaceResources(ctx context.Cont
 	return nil
 }
 
-func (a *authorizer) requireAccessToNamespaces(ctx context.Context, requiredNamespaces []string, perm *permissions.Permission) error {
+func (a *authorizer) requireAccessToNamespaces(ctx context.Context, requiredNamespaces []string, perm *models.Permission) error {
 	for _, ns := range requiredNamespaces {
 		if err := a.requireAccessToNamespace(ctx, ns, perm); err != nil {
 			return err
@@ -313,7 +313,7 @@ func (a *authorizer) requireAccessToNamespaces(ctx context.Context, requiredName
 // match meaning a permission with View Action will not be automatically granted
 // if a subject has a permission with Create, Update, Delete or Manage actions
 // for that ResourceType.
-func (a *authorizer) checkCache(key *cacheKey, perm *permissions.Permission) bool {
+func (a *authorizer) checkCache(key *cacheKey, perm *models.Permission) bool {
 	if !a.useCache {
 		return false
 	}
@@ -364,7 +364,7 @@ func (a *authorizer) getNamespaceMemberships(ctx context.Context,
 }
 
 // addToCache adds specified perms to role and namespaceMembership caches.
-func (a *authorizer) addToCache(membership *models.NamespaceMembership, perms []permissions.Permission) {
+func (a *authorizer) addToCache(membership *models.NamespaceMembership, perms []models.Permission) {
 	if !a.useCache {
 		// Cache isn't being used.
 		return
@@ -388,7 +388,7 @@ func (a *authorizer) addToCache(membership *models.NamespaceMembership, perms []
 	}
 }
 
-func (a *authorizer) addMembershipToCache(key string, perms []permissions.Permission) {
+func (a *authorizer) addMembershipToCache(key string, perms []models.Permission) {
 	if _, ok := a.namespaceMembershipCache[key]; !ok {
 		permsMap := make(map[string]struct{}, len(perms))
 		for _, p := range perms {
@@ -398,7 +398,7 @@ func (a *authorizer) addMembershipToCache(key string, perms []permissions.Permis
 	}
 }
 
-func (a *authorizer) getPermissionsFromMembership(ctx context.Context, membership *models.NamespaceMembership) ([]permissions.Permission, error) {
+func (a *authorizer) getPermissionsFromMembership(ctx context.Context, membership *models.NamespaceMembership) ([]models.Permission, error) {
 	if a.useCache {
 		a.lock.RLock()
 		if perms, ok := a.rolePermissionCache[membership.RoleID]; ok {
@@ -436,7 +436,7 @@ func (a *authorizer) getPermissionsFromMembership(ctx context.Context, membershi
 func (a *authorizer) requirePermission(
 	ctx context.Context,
 	memberships []models.NamespaceMembership,
-	target *permissions.Permission,
+	target *models.Permission,
 ) error {
 	hasViewerAccess := false
 	for _, membership := range memberships {

@@ -9,8 +9,9 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/ryanuber/go-glob"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -160,8 +161,8 @@ func (f *FederatedRegistryCaller) GetNamespaceAccessPolicy(_ context.Context) (*
 	}, nil
 }
 
-// RequirePermission will return an error if the caller doesn't have the specified permissions.
-func (f *FederatedRegistryCaller) RequirePermission(ctx context.Context, _ permissions.Permission, _ ...func(*constraints),
+// RequirePermission will return an error if the caller doesn't have the specified models.
+func (f *FederatedRegistryCaller) RequirePermission(ctx context.Context, _ models.Permission, _ ...func(*constraints),
 ) error {
 	// Federated caller only supports read-only permissions on inheritable resources (i.e. modules and providers)
 	return f.UnauthorizedError(ctx, false)
@@ -169,10 +170,10 @@ func (f *FederatedRegistryCaller) RequirePermission(ctx context.Context, _ permi
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (f *FederatedRegistryCaller) RequireAccessToInheritableResource(ctx context.Context,
-	resourceType permissions.ResourceType, checks ...func(*constraints),
+	modelType types.ModelType, checks ...func(*constraints),
 ) error {
-	if resourceType != permissions.TerraformModuleResourceType && resourceType != permissions.TerraformProviderResourceType {
-		return errors.New("unsupported resource type %s for federated registry caller", resourceType)
+	if !modelType.Equals(types.TerraformModuleModelType) && !modelType.Equals(types.TerraformProviderModelType) {
+		return errors.New("unsupported resource type %s for federated registry caller", modelType.Name())
 	}
 
 	requestedNamespacePaths, err := f.getRequestedNamespacePaths(ctx, getConstraints(checks...))

@@ -9,7 +9,9 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -18,6 +20,7 @@ import (
 // RunnerSessions encapsulates the logic to access sessions from the database
 type RunnerSessions interface {
 	GetRunnerSessionByID(ctx context.Context, id string) (*models.RunnerSession, error)
+	GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error)
 	GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*RunnerSessionsResult, error)
 	CreateRunnerSession(ctx context.Context, session *models.RunnerSession) (*models.RunnerSession, error)
 	UpdateRunnerSession(ctx context.Context, session *models.RunnerSession) (*models.RunnerSession, error)
@@ -97,6 +100,38 @@ func (a *sessions) GetRunnerSessionByID(ctx context.Context, id string) (*models
 	return a.getRunnerSession(ctx, goqu.Ex{"runner_sessions.id": id})
 }
 
+func (a *sessions) GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRunnerSessionByTRN")
+	defer span.End()
+
+	path, err := types.RunnerSessionModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	parts := strings.Split(path, "/")
+
+	ex := goqu.Ex{}
+	switch {
+	case len(parts) >= 3:
+		// Group runner
+		ex["runner_sessions.id"] = gid.FromGlobalID(parts[len(parts)-1])
+		ex["runners.name"] = parts[len(parts)-2]
+		ex["namespaces.path"] = strings.Join(parts[:len(parts)-2], "/")
+	case len(parts) == 2:
+		// Shared runner
+		ex["runner_sessions.id"] = gid.FromGlobalID(parts[len(parts)-1])
+		ex["runners.name"] = parts[len(parts)-2]
+	default:
+		return nil, errors.New("a runner session TRN must have a runner name and session GID separated by a slash. For group runners, a group path prefix is also required",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return a.getRunnerSession(ctx, ex)
+}
+
 func (a *sessions) GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*RunnerSessionsResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetRunnerSessions")
 	defer span.End()
@@ -115,6 +150,8 @@ func (a *sessions) GetRunnerSessions(ctx context.Context, input *GetRunnerSessio
 
 	query := dialect.From(goqu.T("runner_sessions")).
 		Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -186,6 +223,8 @@ func (a *sessions) CreateRunnerSession(ctx context.Context, session *models.Runn
 					"internal":          session.Internal,
 				}).Returning("*"),
 		).Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
 		ToSQL()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -222,6 +261,8 @@ func (a *sessions) UpdateRunnerSession(ctx context.Context, session *models.Runn
 				}).Where(goqu.Ex{"id": session.Metadata.ID, "version": session.Metadata.Version}).
 				Returning("*"),
 		).Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
 		ToSQL()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -250,6 +291,8 @@ func (a *sessions) DeleteRunnerSession(ctx context.Context, session *models.Runn
 				Where(goqu.Ex{"id": session.Metadata.ID, "version": session.Metadata.Version}).
 				Returning("*"),
 		).Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
 		ToSQL()
 	if err != nil {
 		return errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
@@ -274,6 +317,8 @@ func (a *sessions) getRunnerSession(ctx context.Context, exp goqu.Ex) (*models.R
 	query := dialect.From(goqu.T("runner_sessions")).
 		Prepared(true).
 		Select(a.getSelectFields()...).
+		InnerJoin(goqu.T("runners"), goqu.On(goqu.I("runner_sessions.runner_id").Eq(goqu.I("runners.id")))).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.I("runners.group_id").Eq(goqu.I("namespaces.group_id")))).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -304,11 +349,14 @@ func (*sessions) getSelectFields() []interface{} {
 	for _, field := range sessionFieldList {
 		selectFields = append(selectFields, fmt.Sprintf("runner_sessions.%s", field))
 	}
+	selectFields = append(selectFields, "namespaces.path", "runners.name")
 
 	return selectFields
 }
 
 func scanRunnerSession(row scanner) (*models.RunnerSession, error) {
+	var namespacePath *string
+	var runnerName string
 	session := &models.RunnerSession{}
 
 	fields := []interface{}{
@@ -320,11 +368,20 @@ func scanRunnerSession(row scanner) (*models.RunnerSession, error) {
 		&session.LastContactTimestamp,
 		&session.ErrorCount,
 		&session.Internal,
+		&namespacePath,
+		&runnerName,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
+	}
+
+	// Namespace path won't exist for shared runners
+	if namespacePath != nil {
+		session.Metadata.TRN = types.RunnerSessionModelType.BuildTRN(*namespacePath, runnerName, session.GetGlobalID())
+	} else {
+		session.Metadata.TRN = types.RunnerSessionModelType.BuildTRN(runnerName, session.GetGlobalID())
 	}
 
 	return session, nil

@@ -15,9 +15,9 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
@@ -94,7 +94,7 @@ func (c *workspaceController) GetWorkspace(w http.ResponseWriter, r *http.Reques
 
 	path := fmt.Sprintf("%s/%s", convertOrgToGroupPath(org), workspaceName)
 
-	workspace, err := c.workspaceService.GetWorkspaceByFullPath(r.Context(), path)
+	workspace, err := c.workspaceService.GetWorkspaceByTRN(r.Context(), types.WorkspaceModelType.BuildTRN(path))
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -162,7 +162,7 @@ func (c *workspaceController) CreateWorkspace(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get group
-	group, err := c.groupService.GetGroupByFullPath(r.Context(), convertOrgToGroupPath(org))
+	group, err := c.groupService.GetGroupByTRN(r.Context(), types.GroupModelType.BuildTRN(convertOrgToGroupPath(org)))
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -332,7 +332,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 		return
 	}
 
-	token, err := c.createUploadToken(r.Context(), gid.ToGlobalID(gid.ConfigurationVersionType, cv.Metadata.ID))
+	token, err := c.createUploadToken(r.Context(), cv.GetGlobalID())
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -342,7 +342,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 		"%s%s/workspaces/%s/configuration-versions/%s/upload",
 		c.tharsisAPIURL,
 		c.tfeVersionedPath,
-		gid.ToGlobalID(gid.WorkspaceType, cv.WorkspaceID),
+		gid.ToGlobalID(types.WorkspaceModelType, cv.WorkspaceID),
 		token,
 	)
 
@@ -352,7 +352,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *http.Request) {
 	configurationVersionID := gid.FromGlobalID(chi.URLParam(r, "configurationVersionId"))
 
-	cv, err := c.workspaceService.GetConfigurationVersion(r.Context(), configurationVersionID)
+	cv, err := c.workspaceService.GetConfigurationVersionByID(r.Context(), configurationVersionID)
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -362,8 +362,8 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 
 	caller := auth.GetCaller(r.Context())
 	// Only return upload URL if the caller has the required permission
-	if caller != nil && caller.RequirePermission(r.Context(), permissions.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID)) == nil {
-		token, err := c.createUploadToken(r.Context(), gid.ToGlobalID(gid.ConfigurationVersionType, cv.Metadata.ID))
+	if caller != nil && caller.RequirePermission(r.Context(), models.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID)) == nil {
+		token, err := c.createUploadToken(r.Context(), cv.GetGlobalID())
 		if err != nil {
 			c.respWriter.RespondWithError(w, err)
 			return
@@ -373,7 +373,7 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 			"%s%s/workspaces/%s/configuration-versions/%s/upload",
 			c.tharsisAPIURL,
 			c.tfeVersionedPath,
-			gid.ToGlobalID(gid.WorkspaceType, cv.WorkspaceID),
+			gid.ToGlobalID(types.WorkspaceModelType, cv.WorkspaceID),
 			token,
 		)
 	}

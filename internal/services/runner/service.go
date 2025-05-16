@@ -10,12 +10,12 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/fatih/color"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -90,8 +90,8 @@ type SessionEvent struct {
 
 // Service implements all runner related functionality
 type Service interface {
-	GetRunnerByPath(ctx context.Context, path string) (*models.Runner, error)
 	GetRunnerByID(ctx context.Context, id string) (*models.Runner, error)
+	GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error)
 	GetRunners(ctx context.Context, input *GetRunnersInput) (*db.RunnersResult, error)
 	GetRunnersByIDs(ctx context.Context, idList []string) ([]models.Runner, error)
 	CreateRunner(ctx context.Context, input *CreateRunnerInput) (*models.Runner, error)
@@ -102,6 +102,7 @@ type Service interface {
 	CreateRunnerSession(ctx context.Context, input *CreateRunnerSessionInput) (*models.RunnerSession, error)
 	GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*db.RunnerSessionsResult, error)
 	GetRunnerSessionByID(ctx context.Context, id string) (*models.RunnerSession, error)
+	GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error)
 	AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID string) error
 	CreateRunnerSessionError(ctx context.Context, runnerSessionID string, message string) error
 	ReadRunnerSessionErrorLog(ctx context.Context, runnerSessionID string, startOffset int, limit int) ([]byte, error)
@@ -153,7 +154,7 @@ func (s *service) GetRunners(ctx context.Context, input *GetRunnersInput) (*db.R
 	}
 
 	if input.NamespacePath != nil {
-		err = caller.RequirePermission(ctx, permissions.ViewRunnerPermission, auth.WithNamespacePath(*input.NamespacePath))
+		err = caller.RequirePermission(ctx, models.ViewRunnerPermission, auth.WithNamespacePath(*input.NamespacePath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -236,7 +237,7 @@ func (s *service) GetRunnersByIDs(ctx context.Context, idList []string) ([]model
 
 		switch runner.Type {
 		case models.GroupRunnerType:
-			aErr := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+			aErr := caller.RequireAccessToInheritableResource(ctx, types.RunnerModelType,
 				auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
 			if aErr != nil {
 				return nil, aErr
@@ -263,7 +264,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 	}
 
 	if runner.GroupID != nil {
-		err = caller.RequirePermission(ctx, permissions.DeleteRunnerPermission, auth.WithGroupID(*runner.GroupID))
+		err = caller.RequirePermission(ctx, models.DeleteRunnerPermission, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return err
@@ -361,6 +362,36 @@ func (s *service) GetRunnerSessionByID(ctx context.Context, id string) (*models.
 	return session, nil
 }
 
+func (s *service) GetRunnerSessionByTRN(ctx context.Context, trn string) (*models.RunnerSession, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerSessionByTRN")
+	span.SetAttributes(attribute.String("runnerSessionTRN", trn))
+	defer span.End()
+
+	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+		return nil, err
+	}
+
+	session, err := s.dbClient.RunnerSessions.GetRunnerSessionByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get runner session by TRN", errors.WithSpan(span))
+	}
+
+	if session == nil {
+		return nil, errors.New("runner session with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	runner, err := s.getRunnerByID(ctx, span, session.RunnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := RequireViewerAccessToRunnerResource(ctx, runner); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
 func (s *service) GetRunnerSessions(ctx context.Context, input *GetRunnerSessionsInput) (*db.RunnerSessionsResult, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetRunnerSessions")
 	span.SetAttributes(attribute.String("runnerID", input.RunnerID))
@@ -413,7 +444,7 @@ func (s *service) AcceptRunnerSessionHeartbeat(ctx context.Context, sessionID st
 			return errors.New("runner session not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 		}
 
-		err = caller.RequirePermission(ctx, permissions.UpdateRunnerSessionPermission, auth.WithRunnerID(session.RunnerID))
+		err = caller.RequirePermission(ctx, models.UpdateRunnerSessionPermission, auth.WithRunnerID(session.RunnerID))
 		if err != nil {
 			return err
 		}
@@ -439,12 +470,16 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 		return nil, err
 	}
 
-	runner, err := s.getRunnerByPath(ctx, span, input.RunnerPath)
+	runner, err := s.dbClient.Runners.GetRunnerByTRN(ctx, types.RunnerModelType.BuildTRN(input.RunnerPath))
 	if err != nil {
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateRunnerSessionPermission, auth.WithRunnerID(runner.Metadata.ID))
+	if runner == nil {
+		return nil, errors.New("runner not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	err = caller.RequirePermission(ctx, models.CreateRunnerSessionPermission, auth.WithRunnerID(runner.Metadata.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +593,7 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 
 	switch runner.Type {
 	case models.GroupRunnerType:
-		aErr := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+		aErr := caller.RequireAccessToInheritableResource(ctx, types.RunnerModelType,
 			auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
 		if aErr != nil {
 			return nil, aErr
@@ -572,9 +607,8 @@ func (s *service) GetRunnerByID(ctx context.Context, id string) (*models.Runner,
 	return runner, nil
 }
 
-func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Runner, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetRunnerByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunnerByTRN")
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -584,19 +618,19 @@ func (s *service) GetRunnerByPath(ctx context.Context, path string) (*models.Run
 	}
 
 	// Get runner from DB
-	runner, err := s.dbClient.Runners.GetRunnerByPath(ctx, path)
+	runner, err := s.dbClient.Runners.GetRunnerByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runner by path")
+		tracing.RecordError(span, err, "failed to get runner by TRN")
 		return nil, err
 	}
 
 	if runner == nil {
-		return nil, errors.New("runner with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("runner with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	switch runner.Type {
 	case models.GroupRunnerType:
-		aErr := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+		aErr := caller.RequireAccessToInheritableResource(ctx, types.RunnerModelType,
 			auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
 		if aErr != nil {
 			return nil, aErr
@@ -622,7 +656,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 	}
 
 	if input.GroupID != "" {
-		err = caller.RequirePermission(ctx, permissions.CreateRunnerPermission, auth.WithGroupID(input.GroupID))
+		err = caller.RequirePermission(ctx, models.CreateRunnerPermission, auth.WithGroupID(input.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -725,7 +759,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 	}
 
 	if runner.GroupID != nil {
-		err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
+		err = caller.RequirePermission(ctx, models.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -826,7 +860,7 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 		return errors.New("service account cannot be assigned to shared runner", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -847,7 +881,7 @@ func (s *service) AssignServiceAccountToRunner(ctx context.Context, serviceAccou
 
 	// Verify that the service account is in the same group as the runner or in a parent group
 	if saGroupPath != runnerGroupPath && !strings.HasPrefix(runnerGroupPath, fmt.Sprintf("%s/", saGroupPath)) {
-		return errors.New("service account %s cannot be assigned to runner %s", sa.ResourcePath, runner.ResourcePath, errors.WithErrorCode(errors.EInvalid))
+		return errors.New("service account %s cannot be assigned to runner %s", sa.GetResourcePath(), runner.GetResourcePath(), errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return s.dbClient.ServiceAccounts.AssignServiceAccountToRunner(ctx, serviceAccountID, runnerID)
@@ -879,7 +913,7 @@ func (s *service) UnassignServiceAccountFromRunner(ctx context.Context, serviceA
 		return errors.New("service account cannot be unassigned to shared runner", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateRunnerPermission, auth.WithGroupID(*runner.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -904,7 +938,7 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 			return err
 		}
 
-		err = caller.RequirePermission(ctx, permissions.UpdateRunnerSessionPermission, auth.WithRunnerID(session.RunnerID))
+		err = caller.RequirePermission(ctx, models.UpdateRunnerSessionPermission, auth.WithRunnerID(session.RunnerID))
 		if err != nil {
 			return err
 		}
@@ -1096,7 +1130,7 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 	}
 
 	if options.GroupID != nil {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType, auth.WithGroupID(*options.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.RunnerModelType, auth.WithGroupID(*options.GroupID))
 		if err != nil {
 			return nil, err
 		}
@@ -1188,19 +1222,6 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 	return outgoing, nil
 }
 
-func (s *service) getRunnerByPath(ctx context.Context, span trace.Span, path string) (*models.Runner, error) {
-	runner, err := s.dbClient.Runners.GetRunnerByPath(ctx, path)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get runner by path", errors.WithSpan(span))
-	}
-
-	if runner == nil {
-		return nil, errors.New("runner with path %s not found", path, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
-	}
-
-	return runner, nil
-}
-
 func (s *service) getRunnerByID(ctx context.Context, span trace.Span, id string) (*models.Runner, error) {
 	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, id)
 	if err != nil {
@@ -1237,7 +1258,7 @@ func RequireViewerAccessToRunnerResource(ctx context.Context, runner *models.Run
 
 	switch runner.Type {
 	case models.GroupRunnerType:
-		err := caller.RequireAccessToInheritableResource(ctx, permissions.RunnerResourceType,
+		err := caller.RequireAccessToInheritableResource(ctx, types.RunnerModelType,
 			auth.WithGroupID(*runner.GroupID), auth.WithRunnerID(runner.Metadata.ID))
 		if err != nil {
 			return err

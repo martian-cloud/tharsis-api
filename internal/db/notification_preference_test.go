@@ -19,67 +19,6 @@ func (sf NotificationPreferenceSortableField) getValue() string {
 	return string(sf)
 }
 
-func TestGetNotificationPreferenceByID(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Create a test user
-	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
-		Username: "test-user",
-		Email:    "test-user@test.com",
-	})
-	require.Nil(t, err)
-
-	notificationPreference, err := testClient.client.NotificationPreferences.CreateNotificationPreference(ctx, &models.NotificationPreference{
-		UserID: user.Metadata.ID,
-		Scope:  models.NotificationPreferenceScopeAll,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectErrorCode              errors.CodeType
-		name                         string
-		id                           string
-		expectNotificationPreference bool
-	}
-
-	testCases := []testCase{
-		{
-			name:                         "get notification preference by id",
-			id:                           notificationPreference.Metadata.ID,
-			expectNotificationPreference: true,
-		},
-		{
-			name: "notification preference with id not found",
-			id:   nonExistentID,
-		},
-		{
-			name:            "get notification preference with invalid id returns error",
-			id:              invalidID,
-			expectErrorCode: errors.EInvalid,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			notificationPreference, err := testClient.client.NotificationPreferences.GetNotificationPreferenceByID(ctx, test.id)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			if test.expectNotificationPreference {
-				require.NotNil(t, notificationPreference)
-				assert.Equal(t, test.id, notificationPreference.Metadata.ID)
-			} else {
-				assert.Nil(t, notificationPreference)
-			}
-		})
-	}
-}
-
 func TestCreateNotificationPreference(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)

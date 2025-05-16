@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -218,7 +220,7 @@ func TestGetUserByID(t *testing.T) {
 		testCase{
 			name:      "negative: invalid",
 			input:     invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	)
 
@@ -233,6 +235,62 @@ func TestGetUserByID(t *testing.T) {
 				compareUsers(t, test.expectUser, gotUser, true, nil)
 			} else {
 				assert.Nil(t, gotUser)
+			}
+		})
+	}
+}
+
+func TestGetUserByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user",
+		Email:    "test-user@example.com",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectUser      bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get resource by TRN",
+			trn:        user.Metadata.TRN,
+			expectUser: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.UserModelType.BuildTRN("unknown"),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualUser, err := testClient.client.Users.GetUserByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectUser {
+				require.NotNil(t, actualUser)
+				assert.Equal(t, types.UserModelType.BuildTRN(user.Username), actualUser.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualUser)
 			}
 		})
 	}
@@ -286,67 +344,6 @@ func TestGetUserByEmail(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			gotUser, err := testClient.client.Users.GetUserByEmail(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectUser != nil {
-				require.NotNil(t, gotUser)
-				compareUsers(t, test.expectUser, gotUser, true, nil)
-			} else {
-				assert.Nil(t, gotUser)
-			}
-		})
-	}
-}
-
-func TestGetUserByUsername(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdWarmupUsers, _, err := createInitialUsers(ctx, testClient, standardWarmupUsers)
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg  *string
-		expectUser *models.User
-		name       string
-		input      string
-	}
-
-	/*
-		template test case:
-
-		{
-		name       string
-		input      string
-		expectMsg  *string
-		expectUser *models.User
-		}
-	*/
-
-	testCases := []testCase{}
-
-	// Positive case, one linkage per user.
-	for _, user := range createdWarmupUsers {
-		copyUser := user
-		testCases = append(testCases, testCase{
-			name:       "positive--" + user.Username,
-			input:      user.Username,
-			expectUser: &copyUser,
-		})
-	}
-
-	testCases = append(testCases,
-		testCase{
-			name:  "negative: non-exist",
-			input: "nobody",
-		},
-	)
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			gotUser, err := testClient.client.Users.GetUserByUsername(ctx, test.input)
 
 			checkError(t, test.expectMsg, err)
 
@@ -1222,6 +1219,7 @@ func compareUsers(t *testing.T, expected, actual *models.User,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

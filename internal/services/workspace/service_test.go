@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	namespace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -119,7 +119,7 @@ func TestCreateWorkspace(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateWorkspacePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateWorkspacePermission, mock.Anything).Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 
@@ -264,7 +264,7 @@ func TestUpdateWorkspace(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).
 				Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
@@ -320,7 +320,523 @@ func TestUpdateWorkspace(t *testing.T) {
 	}
 }
 
+func TestGetWorkspaceByID(t *testing.T) {
+	workspaceID := "workspace-1"
+	workspaceName := "workspace-name"
+	workspacePath := "group/workspace-name"
+
+	// Test cases
+	tests := []struct {
+		name            string
+		workspaceID     string
+		workspace       *models.Workspace
+		authError       error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:        "successfully get workspace by ID",
+			workspaceID: workspaceID,
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: workspaceID,
+				},
+				Name:     workspaceName,
+				FullPath: workspacePath,
+			},
+		},
+		{
+			name:            "workspace not found",
+			workspaceID:     workspaceID,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:        "subject does not have permission",
+			workspaceID: workspaceID,
+			workspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: workspaceID,
+				},
+				Name:     workspaceName,
+				FullPath: workspacePath,
+			},
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, test.workspaceID).Return(test.workspace, nil)
+
+			if test.workspace != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Workspaces: mockWorkspaces,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			workspace, err := service.GetWorkspaceByID(auth.WithCaller(ctx, mockCaller), test.workspaceID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.workspace, workspace)
+		})
+	}
+}
+
+func TestGetWorkspaceByTRN(t *testing.T) {
+	sampleWorkspace := &models.Workspace{
+		Metadata: models.ResourceMetadata{
+			ID:  "workspace-1",
+			TRN: types.WorkspaceModelType.BuildTRN("group/workspace-name"),
+		},
+		Name:     "workspace-name",
+		FullPath: "group/workspace-name",
+		GroupID:  "group-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		workspace       *models.Workspace
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:      "successfully get workspace by trn",
+			workspace: sampleWorkspace,
+		},
+		{
+			name:            "workspace not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view workspace",
+			workspace: &models.Workspace{
+				Metadata: sampleWorkspace.Metadata,
+				Name:     sampleWorkspace.Name,
+				FullPath: sampleWorkspace.FullPath,
+				GroupID:  sampleWorkspace.GroupID,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, sampleWorkspace.Metadata.TRN).Return(test.workspace, nil)
+
+			if test.workspace != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Workspaces: mockWorkspaces,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualWorkspace, err := service.GetWorkspaceByTRN(auth.WithCaller(ctx, mockCaller), sampleWorkspace.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.workspace, actualWorkspace)
+		})
+	}
+}
+
+func TestGetStateVersionByID(t *testing.T) {
+	stateVersionID := "state-version-1"
+	workspaceID := "workspace-1"
+
+	// Test cases
+	tests := []struct {
+		name            string
+		stateVersionID  string
+		stateVersion    *models.StateVersion
+		authError       error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:           "successfully get state version by ID",
+			stateVersionID: stateVersionID,
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: workspaceID,
+			},
+		},
+		{
+			name:            "state version not found",
+			stateVersionID:  stateVersionID,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:           "subject does not have permission",
+			stateVersionID: stateVersionID,
+			stateVersion: &models.StateVersion{
+				Metadata: models.ResourceMetadata{
+					ID: stateVersionID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockStateVersions := db.NewMockStateVersions(t)
+
+			mockStateVersions.On("GetStateVersionByID", mock.Anything, test.stateVersionID).Return(test.stateVersion, nil)
+
+			if test.stateVersion != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewStateVersionPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				StateVersions: mockStateVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			stateVersion, err := service.GetStateVersionByID(auth.WithCaller(ctx, mockCaller), test.stateVersionID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.stateVersion, stateVersion)
+		})
+	}
+}
+
+func TestGetStateVersionByTRN(t *testing.T) {
+	sampleStateVersion := &models.StateVersion{
+		Metadata: models.ResourceMetadata{
+			ID:  "state-version-1",
+			TRN: types.StateVersionModelType.BuildTRN("state-version-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		stateVersion    *models.StateVersion
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:         "successfully get state version by trn",
+			stateVersion: sampleStateVersion,
+		},
+		{
+			name:            "state version not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view state version",
+			stateVersion: &models.StateVersion{
+				Metadata:    sampleStateVersion.Metadata,
+				WorkspaceID: sampleStateVersion.WorkspaceID,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockStateVersions := db.NewMockStateVersions(t)
+
+			mockStateVersions.On("GetStateVersionByTRN", mock.Anything, sampleStateVersion.Metadata.TRN).Return(test.stateVersion, nil)
+
+			if test.stateVersion != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewStateVersionPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				StateVersions: mockStateVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualStateVersion, err := service.GetStateVersionByTRN(auth.WithCaller(ctx, mockCaller), sampleStateVersion.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.stateVersion, actualStateVersion)
+		})
+	}
+}
+
+func TestGetWorkspaceAssessmentByTRN(t *testing.T) {
+	sampleAssessment := &models.WorkspaceAssessment{
+		Metadata: models.ResourceMetadata{
+			ID:  "assessment-1",
+			TRN: types.WorkspaceAssessmentModelType.BuildTRN("group/workspace-name/assessment-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		assessment      *models.WorkspaceAssessment
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "successfully get assessment by trn",
+			assessment: sampleAssessment,
+		},
+		{
+			name:            "assessment not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view assessment",
+			assessment: &models.WorkspaceAssessment{
+				Metadata:    sampleAssessment.Metadata,
+				WorkspaceID: sampleAssessment.WorkspaceID,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockAssessments := db.NewMockWorkspaceAssessments(t)
+
+			mockAssessments.On("GetWorkspaceAssessmentByTRN", mock.Anything, sampleAssessment.Metadata.TRN).Return(test.assessment, nil)
+
+			if test.assessment != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				WorkspaceAssessments: mockAssessments,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualAssessment, err := service.GetWorkspaceAssessmentByTRN(auth.WithCaller(ctx, mockCaller), sampleAssessment.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.assessment, actualAssessment)
+		})
+	}
+}
+
+func TestGetConfigurationVersionByID(t *testing.T) {
+	configVersionID := "config-version-1"
+	workspaceID := "workspace-1"
+
+	// Test cases
+	tests := []struct {
+		name            string
+		configVersionID string
+		configVersion   *models.ConfigurationVersion
+		authError       error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:            "successfully get configuration version by ID",
+			configVersionID: configVersionID,
+			configVersion: &models.ConfigurationVersion{
+				Metadata: models.ResourceMetadata{
+					ID: configVersionID,
+				},
+				WorkspaceID: workspaceID,
+			},
+		},
+		{
+			name:            "configuration version not found",
+			configVersionID: configVersionID,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject does not have permission",
+			configVersionID: configVersionID,
+			configVersion: &models.ConfigurationVersion{
+				Metadata: models.ResourceMetadata{
+					ID: configVersionID,
+				},
+				WorkspaceID: workspaceID,
+			},
+			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockConfigVersions := db.NewMockConfigurationVersions(t)
+
+			mockConfigVersions.On("GetConfigurationVersionByID", mock.Anything, test.configVersionID).Return(test.configVersion, nil)
+
+			if test.configVersion != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewConfigurationVersionPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				ConfigurationVersions: mockConfigVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			configVersion, err := service.GetConfigurationVersionByID(auth.WithCaller(ctx, mockCaller), test.configVersionID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.configVersion, configVersion)
+		})
+	}
+}
+
+func TestGetConfigurationVersionByTRN(t *testing.T) {
+	sampleConfigVersion := &models.ConfigurationVersion{
+		Metadata: models.ResourceMetadata{
+			ID:  "config-version-1",
+			TRN: types.ConfigurationVersionModelType.BuildTRN("config-version-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		configVersion   *models.ConfigurationVersion
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "successfully get configuration version by trn",
+			configVersion: sampleConfigVersion,
+		},
+		{
+			name:            "configuration version not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view configuration version",
+			configVersion: &models.ConfigurationVersion{
+				Metadata:    sampleConfigVersion.Metadata,
+				WorkspaceID: sampleConfigVersion.WorkspaceID,
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockConfigVersions := db.NewMockConfigurationVersions(t)
+
+			mockConfigVersions.On("GetConfigurationVersionByTRN", mock.Anything, sampleConfigVersion.Metadata.TRN).Return(test.configVersion, nil)
+
+			if test.configVersion != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewConfigurationVersionPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				ConfigurationVersions: mockConfigVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualConfigVersion, err := service.GetConfigurationVersionByTRN(auth.WithCaller(ctx, mockCaller), sampleConfigVersion.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.configVersion, actualConfigVersion)
+		})
+	}
+}
+
 func TestGetWorkspaces(t *testing.T) {
+	groupID := "some-group-id"
 	sampleWorkspace := models.Workspace{
 		Metadata: models.ResourceMetadata{
 			ID: "some-id",
@@ -349,7 +865,7 @@ func TestGetWorkspaces(t *testing.T) {
 		{
 			name: "positive: successfully returns workspaces for a group",
 			input: &GetWorkspacesInput{
-				Group: &models.Group{Metadata: models.ResourceMetadata{ID: "some-group-id"}},
+				GroupID: &groupID,
 			},
 			expectResult: []models.Workspace{
 				sampleWorkspace,
@@ -438,10 +954,10 @@ func TestGetWorkspaces(t *testing.T) {
 				},
 			}
 
-			if test.input.Group != nil {
-				input.Filter.GroupID = &test.input.Group.Metadata.ID
+			if test.input.GroupID != nil {
+				input.Filter.GroupID = test.input.GroupID
 
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.requireWorkspacePermissionError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.requireWorkspacePermissionError)
 			}
 
 			policy := auth.NamespaceAccessPolicy{AllowAll: test.accessPolicyAllowAll}
@@ -643,7 +1159,7 @@ func TestCreateStateVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateStateVersionPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateStateVersionPermission, mock.Anything).
 				Return(test.workspacePermissionError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
@@ -824,7 +1340,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateConfigurationVersionPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateConfigurationVersionPermission, mock.Anything).
 				Return(test.workspacePermissionError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
@@ -996,13 +1512,13 @@ func TestMigrateWorkspace(t *testing.T) {
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
-			perms := []permissions.Permission{permissions.UpdateWorkspacePermission}
+			perms := []models.Permission{models.UpdateWorkspacePermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(workspaceAccessError)
 
-			perms = []permissions.Permission{permissions.DeleteWorkspacePermission}
+			perms = []models.Permission{models.DeleteWorkspacePermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
 
-			perms = []permissions.Permission{permissions.CreateWorkspacePermission}
+			perms = []models.Permission{models.CreateWorkspacePermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
 
 			mockGroups := db.MockGroups{}
@@ -1166,7 +1682,7 @@ func TestSubscribeToWorkspaceEvents(t *testing.T) {
 			var roEventChan <-chan db.Event = mockEventChannel
 			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).
 				Return(test.authError)
 
 			for _, d := range test.sendEvents {
@@ -1289,7 +1805,7 @@ func TestGetDriftDetectionEnabledSetting(t *testing.T) {
 			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
 			testLogger, _ := logger.NewForTest()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
 
 			mockInheritedSettingsResolver.On("GetDriftDetectionEnabled", mock.Anything, &workspace).Return(test.expectSetting, nil).Maybe()
 
@@ -1348,7 +1864,7 @@ func TestGetWorkspaceAssessmentByID(t *testing.T) {
 			mockWorkspaceAssessments := db.NewMockWorkspaceAssessments(t)
 			testLogger, _ := logger.NewForTest()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
 
 			mockWorkspaceAssessments.On("GetWorkspaceAssessmentByID", mock.Anything, assessmentID).Return(test.assessment, nil).Maybe()
 
@@ -1419,7 +1935,7 @@ func TestGetWorkspaceAssessmentsByWorkspaceIDs(t *testing.T) {
 			mockWorkspaceAssessments := db.NewMockWorkspaceAssessments(t)
 			testLogger, _ := logger.NewForTest()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
 
 			mockWorkspaceAssessments.On("GetWorkspaceAssessments", mock.Anything, &db.GetWorkspaceAssessmentsInput{
 				Filter: &db.WorkspaceAssessmentFilter{

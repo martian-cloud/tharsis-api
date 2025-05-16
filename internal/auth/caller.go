@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -50,10 +51,10 @@ func GetSubject(ctx context.Context) *string {
 }
 
 // permissionTypeHandler allows delegating checks based on the permission type.
-type permissionTypeHandler func(ctx context.Context, perm *permissions.Permission, checks *constraints) error
+type permissionTypeHandler func(ctx context.Context, perm *models.Permission, checks *constraints) error
 
 // noopPermissionHandler handles any use-cases where the permission is automatically granted for a caller.
-func noopPermissionHandler(_ context.Context, _ *permissions.Permission, _ *constraints) error {
+func noopPermissionHandler(_ context.Context, _ *models.Permission, _ *constraints) error {
 	return nil
 }
 
@@ -179,13 +180,13 @@ func (s *SystemCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAc
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
-func (s *SystemCaller) RequirePermission(_ context.Context, _ permissions.Permission, _ ...func(*constraints)) error {
+func (s *SystemCaller) RequirePermission(_ context.Context, _ models.Permission, _ ...func(*constraints)) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
 
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
-func (s *SystemCaller) RequireAccessToInheritableResource(_ context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
+func (s *SystemCaller) RequireAccessToInheritableResource(_ context.Context, _ types.ModelType, _ ...func(*constraints)) error {
 	// Return nil because system caller is authorized to perform any action
 	return nil
 }
@@ -211,8 +212,8 @@ type Caller interface {
 	GetSubject() string
 	IsAdmin() bool
 	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
-	RequirePermission(ctx context.Context, perms permissions.Permission, checks ...func(*constraints)) error
-	RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error
+	RequirePermission(ctx context.Context, perms models.Permission, checks ...func(*constraints)) error
+	RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error
 	UnauthorizedError(ctx context.Context, hasViewerAccess bool) error
 }
 

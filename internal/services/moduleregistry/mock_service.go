@@ -192,6 +192,36 @@ func (_m *MockService) GetModuleAttestationByID(ctx context.Context, id string) 
 	return r0, r1
 }
 
+// GetModuleAttestationByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetModuleAttestationByTRN")
+	}
+
+	var r0 *models.TerraformModuleAttestation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformModuleAttestation, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformModuleAttestation); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformModuleAttestation)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetModuleAttestations provides a mock function with given fields: ctx, input
 func (_m *MockService) GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*db.ModuleAttestationsResult, error) {
 	ret := _m.Called(ctx, input)
@@ -282,21 +312,21 @@ func (_m *MockService) GetModuleByID(ctx context.Context, id string) (*models.Te
 	return r0, r1
 }
 
-// GetModuleByPath provides a mock function with given fields: ctx, path
-func (_m *MockService) GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error) {
-	ret := _m.Called(ctx, path)
+// GetModuleByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error) {
+	ret := _m.Called(ctx, trn)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetModuleByPath")
+		panic("no return value specified for GetModuleByTRN")
 	}
 
 	var r0 *models.TerraformModule
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformModule, error)); ok {
-		return rf(ctx, path)
+		return rf(ctx, trn)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformModule); ok {
-		r0 = rf(ctx, path)
+		r0 = rf(ctx, trn)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.TerraformModule)
@@ -304,7 +334,7 @@ func (_m *MockService) GetModuleByPath(ctx context.Context, path string) (*model
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -365,6 +395,36 @@ func (_m *MockService) GetModuleVersionByID(ctx context.Context, id string) (*mo
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetModuleVersionByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetModuleVersionByTRN")
+	}
+
+	var r0 *models.TerraformModuleVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformModuleVersion, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformModuleVersion); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformModuleVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

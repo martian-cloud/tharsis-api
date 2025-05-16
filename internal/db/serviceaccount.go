@@ -12,15 +12,17 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // ServiceAccounts encapsulates the logic to access service accounts from the database
 type ServiceAccounts interface {
 	GetServiceAccountByID(ctx context.Context, id string) (*models.ServiceAccount, error)
-	GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error)
+	GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error)
 	CreateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error)
 	UpdateServiceAccount(ctx context.Context, serviceAccount *models.ServiceAccount) (*models.ServiceAccount, error)
 	GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*ServiceAccountsResult, error)
@@ -124,16 +126,30 @@ func (s *serviceAccounts) GetServiceAccountByID(ctx context.Context, id string) 
 	return s.getServiceAccount(ctx, goqu.Ex{"service_accounts.id": id})
 }
 
-func (s *serviceAccounts) GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error) {
-	ctx, span := tracer.Start(ctx, "db.GetServiceAccountByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *serviceAccounts) GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "db.GetServiceAccountByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
 	defer span.End()
 
-	parts := strings.Split(path, "/")
-	name := parts[len(parts)-1]
-	namespace := strings.Join(parts[:len(parts)-1], "/")
+	path, err := types.ServiceAccountModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
 
-	return s.getServiceAccount(ctx, goqu.Ex{"service_accounts.name": name, "namespaces.path": namespace})
+	lastSlashIndex := strings.LastIndex(path, "/")
+
+	// A service account TRN should always have the group path and the name of the service account.
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a service account TRN must have the group path and service account name separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return s.getServiceAccount(ctx, goqu.Ex{
+		"namespaces.path":       path[:lastSlashIndex],
+		"service_accounts.name": path[lastSlashIndex+1:],
+	})
 }
 
 func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*ServiceAccountsResult, error) {
@@ -241,7 +257,7 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 	// Scan rows
 	results := []models.ServiceAccount{}
 	for rows.Next() {
-		item, err := scanServiceAccount(rows, true)
+		item, err := scanServiceAccount(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -271,46 +287,36 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 
 	timestamp := currentTime()
 
-	tx, err := s.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			s.dbClient.logger.Errorf("failed to rollback tx for CreateServiceAccount: %v", txErr)
-		}
-	}()
-
 	trustPoliciesJSON, err := s.marshalOIDCTrustPolicies(serviceAccount.OIDCTrustPolicies)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to marshal OIDC trust policies")
 		return nil, err
 	}
 
-	sql, args, err := dialect.Insert("service_accounts").
+	sql, args, err := dialect.From("service_accounts").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                  newResourceID(),
-			"version":             initialResourceVersion,
-			"created_at":          timestamp,
-			"updated_at":          timestamp,
-			"name":                serviceAccount.Name,
-			"description":         serviceAccount.Description,
-			"group_id":            serviceAccount.GroupID,
-			"created_by":          serviceAccount.CreatedBy,
-			"oidc_trust_policies": trustPoliciesJSON,
-		}).
-		Returning(serviceAccountFieldList...).ToSQL()
+		With("service_accounts",
+			dialect.Insert("service_accounts").Rows(
+				goqu.Record{
+					"id":                  newResourceID(),
+					"version":             initialResourceVersion,
+					"created_at":          timestamp,
+					"updated_at":          timestamp,
+					"name":                serviceAccount.Name,
+					"description":         serviceAccount.Description,
+					"group_id":            serviceAccount.GroupID,
+					"created_by":          serviceAccount.CreatedBy,
+					"oidc_trust_policies": trustPoliciesJSON,
+				}).Returning("*"),
+		).Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
+	createdServiceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -330,20 +336,6 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, createdServiceAccount.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	createdServiceAccount.ResourcePath = buildServiceAccountResourcePath(namespace.path, createdServiceAccount.Name)
-
 	return createdServiceAccount, nil
 }
 
@@ -361,36 +353,28 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 
 	timestamp := currentTime()
 
-	tx, err := s.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			s.dbClient.logger.Errorf("failed to rollback tx for UpdateServiceAccount: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Update("service_accounts").
+	sql, args, err := dialect.From("service_accounts").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":             goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":          timestamp,
-				"description":         serviceAccount.Description,
-				"oidc_trust_policies": trustPoliciesJSON,
-			},
-		).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).Returning(serviceAccountFieldList...).ToSQL()
+		With("service_accounts",
+			dialect.Update("service_accounts").
+				Set(
+					goqu.Record{
+						"version":             goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":          timestamp,
+						"description":         serviceAccount.Description,
+						"oidc_trust_policies": trustPoliciesJSON,
+					},
+				).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).
+				Returning("*"),
+		).Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedServiceAccount, err := scanServiceAccount(tx.QueryRow(ctx, sql, args...), false)
+	updatedServiceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -400,20 +384,6 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, updatedServiceAccount.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	updatedServiceAccount.ResourcePath = buildServiceAccountResourcePath(namespace.path, updatedServiceAccount.Name)
-
 	return updatedServiceAccount, nil
 }
 
@@ -422,20 +392,21 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("service_accounts").
+	sql, args, err := dialect.From("service_accounts").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      serviceAccount.Metadata.ID,
-				"version": serviceAccount.Metadata.Version,
-			},
-		).Returning(serviceAccountFieldList...).ToSQL()
+		With("service_accounts",
+			dialect.Delete("service_accounts").
+				Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).
+				Returning("*"),
+		).Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	if _, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
+	if _, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
@@ -460,6 +431,9 @@ func (s *serviceAccounts) DeleteServiceAccount(ctx context.Context, serviceAccou
 }
 
 func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "db.getServiceAccount")
+	defer span.End()
+
 	sql, args, err := dialect.From("service_accounts").
 		Prepared(true).
 		Select(s.getSelectFields()...).
@@ -467,16 +441,24 @@ func (s *serviceAccounts) getServiceAccount(ctx context.Context, exp exp.Ex) (*m
 		Where(exp).
 		ToSQL()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	serviceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	serviceAccount, err := scanServiceAccount(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
+
 	return serviceAccount, nil
 }
 
@@ -565,11 +547,8 @@ func (s *serviceAccounts) marshalOIDCTrustPolicies(input []models.OIDCTrustPolic
 	return trustPoliciesJSON, nil
 }
 
-func buildServiceAccountResourcePath(groupPath string, name string) string {
-	return fmt.Sprintf("%s/%s", groupPath, name)
-}
-
-func scanServiceAccount(row scanner, withResourcePath bool) (*models.ServiceAccount, error) {
+func scanServiceAccount(row scanner) (*models.ServiceAccount, error) {
+	var groupPath string
 	serviceAccount := &models.ServiceAccount{}
 
 	policies := []oidcTrustPolicyDBType{}
@@ -584,10 +563,7 @@ func scanServiceAccount(row scanner, withResourcePath bool) (*models.ServiceAcco
 		&serviceAccount.GroupID,
 		&serviceAccount.CreatedBy,
 		&policies,
-	}
-	var path string
-	if withResourcePath {
-		fields = append(fields, &path)
+		&groupPath,
 	}
 
 	err := row.Scan(fields...)
@@ -610,9 +586,7 @@ func scanServiceAccount(row scanner, withResourcePath bool) (*models.ServiceAcco
 		})
 	}
 
-	if withResourcePath {
-		serviceAccount.ResourcePath = buildServiceAccountResourcePath(path, serviceAccount.Name)
-	}
+	serviceAccount.Metadata.TRN = types.ServiceAccountModelType.BuildTRN(groupPath, serviceAccount.Name)
 
 	return serviceAccount, nil
 }

@@ -5,8 +5,12 @@ import (
 	"net/url"
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+var _ Model = (*ServiceAccount)(nil)
 
 const (
 	maximumTrustPolicies = 10
@@ -32,12 +36,26 @@ type OIDCTrustPolicy struct {
 // ServiceAccount provided M2M authentication
 type ServiceAccount struct {
 	Metadata          ResourceMetadata
-	ResourcePath      string
 	Name              string
 	Description       string
 	GroupID           string
 	CreatedBy         string
 	OIDCTrustPolicies []OIDCTrustPolicy
+}
+
+// GetID returns the Metadata ID.
+func (s *ServiceAccount) GetID() string {
+	return s.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (s *ServiceAccount) GetGlobalID() string {
+	return gid.ToGlobalID(s.GetModelType(), s.Metadata.ID)
+}
+
+// GetModelType returns the model type.
+func (s *ServiceAccount) GetModelType() types.ModelType {
+	return types.ServiceAccountModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -109,7 +127,13 @@ func (s *ServiceAccount) Validate() error {
 	return nil
 }
 
+// GetResourcePath returns the ServiceAccount resource's path
+func (s *ServiceAccount) GetResourcePath() string {
+	return strings.Split(s.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+}
+
 // GetGroupPath returns the group path
 func (s *ServiceAccount) GetGroupPath() string {
-	return s.ResourcePath[:strings.LastIndex(s.ResourcePath, "/")]
+	resourcePath := s.GetResourcePath()
+	return resourcePath[:strings.LastIndex(resourcePath, "/")]
 }

@@ -126,7 +126,7 @@ func (r *ruleEnforcer) enforceRules(ctx context.Context, managedIdentity *models
 				"managed identity rule for %s not satisfied for run stage %s and managed identity %s: %s",
 				rule.Type,
 				rule.RunStage,
-				managedIdentity.ResourcePath,
+				managedIdentity.GetResourcePath(),
 				strings.Join(diagnostics, ": "),
 				errors.WithErrorCode(errors.EForbidden),
 			)
@@ -213,7 +213,7 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 	// Perform some additional checks with the state version to ensure it hasn't been altered
 	// except with a run created from the same module source.
 	if rule.VerifyStateLineage && input.CurrentStateVersionID != nil {
-		stateVersion, err := dbClient.StateVersions.GetStateVersion(ctx, *input.CurrentStateVersionID)
+		stateVersion, err := dbClient.StateVersions.GetStateVersionByID(ctx, *input.CurrentStateVersionID)
 		if err != nil {
 			return "", err
 		}
@@ -226,7 +226,7 @@ func enforceModuleAttestationRuleType(ctx context.Context, dbClient *db.Client, 
 			return "workspace's current state version was modified manually which is not permitted when using a module attestation rule with the verify state lineage setting set to true", nil
 		}
 
-		run, err := dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
+		run, err := dbClient.Runs.GetRunByID(ctx, *stateVersion.RunID)
 		if err != nil {
 			return "", err
 		}

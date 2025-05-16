@@ -13,8 +13,10 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
+	"go.opentelemetry.io/otel/attribute"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -22,7 +24,7 @@ import (
 
 // Workspaces encapsulates the logic to access workspaces from the database
 type Workspaces interface {
-	GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error)
+	GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error)
 	GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error)
 	GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) (*WorkspacesResult, error)
 	UpdateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
@@ -119,10 +121,15 @@ func NewWorkspaces(dbClient *Client) Workspaces {
 	return &workspaces{dbClient: dbClient}
 }
 
-func (w *workspaces) GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error) {
-	ctx, span := tracer.Start(ctx, "db.GetWorkspaceByFullPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (w *workspaces) GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspaceByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
 	defer span.End()
+
+	path, err := types.WorkspaceModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
 
 	return w.getWorkspace(ctx, goqu.Ex{"namespaces.path": path})
 }
@@ -283,30 +290,36 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("workspaces").
+	sql, args, err := dialect.From("workspaces").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":                  goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":               timestamp,
-				"description":              nullableString(workspace.Description),
-				"current_job_id":           nullableString(workspace.CurrentJobID),
-				"current_state_version_id": nullableString(workspace.CurrentStateVersionID),
-				"dirty_state":              workspace.DirtyState,
-				"locked":                   workspace.Locked,
-				"max_job_duration":         workspace.MaxJobDuration,
-				"terraform_version":        workspace.TerraformVersion,
-				"prevent_destroy_plan":     workspace.PreventDestroyPlan,
-				"runner_tags":              runnerTags,
-				"drift_detection_enabled":  workspace.EnableDriftDetection,
-			},
-		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
+		With("workspaces",
+			dialect.Update("workspaces").
+				Set(
+					goqu.Record{
+						"version":                  goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":               timestamp,
+						"description":              nullableString(workspace.Description),
+						"current_job_id":           nullableString(workspace.CurrentJobID),
+						"current_state_version_id": nullableString(workspace.CurrentStateVersionID),
+						"dirty_state":              workspace.DirtyState,
+						"locked":                   workspace.Locked,
+						"max_job_duration":         workspace.MaxJobDuration,
+						"terraform_version":        workspace.TerraformVersion,
+						"prevent_destroy_plan":     workspace.PreventDestroyPlan,
+						"runner_tags":              runnerTags,
+						"drift_detection_enabled":  workspace.EnableDriftDetection,
+					},
+				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
+				Returning("*"),
+		).Select(w.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
+	updatedWorkspace, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -315,14 +328,6 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
-
-	namespace, err := getNamespaceByWorkspaceID(ctx, w.dbClient.getConnection(ctx), updatedWorkspace.Metadata.ID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by workspace ID")
-		return nil, err
-	}
-
-	updatedWorkspace.FullPath = namespace.path
 
 	return updatedWorkspace, nil
 }
@@ -425,6 +430,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	}
 
 	createdWorkspace.FullPath = fullPath
+	createdWorkspace.Metadata.TRN = types.WorkspaceModelType.BuildTRN(fullPath)
 
 	return createdWorkspace, nil
 }
@@ -434,20 +440,25 @@ func (w *workspaces) DeleteWorkspace(ctx context.Context, workspace *models.Work
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("workspaces").
+	sql, args, err := dialect.From("workspaces").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      workspace.Metadata.ID,
-				"version": workspace.Metadata.Version,
-			},
-		).Returning(workspaceFieldList...).ToSQL()
+		With("workspaces",
+			dialect.Delete("workspaces").
+				Where(
+					goqu.Ex{
+						"id":      workspace.Metadata.ID,
+						"version": workspace.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(w.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
+	if _, err := scanWorkspace(w.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true); err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
@@ -528,20 +539,26 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 	}
 
 	// Update the group_id field in the workspace being migrated.
-	sql, args, err := dialect.Update("workspaces").
+	sql, args, err := dialect.From("workspaces").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"group_id":   newParentID,
-			},
-		).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).Returning(workspaceFieldList...).ToSQL()
+		With("workspaces",
+			dialect.Update("workspaces").
+				Set(
+					goqu.Record{
+						"version":    goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at": timestamp,
+						"group_id":   newParentID,
+					},
+				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
+				Returning("*"),
+		).Select(w.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate SQL to update the migrating workspace's group ID", errors.WithSpan(span))
 	}
 
-	migratedWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), false)
+	migratedWorkspace, err := scanWorkspace(tx.QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -549,16 +566,6 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 		}
 		return nil, errors.Wrap(err, "failed to execute query to update the migrating workspace's group ID", errors.WithSpan(span))
 	}
-
-	namespace, err := getNamespaceByWorkspaceID(ctx, tx, migratedWorkspace.Metadata.ID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get new namespace of migrating workspace", errors.WithSpan(span))
-	}
-	if namespace == nil {
-		return nil, errors.New("failed to get new namespace of migrating workspace", errors.WithSpan(span))
-	}
-
-	migratedWorkspace.FullPath = namespace.path
 
 	// Delete managed identity assignments to the workspace being migrated
 	// if the home group path of the managed identity is no longer a direct ancestor of the workspace.
@@ -669,6 +676,13 @@ func (w *workspaces) getWorkspace(ctx context.Context, exp goqu.Ex) (*models.Wor
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -764,6 +778,10 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 
 	if currentStateVersionID.Valid {
 		ws.CurrentStateVersionID = currentStateVersionID.String
+	}
+
+	if withFullPath {
+		ws.Metadata.TRN = types.WorkspaceModelType.BuildTRN(ws.FullPath)
 	}
 
 	return ws, nil

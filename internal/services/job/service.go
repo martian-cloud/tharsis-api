@@ -11,12 +11,12 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -104,8 +104,9 @@ type Event struct {
 
 // Service implements all job related functionality
 type Service interface {
-	ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error)
-	GetJob(ctx context.Context, jobID string) (*models.Job, error)
+	ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error)
+	GetJobByID(ctx context.Context, jobID string) (*models.Job, error)
+	GetJobByTRN(ctx context.Context, trn string) (*models.Job, error)
 	GetJobsByIDs(ctx context.Context, idList []string) ([]models.Job, error)
 	GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsResult, error)
 	GetLatestJobForRun(ctx context.Context, run *models.Run) (*models.Job, error)
@@ -139,8 +140,8 @@ func NewService(
 	return &service{logger, dbClient, idp, logStreamManager, eventManager, runStateManager}
 }
 
-func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetJob")
+func (s *service) GetJobByID(ctx context.Context, jobID string) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetJobByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -164,7 +165,40 @@ func (s *service) GetJob(ctx context.Context, jobID string) (*models.Job, error)
 		return nil, errors.New("Job with ID %s not found", jobID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return job, nil
+}
+
+func (s *service) GetJobByTRN(ctx context.Context, trn string) (*models.Job, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetJobByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	job, err := s.dbClient.Jobs.GetJobByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "Failed to get job")
+		return nil, errors.Wrap(
+			err,
+			"Failed to get job",
+		)
+	}
+
+	if job == nil {
+		tracing.RecordError(span, nil, "Job with TRN %s not found", trn)
+		return nil, errors.New("Job with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -192,7 +226,7 @@ func (s *service) GetJobsByIDs(ctx context.Context, idList []string) ([]models.J
 
 	// Verify user has access to all returned jobs
 	for _, job := range resp.Jobs {
-		err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -213,7 +247,7 @@ func (s *service) GetJobs(ctx context.Context, input *GetJobsInput) (*db.JobsRes
 	}
 
 	if input.WorkspaceID != nil {
-		rErr := caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
+		rErr := caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(*input.WorkspaceID))
 		if rErr != nil {
 			return nil, rErr
 		}
@@ -282,7 +316,7 @@ func (s *service) GetLatestJobForRun(ctx context.Context, run *models.Run) (*mod
 		return nil, nil
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobsResult.Jobs[0].Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(jobsResult.Jobs[0].Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -301,7 +335,7 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 	}
 
 	if options.WorkspaceID != nil {
-		err := caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(*options.WorkspaceID))
+		err := caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(*options.WorkspaceID))
 		if err != nil {
 			return nil, err
 		}
@@ -400,13 +434,13 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		return nil, err
 	}
 
-	job, err := s.GetJob(ctx, jobID)
+	job, err := s.GetJobByID(ctx, jobID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get job")
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(job.Metadata.ID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -431,7 +465,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		defer innerSpan.End()
 
 		// Query for the job after the subscription is setup to ensure no events are missed
-		job, err := s.GetJob(innerCtx, jobID)
+		job, err := s.GetJobByID(innerCtx, jobID)
 		if err != nil {
 			tracing.RecordError(innerSpan, err, "Error occurred while checking for job cancellation")
 			s.logger.Errorf("Error occurred while checking for job cancellation: %v", err)
@@ -467,7 +501,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 				continue
 			}
 
-			job, err := s.GetJob(innerCtx, event.ID)
+			job, err := s.GetJobByID(innerCtx, event.ID)
 			if err != nil {
 				if errors.IsContextCanceledError(err) {
 					return
@@ -495,7 +529,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 	return outgoing, nil
 }
 
-func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobResponse, error) {
+func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobResponse, error) {
 	ctx, span := tracer.Start(ctx, "svc.ClaimJob")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -506,42 +540,16 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 		return nil, err
 	}
 
-	// Find runner by path
-	pathParts := strings.Split(runnerPath, "/")
-	getRunnerInput := db.GetRunnersInput{
-		Filter: &db.RunnerFilter{
-			RunnerName: ptr.String(pathParts[len(pathParts)-1]),
-		},
-	}
-
-	if len(pathParts) > 1 {
-		groupPath := strings.Join(pathParts[:len(pathParts)-1], "/")
-		group, ggErr := s.dbClient.Groups.GetGroupByFullPath(ctx, groupPath)
-		if ggErr != nil {
-			tracing.RecordError(span, ggErr, "failed to get group by full path")
-			return nil, ggErr
-		}
-		if group == nil {
-			tracing.RecordError(span, nil, "runner not found")
-			return nil, errors.New("runner not found", errors.WithErrorCode(errors.ENotFound))
-		}
-		getRunnerInput.Filter.GroupID = &group.Metadata.ID
-	}
-
-	runnersResp, err := s.dbClient.Runners.GetRunners(ctx, &getRunnerInput)
+	runner, err := s.dbClient.Runners.GetRunnerByID(ctx, runnerID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get runners")
 		return nil, err
 	}
 
-	if len(runnersResp.Runners) == 0 {
-		tracing.RecordError(span, nil, "runner not found")
-		return nil, errors.New("runner not found", errors.WithErrorCode(errors.ENotFound))
+	if runner == nil {
+		return nil, errors.New("runner with id %s not found", errors.WithErrorCode(errors.ENotFound))
 	}
 
-	runner := runnersResp.Runners[0]
-
-	err = caller.RequirePermission(ctx, permissions.ClaimJobPermission, auth.WithRunnerID(runner.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.ClaimJobPermission, auth.WithRunnerID(runner.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -559,7 +567,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 		job.Timestamps.PendingTimestamp = &now
 		job.Status = models.JobPending
 		job.RunnerID = &runner.Metadata.ID
-		job.RunnerPath = &runner.ResourcePath
+		job.RunnerPath = ptr.String(runner.GetResourcePath())
 
 		job, err = s.runStateManager.UpdateJob(ctx, job)
 		if err != nil {
@@ -578,9 +586,9 @@ func (s *service) ClaimJob(ctx context.Context, runnerPath string) (*ClaimJobRes
 				Expiration: &expiration,
 				Subject:    fmt.Sprintf("job-%s", job.Metadata.ID),
 				Claims: map[string]string{
-					"job_id":       gid.ToGlobalID(gid.JobType, job.Metadata.ID),
-					"run_id":       gid.ToGlobalID(gid.RunType, job.RunID),
-					"workspace_id": gid.ToGlobalID(gid.WorkspaceType, job.WorkspaceID),
+					"job_id":       job.GetGlobalID(),
+					"run_id":       gid.ToGlobalID(types.RunModelType, job.RunID),
+					"workspace_id": gid.ToGlobalID(types.WorkspaceModelType, job.WorkspaceID),
 					"type":         auth.JobTokenType,
 				},
 			})
@@ -614,7 +622,7 @@ func (s *service) SubscribeToLogStreamEvents(ctx context.Context, options *LogSt
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID),
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(job.Metadata.ID),
 		auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		return nil, err
@@ -651,7 +659,7 @@ func (s *service) WriteLogs(ctx context.Context, jobID string, startOffset int, 
 		return 0, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateJobPermission, auth.WithJobID(jobID),
+	err = caller.RequirePermission(ctx, models.UpdateJobPermission, auth.WithJobID(jobID),
 		auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		return 0, err
@@ -691,7 +699,7 @@ func (s *service) ReadLogs(ctx context.Context, jobID string, startOffset int, l
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID),
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(jobID),
 		auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		return nil, err
@@ -735,7 +743,7 @@ func (s *service) GetRunnerAvailabilityForJob(ctx context.Context, jobID string)
 			errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(jobID), auth.WithWorkspaceID(job.WorkspaceID))
 	if err != nil {
 		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
 	}
@@ -883,7 +891,7 @@ func (s *service) GetLogStreamsByJobIDs(ctx context.Context, idList []string) ([
 
 	// Verify user has access to all returned jobs
 	for _, job := range resp.Jobs {
-		err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithJobID(job.Metadata.ID),
+		err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithJobID(job.Metadata.ID),
 			auth.WithWorkspaceID(job.WorkspaceID))
 		if err != nil {
 			return nil, err

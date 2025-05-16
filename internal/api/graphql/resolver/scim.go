@@ -19,7 +19,7 @@ func handleSCIMMutationProblem(e error, clientMutationID *string) (*SCIMTokenPay
 }
 
 func createSCIMTokenMutation(ctx context.Context) (*SCIMTokenPayload, error) {
-	tokenBytes, err := getSCIMService(ctx).CreateSCIMToken(ctx)
+	tokenBytes, err := getServiceCatalog(ctx).SCIMService.CreateSCIMToken(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -3,8 +3,12 @@ package models
 import (
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 )
+
+var _ Model = (*NamespaceMembership)(nil)
 
 // MembershipNamespace represents a namespace which can be a group or workspace
 type MembershipNamespace struct {
@@ -34,6 +38,21 @@ type NamespaceMembership struct {
 	Metadata         ResourceMetadata
 }
 
+// GetID returns the Metadata ID.
+func (nm *NamespaceMembership) GetID() string {
+	return nm.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (nm *NamespaceMembership) GetGlobalID() string {
+	return gid.ToGlobalID(nm.GetModelType(), nm.Metadata.ID)
+}
+
+// GetModelType returns the type of the model.
+func (nm *NamespaceMembership) GetModelType() types.ModelType {
+	return types.NamespaceMembershipModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (nm *NamespaceMembership) ResolveMetadata(key string) (string, error) {
 	val, err := nm.Metadata.resolveFieldValue(key)
@@ -47,4 +66,9 @@ func (nm *NamespaceMembership) ResolveMetadata(key string) (string, error) {
 	}
 
 	return val, nil
+}
+
+// Validate performs validation on the NamespaceMembership
+func (nm *NamespaceMembership) Validate() error {
+	return nil
 }

@@ -5,8 +5,12 @@ import (
 	"regexp"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+var _ Model = (*WorkspaceVCSProviderLink)(nil)
 
 // maxPatternLength defines the maximum length a regex or glob pattern can be.
 const maxPatternLength = 30
@@ -44,6 +48,26 @@ type WorkspaceVCSProviderLink struct {
 	Metadata            ResourceMetadata
 	AutoSpeculativePlan bool // Whether to create speculative plans automatically for PRs.
 	WebhookDisabled     bool
+}
+
+// GetID returns the Metadata ID.
+func (wpl *WorkspaceVCSProviderLink) GetID() string {
+	return wpl.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (wpl *WorkspaceVCSProviderLink) GetGlobalID() string {
+	return gid.ToGlobalID(wpl.GetModelType(), wpl.Metadata.ID)
+}
+
+// GetModelType returns the WorkspaceVCSProviderLink model type.
+func (wpl *WorkspaceVCSProviderLink) GetModelType() types.ModelType {
+	return types.WorkspaceVCSProviderLinkModelType
+}
+
+// ResolveMetadata resolves the metadata fields for cursor-based pagination
+func (wpl *WorkspaceVCSProviderLink) ResolveMetadata(key string) (string, error) {
+	return wpl.Metadata.resolveFieldValue(key)
 }
 
 // Validate verifies a VCS Provider link struct.

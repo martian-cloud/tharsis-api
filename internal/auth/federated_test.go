@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -367,7 +367,7 @@ func TestFederatedRegistryCaller_RequirePermission(t *testing.T) {
 	caller := NewFederatedRegistryCaller(mockDBClient, trustPolicies, subject)
 
 	// Execute
-	err := caller.RequirePermission(ctx, permissions.ViewTerraformModulePermission)
+	err := caller.RequirePermission(ctx, models.ViewTerraformModulePermission)
 
 	// Verify
 	require.Error(t, err)
@@ -380,14 +380,14 @@ func TestFederatedRegistryCaller_RequireAccessToInheritableResource(t *testing.T
 
 	testCases := []struct {
 		name               string
-		resourceType       permissions.ResourceType
+		modelType          types.ModelType
 		constraints        []func(*constraints)
 		setupMocks         func(mockGroups *db.MockGroups)
 		expectErrorMessage string
 	}{
 		{
-			name:         "successful access with matching group pattern",
-			resourceType: permissions.TerraformModuleResourceType,
+			name:      "successful access with matching group pattern",
+			modelType: types.TerraformModuleModelType,
 			constraints: []func(*constraints){
 				WithGroupID("group-id"),
 			},
@@ -397,21 +397,21 @@ func TestFederatedRegistryCaller_RequireAccessToInheritableResource(t *testing.T
 			},
 		},
 		{
-			name:         "successful access with namespace paths",
-			resourceType: permissions.TerraformProviderResourceType,
+			name:      "successful access with namespace paths",
+			modelType: types.TerraformProviderModelType,
 			constraints: []func(*constraints){
 				WithNamespacePaths([]string{"group1"}),
 			},
 		},
 		{
 			name:               "unsupported resource type",
-			resourceType:       permissions.WorkspaceResourceType,
+			modelType:          types.WorkspaceModelType,
 			constraints:        []func(*constraints){},
 			expectErrorMessage: "unsupported resource type",
 		},
 		{
-			name:         "no matching group pattern",
-			resourceType: permissions.TerraformModuleResourceType,
+			name:      "no matching group pattern",
+			modelType: types.TerraformModuleModelType,
 			constraints: []func(*constraints){
 				WithGroupID("group-id"),
 			},
@@ -423,7 +423,7 @@ func TestFederatedRegistryCaller_RequireAccessToInheritableResource(t *testing.T
 		},
 		{
 			name:               "missing constraints",
-			resourceType:       permissions.TerraformModuleResourceType,
+			modelType:          types.TerraformModuleModelType,
 			constraints:        []func(*constraints){},
 			expectErrorMessage: "missing required permissions or constraints",
 		},
@@ -458,7 +458,7 @@ func TestFederatedRegistryCaller_RequireAccessToInheritableResource(t *testing.T
 			caller := NewFederatedRegistryCaller(mockDBClient, trustPolicies, subject)
 
 			// Execute
-			err := caller.RequireAccessToInheritableResource(ctx, tc.resourceType, tc.constraints...)
+			err := caller.RequireAccessToInheritableResource(ctx, tc.modelType, tc.constraints...)
 
 			// Verify
 			if tc.expectErrorMessage != "" {

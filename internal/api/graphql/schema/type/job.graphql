@@ -103,7 +103,11 @@ input JobSubscriptionInput {
 
 input ClaimJobInput {
   clientMutationId: String
-  runnerPath: String!
+  runnerPath: String
+    @deprecated(
+      reason: "Use runnerId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  runnerId: String
 }
 
 input SaveJobLogsInput {

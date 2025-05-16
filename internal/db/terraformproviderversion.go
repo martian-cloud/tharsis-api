@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -20,6 +21,7 @@ import (
 // TerraformProviderVersions encapsulates the logic to access terraform provider versions from the database
 type TerraformProviderVersions interface {
 	GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error)
+	GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error)
 	GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error)
 	CreateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
 	UpdateProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) (*models.TerraformProviderVersion, error)
@@ -106,6 +108,31 @@ func (t *terraformProviderVersions) GetProviderVersionByID(ctx context.Context, 
 	return t.getProviderVersion(ctx, goqu.Ex{"terraform_provider_versions.id": id})
 }
 
+func (t *terraformProviderVersions) GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderVersionByTRN")
+	defer span.End()
+
+	path, err := types.TerraformProviderVersionModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 3 {
+		return nil, errors.New("a Terraform Provider version TRN must have group path, provider name and semver separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return t.getProviderVersion(ctx, goqu.Ex{
+		"terraform_provider_versions.provider_sem_version": parts[len(parts)-1],
+		"terraform_providers.name":                         parts[len(parts)-2],
+		"namespaces.path":                                  strings.Join(parts[:len(parts)-2], "/"),
+	})
+}
+
 func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*ProviderVersionsResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetProviderVersions")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -139,7 +166,9 @@ func (t *terraformProviderVersions) GetProviderVersions(ctx context.Context, inp
 	}
 
 	query := dialect.From(goqu.T("terraform_provider_versions")).
-		Select(providerVersionFieldList...).
+		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -207,25 +236,30 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	sql, args, err := dialect.Insert("terraform_provider_versions").
+	sql, args, err := dialect.From("terraform_provider_versions").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                    newResourceID(),
-			"version":               initialResourceVersion,
-			"created_at":            timestamp,
-			"updated_at":            timestamp,
-			"provider_id":           providerVersion.ProviderID,
-			"provider_sem_version":  providerVersion.SemanticVersion,
-			"gpg_key_id":            providerVersion.GPGKeyID,
-			"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
-			"protocols":             protocolsJSON,
-			"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
-			"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
-			"readme_uploaded":       providerVersion.ReadmeUploaded,
-			"created_by":            providerVersion.CreatedBy,
-			"latest":                providerVersion.Latest,
-		}).
-		Returning(providerVersionFieldList...).ToSQL()
+		With("terraform_provider_versions",
+			dialect.Insert("terraform_provider_versions").
+				Rows(goqu.Record{
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"provider_id":           providerVersion.ProviderID,
+					"provider_sem_version":  providerVersion.SemanticVersion,
+					"gpg_key_id":            providerVersion.GPGKeyID,
+					"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
+					"protocols":             protocolsJSON,
+					"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
+					"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
+					"readme_uploaded":       providerVersion.ReadmeUploaded,
+					"created_by":            providerVersion.CreatedBy,
+					"latest":                providerVersion.Latest,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -260,29 +294,34 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 		return nil, err
 	}
 
-	sql, args, err := dialect.Update("terraform_provider_versions").
+	sql, args, err := dialect.From("terraform_provider_versions").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":               goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":            timestamp,
-				"gpg_key_id":            providerVersion.GPGKeyID,
-				"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
-				"protocols":             protocolsJSON,
-				"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
-				"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
-				"readme_uploaded":       providerVersion.ReadmeUploaded,
-				"latest":                providerVersion.Latest,
-			},
-		).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).Returning(providerVersionFieldList...).ToSQL()
-
+		With("terraform_provider_versions",
+			dialect.Update("terraform_provider_versions").
+				Set(
+					goqu.Record{
+						"version":               goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":            timestamp,
+						"gpg_key_id":            providerVersion.GPGKeyID,
+						"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
+						"protocols":             protocolsJSON,
+						"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
+						"sha_sums_sig_uploaded": providerVersion.SHASumsSignatureUploaded,
+						"readme_uploaded":       providerVersion.ReadmeUploaded,
+						"latest":                providerVersion.Latest,
+					},
+				).Where(goqu.Ex{"id": providerVersion.Metadata.ID, "version": providerVersion.Metadata.Version}).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
 	updatedTerraformProviderVersion, err := scanTerraformProviderVersion(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -300,14 +339,21 @@ func (t *terraformProviderVersions) DeleteProviderVersion(ctx context.Context, p
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("terraform_provider_versions").
+	sql, args, err := dialect.From("terraform_provider_versions").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      providerVersion.Metadata.ID,
-				"version": providerVersion.Metadata.Version,
-			},
-		).Returning(providerVersionFieldList...).ToSQL()
+		With("terraform_provider_versions",
+			dialect.Delete("terraform_provider_versions").
+				Where(
+					goqu.Ex{
+						"id":      providerVersion.Metadata.ID,
+						"version": providerVersion.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
+
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -330,6 +376,8 @@ func (t *terraformProviderVersions) getProviderVersion(ctx context.Context, exp 
 	query := dialect.From(goqu.T("terraform_provider_versions")).
 		Prepared(true).
 		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("terraform_providers"), goqu.On(goqu.I("terraform_providers.id").Eq(goqu.I("terraform_provider_versions.provider_id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -342,6 +390,13 @@ func (t *terraformProviderVersions) getProviderVersion(ctx context.Context, exp 
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -354,10 +409,16 @@ func (t *terraformProviderVersions) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("terraform_provider_versions.%s", field))
 	}
 
+	selectFields = append(selectFields,
+		"namespaces.path",
+		"terraform_providers.name",
+	)
+
 	return selectFields
 }
 
 func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion, error) {
+	var groupPath, providerName string
 	providerVersion := &models.TerraformProviderVersion{}
 
 	fields := []interface{}{
@@ -375,12 +436,20 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		&providerVersion.ReadmeUploaded,
 		&providerVersion.Latest,
 		&providerVersion.CreatedBy,
+		&groupPath,
+		&providerName,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
 	}
+
+	providerVersion.Metadata.TRN = types.TerraformProviderVersionModelType.BuildTRN(
+		groupPath,
+		providerName,
+		providerVersion.SemanticVersion,
+	)
 
 	return providerVersion, nil
 }

@@ -14,6 +14,7 @@ import (
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	mtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
@@ -288,7 +289,7 @@ func TestNewFederatedRegistryToken(t *testing.T) {
 			name: "successful token generation",
 			setupMocks: func(mockIdentityProvider *auth.MockIdentityProvider) {
 				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
-					return input.Subject == gid.ToGlobalID(gid.FederatedRegistryType, "registry-id") &&
+					return input.Subject == gid.ToGlobalID(mtypes.FederatedRegistryModelType, "registry-id") &&
 						input.Audience == "test-audience" &&
 						input.Typ == auth.FederatedRegistryTokenType
 				})).Return([]byte("test-token"), nil)
@@ -343,11 +344,11 @@ func TestNewFederatedRegistryToken(t *testing.T) {
 
 func TestGetFederatedRegistries(t *testing.T) {
 	testCases := []struct {
-		name                string
-		setupMocks          func(*db.MockFederatedRegistries, *db.MockGroups)
-		input               *GetFederatedRegistriesInput
-		expectedRegistries  []*models.FederatedRegistry
-		expectErrorMessage  string
+		name               string
+		setupMocks         func(*db.MockFederatedRegistries, *db.MockGroups)
+		input              *GetFederatedRegistriesInput
+		expectedRegistries []*models.FederatedRegistry
+		expectErrorMessage string
 	}{
 		{
 			name: "successful retrieval - single registry",

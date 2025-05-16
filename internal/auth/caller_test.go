@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
 
 func TestSystemCaller_GetSubject(t *testing.T) {
@@ -22,10 +23,10 @@ func TestSystemCaller_GetNamespaceAccessPolicy(t *testing.T) {
 
 func TestSystemCaller_RequirePermissions(t *testing.T) {
 	caller := SystemCaller{}
-	assert.Nil(t, caller.RequirePermission(WithCaller(context.Background(), &caller), permissions.Permission{}, nil))
+	assert.Nil(t, caller.RequirePermission(WithCaller(context.Background(), &caller), models.Permission{}, nil))
 }
 
 func TestSystemCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := SystemCaller{}
-	assert.Nil(t, caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), permissions.RunResourceType, nil))
+	assert.Nil(t, caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunModelType, nil))
 }

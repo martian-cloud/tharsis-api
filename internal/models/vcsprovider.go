@@ -4,7 +4,12 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
+
+var _ Model = (*VCSProvider)(nil)
 
 // VCSProviderType defines the type of version control system (VCS) provider.
 type VCSProviderType string
@@ -22,7 +27,6 @@ type VCSProvider struct {
 	URL                       url.URL
 	Name                      string
 	Description               string
-	ResourcePath              string
 	Type                      VCSProviderType
 	GroupID                   string
 	OAuthClientSecret         string
@@ -32,6 +36,21 @@ type VCSProvider struct {
 	OAuthRefreshToken         *string
 	Metadata                  ResourceMetadata
 	AutoCreateWebhooks        bool
+}
+
+// GetID returns the Metadata ID.
+func (v *VCSProvider) GetID() string {
+	return v.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (v *VCSProvider) GetGlobalID() string {
+	return gid.ToGlobalID(v.GetModelType(), v.Metadata.ID)
+}
+
+// GetModelType returns the model type.
+func (v *VCSProvider) GetModelType() types.ModelType {
+	return types.VCSProviderModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -60,7 +79,13 @@ func (v *VCSProvider) Validate() error {
 	return verifyValidDescription(v.Description)
 }
 
+// GetResourcePath returns the resource path
+func (v *VCSProvider) GetResourcePath() string {
+	return strings.Split(v.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+}
+
 // GetGroupPath returns the group path
 func (v *VCSProvider) GetGroupPath() string {
-	return v.ResourcePath[:strings.LastIndex(v.ResourcePath, "/")]
+	resourcePath := v.GetResourcePath()
+	return resourcePath[:strings.LastIndex(resourcePath, "/")]
 }

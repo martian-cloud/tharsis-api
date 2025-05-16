@@ -11,6 +11,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -19,6 +20,7 @@ import (
 // TerraformProviderVersionMirrors encapsulates the logic to access Terraform provider version mirrors from the DB
 type TerraformProviderVersionMirrors interface {
 	GetVersionMirrorByID(ctx context.Context, id string) (*models.TerraformProviderVersionMirror, error)
+	GetVersionMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersionMirror, error)
 	GetVersionMirrors(ctx context.Context, input *GetProviderVersionMirrorsInput) (*ProviderVersionMirrorsResult, error)
 	CreateVersionMirror(ctx context.Context, versionMirror *models.TerraformProviderVersionMirror) (*models.TerraformProviderVersionMirror, error)
 	DeleteVersionMirror(ctx context.Context, versionMirror *models.TerraformProviderVersionMirror) error
@@ -107,7 +109,35 @@ func (t *terraformProviderVersionMirrors) GetVersionMirrorByID(ctx context.Conte
 	ctx, span := tracer.Start(ctx, "db.GetVersionMirrorByID")
 	defer span.End()
 
-	return t.getVersionMirror(ctx, goqu.Ex{"id": id})
+	return t.getVersionMirror(ctx, goqu.Ex{"terraform_provider_version_mirrors.id": id})
+}
+
+func (t *terraformProviderVersionMirrors) GetVersionMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersionMirror, error) {
+	ctx, span := tracer.Start(ctx, "db.GetVersionMirrorByTRN")
+	defer span.End()
+
+	path, err := types.TerraformProviderVersionMirrorModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 5 {
+		return nil, errors.New("a Terraform provider version TRN must have group path, registry hostname, registry namespace, type and semantic version separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get version mirror by joining parts from TRN path
+	return t.getVersionMirror(ctx, goqu.Ex{
+		"terraform_provider_version_mirrors.semantic_version":   parts[len(parts)-1],
+		"terraform_provider_version_mirrors.type":               parts[len(parts)-2],
+		"terraform_provider_version_mirrors.registry_namespace": parts[len(parts)-3],
+		"terraform_provider_version_mirrors.registry_hostname":  parts[len(parts)-4],
+		"namespaces.path": strings.Join(parts[:len(parts)-4], "/"),
+	})
 }
 
 func (t *terraformProviderVersionMirrors) GetVersionMirrors(ctx context.Context, input *GetProviderVersionMirrorsInput) (*ProviderVersionMirrorsResult, error) {
@@ -208,22 +238,26 @@ func (t *terraformProviderVersionMirrors) CreateVersionMirror(ctx context.Contex
 		return nil, err
 	}
 
-	sql, args, err := dialect.Insert("terraform_provider_version_mirrors").
+	sql, args, err := dialect.From("terraform_provider_version_mirrors").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                 newResourceID(),
-			"version":            initialResourceVersion,
-			"created_at":         timestamp,
-			"updated_at":         timestamp,
-			"created_by":         versionMirror.CreatedBy,
-			"type":               versionMirror.Type,
-			"semantic_version":   versionMirror.SemanticVersion,
-			"registry_namespace": versionMirror.RegistryNamespace,
-			"registry_hostname":  versionMirror.RegistryHostname,
-			"digests":            digests,
-			"group_id":           versionMirror.GroupID,
-		}).
-		Returning(terraformProviderVersionMirrorFieldList...).ToSQL()
+		With("terraform_provider_version_mirrors",
+			dialect.Insert("terraform_provider_version_mirrors").
+				Rows(goqu.Record{
+					"id":                 newResourceID(),
+					"version":            initialResourceVersion,
+					"created_at":         timestamp,
+					"updated_at":         timestamp,
+					"created_by":         versionMirror.CreatedBy,
+					"type":               versionMirror.Type,
+					"semantic_version":   versionMirror.SemanticVersion,
+					"registry_namespace": versionMirror.RegistryNamespace,
+					"registry_hostname":  versionMirror.RegistryHostname,
+					"digests":            digests,
+					"group_id":           versionMirror.GroupID,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -248,14 +282,17 @@ func (t *terraformProviderVersionMirrors) DeleteVersionMirror(ctx context.Contex
 	ctx, span := tracer.Start(ctx, "db.DeleteVersionMirror")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("terraform_provider_version_mirrors").
+	sql, args, err := dialect.From("terraform_provider_version_mirrors").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      versionMirror.Metadata.ID,
-				"version": versionMirror.Metadata.Version,
-			},
-		).Returning(terraformProviderVersionMirrorFieldList...).ToSQL()
+		With("terraform_provider_version_mirrors",
+			dialect.Delete("terraform_provider_version_mirrors").
+				Where(goqu.Ex{
+					"id":      versionMirror.Metadata.ID,
+					"version": versionMirror.Metadata.Version,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -276,7 +313,8 @@ func (t *terraformProviderVersionMirrors) DeleteVersionMirror(ctx context.Contex
 func (t *terraformProviderVersionMirrors) getVersionMirror(ctx context.Context, exp goqu.Ex) (*models.TerraformProviderVersionMirror, error) {
 	query := dialect.From(goqu.T("terraform_provider_version_mirrors")).
 		Prepared(true).
-		Select(terraformProviderVersionMirrorFieldList...).
+		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_provider_version_mirrors.group_id": goqu.I("namespaces.group_id")})).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
@@ -289,6 +327,13 @@ func (t *terraformProviderVersionMirrors) getVersionMirror(ctx context.Context, 
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -301,10 +346,13 @@ func (*terraformProviderVersionMirrors) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("terraform_provider_version_mirrors.%s", field))
 	}
 
+	selectFields = append(selectFields, "namespaces.path")
+
 	return selectFields
 }
 
 func scanVersionMirror(row scanner) (*models.TerraformProviderVersionMirror, error) {
+	var namespacePath string
 	versionMirror := &models.TerraformProviderVersionMirror{}
 
 	fields := []interface{}{
@@ -319,12 +367,21 @@ func scanVersionMirror(row scanner) (*models.TerraformProviderVersionMirror, err
 		&versionMirror.RegistryHostname,
 		&versionMirror.Digests,
 		&versionMirror.GroupID,
+		&namespacePath,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
 	}
+
+	versionMirror.Metadata.TRN = types.TerraformProviderVersionMirrorModelType.BuildTRN(
+		namespacePath,
+		versionMirror.RegistryHostname,
+		versionMirror.RegistryNamespace,
+		versionMirror.Type,
+		versionMirror.SemanticVersion,
+	)
 
 	return versionMirror, nil
 }

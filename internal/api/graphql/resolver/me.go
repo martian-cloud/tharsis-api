@@ -33,7 +33,7 @@ func meQuery(ctx context.Context) (*MeResponseResolver, error) {
 			return nil
 		},
 		func(ctx context.Context, c *auth.ServiceAccountCaller) error {
-			serviceAccount, err := getSAService(ctx).GetServiceAccountByID(ctx, c.ServiceAccountID)
+			serviceAccount, err := getServiceCatalog(ctx).ServiceAccountService.GetServiceAccountByID(ctx, c.ServiceAccountID)
 			if err != nil {
 				return err
 			}

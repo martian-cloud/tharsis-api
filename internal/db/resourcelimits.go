@@ -8,6 +8,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 )
 
@@ -51,6 +52,13 @@ func (t *resourceLimits) GetResourceLimit(ctx context.Context, name string) (*mo
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
@@ -150,6 +158,8 @@ func scanResourceLimit(row scanner) (*models.ResourceLimit, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	resourceLimit.Metadata.TRN = types.ResourceLimitModelType.BuildTRN(resourceLimit.Name)
 
 	return resourceLimit, nil
 }

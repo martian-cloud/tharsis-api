@@ -8,10 +8,9 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/role"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -24,6 +23,7 @@ type RolesConnectionQueryArgs struct {
 }
 
 // RoleQueryArgs are used to query a single role
+// DEPRECATED: use node query instead with a TRN
 type RoleQueryArgs struct {
 	Name string
 }
@@ -60,7 +60,7 @@ type RoleConnectionResolver struct {
 
 // NewRoleConnectionResolver creates a new RoleConnectionResolver
 func NewRoleConnectionResolver(ctx context.Context, input *role.GetRolesInput) (*RoleConnectionResolver, error) {
-	roleService := getRoleService(ctx)
+	roleService := getServiceCatalog(ctx).RoleService
 
 	result, err := roleService.GetRoles(ctx, input)
 	if err != nil {
@@ -128,7 +128,7 @@ type RoleResolver struct {
 
 // ID resolver
 func (r *RoleResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.RoleType, r.role.Metadata.ID))
+	return graphql.ID(r.role.GetGlobalID())
 }
 
 // Name resolver
@@ -163,13 +163,12 @@ func (r *RoleResolver) Permissions() []string {
 }
 
 func availableRolePermissionsQuery(ctx context.Context) ([]string, error) {
-	return getRoleService(ctx).GetAvailablePermissions(ctx)
+	return getServiceCatalog(ctx).RoleService.GetAvailablePermissions(ctx)
 }
 
+// DEPRECATED: use node query instead with a TRN
 func roleQuery(ctx context.Context, args *RoleQueryArgs) (*RoleResolver, error) {
-	roleService := getRoleService(ctx)
-
-	role, err := roleService.GetRoleByName(ctx, args.Name)
+	role, err := getServiceCatalog(ctx).RoleService.GetRoleByTRN(ctx, types.RoleModelType.BuildTRN(args.Name))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -257,9 +256,7 @@ func handleRoleMutationProblem(e error, clientMutationID *string) (*RoleMutation
 }
 
 func createRoleMutation(ctx context.Context, input *CreateRoleInput) (*RoleMutationPayloadResolver, error) {
-	roleService := getRoleService(ctx)
-
-	perms, err := permissions.ParsePermissions(input.Permissions)
+	perms, err := models.ParsePermissions(input.Permissions)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +267,7 @@ func createRoleMutation(ctx context.Context, input *CreateRoleInput) (*RoleMutat
 		Permissions: perms,
 	}
 
-	createdRole, err := roleService.CreateRole(ctx, roleCreateOptions)
+	createdRole, err := getServiceCatalog(ctx).RoleService.CreateRole(ctx, roleCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -280,9 +277,14 @@ func createRoleMutation(ctx context.Context, input *CreateRoleInput) (*RoleMutat
 }
 
 func updateRoleMutation(ctx context.Context, input *UpdateRoleInput) (*RoleMutationPayloadResolver, error) {
-	roleService := getRoleService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	gotRole, err := roleService.GetRoleByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	gotRole, err := serviceCatalog.RoleService.GetRoleByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +304,7 @@ func updateRoleMutation(ctx context.Context, input *UpdateRoleInput) (*RoleMutat
 	}
 
 	if len(input.Permissions) > 0 {
-		perms, pErr := permissions.ParsePermissions(input.Permissions)
+		perms, pErr := models.ParsePermissions(input.Permissions)
 		if pErr != nil {
 			return nil, pErr
 		}
@@ -310,7 +312,7 @@ func updateRoleMutation(ctx context.Context, input *UpdateRoleInput) (*RoleMutat
 		gotRole.SetPermissions(perms)
 	}
 
-	updatedRole, err := roleService.UpdateRole(ctx, &role.UpdateRoleInput{Role: gotRole})
+	updatedRole, err := serviceCatalog.RoleService.UpdateRole(ctx, &role.UpdateRoleInput{Role: gotRole})
 	if err != nil {
 		return nil, err
 	}
@@ -320,9 +322,14 @@ func updateRoleMutation(ctx context.Context, input *UpdateRoleInput) (*RoleMutat
 }
 
 func deleteRoleMutation(ctx context.Context, input *DeleteRoleInput) (*RoleMutationPayloadResolver, error) {
-	roleService := getRoleService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	gotRole, err := roleService.GetRoleByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	gotRole, err := serviceCatalog.RoleService.GetRoleByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +352,7 @@ func deleteRoleMutation(ctx context.Context, input *DeleteRoleInput) (*RoleMutat
 		deleteOptions.Force = *input.Force
 	}
 
-	if err := roleService.DeleteRole(ctx, &deleteOptions); err != nil {
+	if err := serviceCatalog.RoleService.DeleteRole(ctx, &deleteOptions); err != nil {
 		return nil, err
 	}
 
@@ -382,9 +389,7 @@ func loadRole(ctx context.Context, id string) (*models.Role, error) {
 }
 
 func roleBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getRoleService(ctx)
-
-	roles, err := service.GetRolesByIDs(ctx, ids)
+	roles, err := getServiceCatalog(ctx).RoleService.GetRolesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

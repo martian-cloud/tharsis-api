@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -70,7 +71,7 @@ func TestGetRunnerByID(t *testing.T) {
 		{
 			name:      "returns an error because the runner ID is invalid",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -91,53 +92,76 @@ func TestGetRunnerByID(t *testing.T) {
 	}
 }
 
-func TestGetRunnerByPath(t *testing.T) {
-
-	ctx := context.Background()
+func TestGetRunnerByTRN(t *testing.T) {
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupRunners(ctx, testClient, warmupRunners{
-		groups:  standardWarmupGroupsForRunners,
-		runners: standardWarmupRunners,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	sharedRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name: "test-global-runner",
+		Type: models.SharedRunnerType,
+	})
+	require.NoError(t, err)
+
+	groupRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Type:    models.GroupRunnerType,
+		Name:    "test-group-runner",
+		GroupID: &group.Metadata.ID,
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg    *string
-		expectRunner *models.Runner
-		name         string
-		searchPath   string
+		name            string
+		trn             string
+		expectRunner    bool
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:         "get group runner by path",
-			searchPath:   warmupItems.runners[0].ResourcePath,
-			expectRunner: &warmupItems.runners[0],
+			name:         "get group resource by TRN",
+			trn:          groupRunner.Metadata.TRN,
+			expectRunner: true,
 		},
-
 		{
-			name:         "get shared runner by path",
-			searchPath:   "6-runner-shared",
-			expectRunner: &warmupItems.runners[5],
+			name:         "get global resource by TRN",
+			trn:          sharedRunner.Metadata.TRN,
+			expectRunner: true,
 		},
-
 		{
-			name:       "negative, non-existent runner ID",
-			searchPath: "this/path/does/not/exist",
+			name: "resource with TRN not found",
+			trn:  types.RunnerModelType.BuildTRN("unknown"),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualRunner, err := testClient.client.Runners.GetRunnerByPath(ctx, test.searchPath)
+			actualRunner, err := testClient.client.Runners.GetRunnerByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectRunner != nil {
+			require.NoError(t, err)
+
+			if test.expectRunner {
 				require.NotNil(t, actualRunner)
-				assert.Equal(t, test.expectRunner, actualRunner)
+				if actualRunner.Type == models.SharedRunnerType {
+					assert.Equal(t, types.RunnerModelType.BuildTRN(actualRunner.Name), actualRunner.Metadata.TRN)
+				} else {
+					assert.Equal(t, types.RunnerModelType.BuildTRN(group.FullPath, actualRunner.Name), actualRunner.Metadata.TRN)
+				}
 			} else {
 				assert.Nil(t, actualRunner)
 			}
@@ -205,11 +229,10 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
@@ -242,11 +265,10 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
@@ -282,20 +304,18 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
@@ -328,20 +348,18 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
@@ -375,11 +393,10 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
@@ -423,11 +440,10 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group0.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group0.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
@@ -486,29 +502,26 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv1",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv1",
 		})
 		assert.Nil(t, err)
 
 		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-2",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv2",
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-2",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv2",
 		})
 		assert.Nil(t, err)
 
@@ -568,36 +581,32 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		groupRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "group-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/group-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "group-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
 		groupRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "group-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/group-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv1",
+			Type:      models.GroupRunnerType,
+			Name:      "group-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv1",
 		})
 		assert.Nil(t, err)
 
 		sharedRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.SharedRunnerType,
-			Name:         "shared-runner-0",
-			ResourcePath: "shared-runner-0",
-			CreatedBy:    "someone-sv2",
+			Type:      models.SharedRunnerType,
+			Name:      "shared-runner-0",
+			CreatedBy: "someone-sv2",
 		})
 		assert.Nil(t, err)
 
 		sharedRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.SharedRunnerType,
-			Name:         "shared-runner-1",
-			ResourcePath: "shared-runner-1",
-			CreatedBy:    "someone-sv3",
+			Type:      models.SharedRunnerType,
+			Name:      "shared-runner-1",
+			CreatedBy: "someone-sv3",
 		})
 		assert.Nil(t, err)
 
@@ -636,36 +645,32 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		groupRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "group-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/group-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
+			Type:      models.GroupRunnerType,
+			Name:      "group-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
 		})
 		assert.Nil(t, err)
 
 		groupRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "group-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/group-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv1",
+			Type:      models.GroupRunnerType,
+			Name:      "group-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv1",
 		})
 		assert.Nil(t, err)
 
 		sharedRunner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.SharedRunnerType,
-			Name:         "shared-runner-0",
-			ResourcePath: "shared-runner-0",
-			CreatedBy:    "someone-sv2",
+			Type:      models.SharedRunnerType,
+			Name:      "shared-runner-0",
+			CreatedBy: "someone-sv2",
 		})
 		assert.Nil(t, err)
 
 		sharedRunner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.SharedRunnerType,
-			Name:         "shared-runner-1",
-			ResourcePath: "shared-runner-1",
-			CreatedBy:    "someone-sv3",
+			Type:      models.SharedRunnerType,
+			Name:      "shared-runner-1",
+			CreatedBy: "someone-sv3",
 		})
 		assert.Nil(t, err)
 
@@ -706,7 +711,6 @@ func TestGetRunners(t *testing.T) {
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.GroupRunnerType,
 			Name:            "1-runner-0",
-			ResourcePath:    "top-level-group-0-for-runners/1-runner-0",
 			GroupID:         &group.Metadata.ID,
 			CreatedBy:       "someone-sv0",
 			RunUntaggedJobs: true,
@@ -716,7 +720,6 @@ func TestGetRunners(t *testing.T) {
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.GroupRunnerType,
 			Name:            "1-runner-1",
-			ResourcePath:    "top-level-group-0-for-runners/1-runner-1",
 			GroupID:         &group.Metadata.ID,
 			CreatedBy:       "someone-sv1",
 			RunUntaggedJobs: false,
@@ -758,7 +761,6 @@ func TestGetRunners(t *testing.T) {
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.GroupRunnerType,
 			Name:            "1-runner-0",
-			ResourcePath:    "top-level-group-0-for-runners/1-runner-0",
 			GroupID:         &group.Metadata.ID,
 			CreatedBy:       "someone-sv0",
 			RunUntaggedJobs: true,
@@ -768,7 +770,6 @@ func TestGetRunners(t *testing.T) {
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.GroupRunnerType,
 			Name:            "1-runner-1",
-			ResourcePath:    "top-level-group-0-for-runners/1-runner-1",
 			GroupID:         &group.Metadata.ID,
 			CreatedBy:       "someone-sv1",
 			RunUntaggedJobs: false,
@@ -808,42 +809,38 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
-			Tags:         []string{},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
+			Tags:      []string{},
 		})
 		assert.Nil(t, err)
 
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv1",
-			Tags:         []string{"tag1"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv1",
+			Tags:      []string{"tag1"},
 		})
 		assert.Nil(t, err)
 
 		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-2",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv2",
-			Tags:         []string{"tag1", "tag2"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-2",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv2",
+			Tags:      []string{"tag1", "tag2"},
 		})
 		assert.Nil(t, err)
 
 		runner3, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-3",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-3",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv3",
-			Tags:         []string{"tag1", "tag2", "tag3"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-3",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv3",
+			Tags:      []string{"tag1", "tag2", "tag3"},
 		})
 		assert.Nil(t, err)
 
@@ -885,42 +882,38 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
-			Tags:         []string{},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
+			Tags:      []string{},
 		})
 		assert.Nil(t, err)
 
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv1",
-			Tags:         []string{"tag1"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv1",
+			Tags:      []string{"tag1"},
 		})
 		assert.Nil(t, err)
 
 		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-2",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv2",
-			Tags:         []string{"tag1", "tag2"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-2",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv2",
+			Tags:      []string{"tag1", "tag2"},
 		})
 		assert.Nil(t, err)
 
 		runner3, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-3",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-3",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv3",
-			Tags:         []string{"tag1", "tag2", "tag3"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-3",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv3",
+			Tags:      []string{"tag1", "tag2", "tag3"},
 		})
 		assert.Nil(t, err)
 
@@ -961,42 +954,38 @@ func TestGetRunners(t *testing.T) {
 		assert.Nil(t, err)
 
 		runner0, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-0",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv0",
-			Tags:         []string{},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-0",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv0",
+			Tags:      []string{},
 		})
 		assert.Nil(t, err)
 
 		runner1, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-1",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-1",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv1",
-			Tags:         []string{"tag1"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-1",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv1",
+			Tags:      []string{"tag1"},
 		})
 		assert.Nil(t, err)
 
 		runner2, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-2",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-2",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv2",
-			Tags:         []string{"tag1", "tag2"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-2",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv2",
+			Tags:      []string{"tag1", "tag2"},
 		})
 		assert.Nil(t, err)
 
 		runner3, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
-			Type:         models.GroupRunnerType,
-			Name:         "1-runner-3",
-			ResourcePath: "top-level-group-0-for-runners/1-runner-3",
-			GroupID:      &group.Metadata.ID,
-			CreatedBy:    "someone-sv3",
-			Tags:         []string{"tag1", "tag2", "tag3"},
+			Type:      models.GroupRunnerType,
+			Name:      "1-runner-3",
+			GroupID:   &group.Metadata.ID,
+			CreatedBy: "someone-sv3",
+			Tags:      []string{"tag1", "tag2", "tag3"},
 		})
 		assert.Nil(t, err)
 
@@ -1059,10 +1048,10 @@ func TestCreateRunner(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.RunnerModelType.BuildTRN(warmupItems.groups[0].FullPath, "runner-create-test"),
 				},
 				Type:            models.GroupRunnerType,
 				Name:            "runner-create-test",
-				ResourcePath:    warmupItems.groups[0].FullPath + "/runner-create-test",
 				GroupID:         &warmupItems.groups[0].Metadata.ID,
 				CreatedBy:       "TestCreateRunner",
 				Tags:            []string{"tag1", "tag2"},
@@ -1081,21 +1070,20 @@ func TestCreateRunner(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.RunnerModelType.BuildTRN("runner-create-test"),
 				},
-				Type:         models.SharedRunnerType,
-				Name:         "runner-create-test",
-				ResourcePath: "runner-create-test",
-				CreatedBy:    "TestCreateRunner",
+				Type:      models.SharedRunnerType,
+				Name:      "runner-create-test",
+				CreatedBy: "TestCreateRunner",
 			},
 		},
 
 		{
 			name: "duplicate group ID and runner name",
 			toCreate: &models.Runner{
-				Type:         models.GroupRunnerType,
-				Name:         "runner-create-test",
-				ResourcePath: warmupItems.groups[0].FullPath + "/runner-create-test",
-				GroupID:      &warmupItems.groups[0].Metadata.ID,
+				Type:    models.GroupRunnerType,
+				Name:    "runner-create-test",
+				GroupID: &warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("runner with name runner-create-test already exists in group"),
 		},
@@ -1103,10 +1091,9 @@ func TestCreateRunner(t *testing.T) {
 		{
 			name: "negative, non-existent group ID",
 			toCreate: &models.Runner{
-				Type:         models.GroupRunnerType,
-				Name:         "runner-create-test-non-existent-group-id",
-				ResourcePath: warmupItems.groups[0].FullPath + "/runner-create-test-non-existent-group-id",
-				GroupID:      ptr.String(nonExistentID),
+				Type:    models.GroupRunnerType,
+				Name:    "runner-create-test-non-existent-group-id",
+				GroupID: ptr.String(nonExistentID),
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"runners\" violates foreign key constraint \"fk_group_id\" (SQLSTATE 23503)"),
 		},
@@ -1114,10 +1101,9 @@ func TestCreateRunner(t *testing.T) {
 		{
 			name: "negative, invalid group ID",
 			toCreate: &models.Runner{
-				Type:         models.GroupRunnerType,
-				Name:         "runner-create-test-invalid-group-id",
-				ResourcePath: warmupItems.groups[0].FullPath + "/runner-create-test-invalid-group-id",
-				GroupID:      ptr.String(invalidID),
+				Type:    models.GroupRunnerType,
+				Name:    "runner-create-test-invalid-group-id",
+				GroupID: ptr.String(invalidID),
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -1198,11 +1184,11 @@ func TestUpdateRunner(t *testing.T) {
 					Version:              initialResourceVersion + 1,
 					CreationTimestamp:    positiveRunner.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
+					TRN:                  types.RunnerModelType.BuildTRN(positiveGroup.FullPath, positiveRunner.Name),
 				},
 				Type:            models.GroupRunnerType,
 				Name:            positiveRunner.Name,
 				Description:     "Updated description",
-				ResourcePath:    positiveRunner.ResourcePath,
 				GroupID:         positiveRunner.GroupID,
 				CreatedBy:       positiveRunner.CreatedBy,
 				Tags:            []string{"tag1", "tag2"},
@@ -1389,45 +1375,39 @@ var standardWarmupGroupsForRunners = []models.Group{
 var standardWarmupRunners = []models.Runner{
 	{
 		// This one is public.
-		Type:         models.GroupRunnerType,
-		Name:         "1-runner-0",
-		ResourcePath: "top-level-group-0-for-runners/1-runner-0",
-		GroupID:      ptr.String("top-level-group-0-for-runners/nested-group-9-for-runners"),
-		CreatedBy:    "someone-sv0",
+		Type:      models.GroupRunnerType,
+		Name:      "1-runner-0",
+		GroupID:   ptr.String("top-level-group-0-for-runners/nested-group-9-for-runners"),
+		CreatedBy: "someone-sv0",
 	},
 	{
-		Type:         models.GroupRunnerType,
-		Name:         "1-runner-1",
-		ResourcePath: "top-level-group-1-for-runners/1-runner-1",
-		GroupID:      ptr.String("top-level-group-1-for-runners"),
-		CreatedBy:    "someone-sv1",
+		Type:      models.GroupRunnerType,
+		Name:      "1-runner-1",
+		GroupID:   ptr.String("top-level-group-1-for-runners"),
+		CreatedBy: "someone-sv1",
 	},
 	{
-		Type:         models.GroupRunnerType,
-		Name:         "2-runner-2",
-		ResourcePath: "top-level-group-2-for-runners/2-runner-2",
-		GroupID:      ptr.String("top-level-group-2-for-runners/nested-group-7-for-runners"),
-		CreatedBy:    "someone-sv2",
+		Type:      models.GroupRunnerType,
+		Name:      "2-runner-2",
+		GroupID:   ptr.String("top-level-group-2-for-runners/nested-group-7-for-runners"),
+		CreatedBy: "someone-sv2",
 	},
 	{
-		Type:         models.GroupRunnerType,
-		Name:         "2-runner-3",
-		ResourcePath: "top-level-group-3-for-runners/2-runner-3",
-		GroupID:      ptr.String("top-level-group-3-for-runners"),
-		CreatedBy:    "someone-sv3",
+		Type:      models.GroupRunnerType,
+		Name:      "2-runner-3",
+		GroupID:   ptr.String("top-level-group-3-for-runners"),
+		CreatedBy: "someone-sv3",
 	},
 	{
-		Type:         models.GroupRunnerType,
-		Name:         "5-runner-4",
-		ResourcePath: "top-level-group-4-for-runners/5-runner-4",
-		GroupID:      ptr.String("top-level-group-4-for-runners/nested-group-5-for-runners"),
-		CreatedBy:    "someone-sv4",
+		Type:      models.GroupRunnerType,
+		Name:      "5-runner-4",
+		GroupID:   ptr.String("top-level-group-4-for-runners/nested-group-5-for-runners"),
+		CreatedBy: "someone-sv4",
 	},
 	{
-		Type:         models.SharedRunnerType,
-		Name:         "6-runner-shared",
-		ResourcePath: "6-runner-shared",
-		CreatedBy:    "someone-sv4",
+		Type:      models.SharedRunnerType,
+		Name:      "6-runner-shared",
+		CreatedBy: "someone-sv4",
 	},
 }
 
@@ -1515,7 +1495,6 @@ func compareRunners(t *testing.T, expected, actual *models.Runner,
 	checkID bool, times *timeBounds) {
 
 	assert.Equal(t, expected.Name, actual.Name)
-	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Type, actual.Type)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
 	assert.Equal(t, expected.Description, actual.Description)
@@ -1526,6 +1505,7 @@ func compareRunners(t *testing.T, expected, actual *models.Runner,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {
@@ -1561,7 +1541,7 @@ func createInitialRunners(ctx context.Context, testClient *testClient,
 		}
 
 		result = append(result, *created)
-		resourcePath2ID[created.ResourcePath] = created.Metadata.ID
+		resourcePath2ID[created.GetResourcePath()] = created.Metadata.ID
 	}
 
 	return result, resourcePath2ID, nil

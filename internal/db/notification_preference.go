@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -19,7 +20,6 @@ import (
 
 // NotificationPreferences encapsulates the logic to access preferences from the database
 type NotificationPreferences interface {
-	GetNotificationPreferenceByID(ctx context.Context, id string) (*models.NotificationPreference, error)
 	GetNotificationPreferences(ctx context.Context, input *GetNotificationPreferencesInput) (*NotificationPreferencesResult, error)
 	UpdateNotificationPreference(ctx context.Context, preference *models.NotificationPreference) (*models.NotificationPreference, error)
 	CreateNotificationPreference(ctx context.Context, preference *models.NotificationPreference) (*models.NotificationPreference, error)
@@ -88,13 +88,6 @@ var notificationPreferenceFieldList = append(metadataFieldList, "user_id", "scop
 // NewNotificationPreferences returns an instance of the NotificationPreferences interface
 func NewNotificationPreferences(dbClient *Client) NotificationPreferences {
 	return &notificationPreferences{dbClient: dbClient}
-}
-
-func (np *notificationPreferences) GetNotificationPreferenceByID(ctx context.Context, id string) (*models.NotificationPreference, error) {
-	ctx, span := tracer.Start(ctx, "db.GetNotificationPreferenceByID")
-	defer span.End()
-
-	return np.getNotificationPreference(ctx, goqu.Ex{"notification_preferences.id": id})
 }
 
 func (np *notificationPreferences) GetNotificationPreferences(ctx context.Context, input *GetNotificationPreferencesInput) (*NotificationPreferencesResult, error) {
@@ -351,42 +344,6 @@ func (np *notificationPreferences) DeleteNotificationPreference(ctx context.Cont
 	return nil
 }
 
-func (np *notificationPreferences) getNotificationPreference(ctx context.Context, exp goqu.Ex) (*models.NotificationPreference, error) {
-	ctx, span := tracer.Start(ctx, "db.getNotificationPreference")
-	defer span.End()
-
-	query := dialect.From(goqu.T("notification_preferences")).
-		Prepared(true).
-		Select(np.getSelectFields()...).
-		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"notification_preferences.namespace_id": goqu.I("namespaces.id")})).
-		Where(exp)
-
-	sql, args, err := query.ToSQL()
-	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
-	}
-
-	preference, err := scanNotificationPreference(np.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-
-		if pgErr := asPgError(err); pgErr != nil {
-			if isInvalidIDViolation(pgErr) {
-				return nil, errors.Wrap(pgErr, "invalid ID; %s", pgErr.Message, errors.WithSpan(span), errors.WithErrorCode(errors.EInvalid))
-			}
-		}
-
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	return preference, nil
-}
-
 func (np *notificationPreferences) getSelectFields() []interface{} {
 	selectFields := []interface{}{}
 
@@ -417,6 +374,12 @@ func scanNotificationPreference(row scanner) (*models.NotificationPreference, er
 
 	if err != nil {
 		return nil, err
+	}
+
+	if preference.NamespacePath != nil {
+		preference.Metadata.TRN = types.NotificationPreferenceModelType.BuildTRN(*preference.NamespacePath, preference.GetGlobalID())
+	} else {
+		preference.Metadata.TRN = types.NotificationPreferenceModelType.BuildTRN(preference.GetGlobalID())
 	}
 
 	return preference, nil

@@ -68,7 +68,11 @@ type TerraformModule implements Node {
 
 input CreateTerraformModuleInput {
   clientMutationId: String
-  groupPath: String!
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  groupId: String
   name: String!
   system: String!
   private: Boolean

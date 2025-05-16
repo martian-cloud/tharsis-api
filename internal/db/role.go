@@ -11,8 +11,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -21,6 +21,7 @@ import (
 // Roles encapsulates the logic to access Tharsis roles from the database.
 type Roles interface {
 	GetRoleByName(ctx context.Context, name string) (*models.Role, error)
+	GetRoleByTRN(ctx context.Context, trn string) (*models.Role, error)
 	GetRoleByID(ctx context.Context, id string) (*models.Role, error)
 	GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResult, error)
 	CreateRole(ctx context.Context, role *models.Role) (*models.Role, error)
@@ -104,6 +105,19 @@ func (r *roles) GetRoleByName(ctx context.Context, name string) (*models.Role, e
 	defer span.End()
 
 	return r.getRole(ctx, goqu.Ex{"roles.name": name})
+}
+
+func (r *roles) GetRoleByTRN(ctx context.Context, trn string) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRoleByTRN")
+	defer span.End()
+
+	path, err := types.RoleModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to parse TRN")
+		return nil, err
+	}
+
+	return r.getRole(ctx, goqu.Ex{"roles.name": path})
 }
 
 func (r *roles) GetRoles(ctx context.Context, input *GetRolesInput) (*RolesResult, error) {
@@ -297,7 +311,7 @@ func (r *roles) DeleteRole(ctx context.Context, role *models.Role) error {
 	return nil
 }
 
-func (r *roles) marshalPermissions(input []permissions.Permission) ([]byte, error) {
+func (r *roles) marshalPermissions(input []models.Permission) ([]byte, error) {
 	permissionsJSON, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal role permissions to JSON: %w", err)
@@ -308,7 +322,6 @@ func (r *roles) marshalPermissions(input []permissions.Permission) ([]byte, erro
 
 func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 	ctx, span := tracer.Start(ctx, "db.getRole")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	sql, args, err := dialect.From("roles").
@@ -318,8 +331,7 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 		ToSQL()
 
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	role, err := scanRole(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -328,8 +340,14 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return role, nil
@@ -337,7 +355,7 @@ func (r *roles) getRole(ctx context.Context, exp exp.Ex) (*models.Role, error) {
 
 func scanRole(row scanner) (*models.Role, error) {
 	r := &models.Role{}
-	perms := []permissions.Permission{}
+	perms := []models.Permission{}
 
 	fields := []interface{}{
 		&r.Metadata.ID,
@@ -355,6 +373,7 @@ func scanRole(row scanner) (*models.Role, error) {
 	}
 
 	r.SetPermissions(perms)
+	r.Metadata.TRN = types.RoleModelType.BuildTRN(r.Name)
 
 	return r, nil
 }

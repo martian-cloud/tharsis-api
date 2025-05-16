@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
-	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -24,8 +25,8 @@ import (
 type Groups interface {
 	// GetGroupByID returns a group by ID
 	GetGroupByID(ctx context.Context, id string) (*models.Group, error)
-	// GetGroupByFullPath returns a group by full path
-	GetGroupByFullPath(ctx context.Context, path string) (*models.Group, error)
+	// GetGroupByTRN returns a group by trn
+	GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error)
 	// DeleteGroup deletes a group
 	DeleteGroup(ctx context.Context, group *models.Group) error
 	// GetGroups returns a list of groups
@@ -127,10 +128,15 @@ func (g *groups) GetGroupByID(ctx context.Context, id string) (*models.Group, er
 	return g.getGroup(ctx, goqu.Ex{"groups.id": id})
 }
 
-func (g *groups) GetGroupByFullPath(ctx context.Context, path string) (*models.Group, error) {
-	ctx, span := tracer.Start(ctx, "db.GetGroupByFullPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (g *groups) GetGroupByTRN(ctx context.Context, trn string) (*models.Group, error) {
+	ctx, span := tracer.Start(ctx, "db.GetGroupByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
 	defer span.End()
+
+	path, err := types.GroupModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
 
 	return g.getGroup(ctx, goqu.Ex{"namespaces.path": path})
 }
@@ -345,6 +351,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	}
 
 	createdGroup.FullPath = fullPath
+	createdGroup.Metadata.TRN = types.GroupModelType.BuildTRN(fullPath)
 
 	return createdGroup, nil
 }
@@ -365,23 +372,29 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("groups").
+	sql, args, err := dialect.From("groups").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":                 goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":              timestamp,
-				"description":             nullableString(group.Description),
-				"runner_tags":             runnerTags,
-				"drift_detection_enabled": group.EnableDriftDetection,
-			},
-		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
+		With("groups",
+			dialect.Update("groups").
+				Set(
+					goqu.Record{
+						"version":                 goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":              timestamp,
+						"description":             nullableString(group.Description),
+						"runner_tags":             runnerTags,
+						"drift_detection_enabled": group.EnableDriftDetection,
+					},
+				).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).
+				Returning("*"),
+		).Select(g.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
+	updatedGroup, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -390,14 +403,6 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
-
-	namespace, err := getNamespaceByGroupID(ctx, g.dbClient.getConnection(ctx), updatedGroup.Metadata.ID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	updatedGroup.FullPath = namespace.path
 
 	return updatedGroup, nil
 }
@@ -486,22 +491,28 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	}
 
 	// Update the parent_id field in the group being migrated.
-	sql, args, err := dialect.Update("groups").
+	sql, args, err := dialect.From("groups").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"parent_id":  nullableString(newParentID),
-			},
-		).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).Returning(groupFieldList...).ToSQL()
+		With("groups",
+			dialect.Update("groups").
+				Set(
+					goqu.Record{
+						"version":    goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at": timestamp,
+						"parent_id":  nullableString(newParentID),
+					},
+				).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).
+				Returning("*"),
+		).Select(g.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err,
 			"failed to generate SQL to update the migrating group's parent ID")
 		return nil, fmt.Errorf("failed to generate SQL to update the migrating group's parent ID: %v", err)
 	}
 
-	migratedGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), false)
+	migratedGroup, err := scanGroup(tx.QueryRow(ctx, sql, args...), true)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -511,18 +522,6 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 			"failed to execute query to update the migrating group's parent ID")
 		return nil, fmt.Errorf("failed to execute query to update the migrating group's parent ID: %v", err)
 	}
-
-	namespace, err := getNamespaceByGroupID(ctx, tx, migratedGroup.Metadata.ID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get new namespace of migrating group")
-		return nil, fmt.Errorf("failed to get new namespace of migrating group: %v", err)
-	}
-	if namespace == nil {
-		tracing.RecordError(span, nil, "failed to get new namespace of migrating group")
-		return nil, fmt.Errorf("failed to get new namespace of migrating group")
-	}
-
-	migratedGroup.FullPath = namespace.path
 
 	// Delete managed identity assignments to a workspace
 	// where the workspace is in the tree being migrated
@@ -823,20 +822,25 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("groups").
+	sql, args, err := dialect.From("groups").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      group.Metadata.ID,
-				"version": group.Metadata.Version,
-			},
-		).Returning(groupFieldList...).ToSQL()
+		With("groups",
+			dialect.Delete("groups").
+				Where(
+					goqu.Ex{
+						"id":      group.Metadata.ID,
+						"version": group.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(g.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
+	if _, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true); err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isForeignKeyViolation(pgErr) && pgErr.ConstraintName == "fk_parent_id" {
 				tracing.RecordError(span, nil,
@@ -857,15 +861,19 @@ func (g *groups) DeleteGroup(ctx context.Context, group *models.Group) error {
 	return nil
 }
 
-func (g *groups) getGroup(ctx context.Context, exp exp.Expression) (*models.Group, error) {
+func (g *groups) getGroup(ctx context.Context, exp goqu.Ex) (*models.Group, error) {
+	ctx, span := tracer.Start(ctx, "db.getGroup")
+	defer span.End()
+
 	query := dialect.From(goqu.T("groups")).
 		Prepared(true).
 		Select(g.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).Where(exp)
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
+		Where(exp)
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	group, err := scanGroup(g.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
@@ -873,7 +881,14 @@ func (g *groups) getGroup(ctx context.Context, exp exp.Expression) (*models.Grou
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return group, nil
@@ -925,6 +940,10 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 
 	if description.Valid {
 		group.Description = description.String
+	}
+
+	if withFullPath {
+		group.Metadata.TRN = types.GroupModelType.BuildTRN(group.FullPath)
 	}
 
 	return group, nil

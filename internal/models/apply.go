@@ -1,6 +1,12 @@
 package models
 
-import "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+import (
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
+var _ Model = (*Apply)(nil)
 
 // ApplyStatus represents the various states for a Apply resource
 type ApplyStatus string
@@ -24,6 +30,21 @@ type Apply struct {
 	Comment      string
 	Metadata     ResourceMetadata
 	ErrorMessage *string
+}
+
+// GetID returns the ID of the Apply resource
+func (a *Apply) GetID() string {
+	return a.Metadata.ID
+}
+
+// GetGlobalID returns the GID of the Apply resource
+func (a *Apply) GetGlobalID() string {
+	return gid.ToGlobalID(a.GetModelType(), a.Metadata.ID)
+}
+
+// GetModelType returns the Model's type
+func (a *Apply) GetModelType() types.ModelType {
+	return types.ApplyModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination

@@ -427,7 +427,7 @@ func TharsisUserToSCIMUser(user *models.User) *SCIMUser {
 			UserSchemaURI,
 			UserEnterpriseSchemaURI,
 		},
-		ID:         gid.ToGlobalID(gid.UserType, user.Metadata.ID),
+		ID:         user.GetGlobalID(),
 		ExternalID: user.SCIMExternalID,
 		Metadata: SCIMMetadata{
 			CreatedAt:    user.Metadata.CreationTimestamp,
@@ -455,7 +455,7 @@ func TharsisTeamToSCIMGroup(team *models.Team) *SCIMGroup {
 			LastModified: team.Metadata.LastUpdatedTimestamp,
 		},
 		SchemaURIs:  []SCIMSchemaURI{GroupSchemaURI},
-		ID:          gid.ToGlobalID(gid.TeamType, team.Metadata.ID),
+		ID:          team.GetGlobalID(),
 		DisplayName: team.Name,
 		ExternalID:  team.SCIMExternalID,
 	}

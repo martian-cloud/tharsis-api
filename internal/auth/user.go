@@ -9,10 +9,10 @@ import (
 
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -89,13 +89,13 @@ func (u *UserCaller) GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAc
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
-func (u *UserCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+func (u *UserCaller) RequirePermission(ctx context.Context, perm models.Permission, checks ...func(*constraints)) error {
 	inMaintenance, err := u.maintenanceMonitor.InMaintenanceMode(ctx)
 	if err != nil {
 		return err
 	}
 
-	if inMaintenance && perm.Action != permissions.ViewAction && perm.Action != permissions.ViewValueAction {
+	if inMaintenance && perm.Action != models.ViewAction && perm.Action != models.ViewValueAction {
 		// Server is in maintenance mode, only allow view permissions
 		return errInMaintenanceMode
 	}
@@ -110,22 +110,22 @@ func (u *UserCaller) RequirePermission(ctx context.Context, perm permissions.Per
 	}
 
 	// Lastly, check the authorizer.
-	return u.authorizer.RequireAccess(ctx, []permissions.Permission{perm}, checks...)
+	return u.authorizer.RequireAccess(ctx, []models.Permission{perm}, checks...)
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
-func (u *UserCaller) RequireAccessToInheritableResource(ctx context.Context, resourceType permissions.ResourceType, checks ...func(*constraints)) error {
-	perm := permissions.Permission{Action: permissions.ViewAction, ResourceType: resourceType}
+func (u *UserCaller) RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error {
+	perm := models.Permission{Action: models.ViewAction, ResourceType: modelType.Name()}
 	if perm.IsAssignable() && u.User.Admin {
 		// User is an admin, so assignable permission can be granted.
 		return nil
 	}
 
-	return u.authorizer.RequireAccessToInheritableResource(ctx, []permissions.ResourceType{resourceType}, checks...)
+	return u.authorizer.RequireAccessToInheritableResource(ctx, []types.ModelType{modelType}, checks...)
 }
 
 // requireTeamUpdateAccess will return an error if the specified access is not allowed to the indicated team.
-func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.teamID == nil {
 		return errMissingConstraints
 	}
@@ -148,7 +148,7 @@ func (u *UserCaller) requireTeamUpdateAccess(ctx context.Context, _ *permissions
 	return u.UnauthorizedError(ctx, true)
 }
 
-func (u *UserCaller) requireAdmin(ctx context.Context, _ *permissions.Permission, _ *constraints) error {
+func (u *UserCaller) requireAdmin(ctx context.Context, _ *models.Permission, _ *constraints) error {
 	if u.User.Admin {
 		return nil
 	}
@@ -157,14 +157,14 @@ func (u *UserCaller) requireAdmin(ctx context.Context, _ *permissions.Permission
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
-func (u *UserCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
-	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.CreateTeamPermission: u.requireAdmin,
-		permissions.DeleteTeamPermission: u.requireAdmin,
-		permissions.CreateUserPermission: u.requireAdmin,
-		permissions.UpdateUserPermission: u.requireAdmin,
-		permissions.DeleteUserPermission: u.requireAdmin,
-		permissions.UpdateTeamPermission: u.requireTeamUpdateAccess,
+func (u *UserCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[models.Permission]permissionTypeHandler{
+		models.CreateTeamPermission: u.requireAdmin,
+		models.DeleteTeamPermission: u.requireAdmin,
+		models.CreateUserPermission: u.requireAdmin,
+		models.UpdateUserPermission: u.requireAdmin,
+		models.DeleteUserPermission: u.requireAdmin,
+		models.UpdateTeamPermission: u.requireTeamUpdateAccess,
 	}
 
 	handler, ok := handlerMap[perm]

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -80,6 +81,78 @@ func TestGetWorkspaceAssessmentByID(t *testing.T) {
 				assert.Equal(t, test.id, workspaceAssessment.Metadata.ID)
 			} else {
 				assert.Nil(t, workspaceAssessment)
+			}
+		})
+	}
+}
+
+func TestGetWorkspaceAssessmentByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	workspaceAssessment, err := testClient.client.WorkspaceAssessments.CreateWorkspaceAssessment(ctx, &models.WorkspaceAssessment{
+		WorkspaceID: workspace.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name                      string
+		trn                       string
+		expectWorkspaceAssessment bool
+		expectErrorCode           errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:                      "get resource by TRN",
+			trn:                       workspaceAssessment.Metadata.TRN,
+			expectWorkspaceAssessment: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.WorkspaceAssessmentModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+		},
+		{
+			name:            "assessment TRN cannot have less than two parts",
+			trn:             types.WorkspaceAssessmentModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualWorkspaceAssessment, err := testClient.client.WorkspaceAssessments.GetWorkspaceAssessmentByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectWorkspaceAssessment {
+				require.NotNil(t, actualWorkspaceAssessment)
+				assert.Equal(t, types.WorkspaceAssessmentModelType.BuildTRN(workspace.FullPath, workspaceAssessment.GetGlobalID()), actualWorkspaceAssessment.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualWorkspaceAssessment)
 			}
 		})
 	}

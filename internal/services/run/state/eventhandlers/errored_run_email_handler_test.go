@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -26,7 +27,7 @@ func TestInternalHandleErroredRunEvent(t *testing.T) {
 	planErrorMessage := "synthetic plan error message"
 	applyErrorMessage := "synthetic apply error message"
 	internalRunID := "run-id"
-	globalRunID := gid.NewGlobalID(gid.RunType, internalRunID).String() // "Ul9ydW4taWQ"
+	globalRunID := gid.NewGlobalID(types.RunModelType, internalRunID).String() // "Ul9ydW4taWQ"
 
 	workspace := &models.Workspace{
 		Metadata: models.ResourceMetadata{
@@ -276,7 +277,7 @@ func TestInternalHandleErroredRunEvent(t *testing.T) {
 				applyStatus = models.ApplyErrored
 				thisApplyMsg = &applyErrorMessage
 			}
-			mockApplies.On("GetApply", mock.Anything, test.run.ApplyID).
+			mockApplies.On("GetApplyByID", mock.Anything, test.run.ApplyID).
 				Return(&models.Apply{
 					Metadata: models.ResourceMetadata{
 						ID: test.run.ApplyID,
@@ -291,7 +292,7 @@ func TestInternalHandleErroredRunEvent(t *testing.T) {
 				planStatus = models.PlanErrored
 				thisPlanMsg = &planErrorMessage
 			}
-			mockPlans.On("GetPlan", mock.Anything, test.run.PlanID).
+			mockPlans.On("GetPlanByID", mock.Anything, test.run.PlanID).
 				Return(&models.Plan{
 					Metadata: models.ResourceMetadata{
 						ID: test.run.PlanID,

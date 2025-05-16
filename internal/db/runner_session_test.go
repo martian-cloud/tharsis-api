@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -67,6 +68,102 @@ func TestGetRunnerSessionByID(t *testing.T) {
 				assert.Equal(t, test.id, runnerSession.Metadata.ID)
 			} else {
 				assert.Nil(t, runnerSession)
+			}
+		})
+	}
+}
+
+func TestGetRunnerSessionByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	groupRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name:    "test-group-runner",
+		GroupID: &group.Metadata.ID,
+		Type:    models.GroupRunnerType,
+	})
+	require.NoError(t, err)
+
+	groupRunnerSession, err := testClient.client.RunnerSessions.CreateRunnerSession(ctx, &models.RunnerSession{
+		RunnerID: groupRunner.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	sharedRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name: "test-runner",
+		Type: models.SharedRunnerType,
+	})
+	require.NoError(t, err)
+
+	sharedRunnerSession, err := testClient.client.RunnerSessions.CreateRunnerSession(ctx, &models.RunnerSession{
+		RunnerID: sharedRunner.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectSession   bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "get shared runner session by TRN",
+			trn:           sharedRunnerSession.Metadata.TRN,
+			expectSession: true,
+		},
+		{
+			name:          "get group runner session by TRN",
+			trn:           groupRunnerSession.Metadata.TRN,
+			expectSession: true,
+		},
+		{
+			name: "shared runner session with TRN not found",
+			trn:  types.RunnerSessionModelType.BuildTRN(sharedRunner.Name, nonExistentGlobalID),
+		},
+		{
+			name: "group runner session with TRN not found",
+			trn:  types.RunnerSessionModelType.BuildTRN(group.FullPath, groupRunner.Name, nonExistentGlobalID),
+		},
+		{
+			name:            "runner session TRN cannot have less than two parts",
+			trn:             types.RunnerSessionModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualSession, err := testClient.client.RunnerSessions.GetRunnerSessionByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectSession {
+				require.NotNil(t, actualSession)
+				if test.trn == sharedRunnerSession.Metadata.TRN {
+					assert.Equal(t, types.RunnerSessionModelType.BuildTRN(sharedRunner.Name, sharedRunnerSession.GetGlobalID()), actualSession.Metadata.TRN)
+				} else {
+					assert.Equal(t, types.RunnerSessionModelType.BuildTRN(group.FullPath, groupRunner.Name, groupRunnerSession.GetGlobalID()), actualSession.Metadata.TRN)
+				}
+			} else {
+				assert.Nil(t, actualSession)
 			}
 		})
 	}

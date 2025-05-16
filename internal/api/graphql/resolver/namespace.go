@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	graphql "github.com/graph-gophers/graphql-go"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -149,7 +150,9 @@ func (r *NamespaceResolver) invalidNamespaceType() error {
 }
 
 func namespaceQuery(ctx context.Context, args *NamespaceQueryArgs) (*NamespaceResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, args.FullPath)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(args.FullPath))
 	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return nil, err
 	}
@@ -157,7 +160,7 @@ func namespaceQuery(ctx context.Context, args *NamespaceQueryArgs) (*NamespaceRe
 		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
 	}
 
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, args.FullPath)
+	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(args.FullPath))
 	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return nil, err
 	}

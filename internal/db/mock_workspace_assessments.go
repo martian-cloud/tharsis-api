@@ -92,6 +92,36 @@ func (_m *MockWorkspaceAssessments) GetWorkspaceAssessmentByID(ctx context.Conte
 	return r0, r1
 }
 
+// GetWorkspaceAssessmentByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockWorkspaceAssessments) GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceAssessmentByTRN")
+	}
+
+	var r0 *models.WorkspaceAssessment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceAssessment, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceAssessment); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceAssessment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspaceAssessmentByWorkspaceID provides a mock function with given fields: ctx, workspaceID
 func (_m *MockWorkspaceAssessments) GetWorkspaceAssessmentByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceAssessment, error) {
 	ret := _m.Called(ctx, workspaceID)

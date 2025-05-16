@@ -8,6 +8,7 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 )
 
@@ -20,7 +21,7 @@ type WorkspaceVCSProviderLinkResolver struct {
 
 // ID resolver
 func (r *WorkspaceVCSProviderLinkResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.WorkspaceVCSProviderLinkType, r.workspaceVCSProviderLink.Metadata.ID))
+	return graphql.ID(r.workspaceVCSProviderLink.GetGlobalID())
 }
 
 // CreatedBy resolver
@@ -143,7 +144,8 @@ type CreateWorkspaceVCSProviderLinkInput struct {
 	ModuleDirectory     *string
 	Branch              *string
 	TagRegex            *string
-	WorkspacePath       string
+	WorkspacePath       *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID         *string
 	ProviderID          string
 	RepositoryPath      string
 	GlobPatterns        []string
@@ -183,9 +185,14 @@ func handleWorkspaceVCSProviderLinkMutationProblem(e error, clientMutationID *st
 }
 
 func createWorkspaceVCSProviderLinkMutation(ctx context.Context, input *CreateWorkspaceVCSProviderLinkInput) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
-	service := getVCSService(ctx)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	workspace, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +209,7 @@ func createWorkspaceVCSProviderLinkMutation(ctx context.Context, input *CreateWo
 		WebhookDisabled:     input.WebhookDisabled,
 	}
 
-	response, err := service.CreateWorkspaceVCSProviderLink(ctx, linkCreateOptions)
+	response, err := serviceCatalog.VCSService.CreateWorkspaceVCSProviderLink(ctx, linkCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -221,9 +228,14 @@ func createWorkspaceVCSProviderLinkMutation(ctx context.Context, input *CreateWo
 }
 
 func updateWorkspaceVCSProviderLinkMutation(ctx context.Context, input *UpdateWorkspaceVCSProviderLinkInput) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
-	vcsService := getVCSService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	link, err := vcsService.GetWorkspaceVCSProviderLinkByID(ctx, gid.FromGlobalID(input.ID))
+	linkID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	link, err := serviceCatalog.VCSService.GetWorkspaceVCSProviderLinkByID(ctx, linkID)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +280,7 @@ func updateWorkspaceVCSProviderLinkMutation(ctx context.Context, input *UpdateWo
 		link.WebhookDisabled = *input.WebhookDisabled
 	}
 
-	updatedLink, err := vcsService.UpdateWorkspaceVCSProviderLink(ctx, &vcs.UpdateWorkspaceVCSProviderLinkInput{Link: link})
+	updatedLink, err := serviceCatalog.VCSService.UpdateWorkspaceVCSProviderLink(ctx, &vcs.UpdateWorkspaceVCSProviderLinkInput{Link: link})
 	if err != nil {
 		return nil, err
 	}
@@ -278,9 +290,14 @@ func updateWorkspaceVCSProviderLinkMutation(ctx context.Context, input *UpdateWo
 }
 
 func deleteWorkspaceVCSProviderLinkMutation(ctx context.Context, input *DeleteWorkspaceVCSProviderLinkInput) (*WorkspaceVCSProviderLinkMutationPayloadResolver, error) {
-	vcsService := getVCSService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	link, err := vcsService.GetWorkspaceVCSProviderLinkByID(ctx, gid.FromGlobalID(input.ID))
+	linkID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	link, err := serviceCatalog.VCSService.GetWorkspaceVCSProviderLinkByID(ctx, linkID)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +320,7 @@ func deleteWorkspaceVCSProviderLinkMutation(ctx context.Context, input *DeleteWo
 		toDelete.Force = *input.Force
 	}
 
-	if err = vcsService.DeleteWorkspaceVCSProviderLink(ctx, toDelete); err != nil {
+	if err = serviceCatalog.VCSService.DeleteWorkspaceVCSProviderLink(ctx, toDelete); err != nil {
 		return nil, err
 	}
 
@@ -324,7 +341,8 @@ type CreateVCSRunInput struct {
 	ClientMutationID *string
 	ReferenceName    *string
 	IsDestroy        *bool
-	WorkspacePath    string
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID      *string
 }
 
 func handleVCSRunMutationProblem(e error, clientMutationID *string) (*CreateVCSRunMutationPayload, error) {
@@ -337,7 +355,14 @@ func handleVCSRunMutationProblem(e error, clientMutationID *string) (*CreateVCSR
 }
 
 func createVCSRunMutation(ctx context.Context, input *CreateVCSRunInput) (*CreateVCSRunMutationPayload, error) {
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceCatalog := getServiceCatalog(ctx)
+
+	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +376,7 @@ func createVCSRunMutation(ctx context.Context, input *CreateVCSRunInput) (*Creat
 		runOptions.IsDestroy = *input.IsDestroy
 	}
 
-	if err = getVCSService(ctx).CreateVCSRun(ctx, runOptions); err != nil {
+	if err = serviceCatalog.VCSService.CreateVCSRun(ctx, runOptions); err != nil {
 		return nil, err
 	}
 

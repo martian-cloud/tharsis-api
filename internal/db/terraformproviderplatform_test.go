@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -99,7 +101,7 @@ func TestGetProviderPlatformByID(t *testing.T) {
 		{
 			name:      "defective-ID",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -119,6 +121,95 @@ func TestGetProviderPlatformByID(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, actualTerraformProviderPlatform)
+			}
+		})
+	}
+}
+
+func TestGetProviderPlatformByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider",
+		RootGroupID: group.Metadata.ID,
+		GroupID:     group.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+		ProviderID:      provider.Metadata.ID,
+		SemanticVersion: "1.0.0",
+	})
+	require.NoError(t, err)
+
+	platform, err := testClient.client.TerraformProviderPlatforms.CreateProviderPlatform(ctx, &models.TerraformProviderPlatform{
+		ProviderVersionID: providerVersion.Metadata.ID,
+		OperatingSystem:   "linux",
+		Architecture:      "amd64",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectPlatform  bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:           "get provider platform by TRN",
+			trn:            platform.Metadata.TRN,
+			expectPlatform: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.TerraformProviderPlatformModelType.BuildTRN(group.FullPath, provider.Name, providerVersion.SemanticVersion, "windows", "arm"),
+		},
+		{
+			name:            "provider platform TRN has less than 5 parts",
+			trn:             types.TerraformProviderPlatformModelType.BuildTRN("test-group"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualPlatform, err := testClient.client.TerraformProviderPlatforms.GetProviderPlatformByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectPlatform {
+				require.NotNil(t, actualPlatform)
+				assert.Equal(t,
+					types.TerraformProviderPlatformModelType.BuildTRN(
+						group.FullPath,
+						provider.Name,
+						providerVersion.SemanticVersion,
+						platform.OperatingSystem,
+						platform.Architecture,
+					),
+					actualPlatform.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualPlatform)
 			}
 		})
 	}
@@ -947,20 +1038,18 @@ var standardWarmupGroupsForTerraformProviderPlatforms = []models.Group{
 // The ID fields will be replaced by the real IDs during the create function.
 var standardWarmupTerraformProvidersForTerraformProviderPlatforms = []models.TerraformProvider{
 	{
-		Name:         "terraform-provider-0",
-		ResourcePath: "top-level-group-0-for-terraform-provider-platforms/1-terraform-provider-0",
-		RootGroupID:  "top-level-group-0-for-terraform-provider-platforms",
-		GroupID:      "top-level-group-0-for-terraform-provider-platforms",
-		Private:      false,
-		CreatedBy:    "someone-tp0",
+		Name:        "terraform-provider-0",
+		RootGroupID: "top-level-group-0-for-terraform-provider-platforms",
+		GroupID:     "top-level-group-0-for-terraform-provider-platforms",
+		Private:     false,
+		CreatedBy:   "someone-tp0",
 	},
 	{
-		Name:         "terraform-provider-1",
-		ResourcePath: "top-level-group-0-for-terraform-provider-platforms/1-terraform-provider-1",
-		RootGroupID:  "top-level-group-0-for-terraform-provider-platforms",
-		GroupID:      "top-level-group-0-for-terraform-provider-platforms",
-		Private:      false,
-		CreatedBy:    "someone-tp1",
+		Name:        "terraform-provider-1",
+		RootGroupID: "top-level-group-0-for-terraform-provider-platforms",
+		GroupID:     "top-level-group-0-for-terraform-provider-platforms",
+		Private:     false,
+		CreatedBy:   "someone-tp1",
 	},
 }
 
@@ -1154,6 +1243,7 @@ func compareTerraformProviderPlatforms(t *testing.T, expected, actual *models.Te
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

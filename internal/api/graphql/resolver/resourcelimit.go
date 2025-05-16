@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	graphql "github.com/graph-gophers/graphql-go"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/resourcelimit"
 )
@@ -18,8 +17,7 @@ type ResourceLimitResolver struct {
 }
 
 func resourceLimitsQuery(ctx context.Context) ([]*ResourceLimitResolver, error) {
-
-	resourceLimits, err := getResourceLimitService(ctx).GetResourceLimits(ctx)
+	resourceLimits, err := getServiceCatalog(ctx).ResourceLimitService.GetResourceLimits(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +35,7 @@ func resourceLimitsQuery(ctx context.Context) ([]*ResourceLimitResolver, error) 
 
 // ID resolver
 func (r *ResourceLimitResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ResourceLimitType, r.resourceLimit.Metadata.ID))
+	return graphql.ID(r.resourceLimit.GetGlobalID())
 }
 
 // Metadata resolver
@@ -95,8 +93,6 @@ func handleResourceLimitMutationProblem(e error, clientMutationID *string) (*Res
 }
 
 func updateResourceLimitMutation(ctx context.Context, input *UpdateResourceLimitInput) (*ResourceLimitMutationPayloadResolver, error) {
-	resourceLimitService := getResourceLimitService(ctx)
-
 	toUpdate := &resourcelimit.UpdateResourceLimitInput{
 		Name:  input.Name,
 		Value: int(input.Value),
@@ -109,7 +105,7 @@ func updateResourceLimitMutation(ctx context.Context, input *UpdateResourceLimit
 		}
 	}
 
-	resourceLimit, err := resourceLimitService.UpdateResourceLimit(ctx, toUpdate)
+	resourceLimit, err := getServiceCatalog(ctx).ResourceLimitService.UpdateResourceLimit(ctx, toUpdate)
 	if err != nil {
 		return nil, err
 	}

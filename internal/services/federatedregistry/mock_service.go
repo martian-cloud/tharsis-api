@@ -184,6 +184,36 @@ func (_m *MockService) GetFederatedRegistryByID(ctx context.Context, id string) 
 	return r0, r1
 }
 
+// GetFederatedRegistryByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetFederatedRegistryByTRN(ctx context.Context, trn string) (*models.FederatedRegistry, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFederatedRegistryByTRN")
+	}
+
+	var r0 *models.FederatedRegistry
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.FederatedRegistry, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.FederatedRegistry); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.FederatedRegistry)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdateFederatedRegistry provides a mock function with given fields: ctx, federatedRegistry
 func (_m *MockService) UpdateFederatedRegistry(ctx context.Context, federatedRegistry *models.FederatedRegistry) (*models.FederatedRegistry, error) {
 	ret := _m.Called(ctx, federatedRegistry)

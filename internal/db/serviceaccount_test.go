@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -69,8 +71,8 @@ func TestGetServiceAccountByID(t *testing.T) {
 					ID:                positiveServiceAccount.Metadata.ID,
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               positiveServiceAccount.Metadata.TRN,
 				},
-				ResourcePath:      positiveServiceAccount.ResourcePath,
 				Name:              positiveServiceAccount.Name,
 				Description:       positiveServiceAccount.Description,
 				GroupID:           positiveServiceAccount.GroupID,
@@ -88,7 +90,7 @@ func TestGetServiceAccountByID(t *testing.T) {
 		{
 			name:      "defective-ID",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -113,69 +115,67 @@ func TestGetServiceAccountByID(t *testing.T) {
 	}
 }
 
-func TestGetServiceAccountByPath(t *testing.T) {
+func TestGetServiceAccountByTRN(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := time.Now()
-	warmupGroups, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
-		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
-		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	require.Nil(t, err)
-	createdHigh := time.Now()
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:    "test-service-account",
+		GroupID: group.Metadata.ID,
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg            *string
-		expectServiceAccount *models.ServiceAccount
-		name                 string
-		searchPath           string
+		name            string
+		trn             string
+		expectAccount   bool
+		expectErrorCode errors.CodeType
 	}
 
-	positiveServiceAccount := warmupServiceAccounts[0]
-	now := time.Now()
 	testCases := []testCase{
 		{
-			name:       "positive",
-			searchPath: warmupGroups[0].FullPath + "/" + positiveServiceAccount.Name,
-			expectServiceAccount: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:                positiveServiceAccount.Metadata.ID,
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				ResourcePath:      positiveServiceAccount.ResourcePath,
-				Name:              positiveServiceAccount.Name,
-				Description:       positiveServiceAccount.Description,
-				GroupID:           positiveServiceAccount.GroupID,
-				CreatedBy:         positiveServiceAccount.CreatedBy,
-				OIDCTrustPolicies: positiveServiceAccount.OIDCTrustPolicies,
-			},
+			name:          "get service account by TRN",
+			trn:           serviceAccount.Metadata.TRN,
+			expectAccount: true,
 		},
-
 		{
-			name:       "negative, non-existent service account path",
-			searchPath: "path-does-not-exist",
-			// expect service account and error to be nil
+			name: "resource with TRN not found",
+			trn:  types.ServiceAccountModelType.BuildTRN(group.FullPath, "unknown"),
+		},
+		{
+			name:            "service account TRN has less than two parts",
+			trn:             types.ServiceAccountModelType.BuildTRN("unknown"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualServiceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByPath(ctx, test.searchPath)
+			actualAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectServiceAccount != nil {
-				require.NotNil(t, actualServiceAccount)
-				compareServiceAccounts(t, test.expectServiceAccount, actualServiceAccount, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
+			require.NoError(t, err)
+
+			if test.expectAccount {
+				require.NotNil(t, actualAccount)
+				assert.Equal(t, types.ServiceAccountModelType.BuildTRN(group.FullPath, serviceAccount.Name), actualAccount.Metadata.TRN)
 			} else {
-				assert.Nil(t, actualServiceAccount)
+				assert.Nil(t, actualAccount)
 			}
 		})
 	}
@@ -212,10 +212,10 @@ func TestCreateServiceAccount(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.ServiceAccountModelType.BuildTRN(warmupGroup.FullPath, "positive-create-service-account-nearly-empty"),
 				},
 				Name:              "positive-create-service-account-nearly-empty",
 				GroupID:           warmupGroupID,
-				ResourcePath:      warmupGroup.FullPath + "/positive-create-service-account-nearly-empty",
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 			},
 		},
@@ -234,8 +234,8 @@ func TestCreateServiceAccount(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.ServiceAccountModelType.BuildTRN(warmupGroup.FullPath, "positive-create-service-account-full"),
 				},
-				ResourcePath:      warmupGroup.FullPath + "/positive-create-service-account-full",
 				Name:              "positive-create-service-account-full",
 				Description:       "positive create service account",
 				GroupID:           warmupGroupID,
@@ -347,12 +347,12 @@ func TestUpdateServiceAccount(t *testing.T) {
 					Version:              positiveServiceAccount.Metadata.Version + 1,
 					CreationTimestamp:    positiveServiceAccount.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
+					TRN:                  positiveServiceAccount.Metadata.TRN,
 				},
-				ResourcePath: warmupGroups[0].FullPath + "/" + positiveServiceAccount.Name,
-				Name:         positiveServiceAccount.Name,
-				Description:  "updated description",
-				GroupID:      warmupGroups[0].Metadata.ID,
-				CreatedBy:    positiveServiceAccount.CreatedBy,
+				Name:        positiveServiceAccount.Name,
+				Description: "updated description",
+				GroupID:     warmupGroups[0].Metadata.ID,
+				CreatedBy:   positiveServiceAccount.CreatedBy,
 				OIDCTrustPolicies: []models.OIDCTrustPolicy{
 					{
 						Issuer:      "new-issuer",
@@ -1007,7 +1007,6 @@ var standardWarmupGroupsForServiceAccounts = []models.Group{
 // The create function will convert the group name to group ID.
 var standardWarmupServiceAccounts = []models.ServiceAccount{
 	{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "1-service-account-0",
 		Description:       "service account 0",
 		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
@@ -1015,7 +1014,6 @@ var standardWarmupServiceAccounts = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "sa-resource-path-1",
 		Name:              "1-service-account-1",
 		Description:       "service account 1",
 		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
@@ -1023,7 +1021,6 @@ var standardWarmupServiceAccounts = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "sa-resource-path-2",
 		Name:              "2-service-account-2",
 		Description:       "service account 2",
 		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
@@ -1031,7 +1028,6 @@ var standardWarmupServiceAccounts = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "sa-resource-path-3",
 		Name:              "2-service-account-3",
 		Description:       "service account 3",
 		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
@@ -1039,7 +1035,6 @@ var standardWarmupServiceAccounts = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "sa-resource-path-4",
 		Name:              "5-service-account-4",
 		Description:       "service account 4",
 		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
@@ -1178,7 +1173,6 @@ func serviceAccountIDsFromServiceAccountInfos(serviceAccountInfos []serviceAccou
 func compareServiceAccounts(t *testing.T, expected, actual *models.ServiceAccount,
 	checkID bool, times *timeBounds,
 ) {
-	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Description, actual.Description)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
@@ -1189,6 +1183,7 @@ func compareServiceAccounts(t *testing.T, expected, actual *models.ServiceAccoun
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

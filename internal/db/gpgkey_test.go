@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -77,7 +79,7 @@ func TestGetGPGKeyByID(t *testing.T) {
 		{
 			name:      "defective-ID",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -95,6 +97,67 @@ func TestGetGPGKeyByID(t *testing.T) {
 					updateLow:  &createdLow,
 					updateHigh: &createdHigh,
 				})
+			} else {
+				assert.Nil(t, actualGPGKey)
+			}
+		})
+	}
+}
+
+func TestGetGPGKeyByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	gpgKey, err := testClient.client.GPGKeys.CreateGPGKey(ctx, &models.GPGKey{
+		GroupID:     group.Metadata.ID,
+		Fingerprint: "1234567",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectApply     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:        "get resource by TRN",
+			trn:         gpgKey.Metadata.TRN,
+			expectApply: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.GPGKeyModelType.BuildTRN(group.FullPath, "09876"),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualGPGKey, err := testClient.client.GPGKeys.GetGPGKeyByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectApply {
+				require.NotNil(t, actualGPGKey)
+				assert.Equal(t, types.GPGKeyModelType.BuildTRN(group.FullPath, gpgKey.Fingerprint), actualGPGKey.Metadata.TRN)
 			} else {
 				assert.Nil(t, actualGPGKey)
 			}
@@ -877,6 +940,7 @@ func compareGPGKeys(t *testing.T, expected, actual *models.GPGKey,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

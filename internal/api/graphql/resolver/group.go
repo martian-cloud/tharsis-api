@@ -2,13 +2,12 @@ package resolver
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
@@ -23,6 +22,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 )
@@ -32,11 +32,13 @@ import (
 // GroupConnectionQueryArgs are used to query a group connection
 type GroupConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	ParentPath *string
+	ParentPath *string // DEPRECATED: use ParentID instead with a TRN
+	ParentID   *string
 	Search     *string
 }
 
 // GroupQueryArgs are used to query a single group
+// DEPRECATED: should use node query instead with a TRN
 type GroupQueryArgs struct {
 	FullPath string
 }
@@ -73,7 +75,7 @@ type GroupConnectionResolver struct {
 
 // NewGroupConnectionResolver creates a new GroupConnectionResolver
 func NewGroupConnectionResolver(ctx context.Context, input *group.GetGroupsInput) (*GroupConnectionResolver, error) {
-	groupService := getGroupService(ctx)
+	groupService := getServiceCatalog(ctx).GroupService
 
 	result, err := groupService.GetGroups(ctx, input)
 	if err != nil {
@@ -141,7 +143,7 @@ type GroupResolver struct {
 
 // ID resolver
 func (r *GroupResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.GroupType, r.group.Metadata.ID))
+	return graphql.ID(r.group.GetGlobalID())
 }
 
 // Name resolver
@@ -186,7 +188,7 @@ func (r *GroupResolver) DescendentGroups(ctx context.Context, args ConnectionQue
 
 	input := group.GetGroupsInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
-		ParentGroup:       r.group,
+		ParentGroupID:     &r.group.Metadata.ID,
 	}
 
 	if args.Sort != nil {
@@ -205,7 +207,7 @@ func (r *GroupResolver) Workspaces(ctx context.Context, args *ConnectionQueryArg
 
 	input := workspace.GetWorkspacesInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
-		Group:             r.group,
+		GroupID:           &r.group.Metadata.ID,
 	}
 
 	if args.Sort != nil {
@@ -221,7 +223,7 @@ func (r *GroupResolver) Workspaces(ctx context.Context, args *ConnectionQueryArg
 func (r *GroupResolver) Memberships(ctx context.Context) ([]*NamespaceMembershipResolver, error) {
 	resolvers := []*NamespaceMembershipResolver{}
 
-	result, err := getNamespaceMembershipService(ctx).GetNamespaceMembershipsForNamespace(ctx, r.group.FullPath)
+	result, err := getServiceCatalog(ctx).NamespaceMembershipService.GetNamespaceMembershipsForNamespace(ctx, r.group.FullPath)
 	if err != nil {
 		return nil, err
 	}
@@ -353,12 +355,12 @@ func (r *GroupResolver) Runners(ctx context.Context, args *RunnersConnectionQuer
 
 // RunnerTags resolver
 func (r *GroupResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTagsSetting, error) {
-	return getGroupService(ctx).GetRunnerTagsSetting(ctx, r.group)
+	return getServiceCatalog(ctx).GroupService.GetRunnerTagsSetting(ctx, r.group)
 }
 
 // DriftDetectionEnabled resolver
 func (r *GroupResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
-	return getGroupService(ctx).GetDriftDetectionEnabledSetting(ctx, r.group)
+	return getServiceCatalog(ctx).GroupService.GetDriftDetectionEnabledSetting(ctx, r.group)
 }
 
 // CreatedBy resolver
@@ -455,10 +457,9 @@ func (r GroupResolver) FederatedRegistries(ctx context.Context,
 	return NewFederatedRegistryConnectionResolver(ctx, &input)
 }
 
+// DEPRECATED: should use node query instead since it supports both TRN and GID
 func groupQuery(ctx context.Context, args *GroupQueryArgs) (*GroupResolver, error) {
-	groupService := getGroupService(ctx)
-
-	group, err := groupService.GetGroupByFullPath(ctx, args.FullPath)
+	group, err := getServiceCatalog(ctx).GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(args.FullPath))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -481,12 +482,22 @@ func groupsQuery(ctx context.Context, args *GroupConnectionQueryArgs) (*GroupCon
 		RootOnly:          (args.ParentPath != nil) && (*args.ParentPath == ""),
 	}
 
-	if (args.ParentPath != nil) && (*args.ParentPath != "") {
-		parent, err := getGroupService(ctx).GetGroupByFullPath(ctx, *args.ParentPath)
+	if args.ParentID != nil && args.ParentPath != nil {
+		return nil, errors.New("must specify either parentId or parentPath, not both", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if args.ParentID != nil {
+		parentID, err := getServiceCatalog(ctx).FetchModelID(ctx, *args.ParentID)
 		if err != nil {
 			return nil, err
 		}
-		input.ParentGroup = parent
+		input.ParentGroupID = &parentID
+	} else if (args.ParentPath != nil) && (*args.ParentPath != "") {
+		parent, err := getServiceCatalog(ctx).GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(*args.ParentPath))
+		if err != nil {
+			return nil, err
+		}
+		input.ParentGroupID = &parent.Metadata.ID
 	}
 
 	if args.Sort != nil {
@@ -523,7 +534,8 @@ func (r *GroupMutationPayloadResolver) Group() *GroupResolver {
 type CreateGroupInput struct {
 	ClientMutationID      *string
 	Name                  string
-	ParentPath            *string
+	ParentPath            *string // DEPRECATED: use ParentID instead with a TRN
+	ParentID              *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
 	Description           string
@@ -534,7 +546,7 @@ type UpdateGroupInput struct {
 	ClientMutationID      *string
 	Metadata              *MetadataInput
 	Description           *string
-	GroupPath             *string
+	GroupPath             *string // DEPRECATED: use ID instead with a TRN
 	ID                    *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
@@ -545,15 +557,17 @@ type DeleteGroupInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
 	Force            *bool
-	GroupPath        *string
+	GroupPath        *string // DEPRECATED: use ID instead with a TRN
 	ID               *string
 }
 
 // MigrateGroupInput contains the input for migrating a group
 type MigrateGroupInput struct {
 	ClientMutationID *string
-	NewParentPath    *string
-	GroupPath        string
+	NewParentPath    *string // DEPRECATED: use NewParentID instead with a TRN
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
+	NewParentID      *string
+	GroupID          *string
 }
 
 func handleGroupMutationProblem(e error, clientMutationID *string) (*GroupMutationPayloadResolver, error) {
@@ -591,18 +605,28 @@ func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMu
 		}
 	}
 
-	groupService := getGroupService(ctx)
+	if input.ParentID != nil && input.ParentPath != nil {
+		return nil, errors.New("must specify either parentId or parentPath, not both", errors.WithErrorCode(errors.EInvalid))
+	}
 
-	if input.ParentPath != nil {
-		parent, err := groupService.GetGroupByFullPath(ctx, *input.ParentPath)
+	var valueToResolve *string
+	if input.ParentID != nil {
+		valueToResolve = input.ParentID
+	} else if input.ParentPath != nil {
+		valueToResolve = ptr.String(types.GroupModelType.BuildTRN(*input.ParentPath))
+	}
+
+	serviceCatalog := getServiceCatalog(ctx)
+
+	if valueToResolve != nil {
+		parentID, err := serviceCatalog.FetchModelID(ctx, *valueToResolve)
 		if err != nil {
 			return nil, err
 		}
-		parentID := parent.Metadata.ID
 		groupCreateOptions.ParentID = parentID
 	}
 
-	createdGroup, err := groupService.CreateGroup(ctx, &groupCreateOptions)
+	createdGroup, err := serviceCatalog.GroupService.CreateGroup(ctx, &groupCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -612,18 +636,14 @@ func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMu
 }
 
 func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMutationPayloadResolver, error) {
-	groupService := getGroupService(ctx)
-
-	var group *models.Group
-	var err error
-	switch {
-	case input.GroupPath != nil:
-		group, err = groupService.GetGroupByFullPath(ctx, *input.GroupPath)
-	case input.ID != nil:
-		group, err = groupService.GetGroupByID(ctx, gid.FromGlobalID(*input.ID))
-	default:
-		err = fmt.Errorf("must specify either GroupPath or ID")
+	groupID, err := toModelID(ctx, input.GroupPath, input.ID, types.GroupModelType)
+	if err != nil {
+		return nil, err
 	}
+
+	groupService := getServiceCatalog(ctx).GroupService
+
+	group, err := groupService.GetGroupByID(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -681,18 +701,14 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 }
 
 func deleteGroupMutation(ctx context.Context, input *DeleteGroupInput) (*GroupMutationPayloadResolver, error) {
-	groupService := getGroupService(ctx)
-
-	var groupToDelete *models.Group
-	var err error
-	switch {
-	case input.GroupPath != nil:
-		groupToDelete, err = groupService.GetGroupByFullPath(ctx, *input.GroupPath)
-	case input.ID != nil:
-		groupToDelete, err = groupService.GetGroupByID(ctx, gid.FromGlobalID(*input.ID))
-	default:
-		err = fmt.Errorf("must specify either GroupPath or ID")
+	groupID, err := toModelID(ctx, input.GroupPath, input.ID, types.GroupModelType)
+	if err != nil {
+		return nil, err
 	}
+
+	groupService := getServiceCatalog(ctx).GroupService
+
+	groupToDelete, err := groupService.GetGroupByID(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -724,21 +740,28 @@ func deleteGroupMutation(ctx context.Context, input *DeleteGroupInput) (*GroupMu
 }
 
 func migrateGroupMutation(ctx context.Context, input *MigrateGroupInput) (*GroupMutationPayloadResolver, error) {
-	groupService := getGroupService(ctx)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	group, err := groupService.GetGroupByFullPath(ctx, input.GroupPath)
+	groupService := getServiceCatalog(ctx).GroupService
+
+	group, err := groupService.GetGroupByID(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
 
 	// If supplied, get the new parent group.
 	var newParentID *string
-	if input.NewParentPath != nil {
-		newParent, iErr := groupService.GetGroupByFullPath(ctx, *input.NewParentPath)
-		if iErr != nil {
-			return nil, iErr
+	if input.NewParentID != nil || input.NewParentPath != nil {
+		id, err := toModelID(ctx, input.NewParentPath, input.NewParentID, types.GroupModelType)
+		if err != nil {
+			// Function will return generic errors
+			return nil, errors.Wrap(err, "failed to resolve new parent id")
 		}
-		newParentID = &newParent.Metadata.ID
+
+		newParentID = &id
 	}
 
 	group, err = groupService.MigrateGroup(ctx, group.Metadata.ID, newParentID)
@@ -779,7 +802,7 @@ func loadGroup(ctx context.Context, id string) (*models.Group, error) {
 }
 
 func groupBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	groups, err := getGroupService(ctx).GetGroupsByIDs(ctx, ids)
+	groups, err := getServiceCatalog(ctx).GroupService.GetGroupsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

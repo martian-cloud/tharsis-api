@@ -8,10 +8,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -73,56 +74,68 @@ func TestGetTeamByID(t *testing.T) {
 	}
 }
 
-func TestGetTeamByName(t *testing.T) {
-	teamName := "team-1"
+func TestGetTeamByTRN(t *testing.T) {
+	sampleTeam := &models.Team{
+		Metadata: models.ResourceMetadata{
+			ID:  "team-id-1",
+			TRN: types.TeamModelType.BuildTRN("my-team/team-1"),
+		},
+		Name:        "team-1",
+		Description: "Test team",
+	}
 
 	type testCase struct {
-		expectTeam      *models.Team
+		caller          auth.Caller
 		name            string
+		team            *models.Team
 		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name: "successfully return a team by name",
-			expectTeam: &models.Team{
-				Name: teamName,
-			},
+			name:   "successfully get team by trn",
+			caller: &auth.SystemCaller{},
+			team:   sampleTeam,
 		},
 		{
-			name:            "team does not exist",
+			name:            "team not found",
+			caller:          &auth.SystemCaller{},
 			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "without caller",
+			expectErrorCode: errors.EUnauthorized,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
-			mockCaller := auth.NewMockCaller(t)
 			mockTeams := db.NewMockTeams(t)
 
-			mockTeams.On("GetTeamByName", mock.Anything, teamName).Return(test.expectTeam, nil)
+			if test.caller != nil {
+				ctx = auth.WithCaller(ctx, test.caller)
+				mockTeams.On("GetTeamByTRN", mock.Anything, sampleTeam.Metadata.TRN).Return(test.team, nil)
+			}
 
 			dbClient := &db.Client{
 				Teams: mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := &service{
+				dbClient: dbClient,
+			}
 
-			actualTeam, err := service.GetTeamByName(auth.WithCaller(ctx, mockCaller), teamName)
+			actualTeam, err := service.GetTeamByTRN(ctx, sampleTeam.Metadata.TRN)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.expectTeam, actualTeam)
+			require.NoError(t, err)
+			assert.Equal(t, test.team, actualTeam)
 		})
 	}
 }
@@ -278,7 +291,7 @@ func TestCreateTeam(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTeamPermission).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateTeamPermission).Return(test.authError)
 
 			if test.expectTeam != nil {
 				mockCaller.On("GetSubject").Return("testSubject")
@@ -341,7 +354,7 @@ func TestUpdateTeam(t *testing.T) {
 		{
 			name: "successfully update a team",
 			input: &UpdateTeamInput{
-				Name:        "team",
+				ID:          "team",
 				Description: ptr.String("new description"),
 			},
 			existingTeam: sampleTeam,
@@ -356,14 +369,14 @@ func TestUpdateTeam(t *testing.T) {
 		{
 			name: "team does not exist",
 			input: &UpdateTeamInput{
-				Name: "team",
+				ID: "team",
 			},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "subject does not have permission to update team",
 			input: &UpdateTeamInput{
-				Name: "team",
+				ID: "team",
 			},
 			existingTeam:    sampleTeam,
 			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
@@ -372,7 +385,7 @@ func TestUpdateTeam(t *testing.T) {
 		{
 			name: "team model is not valid",
 			input: &UpdateTeamInput{
-				Name:        "team-1",
+				ID:          "team-1",
 				Description: ptr.String(strings.Repeat("long description", 50)),
 			},
 			existingTeam:    sampleTeam,
@@ -390,10 +403,10 @@ func TestUpdateTeam(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockTeams.On("GetTeamByName", mock.Anything, test.input.Name).Return(test.existingTeam, nil)
+			mockTeams.On("GetTeamByID", mock.Anything, test.input.ID).Return(test.existingTeam, nil)
 
 			if test.existingTeam != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTeamPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(test.authError)
 			}
 
 			if test.expectTeam != nil {
@@ -462,7 +475,7 @@ func TestDeleteTeam(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockTeams := db.NewMockTeams(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteTeamPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTeamPermission, mock.Anything).Return(test.authError)
 
 			if test.expectErrorCode == "" {
 				mockCaller.On("GetSubject").Return("testSubject")
@@ -552,10 +565,10 @@ func TestGetTeamMember(t *testing.T) {
 			mockUsers := db.NewMockUsers(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 
-			mockUsers.On("GetUserByUsername", mock.Anything, sampleUser.Username).Return(test.existingUser, nil)
+			mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(sampleUser.Username)).Return(test.existingUser, nil)
 
 			if test.existingUser != nil {
-				mockTeams.On("GetTeamByName", mock.Anything, sampleTeam.Name).Return(test.existingTeam, nil)
+				mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(sampleTeam.Name)).Return(test.existingTeam, nil)
 			}
 
 			if test.existingTeam != nil && test.existingUser != nil {
@@ -708,14 +721,14 @@ func TestAddUserToTeam(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockTeams.On("GetTeamByName", mock.Anything, sampleTeam.Name).Return(test.existingTeam, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(sampleTeam.Name)).Return(test.existingTeam, nil)
 
 			if test.existingTeam != nil {
-				mockUsers.On("GetUserByUsername", mock.Anything, sampleUser.Username).Return(test.existingUser, nil)
+				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(sampleUser.Username)).Return(test.existingUser, nil)
 			}
 
 			if test.existingTeam != nil && test.existingUser != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTeamPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(test.authError)
 			}
 
 			if test.expectAdded != nil {
@@ -848,14 +861,14 @@ func TestUpdateTeamMember(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockTeams.On("GetTeamByName", mock.Anything, sampleTeam.Name).Return(test.existingTeam, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(sampleTeam.Name)).Return(test.existingTeam, nil)
 
 			if test.existingTeam != nil {
-				mockUsers.On("GetUserByUsername", mock.Anything, sampleUser.Username).Return(test.existingUser, nil)
+				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(sampleUser.Username)).Return(test.existingUser, nil)
 			}
 
 			if test.existingTeam != nil && test.existingUser != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTeamPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(test.authError)
 
 				if test.authError == nil {
 					mockTeamMembers.On("GetTeamMember", mock.Anything, sampleUser.Metadata.ID, sampleTeam.Metadata.ID).Return(test.existingMember, nil)
@@ -942,7 +955,7 @@ func TestDeleteTeamMember(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTeamPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(test.authError)
 
 			if test.expectErrorCode == "" {
 				mockCaller.On("GetSubject").Return("testSubject")

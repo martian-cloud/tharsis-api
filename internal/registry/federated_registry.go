@@ -14,7 +14,6 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
@@ -114,7 +113,7 @@ func (r *federatedRegistryClient) GetModuleAttestations(ctx context.Context, inp
 	response := []*types.TerraformModuleAttestation{}
 
 	count := 0
-	
+
 	var cursor *string
 	for {
 		toSort := types.TerraformModuleAttestationSortableFieldCreatedAtDesc
@@ -219,7 +218,7 @@ func NewFederatedRegistryToken(ctx context.Context, input *FederatedRegistryToke
 	expiration := time.Now().Add(time.Minute)
 	token, err := input.IdentityProvider.GenerateToken(ctx, &auth.TokenInput{
 		Expiration: &expiration,
-		Subject:    gid.ToGlobalID(gid.FederatedRegistryType, input.FederatedRegistry.Metadata.ID),
+		Subject:    input.FederatedRegistry.GetGlobalID(),
 		Audience:   input.FederatedRegistry.Audience,
 		Typ:        auth.FederatedRegistryTokenType,
 	})

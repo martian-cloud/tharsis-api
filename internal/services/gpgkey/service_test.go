@@ -6,11 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -123,11 +125,10 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 		Metadata: models.ResourceMetadata{
 			ID: "gpg-key-id-1", // okay that this is not a valid UUID
 		},
-		GroupID:      "group-id-1",
-		ASCIIArmor:   armor,
-		Fingerprint:  fingerprint,
-		ResourcePath: "root/group/path",
-		GPGKeyID:     gpgKeyID,
+		GroupID:     "group-id-1",
+		ASCIIArmor:  armor,
+		Fingerprint: fingerprint,
+		GPGKeyID:    gpgKeyID,
 	}
 
 	type testCase struct {
@@ -244,6 +245,73 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 
 			assert.Equal(t, test.expectErrorCode, errors.ErrorCode(actualError))
 			assert.Equal(t, test.expectOutput, actualOutput)
+		})
+	}
+}
+
+func TestGPGKeyByTRN(t *testing.T) {
+	sampleGPGKey := &models.GPGKey{
+		Metadata: models.ResourceMetadata{
+			ID:  "gpg-key-id-1",
+			TRN: types.GPGKeyModelType.BuildTRN("my-group/123341"),
+		},
+		GroupID: "group-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		gpgkey          *models.GPGKey
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:   "successfully get gpg key by trn",
+			gpgkey: sampleGPGKey,
+		},
+		{
+			name:            "gpg key not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view gpg key",
+			gpgkey:          sampleGPGKey,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockGPGKeys := db.NewMockGPGKeys(t)
+
+			mockGPGKeys.On("GetGPGKeyByTRN", mock.Anything, sampleGPGKey.Metadata.TRN).Return(test.gpgkey, nil)
+
+			if test.gpgkey != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.GPGKeyModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				GPGKeys: mockGPGKeys,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualGPGKey, err := service.GetGPGKeyByTRN(auth.WithCaller(ctx, mockCaller), sampleGPGKey.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.gpgkey, actualGPGKey)
 		})
 	}
 }

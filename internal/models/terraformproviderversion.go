@@ -2,7 +2,12 @@ package models
 
 import (
 	"fmt"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
+
+var _ Model = (*TerraformProviderVersion)(nil)
 
 // TerraformProviderVersion represents a version of a terraform provider
 type TerraformProviderVersion struct {
@@ -19,6 +24,21 @@ type TerraformProviderVersion struct {
 	Latest                   bool
 }
 
+// GetID returns the Metadata ID.
+func (t *TerraformProviderVersion) GetID() string {
+	return t.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (t *TerraformProviderVersion) GetGlobalID() string {
+	return gid.ToGlobalID(t.GetModelType(), t.Metadata.ID)
+}
+
+// GetModelType returns the type of the model.
+func (t *TerraformProviderVersion) GetModelType() types.ModelType {
+	return types.TerraformProviderVersionModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (t *TerraformProviderVersion) ResolveMetadata(key string) (string, error) {
 	val, err := t.Metadata.resolveFieldValue(key)
@@ -32,6 +52,11 @@ func (t *TerraformProviderVersion) ResolveMetadata(key string) (string, error) {
 	}
 
 	return val, nil
+}
+
+// Validate validates the model.
+func (t *TerraformProviderVersion) Validate() error {
+	return nil
 }
 
 // GetHexGPGKeyID returns the GPG key id in hex format

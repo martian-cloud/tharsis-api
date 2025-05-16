@@ -3,9 +3,12 @@ package models
 import (
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 )
+
+var _ Model = (*Workspace)(nil)
 
 // Workspace represents a terraform workspace
 type Workspace struct {
@@ -24,6 +27,21 @@ type Workspace struct {
 	PreventDestroyPlan    bool
 	RunnerTags            []string
 	EnableDriftDetection  *bool
+}
+
+// GetID returns the Metadata ID.
+func (w *Workspace) GetID() string {
+	return w.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (w *Workspace) GetGlobalID() string {
+	return gid.ToGlobalID(w.GetModelType(), w.Metadata.ID)
+}
+
+// GetModelType returns the model type
+func (w *Workspace) GetModelType() types.ModelType {
+	return types.WorkspaceModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -55,16 +73,6 @@ func (w *Workspace) Validate() error {
 
 	// Check for duplicate tags, too-long tags, and too many tags.
 	return verifyValidRunnerTags(w.RunnerTags)
-}
-
-// GetID returns the ID for this group
-func (w *Workspace) GetID() string {
-	return w.Metadata.ID
-}
-
-// GetResourceType returns the workspace resource type
-func (w *Workspace) GetResourceType() permissions.ResourceType {
-	return permissions.WorkspaceResourceType
 }
 
 // GetPath returns the full path for this workspace

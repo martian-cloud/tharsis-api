@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	graphql "github.com/graph-gophers/graphql-go"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 )
@@ -19,7 +18,7 @@ type TerraformProviderPlatformMirrorResolver struct {
 
 // ID resolver
 func (r *TerraformProviderPlatformMirrorResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformProviderPlatformMirrorType, r.platformMirror.Metadata.ID))
+	return graphql.ID(r.platformMirror.GetGlobalID())
 }
 
 // OS resolver
@@ -88,9 +87,14 @@ func handleTerraformProviderPlatformMirrorMutationProblem(e error, clientMutatio
 }
 
 func deleteTerraformProviderPlatformMirrorMutation(ctx context.Context, input *DeleteTerraformProviderPlatformMirrorInput) (*TerraformProviderPlatformMirrorMutationPayloadResolver, error) {
-	service := getProviderMirrorService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	platformMirror, err := service.GetProviderPlatformMirrorByID(ctx, gid.FromGlobalID(input.ID))
+	mirrorID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	platformMirror, err := serviceCatalog.TerraformProviderMirrorService.GetProviderPlatformMirrorByID(ctx, mirrorID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +113,7 @@ func deleteTerraformProviderPlatformMirrorMutation(ctx context.Context, input *D
 		PlatformMirror: platformMirror,
 	}
 
-	if err := service.DeleteProviderPlatformMirror(ctx, toDelete); err != nil {
+	if err := serviceCatalog.TerraformProviderMirrorService.DeleteProviderPlatformMirror(ctx, toDelete); err != nil {
 		return nil, err
 	}
 

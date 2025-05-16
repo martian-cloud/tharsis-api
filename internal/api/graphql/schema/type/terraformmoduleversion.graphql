@@ -105,7 +105,11 @@ type TerraformModuleVersion implements Node {
 
 input CreateTerraformModuleVersionInput {
   clientMutationId: String
-  modulePath: String!
+  modulePath: String
+    @deprecated(
+      reason: "Use moduleId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  moduleId: String
   version: String!
   shaSum: String!
 }

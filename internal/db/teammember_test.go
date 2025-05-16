@@ -34,76 +34,6 @@ type teamMemberNameSlice struct {
 	teamMembers  []models.TeamMember
 }
 
-func TestGetTeamMemberByID(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdWarmupOutput, err := createWarmupTeamMembers(ctx, testClient, teamMemberWarmupsInput{
-		teams:       standardWarmupTeamsForTeamMembers,
-		users:       standardWarmupUsersForTeamMembers,
-		teamMembers: standardWarmupTeamMembers,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg        *string
-		expectTeamMember *models.TeamMember
-		name             string
-		input            string
-	}
-
-	/*
-		template test case:
-
-		{
-		name             string
-		input            string
-		expectMsg        *string
-		expectTeamMember *models.TeamMember
-		}
-	*/
-
-	testCases := []testCase{}
-
-	// Positive case, one warmup team at a time.
-	for _, toGet := range createdWarmupOutput.teamMembers {
-		copyToGet := toGet
-		testCases = append(testCases, testCase{
-			name:             "positive--" + buildTeamMemberName(createdWarmupOutput, toGet),
-			input:            toGet.Metadata.ID,
-			expectTeamMember: &copyToGet,
-		})
-	}
-
-	testCases = append(testCases,
-		testCase{
-			name:  "negative: non-exist",
-			input: nonExistentID,
-		},
-		testCase{
-			name:      "negative: invalid",
-			input:     invalidID,
-			expectMsg: invalidUUIDMsg1,
-		},
-	)
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			gotTeamMember, err := testClient.client.TeamMembers.GetTeamMemberByID(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectTeamMember != nil {
-				require.NotNil(t, gotTeamMember)
-				compareTeamMembers(t, test.expectTeamMember, gotTeamMember, true, nil)
-			} else {
-				assert.Nil(t, gotTeamMember)
-			}
-		})
-	}
-}
-
 func TestGetTeamMember(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
@@ -165,13 +95,13 @@ func TestGetTeamMember(t *testing.T) {
 			name:      "negative: invalid user ID",
 			userID:    invalidID,
 			teamID:    toGet0.TeamID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 		testCase{
 			name:      "negative: invalid team ID",
 			userID:    toGet0.UserID,
 			teamID:    invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	)
 
@@ -770,6 +700,7 @@ func compareTeamMembers(t *testing.T, expected, actual *models.TeamMember,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

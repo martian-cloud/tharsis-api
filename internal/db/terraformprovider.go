@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -18,7 +19,7 @@ import (
 // TerraformProviders encapsulates the logic to access terraform providers from the database
 type TerraformProviders interface {
 	GetProviderByID(ctx context.Context, id string) (*models.TerraformProvider, error)
-	GetProviderByPath(ctx context.Context, path string) (*models.TerraformProvider, error)
+	GetProviderByTRN(ctx context.Context, trn string) (*models.TerraformProvider, error)
 	GetProviders(ctx context.Context, input *GetProvidersInput) (*ProvidersResult, error)
 	CreateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error)
 	UpdateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error)
@@ -100,12 +101,24 @@ func (t *terraformProviders) GetProviderByID(ctx context.Context, id string) (*m
 	return t.getProvider(ctx, goqu.Ex{"terraform_providers.id": id})
 }
 
-func (t *terraformProviders) GetProviderByPath(ctx context.Context, path string) (*models.TerraformProvider, error) {
-	ctx, span := tracer.Start(ctx, "db.GetProviderByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (t *terraformProviders) GetProviderByTRN(ctx context.Context, trn string) (*models.TerraformProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderByTRN")
 	defer span.End()
 
+	path, err := types.TerraformProviderModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
 	index := strings.LastIndex(path, "/")
+
+	if index == -1 {
+		return nil, errors.New("a Terraform provider TRN must have group path and provider name separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
 	return t.getProvider(ctx, goqu.Ex{"terraform_providers.name": path[index+1:], "namespaces.path": path[:index]})
 }
 
@@ -217,7 +230,7 @@ func (t *terraformProviders) GetProviders(ctx context.Context, input *GetProvide
 	// Scan rows
 	results := []models.TerraformProvider{}
 	for rows.Next() {
-		item, err := scanTerraformProvider(rows, true)
+		item, err := scanTerraformProvider(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -246,41 +259,31 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Insert("terraform_providers").
+	sql, args, err := dialect.From("terraform_providers").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":            newResourceID(),
-			"version":       initialResourceVersion,
-			"created_at":    timestamp,
-			"updated_at":    timestamp,
-			"group_id":      provider.GroupID,
-			"root_group_id": provider.RootGroupID,
-			"name":          provider.Name,
-			"private":       provider.Private,
-			"repo_url":      provider.RepositoryURL,
-			"created_by":    provider.CreatedBy,
-		}).
-		Returning(providerFieldList...).ToSQL()
+		With("terraform_providers",
+			dialect.Insert("terraform_providers").
+				Rows(goqu.Record{
+					"id":            newResourceID(),
+					"version":       initialResourceVersion,
+					"created_at":    timestamp,
+					"updated_at":    timestamp,
+					"group_id":      provider.GroupID,
+					"root_group_id": provider.RootGroupID,
+					"name":          provider.Name,
+					"private":       provider.Private,
+					"repo_url":      provider.RepositoryURL,
+					"created_by":    provider.CreatedBy,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdProvider, err := scanTerraformProvider(tx.QueryRow(ctx, sql, args...), false)
+	createdProvider, err := scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -293,20 +296,6 @@ func (t *terraformProviders) CreateProvider(ctx context.Context, provider *model
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, provider.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	createdProvider.ResourcePath = buildTerraformProviderResourcePath(namespace.path, provider.Name)
-
 	return createdProvider, nil
 }
 
@@ -317,37 +306,29 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Update("terraform_providers").
+	sql, args, err := dialect.From("terraform_providers").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"private":    provider.Private,
-				"repo_url":   provider.RepositoryURL,
-			},
-		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).Returning(providerFieldList...).ToSQL()
+		With("terraform_providers",
+			dialect.Update("terraform_providers").
+				Set(
+					goqu.Record{
+						"version":    goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at": timestamp,
+						"private":    provider.Private,
+						"repo_url":   provider.RepositoryURL,
+					},
+				).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedProvider, err := scanTerraformProvider(tx.QueryRow(ctx, sql, args...), false)
+	updatedProvider, err := scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -358,20 +339,6 @@ func (t *terraformProviders) UpdateProvider(ctx context.Context, provider *model
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, provider.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	updatedProvider.ResourcePath = buildTerraformProviderResourcePath(namespace.path, provider.Name)
-
 	return updatedProvider, nil
 }
 
@@ -380,20 +347,25 @@ func (t *terraformProviders) DeleteProvider(ctx context.Context, provider *model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("terraform_providers").
+	sql, args, err := dialect.From("terraform_providers").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      provider.Metadata.ID,
-				"version": provider.Metadata.Version,
-			},
-		).Returning(providerFieldList...).ToSQL()
+		With("terraform_providers",
+			dialect.Delete("terraform_providers").
+				Where(
+					goqu.Ex{
+						"id":      provider.Metadata.ID,
+						"version": provider.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	_, err = scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
+	_, err = scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -418,11 +390,18 @@ func (t *terraformProviders) getProvider(ctx context.Context, exp goqu.Ex) (*mod
 		return nil, err
 	}
 
-	provider, err := scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	provider, err := scanTerraformProvider(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -440,11 +419,8 @@ func (t *terraformProviders) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func buildTerraformProviderResourcePath(groupPath string, name string) string {
-	return fmt.Sprintf("%s/%s", groupPath, name)
-}
-
-func scanTerraformProvider(row scanner, withResourcePath bool) (*models.TerraformProvider, error) {
+func scanTerraformProvider(row scanner) (*models.TerraformProvider, error) {
+	var groupPath string
 	provider := &models.TerraformProvider{}
 
 	fields := []interface{}{
@@ -458,11 +434,7 @@ func scanTerraformProvider(row scanner, withResourcePath bool) (*models.Terrafor
 		&provider.Private,
 		&provider.RepositoryURL,
 		&provider.CreatedBy,
-	}
-
-	var path string
-	if withResourcePath {
-		fields = append(fields, &path)
+		&groupPath,
 	}
 
 	err := row.Scan(fields...)
@@ -470,9 +442,7 @@ func scanTerraformProvider(row scanner, withResourcePath bool) (*models.Terrafor
 		return nil, err
 	}
 
-	if withResourcePath {
-		provider.ResourcePath = buildTerraformProviderResourcePath(path, provider.Name)
-	}
+	provider.Metadata.TRN = types.TerraformProviderModelType.BuildTRN(groupPath, provider.Name)
 
 	return provider, nil
 }

@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -38,7 +37,7 @@ type PlanResolver struct {
 
 // ID resolver
 func (r *PlanResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.PlanType, r.plan.Metadata.ID))
+	return graphql.ID(r.plan.GetGlobalID())
 }
 
 // Status resolver
@@ -88,7 +87,7 @@ func (r *PlanResolver) Metadata() *MetadataResolver {
 
 // CurrentJob returns the current job for the plan resource
 func (r *PlanResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
-	job, err := getRunService(ctx).GetLatestJobForPlan(ctx, r.plan.Metadata.ID)
+	job, err := getServiceCatalog(ctx).RunService.GetLatestJobForPlan(ctx, r.plan.Metadata.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -100,7 +99,7 @@ func (r *PlanResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
 
 // Changes resolver
 func (r *PlanResolver) Changes(ctx context.Context) (*PlanChangesResolver, error) {
-	diff, err := getRunService(ctx).GetPlanDiff(ctx, r.plan.Metadata.ID)
+	diff, err := getServiceCatalog(ctx).RunService.GetPlanDiff(ctx, r.plan.Metadata.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -153,9 +152,14 @@ func handlePlanMutationProblem(e error, clientMutationID *string) (*PlanMutation
 }
 
 func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutationPayloadResolver, error) {
-	runService := getRunService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	plan, err := runService.GetPlan(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := serviceCatalog.RunService.GetPlanByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +179,7 @@ func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutat
 	plan.HasChanges = input.HasChanges
 	plan.ErrorMessage = input.ErrorMessage
 
-	plan, err = runService.UpdatePlan(ctx, plan)
+	plan, err = serviceCatalog.RunService.UpdatePlan(ctx, plan)
 	if err != nil {
 		return nil, err
 	}
@@ -213,9 +217,7 @@ func loadPlan(ctx context.Context, id string) (*models.Plan, error) {
 }
 
 func planBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getRunService(ctx)
-
-	plans, err := service.GetPlansByIDs(ctx, ids)
+	plans, err := getServiceCatalog(ctx).RunService.GetPlansByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

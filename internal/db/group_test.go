@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 	tharsis "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg"
 )
@@ -159,7 +161,7 @@ func TestGetGroupByID(t *testing.T) {
 			name:        "defective-id",
 			searchID:    invalidID,
 			expectGroup: false,
-			expectMsg:   invalidUUIDMsg1,
+			expectMsg:   ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -179,71 +181,68 @@ func TestGetGroupByID(t *testing.T) {
 	}
 }
 
-// TestGetGroupByFullPath tests GetGroupByFullPath
-func TestGetGroupByFullPath(t *testing.T) {
-	ctx := context.Background()
+func TestGetGroupByTRN(t *testing.T) {
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupGroups, _, err := createInitialGroups(ctx, testClient, standardWarmupGroups)
-	require.Nil(t, err)
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	// Testing edge-cases with namespace path.
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(123),
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg   *string
-		name        string
-		searchPath  string
-		expectGroup bool
+		name            string
+		trn             string
+		expectApply     bool
+		expectErrorCode errors.CodeType
 	}
 
-	testCases := []testCase{}
-	for _, positiveGroup := range createdWarmupGroups {
-		testCases = append(testCases, testCase{
-			name:        "positive-" + positiveGroup.FullPath,
-			searchPath:  positiveGroup.FullPath,
-			expectGroup: true,
-		})
+	testCases := []testCase{
+		{
+			name:        "get resource by TRN",
+			trn:         group.Metadata.TRN,
+			expectApply: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.GroupModelType.BuildTRN("unknown"),
+		},
+		{
+			name: "passing in a workspace TRN should not return any results",
+			trn:  types.GroupModelType.BuildTRN(workspace.FullPath),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
 	}
-
-	testCases = append(testCases,
-		testCase{
-			name:       "negative, non-existent top-level group",
-			searchPath: "non-existent-top-level-group",
-			// expect group and error to be nil
-		},
-		testCase{
-			name:       "negative, non-existent second-level group",
-			searchPath: "top-level-group-1/non-existent-2nd-level-group",
-			// expect group and error to be nil
-		},
-		testCase{
-			name:       "negative, non-existent third-level group",
-			searchPath: "top-level-group-1/2nd-level-group-1b/non-existent-3rd-level-group",
-			// expect group and error to be nil
-		},
-		testCase{
-			name:       "negative, non-existent fourth-level",
-			searchPath: "top-level-group-1/2nd-level-group-1b/3rd-level-group-1b1/non-existent-4th-level-group",
-			// expect group and error to be nil
-		},
-		testCase{
-			name:       "defective-path",
-			searchPath: "this*is*a*not*a*valid*path",
-			// expect group and error to be nil
-			// At the DB layer, the search path is just looked up, with no group returned.
-		},
-	)
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			group, err := testClient.client.Groups.GetGroupByFullPath(ctx, test.searchPath)
+			actualGroup, err := testClient.client.Groups.GetGroupByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectGroup {
-				require.NotNil(t, group)
-				assert.Equal(t, test.searchPath, group.FullPath)
+			require.NoError(t, err)
+
+			if test.expectApply {
+				require.NotNil(t, actualGroup)
+				assert.Equal(t, types.GroupModelType.BuildTRN(group.FullPath), actualGroup.Metadata.TRN)
 			} else {
-				assert.Nil(t, group)
+				assert.Nil(t, actualGroup)
 			}
 		})
 	}
@@ -1283,7 +1282,7 @@ func TestCreateGroup(t *testing.T) {
 						} else {
 
 							// input must be not top-level, so look up the parent's ID.
-							parent, err := testClient.client.Groups.GetGroupByFullPath(ctx, parentPath)
+							parent, err := testClient.client.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(parentPath))
 							require.Nil(t, err)
 
 							input.ParentID = parent.Metadata.ID
@@ -1443,7 +1442,7 @@ func TestUpdateGroup(t *testing.T) {
 			switch {
 
 			case (test.findFullPath != nil) && (test.findGroup == nil):
-				originalGroup, err = testClient.client.Groups.GetGroupByFullPath(ctx, *test.findFullPath)
+				originalGroup, err = testClient.client.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(*test.findFullPath))
 				require.Nil(t, err)
 				require.NotNil(t, originalGroup)
 
@@ -1471,7 +1470,7 @@ func TestUpdateGroup(t *testing.T) {
 
 				compareGroupsUpdate(t, *expectUpdatedDescription, *originalGroup, *claimedUpdatedGroup)
 
-				retrieved, err := testClient.client.Groups.GetGroupByFullPath(ctx, originalGroup.FullPath)
+				retrieved, err := testClient.client.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(originalGroup.FullPath))
 				require.Nil(t, err)
 
 				require.NotNil(t, retrieved)
@@ -1617,7 +1616,7 @@ func TestMigrateGroupBasics(t *testing.T) {
 				assert.Equal(t, fetchPath, newGroup.FullPath)
 
 				// Group can be fetched from new path.
-				fetched, err := testClient.client.Groups.GetGroupByFullPath(ctx, fetchPath)
+				fetched, err := testClient.client.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(fetchPath))
 				require.Nil(t, err)
 				require.NotNil(t, fetched)
 
@@ -1625,12 +1624,12 @@ func TestMigrateGroupBasics(t *testing.T) {
 				compareGroupsMigrate(t, oldGroup.Description, *newGroup, *fetched)
 
 				// No group at old path.
-				oldFetchedGroup, err := testClient.client.Groups.GetGroupByFullPath(ctx, oldGroup.FullPath)
+				oldFetchedGroup, err := testClient.client.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(oldGroup.FullPath))
 				assert.Nil(t, err)
 				assert.Nil(t, oldFetchedGroup)
 
 				// Just in case something went badly awry, no workspace at old path.
-				oldFetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByFullPath(ctx, oldGroup.FullPath)
+				oldFetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(oldGroup.FullPath))
 				assert.Nil(t, err)
 				assert.Nil(t, oldFetchedWorkspace)
 
@@ -1645,25 +1644,25 @@ func TestMigrateGroupBasics(t *testing.T) {
 					newOther, err := testClient.client.ServiceAccounts.GetServiceAccountByID(ctx, oldOther.Metadata.ID)
 					assert.Nil(t, err)
 					assert.NotNil(t, newOther)
-					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+					assert.Equal(t, strings.Replace(oldOther.GetResourcePath(), oldPath, newPath, 1), newOther.GetResourcePath())
 				}
 				for _, oldOther := range test.others.managedIdentities {
 					newOther, err := testClient.client.ManagedIdentities.GetManagedIdentityByID(ctx, oldOther.Metadata.ID)
 					assert.Nil(t, err)
 					assert.NotNil(t, newOther)
-					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+					assert.Equal(t, strings.Replace(oldOther.GetResourcePath(), oldPath, newPath, 1), newOther.GetResourcePath())
 				}
 				for _, oldOther := range test.others.gpgKeys {
 					newOther, err := testClient.client.GPGKeys.GetGPGKeyByID(ctx, oldOther.Metadata.ID)
 					assert.Nil(t, err)
 					assert.NotNil(t, newOther)
-					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+					assert.Equal(t, strings.Replace(oldOther.GetResourcePath(), oldPath, newPath, 1), newOther.GetResourcePath())
 				}
 				for _, oldOther := range test.others.terraformProviders {
 					newOther, err := testClient.client.TerraformProviders.GetProviderByID(ctx, oldOther.Metadata.ID)
 					assert.Nil(t, err)
 					assert.NotNil(t, newOther)
-					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1), newOther.ResourcePath)
+					assert.Equal(t, strings.Replace(oldOther.GetResourcePath(), oldPath, newPath, 1), newOther.GetResourcePath())
 				}
 				for _, oldOther := range test.others.memberships {
 					newOther, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, oldOther.Metadata.ID)
@@ -1699,8 +1698,8 @@ func TestMigrateGroupBasics(t *testing.T) {
 					newOther, err := testClient.client.VCSProviders.GetProviderByID(ctx, oldOther.Metadata.ID)
 					assert.Nil(t, err)
 					assert.NotNil(t, newOther)
-					assert.Equal(t, strings.Replace(oldOther.ResourcePath, oldPath, newPath, 1),
-						newOther.ResourcePath)
+					assert.Equal(t, strings.Replace(oldOther.GetResourcePath(), oldPath, newPath, 1),
+						newOther.GetResourcePath())
 				}
 			}
 		})
@@ -1882,7 +1881,7 @@ func TestMigrateGroupOther(t *testing.T) {
 					ParentID: "dummy", // Simply so GetParentPath won't return empty string.
 					FullPath: test.newPath,
 				}
-				newParentGroup, err = testClient.client.Groups.GetGroupByFullPath(ctx, dummyGroup.GetParentPath())
+				newParentGroup, err = testClient.client.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(dummyGroup.GetParentPath()))
 				assert.Nil(t, err)
 			}
 
@@ -2029,7 +2028,6 @@ var warmupUsersForSearch = []models.User{
 // Warmup service account(s) for GetGroups search.
 var warmupServiceAccountsForSearch = []models.ServiceAccount{
 	{
-		ResourcePath:      "sa-resource-path-for-search",
 		Name:              "service-account-for-search",
 		Description:       "service account for search",
 		GroupID:           "top-level-group-1", // will be fixed later
@@ -2214,7 +2212,6 @@ var warmupWorkspacesForGroupMigration = []models.Workspace{
 
 var warmupServiceAccountsForGroupMigration = []models.ServiceAccount{
 	{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "1-service-account-0",
 		Description:       "service account 0",
 		GroupID:           "top-level-group-1/2nd-level-group-1a", // will be fixed later
@@ -2247,12 +2244,11 @@ var warmupGPGKeysForGroupMigration = []models.GPGKey{
 
 var warmupTerraformProvidersForGroupMigration = []models.TerraformProvider{
 	{
-		Name:         "1-terraform-provider-0",
-		ResourcePath: "top-level-group-1/2nd-level-group-1a/1-terraform-provider-0",
-		RootGroupID:  "top-level-group-1",                    // will be fixed later
-		GroupID:      "top-level-group-1/2nd-level-group-1a", // will be fixed later
-		Private:      false,
-		CreatedBy:    "someone-sv0",
+		Name:        "1-terraform-provider-0",
+		RootGroupID: "top-level-group-1",                    // will be fixed later
+		GroupID:     "top-level-group-1/2nd-level-group-1a", // will be fixed later
+		Private:     false,
+		CreatedBy:   "someone-sv0",
 	},
 }
 
@@ -2435,7 +2431,6 @@ var warmupRunnersForGroupMigrationOther = []models.Runner{
 
 var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 	{
-		ResourcePath:      "A/SA-A-X",
 		Name:              "SA-A-X",
 		Description:       "service account in A for X",
 		GroupID:           "A", // will be fixed later
@@ -2443,7 +2438,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/SA-A-Y",
 		Name:              "SA-A-Y",
 		Description:       "service account in A for Y",
 		GroupID:           "A", // will be fixed later
@@ -2451,7 +2445,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/SA-A-WX",
 		Name:              "SA-A-WX",
 		Description:       "service account in A for WX",
 		GroupID:           "A", // will be fixed later
@@ -2459,7 +2452,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/SA-A-WY",
 		Name:              "SA-A-WY",
 		Description:       "service account in A for WY",
 		GroupID:           "A", // will be fixed later
@@ -2467,7 +2459,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/B/SA-B-X",
 		Name:              "SA-B-X",
 		Description:       "service account in B for X",
 		GroupID:           "A/B", // will be fixed later
@@ -2475,7 +2466,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/B/SA-B-Y",
 		Name:              "SA-B-Y",
 		Description:       "service account in B for Y",
 		GroupID:           "A/B", // will be fixed later
@@ -2483,7 +2473,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/B/SA-B-WX",
 		Name:              "SA-B-WX",
 		Description:       "service account in B for WX",
 		GroupID:           "A/B", // will be fixed later
@@ -2491,7 +2480,6 @@ var warmupServiceAccountsForMigrateOther = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "A/B/SA-B-WY",
 		Name:              "SA-B-WY",
 		Description:       "service account in B for WY",
 		GroupID:           "A/B", // will be fixed later
@@ -2527,41 +2515,37 @@ var warmupVCSProvidersForMigrateOther = []models.VCSProvider{
 
 var warmupTerraformProvidersForMigrateOther = []models.TerraformProvider{
 	{
-		Name:         "TP-X",
-		ResourcePath: "A/B/X/TP-X",
-		RootGroupID:  "A",
-		GroupID:      "A/B/X",
-		Private:      false,
-		CreatedBy:    "someone-TP-X",
+		Name:        "TP-X",
+		RootGroupID: "A",
+		GroupID:     "A/B/X",
+		Private:     false,
+		CreatedBy:   "someone-TP-X",
 	},
 	{
-		Name:         "TP-Y",
-		ResourcePath: "A/B/X/Y/TP-Y",
-		RootGroupID:  "A",
-		GroupID:      "A/B/X/Y",
-		Private:      true,
-		CreatedBy:    "someone-TP-Y",
+		Name:        "TP-Y",
+		RootGroupID: "A",
+		GroupID:     "A/B/X/Y",
+		Private:     true,
+		CreatedBy:   "someone-TP-Y",
 	},
 }
 
 var warmupTerraformModulesForMigrateOther = []models.TerraformModule{
 	{
-		Name:         "TM-X",
-		System:       "aws",
-		ResourcePath: "A/B/X/TM-X",
-		RootGroupID:  "A",
-		GroupID:      "A/B/X",
-		Private:      false,
-		CreatedBy:    "someone-TM-X",
+		Name:        "TM-X",
+		System:      "aws",
+		RootGroupID: "A",
+		GroupID:     "A/B/X",
+		Private:     false,
+		CreatedBy:   "someone-TM-X",
 	},
 	{
-		Name:         "TM-Y",
-		System:       "azure",
-		ResourcePath: "A/B/X/Y/TM-Y",
-		RootGroupID:  "A",
-		GroupID:      "A/B/X/Y",
-		Private:      true,
-		CreatedBy:    "someone-TM-Y",
+		Name:        "TM-Y",
+		System:      "azure",
+		RootGroupID: "A",
+		GroupID:     "A/B/X/Y",
+		Private:     true,
+		CreatedBy:   "someone-TM-Y",
 	},
 }
 
@@ -2855,7 +2839,7 @@ func createAssociations(ctx context.Context, dbClient *Client,
 		// Find the managed identity resource.
 		var managedIdentity *models.ManagedIdentity
 		for _, mi := range resources.managedIdentities {
-			if mi.ResourcePath == input.managedIdentityPath {
+			if mi.GetResourcePath() == input.managedIdentityPath {
 				managedIdentity = &mi
 				break
 			}
@@ -2889,7 +2873,7 @@ func createAssociations(ctx context.Context, dbClient *Client,
 		// Find the service account.
 		var serviceAccount *models.ServiceAccount
 		for _, sa := range resources.serviceAccounts {
-			if sa.ResourcePath == input.serviceAccountPath {
+			if sa.GetResourcePath() == input.serviceAccountPath {
 				serviceAccount = &sa
 				break
 			}
@@ -2953,7 +2937,7 @@ func createAssociations(ctx context.Context, dbClient *Client,
 		// Find the service account.
 		var serviceAccount *models.ServiceAccount
 		for _, sa := range resources.serviceAccounts {
-			if sa.ResourcePath == input.serviceAccountPath {
+			if sa.GetResourcePath() == input.serviceAccountPath {
 				serviceAccount = &sa
 				break
 			}
@@ -2966,7 +2950,7 @@ func createAssociations(ctx context.Context, dbClient *Client,
 		// Find the namespace.  The group or workspace found here is not actually used except for consistency checking.
 		var runner *models.Runner
 		for _, r := range resources.runners {
-			if r.ResourcePath == input.runnerPath {
+			if r.GetResourcePath() == input.runnerPath {
 				runner = &r
 				break
 			}
@@ -3015,7 +2999,7 @@ func createAssociations(ctx context.Context, dbClient *Client,
 		// Find the VCS provider.
 		var provider *models.VCSProvider
 		for _, vp := range resources.vcsProviders {
-			if vp.ResourcePath == input.providerPath {
+			if vp.GetResourcePath() == input.providerPath {
 				provider = &vp
 				break
 			}

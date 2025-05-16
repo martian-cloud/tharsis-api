@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -19,9 +20,9 @@ import (
 func TestEnforceRules(t *testing.T) {
 	managedIdentity := models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "123",
+			ID:  "123",
+			TRN: types.ManagedIdentityModelType.BuildTRN("test-group/test-managed-identity"),
 		},
-		ResourcePath: "test-group/test-managed-identity",
 	}
 
 	runID := "run-1"
@@ -251,9 +252,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -277,9 +278,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -311,9 +312,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -338,9 +339,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -365,9 +366,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -393,9 +394,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -420,9 +421,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -452,9 +453,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{validAttestation}, nil)
 
 				return &RunDetails{
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -484,9 +485,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("IsTharsisModule").Return(true)
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -518,9 +519,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{}, nil)
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -551,9 +552,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("IsTharsisModule").Return(true)
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -591,9 +592,9 @@ func TestEnforceRules(t *testing.T) {
 				mockModuleSource.On("GetAttestations", mock.Anything, "1.0.0", validModuleDigestHex).Return([]string{}, nil)
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -632,9 +633,9 @@ func TestEnforceRules(t *testing.T) {
 
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -673,9 +674,9 @@ func TestEnforceRules(t *testing.T) {
 
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -714,9 +715,9 @@ func TestEnforceRules(t *testing.T) {
 
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -754,9 +755,9 @@ func TestEnforceRules(t *testing.T) {
 
 				return &RunDetails{
 					CurrentStateVersionID: &currentStateVersionID,
-					RunStage:     models.JobPlanType,
-					ModuleDigest: validModuleDigest,
-					ModuleSource: mockModuleSource,
+					RunStage:              models.JobPlanType,
+					ModuleDigest:          validModuleDigest,
+					ModuleSource:          mockModuleSource,
 					ModuleSemanticVersion: ptr.String("1.0.0"),
 				}
 			},
@@ -834,11 +835,11 @@ func TestEnforceRules(t *testing.T) {
 			}, nil)
 
 			if test.stateVersion != nil {
-				mockStateVersions.On("GetStateVersion", mock.Anything, currentStateVersionID).
+				mockStateVersions.On("GetStateVersionByID", mock.Anything, currentStateVersionID).
 					Return(test.stateVersion, nil).Maybe()
 
 				if test.stateVersionRun != nil {
-					mockRuns.On("GetRun", mock.Anything, runID).Return(test.stateVersionRun, nil).Maybe()
+					mockRuns.On("GetRunByID", mock.Anything, runID).Return(test.stateVersionRun, nil).Maybe()
 				}
 			}
 

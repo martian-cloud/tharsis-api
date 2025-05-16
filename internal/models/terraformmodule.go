@@ -2,7 +2,12 @@ package models
 
 import (
 	"strings"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
+
+var _ Model = (*TerraformModule)(nil)
 
 // TerraformModule represents a terraform module
 type TerraformModule struct {
@@ -11,10 +16,24 @@ type TerraformModule struct {
 	System        string // the name of the remote system the module is intended to target
 	GroupID       string
 	RootGroupID   string // the module namespace is the path of the root group
-	ResourcePath  string // resource path is <group-path>/<module-name>/<system>
 	RepositoryURL string
 	Metadata      ResourceMetadata
 	Private       bool
+}
+
+// GetID returns the Metadata ID.
+func (t *TerraformModule) GetID() string {
+	return t.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (t *TerraformModule) GetGlobalID() string {
+	return gid.ToGlobalID(t.GetModelType(), t.Metadata.ID)
+}
+
+// GetModelType returns the model type
+func (t *TerraformModule) GetModelType() types.ModelType {
+	return types.TerraformModuleModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -37,13 +56,18 @@ func (t *TerraformModule) Validate() error {
 	return verifyValidName(t.Name)
 }
 
+// GetResourcePath returns the resource path for the terraform module
+func (t *TerraformModule) GetResourcePath() string {
+	return strings.Split(t.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+}
+
 // GetRegistryNamespace returns the module registry namespace for the terraform module
 func (t *TerraformModule) GetRegistryNamespace() string {
-	return strings.Split(t.ResourcePath, "/")[0]
+	return strings.Split(t.GetResourcePath(), "/")[0]
 }
 
 // GetGroupPath returns the group path
 func (t *TerraformModule) GetGroupPath() string {
-	pathParts := strings.Split(t.ResourcePath, "/")
+	pathParts := strings.Split(t.GetResourcePath(), "/")
 	return strings.Join(pathParts[:len(pathParts)-2], "/")
 }

@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -269,7 +269,7 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 		return nil, err
 	}
 
-	if err = caller.RequirePermission(ctx, permissions.CreateUserPermission); err != nil {
+	if err = caller.RequirePermission(ctx, models.CreateUserPermission); err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateUserPermission, auth.WithUserID(input.ID))
+	err = caller.RequirePermission(ctx, models.UpdateUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -359,7 +359,7 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteUserPermission, auth.WithUserID(input.ID))
+	err = caller.RequirePermission(ctx, models.DeleteUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -436,15 +436,15 @@ func (s *service) CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInp
 		return nil, err
 	}
 
-	if err = caller.RequirePermission(ctx, permissions.CreateTeamPermission); err != nil {
+	if err = caller.RequirePermission(ctx, models.CreateTeamPermission); err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
 	// Check if team with same name exists.
-	existingTeam, err := s.dbClient.Teams.GetTeamByName(ctx, input.Name)
+	existingTeam, err := s.dbClient.Teams.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(input.Name))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get team by name")
+		tracing.RecordError(span, err, "failed to get team by TRN")
 		return nil, err
 	}
 
@@ -488,7 +488,7 @@ func (s *service) UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInpu
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTeamPermission, auth.WithTeamID(input.ID))
+	err = caller.RequirePermission(ctx, models.UpdateTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -514,7 +514,7 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteTeamPermission, auth.WithTeamID(input.ID))
+	err = caller.RequirePermission(ctx, models.DeleteTeamPermission, auth.WithTeamID(input.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err

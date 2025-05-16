@@ -7,8 +7,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -71,7 +71,7 @@ type TerraformModuleVersionConnectionResolver struct {
 
 // NewTerraformModuleVersionConnectionResolver creates a new TerraformModuleVersionConnectionResolver
 func NewTerraformModuleVersionConnectionResolver(ctx context.Context, input *moduleregistry.GetModuleVersionsInput) (*TerraformModuleVersionConnectionResolver, error) {
-	service := getModuleRegistryService(ctx)
+	service := getServiceCatalog(ctx).TerraformModuleRegistryService
 
 	result, err := service.GetModuleVersions(ctx, input)
 	if err != nil {
@@ -139,7 +139,7 @@ type TerraformModuleVersionResolver struct {
 
 // ID resolver
 func (r *TerraformModuleVersionResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformModuleVersionType, r.moduleVersion.Metadata.ID))
+	return graphql.ID(r.moduleVersion.GetGlobalID())
 }
 
 // Version resolver
@@ -203,7 +203,7 @@ func (r *TerraformModuleVersionResolver) ConfigurationDetails(ctx context.Contex
 		return nil, nil
 	}
 
-	metadata, err := getModuleRegistryService(ctx).GetModuleConfigurationDetails(ctx, r.moduleVersion, args.Path)
+	metadata, err := getServiceCatalog(ctx).TerraformModuleRegistryService.GetModuleConfigurationDetails(ctx, r.moduleVersion, args.Path)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -242,7 +242,7 @@ func (r *TerraformModuleVersionResolver) CreatedBy() string {
 }
 
 func terraformModuleVersionQuery(ctx context.Context, args *TerraformModuleVersionQueryArgs) (*TerraformModuleVersionResolver, error) {
-	service := getModuleRegistryService(ctx)
+	service := getServiceCatalog(ctx).TerraformModuleRegistryService
 
 	module, err := service.GetModuleByAddress(ctx, args.RegistryNamespace, args.ModuleName, args.System)
 	if err != nil {
@@ -302,7 +302,8 @@ func (r *TerraformModuleVersionMutationPayloadResolver) ModuleVersion() *Terrafo
 // CreateTerraformModuleVersionInput contains the input for creating a new moduleVersion
 type CreateTerraformModuleVersionInput struct {
 	ClientMutationID *string
-	ModulePath       string
+	ModuleID         *string
+	ModulePath       *string // DEPRECATED: use ModuleID instead with a TRN
 	Version          string
 	SHASum           string
 }
@@ -324,9 +325,7 @@ func handleTerraformModuleVersionMutationProblem(e error, clientMutationID *stri
 }
 
 func createTerraformModuleVersionMutation(ctx context.Context, input *CreateTerraformModuleVersionInput) (*TerraformModuleVersionMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
-
-	module, err := service.GetModuleByPath(ctx, input.ModulePath)
+	moduleID, err := toModelID(ctx, input.ModulePath, input.ModuleID, types.TerraformModuleModelType)
 	if err != nil {
 		return nil, err
 	}
@@ -336,8 +335,8 @@ func createTerraformModuleVersionMutation(ctx context.Context, input *CreateTerr
 		return nil, err
 	}
 
-	createdModuleVersion, err := service.CreateModuleVersion(ctx, &moduleregistry.CreateModuleVersionInput{
-		ModuleID:        module.Metadata.ID,
+	createdModuleVersion, err := getServiceCatalog(ctx).TerraformModuleRegistryService.CreateModuleVersion(ctx, &moduleregistry.CreateModuleVersionInput{
+		ModuleID:        moduleID,
 		SemanticVersion: input.Version,
 		SHASum:          shaSum,
 	})
@@ -350,9 +349,14 @@ func createTerraformModuleVersionMutation(ctx context.Context, input *CreateTerr
 }
 
 func deleteTerraformModuleVersionMutation(ctx context.Context, input *DeleteTerraformModuleVersionInput) (*TerraformModuleVersionMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	moduleVersion, err := service.GetModuleVersionByID(ctx, gid.FromGlobalID(input.ID))
+	versionID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	moduleVersion, err := serviceCatalog.TerraformModuleRegistryService.GetModuleVersionByID(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +371,7 @@ func deleteTerraformModuleVersionMutation(ctx context.Context, input *DeleteTerr
 		moduleVersion.Metadata.Version = v
 	}
 
-	if err := service.DeleteModuleVersion(ctx, moduleVersion); err != nil {
+	if err := serviceCatalog.TerraformModuleRegistryService.DeleteModuleVersion(ctx, moduleVersion); err != nil {
 		return nil, err
 	}
 
@@ -404,9 +408,7 @@ func loadTerraformModuleVersion(ctx context.Context, id string) (*models.Terrafo
 }
 
 func moduleVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getModuleRegistryService(ctx)
-
-	moduleVersions, err := service.GetModuleVersionsByIDs(ctx, ids)
+	moduleVersions, err := getServiceCatalog(ctx).TerraformModuleRegistryService.GetModuleVersionsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

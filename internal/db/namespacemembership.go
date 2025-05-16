@@ -11,7 +11,9 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -30,6 +32,7 @@ type CreateNamespaceMembershipInput struct {
 type NamespaceMemberships interface {
 	GetNamespaceMemberships(ctx context.Context, input *GetNamespaceMembershipsInput) (*NamespaceMembershipResult, error)
 	GetNamespaceMembershipByID(ctx context.Context, id string) (*models.NamespaceMembership, error)
+	GetNamespaceMembershipByTRN(ctx context.Context, trn string) (*models.NamespaceMembership, error)
 	CreateNamespaceMembership(ctx context.Context, input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error)
 	UpdateNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error)
 	DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error
@@ -109,26 +112,30 @@ func (m *namespaceMemberships) GetNamespaceMembershipByID(ctx context.Context, i
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("namespace_memberships").
-		Prepared(true).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
-		Select(m.getSelectFields()...).
-		Where(goqu.Ex{"namespace_memberships.id": id}).ToSQL()
+	return m.getNamespaceMembership(ctx, goqu.Ex{"namespace_memberships.id": id})
+}
+
+func (m *namespaceMemberships) GetNamespaceMembershipByTRN(ctx context.Context, trn string) (*models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "db.GetNamespaceMembershipByTRN")
+	defer span.End()
+
+	path, err := types.NamespaceMembershipModelType.ResourcePathFromTRN(trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	namespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.Wrap(err, "a namespace membership TRN must have namespace path and membership GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
 
-	return namespaceMembership, nil
+	return m.getNamespaceMembership(ctx, goqu.Ex{
+		"namespace_memberships.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path":          path[:lastSlashIndex],
+	})
 }
 
 func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
@@ -170,16 +177,21 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		record["team_id"] = input.TeamID
 	}
 
-	sql, args, err := dialect.Insert("namespace_memberships").
+	sql, args, err := dialect.From("namespace_memberships").
 		Prepared(true).
-		Rows(record).
-		Returning(namespaceMembershipFieldList...).ToSQL()
+		With("namespace_memberships",
+			dialect.Insert("namespace_memberships").
+				Rows(record).
+				Returning("*"),
+		).Select(m.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
+	createdNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -210,10 +222,6 @@ func (m *namespaceMemberships) CreateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
-	createdNamespaceMembership.Namespace.Path = input.NamespacePath
-	createdNamespaceMembership.Namespace.GroupID = &namespace.groupID
-	createdNamespaceMembership.Namespace.WorkspaceID = &namespace.workspaceID
-
 	return createdNamespaceMembership, nil
 }
 
@@ -226,20 +234,29 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("namespace_memberships").
+	sql, args, err := dialect.From("namespace_memberships").
 		Prepared(true).
-		Set(goqu.Record{
-			"version":    goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at": timestamp,
-			"role_id":    namespaceMembership.RoleID,
-		}).
-		Where(goqu.Ex{"id": namespaceMembership.Metadata.ID, "version": namespaceMembership.Metadata.Version}).Returning(namespaceMembershipFieldList...).ToSQL()
+		With("namespace_memberships",
+			dialect.Update("namespace_memberships").
+				Set(goqu.Record{
+					"version":    goqu.L("? + ?", goqu.C("version"), 1),
+					"updated_at": timestamp,
+					"role_id":    namespaceMembership.RoleID,
+				}).
+				Where(goqu.Ex{
+					"id":      namespaceMembership.Metadata.ID,
+					"version": namespaceMembership.Metadata.Version,
+				}).
+				Returning("*"),
+		).Select(m.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
+	updatedNamespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -262,8 +279,6 @@ func (m *namespaceMemberships) UpdateNamespaceMembership(ctx context.Context,
 		return nil, err
 	}
 
-	updatedNamespaceMembership.Namespace = namespaceMembership.Namespace
-
 	return updatedNamespaceMembership, nil
 }
 
@@ -272,20 +287,24 @@ func (m *namespaceMemberships) DeleteNamespaceMembership(ctx context.Context, na
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("namespace_memberships").
+	sql, args, err := dialect.From("namespace_memberships").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      namespaceMembership.Metadata.ID,
-				"version": namespaceMembership.Metadata.Version,
-			},
-		).Returning(namespaceMembershipFieldList...).ToSQL()
+		With("namespace_memberships",
+			dialect.Delete("namespace_memberships").
+				Where(goqu.Ex{
+					"id":      namespaceMembership.Metadata.ID,
+					"version": namespaceMembership.Metadata.Version,
+				}).
+				Returning("*"),
+		).Select(m.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	if _, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
+	if _, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
@@ -397,7 +416,7 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 	// Scan rows
 	results := []models.NamespaceMembership{}
 	for rows.Next() {
-		item, err := scanNamespaceMembership(rows, true)
+		item, err := scanNamespaceMembership(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -419,6 +438,38 @@ func (m *namespaceMemberships) GetNamespaceMemberships(ctx context.Context,
 	return &result, nil
 }
 
+func (m *namespaceMemberships) getNamespaceMembership(ctx context.Context, ex goqu.Ex) (*models.NamespaceMembership, error) {
+	ctx, span := tracer.Start(ctx, "db.getNamespaceMembership")
+	defer span.End()
+
+	sql, args, err := dialect.From("namespace_memberships").
+		Prepared(true).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"namespace_memberships.namespace_id": goqu.I("namespaces.id")})).
+		Select(m.getSelectFields()...).
+		Where(ex).
+		ToSQL()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	namespaceMembership, err := scanNamespaceMembership(m.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return namespaceMembership, nil
+}
+
 func (m *namespaceMemberships) getSelectFields() []interface{} {
 	selectFields := []interface{}{}
 	for _, field := range namespaceMembershipFieldList {
@@ -433,11 +484,9 @@ func (m *namespaceMemberships) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func scanNamespaceMembership(row scanner, withNamespacePath bool) (*models.NamespaceMembership, error) {
+func scanNamespaceMembership(row scanner) (*models.NamespaceMembership, error) {
 	namespaceMembership := &models.NamespaceMembership{}
 
-	var namespaceID, namespacePath string
-	var groupID, workspaceID sql.NullString
 	var userID sql.NullString
 	var serviceAccountID sql.NullString
 	var teamID sql.NullString
@@ -451,31 +500,15 @@ func scanNamespaceMembership(row scanner, withNamespacePath bool) (*models.Names
 		&userID,
 		&serviceAccountID,
 		&teamID,
-	}
-
-	if withNamespacePath {
-		fields = append(fields, &namespaceID)
-		fields = append(fields, &namespacePath)
-		fields = append(fields, &groupID)
-		fields = append(fields, &workspaceID)
+		&namespaceMembership.Namespace.ID,
+		&namespaceMembership.Namespace.Path,
+		&namespaceMembership.Namespace.GroupID,
+		&namespaceMembership.Namespace.WorkspaceID,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
-	}
-
-	if withNamespacePath {
-		namespaceMembership.Namespace.ID = namespaceID
-		namespaceMembership.Namespace.Path = namespacePath
-	}
-
-	if groupID.Valid {
-		namespaceMembership.Namespace.GroupID = &groupID.String
-	}
-
-	if workspaceID.Valid {
-		namespaceMembership.Namespace.WorkspaceID = &workspaceID.String
 	}
 
 	if userID.Valid {
@@ -489,6 +522,8 @@ func scanNamespaceMembership(row scanner, withNamespacePath bool) (*models.Names
 	if teamID.Valid {
 		namespaceMembership.TeamID = &teamID.String
 	}
+
+	namespaceMembership.Metadata.TRN = types.NamespaceMembershipModelType.BuildTRN(namespaceMembership.Namespace.Path, namespaceMembership.GetGlobalID())
 
 	return namespaceMembership, nil
 }

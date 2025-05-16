@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
@@ -49,7 +48,7 @@ type RunnerSessionConnectionResolver struct {
 
 // NewRunnerSessionConnectionResolver creates a new RunnerSessionConnectionResolver
 func NewRunnerSessionConnectionResolver(ctx context.Context, input *runner.GetRunnerSessionsInput) (*RunnerSessionConnectionResolver, error) {
-	service := getRunnerService(ctx)
+	service := getServiceCatalog(ctx).RunnerService
 
 	result, err := service.GetRunnerSessions(ctx, input)
 	if err != nil {
@@ -117,7 +116,7 @@ type RunnerSessionResolver struct {
 
 // ID resolver
 func (r *RunnerSessionResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.RunnerSessionType, r.session.Metadata.ID))
+	return graphql.ID(r.session.GetGlobalID())
 }
 
 // Metadata resolver
@@ -181,7 +180,7 @@ func (r *RunnerSessionErrorLogResolver) Size() (int32, error) {
 
 // Data resolver
 func (r *RunnerSessionErrorLogResolver) Data(ctx context.Context, args *JobLogsQueryArgs) (string, error) {
-	buffer, err := getRunnerService(ctx).ReadRunnerSessionErrorLog(ctx, *r.stream.RunnerSessionID, int(args.StartOffset), int(args.Limit))
+	buffer, err := getServiceCatalog(ctx).RunnerService.ReadRunnerSessionErrorLog(ctx, *r.stream.RunnerSessionID, int(args.StartOffset), int(args.Limit))
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +230,7 @@ func handleCreateRunnerSessionMutationProblem(e error,
 
 func createRunnerSessionMutation(ctx context.Context,
 	input *CreateRunnerSessionInput) (*CreateRunnerSessionMutationPayloadResolver, error) {
-	createdRunnerSession, err := getRunnerService(ctx).CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
+	createdRunnerSession, err := getServiceCatalog(ctx).RunnerService.CreateRunnerSession(ctx, &runner.CreateRunnerSessionInput{
 		RunnerPath: input.RunnerPath,
 	})
 	if err != nil {
@@ -291,7 +290,14 @@ func handleRunnerSessionHeartbeatErrorMutationProblem(e error,
 
 func runnerSessionHeartbeatMutation(ctx context.Context,
 	input *RunnerSessionHeartbeatInput) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
-	err := getRunnerService(ctx).AcceptRunnerSessionHeartbeat(ctx, gid.FromGlobalID(input.RunnerSessionID))
+	serviceCatalog := getServiceCatalog(ctx)
+
+	sessionID, err := serviceCatalog.FetchModelID(ctx, input.RunnerSessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = serviceCatalog.RunnerService.AcceptRunnerSessionHeartbeat(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -306,8 +312,14 @@ func runnerSessionHeartbeatMutation(ctx context.Context,
 
 func createRunnerSessionErrorMutation(ctx context.Context,
 	input *CreateRunnerSessionErrorInput) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
-	err := getRunnerService(ctx).CreateRunnerSessionError(ctx,
-		gid.FromGlobalID(input.RunnerSessionID), input.ErrorMessage)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	sessionID, err := serviceCatalog.FetchModelID(ctx, input.RunnerSessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = serviceCatalog.RunnerService.CreateRunnerSessionError(ctx, sessionID, input.ErrorMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -361,17 +373,27 @@ type RunnerSessionEventSubscriptionInput struct {
 
 func (r RootResolver) runnerSessionEventsSubscription(ctx context.Context,
 	input *RunnerSessionEventSubscriptionInput) (<-chan *RunnerSessionEventResolver, error) {
-	runnerSessionService := getRunnerService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
 	var groupID, runnerID *string
 	var runnerType *models.RunnerType
 
 	if input.GroupID != nil {
-		groupID = ptr.String(gid.FromGlobalID(*input.GroupID))
+		id, err := serviceCatalog.FetchModelID(ctx, *input.GroupID)
+		if err != nil {
+			return nil, err
+		}
+
+		groupID = &id
 	}
 
 	if input.RunnerID != nil {
-		runnerID = ptr.String(gid.FromGlobalID(*input.RunnerID))
+		id, err := serviceCatalog.FetchModelID(ctx, *input.RunnerID)
+		if err != nil {
+			return nil, err
+		}
+
+		runnerID = &id
 	}
 
 	if input.RunnerType != nil {
@@ -379,7 +401,7 @@ func (r RootResolver) runnerSessionEventsSubscription(ctx context.Context,
 		runnerType = &typ
 	}
 
-	events, err := runnerSessionService.SubscribeToRunnerSessions(ctx, &runner.SubscribeToRunnerSessionsInput{
+	events, err := serviceCatalog.RunnerService.SubscribeToRunnerSessions(ctx, &runner.SubscribeToRunnerSessionsInput{
 		GroupID:    groupID,
 		RunnerID:   runnerID,
 		RunnerType: runnerType,
@@ -411,16 +433,21 @@ type RunnerSessionErrorLogSubscriptionInput struct {
 }
 
 func (r RootResolver) runnerSessionErrorLogSubscription(ctx context.Context, input *RunnerSessionErrorLogSubscriptionInput) (<-chan *RunnerSessionErrorLogEventResolver, error) {
-	service := getRunnerService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	sessionID, err := serviceCatalog.FetchModelID(ctx, input.RunnerSessionID)
+	if err != nil {
+		return nil, err
+	}
 
 	options := &runner.SubscribeToRunnerSessionErrorLogInput{
-		RunnerSessionID: gid.FromGlobalID(input.RunnerSessionID),
+		RunnerSessionID: sessionID,
 	}
 	if input.LastSeenLogSize != nil {
 		options.LastSeenLogSize = ptr.Int(int(*input.LastSeenLogSize))
 	}
 
-	events, err := service.SubscribeToRunnerSessionErrorLog(ctx, options)
+	events, err := serviceCatalog.RunnerService.SubscribeToRunnerSessionErrorLog(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +497,7 @@ func loadRunnerSessionLogStream(ctx context.Context, id string) (*models.LogStre
 }
 
 func runnerSessionLogStreamBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	runnerSessionLogStreams, err := getRunnerService(ctx).GetLogStreamsByRunnerSessionIDs(ctx, ids)
+	runnerSessionLogStreams, err := getServiceCatalog(ctx).RunnerService.GetLogStreamsByRunnerSessionIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

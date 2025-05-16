@@ -128,12 +128,42 @@ func (_m *MockService) DeleteWorkspace(ctx context.Context, workspace *models.Wo
 	return r0
 }
 
-// GetConfigurationVersion provides a mock function with given fields: ctx, configurationVersionID
-func (_m *MockService) GetConfigurationVersion(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
+// GetConfigurationVersionByID provides a mock function with given fields: ctx, configurationVersionID
+func (_m *MockService) GetConfigurationVersionByID(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
 	ret := _m.Called(ctx, configurationVersionID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetConfigurationVersion")
+		panic("no return value specified for GetConfigurationVersionByID")
+	}
+
+	var r0 *models.ConfigurationVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.ConfigurationVersion, error)); ok {
+		return rf(ctx, configurationVersionID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.ConfigurationVersion); ok {
+		r0 = rf(ctx, configurationVersionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.ConfigurationVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, configurationVersionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetConfigurationVersionByTRN provides a mock function with given fields: ctx, configurationVersionID
+func (_m *MockService) GetConfigurationVersionByTRN(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
+	ret := _m.Called(ctx, configurationVersionID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConfigurationVersionByTRN")
 	}
 
 	var r0 *models.ConfigurationVersion
@@ -308,12 +338,12 @@ func (_m *MockService) GetRunnerTagsSetting(ctx context.Context, workspace *mode
 	return r0, r1
 }
 
-// GetStateVersion provides a mock function with given fields: ctx, stateVersionID
-func (_m *MockService) GetStateVersion(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
+// GetStateVersionByID provides a mock function with given fields: ctx, stateVersionID
+func (_m *MockService) GetStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
 	ret := _m.Called(ctx, stateVersionID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetStateVersion")
+		panic("no return value specified for GetStateVersionByID")
 	}
 
 	var r0 *models.StateVersion
@@ -331,6 +361,36 @@ func (_m *MockService) GetStateVersion(ctx context.Context, stateVersionID strin
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, stateVersionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStateVersionByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateVersionByTRN")
+	}
+
+	var r0 *models.StateVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.StateVersion, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.StateVersion); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.StateVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -398,9 +458,69 @@ func (_m *MockService) GetStateVersionDependencies(ctx context.Context, stateVer
 	return r0, r1
 }
 
-// GetStateVersionOutputs provides a mock function with given fields: _a0, stateVersionID
-func (_m *MockService) GetStateVersionOutputs(_a0 context.Context, stateVersionID string) ([]models.StateVersionOutput, error) {
-	ret := _m.Called(_a0, stateVersionID)
+// GetStateVersionOutputByID provides a mock function with given fields: ctx, id
+func (_m *MockService) GetStateVersionOutputByID(ctx context.Context, id string) (*models.StateVersionOutput, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateVersionOutputByID")
+	}
+
+	var r0 *models.StateVersionOutput
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.StateVersionOutput, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.StateVersionOutput); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.StateVersionOutput)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStateVersionOutputByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStateVersionOutputByTRN")
+	}
+
+	var r0 *models.StateVersionOutput
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.StateVersionOutput, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.StateVersionOutput); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.StateVersionOutput)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStateVersionOutputs provides a mock function with given fields: ctx, stateVersionID
+func (_m *MockService) GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error) {
+	ret := _m.Called(ctx, stateVersionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStateVersionOutputs")
@@ -409,10 +529,10 @@ func (_m *MockService) GetStateVersionOutputs(_a0 context.Context, stateVersionI
 	var r0 []models.StateVersionOutput
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) ([]models.StateVersionOutput, error)); ok {
-		return rf(_a0, stateVersionID)
+		return rf(ctx, stateVersionID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) []models.StateVersionOutput); ok {
-		r0 = rf(_a0, stateVersionID)
+		r0 = rf(ctx, stateVersionID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.StateVersionOutput)
@@ -420,7 +540,7 @@ func (_m *MockService) GetStateVersionOutputs(_a0 context.Context, stateVersionI
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(_a0, stateVersionID)
+		r1 = rf(ctx, stateVersionID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -548,6 +668,36 @@ func (_m *MockService) GetWorkspaceAssessmentByID(ctx context.Context, id string
 	return r0, r1
 }
 
+// GetWorkspaceAssessmentByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceAssessmentByTRN")
+	}
+
+	var r0 *models.WorkspaceAssessment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.WorkspaceAssessment, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.WorkspaceAssessment); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.WorkspaceAssessment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspaceAssessmentsByWorkspaceIDs provides a mock function with given fields: ctx, idList
 func (_m *MockService) GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceAssessment, error) {
 	ret := _m.Called(ctx, idList)
@@ -578,36 +728,6 @@ func (_m *MockService) GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context
 	return r0, r1
 }
 
-// GetWorkspaceByFullPath provides a mock function with given fields: ctx, path
-func (_m *MockService) GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error) {
-	ret := _m.Called(ctx, path)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetWorkspaceByFullPath")
-	}
-
-	var r0 *models.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Workspace, error)); ok {
-		return rf(ctx, path)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Workspace); ok {
-		r0 = rf(ctx, path)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.Workspace)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetWorkspaceByID provides a mock function with given fields: ctx, id
 func (_m *MockService) GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {
 	ret := _m.Called(ctx, id)
@@ -631,6 +751,36 @@ func (_m *MockService) GetWorkspaceByID(ctx context.Context, id string) (*models
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockService) GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceByTRN")
+	}
+
+	var r0 *models.Workspace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Workspace, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Workspace); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Workspace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

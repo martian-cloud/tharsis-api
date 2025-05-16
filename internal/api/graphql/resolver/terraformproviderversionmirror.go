@@ -7,8 +7,8 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -22,6 +22,7 @@ type TerraformProviderVersionMirrorConnectionQueryArgs struct {
 }
 
 // TerraformProviderVersionMirrorQueryArgs is used to query for a single provider version mirror.
+// Deprecated: use node query instead with a TRN
 type TerraformProviderVersionMirrorQueryArgs struct {
 	RegistryHostname  string
 	RegistryNamespace string
@@ -62,7 +63,7 @@ type TerraformProviderVersionMirrorConnectionResolver struct {
 
 // NewTerraformProviderVersionMirrorConnectionResolver creates a new TerraformProviderVersionMirrorConnectionResolver
 func NewTerraformProviderVersionMirrorConnectionResolver(ctx context.Context, input *providermirror.GetProviderVersionMirrorsInput) (*TerraformProviderVersionMirrorConnectionResolver, error) {
-	service := getProviderMirrorService(ctx)
+	service := getServiceCatalog(ctx).TerraformProviderMirrorService
 
 	result, err := service.GetProviderVersionMirrors(ctx, input)
 	if err != nil {
@@ -130,7 +131,7 @@ type TerraformProviderVersionMirrorResolver struct {
 
 // ID resolver
 func (r *TerraformProviderVersionMirrorResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformProviderVersionMirrorType, r.versionMirror.Metadata.ID))
+	return graphql.ID(r.versionMirror.GetGlobalID())
 }
 
 // Metadata resolver
@@ -175,7 +176,7 @@ func (r *TerraformProviderVersionMirrorResolver) Group(ctx context.Context) (*Gr
 
 // PlatformMirrors resolver
 func (r *TerraformProviderVersionMirrorResolver) PlatformMirrors(ctx context.Context) ([]*TerraformProviderPlatformMirrorResolver, error) {
-	result, err := getProviderMirrorService(ctx).GetProviderPlatformMirrors(ctx, &providermirror.GetProviderPlatformMirrorsInput{
+	result, err := getServiceCatalog(ctx).TerraformProviderMirrorService.GetProviderPlatformMirrors(ctx, &providermirror.GetProviderPlatformMirrorsInput{
 		VersionMirrorID: r.versionMirror.Metadata.ID,
 	})
 	if err != nil {
@@ -191,16 +192,10 @@ func (r *TerraformProviderVersionMirrorResolver) PlatformMirrors(ctx context.Con
 	return resolvers, nil
 }
 
+// Deprecated: use node query instead
 func terraformProviderVersionMirrorQuery(ctx context.Context, args *TerraformProviderVersionMirrorQueryArgs) (*TerraformProviderVersionMirrorResolver, error) {
-	input := &providermirror.GetProviderVersionMirrorByAddressInput{
-		RegistryHostname:  args.RegistryHostname,
-		RegistryNamespace: args.RegistryNamespace,
-		Type:              args.Type,
-		SemanticVersion:   args.Version,
-		GroupPath:         args.GroupPath,
-	}
-
-	versionMirror, err := getProviderMirrorService(ctx).GetProviderVersionMirrorByAddress(ctx, input)
+	trn := types.TerraformProviderVersionMirrorModelType.BuildTRN(args.GroupPath, args.RegistryHostname, args.RegistryNamespace, args.Type, args.Version)
+	versionMirror, err := getServiceCatalog(ctx).TerraformProviderMirrorService.GetProviderVersionMirrorByTRN(ctx, trn)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -237,7 +232,8 @@ func (r *TerraformProviderVersionMirrorMutationPayloadResolver) VersionMirror() 
 // CreateTerraformProviderVersionMirrorInput is the input for creating a TerraformProviderVersionMirror.
 type CreateTerraformProviderVersionMirrorInput struct {
 	ClientMutationID  *string
-	GroupPath         string
+	GroupPath         *string // Deprecated: use GroupID instead with a TRN
+	GroupID           *string
 	Type              string
 	RegistryNamespace string
 	RegistryHostname  string
@@ -262,11 +258,16 @@ func handleTerraformProviderVersionMirrorMutationProblem(e error, clientMutation
 }
 
 func createTerraformProviderVersionMirrorMutation(ctx context.Context, input *CreateTerraformProviderVersionMirrorInput) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
-	createdMirror, err := getProviderMirrorService(ctx).CreateProviderVersionMirror(ctx, &providermirror.CreateProviderVersionMirrorInput{
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
+	if err != nil {
+		return nil, err
+	}
+
+	createdMirror, err := getServiceCatalog(ctx).TerraformProviderMirrorService.CreateProviderVersionMirror(ctx, &providermirror.CreateProviderVersionMirrorInput{
 		Type:              input.Type,
 		RegistryNamespace: input.RegistryNamespace,
 		RegistryHostname:  input.RegistryHostname,
-		GroupPath:         input.GroupPath,
+		GroupID:           groupID,
 		SemanticVersion:   input.SemanticVersion,
 	})
 	if err != nil {
@@ -278,9 +279,14 @@ func createTerraformProviderVersionMirrorMutation(ctx context.Context, input *Cr
 }
 
 func deleteTerraformProviderVersionMirrorMutation(ctx context.Context, input *DeleteTerraformProviderVersionMirrorInput) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
-	service := getProviderMirrorService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	gotMirror, err := service.GetProviderVersionMirrorByID(ctx, gid.FromGlobalID(input.ID))
+	versionMirrorID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	gotMirror, err := serviceCatalog.TerraformProviderMirrorService.GetProviderVersionMirrorByID(ctx, versionMirrorID)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +309,7 @@ func deleteTerraformProviderVersionMirrorMutation(ctx context.Context, input *De
 		toDelete.Force = *input.Force
 	}
 
-	if err := service.DeleteProviderVersionMirror(ctx, toDelete); err != nil {
+	if err := serviceCatalog.TerraformProviderMirrorService.DeleteProviderVersionMirror(ctx, toDelete); err != nil {
 		return nil, err
 	}
 
@@ -340,9 +346,7 @@ func loadTerraformProviderVersionMirror(ctx context.Context, id string) (*models
 }
 
 func providerVersionMirrorBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getProviderMirrorService(ctx)
-
-	versionMirrors, err := service.GetProviderVersionMirrorsByIDs(ctx, ids)
+	versionMirrors, err := getServiceCatalog(ctx).TerraformProviderMirrorService.GetProviderVersionMirrorsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

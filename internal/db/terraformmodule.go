@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -18,7 +19,7 @@ import (
 // TerraformModules encapsulates the logic to access terraform modules from the database
 type TerraformModules interface {
 	GetModuleByID(ctx context.Context, id string) (*models.TerraformModule, error)
-	GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error)
+	GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error)
 	GetModules(ctx context.Context, input *GetModulesInput) (*ModulesResult, error)
 	CreateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error)
 	UpdateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error)
@@ -101,22 +102,29 @@ func (t *terraformModules) GetModuleByID(ctx context.Context, id string) (*model
 	return t.getModule(ctx, goqu.Ex{"terraform_modules.id": id})
 }
 
-func (t *terraformModules) GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error) {
-	ctx, span := tracer.Start(ctx, "db.GetModuleByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (t *terraformModules) GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "db.GetModuleByTRN")
 	defer span.End()
+
+	path, err := types.TerraformModuleModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
 
 	pathParts := strings.Split(path, "/")
 
 	if len(pathParts) < 3 {
-		tracing.RecordError(span, nil, "Invalid resource path for module")
-		return nil, errors.New("Invalid resource path for module", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("a Terraform module TRN must have the namespacePath, module name, and module system separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
 
-	moduleName := pathParts[len(pathParts)-2]
-	moduleSystem := pathParts[len(pathParts)-1]
-	namespacePath := strings.Join(pathParts[:len(pathParts)-2], "/")
-	return t.getModule(ctx, goqu.Ex{"terraform_modules.name": moduleName, "terraform_modules.system": moduleSystem, "namespaces.path": namespacePath})
+	return t.getModule(ctx, goqu.Ex{
+		"terraform_modules.system": pathParts[len(pathParts)-1],
+		"terraform_modules.name":   pathParts[len(pathParts)-2],
+		"namespaces.path":          strings.Join(pathParts[:len(pathParts)-2], "/"),
+	})
 }
 
 func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInput) (*ModulesResult, error) {
@@ -231,7 +239,7 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 	// Scan rows
 	results := []models.TerraformModule{}
 	for rows.Next() {
-		item, err := scanTerraformModule(rows, true)
+		item, err := scanTerraformModule(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -260,42 +268,32 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Insert("terraform_modules").
+	sql, args, err := dialect.From("terraform_modules").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":            newResourceID(),
-			"version":       initialResourceVersion,
-			"created_at":    timestamp,
-			"updated_at":    timestamp,
-			"group_id":      module.GroupID,
-			"root_group_id": module.RootGroupID,
-			"name":          module.Name,
-			"system":        module.System,
-			"private":       module.Private,
-			"repo_url":      module.RepositoryURL,
-			"created_by":    module.CreatedBy,
-		}).
-		Returning(moduleFieldList...).ToSQL()
+		With("terraform_modules",
+			dialect.Insert("terraform_modules").
+				Rows(goqu.Record{
+					"id":            newResourceID(),
+					"version":       initialResourceVersion,
+					"created_at":    timestamp,
+					"updated_at":    timestamp,
+					"group_id":      module.GroupID,
+					"root_group_id": module.RootGroupID,
+					"name":          module.Name,
+					"system":        module.System,
+					"private":       module.Private,
+					"repo_url":      module.RepositoryURL,
+					"created_by":    module.CreatedBy,
+				}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdModule, err := scanTerraformModule(tx.QueryRow(ctx, sql, args...), false)
+	createdModule, err := scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -308,20 +306,6 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, module.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	createdModule.ResourcePath = buildTerraformModuleResourcePath(namespace.path, module.Name, module.System)
-
 	return createdModule, nil
 }
 
@@ -332,37 +316,29 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Update("terraform_modules").
+	sql, args, err := dialect.From("terraform_modules").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":    goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at": timestamp,
-				"private":    module.Private,
-				"repo_url":   module.RepositoryURL,
-			},
-		).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).Returning(moduleFieldList...).ToSQL()
+		With("terraform_modules",
+			dialect.Update("terraform_modules").
+				Set(
+					goqu.Record{
+						"version":    goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at": timestamp,
+						"private":    module.Private,
+						"repo_url":   module.RepositoryURL,
+					},
+				).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedModule, err := scanTerraformModule(tx.QueryRow(ctx, sql, args...), false)
+	updatedModule, err := scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -380,20 +356,6 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, module.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	updatedModule.ResourcePath = buildTerraformModuleResourcePath(namespace.path, module.Name, module.System)
-
 	return updatedModule, nil
 }
 
@@ -402,20 +364,25 @@ func (t *terraformModules) DeleteModule(ctx context.Context, module *models.Terr
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("terraform_modules").
+	sql, args, err := dialect.From("terraform_modules").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      module.Metadata.ID,
-				"version": module.Metadata.Version,
-			},
-		).Returning(moduleFieldList...).ToSQL()
+		With("terraform_modules",
+			dialect.Delete("terraform_modules").
+				Where(
+					goqu.Ex{
+						"id":      module.Metadata.ID,
+						"version": module.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	_, err = scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
+	_, err = scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -440,11 +407,18 @@ func (t *terraformModules) getModule(ctx context.Context, exp goqu.Ex) (*models.
 		return nil, err
 	}
 
-	module, err := scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	module, err := scanTerraformModule(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -462,11 +436,8 @@ func (t *terraformModules) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func buildTerraformModuleResourcePath(groupPath string, name string, system string) string {
-	return fmt.Sprintf("%s/%s/%s", groupPath, name, system)
-}
-
-func scanTerraformModule(row scanner, withResourcePath bool) (*models.TerraformModule, error) {
+func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
+	var groupPath string
 	module := &models.TerraformModule{}
 
 	fields := []interface{}{
@@ -481,11 +452,7 @@ func scanTerraformModule(row scanner, withResourcePath bool) (*models.TerraformM
 		&module.Private,
 		&module.RepositoryURL,
 		&module.CreatedBy,
-	}
-
-	var path string
-	if withResourcePath {
-		fields = append(fields, &path)
+		&groupPath,
 	}
 
 	err := row.Scan(fields...)
@@ -493,9 +460,7 @@ func scanTerraformModule(row scanner, withResourcePath bool) (*models.TerraformM
 		return nil, err
 	}
 
-	if withResourcePath {
-		module.ResourcePath = buildTerraformModuleResourcePath(path, module.Name, module.System)
-	}
+	module.Metadata.TRN = types.TerraformModuleModelType.BuildTRN(groupPath, module.Name, module.System)
 
 	return module, nil
 }

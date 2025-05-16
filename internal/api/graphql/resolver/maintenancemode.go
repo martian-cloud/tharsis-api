@@ -4,7 +4,6 @@ import (
 	"context"
 
 	graphql "github.com/graph-gophers/graphql-go"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -17,7 +16,7 @@ type MaintenanceModeResolver struct {
 
 // ID resolver
 func (r *MaintenanceModeResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.MaintenanceModeType, r.maintenanceMode.Metadata.ID))
+	return graphql.ID(r.maintenanceMode.GetGlobalID())
 }
 
 // Metadata resolver
@@ -36,7 +35,7 @@ func (r *MaintenanceModeResolver) Message() string {
 }
 
 func maintenanceModeQuery(ctx context.Context) (*MaintenanceModeResolver, error) {
-	maintenanceMode, err := getMaintenanceModeService(ctx).GetMaintenanceMode(ctx)
+	maintenanceMode, err := getServiceCatalog(ctx).MaintenanceModeService.GetMaintenanceMode(ctx)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -95,7 +94,7 @@ func enableMaintenanceModeMutation(ctx context.Context, input *EnableMaintenance
 		Message: input.Message,
 	}
 
-	maintenanceMode, err := getMaintenanceModeService(ctx).EnableMaintenanceMode(ctx, toCreate)
+	maintenanceMode, err := getServiceCatalog(ctx).MaintenanceModeService.EnableMaintenanceMode(ctx, toCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +104,7 @@ func enableMaintenanceModeMutation(ctx context.Context, input *EnableMaintenance
 }
 
 func disableMaintenanceModeMutation(ctx context.Context, input *DisableMaintenanceModeInput) (*MaintenanceModeMutationPayloadResolver, error) {
-	service := getMaintenanceModeService(ctx)
+	service := getServiceCatalog(ctx).MaintenanceModeService
 
 	maintenanceMode, err := service.GetMaintenanceMode(ctx)
 	if err != nil {

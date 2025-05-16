@@ -3,8 +3,12 @@ package models
 import (
 	"strings"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+var _ Model = (*Runner)(nil)
 
 // RunnerType constant
 type RunnerType string
@@ -26,12 +30,26 @@ type Runner struct {
 	Name            string
 	Description     string
 	GroupID         *string
-	ResourcePath    string
 	CreatedBy       string
 	Metadata        ResourceMetadata
 	Disabled        bool
 	Tags            []string
 	RunUntaggedJobs bool
+}
+
+// GetID returns the Metadata ID.
+func (r *Runner) GetID() string {
+	return r.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (r *Runner) GetGlobalID() string {
+	return gid.ToGlobalID(r.GetModelType(), r.Metadata.ID)
+}
+
+// GetModelType returns the model type.
+func (r *Runner) GetModelType() types.ModelType {
+	return types.RunnerModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -81,12 +99,19 @@ func (r *Runner) Validate() error {
 	return verifyValidRunnerTags(r.Tags)
 }
 
+// GetResourcePath returns the resource path
+func (r *Runner) GetResourcePath() string {
+	return strings.Split(r.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+}
+
 // GetGroupPath returns the group path
 func (r *Runner) GetGroupPath() string {
 	if r.Type == SharedRunnerType {
 		return ""
 	}
-	return r.ResourcePath[:strings.LastIndex(r.ResourcePath, "/")]
+
+	resourcePath := r.GetResourcePath()
+	return resourcePath[:strings.LastIndex(resourcePath, "/")]
 }
 
 // verifyValidRunnerTags checks for duplicate tags, too-long tags, and too many tags.
