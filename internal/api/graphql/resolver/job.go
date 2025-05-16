@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -48,7 +49,7 @@ type JobConnectionResolver struct {
 
 // NewJobConnectionResolver creates a new JobConnectionResolver
 func NewJobConnectionResolver(ctx context.Context, input *job.GetJobsInput) (*JobConnectionResolver, error) {
-	jobService := getJobService(ctx)
+	jobService := getServiceCatalog(ctx).JobService
 
 	result, err := jobService.GetJobs(ctx, input)
 	if err != nil {
@@ -114,12 +115,14 @@ func (r *JobConnectionResolver) Edges() *[]*JobEdgeResolver {
 // JobConnectionQueryArgs are used to query a list of jobs
 type JobConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	WorkspacePath *string
+	WorkspacePath *string // DEPRECATED: use WorkspaceID instead with a TRN
+	WorkspaceID   *string
 	JobStatus     *models.JobStatus
 	JobType       *models.JobType
 }
 
 // JobQueryArgs are used to query a single job
+// DEPRECATED: use node query instead
 type JobQueryArgs struct {
 	ID string
 }
@@ -174,7 +177,7 @@ type JobResolver struct {
 
 // ID resolver
 func (r *JobResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.JobType, r.job.Metadata.ID))
+	return graphql.ID(r.job.GetGlobalID())
 }
 
 // Status resolver
@@ -280,7 +283,7 @@ func (r *JobResolver) LogSize(ctx context.Context) (int32, error) {
 
 // Logs resolver
 func (r *JobResolver) Logs(ctx context.Context, args *JobLogsQueryArgs) (string, error) {
-	buffer, err := getJobService(ctx).ReadLogs(ctx, r.job.Metadata.ID, int(args.StartOffset), int(args.Limit))
+	buffer, err := getServiceCatalog(ctx).JobService.ReadLogs(ctx, r.job.Metadata.ID, int(args.StartOffset), int(args.Limit))
 	if err != nil {
 		return "", err
 	}
@@ -289,7 +292,7 @@ func (r *JobResolver) Logs(ctx context.Context, args *JobLogsQueryArgs) (string,
 
 // RunnerAvailabilityStatus resolver
 func (r *JobResolver) RunnerAvailabilityStatus(ctx context.Context) (*job.RunnerAvailabilityStatusType, error) {
-	runnerAvailabilityStatus, err := getJobService(ctx).GetRunnerAvailabilityForJob(ctx, r.job.Metadata.ID)
+	runnerAvailabilityStatus, err := getServiceCatalog(ctx).JobService.GetRunnerAvailabilityForJob(ctx, r.job.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -314,15 +317,19 @@ func (j *JobLogStreamEventResolver) Size() int32 {
 	return int32(j.event.Size)
 }
 
+// DEPRECATED: use node query instead
 func jobQuery(ctx context.Context, args *JobQueryArgs) (*JobResolver, error) {
-	jobService := getJobService(ctx)
-
-	job, err := jobService.GetJob(ctx, gid.FromGlobalID(args.ID))
+	model, err := getServiceCatalog(ctx).FetchModel(ctx, args.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	job, ok := model.(*models.Job)
+	if !ok {
+		return nil, errors.New("expected job model type, got %T", model)
 	}
 
 	return &JobResolver{job: job}, nil
@@ -339,8 +346,19 @@ func jobsQuery(ctx context.Context, args *JobConnectionQueryArgs) (*JobConnectio
 		Type:              args.JobType,
 	}
 
-	if args.WorkspacePath != nil {
-		workspace, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, *args.WorkspacePath)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	switch {
+	case args.WorkspaceID != nil && args.WorkspacePath != nil:
+		return nil, errors.New("workspaceID and workspacePath cannot both be specified", errors.WithErrorCode(errors.EInvalid))
+	case args.WorkspaceID != nil:
+		workspaceID, err := serviceCatalog.FetchModelID(ctx, *args.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		input.WorkspaceID = &workspaceID
+	case args.WorkspacePath != nil:
+		workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(*args.WorkspacePath))
 		if err != nil {
 			return nil, err
 		}
@@ -388,19 +406,27 @@ type JobEventSubscriptionInput struct {
 }
 
 func (r RootResolver) jobEventsSubscription(ctx context.Context, input *JobEventSubscriptionInput) (<-chan *JobEventResolver, error) {
-	jobService := getJobService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
 	var wsID, runnerID *string
 
 	if input.WorkspaceID != nil {
-		wsID = ptr.String(gid.FromGlobalID(*input.WorkspaceID))
+		id, err := serviceCatalog.FetchModelID(ctx, *input.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		wsID = &id
 	}
 
 	if input.RunnerID != nil {
-		runnerID = ptr.String(gid.FromGlobalID(*input.RunnerID))
+		id, err := serviceCatalog.FetchModelID(ctx, *input.RunnerID)
+		if err != nil {
+			return nil, err
+		}
+		runnerID = &id
 	}
 
-	events, err := jobService.SubscribeToJobs(ctx, &job.SubscribeToJobsInput{
+	events, err := serviceCatalog.JobService.SubscribeToJobs(ctx, &job.SubscribeToJobsInput{
 		WorkspaceID: wsID,
 		RunnerID:    runnerID,
 	})
@@ -432,16 +458,21 @@ type JobLogStreamSubscriptionInput struct {
 
 func (r RootResolver) jobLogStreamEventsSubscription(ctx context.Context,
 	input *JobLogStreamSubscriptionInput) (<-chan *JobLogStreamEventResolver, error) {
-	service := getJobService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	jobID, err := serviceCatalog.FetchModelID(ctx, input.JobID)
+	if err != nil {
+		return nil, err
+	}
 
 	options := &job.LogStreamEventSubscriptionOptions{
-		JobID: gid.FromGlobalID(input.JobID),
+		JobID: jobID,
 	}
 	if input.LastSeenLogSize != nil {
 		options.LastSeenLogSize = ptr.Int(int(*input.LastSeenLogSize))
 	}
 
-	events, err := service.SubscribeToLogStreamEvents(ctx, options)
+	events, err := serviceCatalog.JobService.SubscribeToLogStreamEvents(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -469,10 +500,15 @@ type JobCancellationEventSubscriptionInput struct {
 
 func (r RootResolver) jobCancellationEventSubscription(ctx context.Context,
 	input *JobCancellationEventSubscriptionInput) (<-chan *JobCancellationEventResolver, error) {
-	service := getJobService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	events, err := service.SubscribeToCancellationEvent(ctx, &job.CancellationSubscriptionsOptions{
-		JobID: gid.FromGlobalID(input.JobID),
+	jobID, err := serviceCatalog.FetchModelID(ctx, input.JobID)
+	if err != nil {
+		return nil, err
+	}
+
+	events, err := serviceCatalog.JobService.SubscribeToCancellationEvent(ctx, &job.CancellationSubscriptionsOptions{
+		JobID: jobID,
 	})
 	if err != nil {
 		return nil, err
@@ -507,7 +543,8 @@ type ClaimJobMutationPayload struct {
 // ClaimJobInput is the input for claiming a job
 type ClaimJobInput struct {
 	ClientMutationID *string
-	RunnerPath       string
+	RunnerPath       *string // DEPRECATED: use RunnerID instead with a TRN
+	RunnerID         *string
 }
 
 // SaveJobLogsPayload is the response payload for a save logs mutation
@@ -544,16 +581,19 @@ func handleSaveJobLogsMutationProblem(e error, clientMutationID *string) (*SaveJ
 }
 
 func claimJobMutation(ctx context.Context, input *ClaimJobInput) (*ClaimJobMutationPayload, error) {
-	jobService := getJobService(ctx)
+	runnerID, err := toModelID(ctx, input.RunnerPath, input.RunnerID, types.RunnerModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	resp, err := jobService.ClaimJob(ctx, input.RunnerPath)
+	resp, err := getServiceCatalog(ctx).JobService.ClaimJob(ctx, runnerID)
 	if err != nil {
 		return nil, err
 	}
 
 	payload := ClaimJobMutationPayload{
 		ClientMutationID: input.ClientMutationID,
-		JobID:            ptr.String(gid.ToGlobalID(gid.JobType, resp.JobID)),
+		JobID:            ptr.String(gid.ToGlobalID(types.JobModelType, resp.JobID)),
 		Token:            &resp.Token,
 		Problems:         []Problem{},
 	}
@@ -561,11 +601,15 @@ func claimJobMutation(ctx context.Context, input *ClaimJobInput) (*ClaimJobMutat
 }
 
 func saveJobLogsMutation(ctx context.Context, input *SaveJobLogsInput) (*SaveJobLogsPayload, error) {
-	jobService := getJobService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 	logs := []byte(input.Logs)
-	jobID := gid.FromGlobalID(input.JobID)
 
-	_, err := jobService.WriteLogs(ctx, jobID, int(input.StartOffset), logs)
+	jobID, err := serviceCatalog.FetchModelID(ctx, input.JobID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = serviceCatalog.JobService.WriteLogs(ctx, jobID, int(input.StartOffset), logs)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +646,7 @@ func loadJob(ctx context.Context, id string) (*models.Job, error) {
 }
 
 func jobBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	groups, err := getJobService(ctx).GetJobsByIDs(ctx, ids)
+	groups, err := getServiceCatalog(ctx).JobService.GetJobsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -645,7 +689,7 @@ func loadJobLogStream(ctx context.Context, id string) (*models.LogStream, error)
 }
 
 func jobLogStreamBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	jobLogStreams, err := getJobService(ctx).GetLogStreamsByJobIDs(ctx, ids)
+	jobLogStreams, err := getServiceCatalog(ctx).JobService.GetLogStreamsByJobIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

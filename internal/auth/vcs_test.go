@@ -7,15 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 func TestVCSWorkspaceLinkCaller_GetSubject(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{Provider: &models.VCSProvider{
-		ResourcePath: "rs1",
+		Metadata: models.ResourceMetadata{
+			TRN: types.VCSProviderModelType.BuildTRN("rs1"),
+		},
 	}}
 	assert.Equal(t, "rs1", caller.GetSubject())
 }
@@ -48,7 +50,9 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 
 	caller := VCSWorkspaceLinkCaller{
 		Provider: &models.VCSProvider{
-			ResourcePath: "group1/vcs-provider",
+			Metadata: models.ResourceMetadata{
+				TRN: types.VCSProviderModelType.BuildTRN("group1/vcs-provider"),
+			},
 		},
 		Link: &models.WorkspaceVCSProviderLink{
 			WorkspaceID: ws.Metadata.ID,
@@ -60,45 +64,45 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 		expectErrorCode   errors.CodeType
 		name              string
 		workspace         *models.Workspace
-		perm              permissions.Permission
+		perm              models.Permission
 		constraints       []func(*constraints)
 		inMaintenanceMode bool
 	}{
 		{
 			name:        "link belongs to requested workspace",
-			perm:        permissions.ViewWorkspacePermission,
+			perm:        models.ViewWorkspacePermission,
 			constraints: []func(*constraints){WithWorkspaceID(ws.Metadata.ID)},
 		},
 		{
 			name:            "access denied because link doesn't belong to requested workspace",
-			perm:            permissions.ViewWorkspacePermission,
+			perm:            models.ViewWorkspacePermission,
 			constraints:     []func(*constraints){WithWorkspaceID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:        "link is creating a run in its own workspace",
-			perm:        permissions.CreateRunPermission,
+			perm:        models.CreateRunPermission,
 			constraints: []func(*constraints){WithWorkspaceID(ws.Metadata.ID)},
 		},
 		{
 			name:            "access denied because link is creating a run outside its own workspace",
-			perm:            permissions.CreateRunPermission,
+			perm:            models.CreateRunPermission,
 			constraints:     []func(*constraints){WithWorkspaceID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because required constraint not provided",
-			perm:            permissions.CreateRunPermission,
+			perm:            models.CreateRunPermission,
 			expectErrorCode: errors.EInternal,
 		},
 		{
 			name:            "access denied because permission is never available to caller",
-			perm:            permissions.CreateGroupPermission,
+			perm:            models.CreateGroupPermission,
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "cannot have write permission when system is in maintenance mode",
-			perm: permissions.CreateRunPermission,
+			perm: models.CreateRunPermission,
 			constraints: []func(*constraints){
 				WithWorkspaceID(ws.Metadata.ID),
 			},
@@ -107,7 +111,7 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 		},
 		{
 			name: "can have read permission when system is in maintenance mode",
-			perm: permissions.ViewWorkspacePermission,
+			perm: models.ViewWorkspacePermission,
 			constraints: []func(*constraints){
 				WithWorkspaceID(ws.Metadata.ID),
 			},
@@ -137,9 +141,11 @@ func TestVCSWorkspaceLinkCaller_RequirePermissions(t *testing.T) {
 func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := VCSWorkspaceLinkCaller{
 		Provider: &models.VCSProvider{
-			ResourcePath: "group1/vcs-provider",
+			Metadata: models.ResourceMetadata{
+				TRN: types.VCSProviderModelType.BuildTRN("group1/vcs-provider"),
+			},
 		},
 	}
-	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), permissions.ApplyResourceType, nil)
+	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.ApplyModelType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }

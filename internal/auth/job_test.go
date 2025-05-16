@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -66,54 +66,54 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		job             *models.Job
 		name            string
 		workspace       *models.Workspace
-		perms           permissions.Permission
+		perms           models.Permission
 		constraints     []func(*constraints)
 	}{
 		{
 			name:        "job is associated with workspace",
-			perms:       permissions.ViewWorkspacePermission,
+			perms:       models.ViewWorkspacePermission,
 			constraints: []func(*constraints){WithWorkspaceID(jobWorkspace.Metadata.ID)},
 		},
 		{
 			name:        "requested workspace is under same root namespace as job's workspace",
 			workspace:   &models.Workspace{FullPath: "a/ws-2"},
-			perms:       permissions.ViewWorkspacePermission,
+			perms:       models.ViewWorkspacePermission,
 			constraints: []func(*constraints){WithWorkspaceID("ws2")},
 		},
 		{
 			name:        "job can view state data because it's for the workspace that contains the job",
 			workspace:   &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws1"}},
-			perms:       permissions.CreateStateVersionPermission,
+			perms:       models.CreateStateVersionPermission,
 			constraints: []func(*constraints){WithWorkspaceID("ws1")},
 		},
 		{
 			name:            "access denied because job cannot view state data for another workspace",
 			workspace:       &models.Workspace{Metadata: models.ResourceMetadata{ID: "ws2"}, FullPath: "a/ws-2"},
-			perms:           permissions.CreateStateVersionPermission,
+			perms:           models.CreateStateVersionPermission,
 			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because workspace is not under same root namespace",
 			workspace:       &models.Workspace{FullPath: "b/ws-2"},
-			perms:           permissions.ViewWorkspacePermission,
+			perms:           models.ViewWorkspacePermission,
 			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because workspace doesn't exist",
-			perms:           permissions.ViewWorkspacePermission,
+			perms:           models.ViewWorkspacePermission,
 			constraints:     []func(*constraints){WithWorkspaceID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:        "job is requesting access to itself",
-			perms:       permissions.UpdateJobPermission,
+			perms:       models.UpdateJobPermission,
 			constraints: []func(*constraints){WithJobID(caller.JobID)},
 		},
 		{
 			name:            "access denied because job is requesting access to another job",
-			perms:           permissions.UpdateJobPermission,
+			perms:           models.UpdateJobPermission,
 			constraints:     []func(*constraints){WithJobID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
@@ -121,13 +121,13 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name:        "job has permission to write to plan",
 			run:         &models.Run{PlanID: "plan1"},
 			job:         &models.Job{Metadata: models.ResourceMetadata{ID: caller.JobID}},
-			perms:       permissions.UpdatePlanPermission,
+			perms:       models.UpdatePlanPermission,
 			constraints: []func(*constraints){WithPlanID("plan1")},
 		},
 		{
 			name:            "access denied because requested plan ID does not match run plan ID",
 			run:             &models.Run{PlanID: "plan1"},
-			perms:           permissions.UpdatePlanPermission,
+			perms:           models.UpdatePlanPermission,
 			constraints:     []func(*constraints){WithPlanID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
@@ -135,20 +135,20 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name:            "access denied because job IDs do not match",
 			run:             &models.Run{PlanID: "plan1"},
 			job:             &models.Job{Metadata: models.ResourceMetadata{ID: invalid}},
-			perms:           permissions.UpdatePlanPermission,
+			perms:           models.UpdatePlanPermission,
 			constraints:     []func(*constraints){WithPlanID("plan1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because run doesn't exist",
-			perms:           permissions.UpdatePlanPermission,
+			perms:           models.UpdatePlanPermission,
 			constraints:     []func(*constraints){WithPlanID("plan1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because latest plan job doesn't exist",
 			run:             &models.Run{PlanID: "plan1"},
-			perms:           permissions.UpdatePlanPermission,
+			perms:           models.UpdatePlanPermission,
 			constraints:     []func(*constraints){WithPlanID("plan1")},
 			expectErrorCode: errors.ENotFound,
 		},
@@ -156,13 +156,13 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name:        "job has permission to write to apply",
 			run:         &models.Run{ApplyID: "apply1"},
 			job:         &models.Job{Metadata: models.ResourceMetadata{ID: caller.JobID}},
-			perms:       permissions.UpdateApplyPermission,
+			perms:       models.UpdateApplyPermission,
 			constraints: []func(*constraints){WithApplyID("apply1")},
 		},
 		{
 			name:            "access denied because requested apply ID does not match run apply ID",
 			run:             &models.Run{ApplyID: "apply1"},
-			perms:           permissions.UpdateApplyPermission,
+			perms:           models.UpdateApplyPermission,
 			constraints:     []func(*constraints){WithApplyID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
@@ -170,20 +170,20 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			name:            "access denied because job IDs do not match",
 			run:             &models.Run{ApplyID: "apply1"},
 			job:             &models.Job{Metadata: models.ResourceMetadata{ID: invalid}},
-			perms:           permissions.UpdateApplyPermission,
+			perms:           models.UpdateApplyPermission,
 			constraints:     []func(*constraints){WithApplyID("apply1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because run doesn't exist",
-			perms:           permissions.UpdateApplyPermission,
+			perms:           models.UpdateApplyPermission,
 			constraints:     []func(*constraints){WithApplyID("apply1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because latest apply job doesn't exist",
 			run:             &models.Run{ApplyID: "apply1"},
-			perms:           permissions.UpdateApplyPermission,
+			perms:           models.UpdateApplyPermission,
 			constraints:     []func(*constraints){WithApplyID("apply1")},
 			expectErrorCode: errors.ENotFound,
 		},
@@ -193,33 +193,33 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		},
 		{
 			name:            "access denied because permission is never available to caller",
-			perms:           permissions.CreateWorkspacePermission,
+			perms:           models.CreateWorkspacePermission,
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "delete variable access denied, no constraints, not found",
 			workspace:       &models.Workspace{FullPath: "a/ws1"},
-			perms:           permissions.DeleteVariablePermission,
+			perms:           models.DeleteVariablePermission,
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "delete variable access denied, matching workspace ID, found but forbidden",
 			workspace:       &models.Workspace{FullPath: "a/ws1"},
-			perms:           permissions.DeleteVariablePermission,
+			perms:           models.DeleteVariablePermission,
 			constraints:     []func(*constraints){WithWorkspaceID("ws1")},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "delete variable access denied, matching group, found but forbidden",
 			workspace:       &models.Workspace{FullPath: "a/ws1"},
-			perms:           permissions.DeleteVariablePermission,
+			perms:           models.DeleteVariablePermission,
 			constraints:     []func(*constraints){WithGroupID("group-ID")},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "delete variable access denied, matching namespace path, found but forbidden",
 			workspace:       &models.Workspace{FullPath: "a/ws1"},
-			perms:           permissions.DeleteVariablePermission,
+			perms:           models.DeleteVariablePermission,
 			constraints:     []func(*constraints){WithNamespacePath("a")},
 			expectErrorCode: errors.EForbidden,
 		},
@@ -239,17 +239,11 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 				stage = models.JobApplyType
 			}
 
-			mockRuns.On("GetRun", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
+			mockRuns.On("GetRunByID", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
 
 			mockJobs.On("GetLatestJobByType", mock.Anything, caller.RunID, stage).Return(test.job, nil).Maybe()
 			if constraints.workspaceID != nil {
 				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, *constraints.workspaceID).Return(test.workspace, nil).Maybe()
-			}
-
-			if len(constraints.namespacePaths) > 0 {
-				for _, p := range constraints.namespacePaths {
-					mockWorkspaces.On("GetWorkspaceByFullPath", mock.Anything, p).Return(test.workspace, nil).Maybe()
-				}
 			}
 
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, caller.WorkspaceID).Return(jobWorkspace, nil).Maybe()
@@ -285,52 +279,52 @@ func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 		workspace       *models.Workspace
 		group           *models.Group
 		name            string
-		resourceType    permissions.ResourceType
+		modelType       types.ModelType
 		constraints     []func(*constraints)
 	}{
 		{
-			name:         "workspace is in requested group",
-			workspace:    &models.Workspace{FullPath: "a/ws1"},
-			group:        &models.Group{FullPath: "a"},
-			resourceType: permissions.ManagedIdentityResourceType,
-			constraints:  []func(*constraints){WithGroupID("group1")},
+			name:        "workspace is in requested group",
+			workspace:   &models.Workspace{FullPath: "a/ws1"},
+			group:       &models.Group{FullPath: "a"},
+			modelType:   types.ManagedIdentityModelType,
+			constraints: []func(*constraints){WithGroupID("group1")},
 		},
 		{
 			name:            "access denied because workspace is not in requested group",
 			workspace:       &models.Workspace{FullPath: "b/ws1"},
 			group:           &models.Group{FullPath: "a"},
-			resourceType:    permissions.ManagedIdentityResourceType,
+			modelType:       types.ManagedIdentityModelType,
 			constraints:     []func(*constraints){WithGroupID("group1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because workspace not found",
-			resourceType:    permissions.ManagedIdentityResourceType,
+			modelType:       types.ManagedIdentityModelType,
 			constraints:     []func(*constraints){WithGroupID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because group not found",
 			workspace:       &models.Workspace{},
-			resourceType:    permissions.ManagedIdentityResourceType,
+			modelType:       types.ManagedIdentityModelType,
 			constraints:     []func(*constraints){WithGroupID(invalid)},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:         "workspace is in requested namespace path",
-			workspace:    &models.Workspace{FullPath: "a/ws1"},
-			resourceType: permissions.ManagedIdentityResourceType,
-			constraints:  []func(*constraints){WithNamespacePath("a")},
+			name:        "workspace is in requested namespace path",
+			workspace:   &models.Workspace{FullPath: "a/ws1"},
+			modelType:   types.ManagedIdentityModelType,
+			constraints: []func(*constraints){WithNamespacePath("a")},
 		},
 		{
 			name:            "access denied because workspace not found",
-			resourceType:    permissions.ManagedIdentityResourceType,
+			modelType:       types.ManagedIdentityModelType,
 			constraints:     []func(*constraints){WithNamespacePath("a")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "access denied because required constraints not provided",
-			resourceType:    permissions.ManagedIdentityResourceType,
+			modelType:       types.ManagedIdentityModelType,
 			expectErrorCode: errors.EInternal,
 		},
 	}
@@ -350,7 +344,7 @@ func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 
 			caller.dbClient = &db.Client{Groups: mockGroups, Workspaces: mockWorkspaces}
 
-			err := caller.RequireAccessToInheritableResource(ctx, test.resourceType, test.constraints...)
+			err := caller.RequireAccessToInheritableResource(ctx, test.modelType, test.constraints...)
 			if test.expectErrorCode != "" {
 				require.NotNil(t, err)
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

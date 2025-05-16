@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -88,6 +89,93 @@ func TestGetLinksByProviderID(t *testing.T) {
 	}
 }
 
+func TestGetLinkByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	provider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:              "test-provider",
+		Description:       "test provider",
+		GroupID:           group.Metadata.ID,
+		URL:               gitHubURL,
+		OAuthClientID:     "client-id",
+		OAuthClientSecret: "client-secret",
+		Type:              models.GitHubProviderType,
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     provider.Metadata.ID,
+		TokenNonce:     uuid.New().String(),
+		RepositoryPath: "owner/repository",
+		Branch:         "main",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectLink      bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get resource by TRN",
+			trn:        link.Metadata.TRN,
+			expectLink: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.WorkspaceVCSProviderLinkModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+		},
+		{
+			name:            "workspace vcs provider link TRN must not be less than two parts",
+			trn:             types.WorkspaceVCSProviderLinkModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectLink {
+				require.NotNil(t, actualLink)
+				assert.Equal(t, test.trn, actualLink.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualLink)
+			}
+		})
+	}
+}
+
 func TestGetLinkByID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
@@ -129,7 +217,7 @@ func TestGetLinkByID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -195,7 +283,7 @@ func TestGetLinkByWorkspaceID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -668,7 +756,7 @@ func createWarmupWorkspaceVCSProviderLinks(ctx context.Context, testClient *test
 
 	providerPath2ID := make(map[string]string, len(resultVCSProviders))
 	for _, provider := range resultVCSProviders {
-		providerPath2ID[provider.ResourcePath] = provider.Metadata.ID
+		providerPath2ID[provider.GetResourcePath()] = provider.Metadata.ID
 	}
 
 	resultLinks, err := createInitialWorkspaceVCSProviderLinks(ctx, testClient,
@@ -746,6 +834,7 @@ func compareWorkspaceVCSProviderLinks(t *testing.T, expected, actual *models.Wor
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -20,6 +21,7 @@ import (
 // VCSProviders encapsulates the logic to access VCS providers from the database.
 type VCSProviders interface {
 	GetProviderByID(ctx context.Context, id string) (*models.VCSProvider, error)
+	GetProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error)
 	GetProviderByOAuthState(ctx context.Context, state string) (*models.VCSProvider, error)
 	GetProviders(ctx context.Context, input *GetVCSProvidersInput) (*VCSProvidersResult, error)
 	CreateProvider(ctx context.Context, provider *models.VCSProvider) (*models.VCSProvider, error)
@@ -128,6 +130,30 @@ func (vp *vcsProviders) GetProviderByID(ctx context.Context, id string) (*models
 	return vp.getProvider(ctx, goqu.Ex{"vcs_providers.id": id})
 }
 
+func (vp *vcsProviders) GetProviderByTRN(ctx context.Context, trn string) (*models.VCSProvider, error) {
+	ctx, span := tracer.Start(ctx, "db.GetProviderByTRN")
+	defer span.End()
+
+	path, err := types.VCSProviderModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	lastSlashIndex := strings.LastIndex(path, "/")
+
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a VCS provider TRN must have a group path and vcs provider name separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return vp.getProvider(ctx, goqu.Ex{
+		"namespaces.path":    path[:lastSlashIndex],
+		"vcs_providers.name": path[lastSlashIndex+1:],
+	})
+}
+
 func (vp *vcsProviders) GetProviderByOAuthState(ctx context.Context, state string) (*models.VCSProvider, error) {
 	ctx, span := tracer.Start(ctx, "db.GetProviderByOAuthState")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -231,7 +257,7 @@ func (vp *vcsProviders) GetProviders(ctx context.Context, input *GetVCSProviders
 	// Scan rows
 	results := []models.VCSProvider{}
 	for rows.Next() {
-		item, err := scanVCSProvider(rows, true)
+		item, err := scanVCSProvider(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -260,48 +286,39 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 
 	timestamp := currentTime()
 
-	tx, err := vp.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			vp.dbClient.logger.Errorf("failed to rollback tx for CreateProvider: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Insert("vcs_providers").
+	sql, args, err := dialect.From("vcs_providers").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                            newResourceID(),
-			"version":                       initialResourceVersion,
-			"created_at":                    timestamp,
-			"updated_at":                    timestamp,
-			"created_by":                    provider.CreatedBy,
-			"name":                          provider.Name,
-			"description":                   nullableString(provider.Description),
-			"type":                          provider.Type,
-			"url":                           provider.URL.String(),
-			"oauth_client_id":               provider.OAuthClientID,
-			"oauth_client_secret":           provider.OAuthClientSecret,
-			"oauth_state":                   provider.OAuthState,
-			"oauth_access_token":            provider.OAuthAccessToken,
-			"oauth_refresh_token":           provider.OAuthRefreshToken,
-			"oauth_access_token_expires_at": provider.OAuthAccessTokenExpiresAt,
-			"auto_create_webhooks":          provider.AutoCreateWebhooks,
-			"group_id":                      provider.GroupID,
-		}).
-		Returning(vcsProvidersFieldList...).ToSQL()
+		With("vcs_providers",
+			dialect.Insert("vcs_providers").
+				Rows(goqu.Record{
+					"id":                            newResourceID(),
+					"version":                       initialResourceVersion,
+					"created_at":                    timestamp,
+					"updated_at":                    timestamp,
+					"created_by":                    provider.CreatedBy,
+					"name":                          provider.Name,
+					"description":                   nullableString(provider.Description),
+					"type":                          provider.Type,
+					"url":                           provider.URL.String(),
+					"oauth_client_id":               provider.OAuthClientID,
+					"oauth_client_secret":           provider.OAuthClientSecret,
+					"oauth_state":                   provider.OAuthState,
+					"oauth_access_token":            provider.OAuthAccessToken,
+					"oauth_refresh_token":           provider.OAuthRefreshToken,
+					"oauth_access_token_expires_at": provider.OAuthAccessTokenExpiresAt,
+					"auto_create_webhooks":          provider.AutoCreateWebhooks,
+					"group_id":                      provider.GroupID,
+				}).Returning("*"),
+		).Select(vp.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
+
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql, args...), false)
+	createdProvider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -318,20 +335,6 @@ func (vp *vcsProviders) CreateProvider(ctx context.Context, provider *models.VCS
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, createdProvider.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	createdProvider.ResourcePath = buildVCSProviderResourcePath(namespace.path, createdProvider.Name)
-
 	return createdProvider, nil
 }
 
@@ -342,42 +345,33 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 
 	timestamp := currentTime()
 
-	tx, err := vp.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			vp.dbClient.logger.Errorf("failed to rollback tx for UpdateProvider: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Update("vcs_providers").
+	sql, args, err := dialect.From("vcs_providers").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":                       goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":                    timestamp,
-				"description":                   nullableString(provider.Description),
-				"oauth_client_id":               provider.OAuthClientID,
-				"oauth_client_secret":           provider.OAuthClientSecret,
-				"oauth_state":                   provider.OAuthState,
-				"oauth_access_token":            provider.OAuthAccessToken,
-				"oauth_refresh_token":           provider.OAuthRefreshToken,
-				"oauth_access_token_expires_at": provider.OAuthAccessTokenExpiresAt,
-			},
-		).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
-		Returning(vcsProvidersFieldList...).ToSQL()
+		With("vcs_providers",
+			dialect.Update("vcs_providers").
+				Set(
+					goqu.Record{
+						"version":                       goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                    timestamp,
+						"description":                   nullableString(provider.Description),
+						"oauth_client_id":               provider.OAuthClientID,
+						"oauth_client_secret":           provider.OAuthClientSecret,
+						"oauth_state":                   provider.OAuthState,
+						"oauth_access_token":            provider.OAuthAccessToken,
+						"oauth_refresh_token":           provider.OAuthRefreshToken,
+						"oauth_access_token_expires_at": provider.OAuthAccessTokenExpiresAt,
+					},
+				).Where(goqu.Ex{"id": provider.Metadata.ID, "version": provider.Metadata.Version}).
+				Returning("*"),
+		).Select(vp.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedProvider, err := scanVCSProvider(tx.QueryRow(ctx, sql, args...), false)
+	updatedProvider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
@@ -387,20 +381,6 @@ func (vp *vcsProviders) UpdateProvider(ctx context.Context, provider *models.VCS
 		return nil, err
 	}
 
-	// Lookup namespace for group
-	namespace, err := getNamespaceByGroupID(ctx, tx, updatedProvider.GroupID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get namespace by group ID")
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
-		return nil, err
-	}
-
-	updatedProvider.ResourcePath = buildVCSProviderResourcePath(namespace.path, updatedProvider.Name)
-
 	return updatedProvider, nil
 }
 
@@ -409,20 +389,25 @@ func (vp *vcsProviders) DeleteProvider(ctx context.Context, provider *models.VCS
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("vcs_providers").
+	sql, args, err := dialect.From("vcs_providers").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      provider.Metadata.ID,
-				"version": provider.Metadata.Version,
-			},
-		).Returning(vcsProvidersFieldList...).ToSQL()
+		With("vcs_providers",
+			dialect.Delete("vcs_providers").
+				Where(
+					goqu.Ex{
+						"id":      provider.Metadata.ID,
+						"version": provider.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(vp.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"vcs_providers.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	if _, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false); err != nil {
+	if _, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
@@ -457,11 +442,18 @@ func (vp *vcsProviders) getProvider(ctx context.Context, exp goqu.Ex) (*models.V
 		return nil, err
 	}
 
-	provider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	provider, err := scanVCSProvider(vp.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
 		return nil, err
 	}
 
@@ -479,13 +471,10 @@ func (vp *vcsProviders) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func buildVCSProviderResourcePath(groupPath string, name string) string {
-	return fmt.Sprintf("%s/%s", groupPath, name)
-}
-
-func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, error) {
+func scanVCSProvider(row scanner) (*models.VCSProvider, error) {
 	var description sql.NullString
 	var providerURL string
+	var namespacePath string
 	vp := &models.VCSProvider{}
 
 	fields := []interface{}{
@@ -506,11 +495,7 @@ func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, e
 		&vp.OAuthAccessTokenExpiresAt,
 		&vp.AutoCreateWebhooks,
 		&vp.GroupID,
-	}
-
-	var path string
-	if withResourcePath {
-		fields = append(fields, &path)
+		&namespacePath,
 	}
 
 	err := row.Scan(fields...)
@@ -522,15 +507,13 @@ func scanVCSProvider(row scanner, withResourcePath bool) (*models.VCSProvider, e
 		vp.Description = description.String
 	}
 
-	if withResourcePath {
-		vp.ResourcePath = buildVCSProviderResourcePath(path, vp.Name)
-	}
-
 	parsedURL, err := url.Parse(providerURL)
 	if err != nil {
 		return nil, err
 	}
 	vp.URL = *parsedURL
+
+	vp.Metadata.TRN = types.VCSProviderModelType.BuildTRN(namespacePath, vp.Name)
 
 	return vp, nil
 }

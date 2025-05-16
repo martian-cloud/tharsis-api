@@ -6,7 +6,6 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -15,7 +14,6 @@ import (
 // VCSEventConnectionQueryArgs are used to query a vcsEvent connection
 type VCSEventConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	WorkspacePath string
 }
 
 // VCSEventEdgeResolver resolves vcsEvent edges
@@ -50,7 +48,7 @@ type VCSEventConnectionResolver struct {
 
 // NewVCSEventConnectionResolver creates a new VCSEventConnectionResolver
 func NewVCSEventConnectionResolver(ctx context.Context, input *vcs.GetVCSEventsInput) (*VCSEventConnectionResolver, error) {
-	vcsService := getVCSService(ctx)
+	vcsService := getServiceCatalog(ctx).VCSService
 
 	result, err := vcsService.GetVCSEvents(ctx, input)
 	if err != nil {
@@ -118,7 +116,7 @@ type VCSEventResolver struct {
 
 // ID resolver
 func (r *VCSEventResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.VCSEventType, r.vcsEvent.Metadata.ID))
+	return graphql.ID(r.vcsEvent.GetGlobalID())
 }
 
 // Metadata resolver
@@ -195,9 +193,7 @@ func loadVCSEvent(ctx context.Context, id string) (*models.VCSEvent, error) {
 }
 
 func vcsEventBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getVCSService(ctx)
-
-	events, err := service.GetVCSEventsByIDs(ctx, ids)
+	events, err := getServiceCatalog(ctx).VCSService.GetVCSEventsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

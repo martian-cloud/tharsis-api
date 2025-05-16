@@ -8,11 +8,12 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
@@ -151,14 +152,14 @@ func TestGetManagedIdentities(t *testing.T) {
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 
 			if test.input.NamespacePath != "" {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
 			if test.input.AliasSourceID != nil {
 				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, *test.input.AliasSourceID).Return(test.expectByIDResult, test.expectByIDError)
 
 				if test.expectByIDResult != nil {
-					mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
+					mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError)
 				}
 			}
 
@@ -189,11 +190,11 @@ func TestGetManagedIdentities(t *testing.T) {
 func TestDeleteManagedIdentity(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-id",
+			ID:  "some-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity-to-delete",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
+		Name:    "a-managed-identity-to-delete",
+		GroupID: "some-group-id",
 	}
 
 	activityEventInput := &activityevent.CreateActivityEventInput{
@@ -273,7 +274,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if !test.input.ManagedIdentity.IsAlias() {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
@@ -316,11 +317,11 @@ func TestDeleteManagedIdentity(t *testing.T) {
 func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 	sampleManagedIdentity := models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-id",
+			ID:  "some-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
+		Name:    "a-managed-identity",
+		GroupID: "some-group-id",
 	}
 
 	type testCase struct {
@@ -359,7 +360,7 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, test.workspaceID).Return(test.expectResult, nil)
 			}
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -386,12 +387,12 @@ func TestGetManagedIdentitiesForWorkspace(t *testing.T) {
 func TestAddManagedIdentityToWorkspace(t *testing.T) {
 	awsManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:    "a-managed-identity",
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	sampleWorkspace := &models.Workspace{
@@ -462,23 +463,23 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			name: "cannot assign more than one non-aws managed identity",
 			existingManagedIdentity: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "some-managed-identity-id",
+					ID:  "some-managed-identity-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 				},
-				Name:         "a-managed-identity",
-				ResourcePath: "some/resource/path",
-				GroupID:      "some-group-id",
-				Type:         models.ManagedIdentityAzureFederated,
+				Name:    "a-managed-identity",
+				GroupID: "some-group-id",
+				Type:    models.ManagedIdentityAzureFederated,
 			},
 			existingWorkspace: sampleWorkspace,
 			identitiesInWorkspace: []models.ManagedIdentity{
 				{
 					Metadata: models.ResourceMetadata{
-						ID: "some-managed-identity-id-1",
+						ID:  "some-managed-identity-id-1",
+						TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 					},
-					Name:         "a-managed-identity",
-					ResourcePath: "some/resource/path",
-					GroupID:      "some-group-id",
-					Type:         models.ManagedIdentityAzureFederated,
+					Name:    "a-managed-identity",
+					GroupID: "some-group-id",
+					Type:    models.ManagedIdentityAzureFederated,
 				},
 			},
 			managedIdentityID: "some-managed-identity-id",
@@ -518,10 +519,10 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
 
 			if test.identitiesInWorkspace != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 				// This mock On is hit by both the initial check before doing the assignment and for the later check afterward.
 				// To get past the initial check but still allow a non-trivial limit value,
@@ -598,12 +599,12 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:    "a-managed-identity",
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	sampleWorkspace := &models.Workspace{
@@ -659,7 +660,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(test.authError)
 
 			if test.authError == nil {
 				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.managedIdentityID).Return(test.existingManagedIdentity, nil)
@@ -704,12 +705,12 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 func TestGetManagedIdentityByID(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:    "a-managed-identity",
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	type testCase struct {
@@ -750,7 +751,7 @@ func TestGetManagedIdentityByID(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.searchID).Return(test.expectManagedIdentity, nil)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError).Maybe()
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -774,75 +775,74 @@ func TestGetManagedIdentityByID(t *testing.T) {
 	}
 }
 
-func TestGetManagedIdentityByPath(t *testing.T) {
+func TestGetManagedIdentityByTRN(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "managed-identity-id-1",
+			TRN: types.ManagedIdentityModelType.BuildTRN("managed-identity-gid-1"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		GroupID: "group-1",
 	}
 
 	type testCase struct {
-		authError             error
-		expectManagedIdentity *models.ManagedIdentity
-		name                  string
-		searchPath            string
-		expectErrorCode       errors.CodeType
+		name            string
+		trn             string
+		authError       error
+		managedIdentity *models.ManagedIdentity
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:                  "positive: successfully returns a managed identity",
-			expectManagedIdentity: sampleManagedIdentity,
-			searchPath:            "some/resource/path",
+			name:            "successfully get managed identity by trn",
+			trn:             sampleManagedIdentity.Metadata.TRN,
+			managedIdentity: sampleManagedIdentity,
 		},
 		{
-			name:            "negative: path is invalid",
-			searchPath:      "/invalid/path/",
-			expectErrorCode: errors.EInvalid,
+			name:            "managed identity not found",
+			trn:             sampleManagedIdentity.Metadata.TRN,
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:                  "negative: subject does not have access to group resource",
-			searchPath:            "some/resource/path",
-			expectManagedIdentity: sampleManagedIdentity,
-			authError:             errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode:       errors.EForbidden,
+			name:            "subject is not authorized to view managed identity",
+			trn:             sampleManagedIdentity.Metadata.TRN,
+			managedIdentity: sampleManagedIdentity,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
-			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockCaller := auth.NewMockCaller(t)
+			mockManagedIdentities := db.NewMockManagedIdentities(t)
 
-			mockManagedIdentities.On("GetManagedIdentityByPath", mock.Anything, test.searchPath).Return(test.expectManagedIdentity, nil).Maybe()
+			mockManagedIdentities.On("GetManagedIdentityByTRN", mock.Anything, test.trn).Return(test.managedIdentity, nil)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError).Maybe()
+			if test.managedIdentity != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError)
+			}
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
+			service := &service{
+				dbClient: dbClient,
+			}
 
-			identity, err := service.GetManagedIdentityByPath(auth.WithCaller(ctx, mockCaller), test.searchPath)
+			actualManagedIdentity, err := service.GetManagedIdentityByTRN(auth.WithCaller(ctx, mockCaller), test.trn)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.expectManagedIdentity, identity)
+			require.NoError(t, err)
+			require.NotNil(t, actualManagedIdentity)
+			assert.Equal(t, test.managedIdentity, actualManagedIdentity)
 		})
 	}
 }
@@ -852,15 +852,15 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		Description:  "this is a managed identity being created",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Data:         []byte("some-data"),
-		CreatedBy:    mockSubject,
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:        "a-managed-identity",
+		Description: "this is a managed identity being created",
+		GroupID:     "some-group-id",
+		Data:        []byte("some-data"),
+		CreatedBy:   mockSubject,
+		Type:        models.ManagedIdentityAWSFederated,
 	}
 
 	sampleGroup := &models.Group{
@@ -889,7 +889,8 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 	type testCase struct {
 		authError               error
 		existingManagedIdentity *models.ManagedIdentity
-		existingGroup           *models.Group
+		aliasGroup              *models.Group
+		sourceIdentityGroup     *models.Group
 		expectCreatedAlias      *models.ManagedIdentity
 		createInput             *models.ManagedIdentity
 		input                   *CreateManagedIdentityAliasInput
@@ -906,7 +907,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 		{
 			name: "positive: successfully create a managed identity alias in a sibling group",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleAliasGroup,
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
@@ -917,13 +918,16 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				CreatedBy:     mockSubject,
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			existingGroup:           sampleGroup,
+			aliasGroup:              sampleAliasGroup,
+			sourceIdentityGroup:     sampleGroup,
 			expectCreatedAlias: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID: "some-new-alias-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN(
+						sampleAliasGroup.FullPath + "/some-managed-identity-alias",
+					),
 				},
 				Type:          sampleManagedIdentity.Type,
-				ResourcePath:  sampleAliasGroup.FullPath + "/some-managed-identity-alias",
 				Name:          sampleAliasName,
 				Description:   sampleManagedIdentity.Description,
 				GroupID:       sampleAliasGroup.Metadata.ID,
@@ -938,7 +942,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 		{
 			name: "negative: source managed identity doesn't exist",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleAliasGroup,
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
@@ -948,7 +952,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			// Shouldn't happen.
 			name: "negative: group associated with source managed identity doesn't exist",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleAliasGroup,
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
@@ -956,32 +960,46 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 			expectErrorCode:         errors.EInternal,
 		},
 		{
-			name: "negative: source managed identity is already available for namespace",
+			// Shouldn't happen.
+			name: "negative: alias group doesn't exist",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleGroup, // Using the same group here.
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			existingGroup:           sampleGroup,
+			sourceIdentityGroup:     sampleGroup,
+			expectErrorCode:         errors.EInternal,
+		},
+		{
+			name: "negative: source managed identity is already available for namespace",
+			input: &CreateManagedIdentityAliasInput{
+				GroupID:       sampleGroup.Metadata.ID, // Using the same group here.
+				AliasSourceID: sampleManagedIdentity.Metadata.ID,
+				Name:          sampleAliasName,
+			},
+			existingManagedIdentity: sampleManagedIdentity,
+			aliasGroup:              sampleAliasGroup,
+			sourceIdentityGroup:     sampleGroup,
 			expectErrorCode:         errors.EInvalid,
 		},
 		{
 			name: "negative: attempting to alias another alias",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleAliasGroup,
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: "some-alias-id",
 				Name:          sampleAliasName,
 			},
 			existingManagedIdentity: &models.ManagedIdentity{
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID, // Only populated for aliases.
 			},
+			aliasGroup:      sampleAliasGroup,
 			expectErrorCode: errors.EInvalid,
 		},
 		{
 			name: "negative: invalid name",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleGroup, // Using the same group here.
+				GroupID:       sampleGroup.Metadata.ID, // Using the same group here.
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          "some/invalid/name",
 			},
@@ -992,35 +1010,38 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				CreatedBy:     mockSubject,
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			existingGroup:           sampleGroup,
+			aliasGroup:              sampleAliasGroup,
+			sourceIdentityGroup:     sampleGroup,
 			expectErrorCode:         errors.EInvalid,
 		},
 		{
 			name: "negative: subject does not have owner role in target group",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleGroup, // Using the same group here.
+				GroupID:       sampleGroup.Metadata.ID, // Using the same group here.
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
+			aliasGroup:      sampleAliasGroup,
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name: "negative: subject does not have owner role in source group",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleGroup, // Using the same group here.
+				GroupID:       sampleGroup.Metadata.ID, // Using the same group here.
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			existingGroup:           sampleGroup,
+			aliasGroup:              sampleAliasGroup,
+			sourceIdentityGroup:     sampleGroup,
 			authError:               errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode:         errors.EForbidden,
 		},
 		{
 			name: "exceeds limit for aliases in group",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleAliasGroup,
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
@@ -1031,13 +1052,16 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				CreatedBy:     mockSubject,
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			existingGroup:           sampleGroup,
+			aliasGroup:              sampleAliasGroup,
+			sourceIdentityGroup:     sampleGroup,
 			expectCreatedAlias: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID: "some-new-alias-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN(
+						sampleAliasGroup.FullPath + "/some-managed-identity-alias",
+					),
 				},
 				Type:          sampleManagedIdentity.Type,
-				ResourcePath:  sampleAliasGroup.FullPath + "/some-managed-identity-alias",
 				Name:          sampleAliasName,
 				Description:   sampleManagedIdentity.Description,
 				GroupID:       sampleAliasGroup.Metadata.ID,
@@ -1055,7 +1079,7 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 		{
 			name: "exceeds limit for aliases per source MI",
 			input: &CreateManagedIdentityAliasInput{
-				Group:         sampleAliasGroup,
+				GroupID:       sampleAliasGroup.Metadata.ID,
 				AliasSourceID: sampleManagedIdentity.Metadata.ID,
 				Name:          sampleAliasName,
 			},
@@ -1066,13 +1090,16 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				CreatedBy:     mockSubject,
 			},
 			existingManagedIdentity: sampleManagedIdentity,
-			existingGroup:           sampleGroup,
+			aliasGroup:              sampleAliasGroup,
+			sourceIdentityGroup:     sampleGroup,
 			expectCreatedAlias: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
 					ID: "some-new-alias-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN(
+						sampleAliasGroup.FullPath + "/some-managed-identity-alias",
+					),
 				},
 				Type:          sampleManagedIdentity.Type,
-				ResourcePath:  sampleAliasGroup.FullPath + "/some-managed-identity-alias",
 				Name:          sampleAliasName,
 				Description:   sampleManagedIdentity.Description,
 				GroupID:       sampleAliasGroup.Metadata.ID,
@@ -1104,7 +1131,8 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, mock.Anything).Return(test.existingManagedIdentity, nil)
 			}
 
-			mockGroups.On("GetGroupByID", mock.Anything, mock.Anything).Return(test.existingGroup, nil).Maybe()
+			mockGroups.On("GetGroupByID", mock.Anything, sampleAliasGroup.Metadata.ID).Return(test.aliasGroup, nil).Maybe()
+			mockGroups.On("GetGroupByID", mock.Anything, sampleGroup.Metadata.ID).Return(test.sourceIdentityGroup, nil).Maybe()
 
 			if (test.expectErrorCode == "") || test.exceedsLimit {
 				mockCaller.On("GetSubject").Return("mockSubject")
@@ -1119,11 +1147,11 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 				}
 			}
 
-			if test.existingGroup != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
+			if test.sourceIdentityGroup != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 			// Called inside transaction to check resource limits.
 			if test.limit > 0 {
@@ -1198,10 +1226,10 @@ func TestCreateManagedIdentityAlias(t *testing.T) {
 func TestDeleteManagedIdentityAlias(t *testing.T) {
 	sampleManagedIdentityAlias := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-alias-id",
+			ID:  "some-alias-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
 		Name:          "a-managed-identity-alias-to-delete",
-		ResourcePath:  "some/resource/path",
 		GroupID:       "some-group-id",
 		AliasSourceID: ptr.String("some-source-managed-identity-id"),
 	}
@@ -1311,10 +1339,10 @@ func TestDeleteManagedIdentityAlias(t *testing.T) {
 			}
 
 			if test.sourceIdentity != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError).Maybe()
+				mockCaller.On("RequirePermission", mock.Anything, models.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError).Maybe()
 			}
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError).Maybe()
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteManagedIdentityPermission, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1344,19 +1372,22 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		Description:  "this is a managed identity being created",
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Data:         []byte("some-data"),
-		CreatedBy:    mockSubject,
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:        "a-managed-identity",
+		Description: "this is a managed identity being created",
+		GroupID:     "some-group-id",
+		Data:        []byte("some-data"),
+		CreatedBy:   mockSubject,
+		Type:        models.ManagedIdentityAWSFederated,
 	}
 
 	sampleServiceAccount := &models.ServiceAccount{
-		ResourcePath: "some/resource/service-account",
+		Metadata: models.ResourceMetadata{
+			ID:  "some-service-account-id",
+			TRN: types.ServiceAccountModelType.BuildTRN("some/resource/service-account"),
+		},
 	}
 
 	activityEventInput := &activityevent.CreateActivityEventInput{
@@ -1486,7 +1517,10 @@ func TestCreateManagedIdentity(t *testing.T) {
 				},
 			},
 			existingServiceAccount: &models.ServiceAccount{
-				ResourcePath: "outside/scope/service-account",
+				Metadata: models.ResourceMetadata{
+					ID:  "outside-scope-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("outside/scope/service-account"),
+				},
 			},
 			expectErrorCode:  errors.EInvalid,
 			expectError:      "service account outside/scope/service-account is outside the scope of group some/resource",
@@ -1601,7 +1635,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 
 			mockDelegate.On("SetManagedIdentityData", mock.Anything, sampleManagedIdentity, sampleManagedIdentity.Data).Return(test.setManagedIdentityDataError).Maybe()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateManagedIdentityPermission, mock.Anything).Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
@@ -1665,10 +1699,10 @@ func TestCreateManagedIdentity(t *testing.T) {
 func TestGetManagedIdentitiesByIDs(t *testing.T) {
 	sampleManagedIdentity := models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some-group/some-identity"),
 		},
-		GroupID:      "some-group-id",
-		ResourcePath: "some-group/some-identity",
+		GroupID: "some-group-id",
 	}
 
 	inputList := []string{
@@ -1723,7 +1757,7 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, test.dbInput).Return(test.expectResult, nil)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -1750,14 +1784,14 @@ func TestGetManagedIdentitiesByIDs(t *testing.T) {
 func TestUpdateManagedIdentity(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		Description:  "old-description",
-		GroupID:      "some-group-id",
-		Data:         []byte("this is old data"),
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:        "a-managed-identity",
+		Description: "old-description",
+		GroupID:     "some-group-id",
+		Data:        []byte("this is old data"),
+		Type:        models.ManagedIdentityAWSFederated,
 	}
 
 	activityEventInput := &activityevent.CreateActivityEventInput{
@@ -1789,14 +1823,14 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			existingManagedIdentity: sampleManagedIdentity,
 			expectManagedIdentity: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "some-managed-identity-id",
+					ID:  "some-managed-identity-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 				},
-				Name:         "a-managed-identity",
-				ResourcePath: "some/resource/path",
-				Description:  "This is an updated description",
-				GroupID:      "some-group-id",
-				Data:         []byte("this is new data"),
-				Type:         models.ManagedIdentityAWSFederated,
+				Name:        "a-managed-identity",
+				Description: "This is an updated description",
+				GroupID:     "some-group-id",
+				Data:        []byte("this is new data"),
+				Type:        models.ManagedIdentityAWSFederated,
 			},
 		},
 		{
@@ -1889,7 +1923,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ID).Return(test.existingManagedIdentity, nil)
 
 			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
 			dbClient := &db.Client{
@@ -1926,14 +1960,14 @@ func TestUpdateManagedIdentity(t *testing.T) {
 func TestGetManagedIdentityAccessRules(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		Description:  "old-description",
-		GroupID:      "some-group-id",
-		Data:         []byte("this is old data"),
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:        "a-managed-identity",
+		Description: "old-description",
+		GroupID:     "some-group-id",
+		Data:        []byte("this is old data"),
+		Type:        models.ManagedIdentityAWSFederated,
 	}
 
 	sampleAccessRules := []models.ManagedIdentityAccessRule{
@@ -2000,7 +2034,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 
 			mockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, test.dbInput).Return(test.dbResult, nil).Maybe()
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -2041,10 +2075,10 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 		ManagedIdentities: []models.ManagedIdentity{
 			{
 				Metadata: models.ResourceMetadata{
-					ID: "some-managed-identity-id",
+					ID:  "some-managed-identity-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("some-group/some-identity"),
 				},
-				GroupID:      "some-group-id",
-				ResourcePath: "some-group/some-identity",
+				GroupID: "some-group-id",
 			},
 		},
 	}
@@ -2113,7 +2147,7 @@ func TestGetManagedIdentityAccessRulesByIDs(t *testing.T) {
 			mockManagedIdentities.On("GetManagedIdentityAccessRules", mock.Anything, test.ruleDBInput).Return(test.dbResult, nil)
 			mockManagedIdentities.On("GetManagedIdentities", mock.Anything, test.identityDBInput).Return(sampleIdentitiesResult, nil)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError)
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -2192,10 +2226,10 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 			mockManagedIdentities := db.NewMockManagedIdentities(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockManagedIdentities.On("GetManagedIdentityAccessRule", mock.Anything, test.searchID).Return(test.expectAccessRule, nil)
+			mockManagedIdentities.On("GetManagedIdentityAccessRuleByID", mock.Anything, test.searchID).Return(test.expectAccessRule, nil)
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, sampleManagedIdentity.Metadata.ID).Return(sampleManagedIdentity, nil).Maybe()
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.ManagedIdentityResourceType, mock.Anything).Return(test.authError).Maybe()
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError).Maybe()
 
 			dbClient := &db.Client{
 				ManagedIdentities: mockManagedIdentities,
@@ -2203,7 +2237,7 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 
 			service := NewService(nil, dbClient, nil, nil, nil, nil, nil)
 
-			rule, err := service.GetManagedIdentityAccessRule(auth.WithCaller(ctx, mockCaller), test.searchID)
+			rule, err := service.GetManagedIdentityAccessRuleByID(auth.WithCaller(ctx, mockCaller), test.searchID)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -2219,14 +2253,97 @@ func TestGetManagedIdentityAccessRule(t *testing.T) {
 	}
 }
 
+func TestGetManagedIdentityAccessRuleByTRN(t *testing.T) {
+	sampleAccessRule := &models.ManagedIdentityAccessRule{
+		Metadata: models.ResourceMetadata{
+			ID:  "access-rule-id-1",
+			TRN: types.ManagedIdentityAccessRuleModelType.BuildTRN("access-rule-gid-1"),
+		},
+		ManagedIdentityID: "managed-identity-id-1",
+		Type:              models.ManagedIdentityAccessRuleEligiblePrincipals,
+		RunStage:          models.JobPlanType,
+	}
+
+	type testCase struct {
+		name            string
+		trn             string
+		authError       error
+		accessRule      *models.ManagedIdentityAccessRule
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "successfully get managed identity access rule by trn",
+			trn:        sampleAccessRule.Metadata.TRN,
+			accessRule: sampleAccessRule,
+		},
+		{
+			name:            "managed identity access rule not found",
+			trn:             sampleAccessRule.Metadata.TRN,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view managed identity access rule",
+			trn:             sampleAccessRule.Metadata.TRN,
+			accessRule:      sampleAccessRule,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockManagedIdentities := db.NewMockManagedIdentities(t)
+
+			mockManagedIdentities.On("GetManagedIdentityAccessRuleByTRN", mock.Anything, test.trn).Return(test.accessRule, nil)
+
+			if test.accessRule != nil {
+				mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.accessRule.ManagedIdentityID).Return(&models.ManagedIdentity{
+					Metadata: models.ResourceMetadata{
+						ID: test.accessRule.ManagedIdentityID,
+					},
+					GroupID: "some-group-id",
+				}, nil)
+			}
+
+			if test.accessRule != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ManagedIdentityModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				ManagedIdentities: mockManagedIdentities,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualAccessRule, err := service.GetManagedIdentityAccessRuleByTRN(auth.WithCaller(ctx, mockCaller), test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, actualAccessRule)
+			assert.Equal(t, test.accessRule, actualAccessRule)
+		})
+	}
+}
+
 func TestCreateManagedIdentityAccessRule(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	sampleAccessRule := &models.ManagedIdentityAccessRule{
@@ -2243,9 +2360,9 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
-			ID: "service-account-id-1",
+			ID:  "service-account-id-1",
+			TRN: types.ServiceAccountModelType.BuildTRN("some/resource/service-account"),
 		},
-		ResourcePath: "some/resource/service-account",
 	}
 
 	activityEventInput := &activityevent.CreateActivityEventInput{
@@ -2295,9 +2412,9 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			existingManagedIdentity: sampleManagedIdentity,
 			existingServiceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
-					ID: "service-account-id-1",
+					ID:  "service-account-id-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("out/of/scope/service-account"),
 				},
-				ResourcePath: "out/of/scope/service-account",
 			},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -2357,7 +2474,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(test.existingServiceAccount, nil).Maybe()
 
 			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
 			// Called inside transaction to check resource limits.
@@ -2413,11 +2530,11 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	sampleAccessRule := &models.ManagedIdentityAccessRule{
@@ -2434,9 +2551,9 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
-			ID: "service-account-id-1",
+			ID:  "service-account-id-1",
+			TRN: types.ServiceAccountModelType.BuildTRN("some/resource/service-account"),
 		},
-		ResourcePath: "some/resource/service-account",
 	}
 
 	activityEventInput := &activityevent.CreateActivityEventInput{
@@ -2476,9 +2593,9 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			existingManagedIdentity: sampleManagedIdentity,
 			existingServiceAccount: &models.ServiceAccount{
 				Metadata: models.ResourceMetadata{
-					ID: "service-account-id-1",
+					ID:  "service-account-id-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("out/of/scope/service-account"),
 				},
-				ResourcePath: "out/of/scope/service-account",
 			},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -2525,7 +2642,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(test.existingServiceAccount, nil).Maybe()
 
 			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
 			dbClient := &db.Client{
@@ -2556,11 +2673,11 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	sampleAccessRule := &models.ManagedIdentityAccessRule{
@@ -2646,7 +2763,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 			mockManagedIdentities.On("GetManagedIdentityByID", mock.Anything, test.input.ManagedIdentityID).Return(test.existingManagedIdentity, nil)
 
 			if test.existingManagedIdentity != nil && !test.existingManagedIdentity.IsAlias() {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdateManagedIdentityPermission, mock.Anything).Return(test.authError)
 			}
 
 			dbClient := &db.Client{
@@ -2674,11 +2791,11 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 func TestCreateCredentials(t *testing.T) {
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		ResourcePath: "some/resource/path",
-		GroupID:      "some-group-id",
-		Type:         models.ManagedIdentityAWSFederated,
+		GroupID: "some-group-id",
+		Type:    models.ManagedIdentityAWSFederated,
 	}
 
 	sampleJob := &models.Job{
@@ -2742,7 +2859,7 @@ func TestCreateCredentials(t *testing.T) {
 			if test.existingManagedIdentities != nil {
 				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, sampleJob.WorkspaceID).Return(test.existingManagedIdentities, nil)
 
-				mockJobService.On("GetJob", mock.Anything, mock.Anything).Return(sampleJob, nil)
+				mockJobService.On("GetJobByID", mock.Anything, sampleJob.Metadata.ID).Return(sampleJob, nil)
 			}
 
 			if test.expectCredentials != nil {
@@ -2794,14 +2911,14 @@ func TestMoveManagedIdentity(t *testing.T) {
 
 	sampleManagedIdentity := &models.ManagedIdentity{
 		Metadata: models.ResourceMetadata{
-			ID: "some-managed-identity-id",
+			ID:  "some-managed-identity-id",
+			TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/path"),
 		},
-		Name:         "a-managed-identity",
-		ResourcePath: "some/resource/path",
-		Description:  "some-description",
-		GroupID:      oldParentGroup.Metadata.ID,
-		Data:         []byte("this is some data"),
-		Type:         models.ManagedIdentityAWSFederated,
+		Name:        "a-managed-identity",
+		Description: "some-description",
+		GroupID:     oldParentGroup.Metadata.ID,
+		Data:        []byte("this is some data"),
+		Type:        models.ManagedIdentityAWSFederated,
 	}
 
 	type testCase struct {
@@ -2830,10 +2947,10 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "mover-id",
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
 				},
-				GroupID:      "old-group-id",
-				ResourcePath: "old-group-path/mover-name",
+				GroupID: "old-group-id",
 			},
 			injectWorkspacesForMI: []models.Workspace{
 				{
@@ -2845,9 +2962,9 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			injectMoved: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "moved-id",
+					ID:  "moved-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("target-group-id/moved-id"),
 				},
-				ResourcePath: "target-group-id/moved-id",
 			},
 			// For the positive test case, GetManagedIdentities is hit when checking the resource limit and for aliases.
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
@@ -2866,16 +2983,16 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "mover-id",
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
 				},
-				GroupID:      "old-group-id",
-				ResourcePath: "old-group-path/mover-name",
+				GroupID: "old-group-id",
 			},
 			injectMoved: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "moved-id",
+					ID:  "moved-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("target-group-id/moved-id"),
 				},
-				ResourcePath: "target-group-id/moved-id",
 			},
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				PageInfo: &pagination.PageInfo{
@@ -2891,10 +3008,10 @@ func TestMoveManagedIdentity(t *testing.T) {
 			targetGroupID: "target-group-id",
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "mover-id",
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
 				},
-				GroupID:      "old-group-id",
-				ResourcePath: "old-group-path/mover-name",
+				GroupID: "old-group-id",
 			},
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				PageInfo: &pagination.PageInfo{
@@ -2908,14 +3025,17 @@ func TestMoveManagedIdentity(t *testing.T) {
 			name:        "negative: attempting to move a managed identity alias",
 			targetGroup: candidateParentGroup,
 			mover: &models.ManagedIdentity{
+				Metadata: models.ResourceMetadata{
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("some/resource/pat"),
+				},
 				AliasSourceID: &sampleManagedIdentity.Metadata.ID,
-				ResourcePath:  "some/resource/path",
 			},
 			injectMoved: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "moved-id",
+					ID:  "moved-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("target-group-id/moved-id"),
 				},
-				ResourcePath: "target-group-id/moved-id",
 			},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -2946,20 +3066,20 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "mover-id",
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
 				},
-				GroupID:      "old-group-id",
-				ResourcePath: "old-group-path/mover-name",
+				GroupID: "old-group-id",
 			},
 			// For negative test cases, GetManagedIdentities is hit when checking for aliases.
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				ManagedIdentities: []models.ManagedIdentity{
 					{
 						Metadata: models.ResourceMetadata{
-							ID: "alias in a descendant group",
+							ID:  "alias in a descendant group",
+							TRN: types.ManagedIdentityModelType.BuildTRN("target-parent-path/target-group-name/descendant-name/alias-name"),
 						},
 						AliasSourceID: ptr.String("mover-id"),
-						ResourcePath:  "target-parent-path/target-group-name/descendant-name/alias-name",
 						GroupID:       "alias-group-id",
 					},
 				},
@@ -2978,20 +3098,20 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "mover-id",
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
 				},
-				GroupID:      "old-group-id",
-				ResourcePath: "old-group-path/mover-name",
+				GroupID: "old-group-id",
 			},
 			// For negative test cases, GetManagedIdentities is hit when checking for aliases.
 			injectGetManagedIdentities: &db.ManagedIdentitiesResult{
 				ManagedIdentities: []models.ManagedIdentity{
 					{
 						Metadata: models.ResourceMetadata{
-							ID: "alias in an ancestor group",
+							ID:  "alias in an ancestor group",
+							TRN: types.ManagedIdentityModelType.BuildTRN("ancestor-path/alias-name"),
 						},
 						AliasSourceID: ptr.String("mover-id"),
-						ResourcePath:  "ancestor-path/alias-name",
 						GroupID:       "alias-group-id",
 					},
 				},
@@ -3010,10 +3130,10 @@ func TestMoveManagedIdentity(t *testing.T) {
 			},
 			mover: &models.ManagedIdentity{
 				Metadata: models.ResourceMetadata{
-					ID: "mover-id",
+					ID:  "mover-id",
+					TRN: types.ManagedIdentityModelType.BuildTRN("old-group-path/mover-name"),
 				},
-				GroupID:      "old-group-id",
-				ResourcePath: "old-group-path/mover-name",
+				GroupID: "old-group-id",
 			},
 			injectWorkspacesForMI: []models.Workspace{
 				{
@@ -3050,9 +3170,9 @@ func TestMoveManagedIdentity(t *testing.T) {
 				Return(test.injectWorkspacesForMI, nil).Maybe()
 
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteManagedIdentityPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteManagedIdentityPermission, mock.Anything).
 				Return(test.authError)
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateManagedIdentityPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateManagedIdentityPermission, mock.Anything).
 				Return(test.authError).Maybe()
 
 			mockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()

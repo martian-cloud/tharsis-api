@@ -163,7 +163,7 @@ func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 		}
 	}()
 
-	oldRun, err := r.dbClient.Runs.GetRun(txContext, run.Metadata.ID)
+	oldRun, err := r.dbClient.Runs.GetRunByID(txContext, run.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (r *RunStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*m
 	}()
 
 	// Get the old plan object from the DB.
-	oldPlan, err := r.dbClient.Plans.GetPlan(txContext, plan.Metadata.ID)
+	oldPlan, err := r.dbClient.Plans.GetPlanByID(txContext, plan.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (r *RunStateManager) UpdateApply(ctx context.Context, apply *models.Apply) 
 	}()
 
 	// Get the old apply object from the DB.
-	oldApply, err := r.dbClient.Applies.GetApply(txContext, apply.Metadata.ID)
+	oldApply, err := r.dbClient.Applies.GetApplyByID(txContext, apply.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +420,7 @@ func registerPlanHandlers(manager *RunStateManager) {
 func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
 	if newJob.Type == models.JobPlanType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
 		// Get run associated with job
-		run, err := p.manager.dbClient.Runs.GetRun(ctx, newJob.RunID)
+		run, err := p.manager.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
 		if err != nil {
 			return err
 		}
@@ -429,7 +429,7 @@ func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *mo
 			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
-		plan, err := p.manager.dbClient.Plans.GetPlan(ctx, run.PlanID)
+		plan, err := p.manager.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
 		if err != nil {
 			return err
 		}
@@ -460,7 +460,7 @@ func registerApplyHandlers(manager *RunStateManager) {
 func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
 	if newJob.Type == models.JobApplyType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
 		// Get run associated with job
-		run, err := a.manager.dbClient.Runs.GetRun(ctx, newJob.RunID)
+		run, err := a.manager.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
 		if err != nil {
 			return err
 		}
@@ -469,7 +469,7 @@ func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *m
 			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
-		apply, err := a.manager.dbClient.Applies.GetApply(ctx, run.ApplyID)
+		apply, err := a.manager.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
 		if err != nil {
 			return err
 		}
@@ -609,7 +609,7 @@ func registerWorkspaceHandlers(manager *RunStateManager) {
 func (w *workspaceHandlers) handleRunStateChangeEvent(ctx context.Context, oldRun *models.Run, newRun *models.Run) error {
 	if !oldRun.ForceCanceled && !newRun.Speculative() && newRun.ForceCanceled {
 		// Check if this run was force cancelled during the apply stage
-		apply, err := w.manager.dbClient.Applies.GetApply(ctx, newRun.ApplyID)
+		apply, err := w.manager.dbClient.Applies.GetApplyByID(ctx, newRun.ApplyID)
 		if err != nil {
 			return err
 		}

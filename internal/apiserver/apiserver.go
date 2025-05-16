@@ -35,6 +35,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
@@ -220,6 +221,34 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		return nil, fmt.Errorf("failed to initialize vcs service %v", err)
 	}
 
+	serviceCatalog := &services.Catalog{
+		ActivityEventService:             activityService,
+		CLIService:                       cliService,
+		FederatedRegistryService:         federatedRegistryService,
+		GPGKeyService:                    gpgKeyService,
+		GroupService:                     groupService,
+		JobService:                       jobService,
+		MaintenanceModeService:           maintenanceModeService,
+		ManagedIdentityService:           managedIdentityService,
+		NamespaceMembershipService:       namespaceMembershipService,
+		ResourceLimitService:             resourceLimitService,
+		RoleService:                      roleService,
+		RunnerService:                    runnerService,
+		RunService:                       runService,
+		SCIMService:                      scimService,
+		ServiceAccountService:            saService,
+		TeamService:                      teamService,
+		TerraformModuleRegistryService:   moduleRegistryService,
+		TerraformProviderMirrorService:   providerMirrorService,
+		TerraformProviderRegistryService: providerRegistryService,
+		UserService:                      userService,
+		VCSService:                       vcsService,
+		VariableService:                  variableService,
+		VersionService:                   versionService,
+		WorkspaceService:                 workspaceService,
+	}
+	serviceCatalog.Init()
+
 	// Start workspace assessment scheduler
 	workspace.NewAssessmentScheduler(
 		dbClient,
@@ -303,32 +332,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	requireAuthenticatedCallerMiddleware := middleware.NewRequireAuthenticatedCallerMiddleware(logger, respWriter)
 
 	resolverState := resolver.State{
-		Config:                     cfg,
-		GroupService:               groupService,
-		WorkspaceService:           workspaceService,
-		RunService:                 runService,
-		JobService:                 jobService,
-		ManagedIdentityService:     managedIdentityService,
-		ServiceAccountService:      saService,
-		UserService:                userService,
-		NamespaceMembershipService: namespaceMembershipService,
-		VariableService:            variableService,
-		Logger:                     logger,
-		TeamService:                teamService,
-		ProviderRegistryService:    providerRegistryService,
-		ModuleRegistryService:      moduleRegistryService,
-		GPGKeyService:              gpgKeyService,
-		CliService:                 cliService,
-		SCIMService:                scimService,
-		VCSService:                 vcsService,
-		ActivityService:            activityService,
-		RoleService:                roleService,
-		RunnerService:              runnerService,
-		ResourceLimitService:       resourceLimitService,
-		ProviderMirrorService:      providerMirrorService,
-		MaintenanceModeService:     maintenanceModeService,
-		VersionService:             versionService,
-		FederatedRegistryService:   federatedRegistryService,
+		Config:         cfg,
+		Logger:         logger,
+		ServiceCatalog: serviceCatalog,
 	}
 
 	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)

@@ -9,10 +9,12 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 
+	"github.com/aws/smithy-go/ptr"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 
@@ -21,8 +23,10 @@ import (
 // ActivityEventConnectionQueryArgs are used to query an activity event connection
 type ActivityEventConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	Username           *string
-	ServiceAccountPath *string
+	UserID             *string
+	ServiceAccountID   *string
+	Username           *string // DEPRECATED: use UserID instead with a TRN
+	ServiceAccountPath *string // DEPRECATED: use ServiceAccountID instead with a TRN
 	NamespacePath      *string
 	IncludeNested      *bool
 	TimeRangeStart     *graphql.Time
@@ -65,7 +69,7 @@ type ActivityEventConnectionResolver struct {
 func NewActivityEventConnectionResolver(ctx context.Context,
 	input *activityevent.GetActivityEventsInput,
 ) (*ActivityEventConnectionResolver, error) {
-	activityService := getActivityService(ctx)
+	activityService := getServiceCatalog(ctx).ActivityEventService
 
 	result, err := activityService.GetActivityEvents(ctx, input)
 	if err != nil {
@@ -281,7 +285,7 @@ type ActivityEventResolver struct {
 
 // ID resolver
 func (r *ActivityEventResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ActivityEventType, r.activityEvent.Metadata.ID))
+	return graphql.ID(r.activityEvent.GetGlobalID())
 }
 
 // Metadata resolver
@@ -472,7 +476,7 @@ func (r *ActivityEventResolver) TargetType() models.ActivityEventTargetType {
 
 // TargetID resolver
 func (r *ActivityEventResolver) TargetID() string {
-	return gid.ToGlobalID(gid.ActivityEventType, r.activityEvent.TargetID)
+	return gid.ToGlobalID(types.ActivityEventModelType, r.activityEvent.TargetID)
 }
 
 // Payload resolver
@@ -680,26 +684,45 @@ func getActivityEventsInputFromQueryArgs(ctx context.Context,
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 	}
 
-	if args.Username != nil {
-
-		user, err := getUserService(ctx).GetUserByUsername(ctx, *args.Username)
-		if err != nil {
-			// if needed, the error is already a Tharsis error
-			return nil, err
-		}
-
-		input.UserID = &user.Metadata.ID
+	if args.UserID != nil && args.Username != nil {
+		return nil, errors.New("cannot specify both userID and username", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	if args.ServiceAccountPath != nil {
+	if args.ServiceAccountID != nil && args.ServiceAccountPath != nil {
+		return nil, errors.New("cannot specify both serviceAccountID and serviceAccountPath", errors.WithErrorCode(errors.EInvalid))
+	}
 
-		serviceAccount, err := getSAService(ctx).GetServiceAccountByPath(ctx, *args.ServiceAccountPath)
+	var userIDToResolve, serviceAccountIDToResolve *string
+
+	if args.UserID != nil {
+		userIDToResolve = args.UserID
+	} else if args.Username != nil {
+		userIDToResolve = ptr.String(types.UserModelType.BuildTRN(*args.Username))
+	}
+
+	if args.ServiceAccountID != nil {
+		serviceAccountIDToResolve = args.ServiceAccountID
+	} else if args.ServiceAccountPath != nil {
+		serviceAccountIDToResolve = ptr.String(types.ServiceAccountModelType.BuildTRN(*args.ServiceAccountPath))
+	}
+
+	// Resolve the user's ID to pass in as a filter
+	if userIDToResolve != nil {
+		userID, err := getServiceCatalog(ctx).FetchModelID(ctx, *userIDToResolve)
 		if err != nil {
-			// if needed, the error is already a Tharsis error
 			return nil, err
 		}
 
-		input.ServiceAccountID = &serviceAccount.Metadata.ID
+		input.UserID = &userID
+	}
+
+	if serviceAccountIDToResolve != nil {
+		serviceAccountID, err := getServiceCatalog(ctx).FetchModelID(ctx, *serviceAccountIDToResolve)
+		if err != nil {
+			return nil, err
+		}
+
+		input.ServiceAccountID = &serviceAccountID
 	}
 
 	if args.NamespacePath != nil {

@@ -26,6 +26,9 @@ const (
 	// a contrived bogus ID
 	nonExistentID = "12345678-1234-1234-1234-123456789abc"
 
+	// a contrived bogus global ID used for testing TRN functions
+	nonExistentGlobalID = "QV84MWI0NDY4OS0wNGExLTRkYTQtOTY1Mi0zYmY4OWE1ZGJkMzU"
+
 	// an invalid ID
 	invalidID = "not-a-valid-uuid"
 
@@ -873,7 +876,7 @@ func createInitialTerraformProviders(ctx context.Context, testClient *testClient
 		}
 
 		result = append(result, *created)
-		resourcePath2ID[created.ResourcePath] = created.Metadata.ID
+		resourcePath2ID[created.GetResourcePath()] = created.Metadata.ID
 	}
 
 	return result, resourcePath2ID, nil

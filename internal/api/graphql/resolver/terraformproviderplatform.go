@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 
@@ -20,7 +19,7 @@ type TerraformProviderPlatformResolver struct {
 
 // ID resolver
 func (r *TerraformProviderPlatformResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformProviderPlatformType, r.providerPlatform.Metadata.ID))
+	return graphql.ID(r.providerPlatform.GetGlobalID())
 }
 
 // OS resolver
@@ -112,10 +111,15 @@ func handleTerraformProviderPlatformMutationProblem(e error, clientMutationID *s
 }
 
 func createTerraformProviderPlatformMutation(ctx context.Context, input *CreateTerraformProviderPlatformInput) (*TerraformProviderPlatformMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	createdProviderPlatform, err := service.CreateProviderPlatform(ctx, &providerregistry.CreateProviderPlatformInput{
-		ProviderVersionID: gid.FromGlobalID(input.ProviderVersionID),
+	versionID, err := serviceCatalog.FetchModelID(ctx, input.ProviderVersionID)
+	if err != nil {
+		return nil, err
+	}
+
+	createdProviderPlatform, err := serviceCatalog.TerraformProviderRegistryService.CreateProviderPlatform(ctx, &providerregistry.CreateProviderPlatformInput{
+		ProviderVersionID: versionID,
 		OperatingSystem:   input.OS,
 		Architecture:      input.Arch,
 		SHASum:            input.SHASum,
@@ -130,9 +134,14 @@ func createTerraformProviderPlatformMutation(ctx context.Context, input *CreateT
 }
 
 func deleteTerraformProviderPlatformMutation(ctx context.Context, input *DeleteTerraformProviderPlatformInput) (*TerraformProviderPlatformMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	providerPlatform, err := service.GetProviderPlatformByID(ctx, gid.FromGlobalID(input.ID))
+	versionID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	providerPlatform, err := serviceCatalog.TerraformProviderRegistryService.GetProviderPlatformByID(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +156,7 @@ func deleteTerraformProviderPlatformMutation(ctx context.Context, input *DeleteT
 		providerPlatform.Metadata.Version = v
 	}
 
-	if err := service.DeleteProviderPlatform(ctx, providerPlatform); err != nil {
+	if err := serviceCatalog.TerraformProviderRegistryService.DeleteProviderPlatform(ctx, providerPlatform); err != nil {
 		return nil, err
 	}
 

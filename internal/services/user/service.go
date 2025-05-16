@@ -6,9 +6,9 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -79,7 +79,7 @@ type GetNotificationPreferenceInput struct {
 // Service implements all user related functionality
 type Service interface {
 	GetUserByID(ctx context.Context, userID string) (*models.User, error)
-	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
+	GetUserByTRN(ctx context.Context, trn string) (*models.User, error)
 	GetUsers(ctx context.Context, input *GetUsersInput) (*db.UsersResult, error)
 	GetUsersByIDs(ctx context.Context, idList []string) ([]models.User, error)
 	UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdminStatusForUserInput) (*models.User, error)
@@ -125,14 +125,14 @@ func (s *service) SetNotificationPreference(ctx context.Context, input *SetNotif
 	// If this is for a namespace, check if the user has access to it
 	if input.NamespacePath != nil {
 		namespacePath := *input.NamespacePath
-		permission := permissions.ViewWorkspacePermission
+		permission := models.ViewWorkspacePermission
 		// Check if this namespace is a group, if it's not a group we can assume it's a workspace
-		group, err := s.dbClient.Groups.GetGroupByFullPath(ctx, namespacePath)
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get group by full path", errors.WithSpan(span))
+			return nil, errors.Wrap(err, "failed to get group by TRN", errors.WithSpan(span))
 		}
 		if group != nil {
-			permission = permissions.ViewGroupPermission
+			permission = models.ViewGroupPermission
 		}
 		if err := userCaller.RequirePermission(ctx, permission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return nil, err
@@ -218,14 +218,14 @@ func (s *service) GetNotificationPreference(ctx context.Context, input *GetNotif
 	// If this is for a namespace, check if the user has access to it
 	if input.NamespacePath != nil {
 		namespacePath := *input.NamespacePath
-		permission := permissions.ViewWorkspacePermission
+		permission := models.ViewWorkspacePermission
 		// Check if this namespace is a group, if it's not a group we can assume it's a workspace
-		group, err := s.dbClient.Groups.GetGroupByFullPath(ctx, namespacePath)
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get group by full path", errors.WithSpan(span))
+			return nil, errors.Wrap(err, "failed to get group by TRN", errors.WithSpan(span))
 		}
 		if group != nil {
-			permission = permissions.ViewGroupPermission
+			permission = models.ViewGroupPermission
 		}
 		if err := userCaller.RequirePermission(ctx, permission, auth.WithNamespacePath(namespacePath)); err != nil {
 			return nil, err
@@ -265,8 +265,8 @@ func (s *service) GetUserByID(ctx context.Context, userID string) (*models.User,
 	return user, nil
 }
 
-func (s *service) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetUserByUsername")
+func (s *service) GetUserByTRN(ctx context.Context, trn string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetUserByTRN")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -276,7 +276,7 @@ func (s *service) GetUserByUsername(ctx context.Context, username string) (*mode
 		return nil, err
 	}
 
-	user, err := s.dbClient.Users.GetUserByUsername(ctx, username)
+	user, err := s.dbClient.Users.GetUserByTRN(ctx, trn)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to get user")
 		return nil, errors.Wrap(
@@ -286,9 +286,9 @@ func (s *service) GetUserByUsername(ctx context.Context, username string) (*mode
 	}
 
 	if user == nil {
-		tracing.RecordError(span, nil, "User with username %s not found", username)
+		tracing.RecordError(span, nil, "User with TRN %s not found", trn)
 		return nil, errors.New(
-			"User with username %s not found", username,
+			"User with TRN %s not found", trn,
 			errors.WithErrorCode(errors.ENotFound))
 	}
 

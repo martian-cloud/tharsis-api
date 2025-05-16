@@ -19,10 +19,10 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -282,7 +282,7 @@ func TestGetProviderVersionMirrorByID(t *testing.T) {
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
 			if test.expectMirror != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 			}
 
 			mockVersionMirrors.On("GetVersionMirrorByID", mock.Anything, versionMirrorID).Return(test.expectMirror, nil)
@@ -309,121 +309,73 @@ func TestGetProviderVersionMirrorByID(t *testing.T) {
 	}
 }
 
-func TestGetProviderVersionMirrorByAddress(t *testing.T) {
-	versionMirrorID := "version-mirror-1"
-	groupID := "group-1"
-	namespace := "some/group"
-	registryHostname := "registry.terraform.io"
-	registryNamespace := "hashicorp"
-	providerType := "aws"
-	semanticVersion := "1.0.0"
+func TestGetProviderVersionMirrorByTRN(t *testing.T) {
+	sampleMirror := &models.TerraformProviderVersionMirror{
+		Metadata: models.ResourceMetadata{
+			ID:  "mirror-1",
+			TRN: types.TerraformProviderVersionMirrorModelType.BuildTRN("group-1/mirror-1"),
+		},
+		GroupID:           "group-1",
+		RegistryHostname:  "registry.terraform.io",
+		RegistryNamespace: "hashicorp",
+		Type:              "aws",
+		SemanticVersion:   "1.0.0",
+	}
 
 	type testCase struct {
-		rootGroup       *models.Group
-		expectMirror    *models.TerraformProviderVersionMirror
-		authError       error
-		name            string
-		expectErrorCode errors.CodeType
+		name          string
+		mirror        *models.TerraformProviderVersionMirror
+		authError     error
+		expectErrCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name: "successfully return version mirror by address",
-			rootGroup: &models.Group{
-				Metadata: models.ResourceMetadata{ID: groupID},
-			},
-			expectMirror: &models.TerraformProviderVersionMirror{
-				Metadata:          models.ResourceMetadata{ID: versionMirrorID},
-				RegistryHostname:  registryHostname,
-				RegistryNamespace: registryNamespace,
-				Type:              providerType,
-				SemanticVersion:   semanticVersion,
-				GroupID:           groupID,
-			},
+			name:   "get provider version mirror by TRN",
+			mirror: sampleMirror,
 		},
 		{
-			name:            "subject does not have access to view version mirror",
-			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
-			expectErrorCode: errors.EForbidden,
+			name:          "subject does not have access to provider version mirror",
+			mirror:        sampleMirror,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
 		},
 		{
-			name: "version mirror not found",
-			rootGroup: &models.Group{
-				Metadata: models.ResourceMetadata{ID: groupID},
-			},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name:            "group not found",
-			expectErrorCode: errors.ENotFound,
+			name:          "provider version mirror not found",
+			expectErrCode: errors.ENotFound,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			mockCaller := auth.NewMockCaller(t)
-			mockGroups := db.NewMockGroups(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+			mockVersionMirrors.On("GetVersionMirrorByTRN", mock.Anything, sampleMirror.Metadata.TRN).Return(test.mirror, nil)
 
-			if test.authError == nil {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, namespace).Return(test.rootGroup, nil)
-			}
-
-			getVersionMirrorsResponse := db.ProviderVersionMirrorsResult{
-				VersionMirrors: []models.TerraformProviderVersionMirror{},
-				PageInfo:       &pagination.PageInfo{},
-			}
-
-			if test.expectMirror != nil {
-				getVersionMirrorsResponse.VersionMirrors = append(getVersionMirrorsResponse.VersionMirrors, *test.expectMirror)
-				getVersionMirrorsResponse.PageInfo.TotalCount = 1
-			}
-
-			if test.rootGroup != nil {
-				mockVersionMirrors.On("GetVersionMirrors", mock.Anything, &db.GetProviderVersionMirrorsInput{
-					PaginationOptions: &pagination.Options{First: ptr.Int32(1)},
-					Filter: &db.TerraformProviderVersionMirrorFilter{
-						GroupID:           &groupID,
-						RegistryHostname:  &registryHostname,
-						RegistryNamespace: &registryNamespace,
-						Type:              &providerType,
-						SemanticVersion:   &semanticVersion,
-					},
-				}).Return(&getVersionMirrorsResponse, nil)
+			if test.mirror != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 			}
 
 			dbClient := &db.Client{
-				Groups:                          mockGroups,
 				TerraformProviderVersionMirrors: mockVersionMirrors,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
-
-			input := &GetProviderVersionMirrorByAddressInput{
-				RegistryHostname:  registryHostname,
-				RegistryNamespace: registryNamespace,
-				Type:              providerType,
-				SemanticVersion:   semanticVersion,
-				GroupPath:         namespace,
+			service := &service{
+				dbClient: dbClient,
 			}
 
-			actualMirror, err := service.GetProviderVersionMirrorByAddress(auth.WithCaller(ctx, mockCaller), input)
+			mirror, err := service.GetProviderVersionMirrorByTRN(auth.WithCaller(ctx, mockCaller), sampleMirror.Metadata.TRN)
 
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.expectMirror, actualMirror)
+			require.NoError(t, err)
+			assert.Equal(t, test.mirror, mirror)
 		})
 	}
 }
@@ -478,7 +430,7 @@ func TestGetProviderVersionMirrorsByIDs(t *testing.T) {
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
 			if test.expectMirror != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 			}
 
 			getVersionMirrorsResponse := db.ProviderVersionMirrorsResult{
@@ -574,7 +526,7 @@ func TestGetProviderVersionMirrors(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 
 			getVersionMirrorsResponse := db.ProviderVersionMirrorsResult{
 				VersionMirrors: []models.TerraformProviderVersionMirror{},
@@ -675,7 +627,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryNamespace,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupPath:         namespace,
+				GroupID:           namespace,
 			},
 			listVersionsResp: &listVersionsResponse{
 				Versions: []struct {
@@ -731,7 +683,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryNamespace,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupPath:         namespace,
+				GroupID:           namespace,
 			},
 			listVersionsResp: &listVersionsResponse{
 				Versions: []struct {
@@ -784,14 +736,14 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		{
 			name: "group not found",
 			input: &CreateProviderVersionMirrorInput{
-				GroupPath: namespace,
+				GroupID: namespace,
 			},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "group is not a root",
 			input: &CreateProviderVersionMirrorInput{
-				GroupPath: namespace,
+				GroupID: namespace,
 			},
 			group: &models.Group{
 				ParentID: "not-root",
@@ -805,7 +757,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryHostname,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupPath:         namespace,
+				GroupID:           namespace,
 			},
 			group: &models.Group{
 				FullPath: namespace,
@@ -819,7 +771,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryHostname,
 				Type:              providerType,
 				SemanticVersion:   "not-semantic",
-				GroupPath:         namespace,
+				GroupID:           namespace,
 			},
 			group: &models.Group{
 				FullPath: namespace,
@@ -833,7 +785,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryHostname,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupPath:         namespace,
+				GroupID:           namespace,
 			},
 			group: &models.Group{
 				FullPath: namespace,
@@ -856,7 +808,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		{
 			name: "subject does not have permissions to create version mirror",
 			input: &CreateProviderVersionMirrorInput{
-				GroupPath: namespace,
+				GroupID: namespace,
 			},
 			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
@@ -875,10 +827,10 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 			mockResourceLimits := db.NewMockResourceLimits(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
 
 			if test.authError == nil {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, namespace).Return(test.group, nil)
+				mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(test.group, nil)
 			}
 
 			if test.expectCreated != nil {
@@ -1047,7 +999,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
 
 			if test.authError == nil && !test.input.Force {
 				mockPlatformMirrors.On("GetPlatformMirrors", mock.Anything, &db.GetProviderPlatformMirrorsInput{
@@ -1154,7 +1106,7 @@ func TestGetProviderPlatformMirrorByID(t *testing.T) {
 			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
 
 			if test.expectMirror != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 
 				mockVersionMirrors.On("GetVersionMirrorByID", mock.Anything, versionMirrorID).
 					Return(&models.TerraformProviderVersionMirror{
@@ -1183,6 +1135,81 @@ func TestGetProviderPlatformMirrorByID(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectMirror, actualMirror)
+		})
+	}
+}
+
+func TestGetProviderPlatformMirrorByTRN(t *testing.T) {
+	sampleMirror := &models.TerraformProviderPlatformMirror{
+		Metadata: models.ResourceMetadata{
+			ID:  "mirror-1",
+			TRN: types.TerraformProviderPlatformMirrorModelType.BuildTRN("group-1/mirror-1"),
+		},
+		VersionMirrorID: "version-1",
+		OS:              "linux",
+		Architecture:    "amd64",
+	}
+
+	type testCase struct {
+		name          string
+		mirror        *models.TerraformProviderPlatformMirror
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:   "get provider platform mirror by TRN",
+			mirror: sampleMirror,
+		},
+		{
+			name:          "subject does not have access to provider platform mirror",
+			mirror:        sampleMirror,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider platform mirror not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVersionMirror := db.NewMockTerraformProviderVersionMirrors(t)
+			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
+
+			mockPlatformMirrors.On("GetPlatformMirrorByTRN", mock.Anything, sampleMirror.Metadata.TRN).Return(test.mirror, nil)
+
+			if test.mirror != nil {
+				mockVersionMirror.On("GetVersionMirrorByID", mock.Anything, sampleMirror.VersionMirrorID).Return(&models.TerraformProviderVersionMirror{
+					GroupID: "group-1",
+				}, nil)
+
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviderVersionMirrors:  mockVersionMirror,
+				TerraformProviderPlatformMirrors: mockPlatformMirrors,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			mirror, err := service.GetProviderPlatformMirrorByTRN(auth.WithCaller(ctx, mockCaller), sampleMirror.Metadata.TRN)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.mirror, mirror)
 		})
 	}
 }
@@ -1254,7 +1281,7 @@ func TestGetProviderPlatformMirrors(t *testing.T) {
 			mockVersionMirrors.On("GetVersionMirrorByID", mock.Anything, versionMirrorID).Return(test.versionMirror, nil)
 
 			if test.versionMirror != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 
 				getPlatformMirrorsResponse := db.ProviderPlatformMirrorsResult{
 					PlatformMirrors: []models.TerraformProviderPlatformMirror{},
@@ -1337,7 +1364,7 @@ func TestDeleteProviderPlatformMirror(t *testing.T) {
 			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
 
 			mockVersionMirrors.On("GetVersionMirrorByID", mock.Anything, versionMirrorID).
 				Return(&models.TerraformProviderVersionMirror{
@@ -1495,7 +1522,7 @@ func TestUploadInstallationPackage(t *testing.T) {
 			mockVersionMirrors.On("GetVersionMirrorByID", mock.Anything, versionMirrorID).Return(test.versionMirror, nil)
 
 			if test.versionMirror != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.CreateTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
 
 				if test.authError == nil {
 					result := &db.ProviderPlatformMirrorsResult{
@@ -1638,10 +1665,10 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 			mockGroups := db.NewMockGroups(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockGroups.On("GetGroupByFullPath", mock.Anything, namespace).Return(test.group, nil)
+			mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(namespace)).Return(test.group, nil)
 
 			if test.group != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 
 				result := &db.ProviderVersionMirrorsResult{
 					VersionMirrors: []models.TerraformProviderVersionMirror{},
@@ -1807,10 +1834,10 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 			mockPlatformMirrors := db.NewMockTerraformProviderPlatformMirrors(t)
 			mockVersionMirrors := db.NewMockTerraformProviderVersionMirrors(t)
 
-			mockGroups.On("GetGroupByFullPath", mock.Anything, namespace).Return(test.group, nil)
+			mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(namespace)).Return(test.group, nil)
 
 			if test.group != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformProviderMirrorResourceType, mock.Anything).Return(test.authError)
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderMirrorModelType, mock.Anything).Return(test.authError)
 
 				versionsResult := &db.ProviderVersionMirrorsResult{
 					VersionMirrors: []models.TerraformProviderVersionMirror{},

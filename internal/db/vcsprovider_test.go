@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -90,7 +92,7 @@ func TestVCSProviders_GetProviderByID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -110,6 +112,77 @@ func TestVCSProviders_GetProviderByID(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, actualVCSProvider)
+			}
+		})
+	}
+}
+
+func TestGetVCSProviderByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	provider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:              "test-provider",
+		GroupID:           group.Metadata.ID,
+		URL:               gitHubURL,
+		OAuthClientID:     "client-id",
+		OAuthClientSecret: "client-secret",
+		OAuthState:        ptr.String(uuid.New().String()),
+		Type:              models.GitHubProviderType,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectProvider  bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:           "get resource by TRN",
+			trn:            provider.Metadata.TRN,
+			expectProvider: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.VCSProviderModelType.BuildTRN(group.FullPath, "unknown"),
+		},
+		{
+			name:            "provider trn has less than 2 parts",
+			trn:             types.VCSProviderModelType.BuildTRN(group.FullPath),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualProvider, err := testClient.client.VCSProviders.GetProviderByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectProvider {
+				require.NotNil(t, actualProvider)
+				assert.Equal(t, types.VCSProviderModelType.BuildTRN(group.FullPath, provider.Name), actualProvider.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualProvider)
 			}
 		})
 	}
@@ -152,7 +225,7 @@ func TestGetProviderByOAuthState(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -736,10 +809,10 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.VCSProviderModelType.BuildTRN(warmupGroup.FullPath, "positive-create-vcs-provider-nearly-empty"),
 				},
 				Name:              "positive-create-vcs-provider-nearly-empty",
 				GroupID:           warmupGroupID,
-				ResourcePath:      warmupGroup.FullPath + "/positive-create-vcs-provider-nearly-empty",
 				URL:               gitHubURL,
 				OAuthClientID:     "a-client-id",
 				OAuthClientSecret: "a-client-secret",
@@ -767,8 +840,8 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.VCSProviderModelType.BuildTRN(warmupGroup.FullPath, "positive-create-vcs-provider-full"),
 				},
-				ResourcePath:       warmupGroup.FullPath + "/positive-create-vcs-provider-full",
 				Name:               "positive-create-vcs-provider-full",
 				Description:        "positive create vcs provider",
 				GroupID:            warmupGroupID,
@@ -892,8 +965,8 @@ func TestVCSProviders_UpdateProvider(t *testing.T) {
 					Version:              positiveVCSProvider.Metadata.Version + 1,
 					CreationTimestamp:    positiveVCSProvider.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
+					TRN:                  positiveVCSProvider.Metadata.TRN,
 				},
-				ResourcePath:      warmupGroup.FullPath + "/" + positiveVCSProvider.Name,
 				Name:              "1-vcs-provider-0",
 				Description:       "updated description",
 				GroupID:           warmupGroup.Metadata.ID,
@@ -1229,7 +1302,6 @@ func compareVCSProviders(t *testing.T, expected, actual *models.VCSProvider,
 	checkID bool, times *timeBounds,
 ) {
 	assert.Equal(t, expected.Type, actual.Type)
-	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Description, actual.Description)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
@@ -1248,6 +1320,7 @@ func compareVCSProviders(t *testing.T, expected, actual *models.VCSProvider,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

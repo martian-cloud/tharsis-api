@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -62,7 +62,7 @@ type TerraformProviderVersionConnectionResolver struct {
 
 // NewTerraformProviderVersionConnectionResolver creates a new TerraformProviderVersionConnectionResolver
 func NewTerraformProviderVersionConnectionResolver(ctx context.Context, input *providerregistry.GetProviderVersionsInput) (*TerraformProviderVersionConnectionResolver, error) {
-	service := getProviderRegistryService(ctx)
+	service := getServiceCatalog(ctx).TerraformProviderRegistryService
 
 	result, err := service.GetProviderVersions(ctx, input)
 	if err != nil {
@@ -130,7 +130,7 @@ type TerraformProviderVersionResolver struct {
 
 // ID resolver
 func (r *TerraformProviderVersionResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformProviderVersionType, r.providerVersion.Metadata.ID))
+	return graphql.ID(r.providerVersion.GetGlobalID())
 }
 
 // GPGKeyID resolver
@@ -166,7 +166,7 @@ func (r *TerraformProviderVersionResolver) ReadmeUploaded() bool {
 // Readme resolver
 func (r *TerraformProviderVersionResolver) Readme(ctx context.Context) (string, error) {
 	if r.providerVersion.ReadmeUploaded {
-		return getProviderRegistryService(ctx).GetProviderVersionReadme(ctx, r.providerVersion)
+		return getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderVersionReadme(ctx, r.providerVersion)
 	}
 	return "", nil
 }
@@ -198,7 +198,7 @@ func (r *TerraformProviderVersionResolver) Provider(ctx context.Context) (*Terra
 
 // Platforms resolver
 func (r *TerraformProviderVersionResolver) Platforms(ctx context.Context) ([]*TerraformProviderPlatformResolver, error) {
-	platforms, err := getProviderRegistryService(ctx).GetProviderPlatforms(ctx, &providerregistry.GetProviderPlatformsInput{
+	platforms, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderPlatforms(ctx, &providerregistry.GetProviderPlatformsInput{
 		ProviderVersionID: &r.providerVersion.Metadata.ID,
 	})
 	if err != nil {
@@ -220,9 +220,9 @@ func (r *TerraformProviderVersionResolver) CreatedBy() string {
 }
 
 func terraformProviderVersionQuery(ctx context.Context, args *TerraformProviderVersionQueryArgs) (*TerraformProviderVersionResolver, error) {
-	service := getProviderRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	provider, err := service.GetProviderByAddress(ctx, args.RegistryNamespace, args.ProviderName)
+	provider, err := serviceCatalog.TerraformProviderRegistryService.GetProviderByAddress(ctx, args.RegistryNamespace, args.ProviderName)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -243,7 +243,7 @@ func terraformProviderVersionQuery(ctx context.Context, args *TerraformProviderV
 		input.Latest = ptr.Bool(true)
 	}
 
-	versionsResponse, err := service.GetProviderVersions(ctx, &input)
+	versionsResponse, err := serviceCatalog.TerraformProviderRegistryService.GetProviderVersions(ctx, &input)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +280,8 @@ func (r *TerraformProviderVersionMutationPayloadResolver) ProviderVersion() *Ter
 // CreateTerraformProviderVersionInput contains the input for creating a new providerVersion
 type CreateTerraformProviderVersionInput struct {
 	ClientMutationID *string
-	ProviderPath     string
+	ProviderPath     *string // DEPRECATED: use ProviderID instead with a TRN
+	ProviderID       *string
 	Version          string
 	Protocols        []string
 }
@@ -302,15 +303,13 @@ func handleTerraformProviderVersionMutationProblem(e error, clientMutationID *st
 }
 
 func createTerraformProviderVersionMutation(ctx context.Context, input *CreateTerraformProviderVersionInput) (*TerraformProviderVersionMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
-
-	provider, err := service.GetProviderByPath(ctx, input.ProviderPath)
+	providerID, err := toModelID(ctx, input.ProviderPath, input.ProviderID, types.TerraformProviderModelType)
 	if err != nil {
 		return nil, err
 	}
 
-	createdProviderVersion, err := service.CreateProviderVersion(ctx, &providerregistry.CreateProviderVersionInput{
-		ProviderID:      provider.Metadata.ID,
+	createdProviderVersion, err := getServiceCatalog(ctx).TerraformProviderRegistryService.CreateProviderVersion(ctx, &providerregistry.CreateProviderVersionInput{
+		ProviderID:      providerID,
 		SemanticVersion: input.Version,
 		Protocols:       input.Protocols,
 	})
@@ -323,9 +322,14 @@ func createTerraformProviderVersionMutation(ctx context.Context, input *CreateTe
 }
 
 func deleteTerraformProviderVersionMutation(ctx context.Context, input *DeleteTerraformProviderVersionInput) (*TerraformProviderVersionMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	providerVersion, err := service.GetProviderVersionByID(ctx, gid.FromGlobalID(input.ID))
+	versionID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	providerVersion, err := serviceCatalog.TerraformProviderRegistryService.GetProviderVersionByID(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +344,7 @@ func deleteTerraformProviderVersionMutation(ctx context.Context, input *DeleteTe
 		providerVersion.Metadata.Version = v
 	}
 
-	if err := service.DeleteProviderVersion(ctx, providerVersion); err != nil {
+	if err := serviceCatalog.TerraformProviderRegistryService.DeleteProviderVersion(ctx, providerVersion); err != nil {
 		return nil, err
 	}
 
@@ -377,9 +381,7 @@ func loadTerraformProviderVersion(ctx context.Context, id string) (*models.Terra
 }
 
 func providerVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getProviderRegistryService(ctx)
-
-	providerVersions, err := service.GetProviderVersionsByIDs(ctx, ids)
+	providerVersions, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderVersionsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

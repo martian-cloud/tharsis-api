@@ -21,10 +21,10 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -104,7 +104,7 @@ var (
 // Service implements all module registry functionality
 type Service interface {
 	GetModuleByID(ctx context.Context, id string) (*models.TerraformModule, error)
-	GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error)
+	GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error)
 	GetModuleByAddress(ctx context.Context, namespace string, name string, system string) (*models.TerraformModule, error)
 	GetModulesByIDs(ctx context.Context, ids []string) ([]models.TerraformModule, error)
 	GetModules(ctx context.Context, input *GetModulesInput) (*db.ModulesResult, error)
@@ -112,11 +112,13 @@ type Service interface {
 	UpdateModule(ctx context.Context, module *models.TerraformModule) (*models.TerraformModule, error)
 	DeleteModule(ctx context.Context, module *models.TerraformModule) error
 	GetModuleAttestationByID(ctx context.Context, id string) (*models.TerraformModuleAttestation, error)
+	GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error)
 	GetModuleAttestations(ctx context.Context, input *GetModuleAttestationsInput) (*db.ModuleAttestationsResult, error)
 	CreateModuleAttestation(ctx context.Context, input *CreateModuleAttestationInput) (*models.TerraformModuleAttestation, error)
 	UpdateModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) (*models.TerraformModuleAttestation, error)
 	DeleteModuleAttestation(ctx context.Context, attestation *models.TerraformModuleAttestation) error
 	GetModuleVersionByID(ctx context.Context, id string) (*models.TerraformModuleVersion, error)
+	GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error)
 	GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*db.ModuleVersionsResult, error)
 	GetModuleVersionsByIDs(ctx context.Context, ids []string) ([]models.TerraformModuleVersion, error)
 	CreateModuleVersion(ctx context.Context, input *CreateModuleVersionInput) (*models.TerraformModuleVersion, error)
@@ -214,7 +216,7 @@ func (s *service) GetModuleByID(ctx context.Context, id string) (*models.Terrafo
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -224,8 +226,8 @@ func (s *service) GetModuleByID(ctx context.Context, id string) (*models.Terrafo
 	return module, nil
 }
 
-func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.TerraformModule, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetModuleByPath")
+func (s *service) GetModuleByTRN(ctx context.Context, trn string) (*models.TerraformModule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleByTRN")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -235,18 +237,18 @@ func (s *service) GetModuleByPath(ctx context.Context, path string) (*models.Ter
 		return nil, err
 	}
 
-	module, err := s.dbClient.TerraformModules.GetModuleByPath(ctx, path)
+	module, err := s.dbClient.TerraformModules.GetModuleByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get module by path")
+		tracing.RecordError(span, err, "failed to get module by TRN")
 		return nil, err
 	}
 
 	if module == nil {
-		return nil, errors.New("module with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("module with trn %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -272,7 +274,7 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -302,7 +304,7 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 	}
 
 	if input.Group != nil {
-		err = caller.RequirePermission(ctx, permissions.ViewTerraformModulePermission, auth.WithNamespacePath(input.Group.FullPath))
+		err = caller.RequirePermission(ctx, models.ViewTerraformModulePermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -347,7 +349,7 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -414,7 +416,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -557,7 +559,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 	s.logger.Infow("Created a module attestation.",
 		"caller", caller.GetSubject(),
 		"moduleID", input.ModuleID,
-		"modulePath", module.ResourcePath,
+		"modulePath", module.GetResourcePath(),
 		"moduleAttestationID", createdAttestation.Metadata.ID,
 	)
 
@@ -581,7 +583,7 @@ func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *mode
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -595,8 +597,7 @@ func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *mode
 
 	s.logger.Infow("Updated module attestation.",
 		"caller", caller.GetSubject(),
-		"moduleID", module.Metadata.ID,
-		"modulePath", module.ResourcePath,
+		"moduleTRN", module.Metadata.TRN,
 		"moduleAttestationID", attestation.Metadata.ID,
 	)
 
@@ -631,7 +632,44 @@ func (s *service) GetModuleAttestationByID(ctx context.Context, id string) (*mod
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
+		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
+			return nil, err
+		}
+	}
+
+	return moduleAttestation, nil
+}
+
+func (s *service) GetModuleAttestationByTRN(ctx context.Context, trn string) (*models.TerraformModuleAttestation, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleAttestationByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	moduleAttestation, err := s.dbClient.TerraformModuleAttestations.GetModuleAttestationByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get module attestation by TRN")
+		return nil, err
+	}
+
+	if moduleAttestation == nil {
+		return nil, errors.New("module attestation with trn %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	module, err := s.getModuleByID(ctx, moduleAttestation.ModuleID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
+		return nil, err
+	}
+
+	if module.Private {
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -659,7 +697,7 @@ func (s *service) GetModuleAttestations(ctx context.Context, input *GetModuleAtt
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -695,7 +733,7 @@ func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *mode
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -709,8 +747,7 @@ func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *mode
 
 	s.logger.Infow("Deleted module attestation.",
 		"caller", caller.GetSubject(),
-		"moduleID", module.Metadata.ID,
-		"modulePath", module.ResourcePath,
+		"moduleTRN", module.Metadata.TRN,
 		"moduleAttestationID", attestation.Metadata.ID,
 	)
 
@@ -728,7 +765,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateTerraformModulePermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateTerraformModulePermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -748,7 +785,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 	if group.ParentID == "" {
 		rootGroupID = input.GroupID
 	} else {
-		rootGroup, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
+		rootGroup, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(group.GetRootGroupPath()))
 		if gErr != nil {
 			tracing.RecordError(span, gErr, "failed to get group by full path")
 			return nil, gErr
@@ -843,7 +880,7 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -917,7 +954,7 @@ func (s *service) GetModulesByIDs(ctx context.Context, ids []string) ([]models.T
 	}
 
 	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithNamespacePaths(namespacePaths))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -945,7 +982,7 @@ func (s *service) GetModuleConfigurationDetails(ctx context.Context, moduleVersi
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -992,7 +1029,44 @@ func (s *service) GetModuleVersionByID(ctx context.Context, id string) (*models.
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
+		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
+			return nil, err
+		}
+	}
+
+	return moduleVersion, nil
+}
+
+func (s *service) GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetModuleVersionByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	moduleVersion, err := s.dbClient.TerraformModuleVersions.GetModuleVersionByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get module version by TRN")
+		return nil, err
+	}
+
+	if moduleVersion == nil {
+		return nil, errors.New("module version with trn %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	module, err := s.getModuleByID(ctx, moduleVersion.ModuleID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get module by ID")
+		return nil, err
+	}
+
+	if module.Private {
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -1020,7 +1094,7 @@ func (s *service) GetModuleVersions(ctx context.Context, input *GetModuleVersion
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -1097,7 +1171,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1236,7 +1310,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1308,7 +1382,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 		s.logger.Infof(
 			"Deleted latest module version, latest flag is being set to latest version %s for module %s",
 			newLatestVersion.SemanticVersion,
-			module.ResourcePath,
+			module.GetResourcePath(),
 		)
 		newLatestVersion.Latest = true
 		if _, err = s.dbClient.TerraformModuleVersions.UpdateModuleVersion(txContext, newLatestVersion); err != nil {
@@ -1348,7 +1422,7 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformModulePermission, auth.WithGroupID(module.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1441,7 +1515,7 @@ func (s *service) GetModuleVersionPackageDownloadURL(ctx context.Context, module
 	}
 
 	if module.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return "", err

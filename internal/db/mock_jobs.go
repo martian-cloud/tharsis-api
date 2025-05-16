@@ -74,6 +74,36 @@ func (_m *MockJobs) GetJobByID(ctx context.Context, id string) (*models.Job, err
 	return r0, r1
 }
 
+// GetJobByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockJobs) GetJobByTRN(ctx context.Context, trn string) (*models.Job, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetJobByTRN")
+	}
+
+	var r0 *models.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Job, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Job); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetJobCountForRunner provides a mock function with given fields: ctx, runnerID
 func (_m *MockJobs) GetJobCountForRunner(ctx context.Context, runnerID string) (int, error) {
 	ret := _m.Called(ctx, runnerID)

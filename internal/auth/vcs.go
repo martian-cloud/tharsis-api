@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -36,7 +36,7 @@ func NewVCSWorkspaceLinkCaller(
 
 // GetSubject returns the subject identifier for this caller.
 func (v *VCSWorkspaceLinkCaller) GetSubject() string {
-	return v.Provider.ResourcePath
+	return v.Provider.GetResourcePath()
 }
 
 // IsAdmin returns true if the caller is an admin.
@@ -73,13 +73,13 @@ func (v *VCSWorkspaceLinkCaller) GetNamespaceAccessPolicy(_ context.Context) (*N
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions.
-func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm models.Permission, checks ...func(*constraints)) error {
 	inMaintenance, err := v.maintenanceMonitor.InMaintenanceMode(ctx)
 	if err != nil {
 		return err
 	}
 
-	if inMaintenance && perm.Action != permissions.ViewAction {
+	if inMaintenance && perm.Action != models.ViewAction {
 		// Server is in maintenance mode, only allow view permissions
 		return errInMaintenanceMode
 	}
@@ -93,13 +93,13 @@ func (v *VCSWorkspaceLinkCaller) RequirePermission(ctx context.Context, perm per
 }
 
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
-func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
+func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, _ ...func(*constraints)) error {
 	// Return an authorization error since VCS does not need any access to inherited resources.
 	return v.UnauthorizedError(ctx, false)
 }
 
 // requireAccessToWorkspace will return an error if the caller doesn't have permission to view the specified workspace.
-func (v *VCSWorkspaceLinkCaller) requireAccessToWorkspace(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (v *VCSWorkspaceLinkCaller) requireAccessToWorkspace(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.workspaceID == nil {
 		return errMissingConstraints
 	}
@@ -115,14 +115,14 @@ func (v *VCSWorkspaceLinkCaller) requireAccessToWorkspace(ctx context.Context, _
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
-func (v *VCSWorkspaceLinkCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
-	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.ViewWorkspacePermission:              v.requireAccessToWorkspace,
-		permissions.ViewRunPermission:                    v.requireAccessToWorkspace,
-		permissions.CreateRunPermission:                  v.requireAccessToWorkspace, // Should only create runs for linked workspace.
-		permissions.ViewConfigurationVersionPermission:   v.requireAccessToWorkspace,
-		permissions.CreateConfigurationVersionPermission: v.requireAccessToWorkspace,
-		permissions.UpdateConfigurationVersionPermission: v.requireAccessToWorkspace,
+func (v *VCSWorkspaceLinkCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[models.Permission]permissionTypeHandler{
+		models.ViewWorkspacePermission:              v.requireAccessToWorkspace,
+		models.ViewRunPermission:                    v.requireAccessToWorkspace,
+		models.CreateRunPermission:                  v.requireAccessToWorkspace, // Should only create runs for linked workspace.
+		models.ViewConfigurationVersionPermission:   v.requireAccessToWorkspace,
+		models.CreateConfigurationVersionPermission: v.requireAccessToWorkspace,
+		models.UpdateConfigurationVersionPermission: v.requireAccessToWorkspace,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

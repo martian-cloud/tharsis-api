@@ -8,8 +8,8 @@ import (
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -24,6 +24,7 @@ type TeamConnectionQueryArgs struct {
 }
 
 // TeamQueryArgs are used to query a single team
+// DEPRECATED: use node query instead with a TRN
 type TeamQueryArgs struct {
 	Name string
 }
@@ -60,7 +61,7 @@ type TeamConnectionResolver struct {
 
 // NewTeamConnectionResolver creates a new TeamConnectionResolver
 func NewTeamConnectionResolver(ctx context.Context, input *team.GetTeamsInput) (*TeamConnectionResolver, error) {
-	teamService := getTeamService(ctx)
+	teamService := getServiceCatalog(ctx).TeamService
 
 	result, err := teamService.GetTeams(ctx, input)
 	if err != nil {
@@ -128,7 +129,7 @@ type TeamResolver struct {
 
 // ID resolver
 func (r *TeamResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TeamType, r.team.Metadata.ID))
+	return graphql.ID(r.team.GetGlobalID())
 }
 
 // Name resolver
@@ -170,10 +171,9 @@ func (r *TeamResolver) Members(ctx context.Context, args *ConnectionQueryArgs) (
 	return NewTeamMemberConnectionResolver(ctx, &input)
 }
 
+// DEPRECATED: use node query instead with a TRN
 func teamQuery(ctx context.Context, args *TeamQueryArgs) (*TeamResolver, error) {
-	teamService := getTeamService(ctx)
-
-	team, err := teamService.GetTeamByName(ctx, args.Name)
+	team, err := getServiceCatalog(ctx).TeamService.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(args.Name))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -237,7 +237,8 @@ type CreateTeamInput struct {
 type UpdateTeamInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
-	Name             string
+	Name             *string // DEPRECATED: use ID instead with TRN
+	ID               *string
 	Description      string
 }
 
@@ -245,7 +246,8 @@ type UpdateTeamInput struct {
 type DeleteTeamInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
-	Name             string
+	Name             *string // DEPRECATED: use ID instead with a TRN
+	ID               *string
 }
 
 func handleTeamMutationProblem(e error, clientMutationID *string) (*TeamMutationPayloadResolver, error) {
@@ -258,14 +260,12 @@ func handleTeamMutationProblem(e error, clientMutationID *string) (*TeamMutation
 }
 
 func createTeamMutation(ctx context.Context, input *CreateTeamInput) (*TeamMutationPayloadResolver, error) {
-	teamService := getTeamService(ctx)
-
 	toCreate := &team.CreateTeamInput{
 		Name:        input.Name,
 		Description: input.Description,
 	}
 
-	createdTeam, err := teamService.CreateTeam(ctx, toCreate)
+	createdTeam, err := getServiceCatalog(ctx).TeamService.CreateTeam(ctx, toCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -275,10 +275,27 @@ func createTeamMutation(ctx context.Context, input *CreateTeamInput) (*TeamMutat
 }
 
 func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutationPayloadResolver, error) {
-	teamService := getTeamService(ctx)
+	var teamValueToResolve string
+	switch {
+	case input.ID != nil && input.Name != nil:
+		return nil, errors.New("cannot specify both team id and name", errors.WithErrorCode(errors.EInvalid))
+	case input.ID != nil:
+		teamValueToResolve = *input.ID
+	case input.Name != nil:
+		teamValueToResolve = types.TeamModelType.BuildTRN(*input.Name)
+	default:
+		return nil, errors.New("either team id or name must be specified", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	serviceCatalog := getServiceCatalog(ctx)
+
+	teamID, err := serviceCatalog.FetchModelID(ctx, teamValueToResolve)
+	if err != nil {
+		return nil, err
+	}
 
 	toUpdate := &team.UpdateTeamInput{
-		Name:        input.Name,
+		ID:          teamID,
 		Description: &input.Description,
 	}
 
@@ -292,7 +309,7 @@ func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutat
 		toUpdate.MetadataVersion = &v
 	}
 
-	team, err := teamService.UpdateTeam(ctx, toUpdate)
+	team, err := serviceCatalog.TeamService.UpdateTeam(ctx, toUpdate)
 	if err != nil {
 		return nil, err
 	}
@@ -302,9 +319,26 @@ func updateTeamMutation(ctx context.Context, input *UpdateTeamInput) (*TeamMutat
 }
 
 func deleteTeamMutation(ctx context.Context, input *DeleteTeamInput) (*TeamMutationPayloadResolver, error) {
-	teamService := getTeamService(ctx)
+	var teamValueToResolve string
+	switch {
+	case input.ID != nil && input.Name != nil:
+		return nil, errors.New("cannot specify both team id and name", errors.WithErrorCode(errors.EInvalid))
+	case input.ID != nil:
+		teamValueToResolve = *input.ID
+	case input.Name != nil:
+		teamValueToResolve = types.TeamModelType.BuildTRN(*input.Name)
+	default:
+		return nil, errors.New("either team id or name must be specified", errors.WithErrorCode(errors.EInvalid))
+	}
 
-	gotTeam, err := teamService.GetTeamByName(ctx, input.Name)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	teamID, err := serviceCatalog.FetchModelID(ctx, teamValueToResolve)
+	if err != nil {
+		return nil, err
+	}
+
+	gotTeam, err := serviceCatalog.TeamService.GetTeamByID(ctx, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +357,7 @@ func deleteTeamMutation(ctx context.Context, input *DeleteTeamInput) (*TeamMutat
 		Team: gotTeam,
 	}
 
-	if err := teamService.DeleteTeam(ctx, toDelete); err != nil {
+	if err := serviceCatalog.TeamService.DeleteTeam(ctx, toDelete); err != nil {
 		return nil, err
 	}
 
@@ -360,7 +394,7 @@ func loadTeam(ctx context.Context, id string) (*models.Team, error) {
 }
 
 func teamBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	teams, err := getTeamService(ctx).GetTeamsByIDs(ctx, ids)
+	teams, err := getServiceCatalog(ctx).TeamService.GetTeamsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +444,7 @@ type TeamMemberConnectionResolver struct {
 func NewTeamMemberConnectionResolver(ctx context.Context,
 	input *team.GetTeamMembersInput,
 ) (*TeamMemberConnectionResolver, error) {
-	result, err := getTeamService(ctx).GetTeamMembers(ctx,
+	result, err := getServiceCatalog(ctx).TeamService.GetTeamMembers(ctx,
 		&db.GetTeamMembersInput{Filter: &db.TeamMemberFilter{TeamIDs: []string{*input.TeamID}}})
 	if err != nil {
 		return nil, err
@@ -477,7 +511,7 @@ type TeamMemberResolver struct {
 
 // ID resolver
 func (r *TeamMemberResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TeamMemberType, r.teamMember.Metadata.ID))
+	return graphql.ID(r.teamMember.GetGlobalID())
 }
 
 // User resolver
@@ -574,7 +608,7 @@ func addUserToTeamMutation(ctx context.Context, input *AddUserToTeamInput) (*Tea
 		IsMaintainer: input.IsMaintainer,
 	}
 
-	teamMember, err := getTeamService(ctx).AddUserToTeam(ctx, createOptions)
+	teamMember, err := getServiceCatalog(ctx).TeamService.AddUserToTeam(ctx, createOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -584,8 +618,6 @@ func addUserToTeamMutation(ctx context.Context, input *AddUserToTeamInput) (*Tea
 }
 
 func updateTeamMemberMutation(ctx context.Context, input *UpdateTeamMemberInput) (*TeamMemberMutationPayloadResolver, error) {
-	service := getTeamService(ctx)
-
 	toUpdate := &team.UpdateTeamMemberInput{
 		TeamName:     input.TeamName,
 		Username:     input.Username,
@@ -602,7 +634,7 @@ func updateTeamMemberMutation(ctx context.Context, input *UpdateTeamMemberInput)
 		toUpdate.MetadataVersion = &v
 	}
 
-	teamMember, err := service.UpdateTeamMember(ctx, toUpdate)
+	teamMember, err := getServiceCatalog(ctx).TeamService.UpdateTeamMember(ctx, toUpdate)
 	if err != nil {
 		return nil, err
 	}
@@ -612,7 +644,7 @@ func updateTeamMemberMutation(ctx context.Context, input *UpdateTeamMemberInput)
 }
 
 func removeUserFromTeamMutation(ctx context.Context, input *RemoveUserFromTeamInput) (*TeamMemberMutationPayloadResolver, error) {
-	service := getTeamService(ctx)
+	service := getServiceCatalog(ctx).TeamService
 
 	teamMember, err := service.GetTeamMember(ctx, input.Username, input.TeamName)
 	if err != nil {

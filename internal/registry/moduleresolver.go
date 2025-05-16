@@ -20,6 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/registry/addrs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -517,7 +518,7 @@ func (m *moduleResolver) ParseModuleRegistrySource(ctx context.Context, moduleSo
 
 // GetModuleByAddress retrieves a module by its namespace, name, and system.
 func GetModuleByAddress(ctx context.Context, dbClient *db.Client, namespace string, name string, system string) (*models.TerraformModule, error) {
-	rootGroup, err := dbClient.Groups.GetGroupByFullPath(ctx, namespace)
+	rootGroup, err := dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespace))
 	if err != nil {
 		return nil, err
 	}

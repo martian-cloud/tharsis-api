@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -78,13 +80,13 @@ func TestGetProviderByID(t *testing.T) {
 					ID:                positiveTerraformProvider.Metadata.ID,
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               positiveTerraformProvider.Metadata.TRN,
 				},
-				Name:         positiveTerraformProvider.Name,
-				ResourcePath: positiveTerraformProvider.ResourcePath,
-				RootGroupID:  positiveTerraformProvider.RootGroupID,
-				GroupID:      positiveTerraformProvider.GroupID,
-				Private:      positiveTerraformProvider.Private,
-				CreatedBy:    positiveTerraformProvider.CreatedBy,
+				Name:        positiveTerraformProvider.Name,
+				RootGroupID: positiveTerraformProvider.RootGroupID,
+				GroupID:     positiveTerraformProvider.GroupID,
+				Private:     positiveTerraformProvider.Private,
+				CreatedBy:   positiveTerraformProvider.CreatedBy,
 			},
 		},
 
@@ -97,7 +99,7 @@ func TestGetProviderByID(t *testing.T) {
 		{
 			name:      "defective-ID",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -122,73 +124,76 @@ func TestGetProviderByID(t *testing.T) {
 	}
 }
 
-func TestGetProviderByPath(t *testing.T) {
-	ctx := context.Background()
+func TestGetProviderByTRN(t *testing.T) {
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := time.Now()
-	warmupItems, err := createWarmupTerraformProviders(ctx, testClient, warmupTerraformProviders{
-		groups:             standardWarmupGroupsForTerraformProviders,
-		terraformProviders: standardWarmupTerraformProviders,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
 	})
-	require.Nil(t, err)
-	createdHigh := time.Now()
+	require.NoError(t, err)
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider",
+		RootGroupID: group.Metadata.ID,
+		GroupID:     group.Metadata.ID,
+		Private:     false,
+		CreatedBy:   "TestGetProviderByTRN",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg               *string
-		expectTerraformProvider *models.TerraformProvider
-		name                    string
-		searchPath              string
+		name            string
+		trn             string
+		expectProvider  bool
+		expectErrorCode errors.CodeType
 	}
 
-	// Search path should consist of two parts separated by a slash (the last slash):
-	// 1) namespace path
-	// 2) provider name
-	positiveTerraformProvider := warmupItems.terraformProviders[0]
-	now := time.Now()
 	testCases := []testCase{
 		{
-			name:       "positive",
-			searchPath: "top-level-group-0-for-terraform-providers/nested-group-9-for-terraform-providers/1-terraform-provider-0",
-			expectTerraformProvider: &models.TerraformProvider{
-				Metadata: models.ResourceMetadata{
-					ID:                positiveTerraformProvider.Metadata.ID,
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				Name:         positiveTerraformProvider.Name,
-				ResourcePath: positiveTerraformProvider.ResourcePath,
-				RootGroupID:  positiveTerraformProvider.RootGroupID,
-				GroupID:      positiveTerraformProvider.GroupID,
-				Private:      positiveTerraformProvider.Private,
-				CreatedBy:    positiveTerraformProvider.CreatedBy,
-			},
+			name:           "get provider by TRN",
+			trn:            provider.Metadata.TRN,
+			expectProvider: true,
 		},
-
 		{
-			name:       "negative, non-existent Terraform provider ID",
-			searchPath: "this/path/does/not/exist",
-			// expect terraform provider and error to be nil
+			name: "resource with TRN not found",
+			trn:  types.TerraformProviderModelType.BuildTRN(group.FullPath, "non-existent-provider"),
+		},
+		{
+			name:            "provider TRN has less than 2 parts",
+			trn:             types.TerraformProviderModelType.BuildTRN("test-group"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualTerraformProvider, err := testClient.client.TerraformProviders.GetProviderByPath(ctx, test.searchPath)
+			actualProvider, err := testClient.client.TerraformProviders.GetProviderByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectTerraformProvider != nil {
-				require.NotNil(t, actualTerraformProvider)
-				compareTerraformProviders(t, test.expectTerraformProvider, actualTerraformProvider, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
+			require.NoError(t, err)
+
+			if test.expectProvider {
+				require.NotNil(t, actualProvider)
+				assert.Equal(t,
+					types.TerraformProviderModelType.BuildTRN(
+						group.FullPath,
+						provider.Name,
+					),
+					actualProvider.Metadata.TRN,
+				)
 			} else {
-				assert.Nil(t, actualTerraformProvider)
+				assert.Nil(t, actualProvider)
 			}
 		})
 	}
@@ -921,34 +926,32 @@ func TestCreateProvider(t *testing.T) {
 		{
 			name: "positive",
 			toCreate: &models.TerraformProvider{
-				Name:         "terraform-provider-create-test",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
-				Private:      true,
-				CreatedBy:    "TestCreateProvider",
+				Name:        "terraform-provider-create-test",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
+				Private:     true,
+				CreatedBy:   "TestCreateProvider",
 			},
 			expectCreated: &models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.TerraformProviderModelType.BuildTRN(warmupItems.groups[0].FullPath, "terraform-provider-create-test"),
 				},
-				Name:         "terraform-provider-create-test",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
-				Private:      true,
-				CreatedBy:    "TestCreateProvider",
+				Name:        "terraform-provider-create-test",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
+				Private:     true,
+				CreatedBy:   "TestCreateProvider",
 			},
 		},
 
 		{
 			name: "duplicate group ID and Terraform provider name",
 			toCreate: &models.TerraformProvider{
-				Name:         "terraform-provider-create-test",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
+				Name:        "terraform-provider-create-test",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("terraform provider with name terraform-provider-create-test already exists"),
 		},
@@ -956,10 +959,9 @@ func TestCreateProvider(t *testing.T) {
 		{
 			name: "negative, non-existent root group ID",
 			toCreate: &models.TerraformProvider{
-				Name:         "terraform-provider-create-test-non-existent-root-group-id",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test-non-existent-root-group-id",
-				RootGroupID:  nonExistentID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
+				Name:        "terraform-provider-create-test-non-existent-root-group-id",
+				RootGroupID: nonExistentID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_providers\" violates foreign key constraint \"fk_root_group_id\" (SQLSTATE 23503)"),
 		},
@@ -967,10 +969,9 @@ func TestCreateProvider(t *testing.T) {
 		{
 			name: "negative, non-existent group ID",
 			toCreate: &models.TerraformProvider{
-				Name:         "terraform-provider-create-test-non-existent-group-id",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test-non-existent-group-id",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      nonExistentID,
+				Name:        "terraform-provider-create-test-non-existent-group-id",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     nonExistentID,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_providers\" violates foreign key constraint \"fk_group_id\" (SQLSTATE 23503)"),
 		},
@@ -978,10 +979,9 @@ func TestCreateProvider(t *testing.T) {
 		{
 			name: "negative, invalid root group ID",
 			toCreate: &models.TerraformProvider{
-				Name:         "terraform-provider-create-test-invalid-root-group-id",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test-invalid-root-group-id",
-				RootGroupID:  invalidID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
+				Name:        "terraform-provider-create-test-invalid-root-group-id",
+				RootGroupID: invalidID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -989,10 +989,9 @@ func TestCreateProvider(t *testing.T) {
 		{
 			name: "negative, invalid group ID",
 			toCreate: &models.TerraformProvider{
-				Name:         "terraform-provider-create-test-invalid-group-id",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-provider-create-test-invalid-group-id",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      invalidID,
+				Name:        "terraform-provider-create-test-invalid-group-id",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     invalidID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -1068,13 +1067,13 @@ func TestUpdateProvider(t *testing.T) {
 					Version:              initialResourceVersion + 1,
 					CreationTimestamp:    positiveTerraformProvider.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
+					TRN:                  positiveTerraformProvider.Metadata.TRN,
 				},
-				Name:         positiveTerraformProvider.Name,
-				ResourcePath: positiveTerraformProvider.ResourcePath,
-				RootGroupID:  positiveTerraformProvider.RootGroupID,
-				GroupID:      positiveTerraformProvider.GroupID,
-				Private:      !positiveTerraformProvider.Private,
-				CreatedBy:    positiveTerraformProvider.CreatedBy,
+				Name:        positiveTerraformProvider.Name,
+				RootGroupID: positiveTerraformProvider.RootGroupID,
+				GroupID:     positiveTerraformProvider.GroupID,
+				Private:     !positiveTerraformProvider.Private,
+				CreatedBy:   positiveTerraformProvider.CreatedBy,
 			},
 		},
 
@@ -1333,7 +1332,6 @@ var standardWarmupTeamMembersForTerraformProviders = []models.TeamMember{
 // The create function will convert the group name to group ID.
 var standardWarmupServiceAccountsForTerraformProviders = []models.ServiceAccount{
 	{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0",
 		GroupID:           "top-level-group-2-for-terraform-providers/nested-group-7-for-terraform-providers",
@@ -1341,7 +1339,6 @@ var standardWarmupServiceAccountsForTerraformProviders = []models.ServiceAccount
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "sa-resource-path-1",
 		Name:              "service-account-1",
 		Description:       "service account 1",
 		GroupID:           "top-level-group-1-for-terraform-providers/nested-group-8-for-terraform-providers",
@@ -1401,44 +1398,39 @@ var standardWarmupNamespaceMembershipsForTerraformProviders = []CreateNamespaceM
 var standardWarmupTerraformProviders = []models.TerraformProvider{
 	{
 		// This one is public.
-		Name:         "1-terraform-provider-0",
-		ResourcePath: "top-level-group-0-for-terraform-providers/1-terraform-provider-0",
-		RootGroupID:  "top-level-group-0-for-terraform-providers",
-		GroupID:      "top-level-group-0-for-terraform-providers/nested-group-9-for-terraform-providers",
-		Private:      false,
-		CreatedBy:    "someone-sv0",
+		Name:        "1-terraform-provider-0",
+		RootGroupID: "top-level-group-0-for-terraform-providers",
+		GroupID:     "top-level-group-0-for-terraform-providers/nested-group-9-for-terraform-providers",
+		Private:     false,
+		CreatedBy:   "someone-sv0",
 	},
 	{
-		Name:         "1-terraform-provider-1",
-		ResourcePath: "top-level-group-1-for-terraform-providers/1-terraform-provider-1",
-		RootGroupID:  "top-level-group-1-for-terraform-providers",
-		GroupID:      "top-level-group-1-for-terraform-providers",
-		Private:      true,
-		CreatedBy:    "someone-sv1",
+		Name:        "1-terraform-provider-1",
+		RootGroupID: "top-level-group-1-for-terraform-providers",
+		GroupID:     "top-level-group-1-for-terraform-providers",
+		Private:     true,
+		CreatedBy:   "someone-sv1",
 	},
 	{
-		Name:         "2-terraform-provider-2",
-		ResourcePath: "top-level-group-2-for-terraform-providers/2-terraform-provider-2",
-		RootGroupID:  "top-level-group-2-for-terraform-providers",
-		GroupID:      "top-level-group-2-for-terraform-providers/nested-group-7-for-terraform-providers",
-		Private:      true,
-		CreatedBy:    "someone-sv2",
+		Name:        "2-terraform-provider-2",
+		RootGroupID: "top-level-group-2-for-terraform-providers",
+		GroupID:     "top-level-group-2-for-terraform-providers/nested-group-7-for-terraform-providers",
+		Private:     true,
+		CreatedBy:   "someone-sv2",
 	},
 	{
-		Name:         "2-terraform-provider-3",
-		ResourcePath: "top-level-group-3-for-terraform-providers/2-terraform-provider-3",
-		RootGroupID:  "top-level-group-3-for-terraform-providers",
-		GroupID:      "top-level-group-3-for-terraform-providers",
-		Private:      true,
-		CreatedBy:    "someone-sv3",
+		Name:        "2-terraform-provider-3",
+		RootGroupID: "top-level-group-3-for-terraform-providers",
+		GroupID:     "top-level-group-3-for-terraform-providers",
+		Private:     true,
+		CreatedBy:   "someone-sv3",
 	},
 	{
-		Name:         "5-terraform-provider-4",
-		ResourcePath: "top-level-group-4-for-terraform-providers/5-terraform-provider-4",
-		RootGroupID:  "top-level-group-4-for-terraform-providers",
-		GroupID:      "top-level-group-4-for-terraform-providers/nested-group-5-for-terraform-providers",
-		Private:      true,
-		CreatedBy:    "someone-sv4",
+		Name:        "5-terraform-provider-4",
+		RootGroupID: "top-level-group-4-for-terraform-providers",
+		GroupID:     "top-level-group-4-for-terraform-providers/nested-group-5-for-terraform-providers",
+		Private:     true,
+		CreatedBy:   "someone-sv4",
 	},
 }
 
@@ -1600,7 +1592,6 @@ func compareTerraformProviders(t *testing.T, expected, actual *models.TerraformP
 	checkID bool, times *timeBounds,
 ) {
 	assert.Equal(t, expected.Name, actual.Name)
-	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.RootGroupID, actual.RootGroupID)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
 	assert.Equal(t, expected.Private, actual.Private)
@@ -1610,6 +1601,7 @@ func compareTerraformProviders(t *testing.T, expected, actual *models.TerraformP
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

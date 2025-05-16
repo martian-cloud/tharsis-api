@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwt"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
@@ -72,7 +71,7 @@ func (d *Delegate) CreateCredentials(ctx context.Context, identity *models.Manag
 	if err = token.Set(jwt.SubjectKey, federatedData.Subject); err != nil {
 		return nil, err
 	}
-	if err = token.Set("tharsis_job_id", gid.ToGlobalID(gid.JobType, job.Metadata.ID)); err != nil {
+	if err = token.Set("tharsis_job_id", job.GetGlobalID()); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +103,7 @@ func (d *Delegate) SetManagedIdentityData(_ context.Context, managedIdentity *mo
 
 	if managedIdentity.Data == nil || len(managedIdentity.Data) == 0 {
 		federatedData = &Data{
-			Subject: gid.ToGlobalID(gid.ManagedIdentityType, managedIdentity.Metadata.ID),
+			Subject: managedIdentity.GetGlobalID(),
 		}
 	} else {
 		federatedData, err = decodeData(managedIdentity.Data)

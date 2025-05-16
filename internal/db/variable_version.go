@@ -9,7 +9,9 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -18,6 +20,7 @@ import (
 type VariableVersions interface {
 	GetVariableVersions(ctx context.Context, input *GetVariableVersionsInput) (*VariableVersionResult, error)
 	GetVariableVersionByID(ctx context.Context, id string) (*models.VariableVersion, error)
+	GetVariableVersionByTRN(ctx context.Context, trn string) (*models.VariableVersion, error)
 }
 
 // VariableVersionSortableField represents the fields that a variable can be sorted by
@@ -82,29 +85,31 @@ func (m *variableVersions) GetVariableVersionByID(ctx context.Context, id string
 	ctx, span := tracer.Start(ctx, "db.GetVariableVersionByID")
 	defer span.End()
 
-	sql, _, err := dialect.From("namespace_variable_versions").
-		Select(m.getSelectFields()...).
-		Where(goqu.Ex{"namespace_variable_versions.id": id}).ToSQL()
+	return m.getVariableVersion(ctx, goqu.Ex{"namespace_variable_versions.id": id})
+}
 
+func (m *variableVersions) GetVariableVersionByTRN(ctx context.Context, trn string) (*models.VariableVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetVariableVersionByTRN")
+	defer span.End()
+
+	path, err := types.VariableVersionModelType.ResourcePathFromTRN(trn)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	variable, err := scanVariableVersion(m.dbClient.getConnection(ctx).QueryRow(ctx, sql))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		if pgErr := asPgError(err); pgErr != nil {
-			if isInvalidIDViolation(pgErr) {
-				return nil, errors.Wrap(pgErr, "invalid ID; %s", pgErr.Message, errors.WithSpan(span), errors.WithErrorCode(errors.EInvalid))
-			}
-		}
-		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		return nil, errors.New("a variable version TRN must have the namespace path, variable key and version GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
 
-	return variable, nil
+	return m.getVariableVersion(ctx, goqu.Ex{
+		"namespace_variable_versions.id":  gid.FromGlobalID(parts[len(parts)-1]),
+		"namespace_variable_versions.key": parts[len(parts)-2],
+		"namespaces.path":                 strings.Join(parts[:len(parts)-2], "/"),
+	})
 }
 
 func (m *variableVersions) GetVariableVersions(ctx context.Context, input *GetVariableVersionsInput) (*VariableVersionResult, error) {
@@ -125,6 +130,8 @@ func (m *variableVersions) GetVariableVersions(ctx context.Context, input *GetVa
 
 	query := dialect.From("namespace_variable_versions").
 		Select(m.getSelectFields()...).
+		InnerJoin(goqu.T("namespace_variables"), goqu.On(goqu.I("namespace_variable_versions.variable_id").Eq(goqu.I("namespace_variables.id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("namespace_variables.namespace_id").Eq(goqu.I("namespaces.id")))).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -175,6 +182,36 @@ func (m *variableVersions) GetVariableVersions(ctx context.Context, input *GetVa
 	return &result, nil
 }
 
+func (m *variableVersions) getVariableVersion(ctx context.Context, ex goqu.Ex) (*models.VariableVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.getVariableVersion")
+	defer span.End()
+
+	sql, _, err := dialect.From("namespace_variable_versions").
+		Select(m.getSelectFields()...).
+		InnerJoin(goqu.T("namespace_variables"), goqu.On(goqu.I("namespace_variable_versions.variable_id").Eq(goqu.I("namespace_variables.id")))).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("namespace_variables.namespace_id").Eq(goqu.I("namespaces.id")))).
+		Where(ex).ToSQL()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	variable, err := scanVariableVersion(m.dbClient.getConnection(ctx).QueryRow(ctx, sql))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return variable, nil
+}
+
 func (m *variableVersions) getSelectFields() []interface{} {
 	selectFields := []interface{}{}
 
@@ -182,10 +219,13 @@ func (m *variableVersions) getSelectFields() []interface{} {
 		selectFields = append(selectFields, fmt.Sprintf("namespace_variable_versions.%s", field))
 	}
 
+	selectFields = append(selectFields, "namespaces.path")
+
 	return selectFields
 }
 
 func scanVariableVersion(row scanner) (*models.VariableVersion, error) {
+	var namespacePath string
 	variableVersion := &models.VariableVersion{}
 
 	fields := []interface{}{
@@ -198,12 +238,15 @@ func scanVariableVersion(row scanner) (*models.VariableVersion, error) {
 		&variableVersion.Value,
 		&variableVersion.Hcl,
 		&variableVersion.SecretData,
+		&namespacePath,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
 	}
+
+	variableVersion.Metadata.TRN = types.VariableVersionModelType.BuildTRN(namespacePath, variableVersion.Key, variableVersion.GetGlobalID())
 
 	return variableVersion, nil
 }

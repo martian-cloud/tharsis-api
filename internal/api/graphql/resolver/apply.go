@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
@@ -22,7 +21,7 @@ type ApplyResolver struct {
 
 // ID resolver
 func (r *ApplyResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ApplyType, r.apply.Metadata.ID))
+	return graphql.ID(r.apply.GetGlobalID())
 }
 
 // Status resolver
@@ -50,7 +49,7 @@ func (r *ApplyResolver) Metadata() *MetadataResolver {
 
 // CurrentJob returns the current job for the apply resource
 func (r *ApplyResolver) CurrentJob(ctx context.Context) (*JobResolver, error) {
-	job, err := getRunService(ctx).GetLatestJobForApply(ctx, r.apply.Metadata.ID)
+	job, err := getServiceCatalog(ctx).RunService.GetLatestJobForApply(ctx, r.apply.Metadata.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -106,9 +105,14 @@ func handleApplyMutationProblem(e error, clientMutationID *string) (*ApplyMutati
 }
 
 func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMutationPayloadResolver, error) {
-	runService := getRunService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	apply, err := runService.GetApply(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	apply, err := serviceCatalog.RunService.GetApplyByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +131,7 @@ func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMu
 	apply.Status = models.ApplyStatus(input.Status)
 	apply.ErrorMessage = input.ErrorMessage
 
-	apply, err = runService.UpdateApply(ctx, apply)
+	apply, err = serviceCatalog.RunService.UpdateApply(ctx, apply)
 	if err != nil {
 		return nil, err
 	}
@@ -165,9 +169,7 @@ func loadApply(ctx context.Context, id string) (*models.Apply, error) {
 }
 
 func applyBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getRunService(ctx)
-
-	applies, err := service.GetAppliesByIDs(ctx, ids)
+	applies, err := getServiceCatalog(ctx).RunService.GetAppliesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

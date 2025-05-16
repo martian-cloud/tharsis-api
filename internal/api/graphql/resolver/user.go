@@ -5,7 +5,6 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
@@ -55,7 +54,7 @@ type UserConnectionResolver struct {
 
 // NewUserConnectionResolver creates a new UserConnectionResolver
 func NewUserConnectionResolver(ctx context.Context, input *user.GetUsersInput) (*UserConnectionResolver, error) {
-	userService := getUserService(ctx)
+	userService := getServiceCatalog(ctx).UserService
 
 	result, err := userService.GetUsers(ctx, input)
 	if err != nil {
@@ -123,7 +122,7 @@ type UserResolver struct {
 
 // ID resolver
 func (r *UserResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.UserType, r.user.Metadata.ID))
+	return graphql.ID(r.user.GetGlobalID())
 }
 
 // Username resolver
@@ -272,8 +271,15 @@ func handleUserMutationProblem(e error, clientMutationID *string) (*UserMutation
 }
 
 func updateUserAdminStatusMutation(ctx context.Context, input *UpdateUserAdminStatusInput) (*UserMutationPayloadResolver, error) {
-	user, err := getUserService(ctx).UpdateAdminStatusForUser(ctx, &user.UpdateAdminStatusForUserInput{
-		UserID: gid.FromGlobalID(input.UserID),
+	serviceCatalog := getServiceCatalog(ctx)
+
+	userID, err := serviceCatalog.FetchModelID(ctx, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := serviceCatalog.UserService.UpdateAdminStatusForUser(ctx, &user.UpdateAdminStatusForUserInput{
+		UserID: userID,
 		Admin:  input.Admin,
 	})
 	if err != nil {
@@ -313,9 +319,7 @@ func loadUser(ctx context.Context, id string) (*models.User, error) {
 }
 
 func userBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	userService := getUserService(ctx)
-
-	users, err := userService.GetUsersByIDs(ctx, ids)
+	users, err := getServiceCatalog(ctx).UserService.GetUsersByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

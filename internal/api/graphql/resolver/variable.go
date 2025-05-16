@@ -10,13 +10,14 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/variable"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// NamesapceVariableVersionQueryArgs are used to query a variable version
-type NamesapceVariableVersionQueryArgs struct {
+// NamespaceVariableVersionQueryArgs are used to query a variable version
+type NamespaceVariableVersionQueryArgs struct {
 	ID                    string
 	IncludeSensitiveValue *bool
 }
@@ -24,11 +25,6 @@ type NamesapceVariableVersionQueryArgs struct {
 // NamespaceVariableVersionConnectionQueryArgs are used to query a version connection
 type NamespaceVariableVersionConnectionQueryArgs struct {
 	ConnectionQueryArgs
-}
-
-// NamespaceVariableVersionQueryArgs are used to query a single version
-type NamespaceVariableVersionQueryArgs struct {
-	Name string
 }
 
 // NamespaceVariableVersionEdgeResolver resolves version edges
@@ -63,7 +59,7 @@ type NamespaceVariableVersionConnectionResolver struct {
 
 // NewNamespaceVariableVersionConnectionResolver creates a new NamespaceVariableVersionConnectionResolver
 func NewNamespaceVariableVersionConnectionResolver(ctx context.Context, input *variable.GetVariableVersionsInput) (*NamespaceVariableVersionConnectionResolver, error) {
-	versionService := getVariableService(ctx)
+	versionService := getServiceCatalog(ctx).VariableService
 
 	result, err := versionService.GetVariableVersions(ctx, input)
 	if err != nil {
@@ -131,7 +127,7 @@ type NamespaceVariableVersionResolver struct {
 
 // ID resolver
 func (r *NamespaceVariableVersionResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.VariableVersionType, r.version.Metadata.ID))
+	return graphql.ID(r.version.GetGlobalID())
 }
 
 // Metadata resolver
@@ -161,7 +157,7 @@ type NamespaceVariableResolver struct {
 
 // ID resolver
 func (r *NamespaceVariableResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.VariableType, r.variable.Metadata.ID))
+	return graphql.ID(r.variable.GetGlobalID())
 }
 
 // Category resolver
@@ -197,7 +193,7 @@ func (r *NamespaceVariableResolver) Value() *string {
 
 // LatestVersionID resolver
 func (r *NamespaceVariableResolver) LatestVersionID() string {
-	return gid.ToGlobalID(gid.VariableVersionType, r.variable.LatestVersionID)
+	return gid.ToGlobalID(types.VariableVersionModelType, r.variable.LatestVersionID)
 }
 
 // Metadata resolver
@@ -227,9 +223,7 @@ func (r *NamespaceVariableResolver) Versions(ctx context.Context, args *Namespac
 /* Variable Queries */
 
 func getVariables(ctx context.Context, namespacePath string) ([]*NamespaceVariableResolver, error) {
-	service := getVariableService(ctx)
-
-	result, err := service.GetVariables(ctx, namespacePath)
+	result, err := getServiceCatalog(ctx).VariableService.GetVariables(ctx, namespacePath)
 	if err != nil {
 		return nil, err
 	}
@@ -243,15 +237,20 @@ func getVariables(ctx context.Context, namespacePath string) ([]*NamespaceVariab
 	return resolvers, nil
 }
 
-func namespaceVariableVersionQuery(ctx context.Context, args *NamesapceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
-	variableService := getVariableService(ctx)
+func namespaceVariableVersionQuery(ctx context.Context, args *NamespaceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	variableVersionID, err := serviceCatalog.FetchModelID(ctx, args.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	includeSensitiveValue := false
 	if args.IncludeSensitiveValue != nil {
 		includeSensitiveValue = *args.IncludeSensitiveValue
 	}
 
-	version, err := variableService.GetVariableVersionByID(ctx, gid.FromGlobalID(args.ID), includeSensitiveValue)
+	version, err := serviceCatalog.VariableService.GetVariableVersionByID(ctx, variableVersionID, includeSensitiveValue)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -281,7 +280,10 @@ func (r *VariableMutationPayloadResolver) Namespace(ctx context.Context) (*Names
 	if r.VariableMutationPayload.NamespacePath == nil {
 		return nil, nil
 	}
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, *r.NamespacePath)
+
+	serviceCatalog := getServiceCatalog(ctx)
+
+	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(*r.NamespacePath))
 	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return nil, err
 	}
@@ -289,7 +291,7 @@ func (r *VariableMutationPayloadResolver) Namespace(ctx context.Context) (*Names
 		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
 	}
 
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, *r.NamespacePath)
+	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(*r.NamespacePath))
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +366,7 @@ func setNamespaceVariablesMutation(ctx context.Context, input *SetNamespaceVaria
 		variables = append(variables, varableInput)
 	}
 
-	if err := getVariableService(ctx).SetVariables(ctx, &variable.SetVariablesInput{
+	if err := getServiceCatalog(ctx).VariableService.SetVariables(ctx, &variable.SetVariablesInput{
 		NamespacePath: input.NamespacePath,
 		Category:      input.Category,
 		Variables:     variables,
@@ -389,7 +391,7 @@ func createNamespaceVariableMutation(ctx context.Context, input *CreateNamespace
 		options.Sensitive = *input.Sensitive
 	}
 
-	variable, err := getVariableService(ctx).CreateVariable(ctx, options)
+	variable, err := getServiceCatalog(ctx).VariableService.CreateVariable(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -399,10 +401,15 @@ func createNamespaceVariableMutation(ctx context.Context, input *CreateNamespace
 }
 
 func updateNamespaceVariableMutation(ctx context.Context, input *UpdateNamespaceVariableInput) (*VariableMutationPayloadResolver, error) {
-	service := getVariableService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	updatedVar, err := service.UpdateVariable(ctx, &variable.UpdateVariableInput{
-		ID:    gid.FromGlobalID(input.ID),
+	variableID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedVar, err := serviceCatalog.VariableService.UpdateVariable(ctx, &variable.UpdateVariableInput{
+		ID:    variableID,
 		Key:   input.Key,
 		Value: input.Value,
 		Hcl:   ptr.ToBool(input.Hcl),
@@ -416,14 +423,19 @@ func updateNamespaceVariableMutation(ctx context.Context, input *UpdateNamespace
 }
 
 func deleteNamespaceVariableMutation(ctx context.Context, input *DeleteNamespaceVariableInput) (*VariableMutationPayloadResolver, error) {
-	service := getVariableService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	variableModel, err := service.GetVariableByID(ctx, gid.FromGlobalID(input.ID))
+	variableID, err := serviceCatalog.FetchModelID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := service.DeleteVariable(ctx, &variable.DeleteVariableInput{
+	variableModel, err := serviceCatalog.VariableService.GetVariableByID(ctx, variableID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := serviceCatalog.VariableService.DeleteVariable(ctx, &variable.DeleteVariableInput{
 		ID: variableModel.Metadata.ID,
 	}); err != nil {
 		return nil, err
@@ -462,7 +474,7 @@ func loadVariable(ctx context.Context, id string) (*models.Variable, error) {
 }
 
 func namespaceVariableBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	variables, err := getVariableService(ctx).GetVariablesByIDs(ctx, ids)
+	variables, err := getServiceCatalog(ctx).VariableService.GetVariablesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

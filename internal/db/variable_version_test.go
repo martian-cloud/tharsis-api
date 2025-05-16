@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -74,6 +75,81 @@ func TestGetVariableVersionByID(t *testing.T) {
 				assert.Equal(t, test.id, variableVersion.Metadata.ID)
 			} else {
 				assert.Nil(t, variableVersion)
+			}
+		})
+	}
+}
+
+func TestGetVariableVersionByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	variable, err := testClient.client.Variables.CreateVariable(ctx, &models.Variable{
+		Category:      models.EnvironmentVariableCategory,
+		NamespacePath: group.FullPath,
+		Hcl:           false,
+		Key:           "test-key",
+		Value:         ptr.String("test-value"),
+	})
+	require.NoError(t, err)
+
+	variableVersion, err := testClient.client.VariableVersions.GetVariableVersionByID(ctx, variable.LatestVersionID)
+	require.NoError(t, err)
+
+	type testCase struct {
+		name                  string
+		trn                   string
+		expectVariableVersion bool
+		expectErrorCode       errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:                  "get resource by TRN",
+			trn:                   variableVersion.Metadata.TRN,
+			expectVariableVersion: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.VariableVersionModelType.BuildTRN(group.FullPath, variableVersion.Key, nonExistentGlobalID),
+		},
+		{
+			name:            "variable version trn must not have less than three parts",
+			trn:             types.VariableVersionModelType.BuildTRN(variableVersion.Key, nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualVariableVersion, err := testClient.client.VariableVersions.GetVariableVersionByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectVariableVersion {
+				require.NotNil(t, actualVariableVersion)
+				assert.Equal(t,
+					types.VariableVersionModelType.BuildTRN(group.FullPath, variableVersion.Key, variableVersion.GetGlobalID()),
+					actualVariableVersion.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualVariableVersion)
 			}
 		})
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/jsonapi"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -52,8 +53,8 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 	}
 
 	resp, err := c.saService.CreateToken(r.Context(), &serviceaccount.CreateTokenInput{
-		ServiceAccount: *req.ServiceAccountPath,
-		Token:          []byte(*req.Token),
+		ServiceAccountPublicID: types.ServiceAccountModelType.BuildTRN(*req.ServiceAccountPath),
+		Token:                  []byte(*req.Token),
 	})
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)

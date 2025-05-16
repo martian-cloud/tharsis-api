@@ -1,5 +1,12 @@
 package models
 
+import (
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+)
+
+var _ Model = (*VCSEvent)(nil)
+
 // VCSEventStatus defines an enum that represents the status of a VCS event.
 type VCSEventStatus string
 
@@ -39,7 +46,27 @@ type VCSEvent struct {
 	Metadata            ResourceMetadata
 }
 
+// GetID returns the Metadata ID.
+func (v *VCSEvent) GetID() string {
+	return v.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (v *VCSEvent) GetGlobalID() string {
+	return gid.ToGlobalID(v.GetModelType(), v.Metadata.ID)
+}
+
+// GetModelType returns the type of the model.
+func (v *VCSEvent) GetModelType() types.ModelType {
+	return types.VCSEventModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (v *VCSEvent) ResolveMetadata(key string) (string, error) {
 	return v.Metadata.resolveFieldValue(key)
+}
+
+// Validate validates the model.
+func (v *VCSEvent) Validate() error {
+	return nil
 }

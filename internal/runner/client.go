@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 )
@@ -58,7 +59,7 @@ func (a *internalClient) CreateRunnerSession(ctx context.Context, input *CreateR
 	if err != nil {
 		return "", err
 	}
-	return gid.ToGlobalID(gid.RunnerSessionType, session.Metadata.ID), nil
+	return session.GetGlobalID(), nil
 }
 
 func (a *internalClient) SendRunnerSessionHeartbeat(ctx context.Context, sessionID string) error {
@@ -66,13 +67,18 @@ func (a *internalClient) SendRunnerSessionHeartbeat(ctx context.Context, session
 }
 
 func (a *internalClient) ClaimJob(ctx context.Context, input *ClaimJobInput) (*ClaimJobResponse, error) {
-	resp, err := a.jobService.ClaimJob(ctx, input.RunnerPath)
+	runner, err := a.runnerService.GetRunnerByTRN(ctx, types.RunnerModelType.BuildTRN(input.RunnerPath))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := a.jobService.ClaimJob(ctx, runner.Metadata.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ClaimJobResponse{
-		JobID: gid.ToGlobalID(gid.JobType, resp.JobID),
+		JobID: gid.ToGlobalID(types.JobModelType, resp.JobID),
 		Token: resp.Token,
 	}, nil
 }

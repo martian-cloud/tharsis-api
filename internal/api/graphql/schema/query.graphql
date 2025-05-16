@@ -14,22 +14,36 @@ type Query {
   node(id: String!): Node
   namespace(fullPath: String!): Namespace
   group(fullPath: String!): Group
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   groups(
     after: String
     before: String
     first: Int
     last: Int
+    parentId: String
     parentPath: String
+      @deprecated(
+        reason: "Use parentId instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     search: String
     sort: GroupSort
   ): GroupConnection!
   workspace(fullPath: String!): Workspace
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   workspaces(
     after: String
     before: String
     first: Int
     last: Int
+    groupId: String
     groupPath: String
+      @deprecated(
+        reason: "Use groupId instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     search: String
     sort: WorkspaceSort
   ): WorkspaceConnection!
@@ -45,6 +59,9 @@ type Query {
     registryNamespace: String!
     providerName: String!
   ): TerraformProvider
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   terraformProviderVersion(
     registryNamespace: String!
     providerName: String!
@@ -63,6 +80,9 @@ type Query {
     moduleName: String!
     system: String!
   ): TerraformModule
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   terraformModuleVersion(
     registryNamespace: String!
     moduleName: String!
@@ -70,30 +90,52 @@ type Query {
     version: String
   ): TerraformModuleVersion
   run(id: String!): Run
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   runs(
     after: String
     before: String
     first: Int
     last: Int
     workspacePath: String
+      @deprecated(
+        reason: "Use workspaceId instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     workspaceId: String
     sort: RunSort
     workspaceAssessment: Boolean
   ): RunConnection!
-  namespaceVariableVersion(id: String! includeSensitiveValue: Boolean): NamespaceVariableVersion
+  namespaceVariableVersion(
+    id: String!
+    includeSensitiveValue: Boolean
+  ): NamespaceVariableVersion
   job(id: String!): Job
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   jobs(
     after: String
     before: String
     first: Int
     last: Int
+    workspaceId: String
     workspacePath: String
+      @deprecated(
+        reason: "Use workspaceId instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     jobType: JobType
     jobStatus: JobStatus
     sort: JobSort
   ): JobConnection!
   managedIdentity(id: String, path: String): ManagedIdentity
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   serviceAccount(id: String!): ServiceAccount
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   users(
     after: String
     before: String
@@ -103,7 +145,13 @@ type Query {
     sort: UserSort
   ): UserConnection!
   configurationVersion(id: String!): ConfigurationVersion
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   team(name: String!): Team
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   teams(
     after: String
     before: String
@@ -126,8 +174,16 @@ type Query {
     before: String
     first: Int
     last: Int
+    userId: String
+    serviceAccountId: String
     username: String
+      @deprecated(
+        reason: "Use userId instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     serviceAccountPath: String
+      @deprecated(
+        reason: "Use serviceAccountId instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     namespacePath: String
     includeNested: Boolean
     timeRangeStart: Time
@@ -137,6 +193,9 @@ type Query {
     sort: ActivityEventSort
   ): ActivityEventConnection!
   role(name: String!): Role
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   roles(
     after: String
     before: String
@@ -155,6 +214,9 @@ type Query {
     version: String!
     groupPath: String!
   ): TerraformProviderVersionMirror
+    @deprecated(
+      reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   maintenanceMode: MaintenanceMode
   version: Version!
 }

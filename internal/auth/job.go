@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -72,7 +72,7 @@ func (j *JobCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcces
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions
-func (j *JobCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+func (j *JobCaller) RequirePermission(ctx context.Context, perm models.Permission, checks ...func(*constraints)) error {
 	handlerFunc, ok := j.getPermissionHandler(perm)
 	if !ok {
 		// Handler not found so we need to check if the job has viewer access to determine which error to return
@@ -110,7 +110,7 @@ func (j *JobCaller) RequirePermission(ctx context.Context, perm permissions.Perm
 }
 
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
-func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, checks ...func(*constraints)) error {
+func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, checks ...func(*constraints)) error {
 	c := getConstraints(checks...)
 	if c.groupID != nil {
 		return j.requireAccessToInheritedGroupResource(ctx, *c.groupID)
@@ -171,7 +171,7 @@ func (j *JobCaller) requireAccessToInheritedNamespaceResource(ctx context.Contex
 }
 
 // requireAccessToWorkspacesInGroupHierarchy delegates the appropriate workspace check based on the Constraints.
-func (j *JobCaller) requireAccessToWorkspacesInGroupHierarchy(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (j *JobCaller) requireAccessToWorkspacesInGroupHierarchy(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.workspaceID != nil {
 		return j.requireAccessToWorkspace(ctx, *checks.workspaceID)
 	}
@@ -199,7 +199,7 @@ func (j *JobCaller) requireAccessToWorkspace(ctx context.Context, workspaceID st
 }
 
 // requireAccessToJobWorkspace will return an error if the job caller isn't in the requested workspace
-func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.workspaceID == nil {
 		return errMissingConstraints
 	}
@@ -212,7 +212,7 @@ func (j *JobCaller) requireAccessToJobWorkspace(ctx context.Context, _ *permissi
 }
 
 // requireRunAccess will return an error if the caller doesn't have permission to the run
-func (j *JobCaller) requireRunAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (j *JobCaller) requireRunAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.runID == nil && checks.workspaceID == nil {
 		return errMissingConstraints
 	}
@@ -228,12 +228,12 @@ func (j *JobCaller) requireRunAccess(ctx context.Context, _ *permissions.Permiss
 }
 
 // requirePlanWriteAccess will return an error if the caller doesn't have permission to update plan state
-func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.planID == nil {
 		return errMissingConstraints
 	}
 
-	run, err := j.dbClient.Runs.GetRun(ctx, j.RunID)
+	run, err := j.dbClient.Runs.GetRunByID(ctx, j.RunID)
 	if err != nil {
 		return err
 	}
@@ -256,12 +256,12 @@ func (j *JobCaller) requirePlanWriteAccess(ctx context.Context, _ *permissions.P
 }
 
 // requireApplyWriteAccess will return an error if the caller doesn't have permission to update apply state
-func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.applyID == nil {
 		return errMissingConstraints
 	}
 
-	run, err := j.dbClient.Runs.GetRun(ctx, j.RunID)
+	run, err := j.dbClient.Runs.GetRunByID(ctx, j.RunID)
 	if err != nil {
 		return err
 	}
@@ -284,7 +284,7 @@ func (j *JobCaller) requireApplyWriteAccess(ctx context.Context, _ *permissions.
 }
 
 // requireJobAccess will return an error if the caller doesn't have permission to the specified job
-func (j *JobCaller) requireJobAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (j *JobCaller) requireJobAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.jobID == nil {
 		return errMissingConstraints
 	}
@@ -322,22 +322,22 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
-func (j *JobCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
-	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.ViewWorkspacePermission:                j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewConfigurationVersionPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewStateVersionPermission:             j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewManagedIdentityPermission:          j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewVariablePermission:                 j.requireAccessToWorkspacesInGroupHierarchy,
-		permissions.ViewStateVersionDataPermission:         j.requireAccessToJobWorkspace,
-		permissions.CreateStateVersionPermission:           j.requireAccessToJobWorkspace,
-		permissions.ViewVariableValuePermission:            j.requireAccessToJobWorkspace,
-		permissions.ViewRunPermission:                      j.requireRunAccess, // View is automatically granted if action != View.
-		permissions.ViewJobPermission:                      j.requireJobAccess, // View is automatically granted if action != View.
-		permissions.UpdateJobPermission:                    j.requireJobAccess,
-		permissions.CreateFederatedRegistryTokenPermission: j.requireJobAccess,
-		permissions.UpdatePlanPermission:                   j.requirePlanWriteAccess,
-		permissions.UpdateApplyPermission:                  j.requireApplyWriteAccess,
+func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[models.Permission]permissionTypeHandler{
+		models.ViewWorkspacePermission:                j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewConfigurationVersionPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewStateVersionPermission:             j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewManagedIdentityPermission:          j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewVariablePermission:                 j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewStateVersionDataPermission:         j.requireAccessToJobWorkspace,
+		models.CreateStateVersionPermission:           j.requireAccessToJobWorkspace,
+		models.ViewVariableValuePermission:            j.requireAccessToJobWorkspace,
+		models.ViewRunPermission:                      j.requireRunAccess, // View is automatically granted if action != View.
+		models.ViewJobPermission:                      j.requireJobAccess, // View is automatically granted if action != View.
+		models.UpdateJobPermission:                    j.requireJobAccess,
+		models.CreateFederatedRegistryTokenPermission: j.requireJobAccess,
+		models.UpdatePlanPermission:                   j.requirePlanWriteAccess,
+		models.UpdateApplyPermission:                  j.requireApplyWriteAccess,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

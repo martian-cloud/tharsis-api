@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
@@ -21,7 +20,7 @@ type WorkspaceAssessmentResolver struct {
 
 // ID resolver
 func (r *WorkspaceAssessmentResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.WorkspaceAssessmentType, r.assessment.Metadata.ID))
+	return graphql.ID(r.assessment.GetGlobalID())
 }
 
 // Metadata resolver
@@ -89,9 +88,7 @@ func loadWorkspaceAssessment(ctx context.Context, workspaceID string) (*models.W
 }
 
 func assessmentBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getWorkspaceService(ctx)
-
-	assessments, err := service.GetWorkspaceAssessmentsByWorkspaceIDs(ctx, ids)
+	assessments, err := getServiceCatalog(ctx).WorkspaceService.GetWorkspaceAssessmentsByWorkspaceIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

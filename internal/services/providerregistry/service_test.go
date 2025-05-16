@@ -8,17 +8,565 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
+
+func TestGetProviderByID(t *testing.T) {
+	providerID := "provider-1"
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		provider      *models.TerraformProvider
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "get private provider by ID",
+			provider: &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID: providerID,
+				},
+				GroupID: groupID,
+				Private: true,
+			},
+		},
+		{
+			name: "get public provider by ID",
+			provider: &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID: providerID,
+				},
+				GroupID: groupID,
+			},
+		},
+		{
+			name: "subject does not have access to private provider",
+			provider: &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID: providerID,
+				},
+				GroupID: groupID,
+				Private: true,
+			},
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+
+			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(test.provider, nil)
+
+			if test.provider != nil && test.provider.Private {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders: mockProviders,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			provider, err := service.GetProviderByID(auth.WithCaller(ctx, mockCaller), providerID)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.provider, provider)
+		})
+	}
+}
+
+func TestGetProviderByTRN(t *testing.T) {
+	providerTRN := types.TerraformProviderModelType.BuildTRN("group/provider")
+	providerID := "provider-1"
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		provider      *models.TerraformProvider
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "get private provider by TRN",
+			provider: &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID:  providerID,
+					TRN: providerTRN,
+				},
+				GroupID: groupID,
+				Private: true,
+			},
+		},
+		{
+			name: "get public provider by TRN",
+			provider: &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID:  providerID,
+					TRN: providerTRN,
+				},
+				GroupID: groupID,
+			},
+		},
+		{
+			name: "subject does not have access to private provider",
+			provider: &models.TerraformProvider{
+				Metadata: models.ResourceMetadata{
+					ID:  providerID,
+					TRN: providerTRN,
+				},
+				GroupID: groupID,
+				Private: true,
+			},
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+
+			mockProviders.On("GetProviderByTRN", mock.Anything, providerTRN).Return(test.provider, nil)
+
+			if test.provider != nil && test.provider.Private {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders: mockProviders,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			provider, err := service.GetProviderByTRN(auth.WithCaller(ctx, mockCaller), providerTRN)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.provider, provider)
+		})
+	}
+}
+
+func TestGetProviderVersionByID(t *testing.T) {
+	versionID := "version-1"
+	providerID := "provider-1"
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		version       *models.TerraformProviderVersion
+		isPrivate     bool
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "get version for private provider by ID",
+			version: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					ID: versionID,
+				},
+				ProviderID: providerID,
+			},
+			isPrivate: true,
+		},
+		{
+			name: "get version for public provider by ID",
+			version: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					ID: versionID,
+				},
+				ProviderID: providerID,
+			},
+		},
+		{
+			name: "subject does not have access to private provider version",
+			version: &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					ID: versionID,
+				},
+				ProviderID: providerID,
+			},
+			isPrivate:     true,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider version not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockProviderVersions := db.NewMockTerraformProviderVersions(t)
+
+			mockProviderVersions.On("GetProviderVersionByID", mock.Anything, versionID).Return(test.version, nil)
+
+			if test.version != nil {
+				mockProviders.On("GetProviderByID", mock.Anything, test.version.ProviderID).Return(&models.TerraformProvider{
+					Metadata: models.ResourceMetadata{ID: test.version.ProviderID},
+					GroupID:  groupID,
+					Private:  test.isPrivate,
+				}, nil)
+			}
+
+			if test.isPrivate {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:        mockProviders,
+				TerraformProviderVersions: mockProviderVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			version, err := service.GetProviderVersionByID(auth.WithCaller(ctx, mockCaller), versionID)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.version, version)
+		})
+	}
+}
+
+func TestGetProviderVersionByTRN(t *testing.T) {
+	sampleVersion := &models.TerraformProviderVersion{
+		Metadata: models.ResourceMetadata{
+			ID:  "version-1",
+			TRN: types.TerraformProviderVersionModelType.BuildTRN("group/provider/0.1.0"),
+		},
+		ProviderID: "provider-1",
+	}
+
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		version       *models.TerraformProviderVersion
+		isPrivate     bool
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:      "get version for private provider by TRN",
+			isPrivate: true,
+			version:   sampleVersion,
+		},
+		{
+			name:    "get version for public provider by TRN",
+			version: sampleVersion,
+		},
+		{
+			name:          "subject does not have access to private provider version",
+			isPrivate:     true,
+			version:       sampleVersion,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider version not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockProviderVersions := db.NewMockTerraformProviderVersions(t)
+
+			mockProviderVersions.On("GetProviderVersionByTRN", mock.Anything, sampleVersion.Metadata.TRN).Return(test.version, nil)
+
+			if test.version != nil {
+				mockProviders.On("GetProviderByID", mock.Anything, sampleVersion.ProviderID).Return(&models.TerraformProvider{
+					Metadata: models.ResourceMetadata{ID: sampleVersion.ProviderID},
+					GroupID:  groupID,
+					Private:  test.isPrivate,
+				}, nil)
+			}
+
+			if test.isPrivate {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:        mockProviders,
+				TerraformProviderVersions: mockProviderVersions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			providerVersion, err := service.GetProviderVersionByTRN(auth.WithCaller(ctx, mockCaller), sampleVersion.Metadata.TRN)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.version, providerVersion)
+		})
+	}
+}
+
+func TestGetProviderPlatformByID(t *testing.T) {
+	platformID := "platform-1"
+	versionID := "version-1"
+	providerID := "provider-1"
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		platform      *models.TerraformProviderPlatform
+		isPrivate     bool
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "get platform for private provider by ID",
+			platform: &models.TerraformProviderPlatform{
+				Metadata: models.ResourceMetadata{
+					ID: platformID,
+				},
+				ProviderVersionID: versionID,
+			},
+			isPrivate: true,
+		},
+		{
+			name: "get platform for public provider by ID",
+			platform: &models.TerraformProviderPlatform{
+				Metadata: models.ResourceMetadata{
+					ID: platformID,
+				},
+				ProviderVersionID: versionID,
+			},
+		},
+		{
+			name: "subject does not have access to private provider platform",
+			platform: &models.TerraformProviderPlatform{
+				Metadata: models.ResourceMetadata{
+					ID: platformID,
+				},
+				ProviderVersionID: versionID,
+			},
+			isPrivate:     true,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider platform not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockProviderVersions := db.NewMockTerraformProviderVersions(t)
+			mockProviderPlatforms := db.NewMockTerraformProviderPlatforms(t)
+
+			mockProviderPlatforms.On("GetProviderPlatformByID", mock.Anything, platformID).Return(test.platform, nil)
+
+			if test.platform != nil {
+				mockProviderVersions.On("GetProviderVersionByID", mock.Anything, test.platform.ProviderVersionID).Return(&models.TerraformProviderVersion{
+					Metadata:   models.ResourceMetadata{ID: test.platform.ProviderVersionID},
+					ProviderID: providerID,
+				}, nil)
+
+				mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
+					Metadata: models.ResourceMetadata{ID: providerID},
+					GroupID:  groupID,
+					Private:  test.isPrivate,
+				}, nil)
+			}
+
+			if test.isPrivate {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:         mockProviders,
+				TerraformProviderVersions:  mockProviderVersions,
+				TerraformProviderPlatforms: mockProviderPlatforms,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			platform, err := service.GetProviderPlatformByID(auth.WithCaller(ctx, mockCaller), platformID)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.platform, platform)
+		})
+	}
+}
+
+func TestGetProviderPlatformByTRN(t *testing.T) {
+	samplePlatform := &models.TerraformProviderPlatform{
+		Metadata: models.ResourceMetadata{
+			ID:  "platform-1",
+			TRN: types.TerraformProviderPlatformModelType.BuildTRN("group/provider/0.1.0/terraform/aws"),
+		},
+		ProviderVersionID: "version-1",
+	}
+
+	groupID := "group-1"
+
+	type testCase struct {
+		name          string
+		platform      *models.TerraformProviderPlatform
+		isPrivate     bool
+		authError     error
+		expectErrCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:      "get platform for private provider by TRN",
+			isPrivate: true,
+			platform:  samplePlatform,
+		},
+		{
+			name:     "get platform for public provider by TRN",
+			platform: samplePlatform,
+		},
+		{
+			name:          "subject does not have access to private provider platform",
+			isPrivate:     true,
+			platform:      samplePlatform,
+			authError:     errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+		{
+			name:          "provider platform not found",
+			expectErrCode: errors.ENotFound,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockProviders := db.NewMockTerraformProviders(t)
+			mockProviderVersions := db.NewMockTerraformProviderVersions(t)
+			mockProviderPlatforms := db.NewMockTerraformProviderPlatforms(t)
+
+			mockProviderPlatforms.On("GetProviderPlatformByTRN", mock.Anything, samplePlatform.Metadata.TRN).Return(test.platform, nil)
+
+			if test.platform != nil {
+				mockProviderVersions.On("GetProviderVersionByID", mock.Anything, samplePlatform.ProviderVersionID).Return(&models.TerraformProviderVersion{
+					Metadata:   models.ResourceMetadata{ID: samplePlatform.ProviderVersionID},
+					ProviderID: "provider-1",
+				}, nil)
+
+				mockProviders.On("GetProviderByID", mock.Anything, "provider-1").Return(&models.TerraformProvider{
+					Metadata: models.ResourceMetadata{ID: "provider-1"},
+					GroupID:  groupID,
+					Private:  test.isPrivate,
+				}, nil)
+			}
+
+			if test.isPrivate {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformProviderModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				TerraformProviders:         mockProviders,
+				TerraformProviderVersions:  mockProviderVersions,
+				TerraformProviderPlatforms: mockProviderPlatforms,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			providerPlatform, err := service.GetProviderPlatformByTRN(auth.WithCaller(ctx, mockCaller), samplePlatform.Metadata.TRN)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.platform, providerPlatform)
+		})
+	}
+}
 
 func TestCreateProvider(t *testing.T) {
 	groupID := "group123"
@@ -124,7 +672,7 @@ func TestCreateProvider(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTerraformProviderPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateTerraformProviderPermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -150,7 +698,7 @@ func TestCreateProvider(t *testing.T) {
 			}
 
 			if test.group != nil && test.group.ParentID != "" {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, test.group.GetRootGroupPath()).Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.group.GetRootGroupPath())).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "root-group"},
 				}, nil)
 			}
@@ -379,7 +927,7 @@ func TestCreateProviderVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.MockTransactions{}
@@ -402,10 +950,10 @@ func TestCreateProviderVersion(t *testing.T) {
 
 			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
-					ID: providerID,
+					ID:  providerID,
+					TRN: types.TerraformProviderModelType.BuildTRN("testgroup/testprovider"),
 				},
-				GroupID:      groupID,
-				ResourcePath: "testgroup/testprovider",
+				GroupID: groupID,
 			}, nil)
 
 			providerVersionsResult := db.ProviderVersionsResult{
@@ -624,7 +1172,7 @@ func TestDeleteProviderVersion(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockTransactions := db.MockTransactions{}
@@ -642,7 +1190,8 @@ func TestDeleteProviderVersion(t *testing.T) {
 
 			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
-					ID: providerID,
+					ID:  providerID,
+					TRN: types.TerraformProviderModelType.BuildTRN("testgroup/testprovider"),
 				},
 				GroupID: groupID,
 			}, nil)
@@ -767,7 +1316,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTerraformProviderPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTerraformProviderPermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject")
 
 			mockProviders := db.NewMockTerraformProviders(t)
@@ -778,10 +1327,10 @@ func TestCreateProviderPlatform(t *testing.T) {
 
 			mockProviders.On("GetProviderByID", mock.Anything, providerID).Return(&models.TerraformProvider{
 				Metadata: models.ResourceMetadata{
-					ID: providerID,
+					ID:  providerID,
+					TRN: types.TerraformProviderModelType.BuildTRN("testgroup/testprovider"),
 				},
-				GroupID:      groupID,
-				ResourcePath: "testgroup/testprovider",
+				GroupID: groupID,
 			}, nil)
 
 			mockProviderVersions.On("GetProviderVersionByID", mock.Anything, mock.Anything).Return(&models.TerraformProviderVersion{

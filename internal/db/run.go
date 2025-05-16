@@ -13,7 +13,9 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -21,7 +23,8 @@ import (
 
 // Runs encapsulates the logic to access runs from the database
 type Runs interface {
-	GetRun(ctx context.Context, id string) (*models.Run, error)
+	GetRunByID(ctx context.Context, id string) (*models.Run, error)
+	GetRunByTRN(ctx context.Context, trn string) (*models.Run, error)
 	GetRunByPlanID(ctx context.Context, planID string) (*models.Run, error)
 	GetRunByApplyID(ctx context.Context, applyID string) (*models.Run, error)
 	CreateRun(ctx context.Context, run *models.Run) (*models.Run, error)
@@ -120,33 +123,36 @@ func NewRuns(dbClient *Client) Runs {
 	return &runs{dbClient: dbClient}
 }
 
-// GetRun returns a run by ID
-func (r *runs) GetRun(ctx context.Context, id string) (*models.Run, error) {
-	ctx, span := tracer.Start(ctx, "db.GetRun")
+// GetRunByID returns a run by ID
+func (r *runs) GetRunByID(ctx context.Context, id string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRunByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("runs").
-		Prepared(true).
-		Select(runFieldList...).
-		Where(goqu.Ex{"id": id}).
-		ToSQL()
+	return r.getRun(ctx, goqu.Ex{"runs.id": id})
+}
 
+func (r *runs) GetRunByTRN(ctx context.Context, trn string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRunByTRN")
+	defer span.End()
+
+	path, err := types.RunModelType.ResourcePathFromTRN(trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	run, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a run TRN must have the workspace path and run GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
-	return run, nil
+
+	return r.getRun(ctx, goqu.Ex{
+		"runs.id":         gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path": path[:lastSlashIndex],
+	})
 }
 
 func (r *runs) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, error) {
@@ -216,7 +222,8 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 
 	selectEx := dialect.From("runs").
 		Select(r.getSelectFields()...).
-		InnerJoin(goqu.T("workspaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("workspaces.id")}))
+		InnerJoin(goqu.T("workspaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("workspaces.id")})).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")}))
 
 	ex := goqu.And()
 
@@ -242,7 +249,6 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		}
 
 		if input.Filter.UserMemberID != nil {
-			selectEx = selectEx.InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")}))
 			ex = ex.Append(namespaceMembershipFilterQuery("namespace_memberships.user_id", *input.Filter.UserMemberID))
 		}
 
@@ -324,36 +330,40 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 		return nil, err
 	}
 
-	sql, args, err := dialect.Insert("runs").
+	sql, args, err := dialect.From("runs").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                        newResourceID(),
-			"version":                   initialResourceVersion,
-			"created_at":                timestamp,
-			"updated_at":                timestamp,
-			"status":                    run.Status,
-			"is_destroy":                run.IsDestroy,
-			"has_changes":               run.HasChanges,
-			"workspace_id":              run.WorkspaceID,
-			"configuration_version_id":  run.ConfigurationVersionID,
-			"created_by":                run.CreatedBy,
-			"plan_id":                   nullableString(run.PlanID),
-			"apply_id":                  nullableString(run.ApplyID),
-			"module_source":             run.ModuleSource,
-			"module_version":            run.ModuleVersion,
-			"module_digest":             run.ModuleDigest,
-			"force_canceled_by":         run.ForceCanceledBy,
-			"force_cancel_available_at": run.ForceCancelAvailableAt,
-			"force_canceled":            run.ForceCanceled,
-			"comment":                   run.Comment,
-			"auto_apply":                false,
-			"terraform_version":         run.TerraformVersion,
-			"targets":                   targets,
-			"refresh":                   run.Refresh,
-			"refresh_only":              run.RefreshOnly,
-			"is_assessment_run":         run.IsAssessmentRun,
-		}).
-		Returning(runFieldList...).ToSQL()
+		With("runs",
+			dialect.Insert("runs").
+				Rows(goqu.Record{
+					"id":                        newResourceID(),
+					"version":                   initialResourceVersion,
+					"created_at":                timestamp,
+					"updated_at":                timestamp,
+					"status":                    run.Status,
+					"is_destroy":                run.IsDestroy,
+					"has_changes":               run.HasChanges,
+					"workspace_id":              run.WorkspaceID,
+					"configuration_version_id":  run.ConfigurationVersionID,
+					"created_by":                run.CreatedBy,
+					"plan_id":                   nullableString(run.PlanID),
+					"apply_id":                  nullableString(run.ApplyID),
+					"module_source":             run.ModuleSource,
+					"module_version":            run.ModuleVersion,
+					"module_digest":             run.ModuleDigest,
+					"force_canceled_by":         run.ForceCanceledBy,
+					"force_cancel_available_at": run.ForceCancelAvailableAt,
+					"force_canceled":            run.ForceCanceled,
+					"comment":                   run.Comment,
+					"auto_apply":                false,
+					"terraform_version":         run.TerraformVersion,
+					"targets":                   targets,
+					"refresh":                   run.Refresh,
+					"refresh_only":              run.RefreshOnly,
+					"is_assessment_run":         run.IsAssessmentRun,
+				}).Returning("*"),
+		).Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -378,24 +388,30 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("runs").
+	sql, args, err := dialect.From("runs").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":                   goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":                timestamp,
-				"status":                    run.Status,
-				"has_changes":               run.HasChanges,
-				"plan_id":                   nullableString(run.PlanID),
-				"apply_id":                  nullableString(run.ApplyID),
-				"module_source":             run.ModuleSource,
-				"module_version":            run.ModuleVersion,
-				"module_digest":             run.ModuleDigest,
-				"force_canceled_by":         run.ForceCanceledBy,
-				"force_cancel_available_at": run.ForceCancelAvailableAt,
-				"force_canceled":            run.ForceCanceled,
-			},
-		).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).Returning(r.getSelectFields()...).ToSQL()
+		With("runs",
+			dialect.Update("runs").
+				Set(
+					goqu.Record{
+						"version":                   goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                timestamp,
+						"status":                    run.Status,
+						"has_changes":               run.HasChanges,
+						"plan_id":                   nullableString(run.PlanID),
+						"apply_id":                  nullableString(run.ApplyID),
+						"module_source":             run.ModuleSource,
+						"module_version":            run.ModuleVersion,
+						"module_digest":             run.ModuleDigest,
+						"force_canceled_by":         run.ForceCanceledBy,
+						"force_cancel_available_at": run.ForceCancelAvailableAt,
+						"force_canceled":            run.ForceCanceled,
+					},
+				).Where(goqu.Ex{"id": run.Metadata.ID, "version": run.Metadata.Version}).
+				Returning("*"),
+		).Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -416,21 +432,53 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 	return updatedRun, nil
 }
 
+func (r *runs) getRun(ctx context.Context, ex goqu.Ex) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "db.getRun")
+	defer span.End()
+
+	sql, args, err := dialect.From("runs").
+		Prepared(true).
+		Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runs.workspace_id": goqu.I("namespaces.workspace_id")})).
+		Where(ex).
+		ToSQL()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	run, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return run, nil
+}
+
 func (r *runs) getSelectFields() []interface{} {
 	selectFields := []interface{}{}
 	for _, field := range runFieldList {
 		selectFields = append(selectFields, fmt.Sprintf("runs.%s", field))
 	}
+	selectFields = append(selectFields, "namespaces.path")
+
 	return selectFields
 }
 
 func scanRun(row scanner) (*models.Run, error) {
-	var configurationVersionID sql.NullString
-	var forceCancelAvailableAt sql.NullTime
-	var forceCanceledBy sql.NullString
 	var planID sql.NullString
 	var applyID sql.NullString
-
+	var workspacePath string
 	run := &models.Run{}
 	run.TargetAddresses = []string{}
 
@@ -443,15 +491,15 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.IsDestroy,
 		&run.HasChanges,
 		&run.WorkspaceID,
-		&configurationVersionID,
+		&run.ConfigurationVersionID,
 		&run.CreatedBy,
 		&planID,
 		&applyID,
 		&run.ModuleSource,
 		&run.ModuleVersion,
 		&run.ModuleDigest,
-		&forceCanceledBy,
-		&forceCancelAvailableAt,
+		&run.ForceCanceledBy,
+		&run.ForceCancelAvailableAt,
 		&run.ForceCanceled,
 		&run.Comment,
 		&run.AutoApply,
@@ -460,13 +508,10 @@ func scanRun(row scanner) (*models.Run, error) {
 		&run.Refresh,
 		&run.RefreshOnly,
 		&run.IsAssessmentRun,
+		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	if configurationVersionID.Valid {
-		run.ConfigurationVersionID = &configurationVersionID.String
 	}
 
 	if planID.Valid {
@@ -477,13 +522,7 @@ func scanRun(row scanner) (*models.Run, error) {
 		run.ApplyID = applyID.String
 	}
 
-	if forceCanceledBy.Valid {
-		run.ForceCanceledBy = &forceCanceledBy.String
-	}
-
-	if forceCancelAvailableAt.Valid {
-		run.ForceCancelAvailableAt = &forceCancelAvailableAt.Time
-	}
+	run.Metadata.TRN = types.RunModelType.BuildTRN(workspacePath, run.GetGlobalID())
 
 	return run, nil
 }

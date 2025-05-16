@@ -92,21 +92,21 @@ func (_m *MockRunners) GetRunnerByID(ctx context.Context, id string) (*models.Ru
 	return r0, r1
 }
 
-// GetRunnerByPath provides a mock function with given fields: ctx, path
-func (_m *MockRunners) GetRunnerByPath(ctx context.Context, path string) (*models.Runner, error) {
-	ret := _m.Called(ctx, path)
+// GetRunnerByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockRunners) GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error) {
+	ret := _m.Called(ctx, trn)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetRunnerByPath")
+		panic("no return value specified for GetRunnerByTRN")
 	}
 
 	var r0 *models.Runner
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Runner, error)); ok {
-		return rf(ctx, path)
+		return rf(ctx, trn)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Runner); ok {
-		r0 = rf(ctx, path)
+		r0 = rf(ctx, trn)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Runner)
@@ -114,7 +114,7 @@ func (_m *MockRunners) GetRunnerByPath(ctx context.Context, path string) (*model
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

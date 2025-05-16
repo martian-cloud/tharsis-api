@@ -36,7 +36,7 @@ func main() {
 	}
 
 	serviceAccountPath := os.Getenv("THARSIS_SERVICE_ACCOUNT_PATH")
-	if runnerPath == "" {
+	if serviceAccountPath == "" {
 		logger.Errorf("THARSIS_SERVICE_ACCOUNT_PATH environment variable is required")
 		return
 	}

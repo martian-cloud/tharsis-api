@@ -18,11 +18,11 @@ import (
 	tfjson "github.com/hashicorp/terraform-json"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ansi"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
@@ -188,7 +188,8 @@ type createRunInput struct {
 
 // Service encapsulates Terraform Enterprise Support
 type Service interface {
-	GetRun(ctx context.Context, runID string) (*models.Run, error)
+	GetRunByID(ctx context.Context, runID string) (*models.Run, error)
+	GetRunByTRN(ctx context.Context, trn string) (*models.Run, error)
 	GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsResult, error)
 	GetRunsByIDs(ctx context.Context, idList []string) ([]models.Run, error)
 	CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error)
@@ -199,14 +200,16 @@ type Service interface {
 	CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
-	GetPlan(ctx context.Context, planID string) (*models.Plan, error)
+	GetPlanByID(ctx context.Context, planID string) (*models.Plan, error)
+	GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, error)
 	GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error)
 	UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error)
 	DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error)
 	UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error
 	ProcessPlanData(ctx context.Context, planID string, plan *tfjson.Plan, providerSchemas *tfjson.ProviderSchemas) error
 	GetAppliesByIDs(ctx context.Context, idList []string) ([]models.Apply, error)
-	GetApply(ctx context.Context, applyID string) (*models.Apply, error)
+	GetApplyByID(ctx context.Context, applyID string) (*models.Apply, error)
+	GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error)
 	UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error)
 	GetLatestJobForPlan(ctx context.Context, planID string) (*models.Job, error)
 	GetLatestJobForApply(ctx context.Context, applyID string) (*models.Job, error)
@@ -307,7 +310,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	var userMemberID *string
 	switch {
 	case options.WorkspaceID != nil:
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithWorkspaceID(*options.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -408,7 +411,7 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -433,7 +436,7 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 	}
 
 	// Get the current state version for the workspace
-	stateVersion, err := s.dbClient.StateVersions.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+	stateVersion, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, workspace.CurrentStateVersionID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get state version with ID %s", workspace.CurrentStateVersionID, errors.WithSpan(span))
 	}
@@ -451,7 +454,7 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 	}
 
 	// Get the run
-	latestRun, err := s.dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
+	latestRun, err := s.dbClient.Runs.GetRunByID(ctx, *stateVersion.RunID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get run with ID %s", *stateVersion.RunID, errors.WithSpan(span))
 	}
@@ -573,7 +576,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -598,7 +601,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 	}
 
 	// Get the current state version for the workspace
-	stateVersion, err := s.dbClient.StateVersions.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+	stateVersion, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, workspace.CurrentStateVersionID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get state version with ID %s", workspace.CurrentStateVersionID, errors.WithSpan(span))
 	}
@@ -616,7 +619,7 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 	}
 
 	// Get the run
-	run, err := s.dbClient.Runs.GetRun(ctx, *stateVersion.RunID)
+	run, err := s.dbClient.Runs.GetRunByID(ctx, *stateVersion.RunID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get run with ID %s", *stateVersion.RunID, errors.WithSpan(span))
 	}
@@ -660,7 +663,7 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -758,7 +761,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 			}
 			// If module is not nil and private, verify that the caller has authorization to use it
 			if module != nil && module.Private {
-				err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformModuleResourceType, auth.WithGroupID(module.GroupID))
+				err = caller.RequireAccessToInheritableResource(ctx, types.TerraformModuleModelType, auth.WithGroupID(module.GroupID))
 				if err != nil {
 					return nil, errors.Wrap(err, "caller not authorized to use module %s", *options.ModuleSource, errors.WithSpan(span))
 				}
@@ -859,7 +862,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 
 	// If there is a configuration version, get it and let it decide whether the run is speculative.
 	if options.ConfigurationVersionID != nil {
-		configVersion, gcvErr := s.dbClient.ConfigurationVersions.GetConfigurationVersion(txContext, *options.ConfigurationVersionID)
+		configVersion, gcvErr := s.dbClient.ConfigurationVersions.GetConfigurationVersionByID(txContext, *options.ConfigurationVersionID)
 		if gcvErr != nil {
 			tracing.RecordError(span, gcvErr, "failed to get configuration version")
 			return nil, errors.Wrap(
@@ -1050,7 +1053,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1108,7 +1111,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 	}
 
 	// Get apply resource
-	apply, err := s.dbClient.Applies.GetApply(ctx, run.ApplyID)
+	apply, err := s.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get apply")
 		return nil, errors.Wrap(
@@ -1214,7 +1217,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 	// TODO: Remember to do something with the options.Comment field.
 
-	run, err := s.GetRun(ctx, options.RunID)
+	run, err := s.GetRunByID(ctx, options.RunID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get run")
 		return nil, err
@@ -1222,7 +1225,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 	// Since UpdateRunPermission means run write access, we must use CreateRunPermission
 	// instead i.e. if caller can create a run, they must be able to cancel it as well.
-	err = caller.RequirePermission(ctx, permissions.CreateRunPermission, auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1274,7 +1277,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 		// the apply job has not yet been queued, cancel the run by simply doing
 		// updateApply on it.
 
-		apply, aErr := s.GetApply(ctx, run.ApplyID)
+		apply, aErr := s.GetApplyByID(ctx, run.ApplyID)
 		if aErr != nil {
 			tracing.RecordError(span, aErr, "failed to get apply")
 			return nil, errors.Wrap(
@@ -1295,7 +1298,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 
 		return run, nil
 	case models.RunPlanQueued:
-		plan, pErr := s.GetPlan(ctx, run.PlanID)
+		plan, pErr := s.GetPlanByID(ctx, run.PlanID)
 		if pErr != nil {
 			tracing.RecordError(span, pErr, "failed to get the plan to cancel a queued run")
 			return nil, errors.Wrap(
@@ -1447,7 +1450,7 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	// Update the plan or apply directly.
 	switch job.Type {
 	case models.JobPlanType:
-		plan, err := s.GetPlan(ctx, run.PlanID)
+		plan, err := s.GetPlanByID(ctx, run.PlanID)
 		if err != nil {
 			return nil, errors.Wrap(
 				err,
@@ -1462,7 +1465,7 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 			return nil, err
 		}
 	case models.JobApplyType:
-		apply, err := s.GetApply(ctx, run.ApplyID)
+		apply, err := s.GetApplyByID(ctx, run.ApplyID)
 		if err != nil {
 			return nil, errors.Wrap(
 				err,
@@ -1481,9 +1484,9 @@ func (s *service) forceCancelRun(ctx context.Context, run *models.Run) (*models.
 	return updatedRun, nil
 }
 
-// GetRun returns a run
-func (s *service) GetRun(ctx context.Context, runID string) (*models.Run, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetRun")
+// GetRunByID returns a run by ID
+func (s *service) GetRunByID(ctx context.Context, runID string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -1499,7 +1502,37 @@ func (s *service) GetRun(ctx context.Context, runID string) (*models.Run, error)
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return run, nil
+}
+
+// GetRunByTRN returns a run by TRN
+func (s *service) GetRunByTRN(ctx context.Context, trn string) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRunByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	run, err := s.dbClient.Runs.GetRunByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by TRN")
+		return nil, errors.Wrap(err, "failed to get run by TRN", errors.WithSpan(span))
+	}
+
+	if run == nil {
+		return nil, errors.New("run with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1525,14 +1558,14 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 
 	switch {
 	case input.Workspace != nil:
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithNamespacePath(input.Workspace.FullPath))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithNamespacePath(input.Workspace.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
 		filter.WorkspaceID = &input.Workspace.Metadata.ID
 	case input.Group != nil:
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithNamespacePath(input.Group.FullPath))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1588,7 +1621,7 @@ func (s *service) GetRunsByIDs(ctx context.Context, idList []string) ([]models.R
 	}
 
 	for _, run := range result.Runs {
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1623,7 +1656,7 @@ func (s *service) GetPlansByIDs(ctx context.Context, idList []string) ([]models.
 	}
 
 	for _, plan := range result.Plans {
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(plan.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithWorkspaceID(plan.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1634,8 +1667,8 @@ func (s *service) GetPlansByIDs(ctx context.Context, idList []string) ([]models.
 }
 
 // GetPlan returns a tfe plan
-func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetPlan")
+func (s *service) GetPlanByID(ctx context.Context, planID string) (*models.Plan, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetPlanByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -1645,7 +1678,7 @@ func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, err
 		return nil, err
 	}
 
-	plan, err := s.dbClient.Plans.GetPlan(ctx, planID)
+	plan, err := s.dbClient.Plans.GetPlanByID(ctx, planID)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to get plan")
 		return nil, errors.Wrap(
@@ -1664,7 +1697,41 @@ func (s *service) GetPlan(ctx context.Context, planID string) (*models.Plan, err
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return plan, nil
+}
+
+func (s *service) GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetPlanByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	plan, err := s.dbClient.Plans.GetPlanByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get plan by TRN", errors.WithSpan(span))
+	}
+
+	if plan == nil {
+		return nil, errors.New("plan with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	run, err := s.dbClient.Runs.GetRunByPlanID(ctx, plan.Metadata.ID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by plan ID")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1683,7 +1750,7 @@ func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Pl
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(plan.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(plan.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1718,7 +1785,7 @@ func (s *service) DownloadPlan(ctx context.Context, planID string) (io.ReadClose
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1746,7 +1813,7 @@ func (s *service) GetRunVariables(ctx context.Context, runID string, includeSens
 		return nil, err
 	}
 
-	run, err := s.dbClient.Runs.GetRun(ctx, runID)
+	run, err := s.dbClient.Runs.GetRunByID(ctx, runID)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to get run")
 		return nil, errors.Wrap(
@@ -1761,9 +1828,9 @@ func (s *service) GetRunVariables(ctx context.Context, runID string, includeSens
 
 	// Only include variable values if the caller has UpdateRunPermission or ViewVariableValuePermission on workspace.
 	includeValues := false
-	if err = caller.RequirePermission(ctx, permissions.ViewVariableValuePermission, auth.WithWorkspaceID(run.WorkspaceID)); err == nil {
+	if err = caller.RequirePermission(ctx, models.ViewVariableValuePermission, auth.WithWorkspaceID(run.WorkspaceID)); err == nil {
 		includeValues = true
-	} else if err = caller.RequirePermission(ctx, permissions.ViewVariablePermission, auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
+	} else if err = caller.RequirePermission(ctx, models.ViewVariablePermission, auth.WithWorkspaceID(run.WorkspaceID)); err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
@@ -1815,7 +1882,7 @@ func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *Set
 		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
-	run, err := s.dbClient.Runs.GetRun(ctx, input.RunID)
+	run, err := s.dbClient.Runs.GetRunByID(ctx, input.RunID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get run", errors.WithSpan(span))
 	}
@@ -1825,7 +1892,7 @@ func (s *service) SetVariablesIncludedInTFConfig(ctx context.Context, input *Set
 	}
 
 	// Since variables should only be updated during the plan operation, we're requiring that permission here.
-	if err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(run.PlanID)); err != nil {
+	if err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(run.PlanID)); err != nil {
 		return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
 	}
 
@@ -1882,7 +1949,7 @@ func (s *service) UploadPlanBinary(ctx context.Context, planID string, reader io
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(planID))
+	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(planID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1915,7 +1982,7 @@ func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tf
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdatePlanPermission, auth.WithPlanID(planID))
+	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(planID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1947,7 +2014,7 @@ func (s *service) ProcessPlanData(ctx context.Context, planID string, tfPlan *tf
 		)
 	}
 
-	planModel, err := s.dbClient.Plans.GetPlan(ctx, planID)
+	planModel, err := s.dbClient.Plans.GetPlanByID(ctx, planID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get plan")
 		return err
@@ -2047,7 +2114,7 @@ func (s *service) GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, e
 		return nil, errors.New("run with plan ID %s not found", planID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -2098,7 +2165,7 @@ func (s *service) GetAppliesByIDs(ctx context.Context, idList []string) ([]model
 	}
 
 	for _, apply := range result.Applies {
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithWorkspaceID(apply.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithWorkspaceID(apply.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -2108,9 +2175,9 @@ func (s *service) GetAppliesByIDs(ctx context.Context, idList []string) ([]model
 	return result.Applies, nil
 }
 
-// GetApply returns a tfe apply
-func (s *service) GetApply(ctx context.Context, applyID string) (*models.Apply, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetApply")
+// GetApplyByID returns a tfe apply
+func (s *service) GetApplyByID(ctx context.Context, applyID string) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetApplyByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -2120,7 +2187,7 @@ func (s *service) GetApply(ctx context.Context, applyID string) (*models.Apply, 
 		return nil, err
 	}
 
-	apply, err := s.dbClient.Applies.GetApply(ctx, applyID)
+	apply, err := s.dbClient.Applies.GetApplyByID(ctx, applyID)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to get apply")
 		return nil, errors.Wrap(
@@ -2143,7 +2210,45 @@ func (s *service) GetApply(ctx context.Context, applyID string) (*models.Apply, 
 		return nil, fmt.Errorf("failed to get run associated with apply id %s", applyID)
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return apply, nil
+}
+
+func (s *service) GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetApplyByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	apply, err := s.dbClient.Applies.GetApplyByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get apply by TRN", errors.WithSpan(span))
+	}
+
+	if apply == nil {
+		return nil, errors.New("apply with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	run, err := s.dbClient.Runs.GetRunByApplyID(ctx, apply.Metadata.ID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get run by apply ID")
+		return nil, err
+	}
+
+	if run == nil {
+		return nil, fmt.Errorf("failed to get run associated with apply id %s", apply.Metadata.ID)
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -2163,7 +2268,7 @@ func (s *service) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateApplyPermission, auth.WithApplyID(apply.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateApplyPermission, auth.WithApplyID(apply.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -2204,7 +2309,7 @@ func (s *service) GetLatestJobForPlan(ctx context.Context, planID string) (*mode
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithJobID(job.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithJobID(job.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -2240,7 +2345,7 @@ func (s *service) GetLatestJobForApply(ctx context.Context, applyID string) (*mo
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewJobPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithJobID(job.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.ViewJobPermission, auth.WithWorkspaceID(run.WorkspaceID), auth.WithJobID(job.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -2268,7 +2373,7 @@ func (s *service) GetStateVersionsByRunIDs(ctx context.Context, runIDs []string)
 	}
 
 	for _, run := range runsResult.Runs {
-		err = caller.RequirePermission(ctx, permissions.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewRunPermission, auth.WithRunID(run.Metadata.ID), auth.WithWorkspaceID(run.WorkspaceID))
 		if err != nil {
 			return nil, err
 		}
@@ -2472,7 +2577,7 @@ func (s *service) enforceManagedIdentityRules(ctx context.Context, managedIdenti
 }
 
 func (s *service) getRun(ctx context.Context, runID string) (*models.Run, error) {
-	run, err := s.dbClient.Runs.GetRun(ctx, runID)
+	run, err := s.dbClient.Runs.GetRunByID(ctx, runID)
 	if err != nil {
 		return nil, errors.Wrap(
 			err,

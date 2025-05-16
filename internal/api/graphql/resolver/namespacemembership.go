@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
@@ -16,12 +16,6 @@ import (
 )
 
 /* Namespace Membership Query Resolvers */
-
-// NamespaceMembershipConnectionQueryArgs are used to query a namespace membership connection
-type NamespaceMembershipConnectionQueryArgs struct {
-	ConnectionQueryArgs
-	NamespacePath string
-}
 
 // NamespaceMembershipEdgeResolver resolves namespace membership edges
 type NamespaceMembershipEdgeResolver struct {
@@ -57,7 +51,7 @@ type NamespaceMembershipConnectionResolver struct {
 func NewNamespaceMembershipConnectionResolver(ctx context.Context,
 	input *namespacemembership.GetNamespaceMembershipsForSubjectInput,
 ) (*NamespaceMembershipConnectionResolver, error) {
-	service := getNamespaceMembershipService(ctx)
+	service := getServiceCatalog(ctx).NamespaceMembershipService
 
 	result, err := service.GetNamespaceMembershipsForSubject(ctx, input)
 	if err != nil {
@@ -148,13 +142,12 @@ type NamespaceMembershipResolver struct {
 
 // ID resolver
 func (r *NamespaceMembershipResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.NamespaceMembershipType, r.namespaceMembership.Metadata.ID))
+	return graphql.ID(r.namespaceMembership.GetGlobalID())
 }
 
 // ResourcePath resolver
 func (r *NamespaceMembershipResolver) ResourcePath() string {
-	return fmt.Sprintf("%s/%s", r.namespaceMembership.Namespace.Path,
-		graphql.ID(gid.ToGlobalID(gid.NamespaceMembershipType, r.namespaceMembership.Metadata.ID)))
+	return fmt.Sprintf("%s/%s", r.namespaceMembership.Namespace.Path, graphql.ID(r.namespaceMembership.GetGlobalID()))
 }
 
 // Member resolver
@@ -248,7 +241,10 @@ func (r *NamespaceMembershipMutationPayloadResolver) Namespace(ctx context.Conte
 	if r.NamespaceMembershipMutationPayload.NamespaceMembership == nil {
 		return nil, nil
 	}
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, r.NamespaceMembership.Namespace.Path)
+
+	serviceCatalog := getServiceCatalog(ctx)
+
+	group, err := serviceCatalog.GroupService.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(r.NamespaceMembership.Namespace.Path))
 	if err != nil && errors.ErrorCode(err) != errors.ENotFound {
 		return nil, err
 	}
@@ -256,7 +252,7 @@ func (r *NamespaceMembershipMutationPayloadResolver) Namespace(ctx context.Conte
 		return &NamespaceResolver{result: &GroupResolver{group: group}}, nil
 	}
 
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, r.NamespaceMembership.Namespace.Path)
+	ws, err := serviceCatalog.WorkspaceService.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(r.NamespaceMembership.Namespace.Path))
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +307,9 @@ func handleNamespaceMembershipMutationProblem(e error,
 func createNamespaceMembershipMutation(ctx context.Context,
 	input *CreateNamespaceMembershipInput,
 ) (*NamespaceMembershipMutationPayloadResolver, error) {
-	role, err := getRoleService(ctx).GetRoleByName(ctx, input.Role)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	role, err := serviceCatalog.RoleService.GetRoleByTRN(ctx, types.RoleModelType.BuildTRN(input.Role))
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +320,7 @@ func createNamespaceMembershipMutation(ctx context.Context,
 	}
 
 	if input.Username != nil {
-		user, uErr := getUserService(ctx).GetUserByUsername(ctx, *input.Username)
+		user, uErr := serviceCatalog.UserService.GetUserByTRN(ctx, types.UserModelType.BuildTRN(*input.Username))
 		if uErr != nil {
 			return nil, uErr
 		}
@@ -330,22 +328,28 @@ func createNamespaceMembershipMutation(ctx context.Context,
 	}
 
 	if input.ServiceAccountID != nil {
-		serviceAccount, sErr := getSAService(ctx).GetServiceAccountByID(ctx, gid.FromGlobalID(*input.ServiceAccountID))
+		model, sErr := serviceCatalog.FetchModel(ctx, *input.ServiceAccountID)
 		if sErr != nil {
 			return nil, sErr
 		}
+
+		serviceAccount, ok := model.(*models.ServiceAccount)
+		if !ok {
+			return nil, errors.New("service account not found", errors.WithErrorCode(errors.ENotFound))
+		}
+
 		createOptions.ServiceAccount = serviceAccount
 	}
 
 	if input.TeamName != nil {
-		team, tErr := getTeamService(ctx).GetTeamByName(ctx, *input.TeamName)
+		team, tErr := serviceCatalog.TeamService.GetTeamByTRN(ctx, types.TeamModelType.BuildTRN(*input.TeamName))
 		if tErr != nil {
 			return nil, tErr
 		}
 		createOptions.Team = team
 	}
 
-	namespaceMembership, nErr := getNamespaceMembershipService(ctx).CreateNamespaceMembership(ctx, &createOptions)
+	namespaceMembership, nErr := serviceCatalog.NamespaceMembershipService.CreateNamespaceMembership(ctx, &createOptions)
 	if nErr != nil {
 		return nil, nErr
 	}
@@ -361,9 +365,14 @@ func createNamespaceMembershipMutation(ctx context.Context,
 func updateNamespaceMembershipMutation(ctx context.Context,
 	input *UpdateNamespaceMembershipInput,
 ) (*NamespaceMembershipMutationPayloadResolver, error) {
-	service := getNamespaceMembershipService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	namespaceMembership, err := service.GetNamespaceMembershipByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	namespaceMembership, err := serviceCatalog.NamespaceMembershipService.GetNamespaceMembershipByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -378,14 +387,14 @@ func updateNamespaceMembershipMutation(ctx context.Context,
 		namespaceMembership.Metadata.Version = v
 	}
 
-	role, err := getRoleService(ctx).GetRoleByName(ctx, input.Role)
+	role, err := serviceCatalog.RoleService.GetRoleByTRN(ctx, types.RoleModelType.BuildTRN(input.Role))
 	if err != nil {
 		return nil, err
 	}
 
 	namespaceMembership.RoleID = role.Metadata.ID
 
-	namespaceMembership, err = service.UpdateNamespaceMembership(ctx, namespaceMembership)
+	namespaceMembership, err = serviceCatalog.NamespaceMembershipService.UpdateNamespaceMembership(ctx, namespaceMembership)
 	if err != nil {
 		return nil, err
 	}
@@ -401,9 +410,14 @@ func updateNamespaceMembershipMutation(ctx context.Context,
 func deleteNamespaceMembershipMutation(ctx context.Context,
 	input *DeleteNamespaceMembershipInput,
 ) (*NamespaceMembershipMutationPayloadResolver, error) {
-	service := getNamespaceMembershipService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	namespaceMembership, err := service.GetNamespaceMembershipByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	namespaceMembership, err := serviceCatalog.NamespaceMembershipService.GetNamespaceMembershipByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +432,7 @@ func deleteNamespaceMembershipMutation(ctx context.Context,
 		namespaceMembership.Metadata.Version = v
 	}
 
-	if err = service.DeleteNamespaceMembership(ctx, namespaceMembership); err != nil {
+	if err = serviceCatalog.NamespaceMembershipService.DeleteNamespaceMembership(ctx, namespaceMembership); err != nil {
 		return nil, err
 	}
 
@@ -459,7 +473,7 @@ func loadNamespaceMembership(ctx context.Context, id string) (*models.NamespaceM
 }
 
 func namespaceMembershipBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	namespaceMemberships, err := getNamespaceMembershipService(ctx).GetNamespaceMembershipsByIDs(ctx, ids)
+	namespaceMemberships, err := getServiceCatalog(ctx).NamespaceMembershipService.GetNamespaceMembershipsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

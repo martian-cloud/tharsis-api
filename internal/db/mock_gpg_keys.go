@@ -92,6 +92,36 @@ func (_m *MockGPGKeys) GetGPGKeyByID(ctx context.Context, id string) (*models.GP
 	return r0, r1
 }
 
+// GetGPGKeyByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockGPGKeys) GetGPGKeyByTRN(ctx context.Context, trn string) (*models.GPGKey, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetGPGKeyByTRN")
+	}
+
+	var r0 *models.GPGKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.GPGKey, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.GPGKey); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.GPGKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetGPGKeys provides a mock function with given fields: ctx, input
 func (_m *MockGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInput) (*GPGKeysResult, error) {
 	ret := _m.Called(ctx, input)

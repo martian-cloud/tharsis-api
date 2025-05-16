@@ -12,14 +12,16 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Runners encapsulates the logic to access runners from the database
 type Runners interface {
-	GetRunnerByPath(ctx context.Context, path string) (*models.Runner, error)
+	GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error)
 	GetRunnerByID(ctx context.Context, id string) (*models.Runner, error)
 	GetRunners(ctx context.Context, input *GetRunnersInput) (*RunnersResult, error)
 	CreateRunner(ctx context.Context, runner *models.Runner) (*models.Runner, error)
@@ -115,20 +117,29 @@ func NewRunners(dbClient *Client) Runners {
 	return &terraformRunners{dbClient: dbClient}
 }
 
-func (t *terraformRunners) GetRunnerByPath(ctx context.Context, path string) (*models.Runner, error) {
-	ctx, span := tracer.Start(ctx, "db.GetRunnerByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (t *terraformRunners) GetRunnerByTRN(ctx context.Context, trn string) (*models.Runner, error) {
+	ctx, span := tracer.Start(ctx, "db.GetRunnerByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
 	defer span.End()
 
-	parts := strings.Split(path, "/")
-	name := parts[len(parts)-1]
-
-	if len(parts) > 1 {
-		namespace := strings.Join(parts[:len(parts)-1], "/")
-		return t.getRunner(ctx, goqu.Ex{"runners.name": name, "namespaces.path": namespace})
+	path, err := types.RunnerModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	return t.getRunner(ctx, goqu.Ex{"runners.name": name})
+	ex := goqu.Ex{}
+	lastSlashIndex := strings.LastIndex(path, "/")
+
+	if lastSlashIndex == -1 {
+		// This is a global runner.
+		ex["runners.name"] = path
+	} else {
+		// This is a group runner.
+		ex["runners.name"] = path[lastSlashIndex+1:]
+		ex["namespaces.path"] = path[:lastSlashIndex]
+	}
+
+	return t.getRunner(ctx, ex)
 }
 
 func (t *terraformRunners) GetRunnerByID(ctx context.Context, id string) (*models.Runner, error) {
@@ -229,7 +240,7 @@ func (t *terraformRunners) GetRunners(ctx context.Context, input *GetRunnersInpu
 	// Scan rows
 	results := []models.Runner{}
 	for rows.Next() {
-		item, err := scanRunner(rows, true)
+		item, err := scanRunner(rows)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to scan row")
 			return nil, err
@@ -263,43 +274,34 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx for CreateRunner: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Insert("runners").
+	sql, args, err := dialect.From("runners").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                newResourceID(),
-			"version":           initialResourceVersion,
-			"created_at":        timestamp,
-			"updated_at":        timestamp,
-			"type":              runner.Type,
-			"group_id":          runner.GroupID,
-			"name":              runner.Name,
-			"description":       runner.Description,
-			"created_by":        runner.CreatedBy,
-			"disabled":          runner.Disabled,
-			"tags":              tags,
-			"run_untagged_jobs": runner.RunUntaggedJobs,
-		}).
-		Returning(runnerFieldList...).ToSQL()
+		With("runners",
+			dialect.Insert("runners").
+				Rows(
+					goqu.Record{
+						"id":                newResourceID(),
+						"version":           initialResourceVersion,
+						"created_at":        timestamp,
+						"updated_at":        timestamp,
+						"type":              runner.Type,
+						"group_id":          runner.GroupID,
+						"name":              runner.Name,
+						"description":       runner.Description,
+						"created_by":        runner.CreatedBy,
+						"disabled":          runner.Disabled,
+						"tags":              tags,
+						"run_untagged_jobs": runner.RunUntaggedJobs,
+					}).Returning("*"),
+		).Select(t.getSelectFields()...).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	createdRunner, err := scanRunner(tx.QueryRow(ctx, sql, args...), false)
+	createdRunner, err := scanRunner(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
@@ -311,23 +313,6 @@ func (t *terraformRunners) CreateRunner(ctx context.Context, runner *models.Runn
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	if createdRunner.GroupID != nil {
-		// Lookup namespace for group
-		namespace, err := getNamespaceByGroupID(ctx, tx, *createdRunner.GroupID)
-		if err != nil {
-			tracing.RecordError(span, err, "failed to get namespace by group ID")
-			return nil, err
-		}
-		createdRunner.ResourcePath = buildGroupRunnerResourcePath(namespace.path, createdRunner.Name)
-	} else {
-		createdRunner.ResourcePath = createdRunner.Name
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -346,61 +331,35 @@ func (t *terraformRunners) UpdateRunner(ctx context.Context, runner *models.Runn
 
 	timestamp := currentTime()
 
-	tx, err := t.dbClient.getConnection(ctx).Begin(ctx)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to begin DB transaction")
-		return nil, err
-	}
-
-	// Rollback is safe to call even if the tx is already closed, so if
-	// the tx commits successfully, this is a no-op
-	defer func() {
-		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			t.dbClient.logger.Errorf("failed to rollback tx for UpdateRunner: %v", txErr)
-		}
-	}()
-
-	sql, args, err := dialect.Update("runners").
+	sql, args, err := dialect.From("runners").
 		Prepared(true).
-		Set(goqu.Record{
-			"version":           goqu.L("? + ?", goqu.C("version"), 1),
-			"updated_at":        timestamp,
-			"description":       runner.Description,
-			"disabled":          runner.Disabled,
-			"tags":              tags,
-			"run_untagged_jobs": runner.RunUntaggedJobs,
-		}).
-		Where(goqu.Ex{"id": runner.Metadata.ID, "version": runner.Metadata.Version}).
-		Returning(runnerFieldList...).ToSQL()
+		With("runners",
+			dialect.Update("runners").
+				Set(
+					goqu.Record{
+						"version":           goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":        timestamp,
+						"description":       runner.Description,
+						"disabled":          runner.Disabled,
+						"tags":              tags,
+						"run_untagged_jobs": runner.RunUntaggedJobs,
+					}).Where(goqu.Ex{"id": runner.Metadata.ID, "version": runner.Metadata.Version}).
+				Returning("*"),
+		).Select(t.getSelectFields()...).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
 	}
 
-	updatedRunner, err := scanRunner(tx.QueryRow(ctx, sql, args...), false)
+	updatedRunner, err := scanRunner(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
 		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
-	}
-
-	if updatedRunner.GroupID != nil {
-		// Lookup namespace for group
-		namespace, err := getNamespaceByGroupID(ctx, tx, *updatedRunner.GroupID)
-		if err != nil {
-			tracing.RecordError(span, err, "failed to get namespace by group ID")
-			return nil, err
-		}
-		updatedRunner.ResourcePath = buildGroupRunnerResourcePath(namespace.path, updatedRunner.Name)
-	} else {
-		updatedRunner.ResourcePath = updatedRunner.Name
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		tracing.RecordError(span, err, "failed to commit DB transaction")
 		return nil, err
 	}
 
@@ -412,21 +371,25 @@ func (t *terraformRunners) DeleteRunner(ctx context.Context, runner *models.Runn
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("runners").
+	sql, args, err := dialect.From("runners").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      runner.Metadata.ID,
-				"version": runner.Metadata.Version,
-			},
-		).Returning(runnerFieldList...).ToSQL()
+		With("runners",
+			dialect.Delete("runners").
+				Where(
+					goqu.Ex{
+						"id":      runner.Metadata.ID,
+						"version": runner.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(t.getSelectFields()...).
+		LeftJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"runners.group_id": goqu.I("namespaces.group_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
 	}
 
-	_, err = scanRunner(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), false)
-	if err != nil {
+	if _, err = scanRunner(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...)); err != nil {
 		if err == pgx.ErrNoRows {
 			tracing.RecordError(span, err, "optimistic lock error")
 			return ErrOptimisticLockError
@@ -440,7 +403,6 @@ func (t *terraformRunners) DeleteRunner(ctx context.Context, runner *models.Runn
 
 func (t *terraformRunners) getRunner(ctx context.Context, exp goqu.Ex) (*models.Runner, error) {
 	ctx, span := tracer.Start(ctx, "db.getRunner")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	query := dialect.From(goqu.T("runners")).
@@ -451,17 +413,22 @@ func (t *terraformRunners) getRunner(ctx context.Context, exp goqu.Ex) (*models.
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
-	runner, err := scanRunner(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...), true)
+	runner, err := scanRunner(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return runner, nil
@@ -478,11 +445,8 @@ func (t *terraformRunners) getSelectFields() []interface{} {
 	return selectFields
 }
 
-func buildGroupRunnerResourcePath(groupPath string, name string) string {
-	return fmt.Sprintf("%s/%s", groupPath, name)
-}
-
-func scanRunner(row scanner, withResourcePath bool) (*models.Runner, error) {
+func scanRunner(row scanner) (*models.Runner, error) {
+	var namespacePath sql.NullString
 	runner := &models.Runner{}
 
 	fields := []interface{}{
@@ -498,10 +462,7 @@ func scanRunner(row scanner, withResourcePath bool) (*models.Runner, error) {
 		&runner.Disabled,
 		&runner.Tags,
 		&runner.RunUntaggedJobs,
-	}
-	var path sql.NullString
-	if withResourcePath {
-		fields = append(fields, &path)
+		&namespacePath,
 	}
 
 	err := row.Scan(fields...)
@@ -509,12 +470,10 @@ func scanRunner(row scanner, withResourcePath bool) (*models.Runner, error) {
 		return nil, err
 	}
 
-	if withResourcePath {
-		if path.Valid {
-			runner.ResourcePath = buildGroupRunnerResourcePath(path.String, runner.Name)
-		} else {
-			runner.ResourcePath = runner.Name
-		}
+	if namespacePath.Valid {
+		runner.Metadata.TRN = types.RunnerModelType.BuildTRN(namespacePath.String, runner.Name)
+	} else {
+		runner.Metadata.TRN = types.RunnerModelType.BuildTRN(runner.Name)
 	}
 
 	return runner, nil

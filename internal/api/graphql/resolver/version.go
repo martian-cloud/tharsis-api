@@ -27,7 +27,7 @@ func (r *VersionResolver) DBMigrationDirty() bool {
 }
 
 func versionQuery(ctx context.Context) (*VersionResolver, error) {
-	versionInfo, err := getVersionService(ctx).GetCurrentVersion(ctx)
+	versionInfo, err := getServiceCatalog(ctx).VersionService.GetCurrentVersion(ctx)
 	if err != nil {
 		return nil, err
 	}

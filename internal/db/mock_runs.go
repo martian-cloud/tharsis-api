@@ -44,36 +44,6 @@ func (_m *MockRuns) CreateRun(ctx context.Context, run *models.Run) (*models.Run
 	return r0, r1
 }
 
-// GetRun provides a mock function with given fields: ctx, id
-func (_m *MockRuns) GetRun(ctx context.Context, id string) (*models.Run, error) {
-	ret := _m.Called(ctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRun")
-	}
-
-	var r0 *models.Run
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Run, error)); ok {
-		return rf(ctx, id)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Run); ok {
-		r0 = rf(ctx, id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.Run)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetRunByApplyID provides a mock function with given fields: ctx, applyID
 func (_m *MockRuns) GetRunByApplyID(ctx context.Context, applyID string) (*models.Run, error) {
 	ret := _m.Called(ctx, applyID)
@@ -104,6 +74,36 @@ func (_m *MockRuns) GetRunByApplyID(ctx context.Context, applyID string) (*model
 	return r0, r1
 }
 
+// GetRunByID provides a mock function with given fields: ctx, id
+func (_m *MockRuns) GetRunByID(ctx context.Context, id string) (*models.Run, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunByID")
+	}
+
+	var r0 *models.Run
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Run, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Run); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Run)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunByPlanID provides a mock function with given fields: ctx, planID
 func (_m *MockRuns) GetRunByPlanID(ctx context.Context, planID string) (*models.Run, error) {
 	ret := _m.Called(ctx, planID)
@@ -127,6 +127,36 @@ func (_m *MockRuns) GetRunByPlanID(ctx context.Context, planID string) (*models.
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, planID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRunByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockRuns) GetRunByTRN(ctx context.Context, trn string) (*models.Run, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRunByTRN")
+	}
+
+	var r0 *models.Run
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Run, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Run); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Run)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -4,13 +4,17 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -65,8 +69,10 @@ type ConfigurationVersionsResult struct {
 // ConfigurationVersions encapsulates the logic to access configuration version from the database
 type ConfigurationVersions interface {
 	GetConfigurationVersions(ctx context.Context, input *GetConfigurationVersionsInput) (*ConfigurationVersionsResult, error)
-	// GetConfigurationVersion returns a configuration version
-	GetConfigurationVersion(ctx context.Context, id string) (*models.ConfigurationVersion, error)
+	// GetConfigurationVersionByID returns a configuration version by ID
+	GetConfigurationVersionByID(ctx context.Context, id string) (*models.ConfigurationVersion, error)
+	// GetConfigurationVersionByTRN returns a configuration version by TRN
+	GetConfigurationVersionByTRN(ctx context.Context, trn string) (*models.ConfigurationVersion, error)
 	// CreateConfigurationVersion creates a new configuration version
 	CreateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error)
 	// UpdateConfigurationVersion updates a configuration version in the database
@@ -114,7 +120,8 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	}
 
 	query := dialect.From("configuration_versions").
-		Select(configurationVersionFieldList...).
+		Select(c.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -169,29 +176,35 @@ func (c *configurationVersions) GetConfigurationVersions(ctx context.Context, in
 	return &result, nil
 }
 
-func (c *configurationVersions) GetConfigurationVersion(ctx context.Context, id string) (*models.ConfigurationVersion, error) {
-	ctx, span := tracer.Start(ctx, "db.GetConfigurationVersion")
+func (c *configurationVersions) GetConfigurationVersionByID(ctx context.Context, id string) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetConfigurationVersionByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("configuration_versions").
-		Prepared(true).
-		Select(configurationVersionFieldList...).
-		Where(goqu.Ex{"id": id}).
-		ToSQL()
+	return c.getConfigurationVersion(ctx, goqu.Ex{"configuration_versions.id": id})
+}
 
+func (c *configurationVersions) GetConfigurationVersionByTRN(ctx context.Context, trn string) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetConfigurationVersionByTRN")
+	defer span.End()
+
+	path, err := types.ConfigurationVersionModelType.ResourcePathFromTRN(trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	configurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a configuration version TRN must have the workspace path and version GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
-	return configurationVersion, nil
+
+	return c.getConfigurationVersion(ctx, goqu.Ex{
+		"configuration_versions.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path":           path[:lastSlashIndex],
+	})
 }
 
 func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, configurationVersion models.ConfigurationVersion) (*models.ConfigurationVersion, error) {
@@ -201,20 +214,24 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("configuration_versions").
+	sql, args, err := dialect.From("configuration_versions").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":           newResourceID(),
-			"version":      initialResourceVersion,
-			"created_at":   timestamp,
-			"updated_at":   timestamp,
-			"status":       configurationVersion.Status,
-			"speculative":  configurationVersion.Speculative,
-			"workspace_id": configurationVersion.WorkspaceID,
-			"created_by":   configurationVersion.CreatedBy,
-			"vcs_event_id": configurationVersion.VCSEventID,
-		}).
-		Returning(configurationVersionFieldList...).ToSQL()
+		With("configuration_versions",
+			dialect.Insert("configuration_versions").
+				Rows(goqu.Record{
+					"id":           newResourceID(),
+					"version":      initialResourceVersion,
+					"created_at":   timestamp,
+					"updated_at":   timestamp,
+					"status":       configurationVersion.Status,
+					"speculative":  configurationVersion.Speculative,
+					"workspace_id": configurationVersion.WorkspaceID,
+					"created_by":   configurationVersion.CreatedBy,
+					"vcs_event_id": configurationVersion.VCSEventID,
+				}).Returning("*"),
+		).Select(c.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -237,18 +254,23 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("configuration_versions").
+	sql, args, err := dialect.From("configuration_versions").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":      goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":   timestamp,
-				"status":       configurationVersion.Status,
-				"speculative":  configurationVersion.Speculative,
-				"workspace_id": configurationVersion.WorkspaceID,
-			},
-		).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).Returning(configurationVersionFieldList...).ToSQL()
-
+		With("configuration_versions",
+			dialect.Update("configuration_versions").
+				Set(
+					goqu.Record{
+						"version":      goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":   timestamp,
+						"status":       configurationVersion.Status,
+						"speculative":  configurationVersion.Speculative,
+						"workspace_id": configurationVersion.WorkspaceID,
+					},
+				).Where(goqu.Ex{"id": configurationVersion.Metadata.ID, "version": configurationVersion.Metadata.Version}).
+				Returning("*"),
+		).Select(c.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -268,7 +290,53 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 	return updatedConfigurationVersion, nil
 }
 
+func (c *configurationVersions) getConfigurationVersion(ctx context.Context, ex goqu.Ex) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.getConfigurationVersion")
+	defer span.End()
+
+	sql, args, err := dialect.From("configuration_versions").
+		Prepared(true).
+		Select(c.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"configuration_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
+		Where(ex).
+		ToSQL()
+
+	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
+		return nil, err
+	}
+
+	configurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		tracing.RecordError(span, err, "failed to execute query")
+		return nil, err
+	}
+
+	return configurationVersion, nil
+}
+
+func (c *configurationVersions) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range configurationVersionFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("configuration_versions.%s", field))
+	}
+	selectFields = append(selectFields, "namespaces.path")
+
+	return selectFields
+}
+
 func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error) {
+	var workspacePath string
 	configurationVersion := &models.ConfigurationVersion{}
 
 	err := row.Scan(
@@ -281,10 +349,13 @@ func scanConfigurationVersion(row scanner) (*models.ConfigurationVersion, error)
 		&configurationVersion.WorkspaceID,
 		&configurationVersion.CreatedBy,
 		&configurationVersion.VCSEventID,
+		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	configurationVersion.Metadata.TRN = types.ConfigurationVersionModelType.BuildTRN(workspacePath, configurationVersion.GetGlobalID())
 
 	return configurationVersion, nil
 }

@@ -14,12 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -78,7 +78,7 @@ func TestGetRunnerByID(t *testing.T) {
 
 			if test.expectRunner != nil && test.expectRunner.GroupID != nil {
 				mockCaller.On("RequireAccessToInheritableResource",
-					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+					mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 					Return(test.authError)
 			}
 
@@ -110,87 +110,82 @@ func TestGetRunnerByID(t *testing.T) {
 	}
 }
 
-func TestGetRunnerByPath(t *testing.T) {
-	path := "group-1/runner-1"
-	runnerID := "runner-1"
-	groupID := "group-1"
-	// Test cases
-	tests := []struct {
-		expectRunner  *models.Runner
-		name          string
-		authError     error
-		expectErrCode errors.CodeType
-	}{
+func TestGetRunnerByTRN(t *testing.T) {
+	sampleRunner := &models.Runner{
+		Metadata: models.ResourceMetadata{
+			ID:  "runner-id-1",
+			TRN: types.RunnerModelType.BuildTRN("my-group/runner-1"),
+		},
+		Name:    "runner-1",
+		GroupID: ptr.String("group-1"),
+		Type:    models.GroupRunnerType,
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		runner          *models.Runner
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
 		{
-			name: "all users can get a shared runner",
-			expectRunner: &models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerID},
-				Name:     "test-runner",
-				Type:     models.SharedRunnerType,
-			},
+			name:   "successfully get group runner by trn",
+			runner: sampleRunner,
 		},
 		{
-			name: "get group runner",
-			expectRunner: &models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerID},
-				GroupID:  &groupID,
-				Name:     "test-runner",
-				Type:     models.GroupRunnerType,
-			},
+			name:            "runner not found",
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name: "subject does not have access to group runner",
-			expectRunner: &models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerID},
-				GroupID:  &groupID,
-				Name:     "test-runner",
-				Type:     models.GroupRunnerType,
-			},
-			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
-			expectErrCode: errors.EForbidden,
+			name:            "subject is not authorized to view group runner",
+			runner:          sampleRunner,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:          "runner not found",
-			expectErrCode: errors.ENotFound,
+			name: "successfully get shared runner by trn",
+			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-id-1",
+					TRN: types.RunnerModelType.BuildTRN("runner-1"),
+				},
+				Name: "runner-1",
+				Type: models.SharedRunnerType,
+			},
 		},
 	}
-	for _, test := range tests {
+
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			mockCaller := auth.NewMockCaller(t)
-
-			if test.expectRunner != nil && test.expectRunner.GroupID != nil {
-				mockCaller.On("RequireAccessToInheritableResource",
-					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
-					Return(test.authError)
-			}
-
 			mockRunners := db.NewMockRunners(t)
 
-			mockRunners.On("GetRunnerByPath", mock.Anything, path).Return(test.expectRunner, nil)
+			mockRunners.On("GetRunnerByTRN", mock.Anything, sampleRunner.Metadata.TRN).Return(test.runner, nil)
 
-			dbClient := db.Client{
+			if test.runner != nil && test.runner.GroupID != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
 				Runners: mockRunners,
 			}
 
-			testLogger, _ := logger.NewForTest()
+			service := &service{
+				dbClient: dbClient,
+			}
 
-			service := NewService(testLogger, &dbClient, nil, nil, nil, nil)
+			actualRunner, err := service.GetRunnerByTRN(auth.WithCaller(ctx, mockCaller), sampleRunner.Metadata.TRN)
 
-			runner, err := service.GetRunnerByPath(auth.WithCaller(ctx, mockCaller), path)
-
-			if test.expectErrCode != "" {
-				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.expectRunner, runner)
+			require.NoError(t, err)
+			assert.Equal(t, test.runner, actualRunner)
 		})
 	}
 }
@@ -208,29 +203,36 @@ func TestGetRunnersByIDs(t *testing.T) {
 		{
 			name: "all users can get a shared runner",
 			expectRunner: &models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerID},
-				Name:     "test-runner",
-				Type:     models.SharedRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  runnerID,
+					TRN: types.RunModelType.BuildTRN("test-runner"),
+				},
+				Name: "test-runner",
+				Type: models.SharedRunnerType,
 			},
 		},
 		{
 			name: "get group runner",
 			expectRunner: &models.Runner{
-				Metadata:     models.ResourceMetadata{ID: runnerID},
-				GroupID:      &groupID,
-				Name:         "test-runner",
-				ResourcePath: "some-group/test-runner",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  runnerID,
+					TRN: types.RunModelType.BuildTRN("some-group/test-runner"),
+				},
+				GroupID: &groupID,
+				Name:    "test-runner",
+				Type:    models.GroupRunnerType,
 			},
 		},
 		{
 			name: "subject does not have access to group runner",
 			expectRunner: &models.Runner{
-				Metadata:     models.ResourceMetadata{ID: runnerID},
-				GroupID:      &groupID,
-				Name:         "test-runner",
-				ResourcePath: "some-group/test-runner",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  runnerID,
+					TRN: types.RunModelType.BuildTRN("some-group/test-runner"),
+				},
+				GroupID: &groupID,
+				Name:    "test-runner",
+				Type:    models.GroupRunnerType,
 			},
 			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
@@ -248,7 +250,7 @@ func TestGetRunnersByIDs(t *testing.T) {
 
 			if test.expectRunner != nil && test.expectRunner.GroupID != nil {
 				mockCaller.On("RequireAccessToInheritableResource",
-					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+					mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 					Return(test.authError)
 			}
 
@@ -391,7 +393,7 @@ func TestGetRunners(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunnerPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunnerPermission, mock.Anything).
 				Return(test.authError).Maybe()
 			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
@@ -471,11 +473,14 @@ func TestCreateRunner(t *testing.T) {
 				RunUntaggedJobs: false,
 			},
 			expectCreatedRunner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group-1/test-runner"),
+				},
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
 				GroupID:         &groupID,
 				CreatedBy:       "mockSubject",
-				ResourcePath:    "group-1/test-runner",
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: false,
 			},
@@ -499,12 +504,15 @@ func TestCreateRunner(t *testing.T) {
 				Tags:    []string{"some-tag"},
 			},
 			expectCreatedRunner: &models.Runner{
-				Type:         models.GroupRunnerType,
-				Name:         "test-runner",
-				GroupID:      &groupID,
-				CreatedBy:    "mockSubject",
-				ResourcePath: "group-1/test-runner",
-				Tags:         []string{"some-tag"},
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group-1/test-runner"),
+				},
+				Type:      models.GroupRunnerType,
+				Name:      "test-runner",
+				GroupID:   &groupID,
+				CreatedBy: "mockSubject",
+				Tags:      []string{"some-tag"},
 			},
 			limit:                 5,
 			injectRunnersPerGroup: 6,
@@ -520,7 +528,7 @@ func TestCreateRunner(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunnerPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunnerPermission, mock.Anything).Return(test.authError)
 			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
 			mockCaller.On("GetSubject").Return("mockSubject")
@@ -611,10 +619,13 @@ func TestUpdateRunner(t *testing.T) {
 		{
 			name: "update runner",
 			input: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+				},
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
 				GroupID:         &groupID,
-				ResourcePath:    "group123/test-runner",
 				Disabled:        false,
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: true,
@@ -623,10 +634,13 @@ func TestUpdateRunner(t *testing.T) {
 		{
 			name: "subject does not have owner role",
 			input: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+				},
 				Type:            models.GroupRunnerType,
 				Name:            "test-runner",
 				GroupID:         &groupID,
-				ResourcePath:    "group123/test-runner",
 				Disabled:        false,
 				Tags:            []string{"some-tag"},
 				RunUntaggedJobs: true,
@@ -643,7 +657,7 @@ func TestUpdateRunner(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateRunnerPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerPermission, mock.Anything).Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 
@@ -702,21 +716,27 @@ func TestDeleteRunner(t *testing.T) {
 		{
 			name: "delete runner",
 			input: &models.Runner{
-				Type:         models.GroupRunnerType,
-				Name:         "test-runner",
-				GroupID:      &groupID,
-				ResourcePath: "group123/test-runner",
-				Disabled:     false,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+				},
+				Type:     models.GroupRunnerType,
+				Name:     "test-runner",
+				GroupID:  &groupID,
+				Disabled: false,
 			},
 		},
 		{
 			name: "subject does not have deployer role",
 			input: &models.Runner{
-				Type:         models.GroupRunnerType,
-				Name:         "test-runner",
-				GroupID:      &groupID,
-				ResourcePath: "group123/test-runner",
-				Disabled:     false,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/test-runner"),
+				},
+				Type:     models.GroupRunnerType,
+				Name:     "test-runner",
+				GroupID:  &groupID,
+				Disabled: false,
 			},
 			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
@@ -730,7 +750,7 @@ func TestDeleteRunner(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteRunnerPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteRunnerPermission, mock.Anything).Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 
@@ -790,22 +810,35 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 		{
 			name: "successfully assign group service account to group runner",
 			runner: &models.Runner{
-				GroupID:      &groupID,
-				ResourcePath: "group123/runner-1",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+				},
+				GroupID: &groupID,
+				Type:    models.GroupRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				GroupID:      groupID,
-				ResourcePath: "group123/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("group123/sa-1"),
+				},
+				GroupID: groupID,
 			},
 		},
 		{
 			name: "cannot assign global service account to shared runner", // unlike in Phobos, where this is allowed
 			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("runner-1"),
+				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				ResourcePath: "global/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("sa-1"),
+				},
 			},
 			isAdmin:       true,
 			expectErrCode: errors.EInvalid,
@@ -813,36 +846,55 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 		{
 			name: "cannot assign group service account to shared runner",
 			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("runner-1"),
+				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				GroupID:      groupID,
-				ResourcePath: "group123/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("group123/sa-1"),
+				},
+				GroupID: groupID,
 			},
 			expectErrCode: errors.EInvalid,
 		},
 		{
 			name: "cannot assign global service account to group runner",
 			runner: &models.Runner{
-				GroupID:      &groupID,
-				ResourcePath: "group123/runner-1",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+				},
+				GroupID: &groupID,
+				Type:    models.GroupRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				ResourcePath: "global/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("global/sa-1"),
+				},
 			},
 			expectErrCode: errors.EInvalid,
 		},
 		{
 			name: "group service account and group runner are not in the same group",
 			runner: &models.Runner{
-				GroupID:      &groupID,
-				ResourcePath: "group123/runner-1",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+				},
+				GroupID: &groupID,
+				Type:    models.GroupRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				GroupID:      "group456",
-				ResourcePath: "group456/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("group456/sa-1"),
+				},
+				GroupID: "group456",
 			},
 			expectErrCode: errors.EInvalid,
 		},
@@ -853,32 +905,48 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 		{
 			name: "service account not found",
 			runner: &models.Runner{
-				GroupID:      &groupID,
-				ResourcePath: "group123/runner-1",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+				},
+				GroupID: &groupID,
+				Type:    models.GroupRunnerType,
 			},
 			expectErrCode: errors.ENotFound,
 		},
 		{
 			name: "global service account cannot be assigned to a shared runner, since caller is not an admin",
 			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("runner-1"),
+				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				ResourcePath: "global/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("global/sa-1"),
+				},
 			},
 			expectErrCode: errors.EInvalid, // unlike in Phobos, where this is forbidden
 		},
 		{
 			name: "subject does not have permissions to assign a group service account to a group runner",
 			runner: &models.Runner{
-				GroupID:      &groupID,
-				ResourcePath: "group123/runner-1",
-				Type:         models.GroupRunnerType,
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("group123/runner-1"),
+				},
+				GroupID: &groupID,
+				Type:    models.GroupRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				GroupID:      groupID,
-				ResourcePath: "group123/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("group123/sa-1"),
+				},
+				GroupID: groupID,
 			},
 			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrCode: errors.EForbidden,
@@ -886,10 +954,17 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 		{
 			name: "global service account cannot be assigned to a shared runner, since caller is not a user",
 			runner: &models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  "runner-1",
+					TRN: types.RunModelType.BuildTRN("runner-1"),
+				},
 				Type: models.SharedRunnerType,
 			},
 			serviceAccount: &models.ServiceAccount{
-				ResourcePath: "global/sa-1",
+				Metadata: models.ResourceMetadata{
+					ID:  "sa-1",
+					TRN: types.ServiceAccountModelType.BuildTRN("global/sa-1"),
+				},
 			},
 			expectErrCode: errors.EInvalid, // unlike in Phobos, where this is forbidden
 		},
@@ -911,7 +986,7 @@ func TestAssignServiceAccountToRunner(t *testing.T) {
 					Return(test.serviceAccount, nil).Maybe()
 			}
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateRunnerPermission, mock.Anything).Return(test.authError).Maybe()
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerPermission, mock.Anything).Return(test.authError).Maybe()
 			mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 
 			if test.expectErrCode == "" {
@@ -1004,7 +1079,7 @@ func TestUnassignServiceAccountFromRunner(t *testing.T) {
 
 			if test.runner != nil {
 				if test.runner.Type.Equals(models.GroupRunnerType) {
-					mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateRunnerPermission, mock.Anything).Return(test.authError)
+					mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerPermission, mock.Anything).Return(test.authError)
 				} else {
 					mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 				}
@@ -1037,6 +1112,7 @@ func TestUnassignServiceAccountFromRunner(t *testing.T) {
 }
 
 func TestCreateRunnerSession(t *testing.T) {
+	runnerID := "runner-1"
 	runnerPath := "runner123"
 	runnerSessionID := "runner-session-123"
 
@@ -1105,19 +1181,22 @@ func TestCreateRunnerSession(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockLimitChecker := limits.NewMockLimitChecker(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunnerSessionPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunnerSessionPermission, mock.Anything).
 				Return(test.authError)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
-			mockRunners.On("GetRunnerByPath", mock.Anything, runnerPath).Return(&models.Runner{
-				Metadata: models.ResourceMetadata{ID: runnerPath},
+			mockRunners.On("GetRunnerByTRN", mock.Anything, types.RunnerModelType.BuildTRN(runnerPath)).Return(&models.Runner{
+				Metadata: models.ResourceMetadata{
+					ID:  runnerID,
+					TRN: types.RunModelType.BuildTRN(runnerPath),
+				},
 			}, nil)
 
 			mockRunnerSessions.On("GetRunnerSessions", mock.Anything, &db.GetRunnerSessionsInput{
 				Filter: &db.RunnerSessionFilter{
-					RunnerID: &runnerPath,
+					RunnerID: &runnerID,
 				},
 				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(0),
@@ -1142,7 +1221,7 @@ func TestCreateRunnerSession(t *testing.T) {
 			if test.limitError != nil {
 				existingSession := models.RunnerSession{
 					Metadata: models.ResourceMetadata{ID: "existing-session"},
-					RunnerID: runnerPath,
+					RunnerID: runnerID,
 				}
 
 				if test.allExistingSessionsActive {
@@ -1153,7 +1232,7 @@ func TestCreateRunnerSession(t *testing.T) {
 				mockRunnerSessions.On("GetRunnerSessions", mock.Anything, &db.GetRunnerSessionsInput{
 					Sort: &sortBy,
 					Filter: &db.RunnerSessionFilter{
-						RunnerID: &runnerPath,
+						RunnerID: &runnerID,
 					},
 					PaginationOptions: &pagination.Options{
 						First: ptr.Int32(1),
@@ -1269,7 +1348,7 @@ func TestGetRunnerSessions(t *testing.T) {
 			if test.runner != nil {
 				if test.runner.Type == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource",
-						mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
 					mockCaller.On("IsAdmin").Return(test.isAdmin)
@@ -1368,7 +1447,7 @@ func TestGetRunnerSessionByID(t *testing.T) {
 			if test.runner != nil {
 				if test.runner.Type == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource",
-						mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
 					mockCaller.On("IsAdmin").Return(test.isAdmin)
@@ -1405,6 +1484,104 @@ func TestGetRunnerSessionByID(t *testing.T) {
 	}
 }
 
+func TestGetRunnerSessionByTRN(t *testing.T) {
+	sampleRunnerSession := &models.RunnerSession{
+		Metadata: models.ResourceMetadata{
+			ID:  "session-id-1",
+			TRN: types.RunnerSessionModelType.BuildTRN("my-group/session-1"),
+		},
+		RunnerID: "runner-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		runnerSession   *models.RunnerSession
+		expectErrorCode errors.CodeType
+		runnerType      models.RunnerType
+		isAdmin         bool
+	}
+
+	testCases := []testCase{
+		{
+			name:          "successfully get runner session by trn",
+			runnerSession: sampleRunnerSession,
+			runnerType:    models.GroupRunnerType,
+		},
+		{
+			name:          "successfully get runner session by trn for a shared runner",
+			runnerSession: sampleRunnerSession,
+			runnerType:    models.SharedRunnerType,
+			isAdmin:       true,
+		},
+		{
+			name:            "runner session not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view shared runner session",
+			runnerSession:   sampleRunnerSession,
+			runnerType:      models.SharedRunnerType,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "subject is not authorized to view group runner session",
+			runnerSession:   sampleRunnerSession,
+			runnerType:      models.GroupRunnerType,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRunners := db.NewMockRunners(t)
+			mockRunnerSessions := db.NewMockRunnerSessions(t)
+
+			mockRunnerSessions.On("GetRunnerSessionByTRN", mock.Anything, sampleRunnerSession.Metadata.TRN).Return(test.runnerSession, nil)
+
+			if test.runnerSession != nil {
+				mockRunners.On("GetRunnerByID", mock.Anything, sampleRunnerSession.RunnerID).Return(&models.Runner{
+					Metadata: models.ResourceMetadata{
+						ID: sampleRunnerSession.RunnerID,
+					},
+					GroupID: ptr.String("group-1"),
+					Type:    test.runnerType,
+				}, nil)
+
+				if test.runnerType == models.GroupRunnerType {
+					mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).Return(test.authError)
+				} else {
+					mockCaller.On("IsAdmin").Return(test.isAdmin)
+				}
+			}
+
+			dbClient := &db.Client{
+				Runners:        mockRunners,
+				RunnerSessions: mockRunnerSessions,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualRunnerSession, err := service.GetRunnerSessionByTRN(auth.WithCaller(ctx, mockCaller), sampleRunnerSession.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.runnerSession, actualRunnerSession)
+		})
+	}
+}
+
 func TestAcceptRunnerSessionHeartbeat(t *testing.T) {
 	runnerSessionID := "runner-session-123"
 
@@ -1436,7 +1613,7 @@ func TestAcceptRunnerSessionHeartbeat(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockRunnerSessions := db.NewMockRunnerSessions(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateRunnerSessionPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerSessionPermission, mock.Anything).Return(test.authError)
 
 			mockRunnerSessions.On("GetRunnerSessionByID", mock.Anything, runnerSessionID).Return(&runnerSession, nil)
 
@@ -1510,7 +1687,7 @@ func TestCreateRunnerSessionError(t *testing.T) {
 			mockLimitChecker := limits.NewMockLimitChecker(t)
 			mockLogStreamManager := logstream.NewMockManager(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateRunnerSessionPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateRunnerSessionPermission, mock.Anything).
 				Return(test.authError)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
@@ -1640,7 +1817,7 @@ func TestReadRunnerSessionErrorLog(t *testing.T) {
 			if test.runner != nil {
 				if test.runner.Type == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource",
-						mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
 					mockCaller.On("IsAdmin").Return(test.isAdmin)
@@ -1759,7 +1936,7 @@ func TestGetLogStreamsByRunnerSessionIDs(t *testing.T) {
 			if test.runner != nil {
 				if test.runner.Type == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource",
-						mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
 					mockCaller.On("IsAdmin").Return(test.isAdmin)
@@ -1903,7 +2080,7 @@ func TestSubscribeToRunnerSessionErrorLog(t *testing.T) {
 			if test.runner != nil {
 				if test.runner.Type == models.GroupRunnerType {
 					mockCaller.On("RequireAccessToInheritableResource",
-						mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+						mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 						Return(test.authError)
 				} else {
 					mockCaller.On("IsAdmin").Return(test.isAdmin)
@@ -2163,11 +2340,11 @@ func TestSubscribeToRunnerSessions(t *testing.T) {
 			}
 
 			if test.input.GroupID != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.RunnerResourceType, mock.Anything).
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.RunnerModelType, mock.Anything).
 					Return(test.authError)
 			} else if test.input.RunnerID != nil {
 				mockCaller.On("RequireAccessToInheritableResource",
-					mock.Anything, permissions.RunnerResourceType, mock.Anything, mock.Anything).
+					mock.Anything, types.RunnerModelType, mock.Anything, mock.Anything).
 					Return(test.authError).Maybe()
 				mockCaller.On("IsAdmin").Return(test.isAdmin).Maybe()
 			} else {

@@ -24,10 +24,10 @@ import (
 	svchost "github.com/hashicorp/terraform-svchost"
 	"github.com/hashicorp/terraform-svchost/disco"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -66,7 +66,7 @@ type CreateProviderVersionMirrorInput struct {
 	RegistryNamespace string
 	RegistryHostname  string
 	SemanticVersion   string
-	GroupPath         string
+	GroupID           string
 }
 
 // DeleteProviderVersionMirrorInput is the input for DeleteTerraformProviderVersionMirror.
@@ -150,12 +150,13 @@ type packageQueryResponse struct {
 // Service implements all the Terraform provider mirror functionality.
 type Service interface {
 	GetProviderVersionMirrorByID(ctx context.Context, id string) (*models.TerraformProviderVersionMirror, error)
-	GetProviderVersionMirrorByAddress(ctx context.Context, input *GetProviderVersionMirrorByAddressInput) (*models.TerraformProviderVersionMirror, error)
+	GetProviderVersionMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersionMirror, error)
 	GetProviderVersionMirrorsByIDs(ctx context.Context, idList []string) ([]models.TerraformProviderVersionMirror, error)
 	GetProviderVersionMirrors(ctx context.Context, input *GetProviderVersionMirrorsInput) (*db.ProviderVersionMirrorsResult, error)
 	CreateProviderVersionMirror(ctx context.Context, input *CreateProviderVersionMirrorInput) (*models.TerraformProviderVersionMirror, error)
 	DeleteProviderVersionMirror(ctx context.Context, input *DeleteProviderVersionMirrorInput) error
 	GetProviderPlatformMirrorByID(ctx context.Context, id string) (*models.TerraformProviderPlatformMirror, error)
+	GetProviderPlatformMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatformMirror, error)
 	GetProviderPlatformMirrors(ctx context.Context, input *GetProviderPlatformMirrorsInput) (*db.ProviderPlatformMirrorsResult, error)
 	DeleteProviderPlatformMirror(ctx context.Context, input *DeleteProviderPlatformMirrorInput) error
 	UploadInstallationPackage(ctx context.Context, input *UploadInstallationPackageInput) error
@@ -215,7 +216,7 @@ func (s *service) GetProviderVersionMirrorByID(ctx context.Context, id string) (
 	}
 
 	// Provider mirror is available to anyone within a group hierarchy.
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithGroupID(versionMirror.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
@@ -224,8 +225,8 @@ func (s *service) GetProviderVersionMirrorByID(ctx context.Context, id string) (
 	return versionMirror, nil
 }
 
-func (s *service) GetProviderVersionMirrorByAddress(ctx context.Context, input *GetProviderVersionMirrorByAddressInput) (*models.TerraformProviderVersionMirror, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetProviderVersionMirrorByAddress")
+func (s *service) GetProviderVersionMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersionMirror, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderVersionMirrorByTRN")
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -234,41 +235,24 @@ func (s *service) GetProviderVersionMirrorByAddress(ctx context.Context, input *
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithNamespacePath(input.GroupPath))
+	versionMirror, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrorByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider version mirror")
+		return nil, err
+	}
+
+	if versionMirror == nil {
+		tracing.RecordError(span, nil, "provider version mirror not found")
+		return nil, errors.New("provider version mirror not found", errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
-	group, err := s.getGroupByFullPath(ctx, input.GroupPath)
-	if err != nil {
-		tracing.RecordError(span, err, "group not found")
-		return nil, err
-	}
-
-	dbInput := &db.GetProviderVersionMirrorsInput{
-		PaginationOptions: &pagination.Options{First: ptr.Int32(1)},
-		Filter: &db.TerraformProviderVersionMirrorFilter{
-			GroupID:           &group.Metadata.ID,
-			RegistryHostname:  &input.RegistryHostname,
-			RegistryNamespace: &input.RegistryNamespace,
-			Type:              &input.Type,
-			SemanticVersion:   &input.SemanticVersion,
-		},
-	}
-
-	result, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrors(ctx, dbInput)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider version mirrors")
-		return nil, err
-	}
-
-	if result.PageInfo.TotalCount == 0 {
-		tracing.RecordError(span, err, "terraform provider version mirror not found")
-		return nil, errors.New("terraform provider version mirror with FQN %s/%s/%s not found", input.RegistryHostname, input.RegistryNamespace, input.Type, errors.WithErrorCode(errors.ENotFound))
-	}
-
-	return &result.VersionMirrors[0], nil
+	return versionMirror, nil
 }
 
 func (s *service) GetProviderVersionMirrorsByIDs(ctx context.Context, idList []string) ([]models.TerraformProviderVersionMirror, error) {
@@ -292,7 +276,7 @@ func (s *service) GetProviderVersionMirrorsByIDs(ctx context.Context, idList []s
 	}
 
 	for _, m := range result.VersionMirrors {
-		err := caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithGroupID(m.GroupID))
+		err := caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(m.GroupID))
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +295,7 @@ func (s *service) GetProviderVersionMirrors(ctx context.Context, input *GetProvi
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithNamespacePath(input.NamespacePath))
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
@@ -357,16 +341,21 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateTerraformProviderMirrorPermission, auth.WithNamespacePath(input.GroupPath))
+	err = caller.RequirePermission(ctx, models.CreateTerraformProviderMirrorPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
-	group, err := s.getGroupByFullPath(ctx, input.GroupPath)
+	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
 	if err != nil {
 		tracing.RecordError(span, err, "group not found")
 		return nil, err
+	}
+
+	if group == nil {
+		tracing.RecordError(span, nil, "group not found")
+		return nil, errors.New("group with id %s not found", input.GroupID, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if group.ParentID != "" {
@@ -492,7 +481,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	s.logger.Infow("Created a terraform provider version mirror.",
 		"caller", caller.GetSubject(),
-		"groupPath", input.GroupPath,
+		"groupPath", input.GroupID,
 		"versionMirrorID", created.Metadata.ID,
 	)
 
@@ -509,7 +498,7 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteTerraformProviderMirrorPermission, auth.WithGroupID(input.VersionMirror.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteTerraformProviderMirrorPermission, auth.WithGroupID(input.VersionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return err
@@ -627,7 +616,43 @@ func (s *service) GetProviderPlatformMirrorByID(ctx context.Context, id string) 
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithGroupID(versionMirror.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
+	if err != nil {
+		tracing.RecordError(span, err, "caller permission check failed")
+		return nil, err
+	}
+
+	return platformMirror, nil
+}
+
+func (s *service) GetProviderPlatformMirrorByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatformMirror, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderPlatformMirrorByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	platformMirror, err := s.dbClient.TerraformProviderPlatformMirrors.GetPlatformMirrorByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider platform mirror")
+		return nil, err
+	}
+
+	if platformMirror == nil {
+		tracing.RecordError(span, nil, "provider platform mirror not found")
+		return nil, errors.New("provider platform mirror not found", errors.WithErrorCode(errors.ENotFound))
+	}
+
+	versionMirror, err := s.getVersionMirrorByID(ctx, platformMirror.VersionMirrorID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider version mirror")
+		return nil, err
+	}
+
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
@@ -652,7 +677,7 @@ func (s *service) GetProviderPlatformMirrors(ctx context.Context, input *GetProv
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithGroupID(versionMirror.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
@@ -693,7 +718,7 @@ func (s *service) DeleteProviderPlatformMirror(ctx context.Context, input *Delet
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteTerraformProviderMirrorPermission, auth.WithGroupID(versionMirror.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteTerraformProviderMirrorPermission, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return err
@@ -731,7 +756,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateTerraformProviderMirrorPermission, auth.WithGroupID(versionMirror.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateTerraformProviderMirrorPermission, auth.WithGroupID(versionMirror.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return err
@@ -860,7 +885,7 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithGroupID(group.Metadata.ID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
@@ -919,7 +944,7 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderMirrorResourceType, auth.WithGroupID(group.Metadata.ID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
@@ -1227,7 +1252,7 @@ func (s *service) getPlatformMirrorByID(ctx context.Context, id string) (*models
 }
 
 func (s *service) getGroupByFullPath(ctx context.Context, path string) (*models.Group, error) {
-	group, err := s.dbClient.Groups.GetGroupByFullPath(ctx, path)
+	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(path))
 	if err != nil {
 		return nil, err
 	}

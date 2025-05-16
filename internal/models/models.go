@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"time"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -17,11 +18,21 @@ const (
 // nameRegex allows letters, numbers with - and _ allowed in non leading or trailing positions, max length is 64
 var nameRegex = regexp.MustCompile("^[0-9a-z](?:[0-9a-z-_]{0,62}[0-9a-z])?$")
 
+// Model defines the interface that all Tharsis models must implement.
+type Model interface {
+	GetID() string
+	GetGlobalID() string
+	GetModelType() types.ModelType
+	ResolveMetadata(key string) (string, error)
+	Validate() error
+}
+
 // ResourceMetadata contains metadata for a particular resource
 type ResourceMetadata struct {
 	CreationTimestamp    *time.Time `json:"createdAt"`
-	LastUpdatedTimestamp *time.Time `json:"updatedAt,omitempty" `
+	LastUpdatedTimestamp *time.Time `json:"updatedAt,omitempty"`
 	ID                   string     `json:"id"`
+	TRN                  string     `json:"trn"`
 	Version              int        `json:"version"`
 }
 

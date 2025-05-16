@@ -49,7 +49,11 @@ type TerraformProviderVersion implements Node {
 
 input CreateTerraformProviderVersionInput {
   clientMutationId: String
-  providerPath: String!
+  providerPath: String
+    @deprecated(
+      reason: "Use providerId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  providerId: String
   version: String!
   protocols: [String!]!
 }

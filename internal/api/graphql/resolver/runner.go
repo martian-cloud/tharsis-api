@@ -6,8 +6,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
@@ -58,7 +58,7 @@ type RunnerConnectionResolver struct {
 
 // NewRunnerConnectionResolver creates a new RunnerConnectionResolver
 func NewRunnerConnectionResolver(ctx context.Context, input *runner.GetRunnersInput) (*RunnerConnectionResolver, error) {
-	service := getRunnerService(ctx)
+	service := getServiceCatalog(ctx).RunnerService
 
 	result, err := service.GetRunners(ctx, input)
 	if err != nil {
@@ -126,7 +126,7 @@ type RunnerResolver struct {
 
 // ID resolver
 func (r *RunnerResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.RunnerType, r.runner.Metadata.ID))
+	return graphql.ID(r.runner.GetGlobalID())
 }
 
 // GroupPath resolver
@@ -136,7 +136,7 @@ func (r *RunnerResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *RunnerResolver) ResourcePath() string {
-	return r.runner.ResourcePath
+	return r.runner.GetResourcePath()
 }
 
 // Name resolver
@@ -306,7 +306,8 @@ func (r *RunnerMutationPayloadResolver) ServiceAccount() *ServiceAccountResolver
 // CreateRunnerInput contains the input for creating a new runner
 type CreateRunnerInput struct {
 	ClientMutationID *string
-	GroupPath        string
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
+	GroupID          *string
 	Disabled         *bool
 	Name             string
 	Description      string
@@ -335,8 +336,10 @@ type DeleteRunnerInput struct {
 // AssignServiceAccountToRunnerInput is used to assign a service account to a runner
 type AssignServiceAccountToRunnerInput struct {
 	ClientMutationID   *string
-	RunnerPath         string
-	ServiceAccountPath string
+	RunnerPath         *string // DEPRECATED: use RunnerID instead with a TRN
+	ServiceAccountPath *string // DEPRECATED: use ServiceAccountID instead with a TRN
+	RunnerID           *string
+	ServiceAccountID   *string
 }
 
 func handleRunnerMutationProblem(e error, clientMutationID *string) (*RunnerMutationPayloadResolver, error) {
@@ -350,7 +353,7 @@ func handleRunnerMutationProblem(e error, clientMutationID *string) (*RunnerMuta
 }
 
 func createRunnerMutation(ctx context.Context, input *CreateRunnerInput) (*RunnerMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
@@ -358,13 +361,13 @@ func createRunnerMutation(ctx context.Context, input *CreateRunnerInput) (*Runne
 	toCreate := &runner.CreateRunnerInput{
 		Name:            input.Name,
 		Description:     input.Description,
-		GroupID:         group.Metadata.ID,
+		GroupID:         groupID,
 		Disabled:        input.Disabled,
 		RunUntaggedJobs: input.RunUntaggedJobs,
 		Tags:            input.Tags,
 	}
 
-	createdRunner, err := getRunnerService(ctx).CreateRunner(ctx, toCreate)
+	createdRunner, err := getServiceCatalog(ctx).RunnerService.CreateRunner(ctx, toCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -374,9 +377,14 @@ func createRunnerMutation(ctx context.Context, input *CreateRunnerInput) (*Runne
 }
 
 func updateRunnerMutation(ctx context.Context, input *UpdateRunnerInput) (*RunnerMutationPayloadResolver, error) {
-	service := getRunnerService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	runner, err := service.GetRunnerByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	runner, err := serviceCatalog.RunnerService.GetRunnerByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +413,7 @@ func updateRunnerMutation(ctx context.Context, input *UpdateRunnerInput) (*Runne
 		runner.Tags = *input.Tags
 	}
 
-	runner, err = service.UpdateRunner(ctx, runner)
+	runner, err = serviceCatalog.RunnerService.UpdateRunner(ctx, runner)
 	if err != nil {
 		return nil, err
 	}
@@ -415,9 +423,14 @@ func updateRunnerMutation(ctx context.Context, input *UpdateRunnerInput) (*Runne
 }
 
 func deleteRunnerMutation(ctx context.Context, input *DeleteRunnerInput) (*RunnerMutationPayloadResolver, error) {
-	service := getRunnerService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	runner, err := service.GetRunnerByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	runner, err := serviceCatalog.RunnerService.GetRunnerByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +445,7 @@ func deleteRunnerMutation(ctx context.Context, input *DeleteRunnerInput) (*Runne
 		runner.Metadata.Version = v
 	}
 
-	if err := service.DeleteRunner(ctx, runner); err != nil {
+	if err := serviceCatalog.RunnerService.DeleteRunner(ctx, runner); err != nil {
 		return nil, err
 	}
 
@@ -441,20 +454,12 @@ func deleteRunnerMutation(ctx context.Context, input *DeleteRunnerInput) (*Runne
 }
 
 func assignServiceAccountToRunnerMutation(ctx context.Context, input *AssignServiceAccountToRunnerInput) (*RunnerMutationPayloadResolver, error) {
-	saService := getSAService(ctx)
-	runnerService := getRunnerService(ctx)
-
-	runner, err := runnerService.GetRunnerByPath(ctx, input.RunnerPath)
+	runner, serviceAccount, err := resolveRunnerAndServiceAccount(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceAccount, err := saService.GetServiceAccountByPath(ctx, input.ServiceAccountPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := runnerService.AssignServiceAccountToRunner(ctx, serviceAccount.Metadata.ID, runner.Metadata.ID); err != nil {
+	if err := getServiceCatalog(ctx).RunnerService.AssignServiceAccountToRunner(ctx, serviceAccount.Metadata.ID, runner.Metadata.ID); err != nil {
 		return nil, err
 	}
 
@@ -463,25 +468,43 @@ func assignServiceAccountToRunnerMutation(ctx context.Context, input *AssignServ
 }
 
 func unassignServiceAccountFromRunnerMutation(ctx context.Context, input *AssignServiceAccountToRunnerInput) (*RunnerMutationPayloadResolver, error) {
-	saService := getSAService(ctx)
-	runnerService := getRunnerService(ctx)
-
-	runner, err := runnerService.GetRunnerByPath(ctx, input.RunnerPath)
+	runner, serviceAccount, err := resolveRunnerAndServiceAccount(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceAccount, err := saService.GetServiceAccountByPath(ctx, input.ServiceAccountPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := runnerService.UnassignServiceAccountFromRunner(ctx, serviceAccount.Metadata.ID, runner.Metadata.ID); err != nil {
+	if err := getServiceCatalog(ctx).RunnerService.UnassignServiceAccountFromRunner(ctx, serviceAccount.Metadata.ID, runner.Metadata.ID); err != nil {
 		return nil, err
 	}
 
 	payload := RunnerMutationPayload{ClientMutationID: input.ClientMutationID, Runner: runner, ServiceAccount: serviceAccount, Problems: []Problem{}}
 	return &RunnerMutationPayloadResolver{RunnerMutationPayload: payload}, nil
+}
+
+func resolveRunnerAndServiceAccount(ctx context.Context, input *AssignServiceAccountToRunnerInput) (*models.Runner, *models.ServiceAccount, error) {
+	runnerID, err := toModelID(ctx, input.RunnerPath, input.RunnerID, types.RunnerModelType)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serviceAccountID, err := toModelID(ctx, input.ServiceAccountPath, input.ServiceAccountID, types.ServiceAccountModelType)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runner, err := serviceCatalog.RunnerService.GetRunnerByID(ctx, runnerID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serviceAccount, err := serviceCatalog.ServiceAccountService.GetServiceAccountByID(ctx, serviceAccountID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return runner, serviceAccount, nil
 }
 
 /* Runner loader */
@@ -513,9 +536,7 @@ func loadRunner(ctx context.Context, id string) (*models.Runner, error) {
 }
 
 func runnerBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	runnerService := getRunnerService(ctx)
-
-	runners, err := runnerService.GetRunnersByIDs(ctx, ids)
+	runners, err := getServiceCatalog(ctx).RunnerService.GetRunnersByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -114,8 +114,16 @@ type Group implements Node, Namespace {
     before: String
     first: Int
     last: Int
+    userId: String
+    serviceAccountId: String
     username: String
+      @deprecated(
+        reason: "Use userId field instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     serviceAccountPath: String
+      @deprecated(
+        reason: "Use serviceAccountId field instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     includeNested: Boolean
     timeRangeStart: Time
     timeRangeEnd: Time
@@ -152,7 +160,11 @@ type Group implements Node, Namespace {
 input CreateGroupInput {
   clientMutationId: String
   name: String!
+  parentId: String
   parentPath: String
+    @deprecated(
+      reason: "Use parentId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   description: String!
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
@@ -161,6 +173,9 @@ input CreateGroupInput {
 input UpdateGroupInput {
   clientMutationId: String
   groupPath: String
+    @deprecated(
+      reason: "Use id field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   id: String
   description: String
   metadata: ResourceMetadataInput
@@ -171,6 +186,9 @@ input UpdateGroupInput {
 input DeleteGroupInput {
   clientMutationId: String
   groupPath: String
+    @deprecated(
+      reason: "Use id field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   id: String
   force: Boolean
   metadata: ResourceMetadataInput
@@ -178,6 +196,14 @@ input DeleteGroupInput {
 
 input MigrateGroupInput {
   clientMutationId: String
-  groupPath: String!
+  groupId: String
+  newParentId: String
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   newParentPath: String
+    @deprecated(
+      reason: "Use newParentId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }

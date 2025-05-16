@@ -11,7 +11,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
@@ -133,7 +132,7 @@ func (t *ErroredRunEmailHandler) sendFailedRunEmail(ctx context.Context, run *mo
 	var errorMessage string
 	var runStage builder.RunStage
 	if run.ApplyID != "" {
-		apply, aErr := t.dbClient.Applies.GetApply(ctx, run.ApplyID)
+		apply, aErr := t.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
 		if aErr != nil {
 			return errors.Wrap(aErr, "failed to get apply by ID %s", run.ApplyID)
 		}
@@ -148,7 +147,7 @@ func (t *ErroredRunEmailHandler) sendFailedRunEmail(ctx context.Context, run *mo
 		}
 	}
 	if errorMessage == "" && run.PlanID != "" {
-		plan, pErr := t.dbClient.Plans.GetPlan(ctx, run.PlanID)
+		plan, pErr := t.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
 		if pErr != nil {
 			return errors.Wrap(pErr, "failed to get plan by ID %s", run.PlanID)
 		}
@@ -194,7 +193,7 @@ func (t *ErroredRunEmailHandler) sendFailedRunEmail(ctx context.Context, run *mo
 			ModuleSource:  run.ModuleSource,
 			CreatedBy:     run.CreatedBy,
 			ErrorMessage:  errorMessage,
-			RunID:         gid.NewGlobalID(gid.RunType, run.Metadata.ID).String(),
+			RunID:         run.GetGlobalID(),
 			RunStage:      runStage,
 		},
 	})

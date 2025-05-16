@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -33,7 +35,7 @@ type runInfoCreateSlice []runInfo
 // runInfoUpdateSlice makes a slice of runInfo sortable by last updated time
 type runInfoUpdateSlice []runInfo
 
-func TestGetRun(t *testing.T) {
+func TestGetRunByID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
@@ -69,13 +71,13 @@ func TestGetRun(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			run, err := testClient.client.Runs.GetRun(ctx, test.searchID)
+			run, err := testClient.client.Runs.GetRunByID(ctx, test.searchID)
 
 			checkError(t, test.expectMsg, err)
 
@@ -89,6 +91,78 @@ func TestGetRun(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, run)
+			}
+		})
+	}
+}
+
+func TestGetRunByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(20),
+	})
+	require.NoError(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectRun       bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:      "get resource by TRN",
+			trn:       run.Metadata.TRN,
+			expectRun: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.RunModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+		},
+		{
+			name:            "run trn cannot have less than two parts",
+			trn:             types.RunModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualRun, err := testClient.client.Runs.GetRunByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectRun {
+				require.NotNil(t, actualRun)
+				assert.Equal(t, types.RunModelType.BuildTRN(workspace.FullPath, run.GetGlobalID()), actualRun.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualRun)
 			}
 		})
 	}
@@ -1243,6 +1317,7 @@ func compareRuns(t *testing.T, expected, actual *models.Run,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

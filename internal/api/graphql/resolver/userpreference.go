@@ -5,9 +5,7 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	graphql "github.com/graph-gophers/graphql-go"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -55,7 +53,7 @@ type UserNamespacePreferenceConnectionResolver struct {
 
 // NewUserGroupPreferenceConnectionResolver creates a new namespace connection
 func NewUserGroupPreferenceConnectionResolver(ctx context.Context, input *group.GetGroupsInput) (*UserNamespacePreferenceConnectionResolver, error) {
-	service := getGroupService(ctx)
+	service := getServiceCatalog(ctx).GroupService
 
 	result, err := service.GetGroups(ctx, input)
 	if err != nil {
@@ -100,7 +98,7 @@ func NewUserGroupPreferenceConnectionResolver(ctx context.Context, input *group.
 
 // NewUserWorkspacePreferenceConnectionResolver creates a new namespace connection
 func NewUserWorkspacePreferenceConnectionResolver(ctx context.Context, input *workspace.GetWorkspacesInput) (*UserNamespacePreferenceConnectionResolver, error) {
-	service := getWorkspaceService(ctx)
+	service := getServiceCatalog(ctx).WorkspaceService
 
 	result, err := service.GetWorkspaces(ctx, input)
 	if err != nil {
@@ -169,10 +167,7 @@ type UserNamespacePreferencesResolver struct {
 
 // ID resolver
 func (r *UserNamespacePreferencesResolver) ID() graphql.ID {
-	if r.namespace.GetResourceType() == permissions.GroupResourceType {
-		return graphql.ID(gid.ToGlobalID(gid.GroupType, r.namespace.GetID()))
-	}
-	return graphql.ID(gid.ToGlobalID(gid.WorkspaceType, r.namespace.GetID()))
+	return graphql.ID(r.namespace.GetGlobalID())
 }
 
 // Path resolver
@@ -182,7 +177,7 @@ func (r *UserNamespacePreferencesResolver) Path() string {
 
 // NotificationPreference resolver
 func (r *UserNamespacePreferencesResolver) NotificationPreference(ctx context.Context) (*UserNotificationPreferenceResolver, error) {
-	pref, err := getUserService(ctx).GetNotificationPreference(ctx, &user.GetNotificationPreferenceInput{
+	pref, err := getServiceCatalog(ctx).UserService.GetNotificationPreference(ctx, &user.GetNotificationPreferenceInput{
 		NamespacePath: ptr.String(r.namespace.GetPath()),
 	})
 	if err != nil {
@@ -231,7 +226,7 @@ type GlobalUserPreferencesResolver struct{}
 
 // NotificationPreference resolver
 func (r *GlobalUserPreferencesResolver) NotificationPreference(ctx context.Context) (*UserNotificationPreferenceResolver, error) {
-	pref, err := getUserService(ctx).GetNotificationPreference(ctx, &user.GetNotificationPreferenceInput{})
+	pref, err := getServiceCatalog(ctx).UserService.GetNotificationPreference(ctx, &user.GetNotificationPreferenceInput{})
 	if err != nil {
 		return nil, err
 	}
@@ -324,8 +319,6 @@ func handleUserNotificationPreferenceMutationProblem(e error, clientMutationID *
 }
 
 func setUserNotificationPreferenceMutation(ctx context.Context, input *SetUserNotificationPreferenceInput) (*UserNotificationPreferenceMutationPayloadResolver, error) {
-	service := getUserService(ctx)
-
 	setPreferenceOptions := &user.SetNotificationPreferenceInput{
 		NamespacePath: input.NamespacePath,
 		Scope:         input.Scope,
@@ -336,7 +329,7 @@ func setUserNotificationPreferenceMutation(ctx context.Context, input *SetUserNo
 		setPreferenceOptions.Inherit = *input.Inherit
 	}
 
-	setting, err := service.SetNotificationPreference(ctx, setPreferenceOptions)
+	setting, err := getServiceCatalog(ctx).UserService.SetNotificationPreference(ctx, setPreferenceOptions)
 	if err != nil {
 		return nil, err
 	}

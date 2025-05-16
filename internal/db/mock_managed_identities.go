@@ -188,12 +188,12 @@ func (_m *MockManagedIdentities) GetManagedIdentitiesForWorkspace(ctx context.Co
 	return r0, r1
 }
 
-// GetManagedIdentityAccessRule provides a mock function with given fields: ctx, ruleID
-func (_m *MockManagedIdentities) GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
+// GetManagedIdentityAccessRuleByID provides a mock function with given fields: ctx, ruleID
+func (_m *MockManagedIdentities) GetManagedIdentityAccessRuleByID(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
 	ret := _m.Called(ctx, ruleID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetManagedIdentityAccessRule")
+		panic("no return value specified for GetManagedIdentityAccessRuleByID")
 	}
 
 	var r0 *models.ManagedIdentityAccessRule
@@ -211,6 +211,36 @@ func (_m *MockManagedIdentities) GetManagedIdentityAccessRule(ctx context.Contex
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, ruleID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManagedIdentityAccessRuleByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockManagedIdentities) GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn string) (*models.ManagedIdentityAccessRule, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetManagedIdentityAccessRuleByTRN")
+	}
+
+	var r0 *models.ManagedIdentityAccessRule
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.ManagedIdentityAccessRule, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.ManagedIdentityAccessRule); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.ManagedIdentityAccessRule)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -278,21 +308,21 @@ func (_m *MockManagedIdentities) GetManagedIdentityByID(ctx context.Context, id 
 	return r0, r1
 }
 
-// GetManagedIdentityByPath provides a mock function with given fields: ctx, path
-func (_m *MockManagedIdentities) GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error) {
-	ret := _m.Called(ctx, path)
+// GetManagedIdentityByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockManagedIdentities) GetManagedIdentityByTRN(ctx context.Context, trn string) (*models.ManagedIdentity, error) {
+	ret := _m.Called(ctx, trn)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetManagedIdentityByPath")
+		panic("no return value specified for GetManagedIdentityByTRN")
 	}
 
 	var r0 *models.ManagedIdentity
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.ManagedIdentity, error)); ok {
-		return rf(ctx, path)
+		return rf(ctx, trn)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.ManagedIdentity); ok {
-		r0 = rf(ctx, path)
+		r0 = rf(ctx, trn)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.ManagedIdentity)
@@ -300,7 +330,7 @@ func (_m *MockManagedIdentities) GetManagedIdentityByPath(ctx context.Context, p
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

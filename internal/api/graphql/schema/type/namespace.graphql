@@ -28,8 +28,16 @@ interface Namespace {
     before: String
     first: Int
     last: Int
+    userId: String
+    serviceAccountId: String
     username: String
+      @deprecated(
+        reason: "Use userId field instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     serviceAccountPath: String
+      @deprecated(
+        reason: "Use serviceAccountId field instead, which accepts a TRN (Tharsis Resource Name)"
+      )
     includeNested: Boolean
     timeRangeStart: Time
     timeRangeEnd: Time
@@ -41,12 +49,12 @@ interface Namespace {
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
 }
 
-input NamespaceRunnerTagsInput  {
+input NamespaceRunnerTagsInput {
   inherit: Boolean!
   tags: [String!]
 }
 
-input NamespaceDriftDetectionEnabledInput  {
+input NamespaceDriftDetectionEnabledInput {
   inherit: Boolean!
   enabled: Boolean
 }

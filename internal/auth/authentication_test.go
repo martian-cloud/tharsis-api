@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -12,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -147,6 +149,11 @@ func TestTharsisIDPTokenAuthenticator_Use(t *testing.T) {
 }
 
 func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
+	jobID := uuid.NewString()
+	runID := uuid.NewString()
+	linkID := uuid.NewString()
+	workspaceID := uuid.NewString()
+
 	tests := []struct {
 		name               string
 		tokenString        string
@@ -191,7 +198,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type":                 ServiceAccountTokenType,
-						"service_account_id":   gid.ToGlobalID(gid.ServiceAccountType, "test-sa-id"),
+						"service_account_id":   gid.ToGlobalID(types.ServiceAccountModelType, uuid.NewString()),
 						"service_account_path": "test/path",
 					},
 				}, nil)
@@ -205,16 +212,16 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type":         JobTokenType,
-						"job_id":       gid.ToGlobalID(gid.JobType, "test-job-id"),
-						"run_id":       gid.ToGlobalID(gid.RunType, "test-run-id"),
-						"workspace_id": gid.ToGlobalID(gid.WorkspaceType, "test-workspace-id"),
+						"job_id":       gid.ToGlobalID(types.JobModelType, jobID),
+						"run_id":       gid.ToGlobalID(types.RunModelType, runID),
+						"workspace_id": gid.ToGlobalID(types.WorkspaceModelType, workspaceID),
 					},
 				}, nil)
 			},
 			expectCaller: &JobCaller{
-				JobID:       "test-job-id",
-				RunID:       "test-run-id",
-				WorkspaceID: "test-workspace-id",
+				JobID:       jobID,
+				RunID:       runID,
+				WorkspaceID: workspaceID,
 			},
 		},
 		{
@@ -285,15 +292,15 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 					Token: token,
 					PrivateClaims: map[string]string{
 						"type":    VCSWorkspaceLinkTokenType,
-						"link_id": gid.ToGlobalID(gid.WorkspaceVCSProviderLinkType, "test-link-id"),
+						"link_id": gid.ToGlobalID(types.WorkspaceVCSProviderLinkModelType, linkID),
 					},
 				}, nil)
 
 				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
-				mockLinks.On("GetLinkByID", mock.Anything, "test-link-id").Return(&models.WorkspaceVCSProviderLink{
-					ProviderID:  "test-provider-id",
-					TokenNonce:  "test-jti",
-					Metadata:    models.ResourceMetadata{ID: "test-link-id"},
+				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
+					ProviderID: "test-provider-id",
+					TokenNonce: "test-jti",
+					Metadata:   models.ResourceMetadata{ID: linkID},
 				}, nil)
 				mockDBClient.WorkspaceVCSProviderLinks = mockLinks
 
@@ -315,15 +322,15 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 					Token: token,
 					PrivateClaims: map[string]string{
 						"type":    VCSWorkspaceLinkTokenType,
-						"link_id": gid.ToGlobalID(gid.WorkspaceVCSProviderLinkType, "test-link-id"),
+						"link_id": gid.ToGlobalID(types.WorkspaceVCSProviderLinkModelType, linkID),
 					},
 				}, nil)
 
 				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
-				mockLinks.On("GetLinkByID", mock.Anything, "test-link-id").Return(&models.WorkspaceVCSProviderLink{
-					ProviderID:  "test-provider-id",
-					TokenNonce:  "different-jti",
-					Metadata:    models.ResourceMetadata{ID: "test-link-id"},
+				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
+					ProviderID: "test-provider-id",
+					TokenNonce: "different-jti",
+					Metadata:   models.ResourceMetadata{ID: linkID},
 				}, nil)
 				mockDBClient.WorkspaceVCSProviderLinks = mockLinks
 			},
@@ -341,15 +348,15 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 					Token: token,
 					PrivateClaims: map[string]string{
 						"type":    VCSWorkspaceLinkTokenType,
-						"link_id": gid.ToGlobalID(gid.WorkspaceVCSProviderLinkType, "test-link-id"),
+						"link_id": gid.ToGlobalID(types.WorkspaceVCSProviderLinkModelType, linkID),
 					},
 				}, nil)
 
 				mockLinks := db.NewMockWorkspaceVCSProviderLinks(t)
-				mockLinks.On("GetLinkByID", mock.Anything, "test-link-id").Return(&models.WorkspaceVCSProviderLink{
-					ProviderID:  "test-provider-id",
-					TokenNonce:  "test-jti",
-					Metadata:    models.ResourceMetadata{ID: "test-link-id"},
+				mockLinks.On("GetLinkByID", mock.Anything, linkID).Return(&models.WorkspaceVCSProviderLink{
+					ProviderID: "test-provider-id",
+					TokenNonce: "test-jti",
+					Metadata:   models.ResourceMetadata{ID: linkID},
 				}, nil)
 				mockDBClient.WorkspaceVCSProviderLinks = mockLinks
 
@@ -357,7 +364,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 				mockProviders.On("GetProviderByID", mock.Anything, "test-provider-id").Return(nil, nil)
 				mockDBClient.VCSProviders = mockProviders
 			},
-			expectErrorMessage: "failed to get vcs provider associated with link test-link-id",
+			expectErrorMessage: "failed to get vcs provider associated with link " + linkID,
 		},
 	}
 

@@ -14,7 +14,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -88,8 +87,8 @@ type GetWorkspacesInput struct {
 	Sort *db.WorkspaceSortableField
 	// PaginationOptions supports cursor based pagination
 	PaginationOptions *pagination.Options
-	// Group filters the workspaces by the specified group
-	Group *models.Group
+	// GroupID filters the workspaces by the specified group
+	GroupID *string
 	// AssignedManagedIdentityID filters the workspaces by the specified managed identity
 	AssignedManagedIdentityID *string
 	// Search is used to search for a workspace by name or namespace path
@@ -119,7 +118,7 @@ type CreateConfigurationVersionInput struct {
 type Service interface {
 	SubscribeToWorkspaceEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error)
 	GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error)
-	GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error)
+	GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error)
 	GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) (*db.WorkspacesResult, error)
 	GetWorkspacesByIDs(ctx context.Context, idList []string) ([]models.Workspace, error)
 	CreateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
@@ -129,18 +128,23 @@ type Service interface {
 	UnlockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
 	GetCurrentStateVersion(ctx context.Context, workspaceID string) (*models.StateVersion, error)
 	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data *string) (*models.StateVersion, error)
-	GetStateVersion(ctx context.Context, stateVersionID string) (*models.StateVersion, error)
+	GetStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error)
+	GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error)
 	GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*db.StateVersionsResult, error)
 	GetStateVersionContent(ctx context.Context, stateVersionID string) (io.ReadCloser, error)
 	GetStateVersionsByIDs(ctx context.Context, idList []string) ([]models.StateVersion, error)
 	GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error)
+	GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error)
 	GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idList []string) ([]models.WorkspaceAssessment, error)
 	CreateConfigurationVersion(ctx context.Context, options *CreateConfigurationVersionInput) (*models.ConfigurationVersion, error)
-	GetConfigurationVersion(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error)
+	GetConfigurationVersionByID(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error)
+	GetConfigurationVersionByTRN(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error)
 	UploadConfigurationVersion(ctx context.Context, configurationVersionID string, reader io.Reader) error
 	GetConfigurationVersionContent(ctx context.Context, configurationVersionID string) (io.ReadCloser, error)
 	GetConfigurationVersionsByIDs(ctx context.Context, idList []string) ([]models.ConfigurationVersion, error)
-	GetStateVersionOutputs(context context.Context, stateVersionID string) ([]models.StateVersionOutput, error)
+	GetStateVersionOutputByID(ctx context.Context, id string) (*models.StateVersionOutput, error)
+	GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error)
+	GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error)
 	GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error)
 	GetStateVersionDependencies(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionDependency, error)
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
@@ -225,7 +229,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(options.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -301,7 +305,7 @@ func (s *service) GetWorkspacesByIDs(ctx context.Context, idList []string) ([]mo
 
 	// Verify caller has access to all returned workspaces.
 	if len(wsPaths) > 0 {
-		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePaths(wsPaths))
+		err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePaths(wsPaths))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -332,13 +336,13 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 		},
 	}
 
-	if input.Group != nil {
-		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(input.Group.FullPath))
+	if input.GroupID != nil {
+		err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithGroupID(*input.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
-		dbInput.Filter.GroupID = &input.Group.Metadata.ID
+		dbInput.Filter.GroupID = input.GroupID
 	} else {
 		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
 		if napErr != nil {
@@ -373,8 +377,8 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 	return workspacesResult, nil
 }
 
-func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceByFullPath")
+func (s *service) GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceByTRN")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -384,23 +388,23 @@ func (s *service) GetWorkspaceByFullPath(ctx context.Context, path string) (*mod
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(path))
-	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
-		return nil, err
-	}
-
-	workspace, err := s.dbClient.Workspaces.GetWorkspaceByFullPath(ctx, path)
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, trn)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get workspace by full path")
 		return nil, err
 	}
 
 	if workspace == nil {
-		tracing.RecordError(span, nil, "Workspace with path %s not found", path)
+		tracing.RecordError(span, nil, "Workspace with TRN %s not found", trn)
 		return nil, errors.New(
-			"Workspace with path %s not found", path,
+			"Workspace with TRN %s not found", trn,
 			errors.WithErrorCode(errors.ENotFound))
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
 	}
 
 	return workspace, nil
@@ -423,7 +427,7 @@ func (s *service) GetWorkspaceByID(ctx context.Context, id string) (*models.Work
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -443,14 +447,14 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.DeleteWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
 	}
 
 	if !force && workspace.CurrentStateVersionID != "" {
-		sv, gErr := s.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+		sv, gErr := s.getStateVersionByID(ctx, workspace.CurrentStateVersionID)
 		if gErr != nil {
 			tracing.RecordError(span, gErr, "failed to get state version")
 			return gErr
@@ -465,7 +469,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 			)
 		}
 
-		run, rErr := s.dbClient.Runs.GetRun(ctx, *sv.RunID)
+		run, rErr := s.dbClient.Runs.GetRunByID(ctx, *sv.RunID)
 		if rErr != nil {
 			tracing.RecordError(span, rErr, "failed to get run")
 			return rErr
@@ -540,7 +544,7 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateWorkspacePermission, auth.WithGroupID(workspace.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateWorkspacePermission, auth.WithGroupID(workspace.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -655,7 +659,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -739,7 +743,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -808,7 +812,7 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -894,13 +898,13 @@ func (s *service) GetCurrentStateVersion(ctx context.Context, workspaceID string
 		return nil, nil
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithNamespacePath(workspace.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithNamespacePath(workspace.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
-	return s.GetStateVersion(ctx, workspace.CurrentStateVersionID)
+	return s.getStateVersionByID(ctx, workspace.CurrentStateVersionID)
 }
 
 func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *models.StateVersion) ([]StateVersionResource, error) {
@@ -914,7 +918,7 @@ func (s *service) GetStateVersionResources(ctx context.Context, stateVersion *mo
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -984,7 +988,7 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1062,7 +1066,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1203,8 +1207,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	return createdStateVersion, nil
 }
 
-// GetStateVersion returns a state version by ID
-func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
+func (s *service) GetStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetStateVersion")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -1215,7 +1218,7 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 		return nil, err
 	}
 
-	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
+	sv, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, stateVersionID)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to query state version from the database")
 		return nil, errors.Wrap(
@@ -1229,7 +1232,39 @@ func (s *service) GetStateVersion(ctx context.Context, stateVersionID string) (*
 		return nil, errors.New("state version with ID %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return sv, nil
+}
+
+func (s *service) GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	sv, err := s.dbClient.StateVersions.GetStateVersionByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get state version")
+	}
+
+	if sv == nil {
+		return nil, errors.New(
+			"state version with TRN %s not found", trn,
+			errors.WithErrorCode(errors.ENotFound),
+			errors.WithSpan(span),
+		)
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1249,7 +1284,7 @@ func (s *service) GetStateVersions(ctx context.Context, input *GetStateVersionsI
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(input.Workspace.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1276,7 +1311,7 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 		return nil, err
 	}
 
-	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
+	sv, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, stateVersionID)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to query state version from the database")
 		return nil, errors.Wrap(
@@ -1290,7 +1325,7 @@ func (s *service) GetStateVersionContent(ctx context.Context, stateVersionID str
 		return nil, errors.New("state version with ID %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionDataPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionDataPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1326,7 +1361,37 @@ func (s *service) GetWorkspaceAssessmentByID(ctx context.Context, id string) (*m
 		return nil, errors.New("workspace assessment with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	if err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(assessment.WorkspaceID)); err != nil {
+	if err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(assessment.WorkspaceID)); err != nil {
+		return nil, err
+	}
+
+	return assessment, nil
+}
+
+func (s *service) GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetWorkspaceAssessmentByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	assessment, err := s.dbClient.WorkspaceAssessments.GetWorkspaceAssessmentByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace assessment", errors.WithSpan(span))
+	}
+
+	if assessment == nil {
+		return nil, errors.New(
+			"workspace assessment with TRN %s not found", trn,
+			errors.WithErrorCode(errors.ENotFound),
+			errors.WithSpan(span),
+		)
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(assessment.WorkspaceID)); err != nil {
 		return nil, err
 	}
 
@@ -1357,7 +1422,7 @@ func (s *service) GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idL
 	}
 
 	for _, a := range result.WorkspaceAssessments {
-		err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithWorkspaceID(a.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithWorkspaceID(a.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1393,7 +1458,7 @@ func (s *service) GetStateVersionsByIDs(ctx context.Context,
 	}
 
 	for _, sv := range result.StateVersions {
-		err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1408,7 +1473,7 @@ func (s *service) GetConfigurationVersionContent(ctx context.Context, configurat
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	cv, err := s.GetConfigurationVersion(ctx, configurationVersionID)
+	cv, err := s.GetConfigurationVersionByID(ctx, configurationVersionID)
 	if err != nil {
 		return nil, err
 	}
@@ -1437,7 +1502,7 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateConfigurationVersionPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.CreateConfigurationVersionPermission, auth.WithWorkspaceID(options.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1502,9 +1567,9 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 	return cv, nil
 }
 
-// GetConfigurationVersion returns a tfe configuration version
-func (s *service) GetConfigurationVersion(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersion")
+// GetConfigurationVersionByID returns a tfe configuration version
+func (s *service) GetConfigurationVersionByID(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersionByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -1514,7 +1579,7 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 		return nil, err
 	}
 
-	cv, err := s.dbClient.ConfigurationVersions.GetConfigurationVersion(ctx, configurationVersionID)
+	cv, err := s.dbClient.ConfigurationVersions.GetConfigurationVersionByID(ctx, configurationVersionID)
 	if err != nil {
 		tracing.RecordError(span, err, "Failed to get configuration version")
 		return nil, errors.Wrap(
@@ -1530,9 +1595,39 @@ func (s *service) GetConfigurationVersion(ctx context.Context, configurationVers
 			errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return cv, nil
+}
+
+func (s *service) GetConfigurationVersionByTRN(ctx context.Context, configurationVersionID string) (*models.ConfigurationVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetConfigurationVersionByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	cv, err := s.dbClient.ConfigurationVersions.GetConfigurationVersionByTRN(ctx, configurationVersionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get configuration version", errors.WithSpan(span))
+	}
+
+	if cv == nil {
+		return nil, errors.New("configuration version with TRN %s not found",
+			configurationVersionID,
+			errors.WithErrorCode(errors.ENotFound),
+			errors.WithSpan(span),
+		)
+	}
+
+	if err = caller.RequirePermission(ctx, models.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID)); err != nil {
 		return nil, err
 	}
 
@@ -1564,7 +1659,7 @@ func (s *service) GetConfigurationVersionsByIDs(ctx context.Context, idList []st
 	}
 
 	for _, cv := range result.ConfigurationVersions {
-		err = caller.RequirePermission(ctx, permissions.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
+		err = caller.RequirePermission(ctx, models.ViewConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -1586,13 +1681,13 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 		return err
 	}
 
-	cv, err := s.GetConfigurationVersion(ctx, configurationVersionID)
+	cv, err := s.GetConfigurationVersionByID(ctx, configurationVersionID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get configuration version")
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1619,6 +1714,78 @@ func (s *service) UploadConfigurationVersion(ctx context.Context, configurationV
 	return nil
 }
 
+func (s *service) GetStateVersionOutputByID(ctx context.Context, id string) (*models.StateVersionOutput, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionOutputByID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	output, err := s.dbClient.StateVersionOutputs.GetStateVersionOutputByID(ctx, id)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version output")
+		return nil, err
+	}
+
+	if output == nil {
+		tracing.RecordError(span, nil, "state version output with ID %s not found", id)
+		return nil, errors.New("state version output with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	stateVersion, err := s.getStateVersionByID(ctx, output.StateVersionID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version")
+		return nil, errors.Wrap(err, "failed to get state version")
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return output, nil
+}
+
+func (s *service) GetStateVersionOutputByTRN(ctx context.Context, trn string) (*models.StateVersionOutput, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetStateVersionOutputByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	output, err := s.dbClient.StateVersionOutputs.GetStateVersionOutputByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version output")
+		return nil, err
+	}
+
+	if output == nil {
+		tracing.RecordError(span, nil, "state version output with TRN %s not found", trn)
+		return nil, errors.New("state version output with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	stateVersion, err := s.getStateVersionByID(ctx, output.StateVersionID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get state version")
+		return nil, errors.Wrap(err, "failed to get state version")
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(stateVersion.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return output, nil
+}
+
 func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID string) ([]models.StateVersionOutput, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetStateVersionOutputs")
 	// TODO: Consider setting trace/span attributes for the input.
@@ -1630,22 +1797,12 @@ func (s *service) GetStateVersionOutputs(ctx context.Context, stateVersionID str
 		return nil, err
 	}
 
-	// sv is needed for access check
-	sv, err := s.dbClient.StateVersions.GetStateVersion(ctx, stateVersionID)
+	sv, err := s.getStateVersionByID(ctx, stateVersionID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to query state version from the database")
-		return nil, errors.Wrap(
-			err,
-			"failed to query state version from the database",
-		)
+		return nil, err
 	}
 
-	if sv == nil {
-		tracing.RecordError(span, nil, "state version with id %s not found", stateVersionID)
-		return nil, errors.New("state version with id %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
-	}
-
-	err = caller.RequirePermission(ctx, permissions.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
+	err = caller.RequirePermission(ctx, models.ViewStateVersionPermission, auth.WithWorkspaceID(sv.WorkspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1674,7 +1831,7 @@ func (s *service) GetRunnerTagsSetting(ctx context.Context, workspace *models.Wo
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1694,7 +1851,7 @@ func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, workspace
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1728,13 +1885,13 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 	}
 
 	// The caller must have CreateWorkspacePermission in the new parent.
-	err = caller.RequirePermission(ctx, permissions.CreateWorkspacePermission, auth.WithGroupID(newGroupID))
+	err = caller.RequirePermission(ctx, models.CreateWorkspacePermission, auth.WithGroupID(newGroupID))
 	if err != nil {
 		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
 	}
 
 	// Caller must have DeleteWorkspacePermission in the workspace being moved.
-	err = caller.RequirePermission(ctx, permissions.DeleteWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	err = caller.RequirePermission(ctx, models.DeleteWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
 		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
 	}
@@ -1844,6 +2001,19 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 	}
 
 	return migratedWorkspace, nil
+}
+
+func (s *service) getStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error) {
+	sv, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, stateVersionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query state version by id")
+	}
+
+	if sv == nil {
+		return nil, errors.New("state version with id %s not found", stateVersionID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return sv, nil
 }
 
 // validateMaxJobDuration validates if duration is within MaxJobDuration limits.

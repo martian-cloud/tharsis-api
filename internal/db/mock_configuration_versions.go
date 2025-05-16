@@ -44,12 +44,12 @@ func (_m *MockConfigurationVersions) CreateConfigurationVersion(ctx context.Cont
 	return r0, r1
 }
 
-// GetConfigurationVersion provides a mock function with given fields: ctx, id
-func (_m *MockConfigurationVersions) GetConfigurationVersion(ctx context.Context, id string) (*models.ConfigurationVersion, error) {
+// GetConfigurationVersionByID provides a mock function with given fields: ctx, id
+func (_m *MockConfigurationVersions) GetConfigurationVersionByID(ctx context.Context, id string) (*models.ConfigurationVersion, error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetConfigurationVersion")
+		panic("no return value specified for GetConfigurationVersionByID")
 	}
 
 	var r0 *models.ConfigurationVersion
@@ -67,6 +67,36 @@ func (_m *MockConfigurationVersions) GetConfigurationVersion(ctx context.Context
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetConfigurationVersionByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockConfigurationVersions) GetConfigurationVersionByTRN(ctx context.Context, trn string) (*models.ConfigurationVersion, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConfigurationVersionByTRN")
+	}
+
+	var r0 *models.ConfigurationVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.ConfigurationVersion, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.ConfigurationVersion); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.ConfigurationVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

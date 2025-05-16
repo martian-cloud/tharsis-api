@@ -3,9 +3,10 @@ package auth
 import (
 	"context"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	terrors "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -59,13 +60,13 @@ func (s *SCIMCaller) GetNamespaceAccessPolicy(_ context.Context) (*NamespaceAcce
 }
 
 // RequirePermission will return an error if the caller doesn't have the specified permissions.
-func (s *SCIMCaller) RequirePermission(ctx context.Context, perm permissions.Permission, checks ...func(*constraints)) error {
+func (s *SCIMCaller) RequirePermission(ctx context.Context, perm models.Permission, checks ...func(*constraints)) error {
 	inMaintenance, err := s.maintenanceMonitor.InMaintenanceMode(ctx)
 	if err != nil {
 		return err
 	}
 
-	if inMaintenance && perm.Action != permissions.ViewAction {
+	if inMaintenance && perm.Action != models.ViewAction {
 		// Server is in maintenance mode, only allow view permissions
 		return errInMaintenanceMode
 	}
@@ -79,13 +80,13 @@ func (s *SCIMCaller) RequirePermission(ctx context.Context, perm permissions.Per
 }
 
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type.
-func (s *SCIMCaller) RequireAccessToInheritableResource(ctx context.Context, _ permissions.ResourceType, _ ...func(*constraints)) error {
+func (s *SCIMCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, _ ...func(*constraints)) error {
 	// Return an authorization error since SCIM does not need any access to inherited resources.
 	return s.UnauthorizedError(ctx, false)
 }
 
 // requireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
-func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.teamID == nil {
 		return errMissingConstraints
 	}
@@ -104,7 +105,7 @@ func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *permissions
 }
 
 // requireUserDeleteAccess will return an error if the specified caller is not allowed to delete a user.
-func (s *SCIMCaller) requireUserDeleteAccess(ctx context.Context, _ *permissions.Permission, checks *constraints) error {
+func (s *SCIMCaller) requireUserDeleteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.userID == nil {
 		return errMissingConstraints
 	}
@@ -123,14 +124,14 @@ func (s *SCIMCaller) requireUserDeleteAccess(ctx context.Context, _ *permissions
 }
 
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
-func (s *SCIMCaller) getPermissionHandler(perm permissions.Permission) (permissionTypeHandler, bool) {
-	handlerMap := map[permissions.Permission]permissionTypeHandler{
-		permissions.DeleteTeamPermission: s.requireTeamDeleteAccess,
-		permissions.DeleteUserPermission: s.requireUserDeleteAccess,
-		permissions.CreateTeamPermission: noopPermissionHandler,
-		permissions.UpdateTeamPermission: noopPermissionHandler,
-		permissions.CreateUserPermission: noopPermissionHandler,
-		permissions.UpdateUserPermission: noopPermissionHandler,
+func (s *SCIMCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
+	handlerMap := map[models.Permission]permissionTypeHandler{
+		models.DeleteTeamPermission: s.requireTeamDeleteAccess,
+		models.DeleteUserPermission: s.requireUserDeleteAccess,
+		models.CreateTeamPermission: noopPermissionHandler,
+		models.UpdateTeamPermission: noopPermissionHandler,
+		models.CreateUserPermission: noopPermissionHandler,
+		models.UpdateUserPermission: noopPermissionHandler,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

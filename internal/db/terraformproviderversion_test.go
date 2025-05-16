@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -97,7 +99,7 @@ func TestGetProviderVersionByID(t *testing.T) {
 		{
 			name:      "defective-ID",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -117,6 +119,86 @@ func TestGetProviderVersionByID(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, actualTerraformProviderVersion)
+			}
+		})
+	}
+}
+
+func TestGetProviderVersionByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider",
+		RootGroupID: group.Metadata.ID,
+		GroupID:     group.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+		ProviderID:      provider.Metadata.ID,
+		SemanticVersion: "1.0.0",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectVersion   bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:          "get provider version by TRN",
+			trn:           providerVersion.Metadata.TRN,
+			expectVersion: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.TerraformProviderVersionModelType.BuildTRN(group.FullPath, provider.Name, "2.0.0"),
+		},
+		{
+			name:            "provider version TRN has less than 3 parts",
+			trn:             types.TerraformProviderVersionModelType.BuildTRN("test-group"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectVersion {
+				require.NotNil(t, actualVersion)
+				assert.Equal(t,
+					types.TerraformProviderVersionModelType.BuildTRN(
+						group.FullPath,
+						provider.Name,
+						providerVersion.SemanticVersion,
+					),
+					actualVersion.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualVersion)
 			}
 		})
 	}
@@ -1151,6 +1233,7 @@ func compareTerraformProviderVersions(t *testing.T, expected, actual *models.Ter
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

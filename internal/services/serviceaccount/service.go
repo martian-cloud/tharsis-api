@@ -11,11 +11,11 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -46,9 +46,8 @@ var (
 
 // CreateTokenInput for logging into a service account
 type CreateTokenInput struct {
-	// ServiceAccount ID or resource path
-	ServiceAccount string
-	Token          []byte
+	ServiceAccountPublicID string // Service account identifier (TRN or GID)
+	Token                  []byte
 }
 
 // CreateTokenResponse returned after logging into a service account
@@ -75,7 +74,7 @@ type GetServiceAccountsInput struct {
 
 // Service implements all service account related functionality
 type Service interface {
-	GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error)
+	GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error)
 	GetServiceAccountByID(ctx context.Context, id string) (*models.ServiceAccount, error)
 	GetServiceAccounts(ctx context.Context, input *GetServiceAccountsInput) (*db.ServiceAccountsResult, error)
 	GetServiceAccountsByIDs(ctx context.Context, idList []string) ([]models.ServiceAccount, error)
@@ -146,7 +145,7 @@ func (s *service) GetServiceAccounts(ctx context.Context, input *GetServiceAccou
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewServiceAccountPermission, auth.WithNamespacePath(input.NamespacePath))
+	err = caller.RequirePermission(ctx, models.ViewServiceAccountPermission, auth.WithNamespacePath(input.NamespacePath))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -214,7 +213,7 @@ func (s *service) GetServiceAccountsByIDs(ctx context.Context, idList []string) 
 	}
 
 	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithNamespacePaths(namespacePaths))
+		err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -235,7 +234,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -286,9 +285,8 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 	return s.dbClient.Transactions.CommitTx(txContext)
 }
 
-func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetServiceAccountByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetServiceAccountByTRN")
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -298,18 +296,18 @@ func (s *service) GetServiceAccountByPath(ctx context.Context, path string) (*mo
 	}
 
 	// Get serviceAccount from DB
-	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByPath(ctx, path)
+	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get service account by path")
+		tracing.RecordError(span, err, "failed to get service account by TRN")
 		return nil, err
 	}
 
 	if serviceAccount == nil {
-		tracing.RecordError(span, nil, "service account with path %s not found", path)
-		return nil, errors.New("service account with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
+		tracing.RecordError(span, nil, "service account with TRN %s not found", trn)
+		return nil, errors.New("service account with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
@@ -341,7 +339,7 @@ func (s *service) GetServiceAccountByID(ctx context.Context, id string) (*models
 		return nil, errors.New("service account with ID %s not found", id, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.ServiceAccountResourceType, auth.WithGroupID(serviceAccount.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.ServiceAccountModelType, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
@@ -361,7 +359,7 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateServiceAccountPermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateServiceAccountPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -451,7 +449,7 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -528,18 +526,30 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 		return nil, errors.New("JWT is missing issuer claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	// Get service account
-	serviceAccount, err := s.dbClient.ServiceAccounts.GetServiceAccountByPath(ctx, input.ServiceAccount)
+	if input.ServiceAccountPublicID == "" {
+		s.logger.Infof("Failed to create token for service account; service account ID is empty")
+		tracing.RecordError(span, nil, "service account ID is empty")
+		return nil, errFailedCreateToken
+	}
+
+	// Get service account based on the ID type (TRN or GID)
+	var serviceAccount *models.ServiceAccount
+	if types.IsTRN(input.ServiceAccountPublicID) {
+		serviceAccount, err = s.dbClient.ServiceAccounts.GetServiceAccountByTRN(ctx, input.ServiceAccountPublicID)
+	} else {
+		serviceAccount, err = s.dbClient.ServiceAccounts.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ServiceAccountPublicID))
+	}
+
 	if err != nil || serviceAccount == nil {
-		s.logger.Infof("Failed to create token for service account; resource path %s does not exist", input.ServiceAccount)
+		s.logger.Infof("Failed to create token for service account; service account %s does not exist", input.ServiceAccountPublicID)
 		tracing.RecordError(span, nil,
-			"failed to create token for service account; resource path does not exist")
+			"failed to create token for service account; service account does not exist")
 		return nil, errFailedCreateToken
 	}
 
 	trustPolicies := s.findMatchingTrustPolicies(issuer, serviceAccount.OIDCTrustPolicies)
 	if len(trustPolicies) == 0 {
-		s.logger.Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.ResourcePath, issuer)
+		s.logger.Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.GetResourcePath(), issuer)
 		tracing.RecordError(span, nil,
 			"failed to create token for service account; issuer not found in trust policy")
 		return nil, errFailedCreateToken
@@ -556,7 +566,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			// Catch bubbled-up invalid token signature errors here.
 			if strings.Contains(err.Error(), failedToVerifyJWSSignature) {
 				s.logger.Infof("Failed to create token for service account %s due to invalid token signature",
-					serviceAccount.ResourcePath)
+					serviceAccount.GetResourcePath())
 				tracing.RecordError(span, nil,
 					"failed to create token for service account; invalid token signature")
 				return nil, errFailedCreateToken
@@ -565,7 +575,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			// Catch token expiration here.  An expired token will be expired for all trust policies.
 			if strings.Contains(err.Error(), expiredTokenDetector) {
 				s.logger.Infof("Failed to create token for service account %s due to expired token",
-					serviceAccount.ResourcePath)
+					serviceAccount.GetResourcePath())
 				tracing.RecordError(span, nil,
 					"failed to create token for service account; expired token")
 				return nil, errExpiredToken
@@ -580,11 +590,11 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			expiration := time.Now().Add(serviceAccountLoginDuration)
 			serviceAccountToken, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
 				Expiration: &expiration,
-				Subject:    serviceAccount.ResourcePath,
+				Subject:    serviceAccount.GetResourcePath(),
 				Claims: map[string]string{
 					"service_account_name": serviceAccount.Name,
-					"service_account_path": serviceAccount.ResourcePath,
-					"service_account_id":   gid.ToGlobalID(gid.ServiceAccountType, serviceAccount.Metadata.ID),
+					"service_account_path": serviceAccount.GetResourcePath(),
+					"service_account_id":   serviceAccount.GetGlobalID(),
 					"type":                 auth.ServiceAccountTokenType,
 				},
 			})

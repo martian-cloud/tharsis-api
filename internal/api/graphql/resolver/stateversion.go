@@ -8,7 +8,6 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -53,7 +52,7 @@ type StateVersionConnectionResolver struct {
 
 // NewStateVersionConnectionResolver creates a new StateVersionConnectionResolver
 func NewStateVersionConnectionResolver(ctx context.Context, input *workspace.GetStateVersionsInput) (*StateVersionConnectionResolver, error) {
-	service := getWorkspaceService(ctx)
+	service := getServiceCatalog(ctx).WorkspaceService
 
 	result, err := service.GetStateVersions(ctx, input)
 	if err != nil {
@@ -157,7 +156,7 @@ type StateVersionResolver struct {
 
 // ID resolver
 func (r *StateVersionResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.StateVersionType, r.stateVersion.Metadata.ID))
+	return graphql.ID(r.stateVersion.GetGlobalID())
 }
 
 // Run resolver
@@ -181,14 +180,22 @@ func (r *StateVersionResolver) Metadata() *MetadataResolver {
 
 // Outputs resolver (does not need connection resolver, because it's not doing pagination)
 func (r *StateVersionResolver) Outputs(ctx context.Context) ([]*StateVersionOutputResolver, error) {
-	return getStateVersionOutputs(ctx, r.stateVersion.Metadata.ID)
+	result, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionOutputs(ctx, r.stateVersion.Metadata.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvers := []*StateVersionOutputResolver{}
+	for ix := range result {
+		resolvers = append(resolvers, &StateVersionOutputResolver{stateVersionOutput: &result[ix]})
+	}
+
+	return resolvers, nil
 }
 
 // Resources resolver
 func (r *StateVersionResolver) Resources(ctx context.Context) ([]*workspace.StateVersionResource, error) {
-	service := getWorkspaceService(ctx)
-
-	resources, err := service.GetStateVersionResources(ctx, r.stateVersion)
+	resources, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionResources(ctx, r.stateVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -205,9 +212,7 @@ func (r *StateVersionResolver) Resources(ctx context.Context) ([]*workspace.Stat
 
 // Dependencies resolver
 func (r *StateVersionResolver) Dependencies(ctx context.Context) ([]*StateVersionDependencyResolver, error) {
-	service := getWorkspaceService(ctx)
-
-	dependencies, err := service.GetStateVersionDependencies(ctx, r.stateVersion)
+	dependencies, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionDependencies(ctx, r.stateVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -226,9 +231,7 @@ func (r *StateVersionResolver) Dependencies(ctx context.Context) ([]*StateVersio
 
 // Data resolver
 func (r *StateVersionResolver) Data(ctx context.Context) (string, error) {
-	service := getWorkspaceService(ctx)
-
-	reader, err := service.GetStateVersionContent(ctx, r.stateVersion.Metadata.ID)
+	reader, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionContent(ctx, r.stateVersion.Metadata.ID)
 	if err != nil {
 		return "", err
 	}
@@ -290,7 +293,14 @@ func handleStateVersionMutationProblem(e error, clientMutationID *string) (*Stat
 }
 
 func createStateVersionMutation(ctx context.Context, input *CreateStateVersionInput) (*StateVersionMutationPayloadResolver, error) {
-	run, err := getRunService(ctx).GetRun(ctx, gid.FromGlobalID(input.RunID))
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	run, err := serviceCatalog.RunService.GetRunByID(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -300,9 +310,7 @@ func createStateVersionMutation(ctx context.Context, input *CreateStateVersionIn
 		RunID:       &run.Metadata.ID,
 	}
 
-	workspaceService := getWorkspaceService(ctx)
-
-	stateVersion, err := workspaceService.CreateStateVersion(ctx, &stateVersionCreateOptions, &input.State)
+	stateVersion, err := serviceCatalog.WorkspaceService.CreateStateVersion(ctx, &stateVersionCreateOptions, &input.State)
 	if err != nil {
 		return nil, err
 	}
@@ -340,9 +348,7 @@ func loadStateVersion(ctx context.Context, id string) (*models.StateVersion, err
 }
 
 func stateVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	wsService := getWorkspaceService(ctx)
-
-	stateVersions, err := wsService.GetStateVersionsByIDs(ctx, ids)
+	stateVersions, err := getServiceCatalog(ctx).WorkspaceService.GetStateVersionsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

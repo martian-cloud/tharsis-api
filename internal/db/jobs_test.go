@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -71,7 +73,7 @@ func TestGetJobByID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -91,6 +93,84 @@ func TestGetJobByID(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, job)
+			}
+		})
+	}
+}
+
+func TestGetJobByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(20),
+	})
+	require.NoError(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectJob       bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:      "get resource by TRN",
+			trn:       job.Metadata.TRN,
+			expectJob: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.JobModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+		},
+		{
+			name:            "job trn has less than two parts",
+			trn:             "trn:job:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualJob, err := testClient.client.Jobs.GetJobByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectJob {
+				require.NotNil(t, actualJob)
+				assert.Equal(t, types.JobModelType.BuildTRN(workspace.FullPath, job.GetGlobalID()), actualJob.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualJob)
 			}
 		})
 	}
@@ -1465,6 +1545,7 @@ func compareJobs(t *testing.T, expected, actual *models.Job,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

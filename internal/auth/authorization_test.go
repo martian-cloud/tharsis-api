@@ -8,9 +8,9 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -99,8 +99,8 @@ func TestRequireAccess(t *testing.T) {
 	tests := []struct {
 		name                 string
 		expectErrorCode      errors.CodeType
-		perms                []permissions.Permission
-		customRolePerms      []permissions.Permission
+		perms                []models.Permission
+		customRolePerms      []models.Permission
 		group                *models.Group
 		workspace            *models.Workspace
 		namespaceMemberships []models.NamespaceMembership
@@ -108,7 +108,7 @@ func TestRequireAccess(t *testing.T) {
 	}{
 		{
 			name:        "user access is granted",
-			perms:       []permissions.Permission{permissions.ViewGroupPermission, permissions.CreateGroupPermission},
+			perms:       []models.Permission{models.ViewGroupPermission, models.CreateGroupPermission},
 			constraints: []func(*constraints){WithGroupID(groupID)},
 			group: &models.Group{
 				FullPath: "ns1",
@@ -119,19 +119,19 @@ func TestRequireAccess(t *testing.T) {
 		},
 		{
 			name:        "user with custom role is granted access",
-			perms:       []permissions.Permission{permissions.ViewGroupPermission, permissions.CreateGroupPermission},
+			perms:       []models.Permission{models.ViewGroupPermission, models.CreateGroupPermission},
 			constraints: []func(*constraints){WithGroupID(groupID)},
 			group: &models.Group{
 				FullPath: "ns1",
 			},
-			customRolePerms: []permissions.Permission{permissions.CreateGroupPermission},
+			customRolePerms: []models.Permission{models.CreateGroupPermission},
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 		},
 		{
 			name:        "multiple permissions and checks are granted access",
-			perms:       []permissions.Permission{permissions.ViewGroupPermission, permissions.ViewWorkspacePermission},
+			perms:       []models.Permission{models.ViewGroupPermission, models.ViewWorkspacePermission},
 			constraints: []func(*constraints){WithGroupID(groupID), WithWorkspaceID("ws-1")},
 			group: &models.Group{
 				FullPath: "ns1",
@@ -145,12 +145,12 @@ func TestRequireAccess(t *testing.T) {
 		},
 		{
 			name:        "access denied because permission is not satisfied",
-			perms:       []permissions.Permission{permissions.ViewGroupPermission, permissions.CreateGroupPermission},
+			perms:       []models.Permission{models.ViewGroupPermission, models.CreateGroupPermission},
 			constraints: []func(*constraints){WithGroupID(groupID)},
 			group: &models.Group{
 				FullPath: "ns1",
 			},
-			customRolePerms: []permissions.Permission{permissions.ViewGroupPermission},
+			customRolePerms: []models.Permission{models.ViewGroupPermission},
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
@@ -162,7 +162,7 @@ func TestRequireAccess(t *testing.T) {
 		},
 		{
 			name:            "access denied because required constraints are missing",
-			perms:           []permissions.Permission{permissions.ViewWorkspacePermission},
+			perms:           []models.Permission{models.ViewWorkspacePermission},
 			expectErrorCode: errors.EInternal,
 		},
 	}
@@ -260,17 +260,17 @@ func TestRequireInheritedAccess(t *testing.T) {
 	tests := []struct {
 		name                 string
 		expectErrorCode      errors.CodeType
-		resourceTypes        []permissions.ResourceType
-		customRolePerms      []permissions.Permission
+		modelTypes           []types.ModelType
+		customRolePerms      []models.Permission
 		group                *models.Group
 		workspace            *models.Workspace
 		namespaceMemberships []models.NamespaceMembership
 		constraints          []func(*constraints)
 	}{
 		{
-			name:          "user access is granted",
-			resourceTypes: []permissions.ResourceType{permissions.ManagedIdentityResourceType, permissions.RunnerResourceType},
-			constraints:   []func(*constraints){WithGroupID(groupID)},
+			name:        "user access is granted",
+			modelTypes:  []types.ModelType{types.ManagedIdentityModelType, types.RunnerModelType},
+			constraints: []func(*constraints){WithGroupID(groupID)},
 			group: &models.Group{
 				FullPath: "ns1/na",
 			},
@@ -279,21 +279,21 @@ func TestRequireInheritedAccess(t *testing.T) {
 			},
 		},
 		{
-			name:          "user with custom role is granted access",
-			resourceTypes: []permissions.ResourceType{permissions.ManagedIdentityResourceType},
-			constraints:   []func(*constraints){WithGroupID(groupID)},
+			name:        "user with custom role is granted access",
+			modelTypes:  []types.ModelType{types.ManagedIdentityModelType},
+			constraints: []func(*constraints){WithGroupID(groupID)},
 			group: &models.Group{
 				FullPath: "ns1/na",
 			},
-			customRolePerms: []permissions.Permission{permissions.CreateManagedIdentityPermission},
+			customRolePerms: []models.Permission{models.CreateManagedIdentityPermission},
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 		},
 		{
-			name:          "multiple permissions and constraints are granted access",
-			resourceTypes: []permissions.ResourceType{permissions.RunnerResourceType, permissions.VCSProviderResourceType},
-			constraints:   []func(*constraints){WithGroupID(groupID), WithNamespacePath("ns1/na/ws-1")},
+			name:        "multiple permissions and constraints are granted access",
+			modelTypes:  []types.ModelType{types.RunnerModelType, types.VCSProviderModelType},
+			constraints: []func(*constraints){WithGroupID(groupID), WithNamespacePath("ns1/na/ws-1")},
 			group: &models.Group{
 				FullPath: "ns1/na",
 			},
@@ -305,13 +305,13 @@ func TestRequireInheritedAccess(t *testing.T) {
 			},
 		},
 		{
-			name:          "access denied because permission is not satisfied",
-			resourceTypes: []permissions.ResourceType{permissions.TerraformModuleResourceType, permissions.TerraformProviderResourceType},
-			constraints:   []func(*constraints){WithGroupID(groupID)},
+			name:        "access denied because permission is not satisfied",
+			modelTypes:  []types.ModelType{types.TerraformModuleModelType, types.TerraformProviderModelType},
+			constraints: []func(*constraints){WithGroupID(groupID)},
 			group: &models.Group{
 				FullPath: "ns1/na",
 			},
-			customRolePerms: []permissions.Permission{permissions.ViewTerraformModulePermission},
+			customRolePerms: []models.Permission{models.ViewTerraformModulePermission},
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: customRoleID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
@@ -323,7 +323,7 @@ func TestRequireInheritedAccess(t *testing.T) {
 		},
 		{
 			name:            "access denied because required constraints are missing",
-			resourceTypes:   []permissions.ResourceType{permissions.ServiceAccountResourceType},
+			modelTypes:      []types.ModelType{types.ServiceAccountModelType},
 			expectErrorCode: errors.EInternal,
 		},
 	}
@@ -396,7 +396,7 @@ func TestRequireInheritedAccess(t *testing.T) {
 
 			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
 
-			err := authorizer.RequireAccessToInheritableResource(WithCaller(ctx, mockCaller), test.resourceTypes, test.constraints...)
+			err := authorizer.RequireAccessToInheritableResource(WithCaller(ctx, mockCaller), test.modelTypes, test.constraints...)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, errors.ErrorCode(err), test.expectErrorCode)
 			} else if err != nil {
@@ -413,10 +413,10 @@ func TestRequireAccessToGroup(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
-		customRolePerms      []permissions.Permission
+		customRolePerms      []models.Permission
 		group                *models.Group
 		name                 string
-		requiredPermission   *permissions.Permission
+		requiredPermission   *models.Permission
 		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 	}{
@@ -429,7 +429,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.ViewGroupPermission,
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user does not have required permission",
@@ -440,7 +440,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -448,7 +448,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.ViewerRoleID.String(), UserID: &userID, Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 		{
@@ -460,8 +460,8 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms:    []permissions.Permission{permissions.UpdateGroupPermission},
-			requiredPermission: &permissions.ViewGroupPermission,
+			customRolePerms:    []models.Permission{models.UpdateGroupPermission},
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user with custom role has required permission",
@@ -472,8 +472,8 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms:    []permissions.Permission{permissions.CreateGPGKeyPermission},
-			requiredPermission: &permissions.CreateGPGKeyPermission,
+			customRolePerms:    []models.Permission{models.CreateGPGKeyPermission},
+			requiredPermission: &models.CreateGPGKeyPermission,
 		},
 		{
 			name: "user with custom role does not have required permissions",
@@ -484,11 +484,11 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms: []permissions.Permission{
-				permissions.UpdateManagedIdentityPermission,
-				permissions.CreateRunPermission,
+			customRolePerms: []models.Permission{
+				models.UpdateManagedIdentityPermission,
+				models.CreateRunPermission,
 			},
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -500,7 +500,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.ViewGPGKeyPermission,
+			requiredPermission: &models.ViewGPGKeyPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 		{
@@ -514,7 +514,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns2/ns11",
 			},
-			requiredPermission: &permissions.CreateGPGKeyPermission,
+			requiredPermission: &models.CreateGPGKeyPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -527,7 +527,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -540,7 +540,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.UpdateManagedIdentityPermission,
+			requiredPermission: &models.UpdateManagedIdentityPermission,
 		},
 		// Need CreateGroupPermission, have 2 namespaces, ensure lowest membership wins.
 		{
@@ -553,7 +553,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 		},
 		{
 			name: "negative: need UpdateManagedIdentityPermission, have deployer",
@@ -564,7 +564,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.UpdateManagedIdentityPermission,
+			requiredPermission: &models.UpdateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -576,7 +576,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		// Ensure higher permission can't be granted if they only have View action.
@@ -589,7 +589,7 @@ func TestRequireAccessToGroup(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 	}
@@ -666,8 +666,8 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 	tests := []struct {
 		workspace            *models.Workspace
 		name                 string
-		customRolePerms      []permissions.Permission
-		requiredPermission   *permissions.Permission
+		customRolePerms      []models.Permission
+		requiredPermission   *models.Permission
 		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
 	}{
@@ -680,7 +680,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: workspaceID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.ViewGroupPermission,
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user does not have required permissions",
@@ -691,7 +691,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: workspaceID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -703,11 +703,11 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: workspaceID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms: []permissions.Permission{
-				permissions.ViewGroupPermission,
-				permissions.CreateManagedIdentityPermission,
+			customRolePerms: []models.Permission{
+				models.ViewGroupPermission,
+				models.CreateManagedIdentityPermission,
 			},
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 		},
 		{
 			name: "user with custom role does not have required permissions",
@@ -718,11 +718,11 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: workspaceID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms: []permissions.Permission{
-				permissions.ViewGroupPermission,
-				permissions.CreateManagedIdentityPermission,
+			customRolePerms: []models.Permission{
+				models.ViewGroupPermission,
+				models.CreateManagedIdentityPermission,
 			},
-			requiredPermission: &permissions.UpdateManagedIdentityPermission,
+			requiredPermission: &models.UpdateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -734,10 +734,10 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: workspaceID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms: []permissions.Permission{
-				permissions.CreateManagedIdentityPermission,
+			customRolePerms: []models.Permission{
+				models.CreateManagedIdentityPermission,
 			},
-			requiredPermission: &permissions.ViewManagedIdentityPermission,
+			requiredPermission: &models.ViewManagedIdentityPermission,
 		},
 		{
 			name: "custom role does not exist",
@@ -748,7 +748,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: workspaceID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.UpdateManagedIdentityPermission,
+			requiredPermission: &models.UpdateManagedIdentityPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 		{
@@ -756,7 +756,7 @@ func TestRequireAccessToWorkspace(t *testing.T) {
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
-			requiredPermission: &permissions.ViewWorkspacePermission,
+			requiredPermission: &models.ViewWorkspacePermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 	}
@@ -836,8 +836,8 @@ func TestRequireAccessToNamespace(t *testing.T) {
 		name                 string
 		requiredNamespace    string
 		expectErrorCode      errors.CodeType
-		customRolePerms      []permissions.Permission
-		requiredPermission   *permissions.Permission
+		customRolePerms      []models.Permission
+		requiredPermission   *models.Permission
 		namespaceMemberships []models.NamespaceMembership
 	}{
 		{
@@ -847,7 +847,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1",
-			requiredPermission: &permissions.ViewGroupPermission,
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user has required permission in parent namespace",
@@ -856,7 +856,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",
-			requiredPermission: &permissions.ViewGroupPermission,
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user with custom role has required permission in namespace",
@@ -865,8 +865,8 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1",
-			customRolePerms:    []permissions.Permission{permissions.CreateGroupPermission},
-			requiredPermission: &permissions.CreateGroupPermission,
+			customRolePerms:    []models.Permission{models.CreateGroupPermission},
+			requiredPermission: &models.CreateGroupPermission,
 		},
 		{
 			name: "user with custom role has required permission in parent namespace",
@@ -875,8 +875,8 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",
-			customRolePerms:    []permissions.Permission{permissions.CreateGroupPermission},
-			requiredPermission: &permissions.CreateGroupPermission,
+			customRolePerms:    []models.Permission{models.CreateGroupPermission},
+			requiredPermission: &models.CreateGroupPermission,
 		},
 		{
 			name: "user with custom role can view a resource because of a higher permission action",
@@ -885,8 +885,8 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",
-			customRolePerms:    []permissions.Permission{permissions.CreateGroupPermission},
-			requiredPermission: &permissions.ViewGroupPermission,
+			customRolePerms:    []models.Permission{models.CreateGroupPermission},
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user with custom role does not have required permission",
@@ -895,8 +895,8 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",
-			customRolePerms:    []permissions.Permission{permissions.ViewGroupPermission},
-			requiredPermission: &permissions.CreateGroupPermission,
+			customRolePerms:    []models.Permission{models.ViewGroupPermission},
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -906,14 +906,14 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			serviceAccountID:   &serviceAccountID,
 			requiredNamespace:  "ns1",
-			requiredPermission: &permissions.ViewGPGKeyPermission,
+			requiredPermission: &models.ViewGPGKeyPermission,
 		},
 		{
 			name:                 "user doesn't have any namespace memberships",
 			namespaceMemberships: []models.NamespaceMembership{},
 			userID:               &userID,
 			requiredNamespace:    "ns1",
-			requiredPermission:   &permissions.ViewGroupPermission,
+			requiredPermission:   &models.ViewGroupPermission,
 			expectErrorCode:      errors.ENotFound,
 		},
 		{
@@ -923,7 +923,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1",
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -933,7 +933,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1/ns2/ns3",
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -943,7 +943,7 @@ func TestRequireAccessToNamespace(t *testing.T) {
 			},
 			userID:             &userID,
 			requiredNamespace:  "ns1",
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 	}
@@ -1015,8 +1015,8 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 		name                 string
 		expectErrorCode      errors.CodeType
 		namespaceMemberships []models.NamespaceMembership
-		customRolePerms      []permissions.Permission
-		requiredPermission   *permissions.Permission
+		customRolePerms      []models.Permission
+		requiredPermission   *models.Permission
 		requiredNamespaces   []string
 	}{
 		{
@@ -1026,7 +1026,7 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			requiredNamespaces: []string{"ns1", "ns1/ns11", "ns2/ns22/ns222"},
-			requiredPermission: &permissions.ViewGPGKeyPermission,
+			requiredPermission: &models.ViewGPGKeyPermission,
 		},
 		{
 			name: "user does not have permissions for all namespaces",
@@ -1035,7 +1035,7 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			requiredNamespaces: []string{"ns1", "ns1/ns11", "ns2/ns22/ns222", "ns2"},
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -1045,11 +1045,11 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			requiredNamespaces: []string{"ns1", "ns1/ns11", "ns2/ns22/ns222", "ns2"},
-			customRolePerms: []permissions.Permission{
-				permissions.CreateGroupPermission, // View should be granted since the action here is greater.
-				permissions.ViewWorkspacePermission,
+			customRolePerms: []models.Permission{
+				models.CreateGroupPermission, // View should be granted since the action here is greater.
+				models.ViewWorkspacePermission,
 			},
-			requiredPermission: &permissions.ViewGroupPermission,
+			requiredPermission: &models.ViewGroupPermission,
 		},
 		{
 			name: "user with custom role does not have permissions for all namespaces",
@@ -1058,11 +1058,11 @@ func TestRequireAccessToNamespaces(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
 			requiredNamespaces: []string{"ns1", "ns1/ns11", "ns2/ns22/ns222", "ns2"},
-			customRolePerms: []permissions.Permission{
-				permissions.CreateGroupPermission, // View should be granted since the action here is greater.
-				permissions.ViewWorkspacePermission,
+			customRolePerms: []models.Permission{
+				models.CreateGroupPermission, // View should be granted since the action here is greater.
+				models.ViewWorkspacePermission,
 			},
-			requiredPermission: &permissions.CreateManagedIdentityPermission,
+			requiredPermission: &models.CreateManagedIdentityPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 		{
@@ -1147,8 +1147,8 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 		group                *models.Group
 		name                 string
 		expectErrorCode      errors.CodeType
-		customRolePerms      []permissions.Permission
-		requiredPermission   *permissions.Permission
+		customRolePerms      []models.Permission
+		requiredPermission   *models.Permission
 		namespaceMemberships []models.NamespaceMembership
 	}{
 		{
@@ -1160,7 +1160,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1",
 			},
-			requiredPermission: &permissions.ViewGPGKeyPermission,
+			requiredPermission: &models.ViewGPGKeyPermission,
 		},
 		{
 			name: "user has required permission for nested group",
@@ -1171,7 +1171,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.ViewManagedIdentityPermission,
+			requiredPermission: &models.ViewManagedIdentityPermission,
 		},
 		{
 			name:                 "user does not have any namespace memberships",
@@ -1202,7 +1202,7 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateGroupPermission,
+			requiredPermission: &models.CreateGroupPermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -1214,8 +1214,8 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms:    []permissions.Permission{permissions.CreateTerraformModulePermission},
-			requiredPermission: &permissions.CreateTerraformModulePermission,
+			customRolePerms:    []models.Permission{models.CreateTerraformModulePermission},
+			requiredPermission: &models.CreateTerraformModulePermission,
 		},
 		{
 			name: "user with custom role does not have required permission",
@@ -1226,8 +1226,8 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			customRolePerms:    []permissions.Permission{permissions.UpdateTerraformModulePermission},
-			requiredPermission: &permissions.CreateTerraformModulePermission,
+			customRolePerms:    []models.Permission{models.UpdateTerraformModulePermission},
+			requiredPermission: &models.CreateTerraformModulePermission,
 			expectErrorCode:    errors.EForbidden,
 		},
 		{
@@ -1239,12 +1239,12 @@ func TestRequireAccessToInheritedGroupResource(t *testing.T) {
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: "ns1/ns11",
 			},
-			requiredPermission: &permissions.CreateServiceAccountPermission,
+			requiredPermission: &models.CreateServiceAccountPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 		{
 			name:               "group does not exist",
-			requiredPermission: &permissions.CreateServiceAccountPermission,
+			requiredPermission: &models.CreateServiceAccountPermission,
 			expectErrorCode:    errors.ENotFound,
 		},
 	}
@@ -1317,7 +1317,7 @@ func TestCheckCache(t *testing.T) {
 	tests := []struct {
 		key                  cacheKey
 		name                 string
-		requiredPermissions  *permissions.Permission
+		requiredPermissions  *models.Permission
 		namespaceMemberships []models.NamespaceMembership
 		expectCacheHit       bool
 	}{
@@ -1327,7 +1327,7 @@ func TestCheckCache(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns2"}},
 			},
-			requiredPermissions: &permissions.ViewGroupPermission,
+			requiredPermissions: &models.ViewGroupPermission,
 			key:                 cacheKey{path: ptr.String("ns1")},
 			expectCacheHit:      true,
 		},
@@ -1337,7 +1337,7 @@ func TestCheckCache(t *testing.T) {
 				{RoleID: models.DeployerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
-			requiredPermissions: &permissions.CreateGroupPermission,
+			requiredPermissions: &models.CreateGroupPermission,
 			key:                 cacheKey{path: ptr.String("ns1")},
 			expectCacheHit:      true,
 		},
@@ -1347,7 +1347,7 @@ func TestCheckCache(t *testing.T) {
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
 			},
-			requiredPermissions: &permissions.CreateManagedIdentityPermission,
+			requiredPermissions: &models.CreateManagedIdentityPermission,
 			key:                 cacheKey{path: ptr.String("ns1/ns11")},
 			expectCacheHit:      true,
 		},
@@ -1356,7 +1356,7 @@ func TestCheckCache(t *testing.T) {
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 			},
-			requiredPermissions: &permissions.CreateGPGKeyPermission,
+			requiredPermissions: &models.CreateGPGKeyPermission,
 			key:                 cacheKey{path: ptr.String("ns1")},
 			expectCacheHit:      false,
 		},
@@ -1365,7 +1365,7 @@ func TestCheckCache(t *testing.T) {
 			namespaceMemberships: []models.NamespaceMembership{
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
 			},
-			requiredPermissions: &permissions.ViewGroupPermission,
+			requiredPermissions: &models.ViewGroupPermission,
 			key:                 cacheKey{path: ptr.String("ns1")},
 			expectCacheHit:      false,
 		},
@@ -1375,14 +1375,14 @@ func TestCheckCache(t *testing.T) {
 				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
 				{RoleID: models.ViewerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1/ns11"}},
 			},
-			requiredPermissions: &permissions.CreateGroupPermission,
+			requiredPermissions: &models.CreateGroupPermission,
 			key:                 cacheKey{path: ptr.String("ns1/ns11")},
 			expectCacheHit:      false,
 		},
 		{
 			name:                 "cache miss because cache is empty",
 			namespaceMemberships: []models.NamespaceMembership{},
-			requiredPermissions:  &permissions.ViewGroupPermission,
+			requiredPermissions:  &models.ViewGroupPermission,
 			key:                  cacheKey{path: ptr.String("ns1")},
 			expectCacheHit:       false,
 		},

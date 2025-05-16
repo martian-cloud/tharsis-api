@@ -80,7 +80,7 @@ func (t *AssessmentRunHandler) handleRunEvent(ctx context.Context, _ state.Event
 			return nil
 		}
 
-		stateVersion, err := t.dbClient.StateVersions.GetStateVersion(ctx, ws.CurrentStateVersionID)
+		stateVersion, err := t.dbClient.StateVersions.GetStateVersionByID(ctx, ws.CurrentStateVersionID)
 		if err != nil {
 			return errors.Wrap(err, "assessment run handler failed to query for state version %q", ws.CurrentStateVersionID)
 		}
@@ -107,7 +107,7 @@ func (t *AssessmentRunHandler) handleRunEvent(ctx context.Context, _ state.Event
 
 	// Only update drift status if the run was completed successfully
 	if run.Status == models.RunPlannedAndFinished {
-		plan, err := t.dbClient.Plans.GetPlan(ctx, run.PlanID)
+		plan, err := t.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
 		if err != nil {
 			return errors.Wrap(err, "assessment run handler failed to query for plan %q", run.PlanID)
 		}

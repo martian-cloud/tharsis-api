@@ -11,10 +11,10 @@ import (
 	"github.com/hashicorp/go-version"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/semver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
@@ -91,7 +91,7 @@ type ProviderPlatformDownloadURLs struct {
 // Service implements all provider registry functionality
 type Service interface {
 	GetProviderByID(ctx context.Context, id string) (*models.TerraformProvider, error)
-	GetProviderByPath(ctx context.Context, path string) (*models.TerraformProvider, error)
+	GetProviderByTRN(ctx context.Context, trn string) (*models.TerraformProvider, error)
 	GetProviderByAddress(ctx context.Context, namespace string, name string) (*models.TerraformProvider, error)
 	GetProvidersByIDs(ctx context.Context, ids []string) ([]models.TerraformProvider, error)
 	GetProviders(ctx context.Context, input *GetProvidersInput) (*db.ProvidersResult, error)
@@ -99,12 +99,14 @@ type Service interface {
 	UpdateProvider(ctx context.Context, provider *models.TerraformProvider) (*models.TerraformProvider, error)
 	DeleteProvider(ctx context.Context, provider *models.TerraformProvider) error
 	GetProviderVersionByID(ctx context.Context, id string) (*models.TerraformProviderVersion, error)
+	GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error)
 	GetProviderVersions(ctx context.Context, input *GetProviderVersionsInput) (*db.ProviderVersionsResult, error)
 	GetProviderVersionsByIDs(ctx context.Context, ids []string) ([]models.TerraformProviderVersion, error)
 	CreateProviderVersion(ctx context.Context, input *CreateProviderVersionInput) (*models.TerraformProviderVersion, error)
 	DeleteProviderVersion(ctx context.Context, providerVersion *models.TerraformProviderVersion) error
 	GetProviderVersionReadme(ctx context.Context, providerVersion *models.TerraformProviderVersion) (string, error)
 	GetProviderPlatformByID(ctx context.Context, id string) (*models.TerraformProviderPlatform, error)
+	GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error)
 	GetProviderPlatforms(ctx context.Context, input *GetProviderPlatformsInput) (*db.ProviderPlatformsResult, error)
 	CreateProviderPlatform(ctx context.Context, input *CreateProviderPlatformInput) (*models.TerraformProviderPlatform, error)
 	DeleteProviderPlatform(ctx context.Context, providerPlatform *models.TerraformProviderPlatform) error
@@ -158,7 +160,7 @@ func (s *service) GetProviderByID(ctx context.Context, id string) (*models.Terra
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -168,9 +170,8 @@ func (s *service) GetProviderByID(ctx context.Context, id string) (*models.Terra
 	return provider, nil
 }
 
-func (s *service) GetProviderByPath(ctx context.Context, path string) (*models.TerraformProvider, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetProviderByPath")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) GetProviderByTRN(ctx context.Context, trn string) (*models.TerraformProvider, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderByTRN")
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -179,18 +180,18 @@ func (s *service) GetProviderByPath(ctx context.Context, path string) (*models.T
 		return nil, err
 	}
 
-	provider, err := s.dbClient.TerraformProviders.GetProviderByPath(ctx, path)
+	provider, err := s.dbClient.TerraformProviders.GetProviderByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get provider by path")
+		tracing.RecordError(span, err, "failed to get provider by TRN")
 		return nil, err
 	}
 
 	if provider == nil {
-		return nil, errors.New("provider with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("provider with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -211,9 +212,9 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 		return nil, err
 	}
 
-	rootGroup, err := s.dbClient.Groups.GetGroupByFullPath(ctx, namespace)
+	rootGroup, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespace))
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get group by full path")
+		tracing.RecordError(span, err, "failed to get group by TRN")
 		return nil, err
 	}
 
@@ -240,7 +241,7 @@ func (s *service) GetProviderByAddress(ctx context.Context, namespace string, na
 	provider := providerResult.Providers[0]
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -270,7 +271,7 @@ func (s *service) GetProviders(ctx context.Context, input *GetProvidersInput) (*
 	}
 
 	if input.Group != nil {
-		err = caller.RequirePermission(ctx, permissions.ViewTerraformProviderPermission, auth.WithNamespacePath(input.Group.FullPath))
+		err = caller.RequirePermission(ctx, models.ViewTerraformProviderPermission, auth.WithNamespacePath(input.Group.FullPath))
 		if err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
@@ -315,7 +316,7 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -376,7 +377,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateTerraformProviderPermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateTerraformProviderPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -396,7 +397,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 	if group.ParentID == "" {
 		rootGroupID = input.GroupID
 	} else {
-		rootGroup, gErr := s.dbClient.Groups.GetGroupByFullPath(ctx, group.GetRootGroupPath())
+		rootGroup, gErr := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(group.GetRootGroupPath()))
 		if gErr != nil {
 			tracing.RecordError(span, gErr, "failed to get group by full path")
 			return nil, gErr
@@ -489,7 +490,7 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -563,7 +564,7 @@ func (s *service) GetProvidersByIDs(ctx context.Context, ids []string) ([]models
 	}
 
 	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithNamespacePaths(namespacePaths))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -591,7 +592,7 @@ func (s *service) GetProviderVersionReadme(ctx context.Context, providerVersion 
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return "", err
@@ -638,7 +639,44 @@ func (s *service) GetProviderVersionByID(ctx context.Context, id string) (*model
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
+			return nil, err
+		}
+	}
+
+	return providerVersion, nil
+}
+
+func (s *service) GetProviderVersionByTRN(ctx context.Context, trn string) (*models.TerraformProviderVersion, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderVersionByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	providerVersion, err := s.dbClient.TerraformProviderVersions.GetProviderVersionByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider version by TRN")
+		return nil, err
+	}
+
+	if providerVersion == nil {
+		return nil, errors.New("provider version with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider by ID")
+		return nil, err
+	}
+
+	if provider.Private {
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -666,7 +704,7 @@ func (s *service) GetProviderVersions(ctx context.Context, input *GetProviderVer
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -742,7 +780,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -880,7 +918,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1006,7 +1044,51 @@ func (s *service) GetProviderPlatformByID(ctx context.Context, id string) (*mode
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
+		if err != nil {
+			tracing.RecordError(span, err, "inheritable resource access check failed")
+			return nil, err
+		}
+	}
+
+	return platform, nil
+}
+
+func (s *service) GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderPlatformByTRN")
+	// TODO: Consider setting trace/span attributes for the input.
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	platform, err := s.dbClient.TerraformProviderPlatforms.GetProviderPlatformByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider platform by TRN")
+		return nil, err
+	}
+
+	if platform == nil {
+		return nil, errors.New("provider platform with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	providerVersion, err := s.getProviderVersionByID(ctx, platform.ProviderVersionID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider version by ID")
+		return nil, err
+	}
+
+	provider, err := s.getProviderByID(ctx, providerVersion.ProviderID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider by ID")
+		return nil, err
+	}
+
+	if provider.Private {
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -1054,7 +1136,7 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -1103,7 +1185,7 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1185,7 +1267,7 @@ func (s *service) DeleteProviderPlatform(ctx context.Context, providerPlatform *
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1223,7 +1305,7 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1283,7 +1365,7 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1343,7 +1425,7 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1403,7 +1485,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateTerraformProviderPermission, auth.WithGroupID(provider.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1512,7 +1594,7 @@ func (s *service) GetProviderPlatformDownloadURLs(ctx context.Context, providerP
 	}
 
 	if provider.Private {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.TerraformProviderResourceType, auth.WithGroupID(provider.GroupID))
+		err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderModelType, auth.WithGroupID(provider.GroupID))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err

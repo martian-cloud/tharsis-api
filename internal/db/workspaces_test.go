@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -40,63 +42,67 @@ type workspaceInfoPathSlice []workspaceInfo
 // workspaceInfoTimeSlice makes a slice of workspaceInfo sortable by last updated time
 type workspaceInfoTimeSlice []workspaceInfo
 
-func TestGetWorkspaceByFullPath(t *testing.T) {
-	ctx := context.Background()
+func TestGetWorkspaceByTRN(t *testing.T) {
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	_, createdWarmupWorkspaces, err := createWarmupWorkspaces(ctx, testClient,
-		standardWarmupGroupsForWorkspaces, standardWarmupWorkspaces)
-	require.Nil(t, err)
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg       *string
 		name            string
-		searchPath      string
+		trn             string
 		expectWorkspace bool
+		expectErrorCode errors.CodeType
 	}
 
-	testCases := []testCase{}
-	for _, positiveWorkspace := range createdWarmupWorkspaces {
-		testCases = append(testCases, testCase{
-			name:            "positive-" + positiveWorkspace.FullPath,
-			searchPath:      positiveWorkspace.FullPath,
+	testCases := []testCase{
+		{
+			name:            "get resource by TRN",
+			trn:             workspace.Metadata.TRN,
 			expectWorkspace: true,
-		})
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.WorkspaceModelType.BuildTRN("some/path"),
+		},
+		{
+			name: "passing group full path to trn shouldn't return a workspace",
+			trn:  types.WorkspaceModelType.BuildTRN(group.FullPath),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
 	}
-
-	testCases = append(testCases,
-		testCase{
-			name:       "negative, non-existent first-level workspace",
-			searchPath: "non-existent-first-level-workspace",
-			// expect workspace and error to be nil
-		},
-		testCase{
-			name:       "negative, non-existent second-level workspace",
-			searchPath: "top-level-group-1-for-workspaces/non-existent-2nd-level-group",
-			// expect workspace and error to be nil
-		},
-		testCase{
-			name:       "defective-path",
-			searchPath: "this*is*a*not*a*valid*path",
-			// expect workspace and error to be nil
-			// At the DB layer, the search path is just looked up, with no workspace returned.
-		},
-	)
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			workspace, err := testClient.client.Workspaces.GetWorkspaceByFullPath(ctx, test.searchPath)
+			actualWorkspace, err := testClient.client.Workspaces.GetWorkspaceByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 
 			if test.expectWorkspace {
-				// the positive case
-				require.NotNil(t, workspace)
-				assert.Equal(t, test.searchPath, workspace.FullPath)
+				require.NotNil(t, actualWorkspace)
+				assert.Equal(t, types.WorkspaceModelType.BuildTRN(workspace.FullPath), actualWorkspace.Metadata.TRN)
 			} else {
-				// the negative and defective cases
-				assert.Nil(t, workspace)
+				assert.Nil(t, actualWorkspace)
 			}
 		})
 	}
@@ -138,7 +144,7 @@ func TestGetWorkspaceByID(t *testing.T) {
 		testCase{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	)
 
@@ -1669,12 +1675,11 @@ func TestMigrateWorkspace(t *testing.T) {
 	require.Nil(t, err)
 
 	rootManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
-		Description:  "root group managed identity for testing workspace migration",
-		Name:         "root-managed-identity",
-		Type:         models.ManagedIdentityTharsisFederated,
-		GroupID:      rootGroup.Metadata.ID,
-		ResourcePath: "root-group/root-managed-identity",
-		Data:         []byte("this is a test"),
+		Description: "root group managed identity for testing workspace migration",
+		Name:        "root-managed-identity",
+		Type:        models.ManagedIdentityTharsisFederated,
+		GroupID:     rootGroup.Metadata.ID,
+		Data:        []byte("this is a test"),
 	})
 	require.Nil(t, err)
 
@@ -1690,12 +1695,11 @@ func TestMigrateWorkspace(t *testing.T) {
 	require.Nil(t, err)
 
 	oldParentManagedIdentity, err := testClient.client.ManagedIdentities.CreateManagedIdentity(ctx, &models.ManagedIdentity{
-		Description:  "old group managed identity for testing workspace migration",
-		Name:         "old-parent-managed-identity",
-		Type:         models.ManagedIdentityTharsisFederated,
-		GroupID:      oldParentGroup.Metadata.ID,
-		ResourcePath: "g1/old-parent-managed-identity",
-		Data:         []byte("this is another test"),
+		Description: "old group managed identity for testing workspace migration",
+		Name:        "old-parent-managed-identity",
+		Type:        models.ManagedIdentityTharsisFederated,
+		GroupID:     oldParentGroup.Metadata.ID,
+		Data:        []byte("this is another test"),
 	})
 	require.Nil(t, err)
 
@@ -1857,7 +1861,7 @@ func TestMigrateWorkspace(t *testing.T) {
 				assert.Equal(t, fetchPath, newWorkspace.FullPath)
 
 				// Workspace can be fetched from new path.
-				fetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByFullPath(ctx, fetchPath)
+				fetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(fetchPath))
 				require.Nil(t, err)
 				require.NotNil(t, fetchedWorkspace)
 
@@ -1872,9 +1876,9 @@ func TestMigrateWorkspace(t *testing.T) {
 				assert.Equal(t, newWorkspace.CreatedBy, fetchedWorkspace.CreatedBy)
 
 				// No workspace at old path.
-				oldFetchedGroup, err := testClient.client.Groups.GetGroupByFullPath(ctx, testWorkspace.FullPath)
+				oldFetchedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(testWorkspace.FullPath))
 				assert.Nil(t, err)
-				assert.Nil(t, oldFetchedGroup)
+				assert.Nil(t, oldFetchedWorkspace)
 
 				// Verify the workspace found by ID has the correct path.
 				fetchedWorkspace, err = testClient.client.Workspaces.GetWorkspaceByID(ctx, testWorkspace.Metadata.ID)
@@ -1886,6 +1890,7 @@ func TestMigrateWorkspace(t *testing.T) {
 				// However, a query for variables in the workspace does not return the root variable.
 				expectedVar := *workspaceVar
 				expectedVar.NamespacePath = fetchedWorkspace.FullPath
+				expectedVar.Metadata.TRN = types.VariableModelType.BuildTRN(fetchedWorkspace.FullPath, string(expectedVar.Category), expectedVar.Key)
 				vars, err := testClient.client.Variables.GetVariables(ctx, &GetVariablesInput{
 					Filter: &VariableFilter{
 						NamespacePaths: []string{fetchedWorkspace.FullPath},
@@ -1909,6 +1914,8 @@ func TestMigrateWorkspace(t *testing.T) {
 				assert.ElementsMatch(t, []models.ManagedIdentity{*rootManagedIdentity}, managedIdentities)
 
 				// Verify the workspace run is still properly connected.
+				expectedRun := *run
+				expectedRun.Metadata.TRN = types.RunModelType.BuildTRN(fetchedWorkspace.FullPath, expectedRun.GetGlobalID())
 				runs, err := testClient.client.Runs.GetRuns(ctx, &GetRunsInput{
 					Filter: &RunFilter{
 						WorkspaceID: &fetchedWorkspace.Metadata.ID,
@@ -1919,9 +1926,11 @@ func TestMigrateWorkspace(t *testing.T) {
 				assert.NotNil(t, runs.PageInfo)
 				assert.NotNil(t, runs.Runs)
 				assert.Equal(t, runs.PageInfo.TotalCount, int32(1))
-				assert.Equal(t, []models.Run{*run}, runs.Runs)
+				assert.Equal(t, []models.Run{expectedRun}, runs.Runs)
 
 				// Verify the workspace state version is still properly connected.
+				expectedSV := *stateVersion
+				expectedSV.Metadata.TRN = types.StateVersionModelType.BuildTRN(fetchedWorkspace.FullPath, expectedSV.GetGlobalID())
 				stateVersions, err := testClient.client.StateVersions.GetStateVersions(ctx, &GetStateVersionsInput{
 					Filter: &StateVersionFilter{
 						WorkspaceID: &fetchedWorkspace.Metadata.ID,
@@ -1932,7 +1941,7 @@ func TestMigrateWorkspace(t *testing.T) {
 				assert.NotNil(t, stateVersions.PageInfo)
 				assert.NotNil(t, stateVersions.StateVersions)
 				assert.Equal(t, stateVersions.PageInfo.TotalCount, int32(1))
-				assert.Equal(t, []models.StateVersion{*stateVersion}, stateVersions.StateVersions)
+				assert.Equal(t, []models.StateVersion{expectedSV}, stateVersions.StateVersions)
 
 				// A query on the workspace does not return any group memberships,
 				// so cannot directly verify the old parent group service account membership has been deleted
@@ -2154,6 +2163,7 @@ func compareWorkspaces(t *testing.T, expected, actual *models.Workspace, checkID
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)

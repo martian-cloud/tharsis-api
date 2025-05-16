@@ -6,8 +6,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -40,6 +40,7 @@ type ServiceAccountsConnectionQueryArgs struct {
 }
 
 // ServiceAccountQueryArgs are used to query a single serviceAccount
+// DEPRECATED: use node query instead
 type ServiceAccountQueryArgs struct {
 	ID string
 }
@@ -76,7 +77,7 @@ type ServiceAccountConnectionResolver struct {
 
 // NewServiceAccountConnectionResolver creates a new ServiceAccountConnectionResolver
 func NewServiceAccountConnectionResolver(ctx context.Context, input *serviceaccount.GetServiceAccountsInput) (*ServiceAccountConnectionResolver, error) {
-	saService := getSAService(ctx)
+	saService := getServiceCatalog(ctx).ServiceAccountService
 
 	result, err := saService.GetServiceAccounts(ctx, input)
 	if err != nil {
@@ -144,7 +145,7 @@ type ServiceAccountResolver struct {
 
 // ID resolver
 func (r *ServiceAccountResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ServiceAccountType, r.serviceAccount.Metadata.ID))
+	return graphql.ID(r.serviceAccount.GetGlobalID())
 }
 
 // GroupPath resolver
@@ -154,7 +155,7 @@ func (r *ServiceAccountResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *ServiceAccountResolver) ResourcePath() string {
-	return r.serviceAccount.ResourcePath
+	return r.serviceAccount.GetResourcePath()
 }
 
 // Name resolver
@@ -245,15 +246,19 @@ func (r *ServiceAccountResolver) ActivityEvents(ctx context.Context,
 	return NewActivityEventConnectionResolver(ctx, input)
 }
 
+// DEPRECATED: use node query instead
 func serviceAccountQuery(ctx context.Context, args *ServiceAccountQueryArgs) (*ServiceAccountResolver, error) {
-	saService := getSAService(ctx)
-
-	serviceAccount, err := saService.GetServiceAccountByID(ctx, gid.FromGlobalID(args.ID))
+	model, err := getServiceCatalog(ctx).FetchModel(ctx, args.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	serviceAccount, ok := model.(*models.ServiceAccount)
+	if !ok {
+		return nil, errors.New("expected service account type, got %T", model)
 	}
 
 	return &ServiceAccountResolver{serviceAccount: serviceAccount}, nil
@@ -286,7 +291,8 @@ type CreateServiceAccountInput struct {
 	ClientMutationID  *string
 	Name              string
 	Description       string
-	GroupPath         string
+	GroupID           *string
+	GroupPath         *string // DEPRECATED: use groupID instead with a TRN
 	OIDCTrustPolicies []OIDCTrustPolicy
 }
 
@@ -317,11 +323,10 @@ func handleServiceAccountMutationProblem(e error, clientMutationID *string) (*Se
 }
 
 func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
-	groupID := group.Metadata.ID
 
 	oidcTrustPolicies, err := convertOIDCTrustPolicies(input.OIDCTrustPolicies)
 	if err != nil {
@@ -335,9 +340,7 @@ func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccou
 		OIDCTrustPolicies: oidcTrustPolicies,
 	}
 
-	saService := getSAService(ctx)
-
-	createdServiceAccount, err := saService.CreateServiceAccount(ctx, &serviceAccountCreateOptions)
+	createdServiceAccount, err := getServiceCatalog(ctx).ServiceAccountService.CreateServiceAccount(ctx, &serviceAccountCreateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -347,9 +350,14 @@ func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccou
 }
 
 func updateServiceAccountMutation(ctx context.Context, input *UpdateServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
-	saService := getSAService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	serviceAccount, err := saService.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceAccount, err := serviceCatalog.ServiceAccountService.GetServiceAccountByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +379,7 @@ func updateServiceAccountMutation(ctx context.Context, input *UpdateServiceAccou
 		return nil, err
 	}
 
-	serviceAccount, err = saService.UpdateServiceAccount(ctx, serviceAccount)
+	serviceAccount, err = serviceCatalog.ServiceAccountService.UpdateServiceAccount(ctx, serviceAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -381,9 +389,14 @@ func updateServiceAccountMutation(ctx context.Context, input *UpdateServiceAccou
 }
 
 func deleteServiceAccountMutation(ctx context.Context, input *DeleteServiceAccountInput) (*ServiceAccountMutationPayloadResolver, error) {
-	saService := getSAService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	serviceAccount, err := saService.GetServiceAccountByID(ctx, gid.FromGlobalID(input.ID))
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceAccount, err := serviceCatalog.ServiceAccountService.GetServiceAccountByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +411,7 @@ func deleteServiceAccountMutation(ctx context.Context, input *DeleteServiceAccou
 		serviceAccount.Metadata.Version = v
 	}
 
-	if err := saService.DeleteServiceAccount(ctx, serviceAccount); err != nil {
+	if err := serviceCatalog.ServiceAccountService.DeleteServiceAccount(ctx, serviceAccount); err != nil {
 		return nil, err
 	}
 
@@ -465,9 +478,7 @@ func loadServiceAccount(ctx context.Context, id string) (*models.ServiceAccount,
 }
 
 func serviceAccountBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	serviceAccountService := getSAService(ctx)
-
-	serviceAccounts, err := serviceAccountService.GetServiceAccountsByIDs(ctx, ids)
+	serviceAccounts, err := getServiceCatalog(ctx).ServiceAccountService.GetServiceAccountsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +497,8 @@ func serviceAccountBatchFunc(ctx context.Context, ids []string) (loader.DataBatc
 // ServiceAccountCreateTokenInput contains the input for the service account create token mutation.
 type ServiceAccountCreateTokenInput struct {
 	ClientMutationID   *string
-	ServiceAccountPath string
+	ServiceAccountID   *string
+	ServiceAccountPath *string // DEPRECATED: use ServiceAccountID instead with a TRN
 	Token              string
 }
 
@@ -501,11 +513,21 @@ type ServiceAccountCreateTokenPayload struct {
 func serviceAccountCreateTokenMutation(ctx context.Context,
 	input *ServiceAccountCreateTokenInput,
 ) (*ServiceAccountCreateTokenPayload, error) {
-	saService := getSAService(ctx)
+	var serviceAccountValue string
+	switch {
+	case input.ServiceAccountPath != nil && input.ServiceAccountID != nil:
+		return nil, errors.New("cannot specify both serviceAccountID and serviceAccountPath", errors.WithErrorCode(errors.EInvalid))
+	case input.ServiceAccountPath != nil:
+		serviceAccountValue = types.ServiceAccountModelType.BuildTRN(*input.ServiceAccountPath)
+	case input.ServiceAccountID != nil:
+		serviceAccountValue = *input.ServiceAccountID
+	default:
+		return nil, errors.New("either serviceAccountID or serviceAccountPath must be specified", errors.WithErrorCode(errors.EInvalid))
+	}
 
-	resp, err := saService.CreateToken(ctx, &serviceaccount.CreateTokenInput{
-		ServiceAccount: input.ServiceAccountPath,
-		Token:          []byte(input.Token),
+	resp, err := getServiceCatalog(ctx).ServiceAccountService.CreateToken(ctx, &serviceaccount.CreateTokenInput{
+		ServiceAccountPublicID: serviceAccountValue,
+		Token:                  []byte(input.Token),
 	})
 	if err != nil {
 		return nil, err

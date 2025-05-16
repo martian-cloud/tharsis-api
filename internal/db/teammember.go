@@ -11,6 +11,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -18,7 +19,6 @@ import (
 
 // TeamMembers encapsulates the logic to access team members from the database
 type TeamMembers interface {
-	GetTeamMemberByID(ctx context.Context, teamMemberID string) (*models.TeamMember, error)
 	GetTeamMember(ctx context.Context, userID, teamID string) (*models.TeamMember, error)
 	GetTeamMembers(ctx context.Context, input *GetTeamMembersInput) (*TeamMembersResult, error)
 	AddUserToTeam(ctx context.Context, teamMember *models.TeamMember) (*models.TeamMember, error)
@@ -124,7 +124,9 @@ func (tm *teamMembers) GetTeamMembers(ctx context.Context, input *GetTeamMembers
 	}
 
 	query := dialect.From(goqu.T("team_members")).
-		Select(teamMemberFieldList...).
+		Select(tm.getSelectFields()...).
+		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -185,18 +187,24 @@ func (tm *teamMembers) AddUserToTeam(ctx context.Context, teamMember *models.Tea
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("team_members").
+	sql, args, err := dialect.From("team_members").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":            newResourceID(),
-			"version":       initialResourceVersion,
-			"created_at":    timestamp,
-			"updated_at":    timestamp,
-			"user_id":       teamMember.UserID,
-			"team_id":       teamMember.TeamID,
-			"is_maintainer": teamMember.IsMaintainer,
-		}).
-		Returning(teamMemberFieldList...).ToSQL()
+		With("team_members",
+			dialect.Insert("team_members").
+				Rows(goqu.Record{
+					"id":            newResourceID(),
+					"version":       initialResourceVersion,
+					"created_at":    timestamp,
+					"updated_at":    timestamp,
+					"user_id":       teamMember.UserID,
+					"team_id":       teamMember.TeamID,
+					"is_maintainer": teamMember.IsMaintainer,
+				}).
+				Returning("*"),
+		).Select(tm.getSelectFields()...).
+		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -245,16 +253,22 @@ func (tm *teamMembers) UpdateTeamMember(ctx context.Context, teamMember *models.
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("team_members").
+	sql, args, err := dialect.From("team_members").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":       goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":    timestamp,
-				"is_maintainer": teamMember.IsMaintainer,
-			},
-		).Where(goqu.Ex{"id": teamMember.Metadata.ID, "version": teamMember.Metadata.Version}).
-		Returning(teamMemberFieldList...).ToSQL()
+		With("team_members",
+			dialect.Update("team_members").
+				Set(
+					goqu.Record{
+						"version":       goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":    timestamp,
+						"is_maintainer": teamMember.IsMaintainer,
+					},
+				).Where(goqu.Ex{"id": teamMember.Metadata.ID, "version": teamMember.Metadata.Version}).
+				Returning("*"),
+		).Select(tm.getSelectFields()...).
+		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -279,14 +293,20 @@ func (tm *teamMembers) RemoveUserFromTeam(ctx context.Context, teamMember *model
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.Delete("team_members").
+	sql, args, err := dialect.From("team_members").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      teamMember.Metadata.ID,
-				"version": teamMember.Metadata.Version,
-			},
-		).Returning(teamMemberFieldList...).ToSQL()
+		With("team_members",
+			dialect.Delete("team_members").
+				Where(
+					goqu.Ex{
+						"id":      teamMember.Metadata.ID,
+						"version": teamMember.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(tm.getSelectFields()...).
+		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return err
@@ -306,14 +326,19 @@ func (tm *teamMembers) RemoveUserFromTeam(ctx context.Context, teamMember *model
 }
 
 func (tm *teamMembers) getTeamMember(ctx context.Context, exp exp.Expression) (*models.TeamMember, error) {
+	ctx, span := tracer.Start(ctx, "db.getTeamMember")
+	defer span.End()
+
 	query := dialect.From(goqu.T("team_members")).
 		Prepared(true).
-		Select(teamMemberFieldList...).
+		Select(tm.getSelectFields()...).
+		InnerJoin(goqu.T("teams"), goqu.On(goqu.I("team_members.team_id").Eq(goqu.I("teams.id")))).
+		InnerJoin(goqu.T("users"), goqu.On(goqu.I("team_members.user_id").Eq(goqu.I("users.id")))).
 		Where(exp)
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	teamMember, err := scanTeamMember(tm.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -321,13 +346,32 @@ func (tm *teamMembers) getTeamMember(ctx context.Context, exp exp.Expression) (*
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return teamMember, nil
 }
 
+func (tm *teamMembers) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range teamMemberFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("team_members.%s", field))
+	}
+
+	selectFields = append(selectFields, "teams.name", "users.username")
+
+	return selectFields
+}
+
 func scanTeamMember(row scanner) (*models.TeamMember, error) {
+	var teamName, userName string
 	teamMember := &models.TeamMember{}
 
 	fields := []interface{}{
@@ -338,12 +382,16 @@ func scanTeamMember(row scanner) (*models.TeamMember, error) {
 		&teamMember.UserID,
 		&teamMember.TeamID,
 		&teamMember.IsMaintainer,
+		&teamName,
+		&userName,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
 	}
+
+	teamMember.Metadata.TRN = types.TeamMemberModelType.BuildTRN(teamName, userName)
 
 	return teamMember, nil
 }

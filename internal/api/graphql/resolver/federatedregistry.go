@@ -7,8 +7,8 @@ import (
 	"github.com/graph-gophers/dataloader"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -54,7 +54,7 @@ type FederatedRegistryConnectionResolver struct {
 func NewFederatedRegistryConnectionResolver(ctx context.Context,
 	input *federatedregistry.GetFederatedRegistriesInput,
 ) (*FederatedRegistryConnectionResolver, error) {
-	federatedRegistryService := getFederatedRegistryService(ctx)
+	federatedRegistryService := getServiceCatalog(ctx).FederatedRegistryService
 
 	result, err := federatedRegistryService.GetFederatedRegistries(ctx, input)
 	if err != nil {
@@ -122,7 +122,7 @@ type FederatedRegistryResolver struct {
 
 // ID resolver
 func (r *FederatedRegistryResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.FederatedRegistryType, r.federatedRegistry.Metadata.ID))
+	return graphql.ID(r.federatedRegistry.GetGlobalID())
 }
 
 // Metadata resolver
@@ -177,7 +177,8 @@ type CreateFederatedRegistryInput struct {
 	ClientMutationID *string
 	Hostname         string
 	Audience         string
-	GroupPath        string
+	GroupID          *string
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
 }
 
 // UpdateFederatedRegistryInput contains the input for updating a federated registry
@@ -208,7 +209,7 @@ func handleFederatedRegistryMutationProblem(e error, clientMutationID *string) (
 func createFederatedRegistryMutation(ctx context.Context,
 	input *CreateFederatedRegistryInput,
 ) (*FederatedRegistryMutationPayloadResolver, error) {
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
@@ -216,10 +217,10 @@ func createFederatedRegistryMutation(ctx context.Context,
 	federatedRegistryCreateOptions := models.FederatedRegistry{
 		Hostname: input.Hostname,
 		Audience: input.Audience,
-		GroupID:  group.Metadata.ID,
+		GroupID:  groupID,
 	}
 
-	createdFederatedRegistry, err := getFederatedRegistryService(ctx).CreateFederatedRegistry(ctx,
+	createdFederatedRegistry, err := getServiceCatalog(ctx).FederatedRegistryService.CreateFederatedRegistry(ctx,
 		&federatedRegistryCreateOptions,
 	)
 	if err != nil {
@@ -233,10 +234,14 @@ func createFederatedRegistryMutation(ctx context.Context,
 func updateFederatedRegistryMutation(ctx context.Context,
 	input *UpdateFederatedRegistryInput,
 ) (*FederatedRegistryMutationPayloadResolver, error) {
-	federatedRegistryService := getFederatedRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	federatedRegistry, err := federatedRegistryService.
-		GetFederatedRegistryByID(ctx, gid.FromGlobalID(input.ID))
+	registryID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	federatedRegistry, err := serviceCatalog.FederatedRegistryService.GetFederatedRegistryByID(ctx, registryID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +265,7 @@ func updateFederatedRegistryMutation(ctx context.Context,
 		federatedRegistry.Audience = *input.Audience
 	}
 
-	federatedRegistry, err = federatedRegistryService.UpdateFederatedRegistry(ctx, federatedRegistry)
+	federatedRegistry, err = serviceCatalog.FederatedRegistryService.UpdateFederatedRegistry(ctx, federatedRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -272,10 +277,14 @@ func updateFederatedRegistryMutation(ctx context.Context,
 func deleteFederatedRegistryMutation(ctx context.Context,
 	input *DeleteFederatedRegistryInput,
 ) (*FederatedRegistryMutationPayloadResolver, error) {
-	federatedRegistryService := getFederatedRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	federatedRegistryToDelete, err := federatedRegistryService.GetFederatedRegistryByID(ctx,
-		gid.FromGlobalID(input.ID))
+	registryID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	federatedRegistryToDelete, err := serviceCatalog.FederatedRegistryService.GetFederatedRegistryByID(ctx, registryID)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +299,7 @@ func deleteFederatedRegistryMutation(ctx context.Context,
 		federatedRegistryToDelete.Metadata.Version = v
 	}
 
-	err = getFederatedRegistryService(ctx).DeleteFederatedRegistry(ctx, federatedRegistryToDelete)
+	err = serviceCatalog.FederatedRegistryService.DeleteFederatedRegistry(ctx, federatedRegistryToDelete)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +349,14 @@ func handleCreateFederatedRegistryTokensMutationProblem(e error,
 func createFederatedRegistryTokensMutation(ctx context.Context,
 	input *CreateFederatedRegistryTokensInput,
 ) (*FederatedRegistryTokensMutationPayloadResolver, error) {
-	tokens, err := getFederatedRegistryService(ctx).CreateFederatedRegistryTokensForJob(ctx, gid.FromGlobalID(input.JobID))
+	serviceCatalog := getServiceCatalog(ctx)
+
+	jobID, err := serviceCatalog.FetchModelID(ctx, input.JobID)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens, err := serviceCatalog.FederatedRegistryService.CreateFederatedRegistryTokensForJob(ctx, jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -383,9 +399,7 @@ func loadFederatedRegistry(ctx context.Context, id string) (*models.FederatedReg
 }
 
 func federatedRegistryBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getFederatedRegistryService(ctx)
-
-	federatedRegistries, err := service.GetFederatedRegistriesByIDs(ctx, ids)
+	federatedRegistries, err := getServiceCatalog(ctx).FederatedRegistryService.GetFederatedRegistriesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

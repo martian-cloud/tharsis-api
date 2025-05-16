@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -71,7 +73,7 @@ func TestGetModuleAttestationByID(t *testing.T) {
 		{
 			name:      "returns an error because the module attestation ID is invalid",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -87,6 +89,94 @@ func TestGetModuleAttestationByID(t *testing.T) {
 				assert.Equal(t, test.expectTerraformModuleAttestation, actualTerraformModuleAttestation)
 			} else {
 				assert.Nil(t, actualTerraformModuleAttestation)
+			}
+		})
+	}
+}
+
+func TestGetModuleAttestationByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module",
+		System:      "aws",
+		RootGroupID: group.Metadata.ID,
+		GroupID:     group.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	attestation, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &models.TerraformModuleAttestation{
+		ModuleID:      module.Metadata.ID,
+		Description:   "test attestation",
+		Data:          "testdata",
+		DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc34"),
+		SchemaType:    "https://in-toto.io/Statement/v0.1",
+		PredicateType: "cosign.sigstore.dev/attestation/v1",
+		Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
+		CreatedBy:     "test",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name              string
+		trn               string
+		expectAttestation bool
+		expectErrorCode   errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:              "get attestation by TRN",
+			trn:               attestation.Metadata.TRN,
+			expectAttestation: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.TerraformModuleAttestationModelType.BuildTRN(group.FullPath, module.Name, module.System, "sha-sum"),
+		},
+		{
+			name:            "attestation TRN has less than 4 parts",
+			trn:             types.TerraformModuleAttestationModelType.BuildTRN("test-group"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualAttestation, err := testClient.client.TerraformModuleAttestations.GetModuleAttestationByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectAttestation {
+				require.NotNil(t, actualAttestation)
+				assert.Equal(t,
+					types.TerraformModuleAttestationModelType.BuildTRN(
+						group.FullPath,
+						module.Name,
+						module.System,
+						string(attestation.DataSHASum),
+					),
+					actualAttestation.Metadata.TRN,
+				)
+			} else {
+				assert.Nil(t, actualAttestation)
 			}
 		})
 	}
@@ -782,6 +872,7 @@ func compareTerraformModuleAttestations(t *testing.T, expected, actual *models.T
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

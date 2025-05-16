@@ -7,8 +7,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -27,6 +27,7 @@ type TerraformModuleConnectionQueryArgs struct {
 }
 
 // TerraformModuleQueryArgs are used to query a terraform module
+// DEPRECATED: use node query instead with a TRN
 type TerraformModuleQueryArgs struct {
 	RegistryNamespace string
 	ModuleName        string
@@ -65,7 +66,7 @@ type TerraformModuleConnectionResolver struct {
 
 // NewTerraformModuleConnectionResolver creates a new TerraformModuleConnectionResolver
 func NewTerraformModuleConnectionResolver(ctx context.Context, input *moduleregistry.GetModulesInput) (*TerraformModuleConnectionResolver, error) {
-	service := getModuleRegistryService(ctx)
+	service := getServiceCatalog(ctx).TerraformModuleRegistryService
 
 	result, err := service.GetModules(ctx, input)
 	if err != nil {
@@ -133,7 +134,7 @@ type TerraformModuleResolver struct {
 
 // ID resolver
 func (r *TerraformModuleResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformModuleType, r.module.Metadata.ID))
+	return graphql.ID(r.module.GetGlobalID())
 }
 
 // Name resolver
@@ -163,7 +164,7 @@ func (r *TerraformModuleResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *TerraformModuleResolver) ResourcePath() string {
-	return r.module.ResourcePath
+	return r.module.GetResourcePath()
 }
 
 // RepositoryURL resolver
@@ -240,7 +241,7 @@ func (r *TerraformModuleResolver) Attestations(ctx context.Context, args *Terraf
 
 // LatestVersion resolver
 func (r *TerraformModuleResolver) LatestVersion(ctx context.Context) (*TerraformModuleVersionResolver, error) {
-	versionsResp, err := getModuleRegistryService(ctx).GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
+	versionsResp, err := getServiceCatalog(ctx).TerraformModuleRegistryService.GetModuleVersions(ctx, &moduleregistry.GetModuleVersionsInput{
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
@@ -276,8 +277,9 @@ func terraformModulesQuery(ctx context.Context, args *TerraformModuleConnectionQ
 	return NewTerraformModuleConnectionResolver(ctx, &input)
 }
 
+// DEPRECATED: use node query instead with a TRN
 func terraformModuleQuery(ctx context.Context, args *TerraformModuleQueryArgs) (*TerraformModuleResolver, error) {
-	module, err := getModuleRegistryService(ctx).GetModuleByAddress(ctx, args.RegistryNamespace, args.ModuleName, args.System)
+	module, err := getServiceCatalog(ctx).TerraformModuleRegistryService.GetModuleByAddress(ctx, args.RegistryNamespace, args.ModuleName, args.System)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -325,7 +327,8 @@ type CreateTerraformModuleInput struct {
 	RepositoryURL    *string
 	Name             string
 	System           string
-	GroupPath        string
+	GroupID          *string
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
 }
 
 // DeleteTerraformModuleInput contains the input for deleting a module
@@ -344,9 +347,14 @@ func handleTerraformModuleMutationProblem(e error, clientMutationID *string) (*T
 }
 
 func createTerraformModuleMutation(ctx context.Context, input *CreateTerraformModuleInput) (*TerraformModuleMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
+	if err != nil {
+		return nil, err
+	}
 
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	group, err := serviceCatalog.GroupService.GetGroupByID(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +374,7 @@ func createTerraformModuleMutation(ctx context.Context, input *CreateTerraformMo
 		createOptions.RepositoryURL = *input.RepositoryURL
 	}
 
-	module, err := service.CreateModule(ctx, &createOptions)
+	module, err := serviceCatalog.TerraformModuleRegistryService.CreateModule(ctx, &createOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -376,9 +384,14 @@ func createTerraformModuleMutation(ctx context.Context, input *CreateTerraformMo
 }
 
 func updateTerraformModuleMutation(ctx context.Context, input *UpdateTerraformModuleInput) (*TerraformModuleMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	module, err := service.GetModuleByID(ctx, gid.FromGlobalID(input.ID))
+	moduleID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	module, err := serviceCatalog.TerraformModuleRegistryService.GetModuleByID(ctx, moduleID)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +415,7 @@ func updateTerraformModuleMutation(ctx context.Context, input *UpdateTerraformMo
 		module.RepositoryURL = *input.RepositoryURL
 	}
 
-	module, err = service.UpdateModule(ctx, module)
+	module, err = serviceCatalog.TerraformModuleRegistryService.UpdateModule(ctx, module)
 	if err != nil {
 		return nil, err
 	}
@@ -412,14 +425,19 @@ func updateTerraformModuleMutation(ctx context.Context, input *UpdateTerraformMo
 }
 
 func deleteTerraformModuleMutation(ctx context.Context, input *DeleteTerraformModuleInput) (*TerraformModuleMutationPayloadResolver, error) {
-	service := getModuleRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	module, err := service.GetModuleByID(ctx, gid.FromGlobalID(input.ID))
+	moduleID, err := serviceCatalog.FetchModelID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := service.DeleteModule(ctx, module); err != nil {
+	module, err := serviceCatalog.TerraformModuleRegistryService.GetModuleByID(ctx, moduleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := serviceCatalog.TerraformModuleRegistryService.DeleteModule(ctx, module); err != nil {
 		return nil, err
 	}
 
@@ -456,9 +474,7 @@ func loadTerraformModule(ctx context.Context, id string) (*models.TerraformModul
 }
 
 func moduleBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getModuleRegistryService(ctx)
-
-	modules, err := service.GetModulesByIDs(ctx, ids)
+	modules, err := getServiceCatalog(ctx).TerraformModuleRegistryService.GetModulesByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

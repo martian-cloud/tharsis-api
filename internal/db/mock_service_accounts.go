@@ -110,21 +110,21 @@ func (_m *MockServiceAccounts) GetServiceAccountByID(ctx context.Context, id str
 	return r0, r1
 }
 
-// GetServiceAccountByPath provides a mock function with given fields: ctx, path
-func (_m *MockServiceAccounts) GetServiceAccountByPath(ctx context.Context, path string) (*models.ServiceAccount, error) {
-	ret := _m.Called(ctx, path)
+// GetServiceAccountByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockServiceAccounts) GetServiceAccountByTRN(ctx context.Context, trn string) (*models.ServiceAccount, error) {
+	ret := _m.Called(ctx, trn)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetServiceAccountByPath")
+		panic("no return value specified for GetServiceAccountByTRN")
 	}
 
 	var r0 *models.ServiceAccount
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.ServiceAccount, error)); ok {
-		return rf(ctx, path)
+		return rf(ctx, trn)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.ServiceAccount); ok {
-		r0 = rf(ctx, path)
+		r0 = rf(ctx, trn)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.ServiceAccount)
@@ -132,7 +132,7 @@ func (_m *MockServiceAccounts) GetServiceAccountByPath(ctx context.Context, path
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

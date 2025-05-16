@@ -59,14 +59,22 @@ input CreateTeamInput {
 
 input UpdateTeamInput {
   clientMutationId: String
-  name: String!
+  id: String
+  name: String
+    @deprecated(
+      reason: "Use id field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   description: String!
   metadata: ResourceMetadataInput
 }
 
 input DeleteTeamInput {
   clientMutationId: String
-  name: String!
+  id: String
+  name: String
+    @deprecated(
+      reason: "Use id field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   metadata: ResourceMetadataInput
 }
 

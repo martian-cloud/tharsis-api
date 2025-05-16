@@ -10,8 +10,10 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
+	"go.opentelemetry.io/otel/attribute"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -23,8 +25,8 @@ type Users interface {
 	GetUserByExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error)
 	LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
+	GetUserByTRN(ctx context.Context, trn string) (*models.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
-	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
 	GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResult, error)
 	UpdateUser(ctx context.Context, user *models.User) (*models.User, error)
 	CreateUser(ctx context.Context, user *models.User) (*models.User, error)
@@ -98,6 +100,19 @@ func (u *users) GetUserByID(ctx context.Context, id string) (*models.User, error
 	defer span.End()
 
 	return u.getUser(ctx, goqu.Ex{"users.id": id})
+}
+
+func (u *users) GetUserByTRN(ctx context.Context, trn string) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.GetUserByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
+	defer span.End()
+
+	path, err := types.UserModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	return u.getUser(ctx, goqu.Ex{"users.username": path})
 }
 
 func (u *users) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
@@ -390,6 +405,9 @@ func (u *users) DeleteUser(ctx context.Context, user *models.User) error {
 }
 
 func (u *users) getUser(ctx context.Context, exp goqu.Ex) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "db.getUser")
+	defer span.End()
+
 	query := dialect.From(goqu.T("users")).
 		Prepared(true).
 		Select(userFieldList...).
@@ -397,7 +415,7 @@ func (u *users) getUser(ctx context.Context, exp goqu.Ex) (*models.User, error) 
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	user, err := scanUser(u.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -405,7 +423,14 @@ func (u *users) getUser(ctx context.Context, exp goqu.Ex) (*models.User, error) 
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return user, nil
@@ -444,6 +469,8 @@ func scanUser(row scanner) (*models.User, error) {
 	if scimExternalID.Valid {
 		user.SCIMExternalID = scimExternalID.String
 	}
+
+	user.Metadata.TRN = types.UserModelType.BuildTRN(user.Username)
 
 	return user, nil
 }

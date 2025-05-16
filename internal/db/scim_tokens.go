@@ -10,6 +10,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
@@ -147,6 +148,9 @@ func (s *scimTokens) DeleteToken(ctx context.Context, token *models.SCIMToken) e
 }
 
 func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToken, error) {
+	ctx, span := tracer.Start(ctx, "db.getToken")
+	defer span.End()
+
 	sql, args, err := dialect.From("scim_tokens").
 		Prepared(true).
 		Select(s.getSelectFields()...).
@@ -154,7 +158,7 @@ func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToke
 		ToSQL()
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	token, err := scanSCIMToken(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -163,7 +167,8 @@ func (s *scimTokens) getToken(ctx context.Context, exp exp.Ex) (*models.SCIMToke
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 	return token, nil
 }
@@ -193,6 +198,8 @@ func scanSCIMToken(row scanner) (*models.SCIMToken, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	token.Metadata.TRN = types.SCIMTokenModelType.BuildTRN(token.GetGlobalID())
 
 	return token, nil
 }

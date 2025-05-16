@@ -92,6 +92,36 @@ func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByID(ctx context.Co
 	return r0, r1
 }
 
+// GetProviderPlatformByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockTerraformProviderPlatforms) GetProviderPlatformByTRN(ctx context.Context, trn string) (*models.TerraformProviderPlatform, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderPlatformByTRN")
+	}
+
+	var r0 *models.TerraformProviderPlatform
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformProviderPlatform, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformProviderPlatform); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformProviderPlatform)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetProviderPlatforms provides a mock function with given fields: ctx, input
 func (_m *MockTerraformProviderPlatforms) GetProviderPlatforms(ctx context.Context, input *GetProviderPlatformsInput) (*ProviderPlatformsResult, error) {
 	ret := _m.Called(ctx, input)

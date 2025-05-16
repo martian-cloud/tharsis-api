@@ -4,14 +4,18 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -67,8 +71,10 @@ type StateVersionsResult struct {
 // StateVersions encapsulates the logic to access stateVersions from the database
 type StateVersions interface {
 	GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*StateVersionsResult, error)
-	// GetStateVersion returns a stateVersion by ID
-	GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error)
+	// GetStateVersionByID returns a stateVersion by ID
+	GetStateVersionByID(ctx context.Context, id string) (*models.StateVersion, error)
+	// GetStateVersionByTRN returns a state version by TRN
+	GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error)
 	// CreateStateVersion will create a new stateVersion
 	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error)
 }
@@ -109,7 +115,8 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	}
 
 	query := dialect.From("state_versions").
-		Select(stateVersionFieldList...).
+		Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -164,32 +171,35 @@ func (s *stateVersions) GetStateVersions(ctx context.Context,
 	return &result, nil
 }
 
-func (s *stateVersions) GetStateVersion(ctx context.Context, id string) (*models.StateVersion, error) {
-	ctx, span := tracer.Start(ctx, "db.GetStateVersion")
+func (s *stateVersions) GetStateVersionByID(ctx context.Context, id string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersionByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
-	sql, args, err := dialect.From("state_versions").
-		Prepared(true).
-		Select(stateVersionFieldList...).
-		Where(goqu.Ex{"id": id}).
-		ToSQL()
+	return s.getStateVersion(ctx, goqu.Ex{"state_versions.id": id})
+}
 
+func (s *stateVersions) GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.GetStateVersionByTRN")
+	defer span.End()
+
+	path, err := types.StateVersionModelType.ResourcePathFromTRN(trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to generate SQL")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
 	}
 
-	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		tracing.RecordError(span, err, "failed to execute query")
-		return nil, err
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a state version TRN must have the workspace path and GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
 	}
-	return stateVersion, nil
+
+	return s.getStateVersion(ctx, goqu.Ex{
+		"state_versions.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path":   path[:lastSlashIndex],
+	})
 }
 
 func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion) (*models.StateVersion, error) {
@@ -199,18 +209,22 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("state_versions").
+	sql, args, err := dialect.From("state_versions").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":           newResourceID(),
-			"version":      initialResourceVersion,
-			"created_at":   timestamp,
-			"updated_at":   timestamp,
-			"workspace_id": stateVersion.WorkspaceID,
-			"run_id":       stateVersion.RunID,
-			"created_by":   stateVersion.CreatedBy,
-		}).
-		Returning(stateVersionFieldList...).ToSQL()
+		With("state_versions",
+			dialect.Insert("state_versions").
+				Rows(goqu.Record{
+					"id":           newResourceID(),
+					"version":      initialResourceVersion,
+					"created_at":   timestamp,
+					"updated_at":   timestamp,
+					"workspace_id": stateVersion.WorkspaceID,
+					"run_id":       stateVersion.RunID,
+					"created_by":   stateVersion.CreatedBy,
+				}).Returning("*"),
+		).Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -227,7 +241,52 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 	return createdStateVersion, nil
 }
 
+func (s *stateVersions) getStateVersion(ctx context.Context, ex goqu.Ex) (*models.StateVersion, error) {
+	ctx, span := tracer.Start(ctx, "db.getStateVersion")
+	defer span.End()
+
+	sql, args, err := dialect.From("state_versions").
+		Prepared(true).
+		Select(s.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"state_versions.workspace_id": goqu.I("namespaces.workspace_id")})).
+		Where(ex).
+		ToSQL()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
+	}
+
+	stateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
+	}
+
+	return stateVersion, nil
+}
+
+func (s *stateVersions) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range stateVersionFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("state_versions.%s", field))
+	}
+
+	selectFields = append(selectFields, "namespaces.path")
+
+	return selectFields
+}
+
 func scanStateVersion(row scanner) (*models.StateVersion, error) {
+	var workspacePath string
 	stateVersion := &models.StateVersion{}
 
 	err := row.Scan(
@@ -238,10 +297,13 @@ func scanStateVersion(row scanner) (*models.StateVersion, error) {
 		&stateVersion.WorkspaceID,
 		&stateVersion.RunID,
 		&stateVersion.CreatedBy,
+		&workspacePath,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	stateVersion.Metadata.TRN = types.StateVersionModelType.BuildTRN(workspacePath, stateVersion.GetGlobalID())
 
 	return stateVersion, nil
 }

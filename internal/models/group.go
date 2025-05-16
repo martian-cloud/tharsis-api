@@ -3,9 +3,12 @@ package models
 import (
 	"strings"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 )
+
+var _ Model = (*Group)(nil)
 
 // Group resource
 type Group struct {
@@ -17,6 +20,21 @@ type Group struct {
 	Metadata             ResourceMetadata
 	RunnerTags           []string
 	EnableDriftDetection *bool
+}
+
+// GetID returns the Metadata ID.
+func (g *Group) GetID() string {
+	return g.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (g *Group) GetGlobalID() string {
+	return gid.ToGlobalID(g.GetModelType(), g.Metadata.ID)
+}
+
+// GetModelType returns the Model's type
+func (g *Group) GetModelType() types.ModelType {
+	return types.GroupModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -56,16 +74,6 @@ func (g *Group) GetRootGroupPath() string {
 		return g.FullPath
 	}
 	return strings.Split(g.FullPath, "/")[0]
-}
-
-// GetID returns the ID for this group
-func (g *Group) GetID() string {
-	return g.Metadata.ID
-}
-
-// GetResourceType returns the group resource type
-func (g *Group) GetResourceType() permissions.ResourceType {
-	return permissions.GroupResourceType
 }
 
 // GetPath returns the full path for this group

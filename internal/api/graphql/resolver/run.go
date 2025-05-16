@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -23,12 +24,13 @@ import (
 // RunConnectionQueryArgs are used to query a run connection
 type RunConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	WorkspacePath       *string
+	WorkspacePath       *string // DEPRECATED: use WorkspaceID with a TRN instead
 	WorkspaceID         *string
 	WorkspaceAssessment *bool
 }
 
 // RunQueryArgs are used to query a single run
+// DEPRECATED: use node query instead
 type RunQueryArgs struct {
 	ID string
 }
@@ -65,7 +67,7 @@ type RunConnectionResolver struct {
 
 // NewRunConnectionResolver creates a new RunConnectionResolver
 func NewRunConnectionResolver(ctx context.Context, input *run.GetRunsInput) (*RunConnectionResolver, error) {
-	runService := getRunService(ctx)
+	runService := getServiceCatalog(ctx).RunService
 
 	result, err := runService.GetRuns(ctx, input)
 	if err != nil {
@@ -139,7 +141,7 @@ type RunResolver struct {
 
 // ID resolver
 func (r *RunResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.RunType, r.run.Metadata.ID))
+	return graphql.ID(r.run.GetGlobalID())
 }
 
 // Status resolver
@@ -239,9 +241,7 @@ func (r *RunResolver) Plan(ctx context.Context) (*PlanResolver, error) {
 func (r *RunResolver) Variables(ctx context.Context) ([]*RunVariableResolver, error) {
 	resolvers := []*RunVariableResolver{}
 
-	service := getRunService(ctx)
-
-	variables, err := service.GetRunVariables(ctx, r.run.Metadata.ID, false)
+	variables, err := getServiceCatalog(ctx).RunService.GetRunVariables(ctx, r.run.Metadata.ID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func (r *RunResolver) SensitiveVariableValues(ctx context.Context) ([]*RunVariab
 	resolvers := []*RunVariableSensitiveValueResolver{}
 
 	// Get run variables including sensitive values
-	variables, err := getRunService(ctx).GetRunVariables(ctx, r.run.Metadata.ID, true)
+	variables, err := getServiceCatalog(ctx).RunService.GetRunVariables(ctx, r.run.Metadata.ID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func (r *RunResolver) SensitiveVariableValues(ctx context.Context) ([]*RunVariab
 				return nil, errors.New("value and version id should be defined for sensitive variable version because includeSensitiveValues is true")
 			}
 			resolvers = append(resolvers, &RunVariableSensitiveValueResolver{
-				VersionID: gid.ToGlobalID(gid.VariableVersionType, *v.VersionID),
+				VersionID: gid.ToGlobalID(types.VariableVersionModelType, *v.VersionID),
 				Value:     *v.Value,
 			})
 		}
@@ -381,7 +381,7 @@ func (r *RunVariableResolver) VersionID() *string {
 	if r.variable.VersionID == nil {
 		return nil
 	}
-	versionID := gid.ToGlobalID(gid.VariableVersionType, *r.variable.VersionID)
+	versionID := gid.ToGlobalID(types.VariableVersionModelType, *r.variable.VersionID)
 	return &versionID
 }
 
@@ -390,15 +390,19 @@ func (r *RunVariableResolver) IncludedInTFConfig() *bool {
 	return r.variable.IncludedInTFConfig
 }
 
+// DEPRECATED: use node query instead
 func runQuery(ctx context.Context, args *RunQueryArgs) (*RunResolver, error) {
-	runService := getRunService(ctx)
-
-	run, err := runService.GetRun(ctx, gid.FromGlobalID(args.ID))
+	model, err := getServiceCatalog(ctx).FetchModel(ctx, args.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	run, ok := model.(*models.Run)
+	if !ok {
+		return nil, fmt.Errorf("expected run model type, got %T", model)
 	}
 
 	return &RunResolver{run: run}, nil
@@ -415,23 +419,29 @@ func runsQuery(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectio
 	}
 
 	if args.WorkspaceID != nil && args.WorkspacePath != nil {
-		return nil, fmt.Errorf("only workspaceId or workspacePath can be set")
-	} else if args.WorkspacePath != nil {
-		// Find workspace with path
-		ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, *args.WorkspacePath)
-		if err != nil {
-			return nil, err
-		}
+		return nil, errors.New("either workspaceId or workspacePath must be set, not both", errors.WithErrorCode(errors.EInvalid))
+	}
 
-		input.Workspace = ws
+	var workspaceFilterValueToResolver *string
+	if args.WorkspacePath != nil {
+		workspaceFilterValueToResolver = ptr.String(types.WorkspaceModelType.BuildTRN(*args.WorkspacePath))
 	} else if args.WorkspaceID != nil {
-		// Find workspace with ID
-		ws, err := getWorkspaceService(ctx).GetWorkspaceByID(ctx, gid.FromGlobalID(*args.WorkspaceID))
+		workspaceFilterValueToResolver = args.WorkspaceID
+	}
+
+	if workspaceFilterValueToResolver != nil {
+		serviceCatalog := getServiceCatalog(ctx)
+
+		workspaceID, err := serviceCatalog.FetchModelID(ctx, *workspaceFilterValueToResolver)
 		if err != nil {
 			return nil, err
 		}
 
-		input.Workspace = ws
+		workspace, err := serviceCatalog.WorkspaceService.GetWorkspaceByID(ctx, workspaceID)
+		if err != nil {
+			return nil, err
+		}
+		input.Workspace = workspace
 	}
 
 	if args.Sort != nil {
@@ -476,7 +486,7 @@ type CreateRunInput struct {
 		Key      string
 		Value    string
 		Category string
-		// DEPRECATED: HCL is deprecated, to be removed in a future release.
+		// DEPRECATED: HCL is DEPRECATED, to be removed in a future release.
 		Hcl *bool
 	}
 	TerraformVersion *string
@@ -484,7 +494,8 @@ type CreateRunInput struct {
 	Refresh          *bool
 	RefreshOnly      *bool
 	Speculative      *bool
-	WorkspacePath    string
+	WorkspaceID      *string
+	WorkspacePath    *string // DEPRECATED: use workspaceID instead with a TRN
 }
 
 // ApplyRunInput is the input for applying a run
@@ -520,14 +531,20 @@ func handleRunMutationProblem(e error, clientMutationID *string) (*RunMutationPa
 }
 
 func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutationPayloadResolver, error) {
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
+	serviceCatalog := getServiceCatalog(ctx)
+
 	var cvID *string
 	if input.ConfigurationVersionID != nil {
-		id := gid.FromGlobalID(*input.ConfigurationVersionID)
+		id, rErr := serviceCatalog.FetchModelID(ctx, *input.ConfigurationVersionID)
+		if rErr != nil {
+			return nil, rErr
+		}
+
 		cvID = &id
 	}
 
@@ -537,7 +554,7 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 	}
 
 	runOptions := &run.CreateRunInput{
-		WorkspaceID:            ws.Metadata.ID,
+		WorkspaceID:            workspaceID,
 		ConfigurationVersionID: cvID,
 		ModuleSource:           input.ModuleSource,
 		ModuleVersion:          input.ModuleVersion,
@@ -580,7 +597,7 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 		runOptions.RefreshOnly = *input.RefreshOnly
 	}
 
-	run, err := getRunService(ctx).CreateRun(ctx, runOptions)
+	run, err := serviceCatalog.RunService.CreateRun(ctx, runOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +607,14 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 }
 
 func applyRunMutation(ctx context.Context, input *ApplyRunInput) (*RunMutationPayloadResolver, error) {
-	run, err := getRunService(ctx).ApplyRun(ctx, gid.FromGlobalID(input.RunID), input.Comment)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	run, err := serviceCatalog.RunService.ApplyRun(ctx, runID, input.Comment)
 	if err != nil {
 		return nil, err
 	}
@@ -600,12 +624,19 @@ func applyRunMutation(ctx context.Context, input *ApplyRunInput) (*RunMutationPa
 }
 
 func cancelRunMutation(ctx context.Context, input *CancelRunInput) (*RunMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
+
 	force := false
 	if input.Force != nil {
 		force = *input.Force
 	}
-	run, err := getRunService(ctx).CancelRun(ctx, &run.CancelRunInput{
-		RunID:   gid.FromGlobalID(input.RunID),
+	run, err := serviceCatalog.RunService.CancelRun(ctx, &run.CancelRunInput{
+		RunID:   runID,
 		Comment: input.Comment,
 		Force:   force,
 	})
@@ -618,17 +649,22 @@ func cancelRunMutation(ctx context.Context, input *CancelRunInput) (*RunMutation
 }
 
 func setVariablesIncludedInTFConfigMutation(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) (*RunMutationPayloadResolver, error) {
-	runID := gid.FromGlobalID(input.RunID)
+	serviceCatalog := getServiceCatalog(ctx)
+
+	runID, err := serviceCatalog.FetchModelID(ctx, input.RunID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Set variables
-	if err := getRunService(ctx).SetVariablesIncludedInTFConfig(ctx, &run.SetVariablesIncludedInTFConfigInput{
+	if err = serviceCatalog.RunService.SetVariablesIncludedInTFConfig(ctx, &run.SetVariablesIncludedInTFConfigInput{
 		RunID:        runID,
 		VariableKeys: input.VariableKeys,
 	}); err != nil {
 		return nil, err
 	}
 
-	run, err := getRunService(ctx).GetRun(ctx, runID)
+	run, err := serviceCatalog.RunService.GetRunByID(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -657,27 +693,45 @@ func (r *RunEventResolver) Run() *RunResolver {
 // RunSubscriptionInput is the input for subscribing to run events
 type RunSubscriptionInput struct {
 	RunID         *string
-	WorkspacePath *string
+	WorkspaceID   *string
+	WorkspacePath *string // DEPRECATED: use workspaceID instead with a TRN
 }
 
 func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input *RunSubscriptionInput) (<-chan *RunEventResolver, error) {
-	runService := getRunService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
 	subscriptionInput := &run.EventSubscriptionOptions{}
 
-	if input.WorkspacePath != nil {
-		workspace, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, *input.WorkspacePath)
+	if input.WorkspaceID != nil && input.WorkspacePath != nil {
+		return nil, errors.New("workspaceId and workspacePath cannot both be set", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	var workspaceValueToResolve *string
+	if input.WorkspaceID != nil {
+		workspaceValueToResolve = input.WorkspaceID
+	} else if input.WorkspacePath != nil {
+		workspaceValueToResolve = ptr.String(types.WorkspaceModelType.BuildTRN(*input.WorkspacePath))
+	}
+
+	if workspaceValueToResolve != nil {
+		workspaceID, err := serviceCatalog.FetchModelID(ctx, *workspaceValueToResolve)
 		if err != nil {
 			return nil, err
 		}
-		subscriptionInput.WorkspaceID = &workspace.Metadata.ID
+
+		subscriptionInput.WorkspaceID = &workspaceID
 	}
 
 	if input.RunID != nil {
-		subscriptionInput.RunID = ptr.String(gid.FromGlobalID(*input.RunID))
+		runID, err := serviceCatalog.FetchModelID(ctx, *input.RunID)
+		if err != nil {
+			return nil, err
+		}
+
+		subscriptionInput.RunID = &runID
 	}
 
-	events, err := runService.SubscribeToRunEvents(ctx, subscriptionInput)
+	events, err := serviceCatalog.RunService.SubscribeToRunEvents(ctx, subscriptionInput)
 	if err != nil {
 		return nil, err
 	}
@@ -727,9 +781,7 @@ func loadRun(ctx context.Context, id string) (*models.Run, error) {
 }
 
 func runBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	runService := getRunService(ctx)
-
-	runs, err := runService.GetRunsByIDs(ctx, ids)
+	runs, err := getServiceCatalog(ctx).RunService.GetRunsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -772,7 +824,7 @@ func loadRunStateVersion(ctx context.Context, id string) (*models.StateVersion, 
 }
 
 func runStateVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	stateVersions, err := getRunService(ctx).GetStateVersionsByRunIDs(ctx, ids)
+	stateVersions, err := getServiceCatalog(ctx).RunService.GetStateVersionsByRunIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

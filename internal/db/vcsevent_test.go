@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -86,7 +88,7 @@ func TestGetEventByID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -106,6 +108,79 @@ func TestGetEventByID(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, actualEvent)
+			}
+		})
+	}
+}
+
+func TestGetVCSEventByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(123),
+	})
+	require.NoError(t, err)
+
+	vcsEvent, err := testClient.client.VCSEvents.CreateEvent(ctx, &models.VCSEvent{
+		RepositoryURL: sampleRepositoryURL,
+		WorkspaceID:   workspace.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectVCSEvent  bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:           "get resource by TRN",
+			trn:            vcsEvent.Metadata.TRN,
+			expectVCSEvent: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.VCSEventModelType.BuildTRN(group.FullPath, nonExistentGlobalID),
+		},
+		{
+			name:            "vcs event TRN cannot have less than two parts",
+			trn:             types.VCSEventModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualVCSEvent, err := testClient.client.VCSEvents.GetEventByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectVCSEvent {
+				require.NotNil(t, actualVCSEvent)
+				assert.Equal(t, test.trn, actualVCSEvent.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualVCSEvent)
 			}
 		})
 	}
@@ -962,6 +1037,7 @@ func compareVCSEvents(t *testing.T, expected, actual *models.VCSEvent,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

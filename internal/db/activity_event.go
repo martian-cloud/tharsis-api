@@ -11,6 +11,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -554,6 +555,8 @@ func scanActivityEvent(row scanner, withOtherTables bool) (*models.ActivityEvent
 	if err != nil {
 		return nil, err
 	}
+
+	activityEvent.Metadata.TRN = types.ActivityEventModelType.BuildTRN(activityEvent.GetGlobalID())
 
 	switch activityEvent.TargetType {
 	case models.TargetGPGKey:

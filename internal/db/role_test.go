@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -138,7 +140,7 @@ func TestGetRoleByID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -161,6 +163,61 @@ func TestGetRoleByID(t *testing.T) {
 				assert.Nil(t, actualRole)
 			}
 
+		})
+	}
+}
+
+func TestGetRoleByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name: "test-role",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectRole      bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get resource by TRN",
+			trn:        role.Metadata.TRN,
+			expectRole: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.RoleModelType.BuildTRN("unknown"),
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualRole, err := testClient.client.Roles.GetRoleByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectRole {
+				require.NotNil(t, actualRole)
+				assert.Equal(t, types.RoleModelType.BuildTRN(role.Name), actualRole.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualRole)
+			}
 		})
 	}
 }
@@ -1056,6 +1113,7 @@ func compareRoles(t *testing.T, expected, actual *models.Role,
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

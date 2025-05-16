@@ -6,10 +6,10 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
@@ -69,7 +69,7 @@ type UpdateManagedIdentityInput struct {
 
 // CreateManagedIdentityAliasInput is the input for creating a managed identity alias.
 type CreateManagedIdentityAliasInput struct {
-	Group         *models.Group
+	GroupID       string
 	Name          string
 	AliasSourceID string
 }
@@ -83,7 +83,7 @@ type MoveManagedIdentityInput struct {
 // Service implements managed identity functionality
 type Service interface {
 	GetManagedIdentityByID(ctx context.Context, id string) (*models.ManagedIdentity, error)
-	GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error)
+	GetManagedIdentityByTRN(ctx context.Context, trn string) (*models.ManagedIdentity, error)
 	GetManagedIdentities(ctx context.Context, input *GetManagedIdentitiesInput) (*db.ManagedIdentitiesResult, error)
 	GetManagedIdentitiesByIDs(ctx context.Context, ids []string) ([]models.ManagedIdentity, error)
 	CreateManagedIdentity(ctx context.Context, input *CreateManagedIdentityInput) (*models.ManagedIdentity, error)
@@ -95,7 +95,8 @@ type Service interface {
 	RemoveManagedIdentityFromWorkspace(ctx context.Context, managedIdentityID string, workspaceID string) error
 	GetManagedIdentityAccessRules(ctx context.Context, managedIdentity *models.ManagedIdentity) ([]models.ManagedIdentityAccessRule, error)
 	GetManagedIdentityAccessRulesByIDs(ctx context.Context, ids []string) ([]models.ManagedIdentityAccessRule, error)
-	GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error)
+	GetManagedIdentityAccessRuleByID(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error)
+	GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn string) (*models.ManagedIdentityAccessRule, error)
 	CreateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	UpdateManagedIdentityAccessRule(ctx context.Context, input *models.ManagedIdentityAccessRule) (*models.ManagedIdentityAccessRule, error)
 	DeleteManagedIdentityAccessRule(ctx context.Context, rule *models.ManagedIdentityAccessRule) error
@@ -147,7 +148,7 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 	}
 
 	if input.NamespacePath != "" {
-		if err = caller.RequirePermission(ctx, permissions.ViewManagedIdentityPermission, auth.WithNamespacePath(input.NamespacePath)); err != nil {
+		if err = caller.RequirePermission(ctx, models.ViewManagedIdentityPermission, auth.WithNamespacePath(input.NamespacePath)); err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
@@ -158,7 +159,7 @@ func (s *service) GetManagedIdentities(ctx context.Context, input *GetManagedIde
 			return nil, gErr
 		}
 
-		if err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(sourceIdentity.GroupID)); err != nil {
+		if err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(sourceIdentity.GroupID)); err != nil {
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
@@ -217,7 +218,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 		return errors.New("Only a source managed identity can be deleted, not an alias", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.DeleteManagedIdentityPermission, auth.WithGroupID(input.ManagedIdentity.GroupID))
+	err = caller.RequirePermission(ctx, models.DeleteManagedIdentityPermission, auth.WithGroupID(input.ManagedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -295,7 +296,7 @@ func (s *service) GetManagedIdentitiesForWorkspace(ctx context.Context, workspac
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.ViewManagedIdentityPermission, auth.WithWorkspaceID(workspaceID))
+	err = caller.RequirePermission(ctx, models.ViewManagedIdentityPermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -321,7 +322,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -341,7 +342,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return err
 	}
 
-	resourcePathParts := strings.Split(identity.ResourcePath, "/")
+	resourcePathParts := strings.Split(identity.GetResourcePath(), "/")
 	groupPath := strings.Join(resourcePathParts[:len(resourcePathParts)-1], "/")
 
 	// Verify that the managed identity's group is in the group hierarchy of the workspace
@@ -440,7 +441,7 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 		return err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
+	err = caller.RequirePermission(ctx, models.UpdateWorkspacePermission, auth.WithWorkspaceID(workspaceID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -520,7 +521,7 @@ func (s *service) GetManagedIdentityByID(ctx context.Context, id string) (*model
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(identity.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(identity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
@@ -529,8 +530,8 @@ func (s *service) GetManagedIdentityByID(ctx context.Context, id string) (*model
 	return identity, nil
 }
 
-func (s *service) GetManagedIdentityByPath(ctx context.Context, path string) (*models.ManagedIdentity, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetManagedIdentityByPath")
+func (s *service) GetManagedIdentityByTRN(ctx context.Context, trn string) (*models.ManagedIdentity, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetManagedIdentityByTRN")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -540,22 +541,18 @@ func (s *service) GetManagedIdentityByPath(ctx context.Context, path string) (*m
 		return nil, err
 	}
 
-	if isResourcePathInvalid(path) {
-		return nil, errors.New("Invalid path", errors.WithErrorCode(errors.EInvalid))
-	}
-
 	// Get identity from DB
-	identity, err := s.dbClient.ManagedIdentities.GetManagedIdentityByPath(ctx, path)
+	identity, err := s.dbClient.ManagedIdentities.GetManagedIdentityByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get managed identity by path")
+		tracing.RecordError(span, err, "failed to get managed identity by TRN")
 		return nil, err
 	}
 
 	if identity == nil {
-		return nil, errors.New("managed identity with path %s not found", path, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("managed identity with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(identity.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(identity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
@@ -576,7 +573,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 	}
 
 	// Require permissions for target group (group being shared to).
-	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission, auth.WithGroupID(input.Group.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -605,14 +602,24 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 	}
 
 	// Require permissions for source group (group source managed identity belongs to).
-	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission, auth.WithGroupID(input.Group.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission, auth.WithGroupID(sourceGroup.Metadata.ID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
+	newGroup, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get group by ID")
+		return nil, err
+	}
+
+	if newGroup == nil {
+		return nil, errors.New("group with ID %s not found", input.GroupID)
+	}
+
 	// Verify managed identity isn't being aliased within same namespace it's already available in.
-	if input.Group.IsDescendantOfGroup(sourceGroup.FullPath) || input.Group.FullPath == sourceGroup.FullPath {
+	if newGroup.IsDescendantOfGroup(sourceGroup.FullPath) || newGroup.FullPath == sourceGroup.FullPath {
 		return nil, errors.New("source managed identity %s is already available within namespace", aliasSourceIdentity.Name, errors.WithErrorCode(errors.EInvalid))
 	}
 
@@ -629,7 +636,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 	}()
 
 	toCreate := &models.ManagedIdentity{
-		GroupID:       input.Group.Metadata.ID,
+		GroupID:       newGroup.Metadata.ID,
 		AliasSourceID: &aliasSourceIdentity.Metadata.ID,
 		Name:          input.Name,
 		CreatedBy:     caller.GetSubject(),
@@ -704,7 +711,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 
 	s.logger.Infow("Created a managed identity alias.",
 		"caller", caller.GetSubject(),
-		"groupID", input.Group.Metadata.ID,
+		"groupID", newGroup.Metadata.ID,
 		"aliasID", createdAlias.Metadata.ID,
 	)
 
@@ -728,7 +735,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 	}
 
 	// First check whether they have permissions for alias' group.
-	perm := permissions.DeleteManagedIdentityPermission
+	perm := models.DeleteManagedIdentityPermission
 	if err = caller.RequirePermission(ctx, perm, auth.WithGroupID(input.ManagedIdentity.GroupID)); err != nil {
 		aliasSource, gErr := s.getManagedIdentityByID(ctx, *input.ManagedIdentity.AliasSourceID)
 		if gErr != nil {
@@ -816,7 +823,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission, auth.WithGroupID(input.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -979,7 +986,7 @@ func (s *service) GetManagedIdentitiesByIDs(ctx context.Context, ids []string) (
 	}
 
 	if len(namespacePaths) > 0 {
-		err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithNamespacePaths(namespacePaths))
+		err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithNamespacePaths(namespacePaths))
 		if err != nil {
 			tracing.RecordError(span, err, "inheritable resource access check failed")
 			return nil, err
@@ -1011,7 +1018,7 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 		return nil, errors.New("Only a source managed identity can be updated, not an alias", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1093,7 +1100,7 @@ func (s *service) GetManagedIdentityAccessRules(ctx context.Context, managedIden
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(managedIdentity.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
@@ -1156,8 +1163,8 @@ func (s *service) GetManagedIdentityAccessRulesByIDs(ctx context.Context,
 	return resp.ManagedIdentityAccessRules, nil
 }
 
-func (s *service) GetManagedIdentityAccessRule(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetManagedIdentityAccessRule")
+func (s *service) GetManagedIdentityAccessRuleByID(ctx context.Context, ruleID string) (*models.ManagedIdentityAccessRule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetManagedIdentityAccessRuleByID")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
@@ -1167,7 +1174,7 @@ func (s *service) GetManagedIdentityAccessRule(ctx context.Context, ruleID strin
 		return nil, err
 	}
 
-	rule, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRule(ctx, ruleID)
+	rule, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRuleByID(ctx, ruleID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get managed identity access rule")
 		return nil, err
@@ -1183,7 +1190,42 @@ func (s *service) GetManagedIdentityAccessRule(ctx context.Context, ruleID strin
 		return nil, err
 	}
 
-	err = caller.RequireAccessToInheritableResource(ctx, permissions.ManagedIdentityResourceType, auth.WithGroupID(managedIdentity.GroupID))
+	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(managedIdentity.GroupID))
+	if err != nil {
+		tracing.RecordError(span, err, "inheritable resource access check failed")
+		return nil, err
+	}
+
+	return rule, nil
+}
+
+func (s *service) GetManagedIdentityAccessRuleByTRN(ctx context.Context, trn string) (*models.ManagedIdentityAccessRule, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetManagedIdentityAccessRuleByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	rule, err := s.dbClient.ManagedIdentities.GetManagedIdentityAccessRuleByTRN(ctx, trn)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity access rule")
+		return nil, err
+	}
+
+	if rule == nil {
+		return nil, errors.New("managed identity access rule with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	managedIdentity, err := s.getManagedIdentityByID(ctx, rule.ManagedIdentityID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get managed identity by ID")
+		return nil, err
+	}
+
+	err = caller.RequireAccessToInheritableResource(ctx, types.ManagedIdentityModelType, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "inheritable resource access check failed")
 		return nil, err
@@ -1219,7 +1261,7 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, errors.New("Access rules can be created only for source managed identities, not for aliases", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1318,7 +1360,7 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 		return nil, errors.New("Access rules can be updated only for source managed identities, not for aliases", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
@@ -1391,7 +1433,7 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 		return errors.New("Access rules can be deleted only for source managed identities, not for aliases", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	err = caller.RequirePermission(ctx, permissions.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
+	err = caller.RequirePermission(ctx, models.UpdateManagedIdentityPermission, auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return err
@@ -1453,7 +1495,7 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 	}
 
 	// Get Job
-	job, err := s.jobService.GetJob(ctx, jobCaller.JobID)
+	job, err := s.jobService.GetJobByID(ctx, jobCaller.JobID)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get job")
 		return nil, err
@@ -1510,13 +1552,13 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 	}
 
 	// Caller must be an owner of both the old group and the new group.
-	err = caller.RequirePermission(ctx, permissions.DeleteManagedIdentityPermission,
+	err = caller.RequirePermission(ctx, models.DeleteManagedIdentityPermission,
 		auth.WithGroupID(managedIdentity.GroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
-	err = caller.RequirePermission(ctx, permissions.CreateManagedIdentityPermission,
+	err = caller.RequirePermission(ctx, models.CreateManagedIdentityPermission,
 		auth.WithGroupID(input.NewGroupID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
@@ -1643,19 +1685,19 @@ func (s *service) checkDisallowedAliases(ctx context.Context,
 		// If the alias is in the target group, then it's a problem.
 		if alias.GroupID == targetGroup.Metadata.ID {
 			return errors.New("managed identity %s is an alias of managed identity %s, which is in the target group %s",
-				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+				alias.GetResourcePath(), managedIdentity.GetResourcePath(), targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// If the alias is in a descendant of the target group, then it's a problem.
 		if utils.IsDescendantOfPath(alias.GetGroupPath(), targetGroup.FullPath) {
 			return errors.New("managed identity %s is an alias of managed identity %s, which is in a descendant group of the target group %s",
-				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+				alias.GetResourcePath(), managedIdentity.GetResourcePath(), targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// If the alias is in an ancestor of the target group, then it's a problem.
 		if targetGroup.IsDescendantOfGroup(alias.GetGroupPath()) {
 			return errors.New("managed identity %s is an alias of managed identity %s, which is in an ancestor group of the target group %s",
-				alias.ResourcePath, managedIdentity.ResourcePath, targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+				alias.GetResourcePath(), managedIdentity.GetResourcePath(), targetGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
@@ -1681,7 +1723,7 @@ func (s *service) checkWorkspaceAssignments(ctx context.Context,
 
 	if len(badPaths) > 0 {
 		return errors.New("managed identity %s is assigned to workspaces %s, which are outside the target group %s",
-			managedIdentity.ResourcePath, strings.Join(badPaths, ", "), newGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
+			managedIdentity.GetResourcePath(), strings.Join(badPaths, ", "), newGroup.FullPath, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
@@ -1709,7 +1751,7 @@ func (s *service) verifyServiceAccountAccessForGroup(ctx context.Context, servic
 		saGroupPath := sa.GetGroupPath()
 
 		if groupPath != saGroupPath && !utils.IsDescendantOfPath(groupPath, saGroupPath) {
-			return errors.New("service account %s is outside the scope of group %s", sa.ResourcePath, groupPath, errors.WithErrorCode(errors.EInvalid))
+			return errors.New("service account %s is outside the scope of group %s", sa.GetResourcePath(), groupPath, errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 	return nil

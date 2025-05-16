@@ -6,6 +6,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
@@ -16,6 +17,7 @@ import (
 /* ConfigurationVersion Query Resolvers */
 
 // ConfigurationVersionQueryArgs are used to query a single configuration version
+// DEPRECATED: use node query instead
 type ConfigurationVersionQueryArgs struct {
 	ID string
 }
@@ -27,7 +29,7 @@ type ConfigurationVersionResolver struct {
 
 // ID resolver
 func (r *ConfigurationVersionResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.ConfigurationVersionType, r.configurationVersion.Metadata.ID))
+	return graphql.ID(r.configurationVersion.GetGlobalID())
 }
 
 // Status resolver
@@ -42,7 +44,7 @@ func (r *ConfigurationVersionResolver) Speculative() bool {
 
 // WorkspaceID resolver
 func (r *ConfigurationVersionResolver) WorkspaceID() string {
-	return gid.ToGlobalID(gid.ConfigurationVersionType, r.configurationVersion.WorkspaceID)
+	return gid.ToGlobalID(types.WorkspaceModelType, r.configurationVersion.WorkspaceID)
 }
 
 // Metadata resolver
@@ -69,10 +71,9 @@ func (r *ConfigurationVersionResolver) VCSEvent(ctx context.Context) (*VCSEventR
 	return &VCSEventResolver{vcsEvent: event}, nil
 }
 
+// DEPRECATED: use node query instead since it supports both TRN and GID
 func configurationVersionQuery(ctx context.Context, args *ConfigurationVersionQueryArgs) (*ConfigurationVersionResolver, error) {
-	service := getWorkspaceService(ctx)
-
-	cv, err := service.GetConfigurationVersion(ctx, gid.FromGlobalID(args.ID))
+	model, err := getServiceCatalog(ctx).FetchModel(ctx, args.ID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -80,8 +81,9 @@ func configurationVersionQuery(ctx context.Context, args *ConfigurationVersionQu
 		return nil, err
 	}
 
-	if cv == nil {
-		return nil, nil
+	cv, ok := model.(*models.ConfigurationVersion)
+	if !ok {
+		return nil, errors.New("expected configuration version model, got %T", model)
 	}
 
 	return &ConfigurationVersionResolver{configurationVersion: cv}, nil
@@ -113,7 +115,8 @@ func (r *ConfigurationVersionMutationPayloadResolver) ConfigurationVersion() *Co
 type CreateConfigurationVersionInput struct {
 	ClientMutationID *string
 	Speculative      *bool
-	WorkspacePath    string
+	WorkspaceID      *string
+	WorkspacePath    *string // DEPRECATED: use WorkspaceID instead with a TRN
 }
 
 func handleConfigurationVersionMutationProblem(e error, clientMutationID *string) (*ConfigurationVersionMutationPayloadResolver, error) {
@@ -126,20 +129,20 @@ func handleConfigurationVersionMutationProblem(e error, clientMutationID *string
 }
 
 func createConfigurationVersionMutation(ctx context.Context, input *CreateConfigurationVersionInput) (*ConfigurationVersionMutationPayloadResolver, error) {
-	ws, err := getWorkspaceService(ctx).GetWorkspaceByFullPath(ctx, input.WorkspacePath)
+	workspaceID, err := toModelID(ctx, input.WorkspacePath, input.WorkspaceID, types.WorkspaceModelType)
 	if err != nil {
 		return nil, err
 	}
 
 	options := &workspace.CreateConfigurationVersionInput{
-		WorkspaceID: ws.Metadata.ID,
+		WorkspaceID: workspaceID,
 	}
 
 	if input.Speculative != nil {
 		options.Speculative = *input.Speculative
 	}
 
-	cv, err := getWorkspaceService(ctx).CreateConfigurationVersion(ctx, options)
+	cv, err := getServiceCatalog(ctx).WorkspaceService.CreateConfigurationVersion(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +180,7 @@ func loadConfigurationVersion(ctx context.Context, id string) (*models.Configura
 }
 
 func configurationVersionBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	configurationVersions, err := getWorkspaceService(ctx).GetConfigurationVersionsByIDs(ctx, ids)
+	configurationVersions, err := getServiceCatalog(ctx).WorkspaceService.GetConfigurationVersionsByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -17,12 +17,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
@@ -147,6 +147,443 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockResourceLimits:        &mockResourceLimits,
 		MockGroups:                &mockGroups,
 		MockStateVersions:         &mockStateVersions,
+	}
+}
+
+func TestRunByTRN(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID:  "run-id-1",
+			TRN: types.RunModelType.BuildTRN("run-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+		Status:      models.RunPlanned,
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		run             *models.Run
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get run by trn",
+			run:  sampleRun,
+		},
+		{
+			name:            "run not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view run",
+			run:             sampleRun,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRuns.On("GetRunByTRN", mock.Anything, sampleRun.Metadata.TRN).Return(test.run, nil)
+
+			if test.run != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualRun, err := service.GetRunByTRN(auth.WithCaller(ctx, mockCaller), sampleRun.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.run, actualRun)
+		})
+	}
+}
+
+func TestGetRunByID(t *testing.T) {
+	sampleRun := &models.Run{
+		Metadata: models.ResourceMetadata{
+			ID: "run-id-1",
+		},
+		WorkspaceID: "workspace-1",
+		Status:      models.RunPlanned,
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		run             *models.Run
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get run by id",
+			run:  sampleRun,
+		},
+		{
+			name:            "run not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view run",
+			run:             sampleRun,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockRuns.On("GetRunByID", mock.Anything, sampleRun.Metadata.ID).Return(test.run, nil)
+
+			if test.run != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Runs: mockRuns,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualRun, err := service.GetRunByID(auth.WithCaller(ctx, mockCaller), sampleRun.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.run, actualRun)
+		})
+	}
+}
+
+func TestGetPlanByID(t *testing.T) {
+	samplePlan := &models.Plan{
+		Metadata: models.ResourceMetadata{
+			ID: "plan-id-1",
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		plan            *models.Plan
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get plan by id",
+			plan: samplePlan,
+		},
+		{
+			name:            "plan not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view plan",
+			plan:            samplePlan,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockRuns := db.NewMockRuns(t)
+			mockPlans := db.NewMockPlans(t)
+
+			mockPlans.On("GetPlanByID", mock.Anything, samplePlan.Metadata.ID).Return(test.plan, nil)
+
+			if test.plan != nil {
+				mockRuns.On("GetRunByPlanID", mock.Anything, samplePlan.Metadata.ID).Return(&models.Run{
+					Metadata: models.ResourceMetadata{
+						ID: "run-id-1",
+					},
+					WorkspaceID: samplePlan.WorkspaceID,
+				}, nil)
+
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Plans: mockPlans,
+				Runs:  mockRuns,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualPlan, err := service.GetPlanByID(auth.WithCaller(ctx, mockCaller), samplePlan.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.plan, actualPlan)
+		})
+	}
+}
+
+func TestGetPlanByTRN(t *testing.T) {
+	samplePlan := &models.Plan{
+		Metadata: models.ResourceMetadata{
+			ID:  "plan-id-1",
+			TRN: types.PlanModelType.BuildTRN("plan-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		plan            *models.Plan
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get plan by trn",
+			plan: samplePlan,
+		},
+		{
+			name:            "plan not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view plan",
+			plan:            samplePlan,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockPlans := db.NewMockPlans(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockPlans.On("GetPlanByTRN", mock.Anything, samplePlan.Metadata.TRN).Return(test.plan, nil)
+
+			if test.plan != nil {
+				mockRuns.On("GetRunByPlanID", mock.Anything, samplePlan.Metadata.ID).Return(&models.Run{
+					Metadata: models.ResourceMetadata{
+						ID: "run-id-1",
+					},
+					WorkspaceID: samplePlan.WorkspaceID,
+				}, nil)
+
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Plans: mockPlans,
+				Runs:  mockRuns,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualPlan, err := service.GetPlanByTRN(auth.WithCaller(ctx, mockCaller), samplePlan.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.plan, actualPlan)
+		})
+	}
+}
+
+func TestGetApplyByID(t *testing.T) {
+	sampleApply := &models.Apply{
+		Metadata: models.ResourceMetadata{
+			ID: "apply-id-1",
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		apply           *models.Apply
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully get apply by id",
+			apply: sampleApply,
+		},
+		{
+			name:            "apply not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view apply",
+			apply:           sampleApply,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockApplies := db.NewMockApplies(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockApplies.On("GetApplyByID", mock.Anything, sampleApply.Metadata.ID).Return(test.apply, nil)
+
+			if test.apply != nil {
+				mockRuns.On("GetRunByApplyID", mock.Anything, sampleApply.Metadata.ID).Return(&models.Run{
+					Metadata: models.ResourceMetadata{
+						ID: "run-id-1",
+					},
+					WorkspaceID: sampleApply.WorkspaceID,
+				}, nil)
+
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Runs:    mockRuns,
+				Applies: mockApplies,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualApply, err := service.GetApplyByID(auth.WithCaller(ctx, mockCaller), sampleApply.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.apply, actualApply)
+		})
+	}
+}
+
+func TestGetApplyByTRN(t *testing.T) {
+	sampleApply := &models.Apply{
+		Metadata: models.ResourceMetadata{
+			ID:  "apply-id-1",
+			TRN: types.ApplyModelType.BuildTRN("apply-gid-1"),
+		},
+		WorkspaceID: "workspace-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		apply           *models.Apply
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully get apply by trn",
+			apply: sampleApply,
+		},
+		{
+			name:            "apply not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view apply",
+			apply:           sampleApply,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockApplies := db.NewMockApplies(t)
+			mockRuns := db.NewMockRuns(t)
+
+			mockApplies.On("GetApplyByTRN", mock.Anything, sampleApply.Metadata.TRN).Return(test.apply, nil)
+
+			if test.apply != nil {
+				mockRuns.On("GetRunByApplyID", mock.Anything, sampleApply.Metadata.ID).Return(&models.Run{
+					Metadata: models.ResourceMetadata{
+						ID: "run-id-1",
+					},
+					WorkspaceID: sampleApply.WorkspaceID,
+				}, nil)
+
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Runs:    mockRuns,
+				Applies: mockApplies,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualApply, err := service.GetApplyByTRN(auth.WithCaller(ctx, mockCaller), sampleApply.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.apply, actualApply)
+		})
 	}
 }
 
@@ -287,13 +724,13 @@ func TestGetRunVariables(t *testing.T) {
 			}
 
 			if test.hasViewVariableValuePermissions {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariableValuePermission, mock.Anything).Return(nil)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(nil)
 			} else {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariableValuePermission, mock.Anything).Return(errors.New("no permission", errors.WithErrorCode(errors.EForbidden)))
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariablePermission, mock.Anything).Return(test.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(errors.New("no permission", errors.WithErrorCode(errors.EForbidden)))
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariablePermission, mock.Anything).Return(test.authError)
 			}
 
-			mockDBClient.MockRuns.On("GetRun", mock.Anything, runID).Return(run, nil)
+			mockDBClient.MockRuns.On("GetRunByID", mock.Anything, runID).Return(run, nil)
 
 			mockArtifactStore.On("GetRunVariables", mock.Anything, run).Return(io.NopCloser(bytes.NewReader(marshaledRunVariables)), nil).Maybe()
 
@@ -349,7 +786,7 @@ func TestCreateRunWithSensitiveVariables(t *testing.T) {
 	mockSecretManager := secret.NewMockManager(t)
 
 	mockCaller := auth.NewMockCaller(t)
-	mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+	mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 	mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -416,7 +853,7 @@ func TestCreateRunWithSensitiveVariables(t *testing.T) {
 	dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
 		Return(&models.ResourceLimit{Value: 100}, nil)
 
-	dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
+	dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
 		Speculative: false,
 	}, nil)
 
@@ -594,7 +1031,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -635,7 +1072,7 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
 				Return(&models.ResourceLimit{Value: test.limit}, nil)
 
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
 				Speculative: false,
 			}, nil)
 
@@ -852,7 +1289,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -894,7 +1331,7 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
 				Return(&models.ResourceLimit{Value: test.limit}, nil)
 
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).Return(&models.ConfigurationVersion{
 				Speculative: false,
 			}, nil)
 
@@ -1172,7 +1609,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1214,7 +1651,7 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 			dbClient.MockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
 				Return(&models.ResourceLimit{Value: test.limit}, nil)
 
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).
 				Return(&models.ConfigurationVersion{
 					Speculative: test.injectConfigVersionSpec,
 				}, nil)
@@ -1353,7 +1790,7 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1447,7 +1884,7 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 				Private: true,
 			}, nil)
 
-			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, permissions.TerraformModuleResourceType, mock.Anything).Return(test.moduleAuthError)
+			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformModuleModelType, mock.Anything).Return(test.moduleAuthError)
 
 			if test.moduleAuthError == nil {
 				mockModuleRegistrySource.On("ResolveSemanticVersion", mock.Anything, &moduleVersion).Return(moduleVersion, nil)
@@ -1619,7 +2056,7 @@ func TestCreateRunWithJobTags(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return(createdBySubject).Maybe()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1645,7 +2082,7 @@ func TestCreateRunWithJobTags(t *testing.T) {
 				},
 			}, nil)
 
-			dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configVersionID).
+			dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configVersionID).
 				Return(&models.ConfigurationVersion{}, nil)
 
 			dbClient.MockApplies.On("CreateApply", mock.Anything, mock.Anything).Return(&models.Apply{
@@ -1819,7 +2256,7 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 			dbClient := buildDBClientWithMocks(t)
 
 			mockCaller := auth.NewMockCaller(t)
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(nil)
 			mockCaller.On("GetSubject").Return("mock-caller").Maybe()
 
 			ctx, cancel := context.WithCancel(auth.WithCaller(context.Background(), mockCaller))
@@ -1835,10 +2272,10 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			apply.Status = models.ApplyCreated // to avoid tripping the state transition checks in UpdateApply, etc.
 
-			dbClient.MockRuns.On("GetRun", mock.Anything, run.Metadata.ID).Return(&run, nil)
+			dbClient.MockRuns.On("GetRunByID", mock.Anything, run.Metadata.ID).Return(&run, nil)
 			dbClient.MockRuns.On("UpdateRun", mock.Anything, mock.Anything).Return(&run, nil)
 
-			dbClient.MockApplies.On("GetApply", mock.Anything, mock.Anything).Return(&apply, nil)
+			dbClient.MockApplies.On("GetApplyByID", mock.Anything, mock.Anything).Return(&apply, nil)
 			dbClient.MockApplies.On("UpdateApply", mock.Anything, mock.Anything).Return(&apply, nil)
 
 			dbClient.MockGroups.On("GetGroups", mock.Anything, mock.Anything).Return(&db.GroupsResult{
@@ -2022,14 +2459,14 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 			mockActivityEvents := activityevent.NewMockService(t)
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return(testSubject).Maybe()
 
 			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
 			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil).Maybe()
-			dbClient.MockStateVersions.On("GetStateVersion", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
+			dbClient.MockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
 
 			if test.expectErrorCode == "" {
 
@@ -2039,7 +2476,7 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 					Return([]models.ManagedIdentity{}, nil)
 
 				if test.stateVersion.RunID != nil {
-					dbClient.MockRuns.On("GetRun", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil)
+					dbClient.MockRuns.On("GetRunByID", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil)
 				}
 
 				dbClient.MockRuns.On("CreateRun", mock.Anything, mock.Anything).
@@ -2056,7 +2493,7 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 					Return(&models.ResourceLimit{Value: 10}, nil)
 
 				if test.currentRun.ConfigurationVersionID != nil {
-					dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).
+					dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).
 						Return(&models.ConfigurationVersion{
 							Speculative: false,
 						}, nil)
@@ -2196,7 +2633,7 @@ func TestGetStateVersionsByRunIDs(t *testing.T) {
 			})
 
 			if runsCount > 0 {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError).Times(runsCount)
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError).Times(runsCount)
 
 				if test.authError == nil {
 					mockStateVersions.On("GetStateVersions", mock.Anything, &db.GetStateVersionsInput{
@@ -2330,7 +2767,7 @@ func TestGetRuns(t *testing.T) {
 			}
 
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil).Maybe()
-			mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewRunPermission}, mock.Anything).Return(test.authError).Maybe()
+			mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewRunPermission}, mock.Anything).Return(test.authError).Maybe()
 
 			if test.expectErrorCode == "" {
 				mockRuns.On("GetRuns", mock.Anything, &db.GetRunsInput{
@@ -2415,7 +2852,7 @@ func TestGetPlanDiff(t *testing.T) {
 
 			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything, mock.Anything).Return(test.authError)
 
 			planDiffBuf, err := json.Marshal(test.expectedDiff)
 			require.NoError(t, err)
@@ -2488,7 +2925,7 @@ func TestUploadPlanBinary(t *testing.T) {
 
 			mockArtifactStore := workspace.NewMockArtifactStore(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdatePlanPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
 
 			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil).Maybe()
 
@@ -2603,7 +3040,7 @@ func TestProcessPlanData(t *testing.T) {
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdatePlanPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
 
 			mockRuns.On("GetRunByPlanID", mock.Anything, run.PlanID).Return(run, nil).Maybe()
 
@@ -2613,7 +3050,7 @@ func TestProcessPlanData(t *testing.T) {
 			if test.authError == nil {
 				mockParser.On("Parse", test.tfPlan, test.tfProviderSchemas).Return(test.expectDiff, nil)
 
-				mockPlans.On("GetPlan", mock.Anything, run.PlanID).Return(&models.Plan{
+				mockPlans.On("GetPlanByID", mock.Anything, run.PlanID).Return(&models.Plan{
 					Metadata: models.ResourceMetadata{
 						ID: planID,
 					},
@@ -2835,7 +3272,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
 
 			if test.input.WorkspaceID != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.ViewRunPermission, mock.Anything).
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewRunPermission, mock.Anything).
 					Return(test.authError)
 			}
 
@@ -3015,10 +3452,10 @@ func TestSetVariablesIncludedInTFConfig(t *testing.T) {
 				},
 			}
 
-			mockRuns.On("GetRun", mock.Anything, runID).Return(tc.run, nil)
+			mockRuns.On("GetRunByID", mock.Anything, runID).Return(tc.run, nil)
 
 			if tc.run != nil {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.UpdatePlanPermission, mock.Anything).Return(tc.authError)
+				mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(tc.authError)
 
 				if tc.authError == nil {
 					data, err := json.Marshal(sampleVariables)
@@ -3108,8 +3545,8 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "run1",
 				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
 			},
 			expectCreateRun: &models.Run{
 				Metadata: models.ResourceMetadata{
@@ -3138,8 +3575,8 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "run1",
 				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
 			},
 			existingAssessment: &models.WorkspaceAssessment{
 				Metadata: models.ResourceMetadata{
@@ -3177,8 +3614,8 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "run1",
 				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
 			},
 			existingAssessment: &models.WorkspaceAssessment{
 				Metadata: models.ResourceMetadata{
@@ -3208,8 +3645,8 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: "run1",
 				},
-				WorkspaceID:   ws.Metadata.ID,
-				ModuleSource:  &moduleSource,
+				WorkspaceID:  ws.Metadata.ID,
+				ModuleSource: &moduleSource,
 			},
 			existingAssessment: &models.WorkspaceAssessment{
 				Metadata: models.ResourceMetadata{
@@ -3258,17 +3695,17 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 
 			ctx = auth.WithCaller(ctx, mockCaller)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateRunPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateRunPermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return(testSubject).Maybe()
 
 			dbClient.MockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
 			dbClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 
 			dbClient.MockWorkspaces.On("GetWorkspaceByID", mock.Anything, ws.Metadata.ID).Return(ws, nil).Maybe()
-			dbClient.MockStateVersions.On("GetStateVersion", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
+			dbClient.MockStateVersions.On("GetStateVersionByID", mock.Anything, stateVersionID).Return(test.stateVersion, nil).Maybe()
 
 			if test.stateVersion != nil && test.stateVersion.RunID != nil {
-				dbClient.MockRuns.On("GetRun", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil).Maybe()
+				dbClient.MockRuns.On("GetRunByID", mock.Anything, *test.stateVersion.RunID).Return(test.currentRun, nil).Maybe()
 			}
 
 			runVariablesJSON, err := json.Marshal([]Variable{
@@ -3315,7 +3752,7 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 					Return(&models.ResourceLimit{Value: 10}, nil)
 
 				if test.currentRun.ConfigurationVersionID != nil {
-					dbClient.MockConfigurationVersions.On("GetConfigurationVersion", mock.Anything, configurationVersionID).
+					dbClient.MockConfigurationVersions.On("GetConfigurationVersionByID", mock.Anything, configurationVersionID).
 						Return(&models.ConfigurationVersion{
 							Speculative: false,
 						}, nil)

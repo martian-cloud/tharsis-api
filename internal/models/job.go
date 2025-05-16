@@ -1,6 +1,13 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+)
+
+var _ Model = (*Job)(nil)
 
 // JobStatus type
 type JobStatus string
@@ -46,7 +53,27 @@ type Job struct {
 	Tags                     []string
 }
 
+// GetID returns the Metadata ID.
+func (j *Job) GetID() string {
+	return j.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (j *Job) GetGlobalID() string {
+	return gid.ToGlobalID(j.GetModelType(), j.Metadata.ID)
+}
+
+// GetModelType returns the Model's type.
+func (j *Job) GetModelType() types.ModelType {
+	return types.JobModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (j *Job) ResolveMetadata(key string) (string, error) {
 	return j.Metadata.resolveFieldValue(key)
+}
+
+// Validate validates the model.
+func (j *Job) Validate() error {
+	return nil
 }

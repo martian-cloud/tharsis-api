@@ -135,8 +135,20 @@ input CreateManagedIdentityAccessRuleInput {
   runStage: JobType!
   moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicyInput!]
   allowedServiceAccounts: [String!]
+    @deprecated(
+      reason: "Use allowedServiceAccountIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   allowedUsers: [String!]
+    @deprecated(
+      reason: "Use allowedUserIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   allowedTeams: [String!]
+    @deprecated(
+      reason: "Use allowedTeamIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  allowedServiceAccountIds: [String!]
+  allowedUserIds: [String!]
+  allowedTeamIds: [String!]
   verifyStateLineage: Boolean
 }
 
@@ -146,8 +158,20 @@ input UpdateManagedIdentityAccessRuleInput {
   runStage: JobType!
   moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicyInput!]
   allowedServiceAccounts: [String!]
+    @deprecated(
+      reason: "Use allowedServiceAccountIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   allowedUsers: [String!]
+    @deprecated(
+      reason: "Use allowedUserIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   allowedTeams: [String!]
+    @deprecated(
+      reason: "Use allowedTeamIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  allowedServiceAccountIds: [String!]
+  allowedUserIds: [String!]
+  allowedTeamIds: [String!]
   verifyStateLineage: Boolean
 }
 
@@ -166,8 +190,20 @@ input ManagedIdentityAccessRuleInput {
   type: ManagedIdentityAccessRuleType!
   moduleAttestationPolicies: [ManagedIdentityAccessRuleModuleAttestationPolicyInput!]
   allowedServiceAccounts: [String!]
+    @deprecated(
+      reason: "Use allowedServiceAccountIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   allowedUsers: [String!]
+    @deprecated(
+      reason: "Use allowedUserIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   allowedTeams: [String!]
+    @deprecated(
+      reason: "Use allowedTeamIds field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  allowedServiceAccountIds: [String!]
+  allowedUserIds: [String!]
+  allowedTeamIds: [String!]
   verifyStateLineage: Boolean
 }
 
@@ -180,7 +216,11 @@ input CreateManagedIdentityInput {
   type: String!
   name: String!
   description: String!
-  groupPath: String!
+  groupId: String
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   data: String!
   accessRules: [ManagedIdentityAccessRuleInput!]
 }
@@ -189,8 +229,15 @@ input CreateManagedIdentityAliasInput {
   clientMutationId: String
   name: String!
   aliasSourceId: String
+  groupId: String
   aliasSourcePath: String
-  groupPath: String!
+    @deprecated(
+      reason: "Use aliasSourceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input DeleteManagedIdentityAliasInput {
@@ -218,8 +265,15 @@ input DeleteManagedIdentityInput {
 input AssignManagedIdentityInput {
   clientMutationId: String
   managedIdentityId: String
+  workspaceId: String
   managedIdentityPath: String
-  workspacePath: String!
+    @deprecated(
+      reason: "Use managedIdentityId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  workspacePath: String
+    @deprecated(
+      reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }
 
 input CreateManagedIdentityCredentialsInput {
@@ -230,5 +284,9 @@ input CreateManagedIdentityCredentialsInput {
 input MoveManagedIdentityInput {
   clientMutationId: String
   managedIdentityId: ID!
-  newParentPath: String!
+  newParentId: String
+  newParentPath: String
+    @deprecated(
+      reason: "Use newParentId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
 }

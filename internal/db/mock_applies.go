@@ -74,12 +74,12 @@ func (_m *MockApplies) GetApplies(ctx context.Context, input *GetAppliesInput) (
 	return r0, r1
 }
 
-// GetApply provides a mock function with given fields: ctx, id
-func (_m *MockApplies) GetApply(ctx context.Context, id string) (*models.Apply, error) {
+// GetApplyByID provides a mock function with given fields: ctx, id
+func (_m *MockApplies) GetApplyByID(ctx context.Context, id string) (*models.Apply, error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetApply")
+		panic("no return value specified for GetApplyByID")
 	}
 
 	var r0 *models.Apply
@@ -97,6 +97,36 @@ func (_m *MockApplies) GetApply(ctx context.Context, id string) (*models.Apply, 
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetApplyByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockApplies) GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetApplyByTRN")
+	}
+
+	var r0 *models.Apply
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Apply, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Apply); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Apply)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

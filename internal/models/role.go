@@ -1,9 +1,12 @@
 package models
 
 import (
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+var _ Model = (*Role)(nil)
 
 // Role defines a subject's ability to access or modify
 // resources within Tharsis. It provides a set of permissions
@@ -12,8 +15,23 @@ type Role struct {
 	Name        string
 	Description string
 	CreatedBy   string
-	permissions []permissions.Permission
+	permissions []Permission
 	Metadata    ResourceMetadata
+}
+
+// GetID returns the Metadata ID.
+func (r *Role) GetID() string {
+	return r.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (r *Role) GetGlobalID() string {
+	return gid.ToGlobalID(r.GetModelType(), r.Metadata.ID)
+}
+
+// GetModelType returns the model type.
+func (r *Role) GetModelType() types.ModelType {
+	return types.RoleModelType
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
@@ -32,12 +50,12 @@ func (r *Role) ResolveMetadata(key string) (string, error) {
 }
 
 // SetPermissions sets permissions for a role.
-func (r *Role) SetPermissions(perms []permissions.Permission) {
+func (r *Role) SetPermissions(perms []Permission) {
 	r.permissions = perms
 }
 
 // GetPermissions returns permissions for a role.
-func (r *Role) GetPermissions() []permissions.Permission {
+func (r *Role) GetPermissions() []Permission {
 	if perms, ok := DefaultRoleID(r.Metadata.ID).Permissions(); ok {
 		return perms
 	}
@@ -54,7 +72,7 @@ func (r *Role) Validate() error {
 
 	// Validate and deduplicate permissions.
 	seen := map[string]struct{}{}
-	uniquePerms := []permissions.Permission{}
+	uniquePerms := []Permission{}
 	for _, perm := range r.permissions {
 		// Make sure the permission can be assigned.
 		if !perm.IsAssignable() {
@@ -105,148 +123,148 @@ func (d DefaultRoleID) IsDefaultRole() bool {
 }
 
 // Permissions returns the Permission set for a default Tharsis role.
-func (d DefaultRoleID) Permissions() ([]permissions.Permission, bool) {
+func (d DefaultRoleID) Permissions() ([]Permission, bool) {
 	perms, ok := defaultRolePermissions[d]
 	return perms, ok
 }
 
 // defaultRolePermissions is a map of default role's ID to its Permission set.
-var defaultRolePermissions = map[DefaultRoleID][]permissions.Permission{
+var defaultRolePermissions = map[DefaultRoleID][]Permission{
 	// Owner Role
 	OwnerRoleID: {
-		permissions.ViewGPGKeyPermission,
-		permissions.CreateGPGKeyPermission,
-		permissions.DeleteGPGKeyPermission,
-		permissions.ViewGroupPermission,
-		permissions.CreateGroupPermission,
-		permissions.UpdateGroupPermission,
-		permissions.DeleteGroupPermission,
-		permissions.ViewWorkspacePermission,
-		permissions.CreateWorkspacePermission,
-		permissions.UpdateWorkspacePermission,
-		permissions.DeleteWorkspacePermission,
-		permissions.ViewNamespaceMembershipPermission,
-		permissions.CreateNamespaceMembershipPermission,
-		permissions.UpdateNamespaceMembershipPermission,
-		permissions.DeleteNamespaceMembershipPermission,
-		permissions.ViewRunPermission,
-		permissions.CreateRunPermission,
-		permissions.ViewJobPermission,
-		permissions.ViewRunnerPermission,
-		permissions.CreateRunnerPermission,
-		permissions.UpdateRunnerPermission,
-		permissions.DeleteRunnerPermission,
-		permissions.ViewVariablePermission,
-		permissions.CreateVariablePermission,
-		permissions.UpdateVariablePermission,
-		permissions.DeleteVariablePermission,
-		permissions.ViewVariableValuePermission,
-		permissions.ViewTerraformProviderPermission,
-		permissions.CreateTerraformProviderPermission,
-		permissions.UpdateTerraformProviderPermission,
-		permissions.DeleteTerraformProviderPermission,
-		permissions.ViewTerraformModulePermission,
-		permissions.CreateTerraformModulePermission,
-		permissions.UpdateTerraformModulePermission,
-		permissions.DeleteTerraformModulePermission,
-		permissions.ViewStateVersionPermission,
-		permissions.ViewStateVersionDataPermission,
-		permissions.CreateStateVersionPermission,
-		permissions.ViewConfigurationVersionPermission,
-		permissions.CreateConfigurationVersionPermission,
-		permissions.UpdateConfigurationVersionPermission,
-		permissions.ViewServiceAccountPermission,
-		permissions.CreateServiceAccountPermission,
-		permissions.UpdateServiceAccountPermission,
-		permissions.DeleteServiceAccountPermission,
-		permissions.ViewManagedIdentityPermission,
-		permissions.CreateManagedIdentityPermission,
-		permissions.UpdateManagedIdentityPermission,
-		permissions.DeleteManagedIdentityPermission,
-		permissions.ViewVCSProviderPermission,
-		permissions.CreateVCSProviderPermission,
-		permissions.UpdateVCSProviderPermission,
-		permissions.DeleteVCSProviderPermission,
-		permissions.ViewTerraformProviderMirrorPermission,
-		permissions.CreateTerraformProviderMirrorPermission,
-		permissions.DeleteTerraformProviderMirrorPermission,
-		permissions.ViewFederatedRegistryPermission,
-		permissions.CreateFederatedRegistryPermission,
-		permissions.UpdateFederatedRegistryPermission,
-		permissions.DeleteFederatedRegistryPermission,
+		ViewGPGKeyPermission,
+		CreateGPGKeyPermission,
+		DeleteGPGKeyPermission,
+		ViewGroupPermission,
+		CreateGroupPermission,
+		UpdateGroupPermission,
+		DeleteGroupPermission,
+		ViewWorkspacePermission,
+		CreateWorkspacePermission,
+		UpdateWorkspacePermission,
+		DeleteWorkspacePermission,
+		ViewNamespaceMembershipPermission,
+		CreateNamespaceMembershipPermission,
+		UpdateNamespaceMembershipPermission,
+		DeleteNamespaceMembershipPermission,
+		ViewRunPermission,
+		CreateRunPermission,
+		ViewJobPermission,
+		ViewRunnerPermission,
+		CreateRunnerPermission,
+		UpdateRunnerPermission,
+		DeleteRunnerPermission,
+		ViewVariablePermission,
+		CreateVariablePermission,
+		UpdateVariablePermission,
+		DeleteVariablePermission,
+		ViewVariableValuePermission,
+		ViewTerraformProviderPermission,
+		CreateTerraformProviderPermission,
+		UpdateTerraformProviderPermission,
+		DeleteTerraformProviderPermission,
+		ViewTerraformModulePermission,
+		CreateTerraformModulePermission,
+		UpdateTerraformModulePermission,
+		DeleteTerraformModulePermission,
+		ViewStateVersionPermission,
+		ViewStateVersionDataPermission,
+		CreateStateVersionPermission,
+		ViewConfigurationVersionPermission,
+		CreateConfigurationVersionPermission,
+		UpdateConfigurationVersionPermission,
+		ViewServiceAccountPermission,
+		CreateServiceAccountPermission,
+		UpdateServiceAccountPermission,
+		DeleteServiceAccountPermission,
+		ViewManagedIdentityPermission,
+		CreateManagedIdentityPermission,
+		UpdateManagedIdentityPermission,
+		DeleteManagedIdentityPermission,
+		ViewVCSProviderPermission,
+		CreateVCSProviderPermission,
+		UpdateVCSProviderPermission,
+		DeleteVCSProviderPermission,
+		ViewTerraformProviderMirrorPermission,
+		CreateTerraformProviderMirrorPermission,
+		DeleteTerraformProviderMirrorPermission,
+		ViewFederatedRegistryPermission,
+		CreateFederatedRegistryPermission,
+		UpdateFederatedRegistryPermission,
+		DeleteFederatedRegistryPermission,
 	},
 	// Deployer Role.
 	DeployerRoleID: {
-		permissions.ViewGPGKeyPermission,
-		permissions.CreateGPGKeyPermission,
-		permissions.DeleteGPGKeyPermission,
-		permissions.ViewGroupPermission,
-		permissions.CreateGroupPermission,
-		permissions.UpdateGroupPermission,
-		permissions.DeleteGroupPermission,
-		permissions.ViewWorkspacePermission,
-		permissions.CreateWorkspacePermission,
-		permissions.UpdateWorkspacePermission,
-		permissions.DeleteWorkspacePermission,
-		permissions.ViewNamespaceMembershipPermission,
-		permissions.ViewRunPermission,
-		permissions.CreateRunPermission,
-		permissions.ViewJobPermission,
-		permissions.ViewRunnerPermission,
-		permissions.ViewVariablePermission,
-		permissions.CreateVariablePermission,
-		permissions.UpdateVariablePermission,
-		permissions.DeleteVariablePermission,
-		permissions.ViewVariableValuePermission,
-		permissions.ViewTerraformProviderPermission,
-		permissions.CreateTerraformProviderPermission,
-		permissions.UpdateTerraformProviderPermission,
-		permissions.DeleteTerraformProviderPermission,
-		permissions.ViewTerraformModulePermission,
-		permissions.CreateTerraformModulePermission,
-		permissions.UpdateTerraformModulePermission,
-		permissions.DeleteTerraformModulePermission,
-		permissions.ViewStateVersionDataPermission,
-		permissions.ViewStateVersionPermission,
-		permissions.CreateStateVersionPermission,
-		permissions.ViewConfigurationVersionPermission,
-		permissions.CreateConfigurationVersionPermission,
-		permissions.UpdateConfigurationVersionPermission,
-		permissions.ViewServiceAccountPermission,
-		permissions.CreateServiceAccountPermission,
-		permissions.UpdateServiceAccountPermission,
-		permissions.DeleteServiceAccountPermission,
-		permissions.ViewManagedIdentityPermission,
-		permissions.ViewVCSProviderPermission,
-		permissions.CreateVCSProviderPermission,
-		permissions.UpdateVCSProviderPermission,
-		permissions.DeleteVCSProviderPermission,
-		permissions.ViewTerraformProviderMirrorPermission,
-		permissions.CreateTerraformProviderMirrorPermission,
-		permissions.DeleteTerraformProviderMirrorPermission,
-		permissions.ViewFederatedRegistryPermission,
-		permissions.CreateFederatedRegistryPermission,
-		permissions.UpdateFederatedRegistryPermission,
-		permissions.DeleteFederatedRegistryPermission,
+		ViewGPGKeyPermission,
+		CreateGPGKeyPermission,
+		DeleteGPGKeyPermission,
+		ViewGroupPermission,
+		CreateGroupPermission,
+		UpdateGroupPermission,
+		DeleteGroupPermission,
+		ViewWorkspacePermission,
+		CreateWorkspacePermission,
+		UpdateWorkspacePermission,
+		DeleteWorkspacePermission,
+		ViewNamespaceMembershipPermission,
+		ViewRunPermission,
+		CreateRunPermission,
+		ViewJobPermission,
+		ViewRunnerPermission,
+		ViewVariablePermission,
+		CreateVariablePermission,
+		UpdateVariablePermission,
+		DeleteVariablePermission,
+		ViewVariableValuePermission,
+		ViewTerraformProviderPermission,
+		CreateTerraformProviderPermission,
+		UpdateTerraformProviderPermission,
+		DeleteTerraformProviderPermission,
+		ViewTerraformModulePermission,
+		CreateTerraformModulePermission,
+		UpdateTerraformModulePermission,
+		DeleteTerraformModulePermission,
+		ViewStateVersionDataPermission,
+		ViewStateVersionPermission,
+		CreateStateVersionPermission,
+		ViewConfigurationVersionPermission,
+		CreateConfigurationVersionPermission,
+		UpdateConfigurationVersionPermission,
+		ViewServiceAccountPermission,
+		CreateServiceAccountPermission,
+		UpdateServiceAccountPermission,
+		DeleteServiceAccountPermission,
+		ViewManagedIdentityPermission,
+		ViewVCSProviderPermission,
+		CreateVCSProviderPermission,
+		UpdateVCSProviderPermission,
+		DeleteVCSProviderPermission,
+		ViewTerraformProviderMirrorPermission,
+		CreateTerraformProviderMirrorPermission,
+		DeleteTerraformProviderMirrorPermission,
+		ViewFederatedRegistryPermission,
+		CreateFederatedRegistryPermission,
+		UpdateFederatedRegistryPermission,
+		DeleteFederatedRegistryPermission,
 	},
 	// Viewer Role.
 	ViewerRoleID: {
-		permissions.ViewGPGKeyPermission,
-		permissions.ViewGroupPermission,
-		permissions.ViewWorkspacePermission,
-		permissions.ViewNamespaceMembershipPermission,
-		permissions.ViewRunPermission,
-		permissions.ViewJobPermission,
-		permissions.ViewRunnerPermission,
-		permissions.ViewVariablePermission,
-		permissions.ViewTerraformProviderPermission,
-		permissions.ViewTerraformModulePermission,
-		permissions.ViewStateVersionPermission,
-		permissions.ViewConfigurationVersionPermission,
-		permissions.ViewServiceAccountPermission,
-		permissions.ViewManagedIdentityPermission,
-		permissions.ViewVCSProviderPermission,
-		permissions.ViewTerraformProviderMirrorPermission,
-		permissions.ViewFederatedRegistryPermission,
+		ViewGPGKeyPermission,
+		ViewGroupPermission,
+		ViewWorkspacePermission,
+		ViewNamespaceMembershipPermission,
+		ViewRunPermission,
+		ViewJobPermission,
+		ViewRunnerPermission,
+		ViewVariablePermission,
+		ViewTerraformProviderPermission,
+		ViewTerraformModulePermission,
+		ViewStateVersionPermission,
+		ViewConfigurationVersionPermission,
+		ViewServiceAccountPermission,
+		ViewManagedIdentityPermission,
+		ViewVCSProviderPermission,
+		ViewTerraformProviderMirrorPermission,
+		ViewFederatedRegistryPermission,
 	},
 }

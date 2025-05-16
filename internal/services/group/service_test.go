@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/namespacemembership"
@@ -47,6 +47,142 @@ func buildDBClientWithMocks(t *testing.T) *mockDBClient {
 		MockTransactions:   &mockTransactions,
 		MockResourceLimits: &mockResourceLimits,
 		MockGroups:         &mockGroups,
+	}
+}
+
+func TestGetGroupByID(t *testing.T) {
+	sampleGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID: "group-id-1",
+		},
+		Name:     "group-1",
+		FullPath: "my-group/group-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		group           *models.Group
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully get group by ID",
+			group: sampleGroup,
+		},
+		{
+			name:            "group not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view group",
+			group:           sampleGroup,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockGroups := db.NewMockGroups(t)
+
+			mockGroups.On("GetGroupByID", mock.Anything, sampleGroup.Metadata.ID).Return(test.group, nil)
+
+			if test.group != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewGroupPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Groups: mockGroups,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualGroup, err := service.GetGroupByID(auth.WithCaller(ctx, mockCaller), sampleGroup.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, actualGroup)
+			assert.Equal(t, test.group, actualGroup)
+		})
+	}
+}
+
+func TestGroupByTRN(t *testing.T) {
+	sampleGroup := &models.Group{
+		Metadata: models.ResourceMetadata{
+			ID:  "group-id-1",
+			TRN: types.GroupModelType.BuildTRN("my-group/group-1"),
+		},
+		Name:     "group-1",
+		FullPath: "my-group/group-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		group           *models.Group
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully get group by trn",
+			group: sampleGroup,
+		},
+		{
+			name:            "group not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view group",
+			group:           sampleGroup,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockGroups := db.NewMockGroups(t)
+
+			mockGroups.On("GetGroupByTRN", mock.Anything, sampleGroup.Metadata.TRN).Return(test.group, nil)
+
+			if test.group != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewGroupPermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Groups: mockGroups,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualGroup, err := service.GetGroupByTRN(auth.WithCaller(ctx, mockCaller), sampleGroup.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.group, actualGroup)
+		})
 	}
 }
 
@@ -216,7 +352,7 @@ func TestCreateNestedGroup(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateGroupPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateGroupPermission, mock.Anything).Return(test.authError)
 
 			mockActivityEvents := activityevent.NewMockService(t)
 
@@ -270,11 +406,6 @@ func TestCreateNestedGroup(t *testing.T) {
 func TestGetGroups(t *testing.T) {
 	rootNamespaceID := "root-namespace-1"
 	parentGroupID := "this-is-a-fake-parent-group-ID"
-	parentGroup := &models.Group{
-		Metadata: models.ResourceMetadata{
-			ID: parentGroupID,
-		},
-	}
 	emptySearch := ""
 	nonEmptySearch := "non-empty-search-string"
 	userMemberID := "this-is-a-fake-user-member-ID"
@@ -371,7 +502,7 @@ func TestGetGroups(t *testing.T) {
 			name:       "admin caller, with parent group, search absent/nil, no root-only",
 			callerType: "admin",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
+				ParentGroupID: &parentGroupID,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -383,8 +514,8 @@ func TestGetGroups(t *testing.T) {
 			name:       "admin caller, with parent group, search empty, no root-only",
 			callerType: "admin",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &emptySearch,
+				ParentGroupID: &parentGroupID,
+				Search:        &emptySearch,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -397,8 +528,8 @@ func TestGetGroups(t *testing.T) {
 			name:       "admin caller, with parent group, search non-empty, no root-only",
 			callerType: "admin",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &nonEmptySearch,
+				ParentGroupID: &parentGroupID,
+				Search:        &nonEmptySearch,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -492,7 +623,7 @@ func TestGetGroups(t *testing.T) {
 			name:       "user member caller, with parent group, search absent/nil, no root-only",
 			callerType: "user",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
+				ParentGroupID: &parentGroupID,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -504,8 +635,8 @@ func TestGetGroups(t *testing.T) {
 			name:       "user member caller, with parent group, search empty, no root-only",
 			callerType: "user",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &emptySearch,
+				ParentGroupID: &parentGroupID,
+				Search:        &emptySearch,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -518,8 +649,8 @@ func TestGetGroups(t *testing.T) {
 			name:       "user member caller, with parent group, search non-empty, no root-only",
 			callerType: "user",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &nonEmptySearch,
+				ParentGroupID: &parentGroupID,
+				Search:        &nonEmptySearch,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -613,7 +744,7 @@ func TestGetGroups(t *testing.T) {
 			name:       "service account member caller, with parent group, search absent/nil, no root-only",
 			callerType: "service-account",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
+				ParentGroupID: &parentGroupID,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -625,8 +756,8 @@ func TestGetGroups(t *testing.T) {
 			name:       "service account member caller, with parent group, search empty, no root-only",
 			callerType: "service-account",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &emptySearch,
+				ParentGroupID: &parentGroupID,
+				Search:        &emptySearch,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -639,8 +770,8 @@ func TestGetGroups(t *testing.T) {
 			name:       "service account member caller, with parent group, search non-empty, no root-only",
 			callerType: "service-account",
 			svcInput: &GetGroupsInput{
-				ParentGroup: parentGroup,
-				Search:      &nonEmptySearch,
+				ParentGroupID: &parentGroupID,
+				Search:        &nonEmptySearch,
 			},
 			dbInput: &db.GetGroupsInput{
 				Filter: &db.GroupFilter{
@@ -802,7 +933,7 @@ func TestUpdateGroup(t *testing.T) {
 			mockTransactions := db.NewMockTransactions(t)
 			mockActivityEvents := activityevent.NewMockService(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateGroupPermission, mock.Anything).
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateGroupPermission, mock.Anything).
 				Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("testsubject").Maybe()
@@ -1045,12 +1176,12 @@ func TestMigrateGroup(t *testing.T) {
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
 
-			perms := []permissions.Permission{permissions.DeleteGroupPermission}
+			perms := []models.Permission{models.DeleteGroupPermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(groupAccessError)
 
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(nil)
 
-			perms = []permissions.Permission{permissions.CreateGroupPermission}
+			perms = []models.Permission{models.CreateGroupPermission}
 			mockAuthorizer.On("RequireAccess", mock.Anything, perms, mock.Anything).Return(parentAccessError)
 
 			mockGroups := db.MockGroups{}
@@ -1182,7 +1313,7 @@ func TestGetDriftDetectionEnabledSetting(t *testing.T) {
 			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
 			testLogger, _ := logger.NewForTest()
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewGroupPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewGroupPermission, mock.Anything).Return(test.authError)
 
 			mockInheritedSettingsResolver.On("GetDriftDetectionEnabled", mock.Anything, &group).Return(test.expectSetting, nil).Maybe()
 

@@ -62,36 +62,6 @@ func (_m *MockNotificationPreferences) DeleteNotificationPreference(ctx context.
 	return r0
 }
 
-// GetNotificationPreferenceByID provides a mock function with given fields: ctx, id
-func (_m *MockNotificationPreferences) GetNotificationPreferenceByID(ctx context.Context, id string) (*models.NotificationPreference, error) {
-	ret := _m.Called(ctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetNotificationPreferenceByID")
-	}
-
-	var r0 *models.NotificationPreference
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.NotificationPreference, error)); ok {
-		return rf(ctx, id)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.NotificationPreference); ok {
-		r0 = rf(ctx, id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.NotificationPreference)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetNotificationPreferences provides a mock function with given fields: ctx, input
 func (_m *MockNotificationPreferences) GetNotificationPreferences(ctx context.Context, input *GetNotificationPreferencesInput) (*NotificationPreferencesResult, error) {
 	ret := _m.Called(ctx, input)

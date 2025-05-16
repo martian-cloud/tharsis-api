@@ -8,17 +8,168 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
+
+func TestGetVariableByID(t *testing.T) {
+	sampleVariable := &models.Variable{
+		Metadata: models.ResourceMetadata{
+			ID: "var-1",
+		},
+		Key:   "key1",
+		Value: ptr.String("test-value"),
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		variable        *models.Variable
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "successfully get variable by id",
+			variable: sampleVariable,
+		},
+		{
+			name:            "variable not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view variable",
+			variable: &models.Variable{
+				Metadata:   sampleVariable.Metadata,
+				Key:        sampleVariable.Key,
+				SecretData: []byte("secret-data"),
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVariables := db.NewMockVariables(t)
+			mockSecretsManager := secret.NewMockManager(t)
+
+			mockVariables.On("GetVariableByID", mock.Anything, sampleVariable.Metadata.ID).Return(test.variable, nil)
+
+			if test.variable != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Variables: mockVariables,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				secretManager: mockSecretsManager,
+			}
+
+			actualVariable, err := service.GetVariableByID(auth.WithCaller(ctx, mockCaller), sampleVariable.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.variable, actualVariable)
+		})
+	}
+}
+
+func TestGetVariableByTRN(t *testing.T) {
+	variableID := "var-1"
+	variableTRN := types.VariableModelType.BuildTRN("variable-gid-1")
+
+	sampleVariable := &models.Variable{
+		Metadata: models.ResourceMetadata{
+			ID:  variableID,
+			TRN: variableTRN,
+		},
+		Key:   "key1",
+		Value: ptr.String("test-value"),
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		variable        *models.Variable
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "successfully get variable by trn",
+			variable: sampleVariable,
+		},
+		{
+			name:            "variable not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "subject is not authorized to view variable",
+			variable: &models.Variable{
+				Metadata:   sampleVariable.Metadata,
+				Key:        sampleVariable.Key,
+				SecretData: []byte("secret-data"),
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVariables := db.NewMockVariables(t)
+			mockSecretsManager := secret.NewMockManager(t)
+
+			mockVariables.On("GetVariableByTRN", mock.Anything, variableTRN).Return(test.variable, nil)
+
+			if test.variable != nil {
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				Variables: mockVariables,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				secretManager: mockSecretsManager,
+			}
+
+			actualVariable, err := service.GetVariableByTRN(auth.WithCaller(ctx, mockCaller), variableTRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.variable, actualVariable)
+		})
+	}
+}
 
 func TestGetVariableVersionByID(t *testing.T) {
 	variableID := "var-1"
@@ -107,7 +258,7 @@ func TestGetVariableVersionByID(t *testing.T) {
 
 			mockVariableVersions.On("GetVariableVersionByID", mock.Anything, variableVersionID).Return(test.variableVersion, nil)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
 			mockVariables.On("GetVariableByID", mock.Anything, variableID).Return(&models.Variable{Metadata: models.ResourceMetadata{ID: variableID}, Sensitive: test.sensitive}, nil)
 
 			if test.sensitive && test.includeSensitiveValue {
@@ -134,6 +285,135 @@ func TestGetVariableVersionByID(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectVariableVersion, variableVersion)
+		})
+	}
+}
+
+func TestGetVariableVersionByTRN(t *testing.T) {
+	variableID := "var-1"
+	variableVersionID := "var-version-1"
+	variableVersionTRN := types.VariableVersionModelType.BuildTRN("variable-version-gid-1")
+	secretValue := "test-secret-value"
+
+	type testCase struct {
+		name                  string
+		isSensitive           bool
+		includeSensitiveValue bool
+		authError             error
+		variableVersion       *models.VariableVersion
+		expectErrorCode       errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get variable version by trn",
+			variableVersion: &models.VariableVersion{
+				Metadata: models.ResourceMetadata{
+					ID:  variableVersionID,
+					TRN: variableVersionTRN,
+				},
+				VariableID: variableID,
+				Key:        "key1",
+				Value:      ptr.String("test-value"),
+			},
+		},
+		{
+			name:            "variable version not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:                  "variable is sensitive",
+			isSensitive:           true,
+			includeSensitiveValue: true,
+			variableVersion: &models.VariableVersion{
+				Metadata: models.ResourceMetadata{
+					ID:  variableVersionID,
+					TRN: variableVersionTRN,
+				},
+				VariableID: variableID,
+				Key:        "key1",
+				SecretData: []byte("secret-data"),
+			},
+		},
+		{
+			name:        "variable is sensitive but don't include sensitive value",
+			isSensitive: true,
+			variableVersion: &models.VariableVersion{
+				Metadata: models.ResourceMetadata{
+					ID:  variableVersionID,
+					TRN: variableVersionTRN,
+				},
+				VariableID: variableID,
+				Key:        "key1",
+				SecretData: []byte("secret-data"),
+			},
+		},
+		{
+			name: "subject is not authorized to view variable version",
+			variableVersion: &models.VariableVersion{
+				Metadata: models.ResourceMetadata{
+					ID:  variableVersionID,
+					TRN: variableVersionTRN,
+				},
+				VariableID: variableID,
+				Key:        "key1",
+				SecretData: []byte("secret-data"),
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockVariables := db.NewMockVariables(t)
+			mockSecretsManager := secret.NewMockManager(t)
+			mockVariableVersions := db.NewMockVariableVersions(t)
+
+			mockVariableVersions.On("GetVariableVersionByTRN", mock.Anything, variableVersionTRN).Return(test.variableVersion, nil)
+
+			if test.variableVersion != nil {
+				mockVariables.On("GetVariableByID", mock.Anything, variableID).Return(&models.Variable{
+					Metadata: models.ResourceMetadata{
+						ID: variableVersionID,
+					},
+					NamespacePath: "my-group",
+					Sensitive:     test.isSensitive,
+				}, nil)
+
+				mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+
+				if test.isSensitive && test.includeSensitiveValue {
+					mockSecretsManager.On("Get", mock.Anything, test.variableVersion.Key, test.variableVersion.SecretData).Return(secretValue, nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				Variables:        mockVariables,
+				VariableVersions: mockVariableVersions,
+			}
+
+			service := &service{
+				dbClient:      dbClient,
+				secretManager: mockSecretsManager,
+			}
+
+			actualVariableVersion, err := service.GetVariableVersionByTRN(auth.WithCaller(ctx, mockCaller), variableVersionTRN, test.includeSensitiveValue)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.variableVersion, actualVariableVersion)
+
+			if test.isSensitive && test.includeSensitiveValue {
+				assert.Equal(t, secretValue, *actualVariableVersion.Value)
+			}
 		})
 	}
 }
@@ -181,7 +461,7 @@ func TestGetVariableVersions(t *testing.T) {
 			mockVariables := db.NewMockVariables(t)
 			mockVariableVersions := db.NewMockVariableVersions(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.ViewVariableValuePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewVariableValuePermission, mock.Anything).Return(test.authError)
 			mockVariables.On("GetVariableByID", mock.Anything, variableID).Return(&models.Variable{Metadata: models.ResourceMetadata{ID: variableID}}, nil)
 
 			if test.authError == nil {
@@ -364,7 +644,7 @@ func TestSetVariables(t *testing.T) {
 			mockGroups := db.NewMockGroups(t)
 			mockTransactions := db.NewMockTransactions(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateVariablePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateVariablePermission, mock.Anything).Return(test.authError)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil).Maybe()
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
@@ -408,7 +688,7 @@ func TestSetVariables(t *testing.T) {
 					mockVariables.On("DeleteVariable", mock.Anything, v).Return(nil)
 				}
 
-				mockGroups.On("GetGroupByFullPath", mock.Anything, test.input.NamespacePath).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
+				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.input.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
 
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
@@ -557,7 +837,7 @@ func TestCreateVariable(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateVariablePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateVariablePermission, mock.Anything).Return(test.authError)
 
 			mockCaller.On("GetSubject").Return("mockSubject")
 
@@ -754,7 +1034,7 @@ func TestUpdateVariable(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateVariablePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateVariablePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -879,7 +1159,7 @@ func TestDeleteVariable(t *testing.T) {
 
 			mockCaller := auth.NewMockCaller(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteVariablePermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteVariablePermission, mock.Anything).Return(test.authError)
 			mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 			mockTransactions := db.NewMockTransactions(t)
@@ -893,7 +1173,7 @@ func TestDeleteVariable(t *testing.T) {
 
 			if test.expectErrCode == "" {
 				mockVariables.On("DeleteVariable", mock.Anything, test.existingVariable).Return(nil)
-				mockGroups.On("GetGroupByFullPath", mock.Anything, test.existingVariable.NamespacePath).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
+				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(test.existingVariable.NamespacePath)).Return(&models.Group{Metadata: models.ResourceMetadata{ID: "group-1"}}, nil)
 			}
 
 			dbClient := db.Client{

@@ -4,12 +4,15 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v4"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -18,6 +21,7 @@ import (
 // WorkspaceAssessments encapsulates the logic to access Tharsis workspaceAssessments from the database.
 type WorkspaceAssessments interface {
 	GetWorkspaceAssessmentByID(ctx context.Context, id string) (*models.WorkspaceAssessment, error)
+	GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error)
 	GetWorkspaceAssessmentByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceAssessment, error)
 	GetWorkspaceAssessments(ctx context.Context, input *GetWorkspaceAssessmentsInput) (*WorkspaceAssessmentsResult, error)
 	CreateWorkspaceAssessment(ctx context.Context, assessment *models.WorkspaceAssessment) (*models.WorkspaceAssessment, error)
@@ -94,6 +98,29 @@ func (r *workspaceAssessments) GetWorkspaceAssessmentByID(ctx context.Context, i
 	return r.getWorkspaceAssessment(ctx, goqu.Ex{"workspace_assessments.id": id})
 }
 
+func (r *workspaceAssessments) GetWorkspaceAssessmentByTRN(ctx context.Context, trn string) (*models.WorkspaceAssessment, error) {
+	ctx, span := tracer.Start(ctx, "db.GetWorkspaceAssessmentByTRN")
+	defer span.End()
+
+	path, err := types.WorkspaceAssessmentModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, err
+	}
+
+	lastSlashIndex := strings.LastIndex(path, "/")
+	if lastSlashIndex == -1 {
+		return nil, errors.New("a workspace assessment TRN must have the workspace path, and assessment GID separated by a forward slash",
+			errors.WithErrorCode(errors.EInvalid),
+			errors.WithSpan(span),
+		)
+	}
+
+	return r.getWorkspaceAssessment(ctx, goqu.Ex{
+		"workspace_assessments.id": gid.FromGlobalID(path[lastSlashIndex+1:]),
+		"namespaces.path":          path[:lastSlashIndex],
+	})
+}
+
 func (r *workspaceAssessments) GetWorkspaceAssessmentByWorkspaceID(ctx context.Context, workspaceID string) (*models.WorkspaceAssessment, error) {
 	ctx, span := tracer.Start(ctx, "db.GetWorkspaceAssessmentByWorkspaceID")
 	defer span.End()
@@ -121,7 +148,8 @@ func (r *workspaceAssessments) GetWorkspaceAssessments(ctx context.Context, inpu
 	}
 
 	query := dialect.From(goqu.T("workspace_assessments")).
-		Select(workspaceAssessmentsFieldList...).
+		Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
 		Where(ex)
 
 	sortDirection := pagination.AscSort
@@ -182,21 +210,25 @@ func (r *workspaceAssessments) CreateWorkspaceAssessment(ctx context.Context, as
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Insert("workspace_assessments").
+	sql, args, err := dialect.From("workspace_assessments").
 		Prepared(true).
-		Rows(goqu.Record{
-			"id":                    newResourceID(),
-			"version":               initialResourceVersion,
-			"created_at":            timestamp,
-			"updated_at":            timestamp,
-			"workspace_id":          assessment.WorkspaceID,
-			"completed_run_id":      assessment.RunID,
-			"has_drift":             assessment.HasDrift,
-			"requires_notification": assessment.RequiresNotification,
-			"completed_at":          assessment.CompletedAtTimestamp,
-			"started_at":            assessment.StartedAtTimestamp,
-		}).
-		Returning(workspaceAssessmentsFieldList...).ToSQL()
+		With("workspace_assessments",
+			dialect.Insert("workspace_assessments").
+				Rows(goqu.Record{
+					"id":                    newResourceID(),
+					"version":               initialResourceVersion,
+					"created_at":            timestamp,
+					"updated_at":            timestamp,
+					"workspace_id":          assessment.WorkspaceID,
+					"completed_run_id":      assessment.RunID,
+					"has_drift":             assessment.HasDrift,
+					"requires_notification": assessment.RequiresNotification,
+					"completed_at":          assessment.CompletedAtTimestamp,
+					"started_at":            assessment.StartedAtTimestamp,
+				}).Returning("*"),
+		).Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -225,19 +257,24 @@ func (r *workspaceAssessments) UpdateWorkspaceAssessment(ctx context.Context, as
 
 	timestamp := currentTime()
 
-	sql, args, err := dialect.Update("workspace_assessments").
+	sql, args, err := dialect.From("workspace_assessments").
 		Prepared(true).
-		Set(
-			goqu.Record{
-				"version":               goqu.L("? + ?", goqu.C("version"), 1),
-				"updated_at":            timestamp,
-				"completed_run_id":      assessment.RunID,
-				"has_drift":             assessment.HasDrift,
-				"requires_notification": assessment.RequiresNotification,
-				"completed_at":          assessment.CompletedAtTimestamp,
-				"started_at":            assessment.StartedAtTimestamp,
-			},
-		).Where(goqu.Ex{"id": assessment.Metadata.ID, "version": assessment.Metadata.Version}).Returning(workspaceAssessmentsFieldList...).ToSQL()
+		With("workspace_assessments",
+			dialect.Update("workspace_assessments").
+				Set(
+					goqu.Record{
+						"version":               goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":            timestamp,
+						"completed_run_id":      assessment.RunID,
+						"has_drift":             assessment.HasDrift,
+						"requires_notification": assessment.RequiresNotification,
+						"completed_at":          assessment.CompletedAtTimestamp,
+						"started_at":            assessment.StartedAtTimestamp,
+					},
+				).Where(goqu.Ex{"id": assessment.Metadata.ID, "version": assessment.Metadata.Version}).Returning("*"),
+		).Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
+		ToSQL()
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
 		return nil, err
@@ -260,14 +297,19 @@ func (r *workspaceAssessments) DeleteWorkspaceAssessment(ctx context.Context, as
 	ctx, span := tracer.Start(ctx, "db.DeleteWorkspaceAssessment")
 	defer span.End()
 
-	sql, args, err := dialect.Delete("workspace_assessments").
+	sql, args, err := dialect.From("workspace_assessments").
 		Prepared(true).
-		Where(
-			goqu.Ex{
-				"id":      assessment.Metadata.ID,
-				"version": assessment.Metadata.Version,
-			},
-		).Returning(workspaceAssessmentsFieldList...).ToSQL()
+		With("workspace_assessments",
+			dialect.Delete("workspace_assessments").
+				Where(
+					goqu.Ex{
+						"id":      assessment.Metadata.ID,
+						"version": assessment.Metadata.Version,
+					},
+				).Returning("*"),
+		).Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
+		ToSQL()
 
 	if err != nil {
 		tracing.RecordError(span, err, "failed to generate SQL")
@@ -293,7 +335,8 @@ func (r *workspaceAssessments) getWorkspaceAssessment(ctx context.Context, exp e
 
 	sql, args, err := dialect.From("workspace_assessments").
 		Prepared(true).
-		Select(workspaceAssessmentsFieldList...).
+		Select(r.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.I("workspace_assessments.workspace_id").Eq(goqu.I("namespaces.workspace_id")))).
 		Where(exp).
 		ToSQL()
 
@@ -311,7 +354,7 @@ func (r *workspaceAssessments) getWorkspaceAssessment(ctx context.Context, exp e
 
 		if pgErr := asPgError(err); pgErr != nil {
 			if isInvalidIDViolation(pgErr) {
-				return nil, errors.Wrap(pgErr, "invalid ID; %s", pgErr.Message, errors.WithSpan(span), errors.WithErrorCode(errors.EInvalid))
+				return nil, ErrInvalidID
 			}
 		}
 
@@ -322,7 +365,19 @@ func (r *workspaceAssessments) getWorkspaceAssessment(ctx context.Context, exp e
 	return assessment, nil
 }
 
+func (r *workspaceAssessments) getSelectFields() []interface{} {
+	selectFields := []interface{}{}
+	for _, field := range workspaceAssessmentsFieldList {
+		selectFields = append(selectFields, fmt.Sprintf("workspace_assessments.%s", field))
+	}
+
+	selectFields = append(selectFields, "namespaces.path")
+
+	return selectFields
+}
+
 func scanWorkspaceAssessment(row scanner) (*models.WorkspaceAssessment, error) {
+	var workspacePath string
 	wa := &models.WorkspaceAssessment{}
 
 	fields := []interface{}{
@@ -336,11 +391,14 @@ func scanWorkspaceAssessment(row scanner) (*models.WorkspaceAssessment, error) {
 		&wa.HasDrift,
 		&wa.RequiresNotification,
 		&wa.RunID,
+		&workspacePath,
 	}
 
 	if err := row.Scan(fields...); err != nil {
 		return nil, err
 	}
+
+	wa.Metadata.TRN = types.WorkspaceAssessmentModelType.BuildTRN(workspacePath, wa.GetGlobalID())
 
 	return wa, nil
 }

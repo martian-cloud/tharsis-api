@@ -84,15 +84,27 @@ type Runner implements Node {
 
 input AssignServiceAccountToRunnerInput {
   clientMutationId: String
-  runnerPath: String!
-  serviceAccountPath: String!
+  runnerPath: String
+    @deprecated(
+      reason: "Use runnerId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  serviceAccountPath: String
+    @deprecated(
+      reason: "Use serviceAccountId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  runnerId: String
+  serviceAccountId: String
 }
 
 input CreateRunnerInput {
   clientMutationId: String
   name: String!
   description: String!
-  groupPath: String!
+  groupId: String
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
   disabled: Boolean
   runUntaggedJobs: Boolean!
   tags: [String!]!

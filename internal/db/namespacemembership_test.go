@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -1267,7 +1269,7 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 		testCase{
 			name:      "negative, invalid",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	)
 
@@ -1284,6 +1286,77 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 			} else {
 				// the negative and defective cases
 				assert.Nil(t, namespaceMembership)
+			}
+		})
+	}
+}
+
+func TestGetNamespaceMembershipByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
+		Name: "test-role",
+	})
+	require.NoError(t, err)
+
+	namespaceMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
+		NamespacePath: group.FullPath,
+		RoleID:        role.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name                      string
+		trn                       string
+		expectNamespaceMembership bool
+		expectErrorCode           errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:                      "get resource by TRN",
+			trn:                       namespaceMembership.Metadata.TRN,
+			expectNamespaceMembership: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.NamespaceMembershipModelType.BuildTRN(group.FullPath, nonExistentGlobalID),
+		},
+		{
+			name:            "namespace membership TRN must not have less than two parts",
+			trn:             types.NamespaceMembershipModelType.BuildTRN(nonExistentGlobalID),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualNamespaceMembership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectNamespaceMembership {
+				require.NotNil(t, actualNamespaceMembership)
+				assert.Equal(t, types.NamespaceMembershipModelType.BuildTRN(group.FullPath, namespaceMembership.GetGlobalID()), actualNamespaceMembership.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualNamespaceMembership)
 			}
 		})
 	}
@@ -1331,9 +1404,8 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				},
 				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 				Namespace: models.MembershipNamespace{
-					Path:        "group-99",
-					GroupID:     &createdWarmupOutput.groups[3].Metadata.ID,
-					WorkspaceID: ptr.String(""),
+					Path:    "group-99",
+					GroupID: &createdWarmupOutput.groups[3].Metadata.ID,
 				},
 				UserID: &createdWarmupOutput.users[0].Metadata.ID,
 			},
@@ -1354,7 +1426,6 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				RoleID: createdWarmupOutput.roles[1].Metadata.ID,
 				Namespace: models.MembershipNamespace{
 					Path:        "group-a/workspace-99",
-					GroupID:     ptr.String(""),
 					WorkspaceID: &createdWarmupOutput.workspaces[3].Metadata.ID,
 				},
 				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
@@ -1375,9 +1446,8 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				},
 				RoleID: createdWarmupOutput.roles[2].Metadata.ID,
 				Namespace: models.MembershipNamespace{
-					Path:        "group-99",
-					GroupID:     &createdWarmupOutput.groups[3].Metadata.ID,
-					WorkspaceID: ptr.String(""),
+					Path:    "group-99",
+					GroupID: &createdWarmupOutput.groups[3].Metadata.ID,
 				},
 				TeamID: &createdWarmupOutput.teamMembers[0].TeamID,
 			},
@@ -2191,8 +2261,9 @@ func compareNamespaceMemberships(t *testing.T, expected, actual *models.Namespac
 
 	assert.Equal(t, expected.RoleID, actual.RoleID)
 
-	assert.Equal(t, expected.Namespace.ID, actual.Namespace.ID)
+	assert.NotNil(t, expected.Namespace.ID, actual.Namespace.ID)
 	assert.Equal(t, expected.Namespace.Path, actual.Namespace.Path)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	assert.Equal(t, (expected.Namespace.GroupID == nil), (actual.Namespace.GroupID == nil))
 	if (expected.Namespace.GroupID != nil) && (actual.Namespace.GroupID != nil) {

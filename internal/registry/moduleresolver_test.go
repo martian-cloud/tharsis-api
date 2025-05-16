@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	db "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	mtypes "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
@@ -116,11 +117,11 @@ func TestLocalTharsisRegistrySource_IsTharsisModule(t *testing.T) {
 
 func TestLocalTharsisRegistrySource_GetAttestations(t *testing.T) {
 	testCases := []struct {
-		name                string
-		moduleDigest        string
-		setupMocks          func(*db.MockTerraformModuleAttestations)
+		name                 string
+		moduleDigest         string
+		setupMocks           func(*db.MockTerraformModuleAttestations)
 		expectedAttestations []string
-		expectErrorMessage  string
+		expectErrorMessage   string
 	}{
 		{
 			name:         "successful attestation retrieval",
@@ -509,10 +510,10 @@ func TestFederatedTharsisRegistrySource_ResolveDigest(t *testing.T) {
 		name               string
 		moduleVersionSetup func(*MockFederatedRegistryClient)
 		expectedDigest     []byte
-		expectErrorMessage       string
+		expectErrorMessage string
 	}{
 		{
-			name:    "successful digest resolution",
+			name: "successful digest resolution",
 			moduleVersionSetup: func(mockClient *MockFederatedRegistryClient) {
 				mockClient.On("GetModuleVersion", mock.Anything, mock.MatchedBy(func(input *GetModuleVersionInput) bool {
 					return input.ModuleVersion == semanticVersion
@@ -526,7 +527,7 @@ func TestFederatedTharsisRegistrySource_ResolveDigest(t *testing.T) {
 			}(),
 		},
 		{
-			name:    "invalid digest format",
+			name: "invalid digest format",
 			moduleVersionSetup: func(mockClient *MockFederatedRegistryClient) {
 				mockClient.On("GetModuleVersion", mock.Anything, mock.MatchedBy(func(input *GetModuleVersionInput) bool {
 					return input.ModuleVersion == semanticVersion
@@ -534,7 +535,7 @@ func TestFederatedTharsisRegistrySource_ResolveDigest(t *testing.T) {
 					SHASum: "invalid-hex",
 				}, nil)
 			},
-			expectErrorMessage:   "failed to decode federated registry module digest",
+			expectErrorMessage: "failed to decode federated registry module digest",
 		},
 	}
 
@@ -612,10 +613,10 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 		wantVersion         *string
 		tokenGeneratorSetup func(*auth.MockIdentityProvider)
 		expectedVersion     string
-		expectErrorMessage        string
+		expectErrorMessage  string
 	}{
 		{
-			name:        "get latest version",
+			name: "get latest version",
 			tokenGeneratorSetup: func(mockIdentityProvider *auth.MockIdentityProvider) {
 				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 			},
@@ -635,8 +636,8 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 			tokenGeneratorSetup: func(mockIdentityProvider *auth.MockIdentityProvider) {
 				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
 			},
-			expectedVersion: "",
-			expectErrorMessage:    "token generation error",
+			expectedVersion:    "",
+			expectErrorMessage: "token generation error",
 		},
 	}
 
@@ -1007,7 +1008,7 @@ func TestParseModuleRegistrySource(t *testing.T) {
 			moduleSource: fmt.Sprintf("%s/namespace/module-name/aws", localRegistryHost),
 			setupMocks: func(mockGroups *db.MockGroups, mockModules *db.MockTerraformModules, _ *db.MockTerraformModuleVersions) {
 				// Setup mocks for local tharsis registry
-				mockGroups.On("GetGroupByFullPath", mock.Anything, "namespace").Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, mtypes.GroupModelType.BuildTRN("namespace")).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "group-id"},
 				}, nil)
 
@@ -1045,7 +1046,7 @@ func TestParseModuleRegistrySource(t *testing.T) {
 			name:         "module not found in namespace",
 			moduleSource: fmt.Sprintf("%s/namespace/module-name/aws", localRegistryHost),
 			setupMocks: func(mockGroups *db.MockGroups, mockModules *db.MockTerraformModules, _ *db.MockTerraformModuleVersions) {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, "namespace").Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, mtypes.GroupModelType.BuildTRN("namespace")).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "group-id"},
 				}, nil)
 
@@ -1160,7 +1161,7 @@ func TestGetModuleByAddress(t *testing.T) {
 			moduleName: "test-module",
 			system:     "aws",
 			setupMocks: func(mockGroups *db.MockGroups, mockModules *db.MockTerraformModules) {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, "test-namespace").Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, mtypes.GroupModelType.BuildTRN("test-namespace")).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "group-id"},
 				}, nil)
 
@@ -1190,7 +1191,7 @@ func TestGetModuleByAddress(t *testing.T) {
 			moduleName: "test-module",
 			system:     "aws",
 			setupMocks: func(mockGroups *db.MockGroups, _ *db.MockTerraformModules) {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, "non-existent-namespace").Return(nil, nil)
+				mockGroups.On("GetGroupByTRN", mock.Anything, mtypes.GroupModelType.BuildTRN("non-existent-namespace")).Return(nil, nil)
 			},
 			expectErrorMessage: "namespace non-existent-namespace not found",
 		},
@@ -1200,7 +1201,7 @@ func TestGetModuleByAddress(t *testing.T) {
 			moduleName: "non-existent-module",
 			system:     "aws",
 			setupMocks: func(mockGroups *db.MockGroups, mockModules *db.MockTerraformModules) {
-				mockGroups.On("GetGroupByFullPath", mock.Anything, "test-namespace").Return(&models.Group{
+				mockGroups.On("GetGroupByTRN", mock.Anything, mtypes.GroupModelType.BuildTRN("test-namespace")).Return(&models.Group{
 					Metadata: models.ResourceMetadata{ID: "group-id"},
 				}, nil)
 

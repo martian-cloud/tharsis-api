@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -170,20 +171,21 @@ func TestCreateActivityEvent(t *testing.T) {
 
 	positiveCallerServiceAccount := models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
-			ID: "test-caller-service-account-id-1",
+			ID:  "test-caller-service-account-id-1",
+			TRN: types.ServiceAccountModelType.BuildTRN("service-account-name-1"),
 		},
-		ResourcePath: "service-account-1-full-path",
-		Name:         "service-account-name-1",
-		Description:  "This is test service account 1.",
+		Name:        "service-account-name-1",
+		Description: "This is test service account 1.",
 	}
 
 	invalidCallerServiceAccount := models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
 			ID: "test-caller-invalid-service-account-id",
+			TRN: types.ServiceAccountModelType.BuildTRN(
+				"invalid-service-account-name-1"),
 		},
-		ResourcePath: "invalid-service-account-full-path",
-		Name:         "invalid",
-		Description:  "This is invalid test service account 1.",
+		Name:        "invalid",
+		Description: "This is invalid test service account 1.",
 	}
 
 	negativeError := fmt.Errorf("this is a negative error")
@@ -303,7 +305,7 @@ func TestCreateActivityEvent(t *testing.T) {
 				testCaller = auth.Caller(newUserCaller)
 			case test.callerServiceAccount != nil:
 				newServiceAccountCaller := auth.NewServiceAccountCaller(test.callerServiceAccount.Metadata.ID,
-					test.callerServiceAccount.ResourcePath, nil, nil, nil)
+					test.callerServiceAccount.GetResourcePath(), nil, nil, nil)
 				testCaller = auth.Caller(newServiceAccountCaller)
 			}
 

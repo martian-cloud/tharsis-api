@@ -1390,7 +1390,7 @@ func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
 /* Namespace Variable Version Queries */
 
 // NamespaceVariableVersion query returns a namespace variable version by ID
-func (r RootResolver) NamespaceVariableVersion(ctx context.Context, args *NamesapceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
+func (r RootResolver) NamespaceVariableVersion(ctx context.Context, args *NamespaceVariableVersionQueryArgs) (*NamespaceVariableVersionResolver, error) {
 	return namespaceVariableVersionQuery(ctx, args)
 }
 

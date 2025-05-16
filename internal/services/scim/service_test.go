@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -247,7 +247,7 @@ func TestCreateSCIMUser(t *testing.T) {
 			mockUsers.Test(t)
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateUserPermission).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateUserPermission).Return(nil)
 
 			mockUsers.On("GetUserByEmail", mock.Anything, test.input.Email).Return(test.existingSCIMUser, nil)
 			mockUsers.On("UpdateUser", mock.Anything, test.existingSCIMUser).Return(test.returnedSCIMUser, nil)
@@ -361,7 +361,7 @@ func TestUpdateSCIMUser(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateUserPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateUserPermission, mock.Anything).Return(nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -439,7 +439,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 			mockCaller.Test(t)
 
 			// Caller function mocks.
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteUserPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteUserPermission, mock.Anything).Return(test.authError)
 
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 
@@ -587,9 +587,9 @@ func TestCreateSCIMGroup(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.CreateTeamPermission).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.CreateTeamPermission).Return(nil)
 
-			mockTeams.On("GetTeamByName", mock.Anything, test.input.Name).Return(test.existingSCIMGroup, nil)
+			mockTeams.On("GetTeamByTRN", mock.Anything, types.TeamModelType.BuildTRN(test.input.Name)).Return(test.existingSCIMGroup, nil)
 			mockTeams.On("UpdateTeam", mock.Anything, test.existingSCIMGroup).Return(test.returnedSCIMGroup, nil)
 			mockTeams.On("CreateTeam", mock.Anything, sampleSCIMGroup).Return(test.returnedSCIMGroup, nil)
 
@@ -675,7 +675,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 					Path: "members",
 					Value: []interface{}{
 						map[string]interface{}{
-							"value": gid.ToGlobalID(gid.UserType, resourceUUID),
+							"value": gid.ToGlobalID(types.UserModelType, resourceUUID),
 						},
 					},
 				},
@@ -693,7 +693,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 					Path: "members",
 					Value: []interface{}{
 						map[string]interface{}{
-							"value": gid.ToGlobalID(gid.UserType, resourceUUID),
+							"value": gid.ToGlobalID(types.UserModelType, resourceUUID),
 						},
 					},
 				},
@@ -714,7 +714,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 					Path: "members",
 					Value: []interface{}{
 						map[string]interface{}{
-							"value": gid.ToGlobalID(gid.UserType, resourceUUID),
+							"value": gid.ToGlobalID(types.UserModelType, resourceUUID),
 						},
 					},
 				},
@@ -788,7 +788,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 			mockCaller := auth.MockCaller{}
 			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, permissions.UpdateTeamPermission, mock.Anything).Return(nil)
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -898,7 +898,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 			mockCaller.Test(t)
 
 			// Caller function mocks.
-			mockCaller.On("RequirePermission", mock.Anything, permissions.DeleteTeamPermission, mock.Anything).Return(test.authError)
+			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTeamPermission, mock.Anything).Return(test.authError)
 
 			ctx := auth.WithCaller(context.Background(), &mockCaller)
 

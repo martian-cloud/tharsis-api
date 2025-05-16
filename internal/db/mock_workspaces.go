@@ -62,36 +62,6 @@ func (_m *MockWorkspaces) DeleteWorkspace(ctx context.Context, workspace *models
 	return r0
 }
 
-// GetWorkspaceByFullPath provides a mock function with given fields: ctx, path
-func (_m *MockWorkspaces) GetWorkspaceByFullPath(ctx context.Context, path string) (*models.Workspace, error) {
-	ret := _m.Called(ctx, path)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetWorkspaceByFullPath")
-	}
-
-	var r0 *models.Workspace
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Workspace, error)); ok {
-		return rf(ctx, path)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Workspace); ok {
-		r0 = rf(ctx, path)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.Workspace)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetWorkspaceByID provides a mock function with given fields: ctx, id
 func (_m *MockWorkspaces) GetWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {
 	ret := _m.Called(ctx, id)
@@ -115,6 +85,36 @@ func (_m *MockWorkspaces) GetWorkspaceByID(ctx context.Context, id string) (*mod
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockWorkspaces) GetWorkspaceByTRN(ctx context.Context, trn string) (*models.Workspace, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkspaceByTRN")
+	}
+
+	var r0 *models.Workspace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Workspace, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Workspace); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Workspace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
 	} else {
 		r1 = ret.Error(1)
 	}

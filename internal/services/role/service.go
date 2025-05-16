@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -31,7 +30,7 @@ type GetRolesInput struct {
 type CreateRoleInput struct {
 	Name        string
 	Description string
-	Permissions []permissions.Permission
+	Permissions []models.Permission
 }
 
 // UpdateRoleInput is the input for updating a Role.
@@ -49,7 +48,7 @@ type DeleteRoleInput struct {
 type Service interface {
 	GetAvailablePermissions(ctx context.Context) ([]string, error)
 	GetRoleByID(ctx context.Context, id string) (*models.Role, error)
-	GetRoleByName(ctx context.Context, name string) (*models.Role, error)
+	GetRoleByTRN(ctx context.Context, trn string) (*models.Role, error)
 	GetRolesByIDs(ctx context.Context, idList []string) ([]models.Role, error)
 	GetRoles(ctx context.Context, input *GetRolesInput) (*db.RolesResult, error)
 	CreateRole(ctx context.Context, input *CreateRoleInput) (*models.Role, error)
@@ -86,7 +85,7 @@ func (s *service) GetAvailablePermissions(ctx context.Context) ([]string, error)
 		return nil, err
 	}
 
-	return permissions.GetAssignablePermissions(), nil
+	return models.GetAssignablePermissions(), nil
 }
 
 func (s *service) GetRoleByID(ctx context.Context, id string) (*models.Role, error) {
@@ -108,9 +107,8 @@ func (s *service) GetRoleByID(ctx context.Context, id string) (*models.Role, err
 	return role, nil
 }
 
-func (s *service) GetRoleByName(ctx context.Context, name string) (*models.Role, error) {
-	ctx, span := tracer.Start(ctx, "svc.GetRoleByName")
-	// TODO: Consider setting trace/span attributes for the input.
+func (s *service) GetRoleByTRN(ctx context.Context, trn string) (*models.Role, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetRoleByTRN")
 	defer span.End()
 
 	if _, err := auth.AuthorizeCaller(ctx); err != nil {
@@ -118,14 +116,14 @@ func (s *service) GetRoleByName(ctx context.Context, name string) (*models.Role,
 		return nil, err
 	}
 
-	role, err := s.dbClient.Roles.GetRoleByName(ctx, name)
+	role, err := s.dbClient.Roles.GetRoleByTRN(ctx, trn)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to get role by name")
+		tracing.RecordError(span, err, "failed to get role by TRN")
 		return nil, err
 	}
 
 	if role == nil {
-		return nil, errors.New("role with name %s not found", name, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("role with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	return role, nil

@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -155,7 +155,7 @@ func TestGetFederatedRegistriesByIDs(t *testing.T) {
 				}, nil).Maybe()
 
 			mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
-				permissions.FederatedRegistryResourceType, mock.Anything).
+				types.FederatedRegistryModelType, mock.Anything).
 				Return(test.injectGroupAccessError).Maybe()
 
 			testLogger, _ := logger.NewForTest()
@@ -259,11 +259,11 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 			mockDBClient := buildDBClientWithMocks(t)
 
 			mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
-				permissions.FederatedRegistryResourceType, mock.Anything).
+				types.FederatedRegistryModelType, mock.Anything).
 				Return(test.injectGroupAccessError).Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything,
-				permissions.ViewFederatedRegistryPermission, mock.Anything).
+				models.ViewFederatedRegistryPermission, mock.Anything).
 				Return(test.injectRegistryPermissionError).Maybe()
 
 			testLogger, _ := logger.NewForTest()
@@ -296,6 +296,73 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectFederatedRegistry, actualRegistry)
+		})
+	}
+}
+
+func TestFederatedRegistryByTRN(t *testing.T) {
+	sampleFederatedRegistry := &models.FederatedRegistry{
+		Metadata: models.ResourceMetadata{
+			ID:  "federated-registry-id-1",
+			TRN: types.FederatedRegistryModelType.BuildTRN("my-group/123341"),
+		},
+		GroupID: "group-1",
+	}
+
+	type testCase struct {
+		name            string
+		authError       error
+		registry        *models.FederatedRegistry
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:     "successfully get federated registry by trn",
+			registry: sampleFederatedRegistry,
+		},
+		{
+			name:            "federated registry not found",
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "subject is not authorized to view federated registry",
+			registry:        sampleFederatedRegistry,
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockFederatedRegistries := db.NewMockFederatedRegistries(t)
+
+			mockFederatedRegistries.On("GetFederatedRegistryByTRN", mock.Anything, sampleFederatedRegistry.Metadata.TRN).Return(test.registry, nil)
+
+			if test.registry != nil {
+				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.FederatedRegistryModelType, mock.Anything).Return(test.authError)
+			}
+
+			dbClient := &db.Client{
+				FederatedRegistries: mockFederatedRegistries,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualRegistry, err := service.GetFederatedRegistryByTRN(auth.WithCaller(ctx, mockCaller), sampleFederatedRegistry.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.registry, actualRegistry)
 		})
 	}
 }
@@ -466,11 +533,11 @@ func TestGetFederatedRegistries(t *testing.T) {
 				}, nil).Maybe()
 
 			mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
-				permissions.FederatedRegistryResourceType, mock.Anything).
+				types.FederatedRegistryModelType, mock.Anything).
 				Return(test.injectGroupAccessError).Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything,
-				permissions.ViewFederatedRegistryPermission, mock.Anything).
+				models.ViewFederatedRegistryPermission, mock.Anything).
 				Return(test.injectRegistryPermissionError).Maybe()
 
 			testCaller := auth.NewUserCaller(
@@ -604,11 +671,11 @@ func TestCreateFederatedRegistry(t *testing.T) {
 			mockCaller.On("GetSubject").Return("test-subject").Maybe()
 
 			mockCaller.On("RequireAccessToInheritableResource", mock.Anything,
-				permissions.FederatedRegistryResourceType, mock.Anything).
+				types.FederatedRegistryModelType, mock.Anything).
 				Return(test.injectGroupAccessError).Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything,
-				permissions.CreateFederatedRegistryPermission, mock.Anything).
+				models.CreateFederatedRegistryPermission, mock.Anything).
 				Return(test.injectRegistryPermissionError).Maybe()
 
 			testLogger, _ := logger.NewForTest()
@@ -745,7 +812,7 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 			mockCaller.On("GetSubject").Return("test-subject").Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything,
-				permissions.UpdateFederatedRegistryPermission, mock.Anything).
+				models.UpdateFederatedRegistryPermission, mock.Anything).
 				Return(test.injectRegistryPermissionError).Maybe()
 
 			testLogger, _ := logger.NewForTest()
@@ -875,7 +942,7 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 			mockCaller.On("GetSubject").Return("test-subject").Maybe()
 
 			mockCaller.On("RequirePermission", mock.Anything,
-				permissions.DeleteFederatedRegistryPermission, mock.Anything).
+				models.DeleteFederatedRegistryPermission, mock.Anything).
 				Return(test.injectRegistryPermissionError).Maybe()
 
 			testLogger, _ := logger.NewForTest()
@@ -962,7 +1029,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 		{
 			name: "authorization fails",
 			setupMocks: func(mockCaller *auth.MockCaller, _ *db.MockJobs, _ *db.MockWorkspaces, _ *db.MockFederatedRegistries, _ *auth.MockIdentityProvider) {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.CreateFederatedRegistryTokenPermission, mock.Anything).
+				mockCaller.On("RequirePermission", mock.Anything, models.CreateFederatedRegistryTokenPermission, mock.Anything).
 					Return(errors.New("caller lacks permission", errors.WithErrorCode(errors.EForbidden)))
 			},
 			expectErrorCode: errors.EForbidden,
@@ -970,7 +1037,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 		{
 			name: "successful token creation",
 			setupMocks: func(mockCaller *auth.MockCaller, mockJobs *db.MockJobs, mockWorkspaces *db.MockWorkspaces, mockFederatedRegistries *db.MockFederatedRegistries, mockIDP *auth.MockIdentityProvider) {
-				mockCaller.On("RequirePermission", mock.Anything, permissions.CreateFederatedRegistryTokenPermission, mock.Anything).
+				mockCaller.On("RequirePermission", mock.Anything, models.CreateFederatedRegistryTokenPermission, mock.Anything).
 					Return(nil)
 				mockJobs.On("GetJobByID", mock.Anything, jobID).Return(&models.Job{
 					WorkspaceID: workspaceID,

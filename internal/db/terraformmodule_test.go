@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -80,7 +82,7 @@ func TestGetModuleByID(t *testing.T) {
 		{
 			name:      "returns an error because the module ID is invalid",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -101,49 +103,76 @@ func TestGetModuleByID(t *testing.T) {
 	}
 }
 
-func TestGetModuleByPath(t *testing.T) {
-
-	ctx := context.Background()
+func TestGetModuleByTRN(t *testing.T) {
+	ctx := t.Context()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups:           standardWarmupGroupsForTerraformModules,
-		terraformModules: standardWarmupTerraformModules,
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module",
+		System:      "aws",
+		RootGroupID: group.Metadata.ID,
+		GroupID:     group.Metadata.ID,
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg             *string
-		expectTerraformModule *models.TerraformModule
-		name                  string
-		searchPath            string
+		name            string
+		trn             string
+		expectModule    bool
+		expectErrorCode errors.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:                  "positive",
-			searchPath:            warmupItems.terraformModules[0].ResourcePath,
-			expectTerraformModule: &warmupItems.terraformModules[0],
+			name:         "get module by TRN",
+			trn:          module.Metadata.TRN,
+			expectModule: true,
 		},
-
 		{
-			name:       "negative, non-existent Terraform module ID",
-			searchPath: "this/path/does/not/exist",
+			name: "resource with TRN not found",
+			trn:  types.TerraformModuleModelType.BuildTRN(group.FullPath, "non-existent-module", "aws"),
+		},
+		{
+			name:            "module TRN has less than 3 parts",
+			trn:             types.TerraformModuleModelType.BuildTRN("test-group"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualTerraformModule, err := testClient.client.TerraformModules.GetModuleByPath(ctx, test.searchPath)
+			actualModule, err := testClient.client.TerraformModules.GetModuleByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectTerraformModule != nil {
-				require.NotNil(t, actualTerraformModule)
-				assert.Equal(t, test.expectTerraformModule, actualTerraformModule)
+			require.NoError(t, err)
+
+			if test.expectModule {
+				require.NotNil(t, actualModule)
+				assert.Equal(t,
+					types.TerraformModuleModelType.BuildTRN(
+						group.FullPath,
+						module.Name,
+						module.System,
+					),
+					actualModule.Metadata.TRN,
+				)
 			} else {
-				assert.Nil(t, actualTerraformModule)
+				assert.Nil(t, actualModule)
 			}
 		})
 	}
@@ -640,14 +669,14 @@ func TestCreateModule(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.TerraformModuleModelType.BuildTRN(warmupItems.groups[0].FullPath, "terraform-module-create-test", "aws"),
 				},
-				Name:         "terraform-module-create-test",
-				System:       "aws",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test/aws",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
-				Private:      true,
-				CreatedBy:    "TestCreateModule",
+				Name:        "terraform-module-create-test",
+				System:      "aws",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
+				Private:     true,
+				CreatedBy:   "TestCreateModule",
 			},
 		},
 
@@ -665,25 +694,24 @@ func TestCreateModule(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					Version:           initialResourceVersion,
 					CreationTimestamp: &now,
+					TRN:               types.TerraformModuleModelType.BuildTRN(warmupItems.groups[0].FullPath, "terraform-module-create-test", "azure"),
 				},
-				Name:         "terraform-module-create-test",
-				System:       "azure",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test/azure",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
-				Private:      true,
-				CreatedBy:    "TestCreateModule",
+				Name:        "terraform-module-create-test",
+				System:      "azure",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
+				Private:     true,
+				CreatedBy:   "TestCreateModule",
 			},
 		},
 
 		{
 			name: "duplicate group ID and Terraform module name",
 			toCreate: &models.TerraformModule{
-				Name:         "terraform-module-create-test",
-				System:       "aws",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
+				Name:        "terraform-module-create-test",
+				System:      "aws",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("terraform module with name terraform-module-create-test and system aws already exists"),
 		},
@@ -691,11 +719,10 @@ func TestCreateModule(t *testing.T) {
 		{
 			name: "negative, non-existent root group ID",
 			toCreate: &models.TerraformModule{
-				Name:         "terraform-module-create-test-non-existent-root-group-id",
-				System:       "aws",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test-non-existent-root-group-id",
-				RootGroupID:  nonExistentID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
+				Name:        "terraform-module-create-test-non-existent-root-group-id",
+				System:      "aws",
+				RootGroupID: nonExistentID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_modules\" violates foreign key constraint \"fk_root_group_id\" (SQLSTATE 23503)"),
 		},
@@ -703,11 +730,10 @@ func TestCreateModule(t *testing.T) {
 		{
 			name: "negative, non-existent group ID",
 			toCreate: &models.TerraformModule{
-				Name:         "terraform-module-create-test-non-existent-group-id",
-				System:       "aws",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test-non-existent-group-id",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      nonExistentID,
+				Name:        "terraform-module-create-test-non-existent-group-id",
+				System:      "aws",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     nonExistentID,
 			},
 			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_modules\" violates foreign key constraint \"fk_group_id\" (SQLSTATE 23503)"),
 		},
@@ -715,11 +741,10 @@ func TestCreateModule(t *testing.T) {
 		{
 			name: "negative, invalid root group ID",
 			toCreate: &models.TerraformModule{
-				Name:         "terraform-module-create-test-invalid-root-group-id",
-				System:       "aws",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test-invalid-root-group-id",
-				RootGroupID:  invalidID,
-				GroupID:      warmupItems.groups[0].Metadata.ID,
+				Name:        "terraform-module-create-test-invalid-root-group-id",
+				System:      "aws",
+				RootGroupID: invalidID,
+				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -727,11 +752,10 @@ func TestCreateModule(t *testing.T) {
 		{
 			name: "negative, invalid group ID",
 			toCreate: &models.TerraformModule{
-				Name:         "terraform-module-create-test-invalid-group-id",
-				System:       "aws",
-				ResourcePath: warmupItems.groups[0].FullPath + "/terraform-module-create-test-invalid-group-id",
-				RootGroupID:  warmupItems.groups[0].Metadata.ID,
-				GroupID:      invalidID,
+				Name:        "terraform-module-create-test-invalid-group-id",
+				System:      "aws",
+				RootGroupID: warmupItems.groups[0].Metadata.ID,
+				GroupID:     invalidID,
 			},
 			expectMsg: invalidUUIDMsg1,
 		},
@@ -810,14 +834,14 @@ func TestUpdateModule(t *testing.T) {
 					Version:              initialResourceVersion + 1,
 					CreationTimestamp:    positiveTerraformModule.Metadata.CreationTimestamp,
 					LastUpdatedTimestamp: &now,
+					TRN:                  types.TerraformModuleModelType.BuildTRN(positiveGroup.FullPath, positiveTerraformModule.Name, positiveTerraformModule.System),
 				},
-				Name:         positiveTerraformModule.Name,
-				System:       positiveTerraformModule.System,
-				ResourcePath: positiveTerraformModule.ResourcePath,
-				RootGroupID:  positiveTerraformModule.RootGroupID,
-				GroupID:      positiveTerraformModule.GroupID,
-				Private:      !positiveTerraformModule.Private,
-				CreatedBy:    positiveTerraformModule.CreatedBy,
+				Name:        positiveTerraformModule.Name,
+				System:      positiveTerraformModule.System,
+				RootGroupID: positiveTerraformModule.RootGroupID,
+				GroupID:     positiveTerraformModule.GroupID,
+				Private:     !positiveTerraformModule.Private,
+				CreatedBy:   positiveTerraformModule.CreatedBy,
 			},
 		},
 
@@ -1078,7 +1102,6 @@ var standardWarmupTeamMembersForTerraformModules = []models.TeamMember{
 // The create function will convert the group name to group ID.
 var standardWarmupServiceAccountsForTerraformModules = []models.ServiceAccount{
 	{
-		ResourcePath:      "sa-resource-path-0",
 		Name:              "service-account-0",
 		Description:       "service account 0",
 		GroupID:           "top-level-group-2-for-terraform-modules/nested-group-7-for-terraform-modules",
@@ -1086,7 +1109,6 @@ var standardWarmupServiceAccountsForTerraformModules = []models.ServiceAccount{
 		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
 	},
 	{
-		ResourcePath:      "sa-resource-path-1",
 		Name:              "service-account-1",
 		Description:       "service account 1",
 		GroupID:           "top-level-group-1-for-terraform-modules/nested-group-8-for-terraform-modules",
@@ -1159,49 +1181,44 @@ var standardWarmupNamespaceMembershipsForTerraformModules = []CreateNamespaceMem
 var standardWarmupTerraformModules = []models.TerraformModule{
 	{
 		// This one is public.
-		Name:         "1-terraform-module-0",
-		System:       "aws",
-		ResourcePath: "top-level-group-0-for-terraform-modules/1-terraform-module-0",
-		RootGroupID:  "top-level-group-0-for-terraform-modules",
-		GroupID:      "top-level-group-0-for-terraform-modules/nested-group-9-for-terraform-modules",
-		Private:      false,
-		CreatedBy:    "someone-sv0",
+		Name:        "1-terraform-module-0",
+		System:      "aws",
+		RootGroupID: "top-level-group-0-for-terraform-modules",
+		GroupID:     "top-level-group-0-for-terraform-modules/nested-group-9-for-terraform-modules",
+		Private:     false,
+		CreatedBy:   "someone-sv0",
 	},
 	{
-		Name:         "1-terraform-module-1",
-		System:       "aws",
-		ResourcePath: "top-level-group-1-for-terraform-modules/1-terraform-module-1",
-		RootGroupID:  "top-level-group-1-for-terraform-modules",
-		GroupID:      "top-level-group-1-for-terraform-modules",
-		Private:      true,
-		CreatedBy:    "someone-sv1",
+		Name:        "1-terraform-module-1",
+		System:      "aws",
+		RootGroupID: "top-level-group-1-for-terraform-modules",
+		GroupID:     "top-level-group-1-for-terraform-modules",
+		Private:     true,
+		CreatedBy:   "someone-sv1",
 	},
 	{
-		Name:         "2-terraform-module-2",
-		System:       "aws",
-		ResourcePath: "top-level-group-2-for-terraform-modules/2-terraform-module-2",
-		RootGroupID:  "top-level-group-2-for-terraform-modules",
-		GroupID:      "top-level-group-2-for-terraform-modules/nested-group-7-for-terraform-modules",
-		Private:      true,
-		CreatedBy:    "someone-sv2",
+		Name:        "2-terraform-module-2",
+		System:      "aws",
+		RootGroupID: "top-level-group-2-for-terraform-modules",
+		GroupID:     "top-level-group-2-for-terraform-modules/nested-group-7-for-terraform-modules",
+		Private:     true,
+		CreatedBy:   "someone-sv2",
 	},
 	{
-		Name:         "2-terraform-module-3",
-		System:       "aws",
-		ResourcePath: "top-level-group-3-for-terraform-modules/2-terraform-module-3",
-		RootGroupID:  "top-level-group-3-for-terraform-modules",
-		GroupID:      "top-level-group-3-for-terraform-modules",
-		Private:      true,
-		CreatedBy:    "someone-sv3",
+		Name:        "2-terraform-module-3",
+		System:      "aws",
+		RootGroupID: "top-level-group-3-for-terraform-modules",
+		GroupID:     "top-level-group-3-for-terraform-modules",
+		Private:     true,
+		CreatedBy:   "someone-sv3",
 	},
 	{
-		Name:         "5-terraform-module-4",
-		System:       "aws",
-		ResourcePath: "top-level-group-4-for-terraform-modules/5-terraform-module-4",
-		RootGroupID:  "top-level-group-4-for-terraform-modules",
-		GroupID:      "top-level-group-4-for-terraform-modules/nested-group-5-for-terraform-modules",
-		Private:      true,
-		CreatedBy:    "someone-sv4",
+		Name:        "5-terraform-module-4",
+		System:      "aws",
+		RootGroupID: "top-level-group-4-for-terraform-modules",
+		GroupID:     "top-level-group-4-for-terraform-modules/nested-group-5-for-terraform-modules",
+		Private:     true,
+		CreatedBy:   "someone-sv4",
 	},
 }
 
@@ -1344,7 +1361,6 @@ func compareTerraformModules(t *testing.T, expected, actual *models.TerraformMod
 	checkID bool, times *timeBounds) {
 
 	assert.Equal(t, expected.Name, actual.Name)
-	assert.Equal(t, expected.ResourcePath, actual.ResourcePath)
 	assert.Equal(t, expected.RootGroupID, actual.RootGroupID)
 	assert.Equal(t, expected.GroupID, actual.GroupID)
 	assert.Equal(t, expected.Private, actual.Private)
@@ -1354,6 +1370,7 @@ func compareTerraformModules(t *testing.T, expected, actual *models.TerraformMod
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {
@@ -1396,7 +1413,7 @@ func createInitialTerraformModules(ctx context.Context, testClient *testClient,
 		}
 
 		result = append(result, *created)
-		resourcePath2ID[created.ResourcePath] = created.Metadata.ID
+		resourcePath2ID[created.GetResourcePath()] = created.Metadata.ID
 	}
 
 	return result, resourcePath2ID, nil

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -74,6 +75,71 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 				assert.Equal(t, test.id, federatedRegistry.Metadata.ID)
 			} else {
 				assert.Nil(t, federatedRegistry)
+			}
+		})
+	}
+}
+
+func TestGetFederatedRegistryByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.Nil(t, err)
+
+	federatedRegistry, err := testClient.client.FederatedRegistries.CreateFederatedRegistry(ctx,
+		&models.FederatedRegistry{
+			Hostname: "remote.registry.host.example.invalid",
+			GroupID:  group.Metadata.ID,
+		})
+	require.Nil(t, err)
+
+	type testCase struct {
+		expectErrorCode         errors.CodeType
+		name                    string
+		trn                     string
+		expectFederatedRegistry bool
+	}
+
+	testCases := []testCase{
+		{
+			name:                    "get resource by TRN",
+			trn:                     federatedRegistry.Metadata.TRN,
+			expectFederatedRegistry: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.FederatedRegistryModelType.BuildTRN(group.FullPath, "invalid.tld"),
+		},
+		{
+			name:            "registry trn has less than two parts",
+			trn:             types.FederatedRegistryModelType.BuildTRN(group.FullPath),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualFederatedRegistry, err := testClient.client.FederatedRegistries.GetFederatedRegistryByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectFederatedRegistry {
+				require.NotNil(t, actualFederatedRegistry)
+				assert.Equal(t, types.FederatedRegistryModelType.BuildTRN(group.FullPath, federatedRegistry.Hostname), actualFederatedRegistry.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualFederatedRegistry)
 			}
 		})
 	}
@@ -421,15 +487,6 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 			},
 			expectCode: errors.EOptimisticLock,
 		},
-		{
-			name: "invalid ID",
-			input: &models.FederatedRegistry{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-			},
-			expectCode: errors.EInvalid,
-		},
 	}
 
 	for _, test := range testCases {
@@ -507,15 +564,6 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 				},
 			},
 			expectCode: errors.EOptimisticLock,
-		},
-		{
-			name: "invalid ID",
-			input: &models.FederatedRegistry{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-			},
-			expectCode: errors.EInvalid,
 		},
 	}
 

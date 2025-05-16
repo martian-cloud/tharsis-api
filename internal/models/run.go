@@ -1,6 +1,13 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+)
+
+var _ Model = (*Run)(nil)
 
 // RunStatus represents the various states for a Run resource
 type RunStatus string
@@ -47,9 +54,29 @@ type Run struct {
 	RefreshOnly            bool
 }
 
+// GetID returns the Metadata ID.
+func (r *Run) GetID() string {
+	return r.Metadata.ID
+}
+
+// GetGlobalID returns the Metadata ID as a GID.
+func (r *Run) GetGlobalID() string {
+	return gid.ToGlobalID(r.GetModelType(), r.Metadata.ID)
+}
+
+// GetModelType returns the type of the model.
+func (r *Run) GetModelType() types.ModelType {
+	return types.RunModelType
+}
+
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
 func (r *Run) ResolveMetadata(key string) (string, error) {
 	return r.Metadata.resolveFieldValue(key)
+}
+
+// Validate validates the model.
+func (r *Run) Validate() error {
+	return nil
 }
 
 // Speculative returns whether this run is speculative.

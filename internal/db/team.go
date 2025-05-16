@@ -11,16 +11,18 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Teams encapsulates the logic to access teams from the database
 type Teams interface {
 	GetTeamBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.Team, error)
 	GetTeamByID(ctx context.Context, id string) (*models.Team, error)
-	GetTeamByName(ctx context.Context, name string) (*models.Team, error)
+	GetTeamByTRN(ctx context.Context, trn string) (*models.Team, error)
 	GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResult, error)
 	CreateTeam(ctx context.Context, team *models.Team) (*models.Team, error)
 	UpdateTeam(ctx context.Context, team *models.Team) (*models.Team, error)
@@ -107,12 +109,17 @@ func (t *teams) GetTeamByID(ctx context.Context, id string) (*models.Team, error
 	return t.getTeam(ctx, goqu.Ex{"teams.id": id})
 }
 
-func (t *teams) GetTeamByName(ctx context.Context, name string) (*models.Team, error) {
-	ctx, span := tracer.Start(ctx, "db.GetTeamByName")
-	// TODO: Consider setting trace/span attributes for the input.
+func (t *teams) GetTeamByTRN(ctx context.Context, trn string) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.GetTeamByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
 	defer span.End()
 
-	return t.getTeam(ctx, goqu.Ex{"teams.name": name})
+	path, err := types.TeamModelType.ResourcePathFromTRN(trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse TRN", errors.WithSpan(span))
+	}
+
+	return t.getTeam(ctx, goqu.Ex{"teams.name": path})
 }
 
 func (t *teams) GetTeams(ctx context.Context, input *GetTeamsInput) (*TeamsResult, error) {
@@ -302,6 +309,9 @@ func (t *teams) DeleteTeam(ctx context.Context, team *models.Team) error {
 }
 
 func (t *teams) getTeam(ctx context.Context, exp goqu.Ex) (*models.Team, error) {
+	ctx, span := tracer.Start(ctx, "db.getTeam")
+	defer span.End()
+
 	query := dialect.From(goqu.T("teams")).
 		Prepared(true).
 		Select(teamFieldList...).
@@ -309,7 +319,7 @@ func (t *teams) getTeam(ctx context.Context, exp goqu.Ex) (*models.Team, error) 
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to generate SQL", errors.WithSpan(span))
 	}
 
 	team, err := scanTeam(t.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
@@ -317,7 +327,14 @@ func (t *teams) getTeam(ctx context.Context, exp goqu.Ex) (*models.Team, error) 
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
-		return nil, err
+
+		if pgErr := asPgError(err); pgErr != nil {
+			if isInvalidIDViolation(pgErr) {
+				return nil, ErrInvalidID
+			}
+		}
+
+		return nil, errors.Wrap(err, "failed to execute query", errors.WithSpan(span))
 	}
 
 	return team, nil
@@ -354,6 +371,8 @@ func scanTeam(row scanner) (*models.Team, error) {
 	if scimExternalID.Valid {
 		team.SCIMExternalID = scimExternalID.String
 	}
+
+	team.Metadata.TRN = types.TeamModelType.BuildTRN(team.Name)
 
 	return team, nil
 }

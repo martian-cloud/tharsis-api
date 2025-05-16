@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -59,7 +59,7 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 		name              string
 		expectErrorCode   errors.CodeType
 		teamMember        *models.TeamMember
-		perm              permissions.Permission
+		perm              models.Permission
 		constraints       []func(*constraints)
 		isAdmin           bool
 		withAuthorizer    bool
@@ -67,69 +67,69 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 	}{
 		{
 			name:           "access is granted by the authorizer",
-			perm:           permissions.ViewGroupPermission,
+			perm:           models.ViewGroupPermission,
 			constraints:    []func(*constraints){WithNamespacePath("namespace")},
 			withAuthorizer: true,
 		},
 		{
 			name:            "access denied by the authorizer because a permission is not satisfied",
-			perm:            permissions.DeleteGroupPermission,
+			perm:            models.DeleteGroupPermission,
 			constraints:     []func(*constraints){WithNamespacePath("namespace")},
 			expectErrorCode: errors.ENotFound,
 			withAuthorizer:  true,
 		},
 		{
 			name:    "permissions are only granted since user is admin",
-			perm:    permissions.CreateTeamPermission,
+			perm:    models.CreateTeamPermission,
 			isAdmin: true,
 		},
 		{
 			name:            "access forbidden because user must be an admin",
-			perm:            permissions.CreateTeamPermission,
+			perm:            models.CreateTeamPermission,
 			constraints:     []func(*constraints){WithGroupID("team-1")},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:        "team update allowed since user is an admin",
-			perm:        permissions.UpdateTeamPermission,
+			perm:        models.UpdateTeamPermission,
 			constraints: []func(*constraints){WithTeamID(teamID)},
 			isAdmin:     true,
 		},
 		{
 			name:            "access denied because user is not an admin or a team maintainer",
 			teamMember:      &models.TeamMember{IsMaintainer: false},
-			perm:            permissions.UpdateTeamPermission,
+			perm:            models.UpdateTeamPermission,
 			constraints:     []func(*constraints){WithTeamID(teamID)},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "access denied because team member not found",
-			perm:            permissions.UpdateTeamPermission,
+			perm:            models.UpdateTeamPermission,
 			constraints:     []func(*constraints){WithTeamID(teamID)},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "access denied because user is not a maintainer",
 			teamMember:      &models.TeamMember{IsMaintainer: false},
-			perm:            permissions.UpdateTeamPermission,
+			perm:            models.UpdateTeamPermission,
 			constraints:     []func(*constraints){WithTeamID(teamID)},
 			expectErrorCode: errors.EForbidden,
 		},
 		{
 			name:            "access denied because required constraints are not specified",
-			perm:            permissions.ViewWorkspacePermission,
+			perm:            models.ViewWorkspacePermission,
 			expectErrorCode: errors.EInternal,
 			withAuthorizer:  true,
 		},
 		{
 			name:              "cannot have write permission when system is in maintenance mode",
-			perm:              permissions.CreateWorkspacePermission,
+			perm:              models.CreateWorkspacePermission,
 			expectErrorCode:   errors.EServiceUnavailable,
 			inMaintenanceMode: true,
 		},
 		{
 			name:              "can have read permission when system is in maintenance mode",
-			perm:              permissions.ViewWorkspacePermission,
+			perm:              models.ViewWorkspacePermission,
 			constraints:       []func(*constraints){WithWorkspaceID("ws-1")},
 			withAuthorizer:    true,
 			inMaintenanceMode: true,
@@ -144,12 +144,12 @@ func TestUserCaller_RequirePermissions(t *testing.T) {
 
 			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(test.inMaintenanceMode, nil)
 
-			if test.perm == permissions.UpdateTeamPermission && !test.isAdmin {
+			if test.perm == models.UpdateTeamPermission && !test.isAdmin {
 				mockTeamMembers.On("GetTeamMember", mock.Anything, caller.User.Metadata.ID, teamID).Return(test.teamMember, nil)
 			}
 
 			if test.withAuthorizer {
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{test.perm}, mock.Anything).Return(requireAccessAuthorizerFunc)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{test.perm}, mock.Anything).Return(requireAccessAuthorizerFunc)
 			}
 
 			caller.User.Admin = test.isAdmin
@@ -175,32 +175,32 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 	testCases := []struct {
 		name            string
 		expectErrorCode errors.CodeType
-		resourceType    permissions.ResourceType
+		modelType       types.ModelType
 		constraints     []func(*constraints)
 		isAdmin         bool
 		withAuthorizer  bool
 	}{
 		{
 			name:           "multiple permissions granted by the authorizer",
-			resourceType:   permissions.ManagedIdentityResourceType,
+			modelType:      types.ManagedIdentityModelType,
 			constraints:    []func(*constraints){WithGroupID("group1")},
 			withAuthorizer: true,
 		},
 		{
 			name:            "access denied by the authorizer because a permission is not satisfied",
-			resourceType:    permissions.ApplyResourceType, // Just using an invalid resource here to deny access.
+			modelType:       types.ApplyModelType, // Just using an invalid resource here to deny access.
 			constraints:     []func(*constraints){WithWorkspaceID("ws2")},
 			expectErrorCode: errors.ENotFound,
 			withAuthorizer:  true,
 		},
 		{
-			name:         "permissions granted since user is admin",
-			resourceType: permissions.GPGKeyResourceType,
-			isAdmin:      true,
+			name:      "permissions granted since user is admin",
+			modelType: types.GPGKeyModelType,
+			isAdmin:   true,
 		},
 		{
 			name:            "access denied because required constraints are not specified",
-			resourceType:    permissions.TerraformModuleResourceType,
+			modelType:       types.TerraformModuleModelType,
 			expectErrorCode: errors.EInternal,
 			withAuthorizer:  true,
 		},
@@ -211,13 +211,13 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 			mockAuthorizer := NewMockAuthorizer(t)
 
 			if test.withAuthorizer {
-				mockAuthorizer.On("RequireAccessToInheritableResource", mock.Anything, []permissions.ResourceType{test.resourceType}, mock.Anything).Return(requireInheritedAccessAuthorizerFunc)
+				mockAuthorizer.On("RequireAccessToInheritableResource", mock.Anything, []types.ModelType{test.modelType}, mock.Anything).Return(requireInheritedAccessAuthorizerFunc)
 			}
 
 			caller.authorizer = mockAuthorizer
 			caller.User.Admin = test.isAdmin
 
-			err := caller.RequireAccessToInheritableResource(ctx, test.resourceType, test.constraints...)
+			err := caller.RequireAccessToInheritableResource(ctx, test.modelType, test.constraints...)
 			if test.expectErrorCode != "" {
 				require.NotNil(t, err)
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

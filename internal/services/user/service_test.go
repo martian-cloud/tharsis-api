@@ -6,18 +6,153 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-	"gotest.tools/v3/assert"
 )
+
+func TestGetUserByID(t *testing.T) {
+	sampleUser := &models.User{
+		Metadata: models.ResourceMetadata{
+			ID: "user-id-1",
+		},
+		Username: "user-1",
+		Email:    "user@test.com",
+		Active:   true,
+		Admin:    false,
+	}
+
+	type testCase struct {
+		caller          auth.Caller
+		name            string
+		user            *models.User
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:   "successfully get user by ID",
+			caller: &auth.SystemCaller{},
+			user:   sampleUser,
+		},
+		{
+			name:            "user not found",
+			caller:          &auth.SystemCaller{},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "without caller",
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockUsers := db.NewMockUsers(t)
+
+			if test.caller != nil {
+				ctx = auth.WithCaller(ctx, test.caller)
+				mockUsers.On("GetUserByID", mock.Anything, sampleUser.Metadata.ID).Return(test.user, nil)
+			}
+
+			dbClient := &db.Client{
+				Users: mockUsers,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualUser, err := service.GetUserByID(ctx, sampleUser.Metadata.ID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.user, actualUser)
+		})
+	}
+}
+
+func TestGetUserByTRN(t *testing.T) {
+	sampleUser := &models.User{
+		Metadata: models.ResourceMetadata{
+			ID:  "user-id-1",
+			TRN: types.UserModelType.BuildTRN("user-1"),
+		},
+		Username: "user-1",
+		Email:    "user@test.com",
+		Active:   true,
+		Admin:    false,
+	}
+
+	type testCase struct {
+		caller          auth.Caller
+		name            string
+		user            *models.User
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:   "successfully get user by trn",
+			caller: &auth.SystemCaller{},
+			user:   sampleUser,
+		},
+		{
+			name:            "user not found",
+			caller:          &auth.SystemCaller{},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "without caller",
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockUsers := db.NewMockUsers(t)
+
+			if test.caller != nil {
+				ctx = auth.WithCaller(ctx, test.caller)
+				mockUsers.On("GetUserByTRN", mock.Anything, sampleUser.Metadata.TRN).Return(test.user, nil)
+			}
+
+			dbClient := &db.Client{
+				Users: mockUsers,
+			}
+
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualUser, err := service.GetUserByTRN(ctx, sampleUser.Metadata.TRN)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.user, actualUser)
+		})
+	}
+}
 
 func TestGetNotificationPreference(t *testing.T) {
 	userID := "user123"
@@ -60,7 +195,7 @@ func TestGetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewGroupPermission}, mock.Anything).Return(nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
 
 				return auth.NewUserCaller(&models.User{
 					Metadata: models.ResourceMetadata{
@@ -84,7 +219,7 @@ func TestGetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewWorkspacePermission}, mock.Anything).Return(nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewWorkspacePermission}, mock.Anything).Return(nil)
 
 				return auth.NewUserCaller(&models.User{
 					Metadata: models.ResourceMetadata{
@@ -108,7 +243,7 @@ func TestGetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewGroupPermission}, mock.Anything).
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).
 					Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
 
 				return auth.NewUserCaller(&models.User{
@@ -144,7 +279,7 @@ func TestGetNotificationPreference(t *testing.T) {
 				if !strings.Contains(*test.input.NamespacePath, "/") {
 					response = &models.Group{}
 				}
-				mockGroups.On("GetGroupByFullPath", mock.Anything, *test.input.NamespacePath).Return(response, nil).Maybe()
+				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(*test.input.NamespacePath)).Return(response, nil).Maybe()
 			}
 
 			if test.expectPreference != nil {
@@ -240,7 +375,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewGroupPermission}, mock.Anything).Return(nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
 
 				return auth.NewUserCaller(&models.User{
 					Metadata: models.ResourceMetadata{
@@ -265,7 +400,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewGroupPermission}, mock.Anything).Return(nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
 
 				return auth.NewUserCaller(&models.User{
 					Metadata: models.ResourceMetadata{
@@ -289,7 +424,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewGroupPermission}, mock.Anything).Return(nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
 
 				return auth.NewUserCaller(&models.User{
 					Metadata: models.ResourceMetadata{
@@ -318,7 +453,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewWorkspacePermission}, mock.Anything).Return(nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewWorkspacePermission}, mock.Anything).Return(nil)
 
 				return auth.NewUserCaller(&models.User{
 					Metadata: models.ResourceMetadata{
@@ -343,7 +478,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				mockAuthorizer := auth.NewMockAuthorizer(t)
 
 				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
-				mockAuthorizer.On("RequireAccess", mock.Anything, []permissions.Permission{permissions.ViewGroupPermission}, mock.Anything).
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).
 					Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
 
 				return auth.NewUserCaller(&models.User{
@@ -399,7 +534,7 @@ func TestSetNotificationPreference(t *testing.T) {
 				if !strings.Contains(*test.input.NamespacePath, "/") {
 					response = &models.Group{}
 				}
-				mockGroups.On("GetGroupByFullPath", mock.Anything, *test.input.NamespacePath).Return(response, nil).Maybe()
+				mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(*test.input.NamespacePath)).Return(response, nil).Maybe()
 			}
 
 			existingPreferences := []models.NotificationPreference{}

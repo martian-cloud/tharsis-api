@@ -40,7 +40,11 @@ type TerraformProviderVersionMirror implements Node {
 
 input CreateTerraformProviderVersionMirrorInput {
   clientMutationId: String
-  groupPath: String!
+  groupPath: String
+    @deprecated(
+      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  groupId: String
   type: String!
   registryNamespace: String!
   registryHostname: String!

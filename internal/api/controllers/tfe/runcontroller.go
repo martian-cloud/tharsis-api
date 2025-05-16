@@ -233,7 +233,7 @@ func (c *runController) CancelRun(w http.ResponseWriter, r *http.Request) {
 func (c *runController) GetRun(w http.ResponseWriter, r *http.Request) {
 	runID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
-	run, err := c.runService.GetRun(r.Context(), runID)
+	run, err := c.runService.GetRunByID(r.Context(), runID)
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -245,7 +245,7 @@ func (c *runController) GetRun(w http.ResponseWriter, r *http.Request) {
 func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 	planID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
-	plan, err := c.runService.GetPlan(r.Context(), planID)
+	plan, err := c.runService.GetPlanByID(r.Context(), planID)
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -258,7 +258,7 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := &gotfe.Plan{
-		ID:                   gid.ToGlobalID(gid.PlanType, plan.Metadata.ID),
+		ID:                   plan.GetGlobalID(),
 		Status:               gotfe.PlanStatus(plan.Status),
 		HasChanges:           plan.HasChanges,
 		ResourceAdditions:    int(plan.Summary.ResourceAdditions),
@@ -273,7 +273,7 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, gid.ToGlobalID(gid.JobType, job.Metadata.ID), string(token))
+		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, job.GetGlobalID(), string(token))
 	}
 
 	c.respWriter.RespondWithJSONAPI(w, resp, http.StatusOK)
@@ -282,7 +282,7 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 	applyID := gid.FromGlobalID(chi.URLParam(r, "id"))
 
-	apply, err := c.runService.GetApply(r.Context(), applyID)
+	apply, err := c.runService.GetApplyByID(r.Context(), applyID)
 	if err != nil {
 		c.respWriter.RespondWithError(w, err)
 		return
@@ -295,7 +295,7 @@ func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := &gotfe.Apply{
-		ID:     gid.ToGlobalID(gid.ApplyType, apply.Metadata.ID),
+		ID:     apply.GetGlobalID(),
 		Status: gotfe.ApplyStatus(apply.Status),
 	}
 
@@ -306,7 +306,7 @@ func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, gid.ToGlobalID(gid.JobType, job.Metadata.ID), string(token))
+		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, job.GetGlobalID(), string(token))
 	}
 
 	c.respWriter.RespondWithJSONAPI(w, resp, http.StatusOK)

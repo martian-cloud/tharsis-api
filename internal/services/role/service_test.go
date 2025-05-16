@@ -7,10 +7,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth/permissions"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -27,7 +28,7 @@ func TestGetAvailablePermissions(t *testing.T) {
 		{
 			name:        "successfully retrieve all available permissions",
 			caller:      &auth.SystemCaller{},
-			expectPerms: permissions.GetAssignablePermissions(),
+			expectPerms: models.GetAssignablePermissions(),
 		},
 		{
 			name:            "without caller",
@@ -110,58 +111,68 @@ func TestGetRoleByID(t *testing.T) {
 	}
 }
 
-func TestGetRoleByName(t *testing.T) {
-	testCases := []struct {
+func TestGetRoleByTRN(t *testing.T) {
+	sampleRole := &models.Role{
+		Metadata: models.ResourceMetadata{
+			ID:  "role-id-1",
+			TRN: types.RoleModelType.BuildTRN("my-role/role-1"),
+		},
+		Name:        "role-1",
+		Description: "Test role",
+	}
+
+	type testCase struct {
 		caller          auth.Caller
 		name            string
-		search          string
-		expectedRole    *models.Role
+		role            *models.Role
 		expectErrorCode errors.CodeType
-	}{
+	}
+
+	testCases := []testCase{
 		{
-			name:         "Role was found",
-			caller:       &auth.SystemCaller{},
-			search:       "role",
-			expectedRole: &models.Role{Name: "role"},
+			name:   "successfully get role by trn",
+			caller: &auth.SystemCaller{},
+			role:   sampleRole,
 		},
 		{
-			name:            "role does not exist",
+			name:            "role not found",
 			caller:          &auth.SystemCaller{},
-			search:          "role-2",
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name:            "without caller",
-			search:          "role-3",
 			expectErrorCode: errors.EUnauthorized,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
 			mockRoles := db.NewMockRoles(t)
 
 			if test.caller != nil {
-				mockRoles.On("GetRoleByName", mock.Anything, test.search).Return(test.expectedRole, nil)
+				ctx = auth.WithCaller(ctx, test.caller)
+				mockRoles.On("GetRoleByTRN", mock.Anything, sampleRole.Metadata.TRN).Return(test.role, nil)
 			}
 
-			dbClient := db.Client{
+			dbClient := &db.Client{
 				Roles: mockRoles,
 			}
 
-			service := NewService(nil, &dbClient, nil)
-			actualRole, err := service.GetRoleByName(auth.WithCaller(context.TODO(), test.caller), test.search)
+			service := &service{
+				dbClient: dbClient,
+			}
+
+			actualRole, err := service.GetRoleByTRN(ctx, sampleRole.Metadata.TRN)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.expectedRole, actualRole)
+			require.NoError(t, err)
+			assert.Equal(t, test.role, actualRole)
 		})
 	}
 }
@@ -303,8 +314,8 @@ func TestCreateRole(t *testing.T) {
 			input: &CreateRoleInput{
 				Name:        "role",
 				Description: "Some new role.",
-				Permissions: []permissions.Permission{
-					permissions.CreateConfigurationVersionPermission,
+				Permissions: []models.Permission{
+					models.CreateConfigurationVersionPermission,
 				},
 			},
 			expectRole: &models.Role{
@@ -323,7 +334,7 @@ func TestCreateRole(t *testing.T) {
 			input: &CreateRoleInput{
 				Name:        "role",
 				Description: "Some new role.",
-				Permissions: []permissions.Permission{permissions.UpdatePlanPermission},
+				Permissions: []models.Permission{models.UpdatePlanPermission},
 			},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -333,7 +344,7 @@ func TestCreateRole(t *testing.T) {
 			input: &CreateRoleInput{
 				Name:        "role",
 				Description: "Some new role.",
-				Permissions: []permissions.Permission{},
+				Permissions: []models.Permission{},
 			},
 			expectErrorCode: errors.EForbidden,
 		},
@@ -345,7 +356,7 @@ func TestCreateRole(t *testing.T) {
 			input: &CreateRoleInput{
 				Name:        "role",
 				Description: "Some new role.",
-				Permissions: []permissions.Permission{},
+				Permissions: []models.Permission{},
 			},
 			expectErrorCode: errors.EForbidden,
 		},
@@ -354,7 +365,7 @@ func TestCreateRole(t *testing.T) {
 			input: &CreateRoleInput{
 				Name:        "role",
 				Description: "Some new role.",
-				Permissions: []permissions.Permission{},
+				Permissions: []models.Permission{},
 			},
 			expectErrorCode: errors.EUnauthorized,
 		},
@@ -417,8 +428,8 @@ func TestUpdateRole(t *testing.T) {
 		expectRole      *models.Role
 		name            string
 		expectErrorCode errors.CodeType
-		updatePerms     []permissions.Permission
-		expectPerms     []permissions.Permission
+		updatePerms     []models.Permission
+		expectPerms     []models.Permission
 	}{
 		{
 			name: "successfully update a role",
@@ -436,9 +447,9 @@ func TestUpdateRole(t *testing.T) {
 					Name: "role",
 				},
 			},
-			updatePerms: []permissions.Permission{
-				permissions.CreateGroupPermission,
-				permissions.CreateGroupPermission, // Should be deduplicated.
+			updatePerms: []models.Permission{
+				models.CreateGroupPermission,
+				models.CreateGroupPermission, // Should be deduplicated.
 			},
 			expectRole: &models.Role{
 				Metadata: models.ResourceMetadata{
@@ -446,7 +457,7 @@ func TestUpdateRole(t *testing.T) {
 				},
 				Name: "role",
 			},
-			expectPerms: []permissions.Permission{permissions.CreateGroupPermission},
+			expectPerms: []models.Permission{models.CreateGroupPermission},
 		},
 		{
 			name: "permissions are not assignable",
@@ -463,8 +474,8 @@ func TestUpdateRole(t *testing.T) {
 					Name: "role",
 				},
 			},
-			updatePerms: []permissions.Permission{
-				permissions.UpdatePlanPermission,
+			updatePerms: []models.Permission{
+				models.UpdatePlanPermission,
 			},
 			expectErrorCode: errors.EInvalid,
 		},
@@ -521,7 +532,7 @@ func TestUpdateRole(t *testing.T) {
 			mockActivityEvents := activityevent.NewMockService(t)
 			mockTransactions := db.NewMockTransactions(t)
 
-			// Set permissions.
+			// Set models.
 			test.input.Role.SetPermissions(test.updatePerms)
 
 			if test.expectRole != nil {

@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
@@ -84,7 +86,7 @@ func TestGetPlatformMirrorByID(t *testing.T) {
 		{
 			name:      "defective-ID",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: ptr.String(ErrInvalidID.Error()),
 		},
 	}
 
@@ -104,6 +106,92 @@ func TestGetPlatformMirrorByID(t *testing.T) {
 				})
 			} else {
 				assert.Nil(t, actualProviderPlatformMirror)
+			}
+		})
+	}
+}
+
+func TestGetPlatformMirrorByTRN(t *testing.T) {
+	ctx := t.Context()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name: "test-group",
+	})
+	require.NoError(t, err)
+
+	versionMirror, err := testClient.client.TerraformProviderVersionMirrors.CreateVersionMirror(ctx, &models.TerraformProviderVersionMirror{
+		RegistryHostname:  "registry.hashicorp.io",
+		RegistryNamespace: "hashicorp",
+		Type:              "github",
+		SemanticVersion:   "0.2.0",
+		GroupID:           group.Metadata.ID,
+	})
+	require.NoError(t, err)
+
+	platformMirror, err := testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+		VersionMirrorID: versionMirror.Metadata.ID,
+		OS:              "linux",
+		Architecture:    "amd64",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		trn             string
+		expectMirror    bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name:         "get platform mirror by TRN",
+			trn:          platformMirror.Metadata.TRN,
+			expectMirror: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  types.TerraformProviderPlatformMirrorModelType.BuildTRN(group.FullPath, "registry.hashicorp.io", "hashicorp", "github", "0.2.0", "darwin", "amd64"),
+		},
+		{
+			name:            "platform mirror TRN has less than 7 parts",
+			trn:             types.TerraformProviderPlatformMirrorModelType.BuildTRN("registry.hashicorp.io", "hashicorp", "github", "0.2.0"),
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "trn:invalid",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualMirror, err := testClient.client.TerraformProviderPlatformMirrors.GetPlatformMirrorByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			if test.expectMirror {
+				require.NotNil(t, actualMirror)
+				assert.Equal(t,
+					types.TerraformProviderPlatformMirrorModelType.BuildTRN(
+						group.FullPath,
+						versionMirror.RegistryHostname,
+						versionMirror.RegistryNamespace,
+						versionMirror.Type,
+						versionMirror.SemanticVersion,
+						platformMirror.OS,
+						platformMirror.Architecture,
+					),
+					actualMirror.Metadata.TRN)
+			} else {
+				assert.Nil(t, actualMirror)
 			}
 		})
 	}
@@ -743,6 +831,7 @@ func compareTerraformProviderPlatformMirrors(t *testing.T, expected, actual *mod
 		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
 	}
 	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
+	assert.NotEmpty(t, actual.Metadata.TRN)
 
 	// Compare timestamps.
 	if times != nil {

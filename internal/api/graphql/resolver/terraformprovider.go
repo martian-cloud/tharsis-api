@@ -7,8 +7,8 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
@@ -27,6 +27,7 @@ type TerraformProviderConnectionQueryArgs struct {
 }
 
 // TerraformProviderQueryArgs are used to query a terraform provider
+// DEPRECATED: use node query instead with a TRN
 type TerraformProviderQueryArgs struct {
 	RegistryNamespace string
 	ProviderName      string
@@ -64,7 +65,7 @@ type TerraformProviderConnectionResolver struct {
 
 // NewTerraformProviderConnectionResolver creates a new TerraformProviderConnectionResolver
 func NewTerraformProviderConnectionResolver(ctx context.Context, input *providerregistry.GetProvidersInput) (*TerraformProviderConnectionResolver, error) {
-	service := getProviderRegistryService(ctx)
+	service := getServiceCatalog(ctx).TerraformProviderRegistryService
 
 	result, err := service.GetProviders(ctx, input)
 	if err != nil {
@@ -132,7 +133,7 @@ type TerraformProviderResolver struct {
 
 // ID resolver
 func (r *TerraformProviderResolver) ID() graphql.ID {
-	return graphql.ID(gid.ToGlobalID(gid.TerraformProviderType, r.provider.Metadata.ID))
+	return graphql.ID(r.provider.GetGlobalID())
 }
 
 // Name resolver
@@ -157,7 +158,7 @@ func (r *TerraformProviderResolver) GroupPath() string {
 
 // ResourcePath resolver
 func (r *TerraformProviderResolver) ResourcePath() string {
-	return r.provider.ResourcePath
+	return r.provider.GetResourcePath()
 }
 
 // RepositoryURL resolver
@@ -212,7 +213,7 @@ func (r *TerraformProviderResolver) Versions(ctx context.Context, args *Terrafor
 
 // LatestVersion resolver
 func (r *TerraformProviderResolver) LatestVersion(ctx context.Context) (*TerraformProviderVersionResolver, error) {
-	versionsResp, err := getProviderRegistryService(ctx).GetProviderVersions(ctx, &providerregistry.GetProviderVersionsInput{
+	versionsResp, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderVersions(ctx, &providerregistry.GetProviderVersionsInput{
 		PaginationOptions: &pagination.Options{
 			First: ptr.Int32(1),
 		},
@@ -248,8 +249,9 @@ func terraformProvidersQuery(ctx context.Context, args *TerraformProviderConnect
 	return NewTerraformProviderConnectionResolver(ctx, &input)
 }
 
+// DEPRECATED: use node query instead
 func terraformProviderQuery(ctx context.Context, args *TerraformProviderQueryArgs) (*TerraformProviderResolver, error) {
-	provider, err := getProviderRegistryService(ctx).GetProviderByAddress(ctx, args.RegistryNamespace, args.ProviderName)
+	provider, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProviderByAddress(ctx, args.RegistryNamespace, args.ProviderName)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.ENotFound {
 			return nil, nil
@@ -296,7 +298,8 @@ type CreateTerraformProviderInput struct {
 	Private          *bool
 	RepositoryURL    *string
 	Name             string
-	GroupPath        string
+	GroupPath        *string // DEPRECATED: use GroupID instead with a TRN
+	GroupID          *string
 }
 
 // DeleteTerraformProviderInput contains the input for deleting a provider
@@ -315,15 +318,13 @@ func handleTerraformProviderMutationProblem(e error, clientMutationID *string) (
 }
 
 func createTerraformProviderMutation(ctx context.Context, input *CreateTerraformProviderInput) (*TerraformProviderMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
-
-	group, err := getGroupService(ctx).GetGroupByFullPath(ctx, input.GroupPath)
+	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
 	if err != nil {
 		return nil, err
 	}
 
 	createOptions := providerregistry.CreateProviderInput{
-		GroupID: group.Metadata.ID,
+		GroupID: groupID,
 		Name:    input.Name,
 		Private: true,
 	}
@@ -336,7 +337,7 @@ func createTerraformProviderMutation(ctx context.Context, input *CreateTerraform
 		createOptions.RepositoryURL = *input.RepositoryURL
 	}
 
-	provider, err := service.CreateProvider(ctx, &createOptions)
+	provider, err := getServiceCatalog(ctx).TerraformProviderRegistryService.CreateProvider(ctx, &createOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -346,9 +347,14 @@ func createTerraformProviderMutation(ctx context.Context, input *CreateTerraform
 }
 
 func updateTerraformProviderMutation(ctx context.Context, input *UpdateTerraformProviderInput) (*TerraformProviderMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	provider, err := service.GetProviderByID(ctx, gid.FromGlobalID(input.ID))
+	providerID, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	provider, err := serviceCatalog.TerraformProviderRegistryService.GetProviderByID(ctx, providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +378,7 @@ func updateTerraformProviderMutation(ctx context.Context, input *UpdateTerraform
 		provider.RepositoryURL = *input.RepositoryURL
 	}
 
-	provider, err = service.UpdateProvider(ctx, provider)
+	provider, err = serviceCatalog.TerraformProviderRegistryService.UpdateProvider(ctx, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -382,14 +388,19 @@ func updateTerraformProviderMutation(ctx context.Context, input *UpdateTerraform
 }
 
 func deleteTerraformProviderMutation(ctx context.Context, input *DeleteTerraformProviderInput) (*TerraformProviderMutationPayloadResolver, error) {
-	service := getProviderRegistryService(ctx)
+	serviceCatalog := getServiceCatalog(ctx)
 
-	provider, err := service.GetProviderByID(ctx, gid.FromGlobalID(input.ID))
+	providerID, err := serviceCatalog.FetchModelID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := service.DeleteProvider(ctx, provider); err != nil {
+	provider, err := serviceCatalog.TerraformProviderRegistryService.GetProviderByID(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := serviceCatalog.TerraformProviderRegistryService.DeleteProvider(ctx, provider); err != nil {
 		return nil, err
 	}
 
@@ -426,9 +437,7 @@ func loadTerraformProvider(ctx context.Context, id string) (*models.TerraformPro
 }
 
 func providerBatchFunc(ctx context.Context, ids []string) (loader.DataBatch, error) {
-	service := getProviderRegistryService(ctx)
-
-	providers, err := service.GetProvidersByIDs(ctx, ids)
+	providers, err := getServiceCatalog(ctx).TerraformProviderRegistryService.GetProvidersByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -48,7 +48,11 @@ type TerraformModuleAttestation implements Node {
 
 input CreateTerraformModuleAttestationInput {
   clientMutationId: String
-  modulePath: String!
+  modulePath: String
+    @deprecated(
+      reason: "Use moduleId field instead, which accepts a TRN (Tharsis Resource Name)"
+    )
+  moduleId: String
   description: String
   attestationData: String!
 }

@@ -92,6 +92,36 @@ func (_m *MockTerraformModuleVersions) GetModuleVersionByID(ctx context.Context,
 	return r0, r1
 }
 
+// GetModuleVersionByTRN provides a mock function with given fields: ctx, trn
+func (_m *MockTerraformModuleVersions) GetModuleVersionByTRN(ctx context.Context, trn string) (*models.TerraformModuleVersion, error) {
+	ret := _m.Called(ctx, trn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetModuleVersionByTRN")
+	}
+
+	var r0 *models.TerraformModuleVersion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.TerraformModuleVersion, error)); ok {
+		return rf(ctx, trn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.TerraformModuleVersion); ok {
+		r0 = rf(ctx, trn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.TerraformModuleVersion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, trn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetModuleVersions provides a mock function with given fields: ctx, input
 func (_m *MockTerraformModuleVersions) GetModuleVersions(ctx context.Context, input *GetModuleVersionsInput) (*ModuleVersionsResult, error) {
 	ret := _m.Called(ctx, input)
