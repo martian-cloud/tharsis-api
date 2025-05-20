@@ -488,8 +488,8 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 		expectErrorMessage string
 	}{
 		{
-			name:    "successful key set fetch without cache",
-			token:   signedToken,
+			name:  "successful key set fetch without cache",
+			token: signedToken,
 			setupMocks: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					keySetJSON, _ := json.Marshal(keySet)
@@ -500,8 +500,8 @@ func TestOIDCTokenVerifier_getKeySet(t *testing.T) {
 			enableCache: false,
 		},
 		{
-			name:    "error fetching key set",
-			token:   signedToken,
+			name:  "error fetching key set",
+			token: signedToken,
 			setupMocks: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
