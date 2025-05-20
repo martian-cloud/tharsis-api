@@ -6,6 +6,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
@@ -14,6 +15,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
+
+// userPreferenceGIDCode is used because UserPreference isn't a formal model type in the system
+// but still needs a unique identifier in the GraphQL API
+const userPreferenceGIDCode = "UP"
 
 // UserNamespacePreferenceConnectionQueryArgs are used to query a user namespace preference connection
 type UserNamespacePreferenceConnectionQueryArgs struct {
@@ -167,7 +172,7 @@ type UserNamespacePreferencesResolver struct {
 
 // ID resolver
 func (r *UserNamespacePreferencesResolver) ID() graphql.ID {
-	return graphql.ID(r.namespace.GetGlobalID())
+	return graphql.ID(gid.NewGlobalIDWithCode(userPreferenceGIDCode, r.namespace.GetID()).String())
 }
 
 // Path resolver

@@ -23,6 +23,11 @@ func NewGlobalID(mt types.ModelType, modelID string) *GlobalID {
 	return &GlobalID{Code: mt.GIDCode(), ID: modelID}
 }
 
+// NewGlobalIDWithCode returns a new GlobalID using a provided code string
+func NewGlobalIDWithCode(code string, modelID string) *GlobalID {
+	return &GlobalID{Code: code, ID: modelID}
+}
+
 // String returns the string representation of the global ID
 func (g *GlobalID) String() string {
 	return base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%s_%s", g.Code, g.ID)))
