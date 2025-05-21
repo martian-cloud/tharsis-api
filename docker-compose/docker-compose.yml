@@ -43,13 +43,13 @@ services:
     networks:
       - tharsis
     ports:
-      - "6530:8080"
+      - "127.0.0.1:6530:8080"
     depends_on:
       - kc_postgres
 
   # Object storage.
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: tharsis-store
     restart: unless-stopped
     command: "server /data"
@@ -62,18 +62,24 @@ services:
     networks:
       - tharsis
     ports:
-      - "9000:9000" # API
+      - "127.0.0.1:9000:9000" # API
       - "127.0.0.1:9010:9010" # UI
+    healthcheck:
+      test: ["CMD", "/usr/bin/mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
-  ## minioconsole creates object storage bucket.
+  # minioconsole creates object storage bucket.
   minioconsole:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     container_name: tharsis-mc
     entrypoint: /bin/sh -c  " /usr/bin/mc config host add minio http://minio:9000 minioadmin miniopassword;  /usr/bin/mc mb --ignore-existing minio/tharsis-objects;  exit 0;  "
     networks:
       - tharsis
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
 
   api:
     image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/api:latest
@@ -114,20 +120,23 @@ services:
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_LOCAL_IMAGE=false # Set to true if using local image.
       - THARSIS_OTEL_TRACE_ENABLED=true
       - THARSIS_OTEL_TRACE_TYPE=otlp
-      - THARSIS_OTEL_TRACE_HOST=localhost
+      - THARSIS_OTEL_TRACE_HOST=jaeger
       - THARSIS_OTEL_TRACE_PORT=4317
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Required for job-executor.
     networks:
       - tharsis
     ports:
-      - "6560:8000"
+      - "127.0.0.1:6560:8000"
     extra_hosts:
       - "localhost:host-gateway"
     depends_on:
-      - minio
-      - keycloak
-      - postgres
+      postgres:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
 
   ui:
     image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-ui:latest
@@ -151,8 +160,9 @@ services:
     networks:
       - tharsis
     ports:
-      - "16686:16686" # Jaeger UI
-      - "4317:4317" # OTEL port
+      - "127.0.0.1:16686:16686" # Jaeger UI
+    expose:
+      - "4317" # OTEL port
 
 networks:
   tharsis:
