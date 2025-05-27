@@ -79,15 +79,8 @@ func (r *Runner) Start(ctx context.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	// Send keep alive
-	go func() {
-		if err := r.sendRunnerSessionHeartbeat(ctx, sessionID); err != nil {
-			r.logger.Errorf("failed to send heartbeat: %v", err)
-			cancel()
-		}
-	}()
+	go r.sendRunnerSessionHeartbeat(ctx, sessionID)
 
 	for {
 		r.logger.Info("Waiting for next available run")
@@ -148,15 +141,15 @@ func (r *Runner) launchJob(ctx context.Context, jobID string, token string) erro
 	return nil
 }
 
-func (r *Runner) sendRunnerSessionHeartbeat(ctx context.Context, sessionID string) error {
+func (r *Runner) sendRunnerSessionHeartbeat(ctx context.Context, sessionID string) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-time.After(models.RunnerSessionHeartbeatInterval):
 			// Send heartbeat
 			if err := r.client.SendRunnerSessionHeartbeat(ctx, sessionID); err != nil {
-				return err
+				r.logger.Errorf("failed to send runner session heartbeat: %v", err)
 			}
 		}
 	}
