@@ -12,7 +12,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const internalErrorMessage = "An internal error has occurred."
+// InternalErrorMessage is the generic message returned for internal errors
+const InternalErrorMessage = "An internal error has occurred."
 
 // CodeType is used to specify the type of error
 type CodeType string
@@ -160,7 +161,7 @@ func ErrorMessage(err error) string {
 
 	e, ok := unwrapTharsisError(err)
 	if !ok {
-		return internalErrorMessage
+		return InternalErrorMessage
 	}
 
 	if e == nil {
@@ -168,7 +169,7 @@ func ErrorMessage(err error) string {
 	}
 
 	if e.code == EInternal {
-		return internalErrorMessage
+		return InternalErrorMessage
 	}
 
 	if e.message != "" {
@@ -180,7 +181,7 @@ func ErrorMessage(err error) string {
 		return ErrorMessage(e.err)
 	}
 
-	return internalErrorMessage
+	return InternalErrorMessage
 }
 
 // IsContextCanceledError returns true if the error is a context.Canceled error
