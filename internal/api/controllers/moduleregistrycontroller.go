@@ -171,6 +171,7 @@ func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWri
 		return
 	}
 
+	w.Header().Set("Access-Control-Expose-Headers", "X-Terraform-Get")
 	w.Header().Set("X-Terraform-Get", downloadURL)
 	w.WriteHeader(http.StatusNoContent)
 }
