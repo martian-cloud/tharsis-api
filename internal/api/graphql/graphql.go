@@ -26,6 +26,11 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
+const (
+	// maxQueryNestedLevels defines the maximum number of nested levels allowed in a GraphQL query
+	maxQueryNestedLevels = 20
+)
+
 // fieldOverrides is initialized map passed into GetQueryComplexity
 var fieldOverrides = map[string]int{
 	"readme":                   1,
@@ -179,7 +184,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	subject := auth.GetSubject(r.Context())
 	if subject == nil {
-		respond(w, errorJSON("No subject string in context"), http.StatusInternalServerError)
+		respond(w, errorJSON("no subject string in context"), http.StatusInternalServerError)
 		return
 	}
 
@@ -213,7 +218,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Rate limit query
 			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, *subject)
 			if qcErr != nil {
-				h.logger.Errorf("Failed to check graphql query complexity; %v", qcErr)
+				h.logger.Errorf("An error occurred while checking graphql query complexity; %v", qcErr)
 				err := errors.New(
 					"invalid graphql query: "+strings.TrimPrefix(qcErr.Error(), "graphql: syntax error: "),
 					errors.WithErrorCode(errors.EInvalid),
@@ -258,6 +263,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					switch errors.ErrorCode(e.Err) {
 					case errors.EInternal:
 						h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
+						// Avoid exposing sensitive error messages
+						e.Message = errors.InternalErrorMessage
 					case errors.EUnauthorized:
 						h.logger.Infof("Unauthorized request from subject: %s", *subject)
 					}
@@ -284,7 +291,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *httpHandler) calculateQueryComplexity(ctx context.Context, q query, subject string) (*queryComplexityResult, error) {
 	// calculate query complexity
-	complexity, err := complexity.GetQueryComplexity(q.Query, q.Variables, fieldOverrides)
+	complexity, err := complexity.GetQueryComplexity(q.Query, q.Variables, fieldOverrides, maxQueryNestedLevels)
 	if err != nil {
 		return nil, err
 	}
