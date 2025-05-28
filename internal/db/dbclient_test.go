@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -250,7 +251,7 @@ func testResourcePaginationAndSorting(
 		_, resources, err = getResourcesFunc(ctx, sortByField, &pagination.Options{})
 		require.Nil(t, err)
 
-		values := []string{}
+		values := []*string{}
 		for _, resource := range resources {
 			value, err := resource.ResolveMetadata(sortByField.getFieldDescriptor().Key)
 			require.Nil(t, err)
@@ -261,39 +262,49 @@ func testResourcePaginationAndSorting(
 		// If they are, must convert them and sort as time.Time rather than as strings.
 		// That is because truncated trailing zeros cause string comparison to be different vs. time value comparison.
 		areAllTimestamps := true
-		timeValues := []time.Time{}
+		timeValues := []*time.Time{}
 		for _, value := range values {
-			tv, err := time.Parse(time.RFC3339, value)
-			if err != nil {
-				areAllTimestamps = false
-				break
+			if value != nil {
+				tv, err := time.Parse(time.RFC3339, *value)
+				if err != nil {
+					areAllTimestamps = false
+					break
+				}
+				timeValues = append(timeValues, &tv)
+			} else {
+				timeValues = append(timeValues, nil)
 			}
-			timeValues = append(timeValues, tv)
 		}
 
 		if areAllTimestamps {
 			// Time value sort/comparison.
-			expectedTimes := []time.Time{}
+			expectedTimes := []*time.Time{}
 			expectedTimes = append(expectedTimes, timeValues...)
 
-			slices.SortFunc(expectedTimes, func(a, b time.Time) int {
-				if sortByField.getSortDirection() == pagination.AscSort {
-					return int(a.Sub(b)) // positive if a is later/greater than g
+			slices.SortFunc(expectedTimes, func(a, b *time.Time) int {
+				if val, ok := cmpNils(a, b, sortByField.getSortDirection()); ok {
+					return val
 				}
-				return int(b.Sub(a)) // positive if b is later/greater than a
+				if sortByField.getSortDirection() == pagination.AscSort {
+					return int(a.Sub(*b)) // positive if a is later/greater than g
+				}
+				return int(b.Sub(*a)) // positive if b is later/greater than a
 			})
 
 			assert.Equal(t, expectedTimes, timeValues, "resources are not sorted correctly when using sort by %s", sortByField.getValue())
 		} else {
 			// Ordinary string sort/comparison.
-			expectedValues := []string{}
+			expectedValues := []*string{}
 			expectedValues = append(expectedValues, values...)
 
-			slices.SortFunc(expectedValues, func(a, b string) int {
-				if sortByField.getSortDirection() == pagination.AscSort {
-					return cmp.Compare(a, b)
+			slices.SortFunc(expectedValues, func(a, b *string) int {
+				if val, ok := cmpNils(a, b, sortByField.getSortDirection()); ok {
+					return val
 				}
-				return cmp.Compare(b, a)
+				if sortByField.getSortDirection() == pagination.AscSort {
+					return cmp.Compare(*a, *b)
+				}
+				return cmp.Compare(*b, *a)
 			})
 
 			assert.Equal(t, expectedValues, values, "resources are not sorted correctly when using sort by %s", sortByField.getValue())
@@ -1039,6 +1050,31 @@ func checkError(t *testing.T, expectedMsg *string, actualError error) {
 		require.NotNil(t, actualError)
 		assert.Contains(t, actualError.Error(), *expectedMsg)
 	}
+}
+
+func cmpNils(a, b any, sortDir pagination.SortDirection) (int, bool) {
+	aIsNil := a == nil || reflect.ValueOf(a).IsNil()
+	bIsNil := b == nil || reflect.ValueOf(b).IsNil()
+
+	if aIsNil && bIsNil {
+		return 0, true
+	}
+
+	// If one of the values is nil, then it is greater than the other
+
+	if sortDir == pagination.AscSort {
+		if aIsNil {
+			return 1, true
+		} else if bIsNil {
+			return -1, true
+		}
+	}
+	if aIsNil {
+		return -1, true
+	} else if bIsNil {
+		return 1, true
+	}
+	return 0, false
 }
 
 // The End.

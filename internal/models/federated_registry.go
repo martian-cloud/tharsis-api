@@ -31,7 +31,7 @@ func (f *FederatedRegistry) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination.
-func (f *FederatedRegistry) ResolveMetadata(key string) (string, error) {
+func (f *FederatedRegistry) ResolveMetadata(key string) (*string, error) {
 	return f.Metadata.resolveFieldValue(key)
 }
 

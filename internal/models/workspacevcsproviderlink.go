@@ -66,7 +66,7 @@ func (wpl *WorkspaceVCSProviderLink) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (wpl *WorkspaceVCSProviderLink) ResolveMetadata(key string) (string, error) {
+func (wpl *WorkspaceVCSProviderLink) ResolveMetadata(key string) (*string, error) {
 	return wpl.Metadata.resolveFieldValue(key)
 }
 

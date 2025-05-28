@@ -35,14 +35,14 @@ func (r *Role) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (r *Role) ResolveMetadata(key string) (string, error) {
+func (r *Role) ResolveMetadata(key string) (*string, error) {
 	val, err := r.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "name":
-			val = r.Name
+			return &r.Name, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

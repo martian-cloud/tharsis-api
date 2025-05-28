@@ -54,14 +54,14 @@ func (nm *NamespaceMembership) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (nm *NamespaceMembership) ResolveMetadata(key string) (string, error) {
+func (nm *NamespaceMembership) ResolveMetadata(key string) (*string, error) {
 	val, err := nm.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "namespace_path":
-			val = nm.Namespace.Path
+			return &nm.Namespace.Path, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

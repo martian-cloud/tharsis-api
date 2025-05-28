@@ -35,7 +35,7 @@ var (
 	runFinished   = metric.NewCounter("run_completed_count", "Amount of times a run is completed.")
 )
 
-type eventHandlerFunc func(ctx context.Context, eventType EventType, old interface{}, new interface{}) error
+type eventHandlerFunc func(ctx context.Context, eventType EventType, oldModel interface{}, newModel interface{}) error
 
 // RunStateManager is used to manage state changes for run resources
 type RunStateManager struct {
@@ -69,13 +69,13 @@ func (r *RunStateManager) RegisterHandler(eventType EventType, handler eventHand
 	r.handlerMap[eventType] = append(r.handlerMap[eventType], handler)
 }
 
-func (r *RunStateManager) fireEvent(ctx context.Context, eventType EventType, old interface{}, new interface{}) error {
+func (r *RunStateManager) fireEvent(ctx context.Context, eventType EventType, oldModel interface{}, newModel interface{}) error {
 	for _, h := range r.handlerMap[eventType] {
 		// Use retry handler here for optimistic lock errors since these are internal updates and
 		// we don't want to return until the handler completes successfully.
 		if err := retry.Do(
 			func() error {
-				return h(ctx, eventType, old, new)
+				return h(ctx, eventType, oldModel, newModel)
 			},
 			retry.Attempts(100),
 			retry.DelayType(retry.FixedDelay),
@@ -316,14 +316,14 @@ type runHandlers struct {
 
 func registerRunHandlers(manager *RunStateManager) {
 	handlers := &runHandlers{manager: manager}
-	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
+	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleRunStateChangeEvent(ctx, oldModel.(*models.Run), newModel.(*models.Run))
 	})
-	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
+	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handlePlanStateChangeEvent(ctx, oldModel.(*models.Plan), newModel.(*models.Plan))
 	})
-	manager.RegisterHandler(applyEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleApplyStateChangeEvent(ctx, old.(*models.Apply), new.(*models.Apply))
+	manager.RegisterHandler(applyEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleApplyStateChangeEvent(ctx, oldModel.(*models.Apply), newModel.(*models.Apply))
 	})
 }
 
@@ -412,8 +412,8 @@ type planHandlers struct {
 
 func registerPlanHandlers(manager *RunStateManager) {
 	handlers := &planHandlers{manager: manager}
-	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
+	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleJobStateChangeEvent(ctx, oldModel.(*models.Job), newModel.(*models.Job))
 	})
 }
 
@@ -452,8 +452,8 @@ type applyHandlers struct {
 
 func registerApplyHandlers(manager *RunStateManager) {
 	handlers := &applyHandlers{manager: manager}
-	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
+	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleJobStateChangeEvent(ctx, oldModel.(*models.Job), newModel.(*models.Job))
 	})
 }
 
@@ -492,11 +492,11 @@ type jobHandlers struct {
 
 func registerJobHandlers(manager *RunStateManager) {
 	handlers := &jobHandlers{manager: manager}
-	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handlePlanStateChangeEvent(ctx, old.(*models.Plan), new.(*models.Plan))
+	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handlePlanStateChangeEvent(ctx, oldModel.(*models.Plan), newModel.(*models.Plan))
 	})
-	manager.RegisterHandler(applyEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleApplyStateChangeEvent(ctx, old.(*models.Apply), new.(*models.Apply))
+	manager.RegisterHandler(applyEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleApplyStateChangeEvent(ctx, oldModel.(*models.Apply), newModel.(*models.Apply))
 	})
 }
 
@@ -598,11 +598,11 @@ type workspaceHandlers struct {
 
 func registerWorkspaceHandlers(manager *RunStateManager) {
 	handlers := &workspaceHandlers{manager: manager}
-	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleRunStateChangeEvent(ctx, old.(*models.Run), new.(*models.Run))
+	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleRunStateChangeEvent(ctx, oldModel.(*models.Run), newModel.(*models.Run))
 	})
-	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, old interface{}, new interface{}) error {
-		return handlers.handleJobStateChangeEvent(ctx, old.(*models.Job), new.(*models.Job))
+	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
+		return handlers.handleJobStateChangeEvent(ctx, oldModel.(*models.Job), newModel.(*models.Job))
 	})
 }
 
@@ -664,27 +664,27 @@ func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJo
 
 // checkPlanStatusChange returns an error if the specified plan status change is invalid.
 // This function is similar to checkApplyStatusChange below.
-func checkPlanStatusChange(old, new models.PlanStatus) error {
-	if old == new {
+func checkPlanStatusChange(oldStatus, newStatus models.PlanStatus) error {
+	if oldStatus == newStatus {
 		return nil
 	}
 
 	// Assume invalid until proven valid.
 	transitionValid := false
 
-	switch old {
+	switch oldStatus {
 	case models.PlanQueued:
-		transitionValid = (new == models.PlanPending) || (new == models.PlanCanceled)
+		transitionValid = (newStatus == models.PlanPending) || (newStatus == models.PlanCanceled)
 	case models.PlanPending:
-		transitionValid = (new == models.PlanRunning) || (new == models.PlanCanceled)
+		transitionValid = (newStatus == models.PlanRunning) || (newStatus == models.PlanCanceled)
 	case models.PlanRunning:
-		transitionValid = (new == models.PlanCanceled) || (new == models.PlanErrored) || (new == models.PlanFinished)
+		transitionValid = (newStatus == models.PlanCanceled) || (newStatus == models.PlanErrored) || (newStatus == models.PlanFinished)
 	}
 
 	// If an error was found, turn it into an error.
 	if !transitionValid {
 		return errors.New(
-			"plan status is not allowed to transition from %s to %s", old, new,
+			"plan status is not allowed to transition from %s to %s", oldStatus, newStatus,
 			errors.WithErrorCode(errors.EInvalid))
 	}
 
@@ -701,29 +701,29 @@ func checkPlanStatusChange(old, new models.PlanStatus) error {
 
 // checkApplyStatusChange returns an error if the specified Apply status change is invalid.
 // This function is similar to checkPlanStatusChange above.
-func checkApplyStatusChange(old, new models.ApplyStatus) error {
-	if old == new {
+func checkApplyStatusChange(oldStatus, newStatus models.ApplyStatus) error {
+	if oldStatus == newStatus {
 		return nil
 	}
 
 	// Assume invalid until proven valid.
 	transitionValid := false
 
-	switch old {
+	switch oldStatus {
 	case models.ApplyCreated:
-		transitionValid = (new == models.ApplyQueued) || (new == models.ApplyCanceled)
+		transitionValid = (newStatus == models.ApplyQueued) || (newStatus == models.ApplyCanceled)
 	case models.ApplyQueued:
-		transitionValid = (new == models.ApplyPending) || (new == models.ApplyCanceled)
+		transitionValid = (newStatus == models.ApplyPending) || (newStatus == models.ApplyCanceled)
 	case models.ApplyPending:
-		transitionValid = (new == models.ApplyRunning) || (new == models.ApplyCanceled)
+		transitionValid = (newStatus == models.ApplyRunning) || (newStatus == models.ApplyCanceled)
 	case models.ApplyRunning:
-		transitionValid = (new == models.ApplyCanceled) || (new == models.ApplyErrored) || (new == models.ApplyFinished)
+		transitionValid = (newStatus == models.ApplyCanceled) || (newStatus == models.ApplyErrored) || (newStatus == models.ApplyFinished)
 	}
 
 	// If an error was found, turn it into an error.
 	if !transitionValid {
 		return errors.New(
-			"apply status is not allowed to transition from %s to %s", old, new,
+			"apply status is not allowed to transition from %s to %s", oldStatus, newStatus,
 			errors.WithErrorCode(errors.EInvalid))
 	}
 
@@ -738,29 +738,29 @@ func checkApplyStatusChange(old, new models.ApplyStatus) error {
 // planned -> canceled, applyQueued
 
 // checkRunStatusChange returns an error for an invalid run transition.
-func checkRunStatusChange(old, new models.RunStatus) error {
-	if old == new {
+func checkRunStatusChange(oldStatus, newStatus models.RunStatus) error {
+	if oldStatus == newStatus {
 		return nil
 	}
 
 	transitionValid := false
 
-	switch old {
+	switch oldStatus {
 	case models.RunPlanQueued:
-		transitionValid = (new == models.RunCanceled) || (new == models.RunErrored) || (new == models.RunPlanning)
+		transitionValid = (newStatus == models.RunCanceled) || (newStatus == models.RunErrored) || (newStatus == models.RunPlanning)
 	case models.RunApplyQueued:
-		transitionValid = (new == models.RunCanceled) || (new == models.RunErrored) || (new == models.RunApplying)
+		transitionValid = (newStatus == models.RunCanceled) || (newStatus == models.RunErrored) || (newStatus == models.RunApplying)
 	case models.RunPlanning:
-		transitionValid = (new == models.RunCanceled) || (new == models.RunErrored) || (new == models.RunPlanned) || (new == models.RunPlannedAndFinished)
+		transitionValid = (newStatus == models.RunCanceled) || (newStatus == models.RunErrored) || (newStatus == models.RunPlanned) || (newStatus == models.RunPlannedAndFinished)
 	case models.RunApplying:
-		transitionValid = (new == models.RunCanceled) || (new == models.RunErrored) || (new == models.RunApplied)
+		transitionValid = (newStatus == models.RunCanceled) || (newStatus == models.RunErrored) || (newStatus == models.RunApplied)
 	case models.RunPlanned:
-		transitionValid = (new == models.RunCanceled) || (new == models.RunApplyQueued)
+		transitionValid = (newStatus == models.RunCanceled) || (newStatus == models.RunApplyQueued)
 	}
 
 	if !transitionValid {
 		return errors.New(
-			"run status is not allowed to transition from %s to %s", old, new,
+			"run status is not allowed to transition from %s to %s", oldStatus, newStatus,
 			errors.WithErrorCode(errors.EInvalid))
 	}
 

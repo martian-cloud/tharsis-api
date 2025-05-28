@@ -66,7 +66,7 @@ func (n *NotificationPreference) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (n *NotificationPreference) ResolveMetadata(key string) (string, error) {
+func (n *NotificationPreference) ResolveMetadata(key string) (*string, error) {
 	return n.Metadata.resolveFieldValue(key)
 }
 

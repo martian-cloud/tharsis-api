@@ -62,11 +62,11 @@ func (t *ErroredRunEmailHandler) RegisterHandlers() {
 // handleErroredRunEvent handles task status going to and from approval pending.
 // It traps and logs the error from the internal function.
 // It always returns nil.
-func (t *ErroredRunEmailHandler) handleErroredRunEvent(_ context.Context, eventType state.EventType, _ interface{}, new interface{}) error {
+func (t *ErroredRunEmailHandler) handleErroredRunEvent(_ context.Context, eventType state.EventType, _ interface{}, newModel interface{}) error {
 	if eventType == state.RunEventType {
-		run, ok := new.(*models.Run)
+		run, ok := newModel.(*models.Run)
 		if !ok {
-			t.logger.Errorf("Errored run email handler received unexpected type for new object: %T", new)
+			t.logger.Errorf("Errored run email handler received unexpected type for new object: %T", newModel)
 			return nil
 		}
 

@@ -69,7 +69,7 @@ func (j *Job) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (j *Job) ResolveMetadata(key string) (string, error) {
+func (j *Job) ResolveMetadata(key string) (*string, error) {
 	return j.Metadata.resolveFieldValue(key)
 }
 

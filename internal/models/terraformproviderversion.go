@@ -40,14 +40,14 @@ func (t *TerraformProviderVersion) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (t *TerraformProviderVersion) ResolveMetadata(key string) (string, error) {
+func (t *TerraformProviderVersion) ResolveMetadata(key string) (*string, error) {
 	val, err := t.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "sem_version":
-			val = t.SemanticVersion
+			return &t.SemanticVersion, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

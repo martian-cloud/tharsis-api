@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -36,14 +37,14 @@ func (w *WorkspaceAssessment) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (w *WorkspaceAssessment) ResolveMetadata(key string) (string, error) {
+func (w *WorkspaceAssessment) ResolveMetadata(key string) (*string, error) {
 	val, err := w.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "started_at":
-			val = w.StartedAtTimestamp.Format(time.RFC3339Nano)
+			return ptr.String(w.StartedAtTimestamp.Format(time.RFC3339Nano)), nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

@@ -35,7 +35,7 @@ func (t *TerraformProviderPlatform) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (t *TerraformProviderPlatform) ResolveMetadata(key string) (string, error) {
+func (t *TerraformProviderPlatform) ResolveMetadata(key string) (*string, error) {
 	return t.Metadata.resolveFieldValue(key)
 }
 

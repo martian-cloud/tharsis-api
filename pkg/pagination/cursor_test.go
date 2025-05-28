@@ -3,6 +3,7 @@ package pagination
 import (
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,23 +12,23 @@ func TestEncode(t *testing.T) {
 	tests := []struct {
 		name            string
 		encodedCursor   string
-		expectPrimary   *cursorField
-		expectSecondary *cursorField
+		expectPrimary   *primaryCursorField
+		expectSecondary *secondaryCursorField
 		expectErrMsg    string
 	}{
 		{
 			name:          "primary only",
 			encodedCursor: *buildTestCursor("1", ""),
-			expectPrimary: &cursorField{name: "id", value: "1"},
+			expectPrimary: &primaryCursorField{name: "id", value: "1"},
 		},
 		{
 			name:            "primary and secondary",
 			encodedCursor:   *buildTestCursor("1", "name1"),
-			expectPrimary:   &cursorField{name: "id", value: "1"},
-			expectSecondary: &cursorField{name: "name", value: "name1"},
+			expectPrimary:   &primaryCursorField{name: "id", value: "1"},
+			expectSecondary: &secondaryCursorField{name: "name", value: ptr.String("name1")},
 		},
 		{
-			name:          "build cursor with error",
+			name:          "build cursor with invalid character",
 			encodedCursor: "dGVzdA==",
 			expectErrMsg:  "invalid cursor: invalid character 'e' in literal true (expecting 'r')",
 		},
@@ -48,9 +49,9 @@ func TestEncode(t *testing.T) {
 }
 
 func buildTestCursor(id string, name string) *string {
-	c := &cursor{primary: &cursorField{name: "id", value: id}}
+	c := &cursor{primary: &primaryCursorField{name: "id", value: id}}
 	if name != "" {
-		c.secondary = &cursorField{name: "name", value: name}
+		c.secondary = &secondaryCursorField{name: "name", value: ptr.String(name)}
 	}
 	encodedCursor, _ := c.encode()
 	return &encodedCursor

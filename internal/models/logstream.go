@@ -32,7 +32,7 @@ func (ls *LogStream) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (ls *LogStream) ResolveMetadata(key string) (string, error) {
+func (ls *LogStream) ResolveMetadata(key string) (*string, error) {
 	return ls.Metadata.resolveFieldValue(key)
 }
 

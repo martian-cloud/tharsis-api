@@ -49,16 +49,16 @@ func (v *Variable) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (v *Variable) ResolveMetadata(key string) (string, error) {
+func (v *Variable) ResolveMetadata(key string) (*string, error) {
 	val, err := v.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "namespace_path":
-			val = v.NamespacePath
+			return &v.NamespacePath, nil
 		case "key":
-			val = v.Key
+			return &v.Key, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -98,7 +98,7 @@ func (v *VariableVersion) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (v *VariableVersion) ResolveMetadata(key string) (string, error) {
+func (v *VariableVersion) ResolveMetadata(key string) (*string, error) {
 	return v.Metadata.resolveFieldValue(key)
 }
 
