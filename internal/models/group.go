@@ -38,14 +38,14 @@ func (g *Group) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (g *Group) ResolveMetadata(key string) (string, error) {
+func (g *Group) ResolveMetadata(key string) (*string, error) {
 	val, err := g.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "full_path":
-			val = g.FullPath
+			return &g.FullPath, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

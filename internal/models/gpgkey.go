@@ -36,14 +36,15 @@ func (g *GPGKey) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (g *GPGKey) ResolveMetadata(key string) (string, error) {
+func (g *GPGKey) ResolveMetadata(key string) (*string, error) {
 	val, err := g.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "group_path":
-			val = g.GetGroupPath()
+			path := g.GetGroupPath()
+			return &path, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

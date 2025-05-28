@@ -41,8 +41,8 @@ func (t *AssessmentRunHandler) RegisterHandlers() {
 	t.runStateManager.RegisterHandler(state.RunEventType, t.handleRunEvent)
 }
 
-func (t *AssessmentRunHandler) handleRunEvent(ctx context.Context, _ state.EventType, _ interface{}, new interface{}) error {
-	run := new.(*models.Run)
+func (t *AssessmentRunHandler) handleRunEvent(ctx context.Context, _ state.EventType, _ interface{}, newModel interface{}) error {
+	run := newModel.(*models.Run)
 
 	// Skip this run if it's not complete
 	if !run.IsComplete() {

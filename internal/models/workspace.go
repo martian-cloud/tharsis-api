@@ -45,14 +45,14 @@ func (w *Workspace) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (w *Workspace) ResolveMetadata(key string) (string, error) {
+func (w *Workspace) ResolveMetadata(key string) (*string, error) {
 	val, err := w.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "full_path":
-			val = w.FullPath
+			return &w.FullPath, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

@@ -2,7 +2,6 @@
 package models
 
 import (
-	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -152,22 +151,24 @@ func (a *ActivityEvent) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (a *ActivityEvent) ResolveMetadata(key string) (string, error) {
+func (a *ActivityEvent) ResolveMetadata(key string) (*string, error) {
 	val, err := a.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "user_id":
-			val = ptr.ToString(a.UserID)
+			return a.UserID, nil
 		case "service_account_id":
-			val = ptr.ToString(a.ServiceAccountID)
+			return a.ServiceAccountID, nil
 		case "namespace_path":
-			val = ptr.ToString(a.NamespacePath)
+			return a.NamespacePath, nil
 		case "action":
-			val = string(a.Action)
+			action := string(a.Action)
+			return &action, nil
 		case "target_type":
-			val = string(a.TargetType)
+			targetType := string(a.TargetType)
+			return &targetType, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

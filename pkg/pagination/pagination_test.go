@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -18,14 +19,14 @@ type testModel struct {
 	name string
 }
 
-func (t testModel) ResolveMetadata(key string) (string, error) {
+func (t testModel) ResolveMetadata(key string) (*string, error) {
 	switch key {
 	case "id":
-		return t.id, nil
+		return &t.id, nil
 	case "name":
-		return t.name, nil
+		return &t.name, nil
 	default:
-		return "", fmt.Errorf("invalid key requested: %s", key)
+		return nil, fmt.Errorf("invalid key requested: %s", key)
 	}
 }
 
@@ -213,7 +214,7 @@ func TestExecute(t *testing.T) {
 			assert.Equal(t, "1", cursor.primary.value)
 
 			if test.sortByField != nil {
-				assert.Equal(t, "m1", cursor.secondary.value)
+				assert.Equal(t, ptr.String("m1"), cursor.secondary.value)
 			} else {
 				assert.Nil(t, cursor.secondary)
 			}

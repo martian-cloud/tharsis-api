@@ -30,7 +30,7 @@ func (s *SCIMToken) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (s *SCIMToken) ResolveMetadata(key string) (string, error) {
+func (s *SCIMToken) ResolveMetadata(key string) (*string, error) {
 	return s.Metadata.resolveFieldValue(key)
 }
 

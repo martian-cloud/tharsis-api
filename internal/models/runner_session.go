@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -37,14 +38,14 @@ func (r *RunnerSession) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (r *RunnerSession) ResolveMetadata(key string) (string, error) {
+func (r *RunnerSession) ResolveMetadata(key string) (*string, error) {
 	val, err := r.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "last_contacted_at":
-			val = r.LastContactTimestamp.Format(time.RFC3339Nano)
+			return ptr.String(r.LastContactTimestamp.Format(time.RFC3339Nano)), nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

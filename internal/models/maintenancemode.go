@@ -30,7 +30,7 @@ func (m *MaintenanceMode) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (m *MaintenanceMode) ResolveMetadata(key string) (string, error) {
+func (m *MaintenanceMode) ResolveMetadata(key string) (*string, error) {
 	return m.Metadata.resolveFieldValue(key)
 }
 

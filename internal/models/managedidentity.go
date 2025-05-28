@@ -70,7 +70,7 @@ func (m *ManagedIdentityAccessRule) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (m *ManagedIdentityAccessRule) ResolveMetadata(key string) (string, error) {
+func (m *ManagedIdentityAccessRule) ResolveMetadata(key string) (*string, error) {
 	return m.Metadata.resolveFieldValue(key)
 }
 
@@ -133,14 +133,15 @@ func (m *ManagedIdentity) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (m *ManagedIdentity) ResolveMetadata(key string) (string, error) {
+func (m *ManagedIdentity) ResolveMetadata(key string) (*string, error) {
 	val, err := m.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "group_path":
-			val = m.GetGroupPath()
+			path := m.GetGroupPath()
+			return &path, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

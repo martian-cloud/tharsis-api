@@ -48,7 +48,7 @@ func (a *Apply) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (a *Apply) ResolveMetadata(key string) (string, error) {
+func (a *Apply) ResolveMetadata(key string) (*string, error) {
 	return a.Metadata.resolveFieldValue(key)
 }
 

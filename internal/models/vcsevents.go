@@ -62,7 +62,7 @@ func (v *VCSEvent) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (v *VCSEvent) ResolveMetadata(key string) (string, error) {
+func (v *VCSEvent) ResolveMetadata(key string) (*string, error) {
 	return v.Metadata.resolveFieldValue(key)
 }
 

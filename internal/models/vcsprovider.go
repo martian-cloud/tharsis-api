@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -54,14 +55,14 @@ func (v *VCSProvider) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (v *VCSProvider) ResolveMetadata(key string) (string, error) {
+func (v *VCSProvider) ResolveMetadata(key string) (*string, error) {
 	val, err := v.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "group_path":
-			val = v.GetGroupPath()
+			return ptr.String(v.GetGroupPath()), nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

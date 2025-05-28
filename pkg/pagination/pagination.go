@@ -21,6 +21,7 @@ import (
 const (
 	gt   = "GT"
 	lt   = "LT"
+	ne   = "<>"
 	asc  = "ASC"
 	desc = "DESC"
 )
@@ -45,7 +46,7 @@ type Connection interface {
 
 // CursorPaginatable implements functions needed to resolve fields for cursor pagination
 type CursorPaginatable interface {
-	ResolveMetadata(key string) (string, error)
+	ResolveMetadata(key string) (*string, error)
 }
 
 // CursorFunc creates an opaque cursor string
@@ -338,7 +339,11 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 				return nil, err
 			}
 
-			cur := cursor{primary: &cursorField{name: p.primaryKey.Key, value: pKeyVal}}
+			if pKeyVal == nil {
+				return nil, te.New("failed to create cursor: primary key value cannot be null", te.WithErrorCode(te.EInvalid))
+			}
+
+			cur := cursor{primary: &primaryCursorField{name: p.primaryKey.Key, value: *pKeyVal}}
 
 			if p.sortBy != nil {
 				sKeyVal, frErr := cp.ResolveMetadata(p.sortBy.Key)
@@ -346,7 +351,7 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 					return nil, frErr
 				}
 
-				cur.secondary = &cursorField{name: p.sortBy.Key, value: sKeyVal}
+				cur.secondary = &secondaryCursorField{name: p.sortBy.Key, value: sKeyVal}
 			}
 
 			encodedCursor, err := cur.encode()
@@ -376,6 +381,18 @@ func (p *PaginatedQueryBuilder) buildWhereCondition() goqu.Expression {
 
 	if p.cur != nil {
 		if p.cur.secondary != nil {
+			// If secondary cursor value is nil, we need to find rows where the sort by is not null or rows
+			// where the sort value is null but the primary key value is gt/lt the primary cursor value
+			// depending on the sort direction.
+			if p.cur.secondary.value == nil {
+				return goqu.Or(
+					goqu.I(p.sortBy.getFullColName()).IsNotNull(),
+					goqu.Ex{
+						p.sortBy.getFullColName():     nil,
+						p.primaryKey.getFullColName(): goqu.Op{op: p.cur.primary.value},
+					},
+				)
+			}
 			return goqu.Or(
 				goqu.Ex{
 					p.sortBy.getFullColName(): goqu.Op{op: p.cur.secondary.value},

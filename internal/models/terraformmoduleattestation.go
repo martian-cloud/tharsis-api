@@ -36,14 +36,14 @@ func (t *TerraformModuleAttestation) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (t *TerraformModuleAttestation) ResolveMetadata(key string) (string, error) {
+func (t *TerraformModuleAttestation) ResolveMetadata(key string) (*string, error) {
 	val, err := t.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "predicate":
-			val = t.PredicateType
+			return &t.PredicateType, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 

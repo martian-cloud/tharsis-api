@@ -192,7 +192,7 @@ func (r *UserNamespacePreferencesResolver) NotificationPreference(ctx context.Co
 }
 
 // ResolveMetadata is used to resolve metadata for the namespace
-func (r *UserNamespacePreferencesResolver) ResolveMetadata(key string) (string, error) {
+func (r *UserNamespacePreferencesResolver) ResolveMetadata(key string) (*string, error) {
 	return r.namespace.ResolveMetadata(key)
 }
 

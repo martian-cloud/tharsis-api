@@ -23,7 +23,7 @@ type Model interface {
 	GetID() string
 	GetGlobalID() string
 	GetModelType() types.ModelType
-	ResolveMetadata(key string) (string, error)
+	ResolveMetadata(key string) (*string, error)
 	Validate() error
 }
 
@@ -37,7 +37,7 @@ type ResourceMetadata struct {
 }
 
 // resolveFieldValue resolves metadata field values for cursor based pagination
-func (r *ResourceMetadata) resolveFieldValue(key string) (string, error) {
+func (r *ResourceMetadata) resolveFieldValue(key string) (*string, error) {
 	var resp string
 
 	switch key {
@@ -48,10 +48,10 @@ func (r *ResourceMetadata) resolveFieldValue(key string) (string, error) {
 	case "created_at":
 		resp = r.CreationTimestamp.Format(time.RFC3339Nano)
 	default:
-		return "", fmt.Errorf("invalid field key requested: %s", key)
+		return nil, fmt.Errorf("invalid field key requested: %s", key)
 	}
 
-	return resp, nil
+	return &resp, nil
 }
 
 func verifyValidName(name string) error {

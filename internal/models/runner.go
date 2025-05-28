@@ -53,14 +53,15 @@ func (r *Runner) GetModelType() types.ModelType {
 }
 
 // ResolveMetadata resolves the metadata fields for cursor-based pagination
-func (r *Runner) ResolveMetadata(key string) (string, error) {
+func (r *Runner) ResolveMetadata(key string) (*string, error) {
 	val, err := r.Metadata.resolveFieldValue(key)
 	if err != nil {
 		switch key {
 		case "group_path":
-			val = r.GetGroupPath()
+			path := r.GetGroupPath()
+			return &path, nil
 		default:
-			return "", err
+			return nil, err
 		}
 	}
 
