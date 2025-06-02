@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -14,11 +15,15 @@ import (
 // Version is passed in via ldflags at build time
 var Version = "1.0.0"
 
+// BuildTimestamp is passed in via ldflags at build time
+var BuildTimestamp = time.Now().UTC().Format(time.RFC3339)
+
 func main() {
 	// create root logger tagged with server version
 	logger := logger.New().With("version", Version)
 
 	logger.Infof("Starting Runner with version %s...", Version)
+	logger.Infof("Build timestamp: %s", BuildTimestamp)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

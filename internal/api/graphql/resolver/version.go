@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 
+	"github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
 )
 
@@ -24,6 +25,11 @@ func (r *VersionResolver) DBMigrationVersion() string {
 // DBMigrationDirty resolver
 func (r *VersionResolver) DBMigrationDirty() bool {
 	return r.versionInfo.DBMigrationDirty
+}
+
+// APIBuildTimestamp resolver
+func (r *VersionResolver) APIBuildTimestamp() graphql.Time {
+	return graphql.Time{Time: r.versionInfo.BuildTimestamp}
 }
 
 func versionQuery(ctx context.Context) (*VersionResolver, error) {
