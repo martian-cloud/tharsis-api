@@ -4,9 +4,11 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -16,16 +18,25 @@ import (
 func TestNewService(t *testing.T) {
 	dbClient := &db.Client{}
 	apiVersion := "1.0.0"
+	buildTimestampStr := "2025-06-02T13:00:00Z"
+
+	buildTimestamp, err := time.Parse(time.RFC3339, buildTimestampStr)
+	require.NoError(t, err)
 
 	expect := &service{
-		dbClient:   dbClient,
-		apiVersion: apiVersion,
+		dbClient:       dbClient,
+		apiVersion:     apiVersion,
+		buildTimestamp: buildTimestamp,
 	}
 
-	assert.Equal(t, expect, NewService(dbClient, apiVersion))
+	actualService, err := NewService(dbClient, apiVersion, buildTimestampStr)
+	require.NoError(t, err)
+	assert.Equal(t, expect, actualService)
 }
 
 func TestGetCurrentVersion(t *testing.T) {
+	buildTimestamp := time.Now().UTC()
+
 	testCases := []struct {
 		dbError         error
 		dbMigration     *db.SchemaMigration
@@ -71,8 +82,9 @@ func TestGetCurrentVersion(t *testing.T) {
 			}
 
 			service := &service{
-				dbClient:   dbClient,
-				apiVersion: "1.0.0",
+				dbClient:       dbClient,
+				apiVersion:     "1.0.0",
+				buildTimestamp: buildTimestamp,
 			}
 
 			actualInfo, err := service.GetCurrentVersion(ctx)
@@ -91,6 +103,7 @@ func TestGetCurrentVersion(t *testing.T) {
 					DBMigrationVersion: strconv.Itoa(test.dbMigration.Version),
 					DBMigrationDirty:   test.dbMigration.Dirty,
 					APIVersion:         "1.0.0",
+					BuildTimestamp:     buildTimestamp,
 				}
 				assert.Equal(t, expectedInfo, actualInfo)
 			}

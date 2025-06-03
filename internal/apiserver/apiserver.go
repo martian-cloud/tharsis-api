@@ -89,7 +89,7 @@ type APIServer struct {
 }
 
 // New creates a new APIServer instance
-func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersion string) (*APIServer, error) {
+func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersion string, buildTimestamp string) (*APIServer, error) {
 	openIDConfigFetcher := auth.NewOpenIDConfigFetcher()
 
 	tlsConfig, err := loadTLSConfig(cfg, logger)
@@ -177,7 +177,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	// Services.
 	var (
-		versionService             = version.NewService(dbClient, apiVersion)
 		activityService            = activityevent.NewService(dbClient, logger)
 		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
@@ -202,6 +201,11 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		providerMirrorService      = providermirror.NewService(logger, dbClient, httpClient, limits, activityService, mirrorStore)
 		maintenanceModeService     = maint.NewService(logger, dbClient)
 	)
+
+	versionService, err := version.NewService(dbClient, apiVersion, buildTimestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize version service %v", err)
+	}
 
 	vcsService, err := vcs.NewService(
 		ctx,

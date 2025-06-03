@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -16,6 +17,9 @@ import (
 // Version is passed in via ldflags at build time
 var Version = "1.0.0"
 
+// BuildTimestamp is passed in via ldflags at build time
+var BuildTimestamp = time.Now().UTC().Format(time.RFC3339)
+
 var flagConfig = flag.String("config", "", "path to the config file")
 
 func main() {
@@ -24,6 +28,7 @@ func main() {
 	logger := logger.New().With("version", Version)
 
 	logger.Info("Starting API...")
+	logger.Infof("Build timestamp: %s", BuildTimestamp)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -35,7 +40,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	apiServer, err := apiserver.New(ctx, cfg, logger, Version)
+	apiServer, err := apiserver.New(ctx, cfg, logger, Version, BuildTimestamp)
 	if err != nil {
 		logger.Errorf("Failed to start API server: %v", err)
 		os.Exit(1)

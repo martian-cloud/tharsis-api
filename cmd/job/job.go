@@ -6,6 +6,7 @@ import (
 	"flag"
 	"os"
 	"strings"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
@@ -15,12 +16,16 @@ import (
 // Version is passed in via ldflags at build time
 var Version = "1.0.0"
 
+// BuildTimestamp is passed in via ldflags at build time
+var BuildTimestamp = time.Now().UTC().Format(time.RFC3339)
+
 func main() {
 	flag.Parse()
 	// create root logger tagged with server version
 	logger := logger.New().With("version", Version)
 
 	logger.Infof("Starting Job Executor with version %s...", Version)
+	logger.Infof("Build timestamp: %s", BuildTimestamp)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

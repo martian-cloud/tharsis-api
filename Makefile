@@ -1,8 +1,9 @@
 GO_VERSION = 1.24
 MODULE = $(shell go list -m)
 VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo "1.0.0")
+BUILD_TIMESTAMP ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 PACKAGES := $(shell go list ./... | grep -v /vendor/)
-LDFLAGS := -ldflags "-X main.Version=${VERSION}"
+LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_TIMESTAMP}"
 
 DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable#gitleaks:allow
 MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.15.2 -path=/migrations/ -database "$(DB_URI)"

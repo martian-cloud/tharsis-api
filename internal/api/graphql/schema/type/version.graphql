@@ -2,4 +2,5 @@ type Version {
   apiVersion: String!
   dbMigrationVersion: String!
   dbMigrationDirty: Boolean!
+  apiBuildTimestamp: Time!
 }

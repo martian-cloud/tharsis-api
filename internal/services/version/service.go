@@ -4,6 +4,7 @@ package version
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -15,6 +16,7 @@ type Info struct {
 	APIVersion         string
 	DBMigrationVersion string
 	DBMigrationDirty   bool
+	BuildTimestamp     time.Time
 }
 
 // Service is an interface for the version service
@@ -23,13 +25,19 @@ type Service interface {
 }
 
 type service struct {
-	dbClient   *db.Client
-	apiVersion string
+	dbClient       *db.Client
+	apiVersion     string
+	buildTimestamp time.Time
 }
 
 // NewService creates a new version service
-func NewService(dbClient *db.Client, apiVersion string) Service {
-	return &service{dbClient, apiVersion}
+func NewService(dbClient *db.Client, apiVersion string, buildTimestamp string) (Service, error) {
+	timestamp, err := time.Parse(time.RFC3339, buildTimestamp)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse build timestamp")
+	}
+
+	return &service{dbClient, apiVersion, timestamp}, nil
 }
 
 // GetCurrentVersion returns version information of the API and its components
@@ -51,5 +59,6 @@ func (s *service) GetCurrentVersion(ctx context.Context) (*Info, error) {
 		DBMigrationVersion: strconv.Itoa(dbMigration.Version),
 		DBMigrationDirty:   dbMigration.Dirty,
 		APIVersion:         s.apiVersion,
+		BuildTimestamp:     s.buildTimestamp,
 	}, nil
 }
