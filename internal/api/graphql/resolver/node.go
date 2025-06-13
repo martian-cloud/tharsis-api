@@ -6,6 +6,7 @@ import (
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
 // NodeResolver resolves a node type
@@ -454,6 +455,9 @@ func (r *NodeResolver) ToFederatedRegistry() (*FederatedRegistryResolver, bool) 
 func node(ctx context.Context, value string) (*NodeResolver, error) {
 	model, err := getServiceCatalog(ctx).FetchModel(ctx, value)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.ENotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 
