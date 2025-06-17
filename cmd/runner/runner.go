@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/auth"
 )
 
 // Version is passed in via ldflags at build time
@@ -64,7 +67,19 @@ func main() {
 		pluginData[k] = v
 	}
 
-	client, err := NewClient(apiURL, serviceAccountPath, credHelperPath, strings.Split(os.Getenv("THARSIS_CREDENTIAL_HELPER_CMD_ARGS"), " "))
+	baseURL, err := url.Parse(apiURL)
+	if err != nil {
+		logger.Errorf("failed to parse THARSIS_API_URL %s: %v", apiURL, err)
+		return
+	}
+
+	tokenProvider, err := createTokenProvider(baseURL.String(), serviceAccountPath, credHelperPath, strings.Split(os.Getenv("THARSIS_CREDENTIAL_HELPER_CMD_ARGS"), " "))
+	if err != nil {
+		logger.Errorf("failed to create token provider: %v", err)
+		return
+	}
+
+	client, err := NewClient(baseURL.String(), tokenProvider)
 	if err != nil {
 		logger.Errorf("failed to create runner client %v", err)
 		return
@@ -74,6 +89,9 @@ func main() {
 		DispatcherType:       dispatcherType,
 		ServiceDiscoveryHost: os.Getenv("THARSIS_SERVICE_DISCOVERY_HOST"),
 		PluginData:           pluginData,
+		TokenGetterFunc: func(_ context.Context) (string, error) {
+			return tokenProvider.GetToken()
+		},
 	})
 	if err != nil {
 		logger.Errorf("Failed to create runner %v", err)
@@ -97,6 +115,21 @@ func main() {
 	runner.Start(ctx)
 
 	logger.Info("Runner has gracefully shutdown")
+}
+
+func createTokenProvider(apiURL string, serviceAccountPath string, credentialHelperPath string, credentialHelperArgs []string) (auth.TokenProvider, error) {
+	// Setup service account token provider
+	tokenProvider, err := auth.NewServiceAccountTokenProvider(apiURL, serviceAccountPath, func() (string, error) {
+		token, chErr := invokeCredentialHelper(credentialHelperPath, credentialHelperArgs)
+		if chErr != nil {
+			return "", fmt.Errorf("failed to invoke credential helper: %v", chErr)
+		}
+		return token, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return tokenProvider, nil
 }
 
 func loadDispatcherData(envPrefix string) map[string]string {

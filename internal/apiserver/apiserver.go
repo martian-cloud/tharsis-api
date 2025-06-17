@@ -31,6 +31,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/registry"
@@ -458,7 +459,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	for _, r := range cfg.InternalRunners {
 		// Create DB entry for runner
-		_, err := dbClient.Runners.CreateRunner(ctx, &models.Runner{
+		runnerModel, err := dbClient.Runners.CreateRunner(ctx, &models.Runner{
 			Type:            models.SharedRunnerType,
 			Name:            r.Name,
 			CreatedBy:       "system",
@@ -470,12 +471,20 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 			}
 		}
 
-		logger.Infof("starting internal runner %s", r.Name)
+		if runnerModel == nil {
+			runnerModel, err = dbClient.Runners.GetRunnerByTRN(ctx, types.RunnerModelType.BuildTRN(r.Name))
+			if err != nil {
+				return nil, fmt.Errorf("failed to get internal runner %q: %v", r.Name, err)
+			}
+		}
+
+		logger.Infof("starting internal runner %q with job dispatcher type %q", r.Name, r.JobDispatcherType)
 
 		runner, err := rnr.NewRunner(ctx, r.Name, logger, apiVersion, runnerClient, &rnr.JobDispatcherSettings{
 			DispatcherType:       r.JobDispatcherType,
 			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
 			PluginData:           r.JobDispatcherData,
+			TokenGetterFunc:      rnr.NewInternalTokenProvider(r.Name, runnerModel.Metadata.ID, tharsisIDP).GetToken,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create runner %v", err)

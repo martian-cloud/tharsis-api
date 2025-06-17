@@ -17,14 +17,31 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/cert"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/configfile"
 	ekscfg "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/eks"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/incluster"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes/configurer/idtoken"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
+// Auth Types
+const (
+	AuthTypeEKSIAM        = "eks_iam"
+	AuthTypeKubeConfig    = "kube_config"
+	AuthTypeX509Cert      = "x509_cert"
+	AuthTypeRunnerIDToken = "runner_id_token"
+	AuthTypeInCluster     = "in_cluster"
+)
+
 var (
-	pluginDataRequiredFields        = []string{"api_url", "auth_type", "image", "memory_request", "memory_limit"}
-	requireEKSIAMAuthFields         = []string{"region", "eks_cluster"}
-	_                        client = (*k8sRunner)(nil)
+	pluginDataRequiredFields              = []string{"api_url", "auth_type", "image", "memory_request", "memory_limit"}
+	requireEKSIAMAuthFields               = []string{"region", "eks_cluster"}
+	requireKubeConfigAuthFields           = []string{"kube_config_path"}
+	requireX509CertAuthFields             = []string{"kube_server", "client_cert", "client_key"}
+	requireRunnerIDTokenAuthFields        = []string{"kube_server"}
+	_                              client = (*k8sRunner)(nil)
 )
 
 type client interface {
@@ -65,7 +82,7 @@ type JobDispatcher struct {
 }
 
 // New creates a JobDispatcher
-func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHost string, logger logger.Logger) (*JobDispatcher, error) {
+func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHost string, tokenGetter types.TokenGetterFunc, logger logger.Logger) (*JobDispatcher, error) {
 	for _, field := range pluginDataRequiredFields {
 		if _, ok := pluginData[field]; !ok {
 			return nil, fmt.Errorf("kubernetes job dispatcher requires plugin data '%s' field", field)
@@ -77,17 +94,51 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		err error
 	)
 	switch pluginData["auth_type"] {
-	case "eks_iam":
-		for _, field := range requireEKSIAMAuthFields {
-			if _, ok := pluginData[field]; !ok {
-				return nil, fmt.Errorf("auth_type 'eks_iam' requires plugin data '%s' field", field)
-			}
+	case AuthTypeEKSIAM:
+		if err = checkRequiredFields(AuthTypeEKSIAM, pluginData, requireEKSIAMAuthFields); err != nil {
+			return nil, err
 		}
 
 		c, err = ekscfg.New(ctx, pluginData["region"], pluginData["eks_cluster"])
 		if err != nil {
-			return nil, fmt.Errorf("failed to configure EKS IAM plugin: %v", err)
+			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeEKSIAM, err)
 		}
+	case AuthTypeKubeConfig:
+		if err = checkRequiredFields(AuthTypeKubeConfig, pluginData, requireKubeConfigAuthFields); err != nil {
+			return nil, err
+		}
+
+		kubeConfigPath := pluginData["kube_config_path"]
+		c, err = configfile.New(kubeConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeKubeConfig, err)
+		}
+	case AuthTypeX509Cert:
+		if err = checkRequiredFields(AuthTypeX509Cert, pluginData, requireX509CertAuthFields); err != nil {
+			return nil, err
+		}
+
+		kubeServer := pluginData["kube_server"]
+		clientCertData := pluginData["client_cert"]
+		clientKeyData := pluginData["client_key"]
+		caCertData := pluginData["ca_cert"]
+		c, err = cert.New(kubeServer, clientCertData, clientKeyData, caCertData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeX509Cert, err)
+		}
+	case AuthTypeRunnerIDToken:
+		if err = checkRequiredFields(AuthTypeRunnerIDToken, pluginData, requireRunnerIDTokenAuthFields); err != nil {
+			return nil, err
+		}
+
+		kubeServer := pluginData["kube_server"]
+		caCertData := pluginData["ca_cert"]
+		c, err = idtoken.New(kubeServer, caCertData, tokenGetter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure kube job dispatcher plugin with auth type %q : %v", AuthTypeRunnerIDToken, err)
+		}
+	case AuthTypeInCluster:
+		c = incluster.New()
 	default:
 		return nil, fmt.Errorf("kubernetes job dispatcher doesn't support auth_type '%s'", pluginData["auth_type"])
 	}
@@ -251,4 +302,13 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 	}
 
 	return string(result.UID), nil
+}
+
+func checkRequiredFields(authType string, pluginData map[string]string, requiredFields []string) error {
+	for _, field := range requiredFields {
+		if _, ok := pluginData[field]; !ok {
+			return fmt.Errorf("kubernetes job dispatcher requires plugin data %q field when using the %q auth type", field, authType)
+		}
+	}
+	return nil
 }
