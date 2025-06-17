@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/ecs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/kubernetes"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/local"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner/jobdispatcher/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -36,6 +37,7 @@ type JobDispatcherSettings struct {
 	PluginData           map[string]string
 	DispatcherType       string
 	ServiceDiscoveryHost string
+	TokenGetterFunc      types.TokenGetterFunc
 }
 
 // Runner will claim the next available job and dispatch it using the configured job dispatcher
@@ -163,7 +165,7 @@ func newJobDispatcherPlugin(ctx context.Context, logger logger.Logger, version s
 
 	switch settings.DispatcherType {
 	case "kubernetes":
-		plugin, err = kubernetes.New(ctx, settings.PluginData, settings.ServiceDiscoveryHost, logger)
+		plugin, err = kubernetes.New(ctx, settings.PluginData, settings.ServiceDiscoveryHost, settings.TokenGetterFunc, logger)
 	case "ecs":
 		plugin, err = ecs.New(ctx, settings.PluginData, settings.ServiceDiscoveryHost, logger)
 	case "docker":

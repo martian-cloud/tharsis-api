@@ -591,6 +591,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			serviceAccountToken, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
 				Expiration: &expiration,
 				Subject:    serviceAccount.GetResourcePath(),
+				Typ:        auth.ServiceAccountTokenType,
 				Claims: map[string]string{
 					"service_account_name": serviceAccount.Name,
 					"service_account_path": serviceAccount.GetResourcePath(),
