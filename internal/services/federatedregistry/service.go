@@ -302,6 +302,13 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
+	// Set the CreatedBy field to the caller's subject
+	federatedRegistry.CreatedBy = caller.GetSubject()
+
+	if validateErr := federatedRegistry.Validate(); validateErr != nil {
+		return nil, errors.Wrap(validateErr, "invalid federated registry", errors.WithSpan(span))
+	}
+
 	err = caller.RequirePermission(ctx, models.CreateFederatedRegistryPermission,
 		auth.WithGroupID(federatedRegistry.GroupID),
 	)
@@ -380,6 +387,10 @@ func (s *service) UpdateFederatedRegistry(ctx context.Context,
 
 	if federatedRegistry == nil {
 		return nil, errors.New("federated registry cannot be nil", errors.WithSpan(span))
+	}
+
+	if err := federatedRegistry.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid federated registry", errors.WithSpan(span))
 	}
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -496,6 +507,11 @@ func (s *service) DeleteFederatedRegistry(ctx context.Context, federatedRegistry
 			Action:        models.ActionDeleteChildResource,
 			TargetType:    models.TargetGroup,
 			TargetID:      federatedRegistry.GroupID,
+			Payload: &models.ActivityEventDeleteChildResourcePayload{
+				Name: federatedRegistry.Hostname,
+				ID:   federatedRegistry.Metadata.ID,
+				Type: string(models.TargetFederatedRegistry),
+			},
 		}); err != nil {
 		return errors.Wrap(err, "failed to create activity event", errors.WithSpan(span))
 	}
