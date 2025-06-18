@@ -80,7 +80,7 @@ type federatedRegistries struct {
 	dbClient *Client
 }
 
-var federatedRegistryFieldList = append(metadataFieldList, "hostname", "group_id", "audience")
+var federatedRegistryFieldList = append(metadataFieldList, "hostname", "group_id", "audience", "created_by")
 
 // NewFederatedRegistries returns an instance of the FederatedRegistries interface
 func NewFederatedRegistries(dbClient *Client) FederatedRegistries {
@@ -214,6 +214,7 @@ func (p *federatedRegistries) CreateFederatedRegistry(ctx context.Context, input
 					"hostname":   input.Hostname,
 					"group_id":   input.GroupID,
 					"audience":   input.Audience,
+					"created_by": input.CreatedBy,
 				}).Returning("*"),
 		).Select(p.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"federated_registries.group_id": goqu.I("namespaces.group_id")})).
@@ -385,6 +386,7 @@ func scanFederatedRegistry(row scanner) (*models.FederatedRegistry, error) {
 		&federatedRegistry.Hostname,
 		&federatedRegistry.GroupID,
 		&federatedRegistry.Audience,
+		&federatedRegistry.CreatedBy,
 		&groupPath,
 	}
 

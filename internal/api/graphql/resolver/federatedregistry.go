@@ -140,6 +140,11 @@ func (r *FederatedRegistryResolver) Audience() string {
 	return r.federatedRegistry.Audience
 }
 
+// CreatedBy resolver
+func (r *FederatedRegistryResolver) CreatedBy() string {
+	return r.federatedRegistry.CreatedBy
+}
+
 // Group resolver
 func (r *FederatedRegistryResolver) Group(ctx context.Context) (*GroupResolver, error) {
 	group, err := loadGroup(ctx, r.federatedRegistry.GroupID)

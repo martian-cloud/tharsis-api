@@ -37,6 +37,7 @@ type FederatedRegistry implements Node {
   hostname: String!
   audience: String!
   group: Group!
+  createdBy: String!
 }
 
 input CreateFederatedRegistryInput {

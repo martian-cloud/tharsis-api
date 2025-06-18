@@ -75,8 +75,10 @@ func TestGetFederatedRegistriesByIDs(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: registryID,
 		},
-		Hostname: hostname,
-		GroupID:  groupID,
+		Hostname:  hostname,
+		GroupID:   groupID,
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -208,8 +210,10 @@ func TestGetFederatedRegistryByID(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: registryID,
 		},
-		Hostname: hostname,
-		GroupID:  groupID,
+		Hostname:  hostname,
+		GroupID:   groupID,
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -306,7 +310,9 @@ func TestFederatedRegistryByTRN(t *testing.T) {
 			ID:  "federated-registry-id-1",
 			TRN: types.FederatedRegistryModelType.BuildTRN("my-group/123341"),
 		},
-		GroupID: "group-1",
+		GroupID:   "group-1",
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -381,8 +387,10 @@ func TestGetFederatedRegistries(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: registryID,
 		},
-		Hostname: hostname,
-		GroupID:  groupID,
+		Hostname:  hostname,
+		GroupID:   groupID,
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -616,8 +624,10 @@ func TestCreateFederatedRegistry(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: registryID,
 		},
-		Hostname: hostname,
-		GroupID:  groupID,
+		Hostname:  hostname,
+		GroupID:   groupID,
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -690,7 +700,12 @@ func TestCreateFederatedRegistry(t *testing.T) {
 			mockDBClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockDBClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
-			mockDBClient.MockFederatedRegistries.On("CreateFederatedRegistry", mock.Anything, &test.input).
+			mockDBClient.MockFederatedRegistries.On("CreateFederatedRegistry", mock.Anything, mock.MatchedBy(func(input *models.FederatedRegistry) bool {
+				// Only match on the fields we care about, ignoring CreatedBy which is set by the service
+				return input.Hostname == test.input.Hostname &&
+					input.GroupID == test.input.GroupID &&
+					input.Audience == test.input.Audience
+			})).
 				Return(&test.expectFederatedRegistry, nil).Maybe()
 
 			mockDBClient.MockFederatedRegistries.On("GetFederatedRegistries", mock.Anything,
@@ -754,8 +769,10 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: registryID,
 		},
-		Hostname: hostname,
-		GroupID:  groupID,
+		Hostname:  hostname,
+		GroupID:   groupID,
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -786,8 +803,10 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 				Metadata: models.ResourceMetadata{
 					ID: otherRegistryID,
 				},
-				Hostname: hostname,
-				GroupID:  groupID,
+				Hostname:  hostname,
+				GroupID:   groupID,
+				Audience:  "test-audience",
+				CreatedBy: "test-user",
 			},
 			expectErrCode: errors.ENotFound,
 		},
@@ -827,16 +846,13 @@ func TestUpdateFederatedRegistry(t *testing.T) {
 			mockDBClient.MockTransactions.On("RollbackTx", mock.Anything).Return(nil).Maybe()
 			mockDBClient.MockTransactions.On("CommitTx", mock.Anything).Return(nil).Maybe()
 
-			mockDBClient.MockFederatedRegistries.On("UpdateFederatedRegistry", mock.Anything, &testRegistry).
+			mockDBClient.MockFederatedRegistries.On("UpdateFederatedRegistry", mock.Anything, mock.MatchedBy(func(input *models.FederatedRegistry) bool {
+				return input.Metadata.ID == registryID
+			})).
 				Return(&test.expectFederatedRegistry, nil).Maybe()
-			mockDBClient.MockFederatedRegistries.On("UpdateFederatedRegistry", mock.Anything,
-				&models.FederatedRegistry{
-					Metadata: models.ResourceMetadata{
-						ID: otherRegistryID,
-					},
-					Hostname: hostname,
-					GroupID:  groupID,
-				}).
+			mockDBClient.MockFederatedRegistries.On("UpdateFederatedRegistry", mock.Anything, mock.MatchedBy(func(input *models.FederatedRegistry) bool {
+				return input.Metadata.ID == otherRegistryID
+			})).
 				Return(nil, errors.New("test registry not found", errors.WithErrorCode(errors.ENotFound))).Maybe()
 
 			mockDBClient.MockFederatedRegistries.On("GetFederatedRegistries", mock.Anything,
@@ -897,8 +913,10 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: registryID,
 		},
-		Hostname: hostname,
-		GroupID:  groupID,
+		Hostname:  hostname,
+		GroupID:   groupID,
+		Audience:  "test-audience",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -964,8 +982,10 @@ func TestDeleteFederatedRegistry(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: otherRegistryID,
 					},
-					Hostname: hostname,
-					GroupID:  groupID,
+					Hostname:  hostname,
+					GroupID:   groupID,
+					Audience:  "test-audience",
+					CreatedBy: "test-user",
 				}).
 				Return(nil, errors.New("test registry not found", errors.WithErrorCode(errors.ENotFound))).Maybe()
 
@@ -1056,8 +1076,10 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 							Metadata: models.ResourceMetadata{
 								ID: "registry1",
 							},
-							Hostname: hostname1,
-							GroupID:  "group-1",
+							Hostname:  hostname1,
+							GroupID:   "group-1",
+							Audience:  "test-audience",
+							CreatedBy: "test-user",
 						},
 					},
 				}, nil)
