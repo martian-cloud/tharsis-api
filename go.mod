@@ -26,7 +26,7 @@ require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.16.0
-	github.com/go-chi/chi/v5 v5.0.12
+	github.com/go-chi/chi/v5 v5.2.2
 	github.com/go-chi/cors v1.2.1
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
