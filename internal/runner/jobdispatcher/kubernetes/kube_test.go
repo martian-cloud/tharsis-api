@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -111,6 +112,45 @@ func TestJobDispatcher_DispatchJob(t *testing.T) {
 				token: "myToken",
 			},
 			want:    "id",
+			wantErr: false,
+		},
+		{
+			name: "create job with node selector succeeds",
+			j: &JobDispatcher{
+				logger: nil,
+				image:  "hello-world",
+				apiURL: "http://localhost",
+				nodeSelector: map[string]string{
+					"kubernetes.io/arch": "amd64",
+					"node-type":          "worker",
+				},
+				client: func() client {
+					client := &mockClient{}
+
+					// Verify that the job contains the node selector
+					client.On("CreateJob", mock.Anything, mock.MatchedBy(func(job *v1.Job) bool {
+						nodeSelector := job.Spec.Template.Spec.NodeSelector
+						return nodeSelector != nil &&
+							nodeSelector["kubernetes.io/arch"] == "amd64" &&
+							nodeSelector["node-type"] == "worker"
+					})).Return(&v1.Job{
+						ObjectMeta: metav1.ObjectMeta{
+							UID: "id-with-node-selector",
+						},
+					}, nil).Once()
+					return client
+				}(),
+			},
+			args: args{
+				ctx: context.TODO(),
+				job: &models.Job{
+					Metadata: models.ResourceMetadata{
+						ID: "test-job-456",
+					},
+				},
+				token: "myToken",
+			},
+			want:    "id-with-node-selector",
 			wantErr: false,
 		},
 	}
@@ -389,6 +429,94 @@ func Test_New(t *testing.T) {
 			tokenGetter:   tokenGetter,
 			wantErr:       false,
 		},
+		{
+			name: "With valid node selector",
+			pluginData: func() map[string]string {
+				data := map[string]string{
+					"api_url":        "https://api.example.com",
+					"image":          "test-image:latest",
+					"memory_request": "128Mi",
+					"memory_limit":   "256Mi",
+					"auth_type":      AuthTypeInCluster,
+					"node_selector":  "kubernetes.io/arch=amd64,node-type=worker",
+				}
+				return data
+			}(),
+			discoveryHost: "discovery.example.com",
+			tokenGetter:   tokenGetter,
+			wantErr:       false,
+		},
+		{
+			name: "With empty node selector",
+			pluginData: func() map[string]string {
+				data := map[string]string{
+					"api_url":        "https://api.example.com",
+					"image":          "test-image:latest",
+					"memory_request": "128Mi",
+					"memory_limit":   "256Mi",
+					"auth_type":      AuthTypeInCluster,
+					"node_selector":  "",
+				}
+				return data
+			}(),
+			discoveryHost: "discovery.example.com",
+			tokenGetter:   tokenGetter,
+			wantErr:       false,
+		},
+		{
+			name: "With invalid node selector format - missing value",
+			pluginData: func() map[string]string {
+				data := map[string]string{
+					"api_url":        "https://api.example.com",
+					"image":          "test-image:latest",
+					"memory_request": "128Mi",
+					"memory_limit":   "256Mi",
+					"auth_type":      AuthTypeInCluster,
+					"node_selector":  "kubernetes.io/arch",
+				}
+				return data
+			}(),
+			discoveryHost:       "discovery.example.com",
+			tokenGetter:         tokenGetter,
+			wantErr:             true,
+			expectedErrContains: "invalid node selector format",
+		},
+		{
+			name: "With invalid node selector format - empty key",
+			pluginData: func() map[string]string {
+				data := map[string]string{
+					"api_url":        "https://api.example.com",
+					"image":          "test-image:latest",
+					"memory_request": "128Mi",
+					"memory_limit":   "256Mi",
+					"auth_type":      AuthTypeInCluster,
+					"node_selector":  "=amd64",
+				}
+				return data
+			}(),
+			discoveryHost:       "discovery.example.com",
+			tokenGetter:         tokenGetter,
+			wantErr:             true,
+			expectedErrContains: "invalid node selector format",
+		},
+		{
+			name: "With invalid node selector format - empty value",
+			pluginData: func() map[string]string {
+				data := map[string]string{
+					"api_url":        "https://api.example.com",
+					"image":          "test-image:latest",
+					"memory_request": "128Mi",
+					"memory_limit":   "256Mi",
+					"auth_type":      AuthTypeInCluster,
+					"node_selector":  "kubernetes.io/arch=",
+				}
+				return data
+			}(),
+			discoveryHost:       "discovery.example.com",
+			tokenGetter:         tokenGetter,
+			wantErr:             true,
+			expectedErrContains: "invalid node selector format",
+		},
 	}
 
 	for _, tt := range tests {
@@ -421,6 +549,22 @@ func Test_New(t *testing.T) {
 						if extraHosts != "" {
 							assert.Contains(t, dispatcher.discoveryProtocolHosts, host)
 						}
+					}
+				}
+
+				// Check if node selector is properly set
+				if nodeSelector, ok := tt.pluginData["node_selector"]; ok {
+					expectedNodeSelector := make(map[string]string)
+					for _, pair := range []string{"kubernetes.io/arch=amd64", "node-type=worker"} {
+						if strings.Contains(nodeSelector, pair) {
+							parts := strings.SplitN(pair, "=", 2)
+							if len(parts) == 2 {
+								expectedNodeSelector[parts[0]] = parts[1]
+							}
+						}
+					}
+					for key, value := range expectedNodeSelector {
+						assert.Equal(t, value, dispatcher.nodeSelector[key])
 					}
 				}
 			}
