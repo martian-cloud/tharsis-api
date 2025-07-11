@@ -8,6 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
@@ -42,6 +43,7 @@ type modelFetcherFunc func(ctx context.Context, value string) (models.Model, err
 // by their Global ID (GID) or Tharsis Resource Name (TRN)
 type Catalog struct {
 	ActivityEventService             activityevent.Service
+	AnnouncementService              announcement.Service
 	CLIService                       cli.Service
 	FederatedRegistryService         federatedregistry.Service
 	GPGKeyService                    gpgkey.Service
@@ -128,6 +130,16 @@ func (c *Catalog) FetchModelID(ctx context.Context, value string) (string, error
 func (c *Catalog) Init() {
 	// Add model fetchers
 	// Methods are sorted alphabetically by service name
+
+	// Announcement Service
+	c.addModelFetchers(types.AnnouncementModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.AnnouncementService.GetAnnouncementByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.AnnouncementService.GetAnnouncementByTRN(ctx, value)
+		},
+	)
 
 	// Federated Registry Service
 	c.addModelFetchers(types.FederatedRegistryModelType,

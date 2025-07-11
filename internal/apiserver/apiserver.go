@@ -38,6 +38,7 @@ import (
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
@@ -179,6 +180,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	// Services.
 	var (
 		activityService            = activityevent.NewService(dbClient, logger)
+		announcementService        = announcement.NewService(logger, dbClient)
 		userService                = user.NewService(logger, dbClient, inheritedSettingsResolver)
 		namespaceMembershipService = namespacemembership.NewService(logger, dbClient, activityService)
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService, inheritedSettingsResolver)
@@ -228,6 +230,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	serviceCatalog := &services.Catalog{
 		ActivityEventService:             activityService,
+		AnnouncementService:              announcementService,
 		CLIService:                       cliService,
 		FederatedRegistryService:         federatedRegistryService,
 		GPGKeyService:                    gpgKeyService,

@@ -22,6 +22,7 @@ type ModelType struct {
 // All possible ModelTypes
 var (
 	ActivityEventModelType                   = ModelType{name: "activity_event", gidCode: "AE"}
+	AnnouncementModelType                    = ModelType{name: "announcement", gidCode: "AN"}
 	ApplyModelType                           = ModelType{name: "apply", gidCode: "A"}
 	ConfigurationVersionModelType            = ModelType{name: "configuration_version", gidCode: "C"}
 	GPGKeyModelType                          = ModelType{name: "gpg_key", gidCode: "GPG"}

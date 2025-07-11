@@ -452,6 +452,18 @@ func (r *NodeResolver) ToFederatedRegistry() (*FederatedRegistryResolver, bool) 
 	}
 }
 
+// ToAnnouncement resolver
+func (r *NodeResolver) ToAnnouncement() (*AnnouncementResolver, bool) {
+	switch res := r.result.(type) {
+	case *AnnouncementResolver:
+		return res, true
+	case *models.Announcement:
+		return &AnnouncementResolver{announcement: res}, true
+	default:
+		return nil, false
+	}
+}
+
 func node(ctx context.Context, value string) (*NodeResolver, error) {
 	model, err := getServiceCatalog(ctx).FetchModel(ctx, value)
 	if err != nil {

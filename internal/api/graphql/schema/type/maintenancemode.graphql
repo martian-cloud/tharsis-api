@@ -14,12 +14,10 @@ type MaintenanceMode {
   id: ID!
   metadata: ResourceMetadata!
   createdBy: String!
-  message: String!
 }
 
 input EnableMaintenanceModeInput {
   clientMutationId: String
-  message: String!
 }
 
 input DisableMaintenanceModeInput {
