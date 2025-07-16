@@ -225,4 +225,7 @@ type Mutation {
   createFederatedRegistryTokens(
     input: CreateFederatedRegistryTokensInput!
   ): CreateFederatedRegistryTokensPayload!
+  createAnnouncement(input: CreateAnnouncementInput!): CreateAnnouncementPayload!
+  updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
+  deleteAnnouncement(input: DeleteAnnouncementInput!): DeleteAnnouncementPayload!
 }

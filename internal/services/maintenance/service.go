@@ -12,15 +12,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-// EnableMaintenanceModeInput is the input for enabling maintenance mode
-type EnableMaintenanceModeInput struct {
-	Message string
-}
-
 // Service is the interface for the maintenance service
 type Service interface {
 	GetMaintenanceMode(ctx context.Context) (*models.MaintenanceMode, error)
-	EnableMaintenanceMode(ctx context.Context, input *EnableMaintenanceModeInput) (*models.MaintenanceMode, error)
+	EnableMaintenanceMode(ctx context.Context) (*models.MaintenanceMode, error)
 	DisableMaintenanceMode(ctx context.Context) error
 }
 
@@ -59,7 +54,7 @@ func (s *service) GetMaintenanceMode(ctx context.Context) (*models.MaintenanceMo
 	return maintenanceMode, nil
 }
 
-func (s *service) EnableMaintenanceMode(ctx context.Context, input *EnableMaintenanceModeInput) (*models.MaintenanceMode, error) {
+func (s *service) EnableMaintenanceMode(ctx context.Context) (*models.MaintenanceMode, error) {
 	ctx, span := tracer.Start(ctx, "svc.EnableMaintenanceMode")
 	defer span.End()
 
@@ -76,7 +71,6 @@ func (s *service) EnableMaintenanceMode(ctx context.Context, input *EnableMainte
 
 	toCreate := &models.MaintenanceMode{
 		CreatedBy: caller.GetSubject(),
-		Message:   input.Message,
 	}
 
 	created, err := s.dbClient.MaintenanceModes.CreateMaintenanceMode(ctx, toCreate)

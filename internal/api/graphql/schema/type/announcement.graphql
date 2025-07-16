@@ -1,0 +1,81 @@
+enum AnnouncementType {
+  INFO
+  ERROR
+  WARNING
+  SUCCESS
+}
+
+enum AnnouncementSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  START_TIME_ASC
+  START_TIME_DESC
+}
+
+type AnnouncementConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [AnnouncementEdge]
+}
+
+type AnnouncementEdge {
+  cursor: String!
+  node: Announcement
+}
+
+type CreateAnnouncementPayload {
+  clientMutationId: String
+  announcement: Announcement
+  problems: [Problem!]!
+}
+
+type UpdateAnnouncementPayload {
+  clientMutationId: String
+  announcement: Announcement
+  problems: [Problem!]!
+}
+
+type DeleteAnnouncementPayload {
+  clientMutationId: String
+  announcement: Announcement
+  problems: [Problem!]!
+}
+
+type Announcement implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  message: String!
+  startTime: Time!
+  endTime: Time
+  createdBy: String!
+  type: AnnouncementType!
+  dismissible: Boolean!
+  active: Boolean!
+  expired: Boolean!
+}
+
+input CreateAnnouncementInput {
+  clientMutationId: String
+  message: String!
+  startTime: Time
+  endTime: Time
+  type: AnnouncementType!
+  dismissible: Boolean!
+}
+
+input UpdateAnnouncementInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+  message: String
+  startTime: Time
+  endTime: Time
+  type: AnnouncementType
+  dismissible: Boolean
+}
+
+input DeleteAnnouncementInput {
+  clientMutationId: String
+  id: ID!
+  metadata: ResourceMetadataInput
+}

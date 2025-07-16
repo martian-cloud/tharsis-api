@@ -63,6 +63,7 @@ type connection interface {
 type Client struct {
 	conn                             *pgxpool.Pool
 	logger                           logger.Logger
+	Announcements                    Announcements
 	Events                           Events
 	Groups                           Groups
 	Runs                             Runs
@@ -167,6 +168,7 @@ func NewClient(
 		logger: logger,
 	}
 
+	dbClient.Announcements = NewAnnouncements(dbClient)
 	dbClient.Events = NewEvents(dbClient)
 	dbClient.Groups = NewGroups(dbClient)
 	dbClient.Runs = NewRuns(dbClient)

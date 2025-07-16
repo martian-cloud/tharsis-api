@@ -28,7 +28,6 @@ func TestNewService(t *testing.T) {
 
 func TestGetMaintenanceMode(t *testing.T) {
 	sampleMaintenanceMode := &models.MaintenanceMode{
-		Message:   "test",
 		CreatedBy: "testSubject",
 	}
 
@@ -95,7 +94,6 @@ func TestEnableMaintenanceMode(t *testing.T) {
 	testSubject := "testSubject"
 
 	sampleMaintenanceMode := &models.MaintenanceMode{
-		Message:   "test",
 		CreatedBy: testSubject,
 	}
 
@@ -145,9 +143,7 @@ func TestEnableMaintenanceMode(t *testing.T) {
 				dbClient: dbClient,
 			}
 
-			maintenanceMode, err := service.EnableMaintenanceMode(auth.WithCaller(ctx, mockCaller), &EnableMaintenanceModeInput{
-				Message: sampleMaintenanceMode.Message,
-			})
+			maintenanceMode, err := service.EnableMaintenanceMode(auth.WithCaller(ctx, mockCaller))
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -164,7 +160,6 @@ func TestDisableMaintenanceMode(t *testing.T) {
 	testSubject := "testSubject"
 
 	sampleMaintenanceMode := &models.MaintenanceMode{
-		Message:   "test",
 		CreatedBy: testSubject,
 	}
 

@@ -1382,6 +1382,43 @@ func (r RootResolver) DisableMaintenanceMode(ctx context.Context,
 	return response, nil
 }
 
+/* Announcement Queries and Mutations */
+
+// Announcements returns a list of announcements
+func (r RootResolver) Announcements(ctx context.Context, args *AnnouncementConnectionQueryArgs) (*AnnouncementConnectionResolver, error) {
+	return announcementsQuery(ctx, args)
+}
+
+// CreateAnnouncement creates a new announcement
+func (r RootResolver) CreateAnnouncement(ctx context.Context,
+	args *struct{ Input *CreateAnnouncementInput }) (*AnnouncementMutationPayloadResolver, error) {
+	response, err := createAnnouncementMutation(ctx, args.Input)
+	if err != nil {
+		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// UpdateAnnouncement updates an existing announcement
+func (r RootResolver) UpdateAnnouncement(ctx context.Context,
+	args *struct{ Input *UpdateAnnouncementInput }) (*AnnouncementMutationPayloadResolver, error) {
+	response, err := updateAnnouncementMutation(ctx, args.Input)
+	if err != nil {
+		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// DeleteAnnouncement deletes an existing announcement
+func (r RootResolver) DeleteAnnouncement(ctx context.Context,
+	args *struct{ Input *DeleteAnnouncementInput }) (*AnnouncementMutationPayloadResolver, error) {
+	response, err := deleteAnnouncementMutation(ctx, args.Input)
+	if err != nil {
+		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
 // Version returns the version of the API and its components
 func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
 	return versionQuery(ctx)

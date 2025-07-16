@@ -18,7 +18,7 @@ func TestWaitForMaintenanceModeEvent(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "1",
 		},
-		Message: "test",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {
@@ -110,7 +110,7 @@ func TestInMaintenanceMode(t *testing.T) {
 		Metadata: models.ResourceMetadata{
 			ID: "1",
 		},
-		Message: "test",
+		CreatedBy: "test-user",
 	}
 
 	type testCase struct {

@@ -218,5 +218,13 @@ type Query {
       reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)"
     )
   maintenanceMode: MaintenanceMode
+  announcements(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: AnnouncementSort
+    active: Boolean
+  ): AnnouncementConnection!
   version: Version!
 }

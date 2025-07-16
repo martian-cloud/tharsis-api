@@ -18,7 +18,7 @@ func TestGetMaintenanceMode(t *testing.T) {
 	defer testClient.close(ctx)
 
 	mode, err := testClient.client.MaintenanceModes.CreateMaintenanceMode(ctx, &models.MaintenanceMode{
-		Message: "down for some test maintenance",
+		CreatedBy: "test-user",
 	})
 	require.Nil(t, err)
 
@@ -62,20 +62,20 @@ func TestCreateMaintenanceMode(t *testing.T) {
 	type testCase struct {
 		name            string
 		expectErrorCode errors.CodeType
-		message         string
+		createdBy       string
 	}
 
 	testCases := []testCase{
 		{
-			name:    "successfully create resource",
-			message: "down for some test maintenance",
+			name:      "successfully create resource",
+			createdBy: "test-user",
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			mode, err := testClient.client.MaintenanceModes.CreateMaintenanceMode(ctx, &models.MaintenanceMode{
-				Message: test.message,
+				CreatedBy: test.createdBy,
 			})
 
 			if test.expectErrorCode != "" {
@@ -95,7 +95,7 @@ func TestDeleteMaintenanceMode(t *testing.T) {
 	defer testClient.close(ctx)
 
 	mode, err := testClient.client.MaintenanceModes.CreateMaintenanceMode(ctx, &models.MaintenanceMode{
-		Message: "down for some test maintenance",
+		CreatedBy: "test-user",
 	})
 	require.Nil(t, err)
 

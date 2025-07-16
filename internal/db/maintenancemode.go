@@ -30,7 +30,7 @@ type maintenanceModes struct {
 	dbClient *Client
 }
 
-var maintenanceModesFieldList = append(metadataFieldList, "created_by", "message")
+var maintenanceModesFieldList = append(metadataFieldList, "created_by")
 
 // NewMaintenanceModes returns an instance of the MaintenanceModes interface.
 func NewMaintenanceModes(dbClient *Client) MaintenanceModes {
@@ -75,7 +75,6 @@ func (s *maintenanceModes) CreateMaintenanceMode(ctx context.Context, mode *mode
 			"created_at": timestamp,
 			"updated_at": timestamp,
 			"created_by": mode.CreatedBy,
-			"message":    mode.Message,
 		}).
 		Returning(maintenanceModesFieldList...).ToSQL()
 	if err != nil {
@@ -136,7 +135,6 @@ func scanMaintenanceMode(row scanner) (*models.MaintenanceMode, error) {
 		&mode.Metadata.LastUpdatedTimestamp,
 		&mode.Metadata.Version,
 		&mode.CreatedBy,
-		&mode.Message,
 	}
 
 	err := row.Scan(fields...)
