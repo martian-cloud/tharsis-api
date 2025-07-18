@@ -6,6 +6,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 	"github.com/graph-gophers/dataloader"
@@ -91,7 +92,7 @@ type UpdateApplyInput struct {
 	ClientMutationID *string
 	ID               string
 	Metadata         *MetadataInput
-	Status           string
+	Status           models.ApplyStatus
 	ErrorMessage     *string
 }
 
@@ -112,9 +113,10 @@ func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMu
 		return nil, err
 	}
 
-	apply, err := serviceCatalog.RunService.GetApplyByID(ctx, id)
-	if err != nil {
-		return nil, err
+	updateInput := &run.UpdateApplyInput{
+		ApplyID:      id,
+		Status:       input.Status,
+		ErrorMessage: input.ErrorMessage,
 	}
 
 	// Check if resource version is specified
@@ -124,14 +126,10 @@ func updateApplyMutation(ctx context.Context, input *UpdateApplyInput) (*ApplyMu
 			return nil, cErr
 		}
 
-		apply.Metadata.Version = v
+		updateInput.MetadataVersion = &v
 	}
 
-	// Update fields
-	apply.Status = models.ApplyStatus(input.Status)
-	apply.ErrorMessage = input.ErrorMessage
-
-	apply, err = serviceCatalog.RunService.UpdateApply(ctx, apply)
+	apply, err := serviceCatalog.RunService.UpdateApply(ctx, updateInput)
 	if err != nil {
 		return nil, err
 	}

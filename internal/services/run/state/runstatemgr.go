@@ -1,6 +1,8 @@
 // Package state package
 package state
 
+//go:generate go tool mockery --name RunStateManager --inpackage --case underscore
+
 import (
 	"context"
 	"time"
@@ -37,39 +39,48 @@ var (
 
 type eventHandlerFunc func(ctx context.Context, eventType EventType, oldModel interface{}, newModel interface{}) error
 
-// RunStateManager is used to manage state changes for run resources
-type RunStateManager struct {
+// RunStateManager defines the interface for managing state changes for run resources
+type RunStateManager interface {
+	RegisterHandler(eventType EventType, handler eventHandlerFunc)
+	UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error)
+	UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error)
+	UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error)
+	UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error)
+}
+
+// runStateManager is the concrete implementation of RunStateManager
+type runStateManager struct {
 	dbClient   *db.Client
 	logger     logger.Logger
 	handlerMap map[EventType][]eventHandlerFunc
 }
 
 // NewRunStateManager creates a new RunStateManager instance
-func NewRunStateManager(dbClient *db.Client, logger logger.Logger) *RunStateManager {
-	manager := &RunStateManager{
+func NewRunStateManager(dbClient *db.Client, logger logger.Logger) RunStateManager {
+	manager := &runStateManager{
 		dbClient:   dbClient,
 		logger:     logger,
 		handlerMap: map[EventType][]eventHandlerFunc{},
 	}
 
-	registerRunHandlers(manager)
-	registerPlanHandlers(manager)
-	registerApplyHandlers(manager)
-	registerJobHandlers(manager)
-	registerWorkspaceHandlers(manager)
+	registerRunHandlers(manager, dbClient)
+	registerPlanHandlers(manager, dbClient)
+	registerApplyHandlers(manager, dbClient)
+	registerJobHandlers(manager, dbClient)
+	registerWorkspaceHandlers(manager, dbClient)
 
 	return manager
 }
 
 // RegisterHandler registers an event handler for a particular event type.
-func (r *RunStateManager) RegisterHandler(eventType EventType, handler eventHandlerFunc) {
+func (r *runStateManager) RegisterHandler(eventType EventType, handler eventHandlerFunc) {
 	if _, ok := r.handlerMap[eventType]; !ok {
 		r.handlerMap[eventType] = []eventHandlerFunc{}
 	}
 	r.handlerMap[eventType] = append(r.handlerMap[eventType], handler)
 }
 
-func (r *RunStateManager) fireEvent(ctx context.Context, eventType EventType, oldModel interface{}, newModel interface{}) error {
+func (r *runStateManager) fireEvent(ctx context.Context, eventType EventType, oldModel interface{}, newModel interface{}) error {
 	for _, h := range r.handlerMap[eventType] {
 		// Use retry handler here for optimistic lock errors since these are internal updates and
 		// we don't want to return until the handler completes successfully.
@@ -97,7 +108,7 @@ func (r *RunStateManager) fireEvent(ctx context.Context, eventType EventType, ol
 }
 
 // UpdateJob handles the state transitions for updating a job resource
-func (r *RunStateManager) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
+func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -145,7 +156,7 @@ func (r *RunStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 }
 
 // UpdateRun handles the state transitions for updating a run resource
-func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
+func (r *runStateManager) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -201,7 +212,7 @@ func (r *RunStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 }
 
 // UpdatePlan handles the state transitions for updating a plan resource
-func (r *RunStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
+func (r *runStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -256,7 +267,7 @@ func (r *RunStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*m
 }
 
 // UpdateApply handles the state transitions for updating an apply resource
-func (r *RunStateManager) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
+func (r *runStateManager) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
@@ -311,11 +322,12 @@ func (r *RunStateManager) UpdateApply(ctx context.Context, apply *models.Apply) 
 }
 
 type runHandlers struct {
-	manager *RunStateManager
+	manager  RunStateManager
+	dbClient *db.Client
 }
 
-func registerRunHandlers(manager *RunStateManager) {
-	handlers := &runHandlers{manager: manager}
+func registerRunHandlers(manager RunStateManager, dbClient *db.Client) {
+	handlers := &runHandlers{manager: manager, dbClient: dbClient}
 	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, oldModel.(*models.Run), newModel.(*models.Run))
 	})
@@ -339,7 +351,7 @@ func (r *runHandlers) handleRunStateChangeEvent(_ context.Context, oldRun *model
 
 func (r *runHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *models.Plan, newPlan *models.Plan) error {
 	if oldPlan.Status != newPlan.Status {
-		run, err := r.manager.dbClient.Runs.GetRunByPlanID(ctx, newPlan.Metadata.ID)
+		run, err := r.dbClient.Runs.GetRunByPlanID(ctx, newPlan.Metadata.ID)
 		if err != nil {
 			return err
 		}
@@ -375,7 +387,7 @@ func (r *runHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *m
 
 func (r *runHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply *models.Apply, newApply *models.Apply) error {
 	if oldApply.Status != newApply.Status {
-		run, err := r.manager.dbClient.Runs.GetRunByApplyID(ctx, newApply.Metadata.ID)
+		run, err := r.dbClient.Runs.GetRunByApplyID(ctx, newApply.Metadata.ID)
 		if err != nil {
 			return err
 		}
@@ -407,11 +419,12 @@ func (r *runHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 /* Plan Handlers */
 
 type planHandlers struct {
-	manager *RunStateManager
+	manager  RunStateManager
+	dbClient *db.Client
 }
 
-func registerPlanHandlers(manager *RunStateManager) {
-	handlers := &planHandlers{manager: manager}
+func registerPlanHandlers(manager RunStateManager, dbClient *db.Client) {
+	handlers := &planHandlers{manager: manager, dbClient: dbClient}
 	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, oldModel.(*models.Job), newModel.(*models.Job))
 	})
@@ -420,7 +433,7 @@ func registerPlanHandlers(manager *RunStateManager) {
 func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
 	if newJob.Type == models.JobPlanType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
 		// Get run associated with job
-		run, err := p.manager.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
+		run, err := p.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
 		if err != nil {
 			return err
 		}
@@ -429,7 +442,7 @@ func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *mo
 			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
-		plan, err := p.manager.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
+		plan, err := p.dbClient.Plans.GetPlanByID(ctx, run.PlanID)
 		if err != nil {
 			return err
 		}
@@ -447,11 +460,12 @@ func (p *planHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *mo
 /* Apply Handlers */
 
 type applyHandlers struct {
-	manager *RunStateManager
+	manager  RunStateManager
+	dbClient *db.Client
 }
 
-func registerApplyHandlers(manager *RunStateManager) {
-	handlers := &applyHandlers{manager: manager}
+func registerApplyHandlers(manager RunStateManager, dbClient *db.Client) {
+	handlers := &applyHandlers{manager: manager, dbClient: dbClient}
 	manager.RegisterHandler(jobEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
 		return handlers.handleJobStateChangeEvent(ctx, oldModel.(*models.Job), newModel.(*models.Job))
 	})
@@ -460,7 +474,7 @@ func registerApplyHandlers(manager *RunStateManager) {
 func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
 	if newJob.Type == models.JobApplyType && oldJob.Status != newJob.Status && newJob.Status == models.JobPending {
 		// Get run associated with job
-		run, err := a.manager.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
+		run, err := a.dbClient.Runs.GetRunByID(ctx, newJob.RunID)
 		if err != nil {
 			return err
 		}
@@ -469,7 +483,7 @@ func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *m
 			return errors.New("run with ID %s not found", newJob.RunID, errors.WithErrorCode(errors.ENotFound))
 		}
 
-		apply, err := a.manager.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
+		apply, err := a.dbClient.Applies.GetApplyByID(ctx, run.ApplyID)
 		if err != nil {
 			return err
 		}
@@ -487,11 +501,12 @@ func (a *applyHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *m
 /* Job Handlers */
 
 type jobHandlers struct {
-	manager *RunStateManager
+	manager  RunStateManager
+	dbClient *db.Client
 }
 
-func registerJobHandlers(manager *RunStateManager) {
-	handlers := &jobHandlers{manager: manager}
+func registerJobHandlers(manager RunStateManager, dbClient *db.Client) {
+	handlers := &jobHandlers{manager: manager, dbClient: dbClient}
 	manager.RegisterHandler(planEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
 		return handlers.handlePlanStateChangeEvent(ctx, oldModel.(*models.Plan), newModel.(*models.Plan))
 	})
@@ -502,12 +517,12 @@ func registerJobHandlers(manager *RunStateManager) {
 
 func (j *jobHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *models.Plan, newPlan *models.Plan) error {
 	if oldPlan.Status != newPlan.Status {
-		run, err := j.manager.dbClient.Runs.GetRunByPlanID(ctx, newPlan.Metadata.ID)
+		run, err := j.dbClient.Runs.GetRunByPlanID(ctx, newPlan.Metadata.ID)
 		if err != nil {
 			return err
 		}
 
-		job, err := j.manager.dbClient.Jobs.GetLatestJobByType(ctx, run.Metadata.ID, models.JobPlanType)
+		job, err := j.dbClient.Jobs.GetLatestJobByType(ctx, run.Metadata.ID, models.JobPlanType)
 		if err != nil {
 			return err
 		}
@@ -547,12 +562,12 @@ func (j *jobHandlers) handlePlanStateChangeEvent(ctx context.Context, oldPlan *m
 
 func (j *jobHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply *models.Apply, newApply *models.Apply) error {
 	if oldApply.Status != newApply.Status {
-		run, err := j.manager.dbClient.Runs.GetRunByApplyID(ctx, newApply.Metadata.ID)
+		run, err := j.dbClient.Runs.GetRunByApplyID(ctx, newApply.Metadata.ID)
 		if err != nil {
 			return err
 		}
 
-		job, err := j.manager.dbClient.Jobs.GetLatestJobByType(ctx, run.Metadata.ID, models.JobApplyType)
+		job, err := j.dbClient.Jobs.GetLatestJobByType(ctx, run.Metadata.ID, models.JobApplyType)
 		if err != nil {
 			return err
 		}
@@ -593,11 +608,12 @@ func (j *jobHandlers) handleApplyStateChangeEvent(ctx context.Context, oldApply 
 /* Workspace Handlers */
 
 type workspaceHandlers struct {
-	manager *RunStateManager
+	manager  RunStateManager
+	dbClient *db.Client
 }
 
-func registerWorkspaceHandlers(manager *RunStateManager) {
-	handlers := &workspaceHandlers{manager: manager}
+func registerWorkspaceHandlers(manager RunStateManager, dbClient *db.Client) {
+	handlers := &workspaceHandlers{manager: manager, dbClient: dbClient}
 	manager.RegisterHandler(RunEventType, func(ctx context.Context, _ EventType, oldModel interface{}, newModel interface{}) error {
 		return handlers.handleRunStateChangeEvent(ctx, oldModel.(*models.Run), newModel.(*models.Run))
 	})
@@ -609,19 +625,19 @@ func registerWorkspaceHandlers(manager *RunStateManager) {
 func (w *workspaceHandlers) handleRunStateChangeEvent(ctx context.Context, oldRun *models.Run, newRun *models.Run) error {
 	if !oldRun.ForceCanceled && !newRun.Speculative() && newRun.ForceCanceled {
 		// Check if this run was force cancelled during the apply stage
-		apply, err := w.manager.dbClient.Applies.GetApplyByID(ctx, newRun.ApplyID)
+		apply, err := w.dbClient.Applies.GetApplyByID(ctx, newRun.ApplyID)
 		if err != nil {
 			return err
 		}
 
 		if apply != nil && apply.Status == models.ApplyCanceled {
-			workspace, err := w.manager.dbClient.Workspaces.GetWorkspaceByID(ctx, newRun.WorkspaceID)
+			workspace, err := w.dbClient.Workspaces.GetWorkspaceByID(ctx, newRun.WorkspaceID)
 			if err != nil {
 				return err
 			}
 			// Set workspace state to dirty since this apply was force canceled while in progress and did not exit gracefully
 			workspace.DirtyState = true
-			_, err = w.manager.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
+			_, err = w.dbClient.Workspaces.UpdateWorkspace(ctx, workspace)
 			if err != nil {
 				return err
 			}
@@ -634,7 +650,7 @@ func (w *workspaceHandlers) handleRunStateChangeEvent(ctx context.Context, oldRu
 func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJob *models.Job, newJob *models.Job) error {
 	if oldJob.Status != newJob.Status {
 		// For tracking current running job in workspace.
-		ws, err := w.manager.dbClient.Workspaces.GetWorkspaceByID(ctx, newJob.WorkspaceID)
+		ws, err := w.dbClient.Workspaces.GetWorkspaceByID(ctx, newJob.WorkspaceID)
 		if err != nil {
 			return err
 		}
@@ -645,7 +661,7 @@ func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJo
 			}
 			ws.Locked = true
 			ws.CurrentJobID = newJob.Metadata.ID
-			if _, err = w.manager.dbClient.Workspaces.UpdateWorkspace(ctx, ws); err != nil {
+			if _, err = w.dbClient.Workspaces.UpdateWorkspace(ctx, ws); err != nil {
 				return err
 			}
 		}
@@ -653,7 +669,7 @@ func (w *workspaceHandlers) handleJobStateChangeEvent(ctx context.Context, oldJo
 		if newJob.Status == models.JobFinished && ws.CurrentJobID == newJob.Metadata.ID {
 			ws.Locked = false
 			ws.CurrentJobID = ""
-			if _, err = w.manager.dbClient.Workspaces.UpdateWorkspace(ctx, ws); err != nil {
+			if _, err = w.dbClient.Workspaces.UpdateWorkspace(ctx, ws); err != nil {
 				return err
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 
 	"github.com/graph-gophers/dataloader"
@@ -137,7 +138,7 @@ type UpdatePlanInput struct {
 	ClientMutationID *string
 	ID               string
 	Metadata         *MetadataInput
-	Status           string
+	Status           models.PlanStatus
 	HasChanges       bool
 	ErrorMessage     *string
 }
@@ -159,27 +160,23 @@ func updatePlanMutation(ctx context.Context, input *UpdatePlanInput) (*PlanMutat
 		return nil, err
 	}
 
-	plan, err := serviceCatalog.RunService.GetPlanByID(ctx, id)
-	if err != nil {
-		return nil, err
+	planInput := &run.UpdatePlanInput{
+		PlanID:       id,
+		Status:       input.Status,
+		HasChanges:   input.HasChanges,
+		ErrorMessage: input.ErrorMessage,
 	}
 
-	// Check if resource version is specified
 	if input.Metadata != nil {
 		v, cErr := strconv.Atoi(input.Metadata.Version)
 		if cErr != nil {
 			return nil, cErr
 		}
 
-		plan.Metadata.Version = v
+		planInput.MetadataVersion = &v
 	}
 
-	// Update fields
-	plan.Status = models.PlanStatus(input.Status)
-	plan.HasChanges = input.HasChanges
-	plan.ErrorMessage = input.ErrorMessage
-
-	plan, err = serviceCatalog.RunService.UpdatePlan(ctx, plan)
+	plan, err := serviceCatalog.RunService.UpdatePlan(ctx, planInput)
 	if err != nil {
 		return nil, err
 	}
