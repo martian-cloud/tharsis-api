@@ -20,14 +20,14 @@ var workspaceDriftCount = metric.NewCounter("workspace_drift_count", "Total coun
 type AssessmentRunHandler struct {
 	logger          logger.Logger
 	dbClient        *db.Client
-	runStateManager *state.RunStateManager
+	runStateManager state.RunStateManager
 }
 
 // NewAssessmentRunHandler returns an instance of AssessmentRunHandler.
 func NewAssessmentRunHandler(
 	logger logger.Logger,
 	dbClient *db.Client,
-	runStateManager *state.RunStateManager,
+	runStateManager state.RunStateManager,
 ) *AssessmentRunHandler {
 	return &AssessmentRunHandler{
 		logger:          logger,

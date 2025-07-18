@@ -125,7 +125,7 @@ type service struct {
 	idp              auth.IdentityProvider
 	logStreamManager logstream.Manager
 	eventManager     *events.EventManager
-	runStateManager  *state.RunStateManager
+	runStateManager  state.RunStateManager
 }
 
 // NewService creates an instance of Service
@@ -135,7 +135,7 @@ func NewService(
 	idp auth.IdentityProvider,
 	logStreamManager logstream.Manager,
 	eventManager *events.EventManager,
-	runStateManager *state.RunStateManager,
+	runStateManager state.RunStateManager,
 ) Service {
 	return &service{logger, dbClient, idp, logStreamManager, eventManager, runStateManager}
 }

@@ -718,9 +718,9 @@ func (_m *MockService) SubscribeToRunEvents(ctx context.Context, options *EventS
 	return r0, r1
 }
 
-// UpdateApply provides a mock function with given fields: ctx, apply
-func (_m *MockService) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
-	ret := _m.Called(ctx, apply)
+// UpdateApply provides a mock function with given fields: ctx, input
+func (_m *MockService) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*models.Apply, error) {
+	ret := _m.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateApply")
@@ -728,19 +728,19 @@ func (_m *MockService) UpdateApply(ctx context.Context, apply *models.Apply) (*m
 
 	var r0 *models.Apply
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Apply) (*models.Apply, error)); ok {
-		return rf(ctx, apply)
+	if rf, ok := ret.Get(0).(func(context.Context, *UpdateApplyInput) (*models.Apply, error)); ok {
+		return rf(ctx, input)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Apply) *models.Apply); ok {
-		r0 = rf(ctx, apply)
+	if rf, ok := ret.Get(0).(func(context.Context, *UpdateApplyInput) *models.Apply); ok {
+		r0 = rf(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Apply)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.Apply) error); ok {
-		r1 = rf(ctx, apply)
+	if rf, ok := ret.Get(1).(func(context.Context, *UpdateApplyInput) error); ok {
+		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -748,9 +748,9 @@ func (_m *MockService) UpdateApply(ctx context.Context, apply *models.Apply) (*m
 	return r0, r1
 }
 
-// UpdatePlan provides a mock function with given fields: ctx, _a1
-func (_m *MockService) UpdatePlan(ctx context.Context, _a1 *models.Plan) (*models.Plan, error) {
-	ret := _m.Called(ctx, _a1)
+// UpdatePlan provides a mock function with given fields: ctx, input
+func (_m *MockService) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*models.Plan, error) {
+	ret := _m.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdatePlan")
@@ -758,19 +758,19 @@ func (_m *MockService) UpdatePlan(ctx context.Context, _a1 *models.Plan) (*model
 
 	var r0 *models.Plan
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Plan) (*models.Plan, error)); ok {
-		return rf(ctx, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *UpdatePlanInput) (*models.Plan, error)); ok {
+		return rf(ctx, input)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.Plan) *models.Plan); ok {
-		r0 = rf(ctx, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *UpdatePlanInput) *models.Plan); ok {
+		r0 = rf(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Plan)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.Plan) error); ok {
-		r1 = rf(ctx, _a1)
+	if rf, ok := ret.Get(1).(func(context.Context, *UpdatePlanInput) error); ok {
+		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}

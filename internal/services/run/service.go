@@ -170,6 +170,23 @@ type CancelRunInput struct {
 	Force   bool
 }
 
+// UpdateApplyInput is the input for updating an apply
+type UpdateApplyInput struct {
+	ApplyID         string
+	ErrorMessage    *string
+	MetadataVersion *int
+	Status          models.ApplyStatus
+}
+
+// UpdatePlanInput is the input for updating a plan
+type UpdatePlanInput struct {
+	ErrorMessage    *string
+	HasChanges      bool
+	MetadataVersion *int
+	PlanID          string
+	Status          models.PlanStatus
+}
+
 type createRunInput struct {
 	ConfigurationVersionID *string
 	Comment                *string
@@ -203,14 +220,14 @@ type Service interface {
 	GetPlanByID(ctx context.Context, planID string) (*models.Plan, error)
 	GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, error)
 	GetPlanDiff(ctx context.Context, planID string) (*plan.Diff, error)
-	UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error)
+	UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*models.Plan, error)
 	DownloadPlan(ctx context.Context, planID string) (io.ReadCloser, error)
 	UploadPlanBinary(ctx context.Context, planID string, reader io.Reader) error
 	ProcessPlanData(ctx context.Context, planID string, plan *tfjson.Plan, providerSchemas *tfjson.ProviderSchemas) error
 	GetAppliesByIDs(ctx context.Context, idList []string) ([]models.Apply, error)
 	GetApplyByID(ctx context.Context, applyID string) (*models.Apply, error)
 	GetApplyByTRN(ctx context.Context, trn string) (*models.Apply, error)
-	UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error)
+	UpdateApply(ctx context.Context, input *UpdateApplyInput) (*models.Apply, error)
 	GetLatestJobForPlan(ctx context.Context, planID string) (*models.Job, error)
 	GetLatestJobForApply(ctx context.Context, applyID string) (*models.Job, error)
 	SubscribeToRunEvents(ctx context.Context, options *EventSubscriptionOptions) (<-chan *Event, error)
@@ -224,7 +241,7 @@ type service struct {
 	eventManager    *events.EventManager
 	jobService      job.Service
 	cliService      cli.Service
-	runStateManager *state.RunStateManager
+	runStateManager state.RunStateManager
 	activityService activityevent.Service
 	moduleResolver  registry.ModuleResolver
 	ruleEnforcer    rules.RuleEnforcer
@@ -243,7 +260,7 @@ func NewService(
 	cliService cli.Service,
 	activityService activityevent.Service,
 	moduleResolver registry.ModuleResolver,
-	runStateManager *state.RunStateManager,
+	runStateManager state.RunStateManager,
 	limitChecker limits.LimitChecker,
 	secretManager secret.Manager,
 ) Service {
@@ -273,7 +290,7 @@ func newService(
 	cliService cli.Service,
 	activityService activityevent.Service,
 	moduleResolver registry.ModuleResolver,
-	runStateManager *state.RunStateManager,
+	runStateManager state.RunStateManager,
 	ruleEnforcer rules.RuleEnforcer,
 	limitChecker limits.LimitChecker,
 	planParser plan.Parser,
@@ -1740,7 +1757,7 @@ func (s *service) GetPlanByTRN(ctx context.Context, trn string) (*models.Plan, e
 	return plan, nil
 }
 
-func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
+func (s *service) UpdatePlan(ctx context.Context, input *UpdatePlanInput) (*models.Plan, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdatePlan")
 	defer span.End()
 
@@ -1750,18 +1767,35 @@ func (s *service) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Pl
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(plan.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdatePlanPermission, auth.WithPlanID(input.PlanID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
-	if plan.ErrorMessage != nil {
-		plan.ErrorMessage = truncateErrorMessage(*plan.ErrorMessage)
+	plan, err := s.dbClient.Plans.GetPlanByID(ctx, input.PlanID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get current plan")
+		return nil, err
+	}
+
+	if plan == nil {
+		return nil, errors.New("plan with id %s not found", input.PlanID)
+	}
+
+	plan.Status = input.Status
+	plan.HasChanges = input.HasChanges
+
+	if input.MetadataVersion != nil {
+		plan.Metadata.Version = *input.MetadataVersion
+	}
+
+	if input.ErrorMessage != nil {
+		plan.ErrorMessage = sanitizeAndTruncateErrorMessage(*input.ErrorMessage)
 	}
 
 	if err := plan.Validate(); err != nil {
-		tracing.RecordError(span, err, "plan is not valid")
+		tracing.RecordError(span, err, "updated plan is not valid")
 		return nil, err
 	}
 
@@ -2257,9 +2291,8 @@ func (s *service) GetApplyByTRN(ctx context.Context, trn string) (*models.Apply,
 	return apply, nil
 }
 
-func (s *service) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
+func (s *service) UpdateApply(ctx context.Context, input *UpdateApplyInput) (*models.Apply, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdateApply")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -2268,18 +2301,34 @@ func (s *service) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateApplyPermission, auth.WithApplyID(apply.Metadata.ID))
+	err = caller.RequirePermission(ctx, models.UpdateApplyPermission, auth.WithApplyID(input.ApplyID))
 	if err != nil {
 		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
-	if apply.ErrorMessage != nil {
-		apply.ErrorMessage = truncateErrorMessage(*apply.ErrorMessage)
+	apply, err := s.dbClient.Applies.GetApplyByID(ctx, input.ApplyID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get current apply")
+		return nil, err
+	}
+
+	if apply == nil {
+		return nil, errors.New("apply with id %s not found", input.ApplyID)
+	}
+
+	apply.Status = input.Status
+
+	if input.MetadataVersion != nil {
+		apply.Metadata.Version = *input.MetadataVersion
+	}
+
+	if input.ErrorMessage != nil {
+		apply.ErrorMessage = sanitizeAndTruncateErrorMessage(*input.ErrorMessage)
 	}
 
 	if err := apply.Validate(); err != nil {
-		tracing.RecordError(span, err, "apply is not valid")
+		tracing.RecordError(span, err, "updated apply is not valid")
 		return nil, err
 	}
 
@@ -2602,16 +2651,20 @@ func (s *service) getJobTags(ctx context.Context, workspace *models.Workspace) (
 	return setting.Value, nil
 }
 
-func truncateErrorMessage(errorMessage string) *string {
-	if len(errorMessage) > maxErrorMessageLength {
-		truncatedMessage := fmt.Sprintf(
+// sanitizeAndTruncateErrorMessage sanitizes UTF-8 characters and truncates if needed
+func sanitizeAndTruncateErrorMessage(errorMessage string) *string {
+	// First sanitize UTF-8 - replace invalid sequences with replacement character
+	sanitized := strings.ToValidUTF8(errorMessage, "�")
+
+	if len(sanitized) > maxErrorMessageLength {
+		truncated := fmt.Sprintf(
 			"%s...\n%s",
-			errorMessage[:maxErrorMessageLength],
+			sanitized[:maxErrorMessageLength],
 			ansi.Colorize("Error message has been truncated, check the logs for the full error message", ansi.Yellow),
 		)
-		return &truncatedMessage
+		return &truncated
 	}
-	return &errorMessage
+	return &sanitized
 }
 
 func getModuleRegistryToken(envVars []Variable) registry.TokenGetterFunc {

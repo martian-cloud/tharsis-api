@@ -1445,7 +1445,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 			}
 
 			// Update the status and error message on the event.
-			errorMessage := err.Error() // ErrorMessage must be a pointer.
+			errorMessage := strings.ToValidUTF8(err.Error(), "�") // ErrorMessage must be a pointer.
 			createdEvent.Status = models.VCSEventErrored
 			createdEvent.ErrorMessage = &errorMessage
 		}
@@ -1601,7 +1601,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 			}
 
 			// Update the status and error message on the event.
-			errorMessage := err.Error() // ErrorMessage must be a pointer.
+			errorMessage := strings.ToValidUTF8(err.Error(), "�") // ErrorMessage must be a pointer.
 			createdEvent.Status = models.VCSEventErrored
 			createdEvent.ErrorMessage = &errorMessage
 		}

@@ -3817,3 +3817,246 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateApply(t *testing.T) {
+	applyID := "apply-1"
+	workspaceID := "ws-1"
+
+	sampleApply := &models.Apply{
+		Metadata: models.ResourceMetadata{
+			ID: applyID,
+		},
+		WorkspaceID: workspaceID,
+		Status:      models.ApplyPending,
+	}
+
+	testCases := []struct {
+		name            string
+		input           *UpdateApplyInput
+		expectApply     *models.Apply
+		authError       error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "update apply with valid UTF-8 error message",
+			input: &UpdateApplyInput{
+				ApplyID:      applyID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Valid UTF-8 error message"),
+			},
+			expectApply: &models.Apply{
+				Metadata:     sampleApply.Metadata,
+				WorkspaceID:  sampleApply.WorkspaceID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Valid UTF-8 error message"),
+			},
+		},
+		{
+			name: "update apply with invalid UTF-8 error message gets sanitized",
+			input: &UpdateApplyInput{
+				ApplyID:      applyID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Invalid UTF-8: \xff\xfe\xfd"),
+			},
+			expectApply: &models.Apply{
+				Metadata:     sampleApply.Metadata,
+				WorkspaceID:  sampleApply.WorkspaceID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Invalid UTF-8: �"),
+			},
+		},
+		{
+			name: "update apply with mixed valid and invalid UTF-8",
+			input: &UpdateApplyInput{
+				ApplyID:      applyID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Valid text \xff invalid \xfe more valid text"),
+			},
+			expectApply: &models.Apply{
+				Metadata:     sampleApply.Metadata,
+				WorkspaceID:  sampleApply.WorkspaceID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Valid text � invalid � more valid text"),
+			},
+		},
+		{
+			name: "update apply without permission",
+			input: &UpdateApplyInput{
+				ApplyID:      applyID,
+				Status:       models.ApplyErrored,
+				ErrorMessage: ptr.String("Error message"),
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockApplies := db.NewMockApplies(t)
+			mockRunStateManager := state.NewMockRunStateManager(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdateApplyPermission, mock.Anything).Return(test.authError)
+
+			if test.authError == nil {
+				mockApplies.On("GetApplyByID", mock.Anything, test.input.ApplyID).Return(sampleApply, nil)
+			}
+
+			if test.expectErrorCode == "" {
+				mockRunStateManager.On("UpdateApply", mock.Anything, mock.Anything).
+					Return(func(_ context.Context, apply *models.Apply) (*models.Apply, error) {
+						return apply, nil
+					})
+			}
+
+			dbClient := &db.Client{
+				Applies: mockApplies,
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient:        dbClient,
+				logger:          logger,
+				runStateManager: mockRunStateManager,
+			}
+
+			result, err := service.UpdateApply(auth.WithCaller(ctx, mockCaller), test.input)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+		})
+	}
+}
+
+func TestUpdatePlan(t *testing.T) {
+	planID := "plan-1"
+	workspaceID := "ws-1"
+
+	samplePlan := &models.Plan{
+		Metadata: models.ResourceMetadata{
+			ID: planID,
+		},
+		WorkspaceID: workspaceID,
+		Status:      models.PlanPending,
+	}
+
+	testCases := []struct {
+		name            string
+		input           *UpdatePlanInput
+		expectPlan      *models.Plan
+		authError       error
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "update plan with valid UTF-8 error message",
+			input: &UpdatePlanInput{
+				PlanID:       planID,
+				Status:       models.PlanErrored,
+				HasChanges:   true,
+				ErrorMessage: ptr.String("Valid UTF-8 error message"),
+			},
+			expectPlan: &models.Plan{
+				Metadata:     samplePlan.Metadata,
+				WorkspaceID:  samplePlan.WorkspaceID,
+				Status:       models.PlanErrored,
+				HasChanges:   true,
+				ErrorMessage: ptr.String("Valid UTF-8 error message"),
+			},
+		},
+		{
+			name: "update plan with invalid UTF-8 error message gets sanitized",
+			input: &UpdatePlanInput{
+				PlanID:       planID,
+				Status:       models.PlanErrored,
+				HasChanges:   false,
+				ErrorMessage: ptr.String("Invalid UTF-8: \xff\xfe\xfd"),
+			},
+			expectPlan: &models.Plan{
+				Metadata:     samplePlan.Metadata,
+				WorkspaceID:  samplePlan.WorkspaceID,
+				Status:       models.PlanErrored,
+				HasChanges:   true,
+				ErrorMessage: ptr.String("Invalid UTF-8: �"),
+			},
+		},
+		{
+			name: "update plan with mixed valid and invalid UTF-8",
+			input: &UpdatePlanInput{
+				PlanID:       planID,
+				Status:       models.PlanErrored,
+				HasChanges:   false,
+				ErrorMessage: ptr.String("Valid text \xff invalid \xfe more valid text"),
+			},
+			expectPlan: &models.Plan{
+				Metadata:     samplePlan.Metadata,
+				WorkspaceID:  samplePlan.WorkspaceID,
+				Status:       models.PlanErrored,
+				HasChanges:   true,
+				ErrorMessage: ptr.String("Valid text � invalid � more valid text"),
+			},
+		},
+		{
+			name: "update plan without permission",
+			input: &UpdatePlanInput{
+				PlanID:       planID,
+				Status:       models.PlanErrored,
+				HasChanges:   false,
+				ErrorMessage: ptr.String("Error message"),
+			},
+			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockPlans := db.NewMockPlans(t)
+			mockRunStateManager := state.NewMockRunStateManager(t)
+
+			mockCaller.On("RequirePermission", mock.Anything, models.UpdatePlanPermission, mock.Anything).Return(test.authError)
+
+			if test.authError == nil {
+				mockPlans.On("GetPlanByID", mock.Anything, test.input.PlanID).Return(samplePlan, nil)
+			}
+
+			if test.expectErrorCode == "" {
+				mockRunStateManager.On("UpdatePlan", mock.Anything, mock.Anything).
+					Return(func(_ context.Context, plan *models.Plan) (*models.Plan, error) {
+						return plan, nil
+					})
+			}
+
+			dbClient := &db.Client{
+				Plans: mockPlans,
+			}
+
+			logger, _ := logger.NewForTest()
+			service := &service{
+				dbClient:        dbClient,
+				logger:          logger,
+				runStateManager: mockRunStateManager,
+			}
+
+			result, err := service.UpdatePlan(auth.WithCaller(ctx, mockCaller), test.input)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+		})
+	}
+}

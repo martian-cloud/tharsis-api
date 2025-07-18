@@ -24,7 +24,7 @@ import (
 type ErroredRunEmailHandler struct {
 	logger              logger.Logger
 	dbClient            *db.Client
-	runStateManager     *state.RunStateManager
+	runStateManager     state.RunStateManager
 	emailClient         email.Client
 	notificationManager namespace.NotificationManager
 	asyncTaskManager    asynctask.Manager
@@ -39,7 +39,7 @@ var (
 func NewErroredRunEmailHandler(
 	logger logger.Logger,
 	dbClient *db.Client,
-	runStateManager *state.RunStateManager,
+	runStateManager state.RunStateManager,
 	emailClient email.Client,
 	notificationManager namespace.NotificationManager,
 	asyncTaskManager asynctask.Manager,
