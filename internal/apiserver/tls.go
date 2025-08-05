@@ -31,7 +31,7 @@ func loadTLSConfig(cfg *config.Config, logger logger.Logger) (*tls.Config, error
 
 		var cert tls.Certificate
 		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
-			logger.Info("Starting server with TLS enabled: certPath=%s, keyPath=%s", cfg.TLSCertFile, cfg.TLSKeyFile)
+			logger.Infof("Starting server with TLS enabled: certPath=%s, keyPath=%s", cfg.TLSCertFile, cfg.TLSKeyFile)
 
 			c, err := tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
 			if err != nil {

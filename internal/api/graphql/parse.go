@@ -3,10 +3,18 @@ package graphql
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 )
+
+var acceptedContentTypes = []string{
+	"application/json",
+	"application/graphql",
+}
 
 func parse(r *http.Request) (request, error) {
 	// We always need to read and close the request body.
@@ -16,18 +24,34 @@ func parse(r *http.Request) (request, error) {
 	}
 	_ = r.Body.Close()
 
-	var req request
-
 	switch r.Method {
 	case "POST":
-		req = parsePost(body)
+		if err = validateContentType(r); err != nil {
+			return request{}, err
+		}
+		return parsePost(body), nil
 	case "GET":
-		req = parseGet(r.URL.Query())
+		return parseGet(r.URL.Query()), nil
 	default:
-		err = errors.New("only POST and GET requests are supported")
+		return request{}, errors.New("only POST and GET requests are supported")
+	}
+}
+
+func validateContentType(r *http.Request) error {
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" {
+		return errors.New("header Content-Type is required for POST requests")
 	}
 
-	return req, err
+	// Parse the media type, ignoring parameters like charset
+	mediaType := strings.ToLower(strings.Split(contentType, ";")[0])
+	mediaType = strings.TrimSpace(mediaType)
+
+	if slices.Contains(acceptedContentTypes, mediaType) {
+		return nil
+	}
+
+	return fmt.Errorf("header Content-Type must be one of %s for POST requests", strings.Join(acceptedContentTypes, ", "))
 }
 
 func parseGet(v url.Values) request {

@@ -340,6 +340,10 @@ type query struct {
 func respond(w http.ResponseWriter, body []byte, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	w.WriteHeader(code)
 	_, _ = w.Write(body)
 }
