@@ -213,6 +213,27 @@ func (r *UserResolver) ActivityEvents(ctx context.Context,
 	return NewActivityEventConnectionResolver(ctx, input)
 }
 
+// UserSessions resolver
+func (r *UserResolver) UserSessions(ctx context.Context,
+	args *ConnectionQueryArgs,
+) (*UserSessionConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := user.GetUserSessionsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		UserID:            r.user.Metadata.ID,
+	}
+
+	if args.Sort != nil {
+		sort := db.UserSessionSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewUserSessionConnectionResolver(ctx, &input)
+}
+
 func usersQuery(ctx context.Context, args *UserConnectionQueryArgs) (*UserConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err
@@ -240,9 +261,20 @@ type UserMutationPayload struct {
 	Problems         []Problem
 }
 
+// RevokeUserSessionPayload is the response payload for revoking a user session.
+type RevokeUserSessionPayload struct {
+	ClientMutationID *string
+	Problems         []Problem
+}
+
 // UserMutationPayloadResolver resolves a UserMutationPayload
 type UserMutationPayloadResolver struct {
 	UserMutationPayload
+}
+
+// RevokeUserSessionPayloadResolver resolves a RevokeUserSessionPayload
+type RevokeUserSessionPayloadResolver struct {
+	RevokeUserSessionPayload
 }
 
 // User field resolver
@@ -259,6 +291,12 @@ type UpdateUserAdminStatusInput struct {
 	ClientMutationID *string
 	UserID           string
 	Admin            bool
+}
+
+// RevokeUserSessionInput is the input for revoking a user session.
+type RevokeUserSessionInput struct {
+	ClientMutationID *string
+	UserSessionID    string
 }
 
 func handleUserMutationProblem(e error, clientMutationID *string) (*UserMutationPayloadResolver, error) {
@@ -288,6 +326,34 @@ func updateUserAdminStatusMutation(ctx context.Context, input *UpdateUserAdminSt
 
 	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, User: user, Problems: []Problem{}}
 	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
+}
+
+func handleRevokeUserSessionProblem(e error, clientMutationID *string) (*RevokeUserSessionPayloadResolver, error) {
+	problem, err := buildProblem(e)
+	if err != nil {
+		return nil, err
+	}
+	payload := RevokeUserSessionPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}
+	return &RevokeUserSessionPayloadResolver{RevokeUserSessionPayload: payload}, nil
+}
+
+func revokeUserSessionMutation(ctx context.Context, input *RevokeUserSessionInput) (*RevokeUserSessionPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	userSessionID, err := serviceCatalog.FetchModelID(ctx, input.UserSessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = serviceCatalog.UserService.RevokeUserSession(ctx, &user.RevokeUserSessionInput{
+		UserSessionID: userSessionID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RevokeUserSessionPayload{ClientMutationID: input.ClientMutationID, Problems: []Problem{}}
+	return &RevokeUserSessionPayloadResolver{RevokeUserSessionPayload: payload}, nil
 }
 
 /* User loader */

@@ -201,7 +201,7 @@ func TestGetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectPreference: &namespace.NotificationPreferenceSetting{
 				Inherited:     false,
@@ -225,7 +225,7 @@ func TestGetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectPreference: &namespace.NotificationPreferenceSetting{
 				Inherited:     false,
@@ -250,7 +250,7 @@ func TestGetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectErrCode: errors.EForbidden,
 		},
@@ -381,7 +381,7 @@ func TestSetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectPreference: &namespace.NotificationPreferenceSetting{
 				Inherited:     false,
@@ -406,7 +406,7 @@ func TestSetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectPreference: &namespace.NotificationPreferenceSetting{
 				Inherited: true,
@@ -430,7 +430,7 @@ func TestSetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			existingPreference: &models.NotificationPreference{
 				UserID:        userID,
@@ -459,7 +459,7 @@ func TestSetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectPreference: &namespace.NotificationPreferenceSetting{
 				Inherited:     false,
@@ -485,7 +485,7 @@ func TestSetNotificationPreference(t *testing.T) {
 					Metadata: models.ResourceMetadata{
 						ID: userID,
 					},
-				}, mockAuthorizer, nil, mockMaintenanceMonitor)
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
 			},
 			expectErrCode: errors.EForbidden,
 		},
@@ -746,6 +746,466 @@ func TestUpdateAdminStatusForUser(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, actualUser)
 			assert.Equal(t, tc.expectAdmin, actualUser.Admin)
+		})
+	}
+}
+
+func TestGetUserSessions(t *testing.T) {
+	userID := "user-id"
+	adminUserID := "admin-user-id"
+	otherUserID := "other-user-id"
+	userSessionID := "user-session-id"
+
+	testCases := []struct {
+		name          string
+		input         *GetUserSessionsInput
+		caller        auth.Caller
+		expectError   bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "admin can query any user's sessions",
+			input: &GetUserSessionsInput{
+				UserID: userID,
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+		},
+		{
+			name: "user can query their own sessions",
+			input: &GetUserSessionsInput{
+				UserID: userID,
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+		},
+		{
+			name: "user cannot query other user's sessions",
+			input: &GetUserSessionsInput{
+				UserID: otherUserID,
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "service account cannot query user sessions",
+			input: &GetUserSessionsInput{
+				UserID: userID,
+			},
+			caller:          &auth.ServiceAccountCaller{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockUsers := db.NewMockUsers(t)
+			mockUserSessions := db.NewMockUserSessions(t)
+
+			dbClient := &db.Client{
+				Users:        mockUsers,
+				UserSessions: mockUserSessions,
+			}
+
+			if !tc.expectError {
+				mockUserSessions.On("GetUserSessions", mock.Anything, mock.MatchedBy(func(input *db.GetUserSessionsInput) bool {
+					return input.Filter != nil && input.Filter.UserID != nil && *input.Filter.UserID == tc.input.UserID
+				})).Return(&db.UserSessionsResult{
+					UserSessions: []models.UserSession{
+						{
+							Metadata: models.ResourceMetadata{ID: userSessionID},
+							UserID:   tc.input.UserID,
+						},
+					},
+				}, nil)
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			result, err := testService.GetUserSessions(ctx, tc.input)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Len(t, result.UserSessions, 1)
+			assert.Equal(t, userSessionID, result.UserSessions[0].Metadata.ID)
+		})
+	}
+}
+
+func TestGetUserSessionByID(t *testing.T) {
+	userID := "user-id"
+	adminUserID := "admin-user-id"
+	otherUserID := "other-user-id"
+	userSessionID := "user-session-id"
+
+	testCases := []struct {
+		name          string
+		userSessionID string
+		caller        auth.Caller
+		expectError   bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:          "admin can access any user session",
+			userSessionID: userSessionID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+		},
+		{
+			name:          "user can access their own session",
+			userSessionID: userSessionID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+		},
+		{
+			name:          "user cannot access other user's session",
+			userSessionID: userSessionID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: otherUserID},
+					Admin:    false,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:          "service account cannot access user sessions",
+			userSessionID: userSessionID,
+			caller:        &auth.ServiceAccountCaller{},
+			expectError:   true,
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockUserSessions := db.NewMockUserSessions(t)
+
+			dbClient := &db.Client{
+				UserSessions: mockUserSessions,
+			}
+
+			if !tc.expectError {
+				mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.userSessionID).Return(&models.UserSession{
+					Metadata: models.ResourceMetadata{ID: tc.userSessionID},
+					UserID:   userID,
+				}, nil)
+			} else if tc.expectErrorCode == errors.EForbidden {
+				// For forbidden cases where we need to check ownership, we still need to return the session
+				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
+				if isUserCaller && !userCaller.IsAdmin() {
+					mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.userSessionID).Return(&models.UserSession{
+						Metadata: models.ResourceMetadata{ID: tc.userSessionID},
+						UserID:   userID, // Session belongs to userID, but caller is otherUserID
+					}, nil)
+				}
+				// For service accounts, we don't mock the database call since it should fail before that
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			result, err := testService.GetUserSessionByID(ctx, tc.userSessionID)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tc.userSessionID, result.Metadata.ID)
+		})
+	}
+}
+
+func TestGetUserSessionByTRN(t *testing.T) {
+	userID := "user-id"
+	adminUserID := "admin-user-id"
+	otherUserID := "other-user-id"
+	userSessionID := "user-session-id"
+	username := "test-user"
+	sessionTRN := "trn:user_session:" + username + "/US_" + userSessionID
+
+	testCases := []struct {
+		name          string
+		trn           string
+		caller        auth.Caller
+		expectError   bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "admin can access any user session by TRN",
+			trn:  sessionTRN,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+		},
+		{
+			name: "user can access their own session by TRN",
+			trn:  sessionTRN,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+		},
+		{
+			name: "user cannot access other user's session by TRN",
+			trn:  sessionTRN,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: otherUserID},
+					Admin:    false,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "service account cannot access user sessions by TRN",
+			trn:  sessionTRN,
+			caller:        &auth.ServiceAccountCaller{},
+			expectError:   true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:          "invalid TRN format",
+			trn:           "invalid-trn",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockUserSessions := db.NewMockUserSessions(t)
+
+			dbClient := &db.Client{
+				UserSessions: mockUserSessions,
+			}
+
+			if !tc.expectError {
+				mockUserSessions.On("GetUserSessionByTRN", mock.Anything, tc.trn).Return(&models.UserSession{
+					Metadata: models.ResourceMetadata{ID: userSessionID, TRN: tc.trn},
+					UserID:   userID,
+				}, nil)
+			} else if tc.expectErrorCode == errors.EForbidden {
+				// For forbidden cases where we need to check ownership, we still need to return the session
+				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
+				if isUserCaller && !userCaller.IsAdmin() {
+					mockUserSessions.On("GetUserSessionByTRN", mock.Anything, tc.trn).Return(&models.UserSession{
+						Metadata: models.ResourceMetadata{ID: userSessionID, TRN: tc.trn},
+						UserID:   userID, // Session belongs to userID, but caller is otherUserID
+					}, nil)
+				}
+				// For service accounts, we don't mock the database call since it should fail before that
+			} else if tc.expectErrorCode == errors.EInvalid {
+				// For invalid TRN, the database call should return an error
+				mockUserSessions.On("GetUserSessionByTRN", mock.Anything, tc.trn).Return(nil, errors.New("invalid TRN format", errors.WithErrorCode(errors.EInvalid)))
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			result, err := testService.GetUserSessionByTRN(ctx, tc.trn)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, userSessionID, result.Metadata.ID)
+			assert.Equal(t, tc.trn, result.Metadata.TRN)
+		})
+	}
+}
+
+func TestRevokeUserSession(t *testing.T) {
+	userID := "user-id"
+	adminUserID := "admin-user-id"
+	otherUserID := "other-user-id"
+	userSessionID := "user-session-id"
+
+	testCases := []struct {
+		name            string
+		input           *RevokeUserSessionInput
+		caller          auth.Caller
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "admin can revoke any user session",
+			input: &RevokeUserSessionInput{
+				UserSessionID: userSessionID,
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+		},
+		{
+			name: "user can revoke their own session",
+			input: &RevokeUserSessionInput{
+				UserSessionID: userSessionID,
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+		},
+		{
+			name: "user cannot revoke other user's session",
+			input: &RevokeUserSessionInput{
+				UserSessionID: userSessionID,
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: otherUserID},
+					Admin:    false,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "service account cannot revoke user sessions",
+			input: &RevokeUserSessionInput{
+				UserSessionID: userSessionID,
+			},
+			caller:          &auth.ServiceAccountCaller{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "session not found",
+			input: &RevokeUserSessionInput{
+				UserSessionID: "non-existent-session",
+			},
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockUserSessions := db.NewMockUserSessions(t)
+
+			dbClient := &db.Client{
+				UserSessions: mockUserSessions,
+			}
+
+			if tc.name == "session not found" {
+				mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.input.UserSessionID).Return(nil, nil)
+			} else if !tc.expectError {
+				// Mock successful case
+				mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.input.UserSessionID).Return(&models.UserSession{
+					Metadata: models.ResourceMetadata{ID: tc.input.UserSessionID},
+					UserID:   userID,
+				}, nil)
+				mockUserSessions.On("DeleteUserSession", mock.Anything, mock.MatchedBy(func(session *models.UserSession) bool {
+					return session.Metadata.ID == tc.input.UserSessionID
+				})).Return(nil)
+			} else if tc.expectErrorCode == errors.EForbidden {
+				// For forbidden cases where we need to check ownership, we still need to return the session
+				userCaller, isUserCaller := tc.caller.(*auth.UserCaller)
+				if isUserCaller && !userCaller.IsAdmin() {
+					mockUserSessions.On("GetUserSessionByID", mock.Anything, tc.input.UserSessionID).Return(&models.UserSession{
+						Metadata: models.ResourceMetadata{ID: tc.input.UserSessionID},
+						UserID:   userID, // Session belongs to userID, but caller is otherUserID
+					}, nil)
+				}
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			err := testService.RevokeUserSession(ctx, tc.input)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.expectErrorCode != "" {
+					assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				}
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

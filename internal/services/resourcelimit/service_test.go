@@ -149,6 +149,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 					&mockAuthorizer,
 					dbClient,
 					mockMaintenanceMonitor,
+					nil,
 				)
 			case "user":
 				testCaller = auth.NewUserCaller(
@@ -162,6 +163,7 @@ func TestUpdateResourceLimit(t *testing.T) {
 					&mockAuthorizer,
 					dbClient,
 					mockMaintenanceMonitor,
+					nil,
 				)
 			case "service-account":
 				testCaller = auth.NewServiceAccountCaller(

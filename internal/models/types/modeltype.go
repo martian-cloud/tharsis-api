@@ -56,6 +56,7 @@ var (
 	TerraformProviderVersionMirrorModelType  = ModelType{name: "terraform_provider_version_mirror", gidCode: "TVM"}
 	TerraformProviderVersionModelType        = ModelType{name: "terraform_provider_version", gidCode: "TPV"}
 	UserModelType                            = ModelType{name: "user", gidCode: "U"}
+	UserSessionModelType                     = ModelType{name: "user_session", gidCode: "US"}
 	VariableModelType                        = ModelType{name: "variable", gidCode: "V"}
 	VariableVersionModelType                 = ModelType{name: "variable_version", gidCode: "VV"}
 	VCSEventModelType                        = ModelType{name: "vcs_event", gidCode: "VE"}

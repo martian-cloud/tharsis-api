@@ -189,6 +189,11 @@ func IsContextCanceledError(err error) bool {
 	return errors.Is(err, context.Canceled)
 }
 
+// IsDeadlineExceededError returns true if the error is a context.DeadlineExceeded error
+func IsDeadlineExceededError(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded)
+}
+
 func interpretArgs(msg string, raw ...interface{}) (string, *config) {
 	// Build our args and options
 	var args []interface{}

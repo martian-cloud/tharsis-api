@@ -213,6 +213,9 @@ type Mutation {
   updateUserAdminStatus(
     input: UpdateUserAdminStatusInput!
   ): UpdateUserAdminStatusPayload!
+  revokeUserSession(
+    input: RevokeUserSessionInput!
+  ): RevokeUserSessionPayload!
   createFederatedRegistry(
     input: CreateFederatedRegistryInput!
   ): FederatedRegistryMutationPayload!

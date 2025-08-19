@@ -27,10 +27,25 @@ type GetUsersInput struct {
 	Search *string
 }
 
+// GetUserSessionsInput is the input for listing user sessions
+type GetUserSessionsInput struct {
+	// Sort specifies the field to sort on and direction
+	Sort *db.UserSessionSortableField
+	// PaginationOptions supports cursor based pagination
+	PaginationOptions *pagination.Options
+	// UserID is the ID of the user to get sessions for
+	UserID string
+}
+
 // UpdateAdminStatusForUserInput is the input for setting / unsetting users as admin.
 type UpdateAdminStatusForUserInput struct {
 	UserID string
 	Admin  bool
+}
+
+// RevokeUserSessionInput is the input for revoking a user session.
+type RevokeUserSessionInput struct {
+	UserSessionID string
 }
 
 // SetNotificationPreferenceInput is the input for setting notification preferences
@@ -82,7 +97,11 @@ type Service interface {
 	GetUserByTRN(ctx context.Context, trn string) (*models.User, error)
 	GetUsers(ctx context.Context, input *GetUsersInput) (*db.UsersResult, error)
 	GetUsersByIDs(ctx context.Context, idList []string) ([]models.User, error)
+	GetUserSessions(ctx context.Context, input *GetUserSessionsInput) (*db.UserSessionsResult, error)
+	GetUserSessionByID(ctx context.Context, userSessionID string) (*models.UserSession, error)
+	GetUserSessionByTRN(ctx context.Context, trn string) (*models.UserSession, error)
 	UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdminStatusForUserInput) (*models.User, error)
+	RevokeUserSession(ctx context.Context, input *RevokeUserSessionInput) error
 	SetNotificationPreference(ctx context.Context, input *SetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error)
 	GetNotificationPreference(ctx context.Context, input *GetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error)
 }
@@ -341,6 +360,103 @@ func (s *service) GetUsersByIDs(ctx context.Context, idList []string) ([]models.
 	return resp.Users, nil
 }
 
+func (s *service) GetUserSessions(ctx context.Context, input *GetUserSessionsInput) (*db.UserSessionsResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetUserSessions")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can query user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	// Only admins or the current user can query user sessions
+	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != input.UserID {
+		return nil, errors.New("only admins or the current user can query user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	userSessionsResult, err := s.dbClient.UserSessions.GetUserSessions(ctx, &db.GetUserSessionsInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.UserSessionFilter{
+			UserID: &input.UserID,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user sessions", errors.WithSpan(span))
+	}
+
+	return userSessionsResult, nil
+}
+
+func (s *service) GetUserSessionByID(ctx context.Context, userSessionID string) (*models.UserSession, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetUserSessionByID")
+	span.SetAttributes(attribute.String("session_id", userSessionID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can query user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	userSession, err := s.dbClient.UserSessions.GetUserSessionByID(ctx, userSessionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user session", errors.WithSpan(span))
+	}
+
+	if userSession == nil {
+		return nil, errors.New("user session with ID %s not found", userSessionID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Only admins or the session owner can access the user session
+	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userSession.UserID {
+		return nil, errors.New("only admins or the session owner can access user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	return userSession, nil
+}
+
+func (s *service) GetUserSessionByTRN(ctx context.Context, trn string) (*models.UserSession, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetUserSessionByTRN")
+	span.SetAttributes(attribute.String("trn", trn))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can query user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	userSession, err := s.dbClient.UserSessions.GetUserSessionByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user session", errors.WithSpan(span))
+	}
+
+	if userSession == nil {
+		return nil, errors.New("user session with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Only admins or the session owner can access the user session
+	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userSession.UserID {
+		return nil, errors.New("only admins or the session owner can access user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	return userSession, nil
+}
+
 func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdminStatusForUserInput) (*models.User, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdateAdminStatusForUser")
 	span.SetAttributes(attribute.String("userID", input.UserID))
@@ -402,4 +518,48 @@ func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdm
 	)
 
 	return updateUser, nil
+}
+
+func (s *service) RevokeUserSession(ctx context.Context, input *RevokeUserSessionInput) error {
+	ctx, span := tracer.Start(ctx, "svc.RevokeUserSession")
+	span.SetAttributes(attribute.String("user_session_id", input.UserSessionID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return errors.New("only users can revoke user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	// Get the user session to verify ownership
+	userSession, err := s.dbClient.UserSessions.GetUserSessionByID(ctx, input.UserSessionID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get user session", errors.WithSpan(span))
+	}
+
+	if userSession == nil {
+		return errors.New("user session with ID %s not found", input.UserSessionID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Only admins or the session owner can revoke the user session
+	if !userCaller.IsAdmin() && userCaller.User.Metadata.ID != userSession.UserID {
+		return errors.New("only admins or the session owner can revoke user sessions", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	// Delete the user session
+	if err := s.dbClient.UserSessions.DeleteUserSession(ctx, userSession); err != nil {
+		return errors.Wrap(err, "failed to revoke user session", errors.WithSpan(span))
+	}
+
+	s.logger.Infow("Revoked a user session.",
+		"caller", caller.GetSubject(),
+		"session_id", input.UserSessionID,
+		"session_user_id", userSession.UserID,
+	)
+
+	return nil
 }

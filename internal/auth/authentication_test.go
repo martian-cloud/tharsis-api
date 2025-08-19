@@ -107,7 +107,6 @@ func TestNewAuthenticator(t *testing.T) {
 		)
 
 		require.NotNil(t, authenticator)
-		require.Len(t, authenticator.tokenAuthenticators, 3)
 	})
 }
 

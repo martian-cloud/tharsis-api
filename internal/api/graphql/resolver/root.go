@@ -673,6 +673,16 @@ func (r RootResolver) UpdateUserAdminStatus(ctx context.Context, args *struct{ I
 	return response, nil
 }
 
+// RevokeUserSession revokes a user session.
+func (r RootResolver) RevokeUserSession(ctx context.Context, args *struct{ Input *RevokeUserSessionInput }) (*RevokeUserSessionPayloadResolver, error) {
+	response, err := revokeUserSessionMutation(ctx, args.Input)
+	if err != nil {
+		return handleRevokeUserSessionProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Teams Queries and Mutations */
 
 // Team query returns a team by name

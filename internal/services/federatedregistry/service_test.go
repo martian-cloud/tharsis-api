@@ -559,6 +559,7 @@ func TestGetFederatedRegistries(t *testing.T) {
 				&mockAuthorizer,
 				mockDBClient.Client,
 				mockMaintenanceMonitor,
+				nil,
 			)
 
 			testLogger, _ := logger.NewForTest()

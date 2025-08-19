@@ -2795,6 +2795,7 @@ func TestGetRuns(t *testing.T) {
 				mockAuthorizer,
 				dbClient,
 				mockMaintenanceMonitor,
+				nil,
 			)
 
 			runsResult, err := service.GetRuns(auth.WithCaller(ctx, userCaller), test.input)
@@ -3336,6 +3337,7 @@ func TestSubscribeToRunEvents(t *testing.T) {
 					mockAuthorizer,
 					&dbClient,
 					mockMaintenanceMonitor,
+					nil,
 				)
 			}
 

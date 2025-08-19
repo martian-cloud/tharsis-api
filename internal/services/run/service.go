@@ -362,7 +362,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) {
+				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
 					s.logger.Errorf("Error occurred while waiting for run events: %v", err)
 				}
 				return
@@ -395,7 +395,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				},
 			})
 			if err != nil {
-				if errors.IsContextCanceledError(err) {
+				if errors.IsContextCanceledError(err) || errors.IsDeadlineExceededError(err) {
 					return
 				}
 				s.logger.Errorf("Error occurred while querying for run associated with run event %s: %v", event.ID, err)

@@ -1,12 +1,14 @@
 // Package auth package
 package auth
 
+//go:generate go tool mockery --name Authenticator --inpackage --case underscore
 //go:generate go tool mockery --name tokenAuthenticator --inpackage --case underscore
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -19,8 +21,6 @@ var (
 	errExpired      = "token is expired"
 	errNBFInvalid   = "token nbf validation failed"
 	errIATInvalid   = "token iat validation failed"
-	errNoTokenFound = "no token found"     // nolint
-	errAlgoInvalid  = "algorithm mismatch" // nolint
 )
 
 // Valid token types used as private claims for tokens
@@ -29,10 +29,18 @@ var (
 const (
 	JobTokenType               string = "job"
 	ServiceAccountTokenType    string = "service_account"
+	UserSessionAccessTokenType string = "user_session_access"
+	UserSessionCSRFTokenType          = "user_session_csrf"
 	SCIMTokenType              string = "scim"
 	VCSWorkspaceLinkTokenType  string = "vcs_workspace_link"
 	FederatedRegistryTokenType string = "federated_registry"
 )
+
+// Authenticator is used to authenticate JWT tokens
+type Authenticator interface {
+	// Authenticate verifies the token and returns a Caller
+	Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error)
+}
 
 type tokenAuthenticator interface {
 	Use(token jwt.Token) bool
@@ -40,7 +48,7 @@ type tokenAuthenticator interface {
 }
 
 // Authenticator is used to authenticate JWT tokens
-type Authenticator struct {
+type authenticator struct {
 	tokenAuthenticators []tokenAuthenticator
 }
 
@@ -52,7 +60,7 @@ func NewAuthenticator(
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
 	issuerURL string,
-) *Authenticator {
+) Authenticator {
 	return newAuthenticator(
 		[]tokenAuthenticator{
 			&tharsisIDPTokenAuthenticator{
@@ -69,14 +77,14 @@ func NewAuthenticator(
 
 func newAuthenticator(
 	tokenAuthenticators []tokenAuthenticator,
-) *Authenticator {
-	return &Authenticator{
+) *authenticator {
+	return &authenticator{
 		tokenAuthenticators: tokenAuthenticators,
 	}
 }
 
 // Authenticate verifies the token and returns a Caller
-func (a *Authenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
+func (a *authenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
 	if tokenString == "" {
 		return nil, errors.New("authentication token is missing", errors.WithErrorCode(errors.EUnauthorized))
 	}
@@ -123,6 +131,31 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 	}
 
 	switch tokenType {
+	case UserSessionAccessTokenType:
+		user, err := t.dbClient.Users.GetUserByID(ctx, gid.FromGlobalID(output.Token.Subject()))
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, errors.New("user not found for token subject %s", output.Token.Subject(), errors.WithErrorCode(errors.EUnauthorized))
+		}
+
+		if !user.Active {
+			return nil, errors.New(
+				"User has been disabled",
+				errors.WithErrorCode(errors.EUnauthorized),
+			)
+		}
+
+		sessionGID := output.PrivateClaims[SessionIDClaim]
+
+		return NewUserCaller(
+			user,
+			newNamespaceMembershipAuthorizer(t.dbClient, &user.Metadata.ID, nil, useCache),
+			t.dbClient,
+			t.maintenanceMonitor,
+			ptr.String(gid.FromGlobalID(sessionGID)),
+		), nil
 	case ServiceAccountTokenType:
 		serviceAccountID := gid.FromGlobalID(output.PrivateClaims["service_account_id"])
 		return NewServiceAccountCaller(

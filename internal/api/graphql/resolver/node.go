@@ -200,6 +200,18 @@ func (r *NodeResolver) ToUser() (*UserResolver, bool) {
 	}
 }
 
+// ToUserSession resolver
+func (r *NodeResolver) ToUserSession() (*UserSessionResolver, bool) {
+	switch res := r.result.(type) {
+	case *UserSessionResolver:
+		return res, true
+	case *models.UserSession:
+		return &UserSessionResolver{userSession: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToNamespaceVariable resolver
 func (r *NodeResolver) ToNamespaceVariable() (*NamespaceVariableResolver, bool) {
 	switch res := r.result.(type) {

@@ -104,6 +104,7 @@ type Client struct {
 	MaintenanceModes                 MaintenanceModes
 	LogStreams                       LogStreams
 	RunnerSessions                   RunnerSessions
+	UserSessions                     UserSessions
 	SchemaMigrations                 SchemaMigrations
 	NotificationPreferences          NotificationPreferences
 	FederatedRegistries              FederatedRegistries
@@ -209,6 +210,7 @@ func NewClient(
 	dbClient.MaintenanceModes = NewMaintenanceModes(dbClient)
 	dbClient.LogStreams = NewLogStreams(dbClient)
 	dbClient.RunnerSessions = NewRunnerSessions(dbClient)
+	dbClient.UserSessions = NewUserSessions(dbClient)
 	dbClient.SchemaMigrations = NewSchemaMigrations(dbClient)
 	dbClient.NotificationPreferences = NewNotificationPreferences(dbClient)
 	dbClient.FederatedRegistries = NewFederatedRegistries(dbClient)

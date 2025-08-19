@@ -20,6 +20,7 @@ import (
 // UserCaller represents a user subject
 type UserCaller struct {
 	User               *models.User
+	UserSessionID      *string
 	authorizer         Authorizer
 	dbClient           *db.Client
 	maintenanceMonitor maintenance.Monitor
@@ -32,9 +33,11 @@ func NewUserCaller(
 	authorizer Authorizer,
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
+	userSessionID *string,
 ) *UserCaller {
 	return &UserCaller{
 		User:               user,
+		UserSessionID:      userSessionID,
 		authorizer:         authorizer,
 		dbClient:           dbClient,
 		maintenanceMonitor: maintenanceMonitor,
@@ -312,6 +315,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 		newNamespaceMembershipAuthorizer(u.dbClient, &userModel.Metadata.ID, nil, useCache),
 		u.dbClient,
 		u.maintenanceMonitor,
+		nil,
 	), nil
 }
 

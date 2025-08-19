@@ -1169,7 +1169,7 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 		for {
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
-				if !errors.IsContextCanceledError(err) {
+				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
 					s.logger.Errorf("error occurred while waiting for runner session events: %v", err)
 				}
 				return

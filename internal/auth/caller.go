@@ -13,6 +13,9 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
+// ErrNoCaller is the error returned when the context does not have a caller or a caller auth error
+var ErrNoCaller = errors.New("Authentication is required", errors.WithErrorCode(errors.EUnauthorized))
+
 // errMissingConstraints is the error returned when required constraints or permissions are missing.
 var errMissingConstraints = goerror.New("missing required permissions or constraints")
 
@@ -24,6 +27,9 @@ type contextKey string
 
 // contextKeyCaller accesses the caller object.
 var contextKeyCaller = contextKey("caller")
+
+// contextKeyCallerAuthError accesses an error that occurred while authenticating a caller
+var contextKeyCallerAuthError = contextKey("caller error")
 
 // contextKeySubject accesses the subject string.
 var contextKeySubject = contextKey("subject")
@@ -222,6 +228,11 @@ func WithCaller(ctx context.Context, caller Caller) context.Context {
 	return context.WithValue(ctx, contextKeyCaller, caller)
 }
 
+// WithCallerAuthenticationError adds the auth error to the context
+func WithCallerAuthenticationError(ctx context.Context, err error) context.Context {
+	return context.WithValue(ctx, contextKeyCallerAuthError, err)
+}
+
 // WithSubject adds the subject string to the context
 func WithSubject(ctx context.Context, subject string) context.Context {
 	return context.WithValue(ctx, contextKeySubject, subject)
@@ -231,7 +242,13 @@ func WithSubject(ctx context.Context, subject string) context.Context {
 func AuthorizeCaller(ctx context.Context) (Caller, error) {
 	caller, ok := ctx.Value(contextKeyCaller).(Caller)
 	if !ok {
-		return nil, errors.New("Authentication is required", errors.WithErrorCode(errors.EUnauthorized))
+		// Check if authentication error exists in the context
+		authErr, ok := ctx.Value(contextKeyCallerAuthError).(error)
+		if ok && authErr != nil {
+			return nil, authErr
+		}
+		// No caller found on context
+		return nil, ErrNoCaller
 	}
 
 	return caller, nil
@@ -258,13 +275,29 @@ func HandleCaller(
 	}
 }
 
-// FindToken returns the bearer token from an HTTP request
-func FindToken(r *http.Request) string {
+// FindToken returns the bearer token from an HTTP request or from the cookie.
+func FindToken(r *http.Request, secureUserSessionCookiesEnabled bool) (string, error) {
+	var tokenFromHeader, tokenFromCookie string
 	// Get token from authorization header.
 	bearer := r.Header.Get("Authorization")
 	if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
-		return bearer[7:]
+		tokenFromHeader = bearer[7:]
 	}
 
-	return ""
+	// Check for token stored in request cookie
+	accessTokenCookie, _ := r.Cookie(GetUserSessionAccessTokenCookieName(secureUserSessionCookiesEnabled))
+	if accessTokenCookie != nil {
+		tokenFromCookie = accessTokenCookie.Value
+	}
+
+	if tokenFromCookie != "" && tokenFromHeader != "" {
+		return "", errors.New("token cannot be set in both cookie and authorization header", errors.WithErrorCode(errors.EInvalid))
+	} else if tokenFromCookie != "" {
+		return tokenFromCookie, nil
+	} else if tokenFromHeader != "" {
+		return tokenFromHeader, nil
+	}
+
+	// No token found in header or cookie
+	return "", nil
 }

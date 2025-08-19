@@ -230,6 +230,7 @@ lNBLBcAMCdEMd4qgt0YvzKzE3GbQoiAkBKJ2qoqun2MXM60324j01B/x/r3E+p15
 				&mockAuthorizer,
 				dbClient.Client,
 				mockMaintenanceMonitor,
+				nil,
 			)
 
 			logger, _ := logger.NewForTest()

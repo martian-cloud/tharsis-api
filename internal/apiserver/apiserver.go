@@ -10,15 +10,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	httpSwagger "github.com/swaggo/http-swagger"
 
 	_ "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity" // Placeholder to ensure private packages are being downloaded
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers"
-	tfecontrollers "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/controllers/tfe"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/resolver"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/middleware"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
@@ -64,19 +58,10 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
 	workspacesvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
-)
-
-var (
-	tfpAPIEndpointHeader  = "TFP-API-Version"
-	tfpAPIEndpointVersion = "2.5.0"
-
-	tfeBasePath    = "/tfe"
-	tfeVersionPath = "/v2"
 )
 
 // APIServer represents an instance of a server
@@ -148,6 +133,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher)
 	federatedRegistryAuth := auth.NewFederatedRegistryAuth(ctx, cfg.FederatedRegistryTrustPolicies, logger, openIDConfigFetcher, dbClient)
 	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, tharsisIDP, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
+	userSessionManager := auth.NewUserSessionManager(dbClient, tharsisIDP, authenticator, logger, cfg.UserSessionAccessTokenExpirationMinutes, cfg.UserSessionRefreshTokenExpirationMinutes, cfg.UserSessionMaxSessionsPerUser)
 
 	respWriter := response.NewWriter(logger)
 
@@ -268,27 +254,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		cfg.WorkspaceAssessmentRunLimit,
 	).Start(ctx)
 
-	routeBuilder := api.NewRouteBuilder(
-		middleware.PrometheusMiddleware,
-		middleware.NewAuthenticationMiddleware(authenticator, logger, respWriter),
-		middleware.HTTPRateLimiterMiddleware(
-			logger,
-			respWriter,
-			pluginCatalog.HTTPRateLimitStore,
-		), // catch all calls, including GraphQL
-	).WithSubRouter("/v1").
-		WithSubRouter(tfeBasePath,
-			middleware.NewCommonHeadersMiddleware(map[string]string{
-				tfpAPIEndpointHeader: tfpAPIEndpointVersion,
-			}),
-		)
-
-	v1RouteBuilder := routeBuilder.SubRouteBuilder("/v1")
-
-	// set up terraform /v2 routes
-	routeBuilder.SubRouteBuilder(tfeBasePath).WithSubRouter(tfeVersionPath)
-	terraformV2RouteBuilder := routeBuilder.SubRouteBuilder(tfeBasePath).SubRouteBuilder(tfeVersionPath)
-
 	// Create the admin user if an email is provided.
 	if cfg.AdminUserEmail != "" {
 		user, uErr := dbClient.Users.GetUserByEmail(ctx, cfg.AdminUserEmail)
@@ -305,158 +270,19 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 				return nil, fmt.Errorf("failed to create admin user: %v", err)
 			}
 			logger.Infof("User with email %s created.", cfg.AdminUserEmail)
-		} else {
-			logger.Infof("User with email %s already exists. Skipping creation.", cfg.AdminUserEmail)
-		}
-	}
-
-	if cfg.TFELoginEnabled {
-		var loginIdp *config.IdpConfig
-		// Find IDP that matches client ID
-		for _, idp := range cfg.OauthProviders {
-			if idp.ClientID == cfg.TFELoginClientID {
-				idp := idp
-				loginIdp = &idp
-				break
+		} else if !user.Admin {
+			user.Admin = true
+			if _, err = dbClient.Users.UpdateUser(ctx, user); err != nil {
+				return nil, fmt.Errorf("failed to set user to admin: %v", err)
 			}
+			logger.Infof("User with email %s has been granted admin privileges.", cfg.AdminUserEmail)
 		}
-
-		if loginIdp == nil {
-			return nil, errors.New("OIDC Identity Provider not found for TFE login")
-		}
-
-		tfeHandler, sdErr := tfe.BuildTFEServiceDiscoveryHandler(ctx, logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL, tfeBasePath, openIDConfigFetcher)
-		if sdErr != nil {
-			return nil, fmt.Errorf("failed to build TFE discovery document handler %v", sdErr)
-		}
-
-		routeBuilder.AddHandlerFunc(
-			"GET",
-			"/.well-known/terraform.json",
-			tfeHandler,
-		)
 	}
 
-	requireAuthenticatedCallerMiddleware := middleware.NewRequireAuthenticatedCallerMiddleware(logger, respWriter)
-
-	resolverState := resolver.State{
-		Config:         cfg,
-		Logger:         logger,
-		ServiceCatalog: serviceCatalog,
-	}
-
-	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, cfg.MaxGraphQLComplexity, authenticator)
+	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, userSessionManager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
+		return nil, err
 	}
-
-	routeBuilder.AddHandler("/graphql", graphqlHandler)
-	routeBuilder.AddHandlerFunc("GET", "/swagger/*", httpSwagger.WrapHandler)
-
-	// Terraform Backend Ping Endpoint
-	terraformV2RouteBuilder.AddHandlerFunc("GET", "/ping", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	// Controllers.
-	routeBuilder.AddRoutes(controllers.NewHealthController(
-		respWriter,
-	))
-	routeBuilder.AddRoutes(controllers.NewOIDCController(
-		respWriter,
-		pluginCatalog.JWSProvider,
-		cfg.TharsisAPIURL,
-	))
-
-	// TFE Controllers
-	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewStateController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		workspaceService,
-		cfg.TharsisAPIURL,
-		tfeBasePath+tfeVersionPath,
-	))
-	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewRunController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		pluginCatalog.JWSProvider,
-		runService,
-		cfg.TharsisAPIURL,
-	))
-	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewOrgController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		runService,
-		groupService,
-	))
-	terraformV2RouteBuilder.AddRoutes(tfecontrollers.NewWorkspaceController(
-		logger,
-		respWriter,
-		runService,
-		workspaceService,
-		groupService,
-		managedIdentityService,
-		pluginCatalog.JWSProvider,
-		variableService,
-		cfg.TharsisAPIURL,
-		tfeBasePath+tfeVersionPath,
-	))
-
-	// Tharsis Controllers
-	v1RouteBuilder.AddRoutes(controllers.NewRunController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		runService,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewJobController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		pluginCatalog.JWSProvider,
-		jobService,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewServiceAccountController(
-		logger,
-		respWriter,
-		saService,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewProviderRegistryController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		providerRegistryService,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewModuleRegistryController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		moduleRegistryService,
-		cfg.ModuleRegistryMaxUploadSize,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewSCIMController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		userService,
-		teamService,
-		scimService,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewVCSController(
-		logger,
-		respWriter,
-		authenticator,
-		vcsService,
-	))
-	v1RouteBuilder.AddRoutes(controllers.NewProviderMirrorController(
-		logger,
-		respWriter,
-		requireAuthenticatedCallerMiddleware,
-		providerMirrorService,
-	))
 
 	runnerClient := rnr.NewInternalClient(runnerService, jobService)
 
@@ -502,7 +328,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		taskManager: taskManager,
 		srv: &http.Server{
 			Addr:              fmt.Sprintf(":%v", cfg.ServerPort),
-			Handler:           routeBuilder.Router(),
+			Handler:           router,
 			ReadHeaderTimeout: time.Minute,
 			TLSConfig:         tlsConfig,
 		},
