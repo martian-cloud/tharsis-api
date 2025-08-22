@@ -3,5 +3,4 @@ type AuthSettings {
   oidcClientId: String
   oidcUsernameClaim: String
   oidcScope: String
-  oidcLogoutUrl: String
 }

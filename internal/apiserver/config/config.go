@@ -17,21 +17,24 @@ import (
 )
 
 const (
-	defaultServerPort                       = "8000"
-	envOidcProviderConfigPrefix             = "THARSIS_OAUTH_PROVIDERS_"
-	envRunnerConfigPrefix                   = "THARSIS_INTERNAL_RUNNERS_"
-	envFederatedRegistryTrustPolicyName     = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
-	defaultMaxGraphQLComplexity             = 0
-	defaultRateLimitStorePluginType         = "memory"
-	defaultModuleRegistryMaxUploadSize      = 1024 * 1024 * 128 // 128 MiB
-	defaultVCSRepositorySizeLimit           = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
-	defaultAsyncTaskTimeout                 = 180               // seconds
-	defaultDBAutoMigrateEnabled             = true
-	defaultOtelTraceEnabled                 = false
-	defaultHTTPRateLimit                    = 60 // in calls per second
-	defaultTerraformCLIVersions             = ">= 1.0.0"
-	defaultWorkspaceAssessmentIntervalHours = 24
-	defaultWorkspaceAssessmentRunLimit      = 20
+	defaultServerPort                               = "8000"
+	envOidcProviderConfigPrefix                     = "THARSIS_OAUTH_PROVIDERS_"
+	envRunnerConfigPrefix                           = "THARSIS_INTERNAL_RUNNERS_"
+	envFederatedRegistryTrustPolicyName             = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
+	defaultMaxGraphQLComplexity                     = 0
+	defaultRateLimitStorePluginType                 = "memory"
+	defaultModuleRegistryMaxUploadSize              = 1024 * 1024 * 128 // 128 MiB
+	defaultVCSRepositorySizeLimit                   = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
+	defaultAsyncTaskTimeout                         = 180               // seconds
+	defaultDBAutoMigrateEnabled                     = true
+	defaultOtelTraceEnabled                         = false
+	defaultHTTPRateLimit                            = 60 // in calls per second
+	defaultTerraformCLIVersions                     = ">= 1.0.0"
+	defaultWorkspaceAssessmentIntervalHours         = 24
+	defaultWorkspaceAssessmentRunLimit              = 20
+	defaultUserSessionAccessTokenExpirationMinutes  = 5
+	defaultUserSessionRefreshTokenExpirationMinutes = 60 * 12 // 12 hours
+	defaultUserSessionMaxSessionsPerUser            = 20
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -40,7 +43,6 @@ type IdpConfig struct {
 	ClientID      string `yaml:"client_id"`
 	UsernameClaim string `yaml:"username_claim"`
 	Scope         string `yaml:"scope"`
-	LogoutURL     string `yaml:"logout_url"`
 }
 
 // RunnerConfig contains the config fields for a system runner
@@ -159,6 +161,18 @@ type Config struct {
 
 	// WorkspaceAssessmentRunLimit is the max number of assessment runs that can be created at a time
 	WorkspaceAssessmentRunLimit int `yaml:"workspace_assessment_run_limit" env:"WORKSPACE_ASSESSMENT_RUN_LIMIT"`
+
+	// UserSessionAccessTokenExpirationMinutes is the duration in minutes for when a user session access token will expire
+	UserSessionAccessTokenExpirationMinutes int `yaml:"user_session_access_token_expiration_minutes" env:"USER_SESSION_ACCESS_TOKEN_EXPIRATION_MINUTES"`
+
+	// UserSessionRefreshTokenExpirationMinutes is the duration in minutes for when a user session refresh token will expire
+	UserSessionRefreshTokenExpirationMinutes int `yaml:"user_session_refresh_token_expiration_minutes" env:"USER_SESSION_REFRESH_TOKEN_EXPIRATION_MINUTES"`
+
+	// UserSessionMaxSessionsPerUser is the max number of sessions that a user can have at a time
+	UserSessionMaxSessionsPerUser int `yaml:"user_session_max_sessions_per_user" env:"USER_SESSION_MAX_SESSIONS_PER_USER"`
+
+	// CorsAllowedOrigins is a comma delimited list of allowed origins (defaults to the UI URL)
+	CorsAllowedOrigins string `yaml:"cors_allowed_origins" env:"CORS_ALLOWED_ORIGINS"`
 }
 
 // Validate validates the application configuration.
@@ -168,6 +182,7 @@ func (c Config) Validate() error {
 		validation.Field(&c.ObjectStorePluginType, validation.Required),
 		validation.Field(&c.JWSProviderPluginType, validation.Required),
 		validation.Field(&c.TharsisAPIURL, validation.Required),
+		validation.Field(&c.TharsisUIURL, validation.Required),
 	)
 }
 
@@ -175,18 +190,21 @@ func (c Config) Validate() error {
 func Load(file string, logger logger.Logger) (*Config, error) {
 	// default config
 	c := Config{
-		ServerPort:                       defaultServerPort,
-		MaxGraphQLComplexity:             defaultMaxGraphQLComplexity,
-		RateLimitStorePluginType:         defaultRateLimitStorePluginType,
-		ModuleRegistryMaxUploadSize:      defaultModuleRegistryMaxUploadSize,
-		VCSRepositorySizeLimit:           defaultVCSRepositorySizeLimit,
-		AsyncTaskTimeout:                 defaultAsyncTaskTimeout,
-		DBAutoMigrateEnabled:             defaultDBAutoMigrateEnabled,
-		OtelTraceEnabled:                 defaultOtelTraceEnabled,
-		HTTPRateLimit:                    defaultHTTPRateLimit,
-		TerraformCLIVersionConstraint:    defaultTerraformCLIVersions,
-		WorkspaceAssessmentIntervalHours: defaultWorkspaceAssessmentIntervalHours,
-		WorkspaceAssessmentRunLimit:      defaultWorkspaceAssessmentRunLimit,
+		ServerPort:                               defaultServerPort,
+		MaxGraphQLComplexity:                     defaultMaxGraphQLComplexity,
+		RateLimitStorePluginType:                 defaultRateLimitStorePluginType,
+		ModuleRegistryMaxUploadSize:              defaultModuleRegistryMaxUploadSize,
+		VCSRepositorySizeLimit:                   defaultVCSRepositorySizeLimit,
+		AsyncTaskTimeout:                         defaultAsyncTaskTimeout,
+		DBAutoMigrateEnabled:                     defaultDBAutoMigrateEnabled,
+		OtelTraceEnabled:                         defaultOtelTraceEnabled,
+		HTTPRateLimit:                            defaultHTTPRateLimit,
+		TerraformCLIVersionConstraint:            defaultTerraformCLIVersions,
+		WorkspaceAssessmentIntervalHours:         defaultWorkspaceAssessmentIntervalHours,
+		WorkspaceAssessmentRunLimit:              defaultWorkspaceAssessmentRunLimit,
+		UserSessionAccessTokenExpirationMinutes:  defaultUserSessionAccessTokenExpirationMinutes,
+		UserSessionRefreshTokenExpirationMinutes: defaultUserSessionRefreshTokenExpirationMinutes,
+		UserSessionMaxSessionsPerUser:            defaultUserSessionMaxSessionsPerUser,
 	}
 
 	// load from YAML config file
@@ -292,6 +310,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		c.JWTIssuerURL = c.TharsisAPIURL
 	}
 
+	// Default to UI URL
+	if c.CorsAllowedOrigins == "" {
+		c.CorsAllowedOrigins = c.TharsisUIURL
+	}
+
 	// validation
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
@@ -333,12 +356,10 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 			clientIDKey := envOidcProviderConfigPrefix + index + "_CLIENT_ID"
 			usernameClaimKey := envOidcProviderConfigPrefix + index + "_USERNAME_CLAIM"
 			scopeKey := envOidcProviderConfigPrefix + index + "_SCOPE"
-			logoutKey := envOidcProviderConfigPrefix + index + "_LOGOUT_URL"
 
 			clientID := os.Getenv(clientIDKey)
 			usernameClaim := os.Getenv(usernameClaimKey)
 			scope := os.Getenv(scopeKey)
-			logoutURL := os.Getenv(logoutKey)
 
 			if clientID == "" {
 				return nil, errors.New(clientIDKey + " environment variable is required")
@@ -353,7 +374,6 @@ func loadOauthConfigFromEnvironment() ([]IdpConfig, error) {
 				ClientID:      clientID,
 				UsernameClaim: usernameClaim,
 				Scope:         scope,
-				LogoutURL:     logoutURL,
 			})
 		}
 	}

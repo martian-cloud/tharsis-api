@@ -59,6 +59,7 @@ func (c *contextGenerator) BuildContext(ctx context.Context, _ *http.Request) (c
 		options = append(options, dataloader.WithCache(&dataloader.NoCache{}))
 	}
 	ctx = c.loaders.Attach(ctx, options...)
+
 	return ctx, nil
 }
 
@@ -73,8 +74,9 @@ func NewGraphQL(
 	resolverState *resolver.State,
 	logger logger.Logger,
 	ratelimitStore ratelimitstore.Store,
+	authenticator auth.Authenticator,
 	maxGraphqlComplexity int,
-	authenticator *auth.Authenticator,
+	maxSubscriptionDuration time.Duration,
 ) (*GraphQL, error) {
 	schemaStr, err := schema.String()
 	if err != nil {
@@ -129,7 +131,6 @@ func NewGraphQL(
 			loaders:       loaderCollection,
 		},
 		maxGraphqlComplexity: maxGraphqlComplexity,
-		authenticator:        authenticator,
 	}
 
 	return &GraphQL{
@@ -137,9 +138,10 @@ func NewGraphQL(
 		handlerFunc: newSubscriptionHandler(
 			&httpHandler,
 			schema,
-			authenticator,
 			resolverState,
 			loaderCollection,
+			authenticator,
+			maxSubscriptionDuration,
 		),
 	}, nil
 }
@@ -159,7 +161,6 @@ type httpHandler struct {
 	logger               logger.Logger
 	ctxGenerator         *contextGenerator
 	rateLimitStore       ratelimitstore.Store
-	authenticator        *auth.Authenticator
 	maxGraphqlComplexity int
 }
 
@@ -170,13 +171,7 @@ var (
 )
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	caller := auth.GetCaller(r.Context())
-
-	parentCtx := r.Context()
-	if caller != nil {
-		parentCtx = auth.WithCaller(parentCtx, caller)
-	}
-	ctx, err := h.ctxGenerator.BuildContext(parentCtx, r)
+	ctx, err := h.ctxGenerator.BuildContext(r.Context(), r)
 	if err != nil {
 		respond(w, errorJSON(err.Error()), http.StatusInternalServerError)
 		return
@@ -255,6 +250,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	duration := time.Since(start)
 	queryExecutionTime.Observe(float64(duration.Milliseconds()))
 
+	responseStatusCode := http.StatusOK
+
 	// Add extensions to errors
 	for _, response := range responses {
 		for _, e := range response.Errors {
@@ -266,7 +263,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						// Avoid exposing sensitive error messages
 						e.Message = errors.InternalErrorMessage
 					case errors.EUnauthorized:
-						h.logger.Infof("Unauthorized request from subject: %s", *subject)
+						responseStatusCode = http.StatusUnauthorized
 					}
 				}
 
@@ -283,10 +280,11 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		respond(w, errorJSON("server error"), http.StatusInternalServerError)
-		return
+		resp = errorJSON("server error")
+		responseStatusCode = http.StatusInternalServerError
 	}
-	respond(w, resp, http.StatusOK)
+
+	respond(w, resp, responseStatusCode)
 }
 
 func (h *httpHandler) calculateQueryComplexity(ctx context.Context, q query, subject string) (*queryComplexityResult, error) {

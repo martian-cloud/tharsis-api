@@ -1,0 +1,25 @@
+enum UserSessionSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  EXPIRATION_ASC
+  EXPIRATION_DESC
+}
+
+type UserSessionConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [UserSessionEdge]
+}
+
+type UserSessionEdge {
+  cursor: String!
+  node: UserSession
+}
+
+type UserSession implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  userAgent: String!
+  expiration: Time!
+  expired: Boolean!
+}

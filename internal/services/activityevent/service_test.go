@@ -88,6 +88,7 @@ func TestGetActivityEvents(t *testing.T) {
 					&mockAuthorizer,
 					dbClient.Client,
 					nil,
+					nil,
 				)
 			case "serviceAccount":
 				testCaller = auth.NewServiceAccountCaller(
@@ -301,7 +302,7 @@ func TestCreateActivityEvent(t *testing.T) {
 			var testCaller auth.Caller
 			switch {
 			case test.callerUser != nil:
-				newUserCaller := auth.NewUserCaller(test.callerUser, nil, dbClient.Client, nil)
+				newUserCaller := auth.NewUserCaller(test.callerUser, nil, dbClient.Client, nil, nil)
 				testCaller = auth.Caller(newUserCaller)
 			case test.callerServiceAccount != nil:
 				newServiceAccountCaller := auth.NewServiceAccountCaller(test.callerServiceAccount.Metadata.ID,

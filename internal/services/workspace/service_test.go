@@ -1597,6 +1597,7 @@ func TestMigrateWorkspace(t *testing.T) {
 				&mockAuthorizer,
 				&dbClient,
 				mockMaintenanceMonitor,
+				nil,
 			)
 
 			logger, _ := logger.NewForTest()
@@ -1723,6 +1724,7 @@ func TestSubscribeToWorkspaceEvents(t *testing.T) {
 					mockAuthorizer,
 					&dbClient,
 					mockMaintenanceMonitor,
+					nil,
 				)
 			}
 

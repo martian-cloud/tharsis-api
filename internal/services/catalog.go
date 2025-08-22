@@ -371,6 +371,16 @@ func (c *Catalog) Init() {
 		},
 	)
 
+	// User Session - UserSession supports TRN resolution
+	c.addModelFetchers(types.UserSessionModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.UserService.GetUserSessionByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.UserService.GetUserSessionByTRN(ctx, value)
+		},
+	)
+
 	// Variable Service
 	c.addModelFetchers(types.VariableModelType,
 		func(ctx context.Context, value string) (models.Model, error) {

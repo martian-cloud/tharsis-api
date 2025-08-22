@@ -20,6 +20,11 @@ type UpdateUserAdminStatusPayload {
   problems: [Problem!]!
 }
 
+type RevokeUserSessionPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+}
+
 type User implements Node {
   id: ID!
   metadata: ResourceMetadata!
@@ -53,9 +58,20 @@ type User implements Node {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  userSessions(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: UserSessionSort
+  ): UserSessionConnection!
 }
 
 input UpdateUserAdminStatusInput {
   userId: String!
   admin: Boolean!
+}
+
+input RevokeUserSessionInput {
+  userSessionId: String!
 }

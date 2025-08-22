@@ -25,7 +25,6 @@ func authSettingsQuery(ctx context.Context) *AuthSettingsResolver {
 			OIDCClientID:      &provider.ClientID,
 			OIDCUsernameClaim: &provider.UsernameClaim,
 			OIDCScope:         &provider.Scope,
-			OIDCLogoutURL:     &provider.LogoutURL,
 		}
 	}
 

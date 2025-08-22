@@ -806,6 +806,7 @@ func TestEnforceRules(t *testing.T) {
 					nil,
 					&dbClient,
 					nil,
+					nil,
 				)
 			case "serviceAccount":
 				testCaller = auth.NewServiceAccountCaller(

@@ -97,7 +97,7 @@ type gitHubWebhookRequest struct {
 type vcsController struct {
 	logger        logger.Logger
 	respWriter    response.Writer
-	authenticator *auth.Authenticator
+	authenticator auth.Authenticator
 	vcsService    vcs.Service
 }
 
@@ -105,7 +105,7 @@ type vcsController struct {
 func NewVCSController(
 	logger logger.Logger,
 	respWriter response.Writer,
-	authenticator *auth.Authenticator,
+	authenticator auth.Authenticator,
 	vcsService vcs.Service,
 ) Controller {
 	return &vcsController{

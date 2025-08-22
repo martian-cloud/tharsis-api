@@ -818,6 +818,7 @@ func TestGetGroups(t *testing.T) {
 					&mockAuthorizer,
 					dbClient.Client,
 					mockMaintenanceMonitor,
+					nil,
 				)
 			case "user":
 				testCaller = auth.NewUserCaller(
@@ -831,6 +832,7 @@ func TestGetGroups(t *testing.T) {
 					&mockAuthorizer,
 					dbClient.Client,
 					mockMaintenanceMonitor,
+					nil,
 				)
 			case "service-account":
 				testCaller = auth.NewServiceAccountCaller(
@@ -1263,6 +1265,7 @@ func TestMigrateGroup(t *testing.T) {
 				&mockAuthorizer,
 				&dbClient,
 				mockMaintenanceMonitor,
+				nil,
 			)
 
 			logger, _ := logger.NewForTest()
