@@ -241,7 +241,7 @@ func (s *service) CreateTeam(ctx context.Context, input *CreateTeamInput) (*mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateTeam: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateTeam: %v", txErr)
 		}
 	}()
 
@@ -266,8 +266,7 @@ func (s *service) CreateTeam(ctx context.Context, input *CreateTeamInput) (*mode
 		return nil, err
 	}
 
-	s.logger.Infow("Created a new team.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a new team.",
 		"teamName", createdTeam.Name,
 		"teamID", createdTeam.Metadata.ID,
 	)
@@ -322,7 +321,7 @@ func (s *service) UpdateTeam(ctx context.Context, input *UpdateTeamInput) (*mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateTeam: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateTeam: %v", txErr)
 		}
 	}()
 
@@ -347,8 +346,7 @@ func (s *service) UpdateTeam(ctx context.Context, input *UpdateTeamInput) (*mode
 		return nil, err
 	}
 
-	s.logger.Infow("Updated a team.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated a team.",
 		"teamName", team.Name,
 		"teamID", team.Metadata.ID,
 	)
@@ -376,8 +374,7 @@ func (s *service) DeleteTeam(ctx context.Context, input *DeleteTeamInput) error 
 		return err
 	}
 
-	s.logger.Infow("Deleted a team.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a team.",
 		"teamName", input.Team.Name,
 		"teamID", input.Team.Metadata.ID,
 	)
@@ -475,7 +472,7 @@ func (s *service) AddUserToTeam(ctx context.Context, input *AddUserToTeamInput) 
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer AddUserToTeam: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer AddUserToTeam: %v", txErr)
 		}
 	}()
 
@@ -510,8 +507,7 @@ func (s *service) AddUserToTeam(ctx context.Context, input *AddUserToTeamInput) 
 		return nil, err
 	}
 
-	s.logger.Infow("Created a new team member.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a new team member.",
 		"userID", user.Metadata.ID,
 		"teamID", team.Metadata.ID,
 		"isMaintainer", input.IsMaintainer,
@@ -571,7 +567,7 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *UpdateTeamMemberI
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateTeamMember: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateTeamMember: %v", txErr)
 		}
 	}()
 
@@ -600,8 +596,7 @@ func (s *service) UpdateTeamMember(ctx context.Context, input *UpdateTeamMemberI
 		return nil, err
 	}
 
-	s.logger.Infow("Updated a team member.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated a team member.",
 		"userID", user.Metadata.ID,
 		"teamID", team.Metadata.ID,
 		"isMaintainer", input.IsMaintainer,
@@ -634,7 +629,7 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *RemoveUserFromT
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer RemoveUserFromTeam: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer RemoveUserFromTeam: %v", txErr)
 		}
 	}()
 
@@ -662,8 +657,7 @@ func (s *service) RemoveUserFromTeam(ctx context.Context, input *RemoveUserFromT
 		return err
 	}
 
-	s.logger.Infow("Deleted a team member.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a team member.",
 		"userID", input.TeamMember.UserID,
 		"teamID", input.TeamMember.TeamID,
 		"isMaintainer", input.TeamMember.IsMaintainer,

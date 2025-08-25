@@ -344,7 +344,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateNamespaceMembership: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateNamespaceMembership: %v", txErr)
 		}
 	}()
 
@@ -455,7 +455,7 @@ func (s *service) UpdateNamespaceMembership(ctx context.Context,
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateNamespaceMembership: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateNamespaceMembership: %v", txErr)
 		}
 	}()
 
@@ -516,7 +516,7 @@ func (s *service) DeleteNamespaceMembership(ctx context.Context, namespaceMember
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteNamespaceMembership: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteNamespaceMembership: %v", txErr)
 		}
 	}()
 

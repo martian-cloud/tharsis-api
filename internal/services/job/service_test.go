@@ -138,7 +138,7 @@ func TestClaimJob(t *testing.T) {
 				mockJobs.On("GetJobByID", mock.Anything, mock.Anything).
 					Return(&sampleQueuedJob, nil)
 
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte(token), nil)
 			}

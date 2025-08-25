@@ -106,6 +106,7 @@ func BuildRouter(
 			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", auth.CSRFTokenHeader},
 			AllowCredentials: true,
 		}),
+		middleware.NewRequestIDMiddleware(),
 		middleware.PrometheusMiddleware,
 		middleware.NewAuthenticationMiddleware(authenticator, respWriter, enableSecureCookies),
 		middleware.NewSubjectMiddleware(logger, respWriter),

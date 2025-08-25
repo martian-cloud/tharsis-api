@@ -491,7 +491,7 @@ func TestGetProviderPlatforms(t *testing.T) {
 					Architecture:      ptr.String(""),
 				},
 			},
-			expectMsg:                          emptyUUIDMsg2,
+			expectMsg:                          invalidUUIDMsg,
 			expectTerraformProviderPlatformIDs: []string{},
 			expectPageInfo:                     pagination.PageInfo{},
 		},
@@ -530,7 +530,7 @@ func TestGetProviderPlatforms(t *testing.T) {
 					ProviderID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                          invalidUUIDMsg2,
+			expectMsg:                          invalidUUIDMsg,
 			expectTerraformProviderPlatformIDs: []string{},
 			expectPageInfo:                     pagination.PageInfo{},
 		},
@@ -569,7 +569,7 @@ func TestGetProviderPlatforms(t *testing.T) {
 					ProviderVersionID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                          invalidUUIDMsg2,
+			expectMsg:                          invalidUUIDMsg,
 			expectTerraformProviderPlatformIDs: []string{},
 			expectPageInfo:                     pagination.PageInfo{},
 		},
@@ -821,7 +821,7 @@ func TestCreateProviderPlatform(t *testing.T) {
 				CreatedBy:         "TestCreateProviderPlatform",
 				BinaryUploaded:    true,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -925,7 +925,7 @@ func TestUpdateProviderPlatform(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1006,7 +1006,7 @@ func TestDeleteProviderPlatform(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

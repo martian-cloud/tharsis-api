@@ -345,7 +345,7 @@ func TestGetModules(t *testing.T) {
 					ServiceAccountID: ptr.String(""),
 				},
 			},
-			expectMsg:                emptyUUIDMsg2,
+			expectMsg:                invalidUUIDMsg,
 			expectTerraformModuleIDs: []string{},
 		},
 
@@ -456,7 +456,7 @@ func TestGetModules(t *testing.T) {
 					RootGroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                invalidUUIDMsg2,
+			expectMsg:                invalidUUIDMsg,
 			expectTerraformModuleIDs: []string{},
 		},
 
@@ -490,7 +490,7 @@ func TestGetModules(t *testing.T) {
 					GroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                invalidUUIDMsg2,
+			expectMsg:                invalidUUIDMsg,
 			expectTerraformModuleIDs: []string{},
 		},
 
@@ -526,7 +526,7 @@ func TestGetModules(t *testing.T) {
 					UserID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                invalidUUIDMsg2,
+			expectMsg:                invalidUUIDMsg,
 			expectTerraformModuleIDs: []string{},
 		},
 
@@ -562,7 +562,7 @@ func TestGetModules(t *testing.T) {
 					ServiceAccountID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                invalidUUIDMsg2,
+			expectMsg:                invalidUUIDMsg,
 			expectTerraformModuleIDs: []string{},
 		},
 
@@ -599,7 +599,7 @@ func TestGetModules(t *testing.T) {
 					TerraformModuleIDs: []string{invalidID},
 				},
 			},
-			expectMsg:                invalidUUIDMsg2,
+			expectMsg:                invalidUUIDMsg,
 			expectTerraformModuleIDs: []string{},
 		},
 	}
@@ -746,7 +746,7 @@ func TestCreateModule(t *testing.T) {
 				RootGroupID: invalidID,
 				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		{
@@ -757,7 +757,7 @@ func TestCreateModule(t *testing.T) {
 				RootGroupID: warmupItems.groups[0].Metadata.ID,
 				GroupID:     invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -877,7 +877,7 @@ func TestUpdateModule(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -957,7 +957,7 @@ func TestDeleteModule(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

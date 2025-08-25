@@ -631,7 +631,7 @@ func TestGetRoles(t *testing.T) {
 					RoleIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectRoleIDs:        []string{},
 			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
@@ -880,7 +880,7 @@ func TestUpdateRole(t *testing.T) {
 					Version: positiveRole.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -959,7 +959,7 @@ func TestDeleteRole(t *testing.T) {
 				},
 				Description: "looking for a defective ID",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

@@ -337,7 +337,7 @@ func TestGetModuleVersions(t *testing.T) {
 					ModuleVersionIDs: []string{invalidID},
 				},
 			},
-			expectMsg:                       invalidUUIDMsg2,
+			expectMsg:                       invalidUUIDMsg,
 			expectTerraformModuleVersionIDs: []string{},
 		},
 
@@ -582,7 +582,7 @@ func TestUpdateModuleVersion(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -663,7 +663,7 @@ func TestDeleteModuleVersion(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

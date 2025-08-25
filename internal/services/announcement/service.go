@@ -181,8 +181,7 @@ func (s *service) CreateAnnouncement(ctx context.Context, input *CreateAnnouncem
 		return nil, errors.Wrap(err, "failed to create announcement", errors.WithSpan(span))
 	}
 
-	s.logger.Infow("Created announcement.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created announcement.",
 		"announcement_id", created.Metadata.ID,
 	)
 
@@ -243,8 +242,7 @@ func (s *service) UpdateAnnouncement(ctx context.Context, input *UpdateAnnouncem
 		return nil, errors.Wrap(err, "failed to update announcement", errors.WithSpan(span))
 	}
 
-	s.logger.Infow("Updated announcement.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated announcement.",
 		"announcement_id", updated.Metadata.ID,
 	)
 
@@ -282,8 +280,7 @@ func (s *service) DeleteAnnouncement(ctx context.Context, input *DeleteAnnouncem
 		return errors.Wrap(err, "failed to delete announcement", errors.WithSpan(span))
 	}
 
-	s.logger.Infow("Deleted announcement.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted announcement.",
 		"announcement_id", announcement.Metadata.ID,
 	)
 

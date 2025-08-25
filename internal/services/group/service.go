@@ -282,8 +282,7 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 		return err
 	}
 
-	s.logger.Infow("Requested deletion of a group.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a group.",
 		"fullPath", input.Group.FullPath,
 		"groupID", input.Group.Metadata.ID,
 	)
@@ -334,7 +333,7 @@ func (s *service) DeleteGroup(ctx context.Context, input *DeleteGroupInput) erro
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for DeleteGroup: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for DeleteGroup: %v", txErr)
 		}
 	}()
 
@@ -416,7 +415,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateGroup: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateGroup: %v", txErr)
 		}
 	}()
 
@@ -476,8 +475,7 @@ func (s *service) CreateGroup(ctx context.Context, input *models.Group) (*models
 		return nil, err
 	}
 
-	s.logger.Infow("Created a new group.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a new group.",
 		"fullPath", group.FullPath,
 		"groupID", group.Metadata.ID,
 	)
@@ -507,8 +505,7 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 		return nil, err
 	}
 
-	s.logger.Infow("Requested an update to a group.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested an update to a group.",
 		"fullPath", group.FullPath,
 		"groupID", group.Metadata.ID,
 	)
@@ -521,7 +518,7 @@ func (s *service) UpdateGroup(ctx context.Context, group *models.Group) (*models
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateGroup: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateGroup: %v", txErr)
 		}
 	}()
 
@@ -654,8 +651,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 	// Because the group to be moved and the new parent group have been fetched from the DB,
 	// there's no need to validate them.
 
-	s.logger.Infow("Requested a group migration.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested a group migration.",
 		"fullPath", group.FullPath, // This is the full path of the group prior to migration.
 		"groupID", group.Metadata.ID,
 		"newParentPath", newParentPath,
@@ -669,7 +665,7 @@ func (s *service) MigrateGroup(ctx context.Context, groupID string, newParentID 
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer MigrateGroup: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer MigrateGroup: %v", txErr)
 		}
 	}()
 

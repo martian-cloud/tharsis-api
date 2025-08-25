@@ -240,7 +240,7 @@ func (c *configurationVersions) CreateConfigurationVersion(ctx context.Context, 
 
 	createdConfigurationVersion, err := scanConfigurationVersion(c.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 	if err != nil {
-		c.dbClient.logger.Error(err)
+		c.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func (c *configurationVersions) UpdateConfigurationVersion(ctx context.Context, 
 			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		c.dbClient.logger.Error(err)
+		c.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}

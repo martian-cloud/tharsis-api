@@ -196,7 +196,7 @@ func (m *managedIdentities) GetManagedIdentityAccessRules(ctx context.Context,
 		}
 
 		if input.Filter.ManagedIdentityAccessRuleIDs != nil {
-			ex = ex.Append(goqu.I("id").In(input.Filter.ManagedIdentityAccessRuleIDs))
+			ex = ex.Append(goqu.I("managed_identity_rules.id").In(input.Filter.ManagedIdentityAccessRuleIDs))
 		}
 	}
 
@@ -325,7 +325,7 @@ func (m *managedIdentities) CreateManagedIdentityAccessRule(ctx context.Context,
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			m.dbClient.logger.Errorf("failed to rollback tx for CreateManagedIdentityAccessRule: %v", txErr)
+			m.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateManagedIdentityAccessRule: %v", txErr)
 		}
 	}()
 
@@ -465,7 +465,7 @@ func (m *managedIdentities) UpdateManagedIdentityAccessRule(ctx context.Context,
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			m.dbClient.logger.Errorf("failed to rollback tx for UpdateManagedIdentityAccessRule: %v", txErr)
+			m.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UpdateManagedIdentityAccessRule: %v", txErr)
 		}
 	}()
 
@@ -954,7 +954,7 @@ func (m *managedIdentities) CreateManagedIdentity(ctx context.Context, managedId
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			m.dbClient.logger.Errorf("failed to rollback tx for CreateManagedIdentity: %v", txErr)
+			m.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateManagedIdentity: %v", txErr)
 		}
 	}()
 

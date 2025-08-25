@@ -73,7 +73,7 @@ func (c *runController) DownloadPlan(w http.ResponseWriter, r *http.Request) {
 
 	result, err := c.runService.DownloadPlan(r.Context(), planID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -82,7 +82,7 @@ func (c *runController) DownloadPlan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := io.Copy(w, result); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 }
@@ -93,18 +93,18 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 	// Read the response for re-use if variables use broken api
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if err = jsonapi.UnmarshalPayload(io.NopCloser(bytes.NewReader(body)), &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	variables, err := parseRunVariables(req, body)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -130,11 +130,11 @@ func (c *runController) CreateRun(w http.ResponseWriter, r *http.Request) {
 
 	run, err := c.runService.CreateRun(r.Context(), options)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisRunToRun(run), http.StatusCreated)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisRunToRun(run), http.StatusCreated)
 }
 
 func parseRunVariables(req gotfe.RunCreateOptions, body []byte) ([]run.Variable, error) {
@@ -194,17 +194,17 @@ func (c *runController) ApplyRun(w http.ResponseWriter, r *http.Request) {
 
 	var req gotfe.RunApplyOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	run, err := c.runService.ApplyRun(r.Context(), runID, req.Comment)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisRunToRun(run), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisRunToRun(run), http.StatusOK)
 }
 
 func (c *runController) CancelRun(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +212,7 @@ func (c *runController) CancelRun(w http.ResponseWriter, r *http.Request) {
 
 	var req gotfe.RunCancelOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -223,11 +223,11 @@ func (c *runController) CancelRun(w http.ResponseWriter, r *http.Request) {
 		// Only the GraphQL interface supports the force option.
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisRunToRun(run), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisRunToRun(run), http.StatusOK)
 }
 
 func (c *runController) GetRun(w http.ResponseWriter, r *http.Request) {
@@ -235,11 +235,11 @@ func (c *runController) GetRun(w http.ResponseWriter, r *http.Request) {
 
 	run, err := c.runService.GetRunByID(r.Context(), runID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisRunToRun(run), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisRunToRun(run), http.StatusOK)
 }
 
 func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
@@ -247,13 +247,13 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 
 	plan, err := c.runService.GetPlanByID(r.Context(), planID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	job, err := c.runService.GetLatestJobForPlan(r.Context(), planID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -269,14 +269,14 @@ func (c *runController) GetPlan(w http.ResponseWriter, r *http.Request) {
 	if job != nil && c.tharsisAPIURL != "" {
 		token, err := c.createJobLogToken(r.Context(), job)
 		if err != nil {
-			c.respWriter.RespondWithError(w, err)
+			c.respWriter.RespondWithError(r.Context(), w, err)
 			return
 		}
 
 		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, job.GetGlobalID(), string(token))
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, resp, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, resp, http.StatusOK)
 }
 
 func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
@@ -284,13 +284,13 @@ func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 
 	apply, err := c.runService.GetApplyByID(r.Context(), applyID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	job, err := c.runService.GetLatestJobForApply(r.Context(), applyID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -302,14 +302,14 @@ func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 	if job != nil && c.tharsisAPIURL != "" {
 		token, err := c.createJobLogToken(r.Context(), job)
 		if err != nil {
-			c.respWriter.RespondWithError(w, err)
+			c.respWriter.RespondWithError(r.Context(), w, err)
 			return
 		}
 
 		resp.LogReadURL = fmt.Sprintf("%s/v1/jobs/%s/logs/%s", c.tharsisAPIURL, job.GetGlobalID(), string(token))
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, resp, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, resp, http.StatusOK)
 }
 
 func (c *runController) createJobLogToken(ctx context.Context, job *models.Job) ([]byte, error) {

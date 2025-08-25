@@ -401,7 +401,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					NamespacePaths:      []string{},
 				},
 			},
-			expectMsg:      emptyUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectTrails:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -466,7 +466,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					UserID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectTrails:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -531,7 +531,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					ServiceAccountID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectTrails:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -596,7 +596,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					TeamID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectTrails:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -677,7 +677,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					GroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectTrails:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -756,7 +756,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					WorkspaceID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectTrails:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -1061,7 +1061,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					NamespaceMembershipIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectTrails:         []string{},
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
@@ -1532,7 +1532,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				UserID:        ptr.String(invalidID),
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		{
@@ -1542,7 +1542,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccountID: ptr.String(invalidID),
 				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		{
@@ -1552,7 +1552,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				TeamID:        ptr.String(invalidID),
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1670,7 +1670,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				},
 				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		})
 
 	for _, test := range testCases {
@@ -1758,7 +1758,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					ID: invalidID,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 

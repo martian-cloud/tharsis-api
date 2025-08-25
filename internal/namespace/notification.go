@@ -81,7 +81,7 @@ func (n *notificationManager) GetUsersToNotify(ctx context.Context, input *GetUs
 	for _, userID := range userIDs {
 		setting, ok := notificationSettings[userID]
 		if !ok {
-			n.logger.Errorf("user notification preference not found for user %s", userID)
+			n.logger.WithContextFields(ctx).Errorf("user notification preference not found for user %s", userID)
 			continue
 		}
 		switch setting.Scope {

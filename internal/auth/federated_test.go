@@ -76,7 +76,7 @@ func TestFederatedRegistryAuth_Use(t *testing.T) {
 			name: "valid federated registry token",
 			tokenSetup: func() jwt.Token {
 				mockToken := jwt.New()
-				_ = mockToken.Set("typ", FederatedRegistryTokenType)
+				_ = mockToken.Set("tharsis_type", FederatedRegistryTokenType)
 				_ = mockToken.Set(jwt.IssuerKey, "https://issuer1.example.com")
 				return mockToken
 			},
@@ -86,7 +86,7 @@ func TestFederatedRegistryAuth_Use(t *testing.T) {
 			name: "token with incorrect type",
 			tokenSetup: func() jwt.Token {
 				mockToken := jwt.New()
-				_ = mockToken.Set("typ", "incorrect-type")
+				_ = mockToken.Set("tharsis_type", "incorrect-type")
 				_ = mockToken.Set(jwt.IssuerKey, "https://issuer1.example.com")
 				return mockToken
 			},
@@ -96,7 +96,7 @@ func TestFederatedRegistryAuth_Use(t *testing.T) {
 			name: "token with incorrect issuer",
 			tokenSetup: func() jwt.Token {
 				mockToken := jwt.New()
-				_ = mockToken.Set("typ", FederatedRegistryTokenType)
+				_ = mockToken.Set("tharsis_type", FederatedRegistryTokenType)
 				_ = mockToken.Set(jwt.IssuerKey, "https://incorrect-issuer.example.com")
 				return mockToken
 			},
@@ -115,7 +115,7 @@ func TestFederatedRegistryAuth_Use(t *testing.T) {
 			name: "token with non-string type claim",
 			tokenSetup: func() jwt.Token {
 				mockToken := jwt.New()
-				_ = mockToken.Set("typ", 123)
+				_ = mockToken.Set("tharsis_type", 123)
 				_ = mockToken.Set(jwt.IssuerKey, "https://issuer1.example.com")
 				return mockToken
 			},

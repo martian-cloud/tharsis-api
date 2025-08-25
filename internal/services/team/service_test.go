@@ -294,7 +294,7 @@ func TestCreateTeam(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateTeamPermission).Return(test.authError)
 
 			if test.expectTeam != nil {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -410,7 +410,7 @@ func TestUpdateTeam(t *testing.T) {
 			}
 
 			if test.expectTeam != nil {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -478,7 +478,7 @@ func TestDeleteTeam(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.DeleteTeamPermission, mock.Anything).Return(test.authError)
 
 			if test.expectErrorCode == "" {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTeams.On("DeleteTeam", mock.Anything, &models.Team{}).Return(nil)
 			}
@@ -732,7 +732,7 @@ func TestAddUserToTeam(t *testing.T) {
 			}
 
 			if test.expectAdded != nil {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -876,7 +876,7 @@ func TestUpdateTeamMember(t *testing.T) {
 			}
 
 			if test.expectUpdated != nil {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -958,7 +958,7 @@ func TestDeleteTeamMember(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateTeamPermission, mock.Anything).Return(test.authError)
 
 			if test.expectErrorCode == "" {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)

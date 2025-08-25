@@ -2,6 +2,7 @@
 package response
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,10 +22,10 @@ type errorResponse struct {
 
 // Writer provides utility functions for responding to http requests
 type Writer interface {
-	RespondWithError(w http.ResponseWriter, err error)
-	RespondWithJSON(w http.ResponseWriter, model interface{}, statusCode int)
-	RespondWithJSONAPI(w http.ResponseWriter, model interface{}, statusCode int)
-	RespondWithPaginatedJSONAPI(w http.ResponseWriter, model interface{}, statusCode int)
+	RespondWithError(ctx context.Context, w http.ResponseWriter, err error)
+	RespondWithJSON(ctx context.Context, w http.ResponseWriter, model interface{}, statusCode int)
+	RespondWithJSONAPI(ctx context.Context, w http.ResponseWriter, model interface{}, statusCode int)
+	RespondWithPaginatedJSONAPI(ctx context.Context, w http.ResponseWriter, model interface{}, statusCode int)
 }
 
 type responseHelper struct {
@@ -50,45 +51,45 @@ func NewWriter(logger logger.Logger) Writer {
 }
 
 // RespondWithError responds to an http request with an error response
-func (rh *responseHelper) RespondWithError(w http.ResponseWriter, err error) {
+func (rh *responseHelper) RespondWithError(ctx context.Context, w http.ResponseWriter, err error) {
 	if !te.IsContextCanceledError(err) && te.ErrorCode(err) == te.EInternal {
 		// Log error message
-		rh.logger.Errorf("Unexpected error occurred: %s", err.Error())
+		rh.logger.WithContextFields(ctx).Errorf("Unexpected error occurred: %s", err.Error())
 	}
-	rh.respondWithError(w, ErrorCodeToStatusCode(te.ErrorCode(err)), te.ErrorMessage(err))
+	rh.respondWithError(ctx, w, ErrorCodeToStatusCode(te.ErrorCode(err)), te.ErrorMessage(err))
 }
 
 // RespondWithJSON responds to an http request with a json payload
-func (rh *responseHelper) RespondWithJSON(w http.ResponseWriter, model interface{}, statusCode int) {
+func (rh *responseHelper) RespondWithJSON(ctx context.Context, w http.ResponseWriter, model interface{}, statusCode int) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 	w.WriteHeader(statusCode)
 
 	if model != nil {
 		response, err := json.Marshal(model)
 		if err != nil {
-			rh.RespondWithError(w, err)
+			rh.RespondWithError(ctx, w, err)
 			return
 		}
 
 		if _, err := w.Write(response); err != nil {
-			rh.RespondWithError(w, err)
+			rh.RespondWithError(ctx, w, err)
 			return
 		}
 	}
 }
 
-func (rh *responseHelper) RespondWithJSONAPI(w http.ResponseWriter, model interface{}, statusCode int) {
+func (rh *responseHelper) RespondWithJSONAPI(ctx context.Context, w http.ResponseWriter, model interface{}, statusCode int) {
 	w.Header().Set("Content-Type", jsonapi.MediaType)
 	w.WriteHeader(statusCode)
 
 	if model != nil {
 		if err := jsonapi.MarshalPayload(w, model); err != nil {
-			rh.RespondWithError(w, err)
+			rh.RespondWithError(ctx, w, err)
 		}
 	}
 }
 
-func (rh *responseHelper) RespondWithPaginatedJSONAPI(w http.ResponseWriter, model interface{}, statusCode int) {
+func (rh *responseHelper) RespondWithPaginatedJSONAPI(ctx context.Context, w http.ResponseWriter, model interface{}, statusCode int) {
 	w.Header().Set("Content-Type", jsonapi.MediaType)
 	w.WriteHeader(statusCode)
 
@@ -97,7 +98,7 @@ func (rh *responseHelper) RespondWithPaginatedJSONAPI(w http.ResponseWriter, mod
 
 		// Verify that the value is a struct
 		if val.Kind() != reflect.Struct {
-			rh.RespondWithError(w, fmt.Errorf("unexpected error occurred: type is not a struct"))
+			rh.RespondWithError(ctx, w, fmt.Errorf("unexpected error occurred: type is not a struct"))
 			return
 		}
 
@@ -107,19 +108,19 @@ func (rh *responseHelper) RespondWithPaginatedJSONAPI(w http.ResponseWriter, mod
 
 		// Verify that the items field is present
 		if !items.IsValid() {
-			rh.RespondWithError(w, fmt.Errorf("unexpected error occurred: items field is missing"))
+			rh.RespondWithError(ctx, w, fmt.Errorf("unexpected error occurred: items field is missing"))
 			return
 		}
 
 		// Verify that the items field is of type slice
 		if items.Type().Kind() != reflect.Slice {
-			rh.RespondWithError(w, fmt.Errorf("unexpected error occurred: items field is not of type Slice"))
+			rh.RespondWithError(ctx, w, fmt.Errorf("unexpected error occurred: items field is not of type Slice"))
 			return
 		}
 
 		payload, err := jsonapi.Marshal(items.Interface())
 		if err != nil {
-			rh.RespondWithError(w, fmt.Errorf("unexpected error occurred: failed to marshal pagination response"))
+			rh.RespondWithError(ctx, w, fmt.Errorf("unexpected error occurred: failed to marshal pagination response"))
 			return
 		}
 
@@ -128,12 +129,12 @@ func (rh *responseHelper) RespondWithPaginatedJSONAPI(w http.ResponseWriter, mod
 			var meta map[string]interface{}
 			metaJSON, err := json.Marshal(pagination.Interface())
 			if err != nil {
-				rh.RespondWithError(w, fmt.Errorf("unexpected error occurred: failed to marshal pagination metadata"))
+				rh.RespondWithError(ctx, w, fmt.Errorf("unexpected error occurred: failed to marshal pagination metadata"))
 				return
 			}
 
 			if err := json.Unmarshal(metaJSON, &meta); err != nil {
-				rh.RespondWithError(w, fmt.Errorf("unexpected error occurred: failed to unmarshal pagination metadata"))
+				rh.RespondWithError(ctx, w, fmt.Errorf("unexpected error occurred: failed to unmarshal pagination metadata"))
 				return
 			}
 
@@ -144,13 +145,13 @@ func (rh *responseHelper) RespondWithPaginatedJSONAPI(w http.ResponseWriter, mod
 		payload.(*jsonapi.ManyPayload).Included = []*jsonapi.Node{}
 
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			rh.RespondWithError(w, err)
+			rh.RespondWithError(ctx, w, err)
 		}
 	}
 }
 
-func (rh *responseHelper) respondWithError(w http.ResponseWriter, code int, msg string) {
-	rh.RespondWithJSON(w, &errorResponse{Detail: msg}, code)
+func (rh *responseHelper) respondWithError(ctx context.Context, w http.ResponseWriter, code int, msg string) {
+	rh.RespondWithJSON(ctx, w, &errorResponse{Detail: msg}, code)
 }
 
 // ErrorCodeToStatusCode maps a tharsis error code string to a

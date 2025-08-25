@@ -511,8 +511,7 @@ func (s *service) UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdm
 		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
 	}
 
-	s.logger.Infow("Updated the admin status of a user.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated the admin status of a user.",
 		"email", user.Email,
 		"admin", input.Admin,
 	)
@@ -555,8 +554,7 @@ func (s *service) RevokeUserSession(ctx context.Context, input *RevokeUserSessio
 		return errors.Wrap(err, "failed to revoke user session", errors.WithSpan(span))
 	}
 
-	s.logger.Infow("Revoked a user session.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Revoked a user session.",
 		"session_id", input.UserSessionID,
 		"session_user_id", userSession.UserID,
 	)

@@ -215,7 +215,7 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateRole: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateRole: %v", txErr)
 		}
 	}()
 
@@ -240,8 +240,7 @@ func (s *service) CreateRole(ctx context.Context, input *CreateRoleInput) (*mode
 		return nil, err
 	}
 
-	s.logger.Infow("Created a role.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a role.",
 		"roleName", input.Name,
 		"roleID", createdRole.Metadata.ID,
 	)
@@ -287,7 +286,7 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateRole: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateRole: %v", txErr)
 		}
 	}()
 
@@ -312,8 +311,7 @@ func (s *service) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*mode
 		return nil, err
 	}
 
-	s.logger.Infow("Updated a role.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated a role.",
 		"roleName", input.Role.Name,
 		"roleID", input.Role.Metadata.ID,
 	)
@@ -365,8 +363,7 @@ func (s *service) DeleteRole(ctx context.Context, input *DeleteRoleInput) error 
 		)
 	}
 
-	s.logger.Infow("Requested to delete a role.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested to delete a role.",
 		"roleName", input.Role.Name,
 		"roleID", input.Role.Metadata.ID,
 	)

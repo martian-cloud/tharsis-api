@@ -130,6 +130,5 @@ type ActivityEvent implements Node {
   action: ActivityEventAction!
   target: Node!
   targetType: ActivityEventTargetType!
-  targetId: String!
   payload: ActivityEventPayload
 }

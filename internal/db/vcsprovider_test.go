@@ -651,7 +651,7 @@ func TestVCSProviders_GetProviders(t *testing.T) {
 					VCSProviderIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -886,7 +886,7 @@ func TestVCSProviders_CreateProvider(t *testing.T) {
 				Name:    "non-existent-group-id",
 				GroupID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1001,7 +1001,7 @@ func TestVCSProviders_UpdateProvider(t *testing.T) {
 				OAuthState:       ptr.String(uuid.New().String()),
 				OAuthAccessToken: ptr.String("an-oauth-token"),
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1075,7 +1075,7 @@ func TestVCSProviders_DeleteProvider(t *testing.T) {
 				},
 				Description: "looking for a defective ID",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

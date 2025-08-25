@@ -480,7 +480,7 @@ func TestGetProviderVersions(t *testing.T) {
 					// ProviderVersionsIDs: []string{},
 				},
 			},
-			expectMsg:                         emptyUUIDMsg2,
+			expectMsg:                         invalidUUIDMsg,
 			expectTerraformProviderVersionIDs: []string{},
 			expectPageInfo:                    pagination.PageInfo{},
 		},
@@ -519,7 +519,7 @@ func TestGetProviderVersions(t *testing.T) {
 					ProviderID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                         invalidUUIDMsg2,
+			expectMsg:                         invalidUUIDMsg,
 			expectTerraformProviderVersionIDs: []string{},
 			expectPageInfo:                    pagination.PageInfo{},
 		},
@@ -670,7 +670,7 @@ func TestGetProviderVersions(t *testing.T) {
 					ProviderVersionIDs: []string{invalidID},
 				},
 			},
-			expectMsg:                         invalidUUIDMsg2,
+			expectMsg:                         invalidUUIDMsg,
 			expectTerraformProviderVersionIDs: []string{},
 			expectPageInfo:                    pagination.PageInfo{},
 		},
@@ -830,7 +830,7 @@ func TestCreateProviderVersion(t *testing.T) {
 				ProviderID:      invalidID,
 				SemanticVersion: "2.5.9",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -949,7 +949,7 @@ func TestUpdateProviderVersion(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1029,7 +1029,7 @@ func TestDeleteProviderVersion(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

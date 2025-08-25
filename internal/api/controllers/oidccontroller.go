@@ -39,7 +39,7 @@ func (c *oidcController) RegisterRoutes(router chi.Router) {
 	router.Get("/oauth/discovery/keys", c.GetKeys)
 }
 
-func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, _ *http.Request) {
+func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, r *http.Request) {
 	oidcConfig := &openIDConfig{
 		Issuer:                           c.tharsisAPIURL,
 		JwksURI:                          fmt.Sprintf("%s/oauth/discovery/keys", c.tharsisAPIURL),
@@ -48,18 +48,18 @@ func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, _ *http.Request)
 		SubjectTypesSupported:            []string{}, // Explicitly set to empty list
 		IDTokenSigningAlgValuesSupported: []string{"RS256"},
 	}
-	c.respWriter.RespondWithJSON(w, oidcConfig, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, oidcConfig, http.StatusOK)
 }
 
 func (c *oidcController) GetKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := c.jwsProvider.GetKeySet(r.Context())
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if _, err := w.Write(keys); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 

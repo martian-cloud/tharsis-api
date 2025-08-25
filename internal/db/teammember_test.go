@@ -301,7 +301,7 @@ func TestAddUserToTeam(t *testing.T) {
 				UserID: invalidID,
 				TeamID: teamID0,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		testCase{
@@ -310,7 +310,7 @@ func TestAddUserToTeam(t *testing.T) {
 				UserID: userID0,
 				TeamID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 
@@ -436,7 +436,7 @@ func TestUpdateTeamMember(t *testing.T) {
 				},
 				IsMaintainer: false,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 
@@ -527,7 +527,7 @@ func TestRemoveUserFromTeam(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg:             invalidUUIDMsg1,
+			expectMsg:             invalidUUIDMsg,
 			expectTeamMemberNames: warmupNames,
 		},
 	}

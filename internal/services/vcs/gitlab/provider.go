@@ -227,7 +227,7 @@ func (p *Provider) GetProject(ctx context.Context, input *types.GetProjectInput)
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			p.logger.Errorf("failed to close response body in GetProject: %v", err)
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in GetProject: %v", err)
 		}
 	}()
 
@@ -282,7 +282,7 @@ func (p *Provider) GetDiff(ctx context.Context, input *types.GetDiffInput) (*typ
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			p.logger.Errorf("failed to close response body in GetDiff: %v", err)
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in GetDiff: %v", err)
 		}
 	}()
 
@@ -340,7 +340,7 @@ func (p *Provider) GetDiffs(ctx context.Context, input *types.GetDiffsInput) (*t
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			p.logger.Errorf("failed to close response body in GetDiffs: %v", err)
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in GetDiffs: %v", err)
 		}
 	}()
 
@@ -449,7 +449,7 @@ func (p *Provider) CreateAccessToken(ctx context.Context, input *types.CreateAcc
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			p.logger.Errorf("failed to close response body in CreateAccessToken: %v", err)
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in CreateAccessToken: %v", err)
 		}
 	}()
 
@@ -525,7 +525,7 @@ func (p *Provider) CreateWebhook(ctx context.Context, input *types.CreateWebhook
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			p.logger.Errorf("failed to close response body in CreateWebhook: %v", err)
+			p.logger.WithContextFields(ctx).Errorf("failed to close response body in CreateWebhook: %v", err)
 		}
 	}()
 

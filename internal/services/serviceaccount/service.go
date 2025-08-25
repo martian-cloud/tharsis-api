@@ -240,8 +240,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 		return err
 	}
 
-	s.logger.Infow("Requested deletion of a service account.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a service account.",
 		"groupID", serviceAccount.GroupID,
 		"serviceAccountID", serviceAccount.Metadata.ID,
 	)
@@ -254,7 +253,7 @@ func (s *service) DeleteServiceAccount(ctx context.Context, serviceAccount *mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteServiceAccount: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteServiceAccount: %v", txErr)
 		}
 	}()
 
@@ -373,8 +372,7 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 
 	input.CreatedBy = caller.GetSubject()
 
-	s.logger.Infow("Requested creation of a service account.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested creation of a service account.",
 		"groupID", input.GroupID,
 		"serviceAccountName", input.Name,
 	)
@@ -387,7 +385,7 @@ func (s *service) CreateServiceAccount(ctx context.Context, input *models.Servic
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateServiceAccount: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateServiceAccount: %v", txErr)
 		}
 	}()
 
@@ -461,8 +459,7 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 		return nil, err
 	}
 
-	s.logger.Infow("Requested an update to a service account.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested an update to a service account.",
 		"groupID", serviceAccount.GroupID,
 		"serviceAccountID", serviceAccount.Metadata.ID,
 	)
@@ -475,7 +472,7 @@ func (s *service) UpdateServiceAccount(ctx context.Context, serviceAccount *mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateServiceAccount: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateServiceAccount: %v", txErr)
 		}
 	}()
 
@@ -527,7 +524,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	}
 
 	if input.ServiceAccountPublicID == "" {
-		s.logger.Infof("Failed to create token for service account; service account ID is empty")
+		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account; service account ID is empty")
 		tracing.RecordError(span, nil, "service account ID is empty")
 		return nil, errFailedCreateToken
 	}
@@ -541,7 +538,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	}
 
 	if err != nil || serviceAccount == nil {
-		s.logger.Infof("Failed to create token for service account; service account %s does not exist", input.ServiceAccountPublicID)
+		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account; service account %s does not exist", input.ServiceAccountPublicID)
 		tracing.RecordError(span, nil,
 			"failed to create token for service account; service account does not exist")
 		return nil, errFailedCreateToken
@@ -549,7 +546,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 
 	trustPolicies := s.findMatchingTrustPolicies(issuer, serviceAccount.OIDCTrustPolicies)
 	if len(trustPolicies) == 0 {
-		s.logger.Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.GetResourcePath(), issuer)
+		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.GetResourcePath(), issuer)
 		tracing.RecordError(span, nil,
 			"failed to create token for service account; issuer not found in trust policy")
 		return nil, errFailedCreateToken
@@ -565,7 +562,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 
 			// Catch bubbled-up invalid token signature errors here.
 			if strings.Contains(err.Error(), failedToVerifyJWSSignature) {
-				s.logger.Infof("Failed to create token for service account %s due to invalid token signature",
+				s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s due to invalid token signature",
 					serviceAccount.GetResourcePath())
 				tracing.RecordError(span, nil,
 					"failed to create token for service account; invalid token signature")
@@ -574,7 +571,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 
 			// Catch token expiration here.  An expired token will be expired for all trust policies.
 			if strings.Contains(err.Error(), expiredTokenDetector) {
-				s.logger.Infof("Failed to create token for service account %s due to expired token",
+				s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s due to expired token",
 					serviceAccount.GetResourcePath())
 				tracing.RecordError(span, nil,
 					"failed to create token for service account; expired token")
@@ -591,7 +588,6 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 			serviceAccountToken, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
 				Expiration: &expiration,
 				Subject:    serviceAccount.GetResourcePath(),
-				Typ:        auth.ServiceAccountTokenType,
 				Claims: map[string]string{
 					"service_account_name": serviceAccount.Name,
 					"service_account_path": serviceAccount.GetResourcePath(),
@@ -612,7 +608,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 	}
 
 	// Log all the mismatches found so we can look them up if needed.
-	s.logger.Infof("failed to create service account token for issuer %s; %s", issuer, strings.Join(mismatchesFound, "; "))
+	s.logger.WithContextFields(ctx).Infof("failed to create service account token for issuer %s; %s", issuer, strings.Join(mismatchesFound, "; "))
 
 	// We know there was at least one trust policy checked, otherwise we would have returned before the for loop.
 	// To get here, all of the trust policies that were checked must have failed.

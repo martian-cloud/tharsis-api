@@ -53,7 +53,7 @@ func TestInternalTokenProvider_GetToken(t *testing.T) {
 			mockIDP.On("GenerateToken", ctx, mock.MatchedBy(func(input *auth.TokenInput) bool {
 				return input.Subject == tc.runnerName &&
 					input.Audience == internalRunnerJWTAudience &&
-					input.Typ == internalRunnerJWTType &&
+					input.Claims["type"] == internalRunnerJWTType &&
 					input.Claims["runner_id"] == gid.ToGlobalID(types.RunnerModelType, tc.runnerID) &&
 					input.Expiration != nil
 			})).Return(tc.mockTokenResponse, tc.mockTokenError)
@@ -99,7 +99,7 @@ func TestInternalTokenProvider_isTokenExpired(t *testing.T) {
 		mockIDP.On("GenerateToken", ctx, mock.MatchedBy(func(input *auth.TokenInput) bool {
 			return input.Subject == runnerName &&
 				input.Audience == internalRunnerJWTAudience &&
-				input.Typ == internalRunnerJWTType &&
+				input.Claims["type"] == internalRunnerJWTType &&
 				input.Claims["runner_id"] == gid.ToGlobalID(types.RunnerModelType, runnerID) &&
 				input.Expiration != nil
 		})).Return([]byte("token-1"), nil).Once()
@@ -108,7 +108,7 @@ func TestInternalTokenProvider_isTokenExpired(t *testing.T) {
 		mockIDP.On("GenerateToken", ctx, mock.MatchedBy(func(input *auth.TokenInput) bool {
 			return input.Subject == runnerName &&
 				input.Audience == internalRunnerJWTAudience &&
-				input.Typ == internalRunnerJWTType &&
+				input.Claims["type"] == internalRunnerJWTType &&
 				input.Claims["runner_id"] == gid.ToGlobalID(types.RunnerModelType, runnerID) &&
 				input.Expiration != nil
 		})).Return([]byte("token-2"), nil).Once()

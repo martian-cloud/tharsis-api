@@ -561,7 +561,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 				if !test.exceedsLimit {
 					mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-					mockCaller.On("GetSubject").Return("mockSubject")
+					mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 				}
 			}
 
@@ -677,7 +677,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
-				mockCaller.On("GetSubject").Return("mockSubject")
+				mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 			}
 
 			dbClient := &db.Client{
@@ -1913,7 +1913,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, activityEventInput).Return(&models.ActivityEvent{}, nil)
 
-				mockCaller.On("GetSubject").Return("mockSubject")
+				mockCaller.On("GetSubject").Return("mockSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)

@@ -85,7 +85,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 
 		conn, err := e.dbClient.conn.Acquire(ctx)
 		if err != nil {
-			e.dbClient.logger.Errorf("failed to acquire db connection in db events module: %v", err)
+			e.dbClient.logger.WithContextFields(ctx).Errorf("failed to acquire db connection in db events module: %v", err)
 			fatalErrors <- errors.Wrap(err, "failed to acquire db connection from pool")
 			wg.Done()
 			return
@@ -94,7 +94,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 
 		_, err = conn.Exec(ctx, "listen events")
 		if err != nil {
-			e.dbClient.logger.Errorf("failed to start listening for db events: %v", err)
+			e.dbClient.logger.WithContextFields(ctx).Errorf("failed to start listening for db events: %v", err)
 			fatalErrors <- errors.Wrap(err, "error when listening on events channel")
 			wg.Done()
 			return
@@ -112,14 +112,14 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 			}
 
 			if err != nil {
-				e.dbClient.logger.Errorf("received error when listening for db event: %v", err)
+				e.dbClient.logger.WithContextFields(ctx).Errorf("received error when listening for db event: %v", err)
 				fatalErrors <- errors.Wrap(err, "error waiting for db notification")
 				return
 			}
 
 			var event Event
 			if err := json.Unmarshal([]byte(notification.Payload), &event); err != nil {
-				e.dbClient.logger.Errorf("failed to unmarshal db event %v", err)
+				e.dbClient.logger.WithContextFields(ctx).Errorf("failed to unmarshal db event %v", err)
 				continue
 			}
 

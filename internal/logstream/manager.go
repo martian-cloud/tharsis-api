@@ -68,7 +68,7 @@ func (s *stream) WriteLogs(ctx context.Context, logStreamID string, startOffset 
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 
@@ -137,14 +137,14 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
-					s.logger.Errorf("error occurred while waiting for log events: %v", err)
+					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for log events: %v", err)
 				}
 				return
 			}
 
 			logStreamEventData, err := event.ToLogStreamEventData()
 			if err != nil {
-				s.logger.Errorf("failed to get log stream event data in log stream subscription, log event %s: %v", event.ID, err)
+				s.logger.WithContextFields(ctx).Errorf("failed to get log stream event data in log stream subscription, log event %s: %v", event.ID, err)
 				return
 			}
 

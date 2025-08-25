@@ -22,7 +22,7 @@ func NewAuthenticationMiddleware(
 
 			token, err := auth.FindToken(r, secureUserSessionCookiesEnabled)
 			if err != nil {
-				respWriter.RespondWithError(w, err)
+				respWriter.RespondWithError(r.Context(), w, err)
 				return
 			}
 
@@ -33,7 +33,7 @@ func NewAuthenticationMiddleware(
 				caller, err := authenticator.Authenticate(ctx, token, usePermissionCache)
 				if err != nil {
 					if errors.ErrorCode(err) != errors.EUnauthorized {
-						respWriter.RespondWithError(w, err)
+						respWriter.RespondWithError(r.Context(), w, err)
 						return
 					}
 

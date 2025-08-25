@@ -61,7 +61,6 @@ func (s *service) GetActivityEvents(ctx context.Context,
 	input *GetActivityEventsInput,
 ) (*db.ActivityEventsResult, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetActivityEvents")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)

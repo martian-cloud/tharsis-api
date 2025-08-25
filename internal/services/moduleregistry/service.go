@@ -368,7 +368,7 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateModule: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateModule: %v", txErr)
 		}
 	}()
 
@@ -521,7 +521,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateModuleAttestation: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateModuleAttestation: %v", txErr)
 		}
 	}()
 
@@ -556,8 +556,7 @@ func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModu
 		return nil, err
 	}
 
-	s.logger.Infow("Created a module attestation.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a module attestation.",
 		"moduleID", input.ModuleID,
 		"modulePath", module.GetResourcePath(),
 		"moduleAttestationID", createdAttestation.Metadata.ID,
@@ -595,8 +594,7 @@ func (s *service) UpdateModuleAttestation(ctx context.Context, attestation *mode
 		return nil, err
 	}
 
-	s.logger.Infow("Updated module attestation.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated module attestation.",
 		"moduleTRN", module.Metadata.TRN,
 		"moduleAttestationID", attestation.Metadata.ID,
 	)
@@ -745,8 +743,7 @@ func (s *service) DeleteModuleAttestation(ctx context.Context, attestation *mode
 		return err
 	}
 
-	s.logger.Infow("Deleted module attestation.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted module attestation.",
 		"moduleTRN", module.Metadata.TRN,
 		"moduleAttestationID", attestation.Metadata.ID,
 	)
@@ -820,7 +817,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateModule: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateModule: %v", txErr)
 		}
 	}()
 
@@ -894,7 +891,7 @@ func (s *service) DeleteModule(ctx context.Context, module *models.TerraformModu
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteModule: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteModule: %v", txErr)
 		}
 	}()
 
@@ -1207,7 +1204,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateModuleVersion: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateModuleVersion: %v", txErr)
 		}
 	}()
 
@@ -1284,8 +1281,7 @@ func (s *service) CreateModuleVersion(ctx context.Context, input *CreateModuleVe
 		return nil, err
 	}
 
-	s.logger.Infow("Created a module version.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a module version.",
 		"moduleID", input.ModuleID,
 		"moduleVersion", moduleVersion.SemanticVersion,
 	)
@@ -1368,7 +1364,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for DeleteModuleVersion: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for DeleteModuleVersion: %v", txErr)
 		}
 	}()
 
@@ -1379,7 +1375,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 	}
 
 	if newLatestVersion != nil {
-		s.logger.Infof(
+		s.logger.WithContextFields(ctx).Infof(
 			"Deleted latest module version, latest flag is being set to latest version %s for module %s",
 			newLatestVersion.SemanticVersion,
 			module.GetResourcePath(),
@@ -1396,8 +1392,7 @@ func (s *service) DeleteModuleVersion(ctx context.Context, moduleVersion *models
 		return err
 	}
 
-	s.logger.Infow("Deleted a module version.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a module version.",
 		"moduleID", module.Metadata.ID,
 		"moduleVersion", moduleVersion.SemanticVersion,
 	)
@@ -1444,7 +1439,7 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 
@@ -1473,14 +1468,14 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 		return err
 	}
 
-	s.logger.Infof("Uploaded module with sha checksum %s", hex.EncodeToString(checksum.Sum(nil)))
+	s.logger.WithContextFields(ctx).Infof("Uploaded module with sha checksum %s", hex.EncodeToString(checksum.Sum(nil)))
 
 	// Verify checksum matches expected checksum
 	shaSum := hex.EncodeToString(checksum.Sum(nil))
 	if shaSum != updatedModuleVersion.GetSHASumHex() {
 		if err = s.setModuleVersionError(ctx, moduleVersion.Metadata.ID, fmt.Sprintf("Expected checksum of %s does not match received checksum %s", updatedModuleVersion.GetSHASumHex(), shaSum)); err != nil {
 			tracing.RecordError(span, err, "failed to set module version status to errored")
-			s.logger.Errorf("failed to set terraform module version status to errored %v", err)
+			s.logger.WithContextFields(ctx).Errorf("failed to set terraform module version status to errored %v", err)
 		}
 		return nil
 	}
@@ -1489,7 +1484,7 @@ func (s *service) UploadModuleVersionPackage(ctx context.Context, moduleVersion 
 	s.taskManager.StartTask(func(taskCtx context.Context) {
 		if err := s.uploadModuleMetadata(taskCtx, module, updatedModuleVersion); err != nil {
 			if err = s.setModuleVersionError(taskCtx, moduleVersion.Metadata.ID, err.Error()); err != nil {
-				s.logger.Errorf("failed to set terraform module version status to errored %v", err)
+				s.logger.WithContextFields(ctx).Errorf("failed to set terraform module version status to errored %v", err)
 			}
 		}
 	})
@@ -1575,7 +1570,7 @@ func (s *service) uploadModuleMetadata(ctx context.Context, module *models.Terra
 	}
 	defer os.RemoveAll(moduleDir)
 
-	s.logger.Infof("Unpacking slug to temp dir %s", moduleDir)
+	s.logger.WithContextFields(ctx).Infof("Unpacking slug to temp dir %s", moduleDir)
 
 	// Unpack slug
 	if err = slug.Unpack(slugFile, moduleDir); err != nil {

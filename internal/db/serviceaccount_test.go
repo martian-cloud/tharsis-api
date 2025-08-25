@@ -270,7 +270,7 @@ func TestCreateServiceAccount(t *testing.T) {
 				Name:    "non-existent-group-id",
 				GroupID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -381,7 +381,7 @@ func TestUpdateServiceAccount(t *testing.T) {
 					Version: positiveServiceAccount.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -811,7 +811,7 @@ func TestGetServiceAccounts(t *testing.T) {
 					ServiceAccountIDs: []string{invalidID},
 				},
 			},
-			expectMsg:               invalidUUIDMsg2,
+			expectMsg:               invalidUUIDMsg,
 			expectServiceAccountIDs: []string{},
 			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:    true,
@@ -976,7 +976,7 @@ func TestDeleteServiceAccount(t *testing.T) {
 				},
 				Description: "looking for a defective ID",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

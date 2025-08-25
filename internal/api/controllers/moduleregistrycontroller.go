@@ -74,7 +74,7 @@ func (c *moduleRegistryController) UploadModuleVersionPackage(w http.ResponseWri
 
 	moduleVersion, err := c.moduleRegistryService.GetModuleVersionByID(r.Context(), moduleVersionID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -84,14 +84,14 @@ func (c *moduleRegistryController) UploadModuleVersionPackage(w http.ResponseWri
 
 	if err := c.moduleRegistryService.UploadModuleVersionPackage(r.Context(), moduleVersion, limitReader); err != nil {
 		if strings.Contains(err.Error(), "read multipart upload data failed, http: request body too large") {
-			c.respWriter.RespondWithError(w, terrors.New("upload failed, module size exceeds maximum size of %d bytes", c.moduleRegistryMaxUploadSize, terrors.WithErrorCode(errors.ETooLarge)))
+			c.respWriter.RespondWithError(r.Context(), w, terrors.New("upload failed, module size exceeds maximum size of %d bytes", c.moduleRegistryMaxUploadSize, terrors.WithErrorCode(errors.ETooLarge)))
 		} else {
-			c.respWriter.RespondWithError(w, err)
+			c.respWriter.RespondWithError(r.Context(), w, err)
 		}
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *moduleRegistryController) GetModuleVersions(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (c *moduleRegistryController) GetModuleVersions(w http.ResponseWriter, r *h
 
 	module, err := c.moduleRegistryService.GetModuleByAddress(r.Context(), namespace, moduleName, moduleSystem)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (c *moduleRegistryController) GetModuleVersions(w http.ResponseWriter, r *h
 		Status:   &statusFilter,
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -128,7 +128,7 @@ func (c *moduleRegistryController) GetModuleVersions(w http.ResponseWriter, r *h
 		})
 	}
 
-	c.respWriter.RespondWithJSON(w, &tfeResponse, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, &tfeResponse, http.StatusOK)
 }
 
 func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +139,7 @@ func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWri
 
 	module, err := c.moduleRegistryService.GetModuleByAddress(r.Context(), namespace, moduleName, moduleSystem)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -154,12 +154,12 @@ func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWri
 		Status:          &statusFilter,
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if len(versionsResponse.ModuleVersions) == 0 {
-		c.respWriter.RespondWithError(w, terrors.New("module version %s not found", version, terrors.WithErrorCode(errors.ENotFound)))
+		c.respWriter.RespondWithError(r.Context(), w, terrors.New("module version %s not found", version, terrors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 
@@ -167,7 +167,7 @@ func (c *moduleRegistryController) GetModuleVersionPackageURL(w http.ResponseWri
 
 	downloadURL, err := c.moduleRegistryService.GetModuleVersionPackageDownloadURL(r.Context(), &moduleVersion)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 

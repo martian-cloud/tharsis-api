@@ -9,14 +9,14 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	log "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 // NewSubjectMiddleware creates a middleware that sets the subject in the context.
 // If the request is authenticated, the subject is taken from the Caller.
 // If not authenticated, the subject is set to "anonymous-<IP_ADDRESS>".
 func NewSubjectMiddleware(
-	logger logger.Logger,
+	logger log.Logger,
 	respWriter response.Writer,
 ) Handler {
 	return func(next http.Handler) http.Handler {
@@ -31,8 +31,8 @@ func NewSubjectMiddleware(
 				var ip string
 				ip, err := getSourceIP(r)
 				if err != nil {
-					logger.Errorf("Error finding client IP: %v", err)
-					respWriter.RespondWithError(w, errors.Wrap(err, "Error finding client IP", errors.WithErrorCode(errors.EInvalid)))
+					logger.WithContextFields(ctx).Errorf("Error finding client IP: %v", err)
+					respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "Error finding client IP", errors.WithErrorCode(errors.EInvalid)))
 					return
 				}
 				subject = fmt.Sprintf("anonymous-%s", ip)
@@ -40,7 +40,11 @@ func NewSubjectMiddleware(
 				subject = caller.GetSubject()
 			}
 
+			// Add subject to auth context
 			ctx = auth.WithSubject(ctx, subject)
+			// Add subject to logger context
+			ctx = log.WithSubject(ctx, subject)
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

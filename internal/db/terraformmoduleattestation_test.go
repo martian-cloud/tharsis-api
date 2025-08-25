@@ -355,7 +355,7 @@ func TestGetModuleAttestations(t *testing.T) {
 					ModuleAttestationIDs: []string{invalidID},
 				},
 			},
-			expectMsg:                           invalidUUIDMsg2,
+			expectMsg:                           invalidUUIDMsg,
 			expectTerraformModuleAttestationIDs: []string{},
 		},
 	}
@@ -568,7 +568,7 @@ func TestUpdateModuleAttestation(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -649,7 +649,7 @@ func TestDeleteModuleAttestation(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

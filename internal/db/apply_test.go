@@ -432,7 +432,7 @@ func TestGetApplies(t *testing.T) {
 					ApplyIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -591,7 +591,7 @@ func TestCreateApply(t *testing.T) {
 			toCreate: &models.Apply{
 				WorkspaceID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -692,7 +692,7 @@ func TestUpdateApply(t *testing.T) {
 					Version: positiveApply.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

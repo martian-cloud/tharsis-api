@@ -26,20 +26,21 @@ func HTTPRateLimiterMiddleware(
 ) Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
 			// Use the subject string set by the ResolveSubject middleware.
-			subject := auth.GetSubject(r.Context())
+			subject := auth.GetSubject(ctx)
 			if subject == nil {
-				logger.Errorf("No subject string in context")
-				respWriter.RespondWithError(w, errors.New("No subject string in context"))
+				logger.WithContextFields(ctx).Errorf("No subject string in context")
+				respWriter.RespondWithError(r.Context(), w, errors.New("No subject string in context"))
 
 				return
 			}
 
 			// Check whether rate limit has been exceeded.
-			tokenLimit, remaining, _, ok, err := store.TakeMany(r.Context(), "http-"+*subject, uint64(1))
+			tokenLimit, remaining, _, ok, err := store.TakeMany(ctx, "http-"+*subject, uint64(1))
 			if err != nil {
-				logger.Errorf("Failed to check HTTP rate limit: %w", err)
-				respWriter.RespondWithError(w, errors.Wrap(err, "Failed to check HTTP rate limit"))
+				logger.WithContextFields(ctx).Errorf("Failed to check HTTP rate limit: %w", err)
+				respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "Failed to check HTTP rate limit"))
 				return
 			}
 
@@ -49,8 +50,8 @@ func HTTPRateLimiterMiddleware(
 			w.Header().Add(headerRateReset, "1") // we always use a 1-second interval
 
 			if !ok {
-				logger.Infof("HTTP rate limit exceeded for subject: %s", *subject)
-				respWriter.RespondWithError(w, errors.New("request rate limit exceeded", errors.WithErrorCode(errors.ETooManyRequests)))
+				logger.WithContextFields(ctx).Infof("HTTP rate limit exceeded for subject: %s", *subject)
+				respWriter.RespondWithError(r.Context(), w, errors.New("request rate limit exceeded", errors.WithErrorCode(errors.ETooManyRequests)))
 
 				// Tell the requester how long to wait before trying again.
 				w.Header().Add(headerRetryAfter, "1") // we always use a 1-second interval

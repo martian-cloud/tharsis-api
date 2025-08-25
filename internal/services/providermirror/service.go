@@ -421,7 +421,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateProviderVersionMirror: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateProviderVersionMirror: %v", txErr)
 		}
 	}()
 
@@ -479,8 +479,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, err
 	}
 
-	s.logger.Infow("Created a terraform provider version mirror.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a terraform provider version mirror.",
 		"groupPath", input.GroupID,
 		"versionMirrorID", created.Metadata.ID,
 	)
@@ -541,7 +540,7 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteProviderVersionMirror: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteProviderVersionMirror: %v", txErr)
 		}
 	}()
 
@@ -584,8 +583,7 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 		return err
 	}
 
-	s.logger.Infow("Deleted a terraform provider version mirror.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a terraform provider version mirror.",
 		"groupID", input.VersionMirror.GroupID,
 		"providerName", providerName,
 		"semver", input.VersionMirror.SemanticVersion,
@@ -729,8 +727,7 @@ func (s *service) DeleteProviderPlatformMirror(ctx context.Context, input *Delet
 		return err
 	}
 
-	s.logger.Infow("Deleted a terraform provider platform mirror.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a terraform provider platform mirror.",
 		"groupID", versionMirror.GroupID,
 		"versionMirrorID", versionMirror.Metadata.ID,
 		"os", input.PlatformMirror.OS,
@@ -791,7 +788,7 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UploadInstallationPackage: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UploadInstallationPackage: %v", txErr)
 		}
 	}()
 

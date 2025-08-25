@@ -56,11 +56,11 @@ func (c *stateController) GetStateVersion(w http.ResponseWriter, r *http.Request
 
 	sv, err := c.workspaceService.GetStateVersionByID(r.Context(), stateVersionID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
 }
 
 func (c *stateController) DownloadStateVersion(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func (c *stateController) DownloadStateVersion(w http.ResponseWriter, r *http.Re
 
 	result, err := c.workspaceService.GetStateVersionContent(r.Context(), stateVersionID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -77,7 +77,7 @@ func (c *stateController) DownloadStateVersion(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := io.Copy(w, result); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 }

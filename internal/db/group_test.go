@@ -312,7 +312,7 @@ func TestDeleteGroup(t *testing.T) {
 		{
 			name:             "negative, invalid ID",
 			ids:              []string{invalidID},
-			expectMsgNonTop:  invalidUUIDMsg1,
+			expectMsgNonTop:  invalidUUIDMsg,
 			expectFinalCount: 6,
 		},
 	}
@@ -743,7 +743,7 @@ func TestGetGroups(t *testing.T) {
 					GroupIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectGroupPaths:     []string{allPaths[0], allPaths[2], allPaths[4]},
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
@@ -856,7 +856,7 @@ func TestGetGroups(t *testing.T) {
 					NamespaceIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectGroupPaths:     []string{allPaths[0], allPaths[2], allPaths[4]},
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
@@ -1416,7 +1416,7 @@ func TestUpdateGroup(t *testing.T) {
 				CreatedBy:   "someone",
 			},
 			newDescription: ptr.String("Update description for a group that does not exist."),
-			expectMsg:      invalidUUIDMsg1,
+			expectMsg:      invalidUUIDMsg,
 		},
 		testCase{
 			name: "negative, invalid uuid, sub-group",
@@ -1432,7 +1432,7 @@ func TestUpdateGroup(t *testing.T) {
 				CreatedBy:   "someone else",
 			},
 			newDescription: ptr.String("Update description for a group that does not exist."),
-			expectMsg:      invalidUUIDMsg1,
+			expectMsg:      invalidUUIDMsg,
 		},
 	)
 

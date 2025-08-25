@@ -373,7 +373,7 @@ func (r *runs) CreateRun(ctx context.Context, run *models.Run) (*models.Run, err
 	createdRun, err := scanRun(r.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
-		r.dbClient.logger.Error(err)
+		r.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
@@ -425,7 +425,7 @@ func (r *runs) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, err
 			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		r.dbClient.logger.Error(err)
+		r.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}

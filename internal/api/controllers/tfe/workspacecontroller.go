@@ -96,11 +96,11 @@ func (c *workspaceController) GetWorkspace(w http.ResponseWriter, r *http.Reques
 
 	workspace, err := c.workspaceService.GetWorkspaceByTRN(r.Context(), types.WorkspaceModelType.BuildTRN(path))
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
 }
 
 func (c *workspaceController) GetWorkspaceByID(w http.ResponseWriter, r *http.Request) {
@@ -108,11 +108,11 @@ func (c *workspaceController) GetWorkspaceByID(w http.ResponseWriter, r *http.Re
 
 	workspace, err := c.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
 }
 
 func (c *workspaceController) GetWorkspaceVariables(w http.ResponseWriter, r *http.Request) {
@@ -120,13 +120,13 @@ func (c *workspaceController) GetWorkspaceVariables(w http.ResponseWriter, r *ht
 
 	workspace, err := c.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	variables, err := c.variableService.GetVariables(r.Context(), workspace.FullPath)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -135,7 +135,7 @@ func (c *workspaceController) GetWorkspaceVariables(w http.ResponseWriter, r *ht
 		vCopy := v
 
 		if vCopy.Value == nil {
-			c.respWriter.RespondWithError(w, errors.New("Subject does not have the required access level to view variable values", errors.WithErrorCode(errors.EForbidden)))
+			c.respWriter.RespondWithError(r.Context(), w, errors.New("Subject does not have the required access level to view variable values", errors.WithErrorCode(errors.EForbidden)))
 			return
 		}
 
@@ -149,7 +149,7 @@ func (c *workspaceController) GetWorkspaceVariables(w http.ResponseWriter, r *ht
 		Items: tfeVariables,
 	}
 
-	c.respWriter.RespondWithPaginatedJSONAPI(w, variableList, http.StatusOK)
+	c.respWriter.RespondWithPaginatedJSONAPI(r.Context(),w, variableList, http.StatusOK)
 }
 
 func (c *workspaceController) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -157,14 +157,14 @@ func (c *workspaceController) CreateWorkspace(w http.ResponseWriter, r *http.Req
 
 	var req gotfe.WorkspaceCreateOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	// Get group
 	group, err := c.groupService.GetGroupByTRN(r.Context(), types.GroupModelType.BuildTRN(convertOrgToGroupPath(org)))
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -175,11 +175,11 @@ func (c *workspaceController) CreateWorkspace(w http.ResponseWriter, r *http.Req
 
 	ws, err := c.workspaceService.CreateWorkspace(r.Context(), options)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisWorkspaceToWorkspace(ws), http.StatusCreated)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisWorkspaceToWorkspace(ws), http.StatusCreated)
 }
 
 func (c *workspaceController) GetWorkspaceCurrentStateVersion(w http.ResponseWriter, r *http.Request) {
@@ -187,16 +187,16 @@ func (c *workspaceController) GetWorkspaceCurrentStateVersion(w http.ResponseWri
 
 	sv, err := c.workspaceService.GetCurrentStateVersion(r.Context(), workspaceID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if sv == nil {
-		c.respWriter.RespondWithJSONAPI(w, nil, http.StatusNotFound)
+		c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusNotFound)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusOK)
 }
 
 func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Request) {
@@ -204,7 +204,7 @@ func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Re
 
 	ws, err := c.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -212,11 +212,11 @@ func (c *workspaceController) GetWorkspaceRuns(w http.ResponseWriter, r *http.Re
 		Workspace: ws,
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, runs.Runs, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, runs.Runs, http.StatusOK)
 }
 
 func (c *workspaceController) LockWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -224,17 +224,17 @@ func (c *workspaceController) LockWorkspace(w http.ResponseWriter, r *http.Reque
 
 	workspace, err := c.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	workspace, err = c.workspaceService.LockWorkspace(r.Context(), workspace)
 	if err != nil {
-		c.respWriter.RespondWithError(w, TharsisErrorToTfeError(err))
+		c.respWriter.RespondWithError(r.Context(), w, TharsisErrorToTfeError(err))
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
 }
 
 func (c *workspaceController) UnlockWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -242,17 +242,17 @@ func (c *workspaceController) UnlockWorkspace(w http.ResponseWriter, r *http.Req
 
 	workspace, err := c.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	workspace, err = c.workspaceService.UnlockWorkspace(r.Context(), workspace)
 	if err != nil {
-		c.respWriter.RespondWithError(w, TharsisErrorToTfeError(err))
+		c.respWriter.RespondWithError(r.Context(), w, TharsisErrorToTfeError(err))
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisWorkspaceToWorkspace(workspace), http.StatusOK)
 }
 
 func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +260,7 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 
 	var req gotfe.StateVersionCreateOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -275,7 +275,7 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 				},
 			},
 		}
-		c.respWriter.RespondWithJSON(w, &errorPayload, http.StatusBadRequest)
+		c.respWriter.RespondWithJSON(r.Context(), w, &errorPayload, http.StatusBadRequest)
 		return
 	}
 
@@ -283,11 +283,11 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 
 	sv, err := c.workspaceService.CreateStateVersion(r.Context(), &options, req.State)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusCreated)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisStateVersionToStateVersion(sv, c.tharsisAPIURL, c.tfeVersionedPath), http.StatusCreated)
 }
 
 func (c *workspaceController) DownloadConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -295,7 +295,7 @@ func (c *workspaceController) DownloadConfigurationVersion(w http.ResponseWriter
 
 	result, err := c.workspaceService.GetConfigurationVersionContent(r.Context(), configVersionID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -304,7 +304,7 @@ func (c *workspaceController) DownloadConfigurationVersion(w http.ResponseWriter
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := io.Copy(w, result); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 }
@@ -314,7 +314,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 
 	var req gotfe.ConfigurationVersionCreateOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -328,13 +328,13 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 
 	cv, err := c.workspaceService.CreateConfigurationVersion(r.Context(), options)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	token, err := c.createUploadToken(r.Context(), cv.GetGlobalID())
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -346,7 +346,7 @@ func (c *workspaceController) CreateConfigurationVersion(w http.ResponseWriter, 
 		token,
 	)
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, uploadURL), http.StatusCreated)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisCVToCV(cv, uploadURL), http.StatusCreated)
 }
 
 func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -354,7 +354,7 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 
 	cv, err := c.workspaceService.GetConfigurationVersionByID(r.Context(), configurationVersionID)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -365,7 +365,7 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 	if caller != nil && caller.RequirePermission(r.Context(), models.UpdateConfigurationVersionPermission, auth.WithWorkspaceID(cv.WorkspaceID)) == nil {
 		token, err := c.createUploadToken(r.Context(), cv.GetGlobalID())
 		if err != nil {
-			c.respWriter.RespondWithError(w, err)
+			c.respWriter.RespondWithError(r.Context(), w, err)
 			return
 		}
 
@@ -378,7 +378,7 @@ func (c *workspaceController) GetConfigurationVersion(w http.ResponseWriter, r *
 		)
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, TharsisCVToCV(cv, uploadURL), http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, TharsisCVToCV(cv, uploadURL), http.StatusOK)
 }
 
 func (c *workspaceController) UploadConfigurationVersion(w http.ResponseWriter, r *http.Request) {
@@ -409,7 +409,7 @@ func (c *workspaceController) UploadConfigurationVersion(w http.ResponseWriter, 
 		// Validate token
 		sub, err := c.verifyUploadToken(r.Context(), []byte(token))
 		if err != nil {
-			c.respWriter.RespondWithError(w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
+			c.respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
 			return
 		}
 
@@ -420,11 +420,11 @@ func (c *workspaceController) UploadConfigurationVersion(w http.ResponseWriter, 
 	}
 
 	if err := c.workspaceService.UploadConfigurationVersion(ctx, gid.FromGlobalID(configurationVersionID), r.Body); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *workspaceController) createUploadToken(ctx context.Context, subjectClaim string) ([]byte, error) {

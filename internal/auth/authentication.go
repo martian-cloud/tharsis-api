@@ -30,7 +30,7 @@ const (
 	JobTokenType               string = "job"
 	ServiceAccountTokenType    string = "service_account"
 	UserSessionAccessTokenType string = "user_session_access"
-	UserSessionCSRFTokenType          = "user_session_csrf"
+	UserSessionCSRFTokenType   string = "user_session_csrf"
 	SCIMTokenType              string = "scim"
 	VCSWorkspaceLinkTokenType  string = "vcs_workspace_link"
 	FederatedRegistryTokenType string = "federated_registry"

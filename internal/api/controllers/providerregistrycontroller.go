@@ -102,44 +102,44 @@ func (c *providerRegistryController) UploadProviderVersionReadme(w http.Response
 	providerVersionID := gid.FromGlobalID(chi.URLParam(r, "providerVersionId"))
 
 	if err := c.providerRegistryService.UploadProviderVersionReadme(r.Context(), providerVersionID, r.Body); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *providerRegistryController) UploadProviderVersionSHASums(w http.ResponseWriter, r *http.Request) {
 	providerVersionID := gid.FromGlobalID(chi.URLParam(r, "providerVersionId"))
 
 	if err := c.providerRegistryService.UploadProviderVersionSHA256Sums(r.Context(), providerVersionID, r.Body); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *providerRegistryController) UploadProviderVersionSHASumsSignature(w http.ResponseWriter, r *http.Request) {
 	providerVersionID := gid.FromGlobalID(chi.URLParam(r, "providerVersionId"))
 
 	if err := c.providerRegistryService.UploadProviderVersionSHA256SumsSignature(r.Context(), providerVersionID, r.Body); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *providerRegistryController) UploadPlatformBinary(w http.ResponseWriter, r *http.Request) {
 	platformID := gid.FromGlobalID(chi.URLParam(r, "platformId"))
 
 	if err := c.providerRegistryService.UploadProviderPlatformBinary(r.Context(), platformID, r.Body); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *providerRegistryController) GetVersions(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +148,7 @@ func (c *providerRegistryController) GetVersions(w http.ResponseWriter, r *http.
 
 	provider, err := c.providerRegistryService.GetProviderByAddress(r.Context(), namespace, providerName)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -159,7 +159,7 @@ func (c *providerRegistryController) GetVersions(w http.ResponseWriter, r *http.
 		SHASumsSignatureUploaded: ptr.Bool(true),
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -169,7 +169,7 @@ func (c *providerRegistryController) GetVersions(w http.ResponseWriter, r *http.
 		BinaryUploaded: ptr.Bool(true),
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -204,7 +204,7 @@ func (c *providerRegistryController) GetVersions(w http.ResponseWriter, r *http.
 		response.Versions = append(response.Versions, tfeVersion)
 	}
 
-	c.respWriter.RespondWithJSON(w, &response, 200)
+	c.respWriter.RespondWithJSON(r.Context(), w, &response, 200)
 }
 
 func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +216,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 
 	provider, err := c.providerRegistryService.GetProviderByAddress(r.Context(), namespace, providerName)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -231,12 +231,12 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 		SHASumsSignatureUploaded: ptr.Bool(true),
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if len(versionsResponse.ProviderVersions) == 0 {
-		c.respWriter.RespondWithError(w, errors.New("provider version %s not found", version, errors.WithErrorCode(errors.ENotFound)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("provider version %s not found", version, errors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 
@@ -252,12 +252,12 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 		Architecture:      &arch,
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if len(platformsResponse.ProviderPlatforms) == 0 {
-		c.respWriter.RespondWithError(w, errors.New("provider platform %s_%s not found", os, arch, errors.WithErrorCode(errors.ENotFound)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("provider platform %s_%s not found", os, arch, errors.WithErrorCode(errors.ENotFound)))
 		return
 	}
 
@@ -265,7 +265,7 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 
 	downloadURLs, err := c.providerRegistryService.GetProviderPlatformDownloadURLs(r.Context(), &providerPlatform)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -288,5 +288,5 @@ func (c *providerRegistryController) GetVersion(w http.ResponseWriter, r *http.R
 		},
 	}
 
-	c.respWriter.RespondWithJSON(w, &downloadResponse, 200)
+	c.respWriter.RespondWithJSON(r.Context(), w, &downloadResponse, 200)
 }

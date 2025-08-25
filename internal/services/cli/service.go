@@ -157,7 +157,7 @@ func (s *service) CreateTerraformCLIDownloadURL(ctx context.Context, input *Terr
 		s.taskManager.StartTask(func(taskCtx context.Context) {
 			if err := s.downloadTerraformCLIRelease(taskCtx, input); err != nil {
 				// Cannot trace an error, because the span will have already been ended.
-				s.logger.Errorf("error while downloading Terraform CLI release: %v", err)
+				s.logger.WithContextFields(taskCtx).Errorf("error while downloading Terraform CLI release: %v", err)
 			}
 		})
 

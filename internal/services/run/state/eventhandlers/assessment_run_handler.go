@@ -101,7 +101,7 @@ func (t *AssessmentRunHandler) handleRunEvent(ctx context.Context, _ state.Event
 
 	if assessment == nil {
 		// This should never happen unless the assessment record is manually deleted from the database after the run was started
-		t.logger.Errorf("assessment record not found for workspace %q", run.WorkspaceID)
+		t.logger.WithContextFields(ctx).Errorf("assessment record not found for workspace %q", run.WorkspaceID)
 		return nil
 	}
 

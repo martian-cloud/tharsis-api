@@ -56,7 +56,7 @@ func BuildTFEServiceDiscoveryHandler(
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		if _, err := w.Write([]byte(respStr)); err != nil {
-			logger.Errorf("Failed to response with service discovery document %v", err)
+			logger.WithContextFields(ctx).Errorf("Failed to response with service discovery document %v", err)
 		}
 	}, nil
 }

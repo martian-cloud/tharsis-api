@@ -202,8 +202,6 @@ func TestDisableMaintenanceMode(t *testing.T) {
 			}
 
 			if test.existingMaintenanceMode != nil {
-				mockCaller.On("GetSubject").Return(testSubject)
-
 				mockMaintenanceModes.On("DeleteMaintenanceMode", mock.Anything, sampleMaintenanceMode).Return(nil)
 			}
 
