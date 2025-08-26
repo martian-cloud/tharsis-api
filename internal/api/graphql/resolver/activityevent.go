@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
@@ -472,11 +471,6 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 // TargetType resolver
 func (r *ActivityEventResolver) TargetType() models.ActivityEventTargetType {
 	return r.activityEvent.TargetType
-}
-
-// TargetID resolver
-func (r *ActivityEventResolver) TargetID() string {
-	return gid.ToGlobalID(types.ActivityEventModelType, r.activityEvent.TargetID)
 }
 
 // Payload resolver

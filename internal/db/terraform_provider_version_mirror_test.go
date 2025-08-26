@@ -435,7 +435,7 @@ func TestGetVersionMirrors(t *testing.T) {
 					SemanticVersion:   ptr.String(""),
 				},
 			},
-			expectMsg:                      emptyUUIDMsg2,
+			expectMsg:                      invalidUUIDMsg,
 			expectProviderVersionMirrorIDs: []string{},
 			expectPageInfo:                 pagination.PageInfo{},
 		},
@@ -474,7 +474,7 @@ func TestGetVersionMirrors(t *testing.T) {
 					GroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                      invalidUUIDMsg2,
+			expectMsg:                      invalidUUIDMsg,
 			expectProviderVersionMirrorIDs: []string{},
 			expectPageInfo:                 pagination.PageInfo{},
 		},
@@ -636,7 +636,7 @@ func TestGetVersionMirrors(t *testing.T) {
 					VersionMirrorIDs: []string{invalidID},
 				},
 			},
-			expectMsg:                      invalidUUIDMsg2,
+			expectMsg:                      invalidUUIDMsg,
 			expectProviderVersionMirrorIDs: []string{},
 			expectPageInfo:                 pagination.PageInfo{},
 		},
@@ -830,7 +830,7 @@ func TestCreateVersionMirror(t *testing.T) {
 				GroupID:         invalidID,
 				SemanticVersion: "2.5.9",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -910,7 +910,7 @@ func TestDeleteVersionMirror(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

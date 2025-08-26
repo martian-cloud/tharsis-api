@@ -122,7 +122,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, token string, us
 
 	defer func() {
 		if rollbackErr := u.dbClient.Transactions.RollbackTx(txContext); rollbackErr != nil {
-			u.logger.Errorf("failed to rollback transaction: %v", rollbackErr)
+			u.logger.WithContextFields(ctx).Errorf("failed to rollback transaction: %v", rollbackErr)
 		}
 	}()
 
@@ -156,7 +156,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, token string, us
 		return nil, errors.Wrap(err, "failed to generate csrf token for user session")
 	}
 
-	u.logger.Infow("New user session created",
+	u.logger.WithContextFields(ctx).Infow("New user session created",
 		"user_id", userCaller.User.Metadata.ID,
 		"session_id", session.Metadata.ID,
 		"user_agent", userAgent,

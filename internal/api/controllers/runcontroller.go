@@ -60,11 +60,11 @@ func (c *runController) UploadPlanBinary(w http.ResponseWriter, r *http.Request)
 
 	err := c.runService.UploadPlanBinary(r.Context(), planID, r.Body)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *runController) UploadPlanData(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +79,7 @@ func (c *runController) UploadPlanData(w http.ResponseWriter, r *http.Request) {
 	case "gzip":
 		reader, err = gzip.NewReader(r.Body)
 		if err != nil {
-			c.respWriter.RespondWithError(w, fmt.Errorf("failed to create gzip reader: %w", err))
+			c.respWriter.RespondWithError(r.Context(), w, fmt.Errorf("failed to create gzip reader: %w", err))
 			return
 		}
 		defer reader.Close()
@@ -89,15 +89,15 @@ func (c *runController) UploadPlanData(w http.ResponseWriter, r *http.Request) {
 
 	var planData planWithProviderSchemas
 	if err = json.NewDecoder(reader).Decode(&planData); err != nil {
-		c.respWriter.RespondWithError(w, fmt.Errorf("failed to decode plan data: %w", err))
+		c.respWriter.RespondWithError(r.Context(), w, fmt.Errorf("failed to decode plan data: %w", err))
 		return
 	}
 
 	err = c.runService.ProcessPlanData(r.Context(), planID, planData.Plan, planData.ProviderSchemas)
 	if err != nil {
-		c.respWriter.RespondWithError(w, fmt.Errorf("failed to process plan data: %w", err))
+		c.respWriter.RespondWithError(r.Context(), w, fmt.Errorf("failed to process plan data: %w", err))
 		return
 	}
 
-	c.respWriter.RespondWithJSONAPI(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, nil, http.StatusOK)
 }

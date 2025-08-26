@@ -38,17 +38,17 @@ func (c *serviceAccountController) RegisterRoutes(router chi.Router) {
 func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request) {
 	var req ServiceAccountLoginOptions
 	if err := jsonapi.UnmarshalPayload(r.Body, &req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if req.ServiceAccountPath == nil {
-		c.respWriter.RespondWithError(w, errors.New("ServiceAccountPath field is required", errors.WithErrorCode(errors.EInvalid)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("ServiceAccountPath field is required", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
 	if req.Token == nil {
-		c.respWriter.RespondWithError(w, errors.New("Token field is required", errors.WithErrorCode(errors.EInvalid)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("Token field is required", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -57,11 +57,11 @@ func (c *serviceAccountController) Login(w http.ResponseWriter, r *http.Request)
 		Token:                  []byte(*req.Token),
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	jsonAPIResp := &ServiceAccountLoginResponse{ID: uuid.New().String(), Token: string(resp.Token)}
 
-	c.respWriter.RespondWithJSONAPI(w, jsonAPIResp, http.StatusCreated)
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, jsonAPIResp, http.StatusCreated)
 }

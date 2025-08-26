@@ -434,7 +434,7 @@ func TestGetPlans(t *testing.T) {
 					PlanIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -591,7 +591,7 @@ func TestCreatePlan(t *testing.T) {
 			toCreate: &models.Plan{
 				WorkspaceID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -690,7 +690,7 @@ func TestUpdatePlan(t *testing.T) {
 					Version: positivePlan.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

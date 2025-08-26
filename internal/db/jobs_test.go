@@ -454,7 +454,7 @@ func TestGetJobs(t *testing.T) {
 					// JobIDs: []string{},
 				},
 			},
-			expectMsg:      emptyUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectJobIDs:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -495,7 +495,7 @@ func TestGetJobs(t *testing.T) {
 					RunID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -537,7 +537,7 @@ func TestGetJobs(t *testing.T) {
 					WorkspaceID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -691,7 +691,7 @@ func TestGetJobs(t *testing.T) {
 					JobIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -987,7 +987,7 @@ func TestCreateJob(t *testing.T) {
 				RunID:       warmupRuns[0].Metadata.ID,
 				RunnerID:    &warmupRunners[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1123,7 +1123,7 @@ func TestUpdateJob(t *testing.T) {
 				RunID:    warmupRuns[0].Metadata.ID,
 				RunnerID: &mainRunnerID,
 			},
-			expectMsg: invalidUUIDMsg4,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1207,7 +1207,7 @@ func TestGetLatestJobByType(t *testing.T) {
 			name:          "defective run id",
 			searchRunID:   invalidID,
 			searchJobType: models.JobPlanType,
-			expectMsg:     ptr.String("failed to get job: " + *invalidUUIDMsg2),
+			expectMsg:     invalidUUIDMsg,
 		},
 	}
 
@@ -1267,7 +1267,7 @@ func TestGetJobCountForRunner(t *testing.T) {
 		{
 			name:      "defective-id",
 			runnerID:  invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

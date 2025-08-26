@@ -491,7 +491,7 @@ func TestGetEvents(t *testing.T) {
 					VCSEventIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -695,7 +695,7 @@ func TestCreateEvent(t *testing.T) {
 			toCreate: &models.VCSEvent{
 				WorkspaceID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -799,7 +799,7 @@ func TestUpdateEvent(t *testing.T) {
 					Version: positiveVCSEvent.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

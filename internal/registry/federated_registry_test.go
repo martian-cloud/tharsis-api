@@ -32,7 +32,7 @@ func TestFederatedRegistryClient_GetModuleVersion(t *testing.T) {
 			name: "successful module version retrieval",
 			setupMocks: func(mockIdentityProvider *auth.MockIdentityProvider, mockSDKClient *mockSdkClient) {
 				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
-					return input.Typ == auth.FederatedRegistryTokenType &&
+					return input.Claims["type"] == auth.FederatedRegistryTokenType &&
 						input.Audience == "test-audience"
 				})).Return([]byte("test-token"), nil)
 
@@ -291,7 +291,7 @@ func TestNewFederatedRegistryToken(t *testing.T) {
 				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
 					return input.Subject == gid.ToGlobalID(mtypes.FederatedRegistryModelType, "registry-id") &&
 						input.Audience == "test-audience" &&
-						input.Typ == auth.FederatedRegistryTokenType
+						input.Claims["type"] == auth.FederatedRegistryTokenType
 				})).Return([]byte("test-token"), nil)
 			},
 			input: &FederatedRegistryTokenInput{

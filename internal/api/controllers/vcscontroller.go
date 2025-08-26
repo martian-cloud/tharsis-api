@@ -136,8 +136,8 @@ func (c *vcsController) OAuthHandler(w http.ResponseWriter, r *http.Request) {
 		State:             queries.Get("state"),
 	}); err != nil {
 		// Return a simple EUnauthorized here.
-		c.logger.Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
-		c.respWriter.RespondWithError(w, errors.New("Unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
+		c.logger.WithContextFields(r.Context()).Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("Unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
@@ -145,8 +145,8 @@ func (c *vcsController) OAuthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(oAuthCallbackResponseBody)); err != nil {
-		c.logger.Errorf("failed to write callback response body in OAuthHandler: %v", err)
-		c.respWriter.RespondWithError(w, errors.New("Internal error has occurred"))
+		c.logger.WithContextFields(r.Context()).Errorf("failed to write callback response body in OAuthHandler: %v", err)
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("Internal error has occurred"))
 	}
 }
 
@@ -154,15 +154,15 @@ func (c *vcsController) DesignateEventHandler(w http.ResponseWriter, r *http.Req
 	// Authenticate the request.
 	caller, err := c.authenticator.Authenticate(r.Context(), findToken(r), false)
 	if err != nil {
-		c.logger.Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
-		c.respWriter.RespondWithError(w, errors.Wrap(err, "unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
+		c.logger.WithContextFields(r.Context()).Infof("Unauthorized request to %s %s: %v", r.Method, r.URL.Path, err)
+		c.respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
 	// Make sure this is a VCS caller.
 	vcsCaller, ok := caller.(*auth.VCSWorkspaceLinkCaller)
 	if !ok {
-		c.respWriter.RespondWithError(w, errors.New("Invalid token", errors.WithErrorCode(errors.EForbidden)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("Invalid token", errors.WithErrorCode(errors.EForbidden)))
 		return
 	}
 
@@ -182,11 +182,11 @@ func (c *vcsController) DesignateEventHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, nil, http.StatusOK)
 }
 
 func (c *vcsController) gitLabHandler(r *http.Request) error {

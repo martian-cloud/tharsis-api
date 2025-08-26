@@ -20,7 +20,6 @@ type TokenInput struct {
 	Claims     map[string]string
 	Subject    string
 	JwtID      string
-	Typ        string
 	Audience   string
 }
 
@@ -87,11 +86,6 @@ func (s *identityProvider) GenerateToken(ctx context.Context, input *TokenInput)
 			return nil, err
 		}
 	}
-	if input.Typ != "" {
-		if err := token.Set("typ", input.Typ); err != nil {
-			return nil, err
-		}
-	}
 
 	for k, v := range input.Claims {
 		if err := token.Set(fmt.Sprintf("%s%s", privateClaimPrefix, k), v); err != nil {
@@ -125,12 +119,12 @@ func (s *identityProvider) VerifyToken(ctx context.Context, token string) (*Veri
 
 	return &VerifyTokenOutput{
 		Token:         decodedToken,
-		PrivateClaims: s.getPrivateClaims(decodedToken),
+		PrivateClaims: getPrivateClaims(decodedToken),
 	}, nil
 }
 
 // GetPrivateClaims returns a map of the token's private claims
-func (s *identityProvider) getPrivateClaims(token jwt.Token) map[string]string {
+func getPrivateClaims(token jwt.Token) map[string]string {
 	claimsMap := make(map[string]string)
 
 	privClaims := token.PrivateClaims()
@@ -141,4 +135,13 @@ func (s *identityProvider) getPrivateClaims(token jwt.Token) map[string]string {
 	}
 
 	return claimsMap
+}
+
+func getPrivateClaim(claim string, token jwt.Token) (string, bool) {
+	if claim, ok := token.Get(privateClaimPrefix + claim); ok {
+		if val, ok := claim.(string); ok {
+			return val, true
+		}
+	}
+	return "", false
 }

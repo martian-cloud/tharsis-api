@@ -335,7 +335,7 @@ func (s *service) UpdateProvider(ctx context.Context, provider *models.Terraform
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateProvider: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateProvider: %v", txErr)
 		}
 	}()
 
@@ -431,7 +431,7 @@ func (s *service) CreateProvider(ctx context.Context, input *CreateProviderInput
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateProvider: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateProvider: %v", txErr)
 		}
 	}()
 
@@ -504,7 +504,7 @@ func (s *service) DeleteProvider(ctx context.Context, provider *models.Terraform
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteProvider: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteProvider: %v", txErr)
 		}
 	}()
 
@@ -816,7 +816,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateProviderVersion: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateProviderVersion: %v", txErr)
 		}
 	}()
 
@@ -892,8 +892,7 @@ func (s *service) CreateProviderVersion(ctx context.Context, input *CreateProvid
 		return nil, err
 	}
 
-	s.logger.Infow("Created a provider version.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a provider version.",
 		"providerID", input.ProviderID,
 		"providerVersion", providerVersion.SemanticVersion,
 	)
@@ -976,7 +975,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for DeleteProviderVersion: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for DeleteProviderVersion: %v", txErr)
 		}
 	}()
 
@@ -987,7 +986,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 	}
 
 	if newLatestVersion != nil {
-		s.logger.Infof(
+		s.logger.WithContextFields(ctx).Infof(
 			"Deleted latest provider version, latest flag is being set to latest version %s for provider %s",
 			newLatestVersion.SemanticVersion,
 			provider.GetRegistryNamespace(),
@@ -1005,8 +1004,7 @@ func (s *service) DeleteProviderVersion(ctx context.Context, providerVersion *mo
 		return err
 	}
 
-	s.logger.Infow("Deleted a provider version.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a provider version.",
 		"providerID", provider.Metadata.ID,
 		"providerVersion", providerVersion.SemanticVersion,
 	)
@@ -1199,7 +1197,7 @@ func (s *service) CreateProviderPlatform(ctx context.Context, input *CreateProvi
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateProviderPlatform: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateProviderPlatform: %v", txErr)
 		}
 	}()
 
@@ -1323,7 +1321,7 @@ func (s *service) UploadProviderPlatformBinary(ctx context.Context, providerPlat
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 
@@ -1383,7 +1381,7 @@ func (s *service) UploadProviderVersionReadme(ctx context.Context, providerVersi
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 
@@ -1443,7 +1441,7 @@ func (s *service) UploadProviderVersionSHA256Sums(ctx context.Context, providerV
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 
@@ -1503,7 +1501,7 @@ func (s *service) UploadProviderVersionSHA256SumsSignature(ctx context.Context, 
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 		}
 	}()
 

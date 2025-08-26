@@ -378,14 +378,14 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
-					s.logger.Errorf("error occurred while waiting for job events: %v", err)
+					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for job events: %v", err)
 				}
 				return
 			}
 
 			eventData, err := event.ToJobEventData()
 			if err != nil {
-				s.logger.Errorf("failed to get job event data in job subscription: %v", err)
+				s.logger.WithContextFields(ctx).Errorf("failed to get job event data in job subscription: %v", err)
 				continue
 			}
 
@@ -401,11 +401,11 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 
 			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
 			if err != nil {
-				s.logger.Errorf("error querying for job in subscription goroutine: %v", err)
+				s.logger.WithContextFields(ctx).Errorf("error querying for job in subscription goroutine: %v", err)
 				continue
 			}
 			if job == nil {
-				s.logger.Errorf("received event for job that does not exist %s", event.ID)
+				s.logger.WithContextFields(ctx).Errorf("received event for job that does not exist %s", event.ID)
 				continue
 			}
 
@@ -468,7 +468,7 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 		job, err := s.GetJobByID(innerCtx, jobID)
 		if err != nil {
 			tracing.RecordError(innerSpan, err, "Error occurred while checking for job cancellation")
-			s.logger.Errorf("Error occurred while checking for job cancellation: %v", err)
+			s.logger.WithContextFields(innerCtx).Errorf("Error occurred while checking for job cancellation: %v", err)
 			return
 		}
 
@@ -486,14 +486,14 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 			if err != nil {
 				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
 					tracing.RecordError(innerSpan, err, "Error occurred while waiting for job cancellation events")
-					s.logger.Errorf("Error occurred while waiting for job cancellation events: %v", err)
+					s.logger.WithContextFields(innerCtx).Errorf("Error occurred while waiting for job cancellation events: %v", err)
 				}
 				return
 			}
 
 			eventData, err := event.ToJobEventData()
 			if err != nil {
-				s.logger.Errorf("failed to get job event data in job event subscription: %v", err)
+				s.logger.WithContextFields(innerCtx).Errorf("failed to get job event data in job event subscription: %v", err)
 				continue
 			}
 
@@ -508,13 +508,13 @@ func (s *service) SubscribeToCancellationEvent(ctx context.Context, options *Can
 				}
 				tracing.RecordError(innerSpan, err,
 					"Error occurred while querying for job associated with cancellation event %s", event.ID)
-				s.logger.Errorf("Error occurred while querying for job associated with cancellation event %s: %v", event.ID, err)
+				s.logger.WithContextFields(innerCtx).Errorf("Error occurred while querying for job associated with cancellation event %s: %v", event.ID, err)
 				return
 			}
 
 			if job == nil {
 				tracing.RecordError(innerSpan, nil, "Job not found for event with ID %s", event.ID)
-				s.logger.Errorf("Job not found for event with ID %s", event.ID)
+				s.logger.WithContextFields(innerCtx).Errorf("Job not found for event with ID %s", event.ID)
 				continue
 			}
 
@@ -597,8 +597,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 				return nil, err
 			}
 
-			s.logger.Infow("Claimed a job.",
-				"caller", caller.GetSubject(),
+			s.logger.WithContextFields(ctx).Infow("Claimed a job.",
 				"workspaceID", job.WorkspaceID,
 				"jobID", job.Metadata.ID,
 			)

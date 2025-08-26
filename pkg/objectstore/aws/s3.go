@@ -106,7 +106,7 @@ func (s *ObjectStore) UploadObject(ctx context.Context, key string, body io.Read
 		Body:   body,
 	})
 	if err != nil {
-		s.logger.Errorf("Failed to upload file to location %v", err)
+		s.logger.WithContextFields(ctx).Errorf("Failed to upload file to location %v", err)
 		return err
 	}
 
@@ -136,7 +136,7 @@ func (s *ObjectStore) DownloadObject(ctx context.Context, key string, w io.Write
 			return te.New("Range %s not found in %s", *options.ContentRange, key, te.WithErrorCode(te.ENotFound))
 		}
 
-		s.logger.Errorf("Failed to download file from key %s %v", key, err)
+		s.logger.WithContextFields(ctx).Errorf("Failed to download file from key %s %v", key, err)
 		return err
 	}
 
@@ -166,7 +166,7 @@ func (s *ObjectStore) GetObjectStream(ctx context.Context, key string, options *
 			return nil, te.New("Range %s not found in %s", *options.ContentRange, key, te.WithErrorCode(te.ENotFound))
 		}
 
-		s.logger.Errorf("Failed to get file from key %s %v", key, err)
+		s.logger.WithContextFields(ctx).Errorf("Failed to get file from key %s %v", key, err)
 		return nil, err
 	}
 

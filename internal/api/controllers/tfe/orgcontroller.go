@@ -60,8 +60,8 @@ func (c *orgController) RegisterRoutes(router chi.Router) {
 	router.Get("/organizations/{organization}/runs/queue", c.GetRunQueue)
 }
 
-func (c *orgController) GetEntitlements(w http.ResponseWriter, _ *http.Request) {
-	c.respWriter.RespondWithJSONAPI(w, &EntitlementSettings, http.StatusOK)
+func (c *orgController) GetEntitlements(w http.ResponseWriter, r *http.Request) {
+	c.respWriter.RespondWithJSONAPI(r.Context(), w, &EntitlementSettings, http.StatusOK)
 }
 
 func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 
 	group, err := c.groupService.GetGroupByTRN(r.Context(), types.GroupModelType.BuildTRN(groupPath))
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -81,7 +81,7 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 		Group: group,
 	})
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -100,5 +100,5 @@ func (c *orgController) GetRunQueue(w http.ResponseWriter, r *http.Request) {
 		Items: tfeRuns,
 	}
 
-	c.respWriter.RespondWithPaginatedJSONAPI(w, runQueue, http.StatusOK)
+	c.respWriter.RespondWithPaginatedJSONAPI(r.Context(), w, runQueue, http.StatusOK)
 }

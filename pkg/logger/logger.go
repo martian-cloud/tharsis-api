@@ -2,6 +2,8 @@
 package logger
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -11,6 +13,9 @@ import (
 type Logger interface {
 	// With returns a logger based off the root logger and decorates it with the given arguments.
 	With(args ...interface{}) Logger
+
+	// WithContextFields returns a logger with the available context fields
+	WithContextFields(ctx context.Context) Logger
 
 	// Debug uses fmt.Sprint to construct and log a message at DEBUG level
 	Debug(args ...interface{})
@@ -33,6 +38,18 @@ type Logger interface {
 	Infow(msg string, keysAndValues ...interface{})
 	// Errorw logs a message with some additional context
 	Errorw(msg string, keysAndValues ...interface{})
+}
+
+// Uses the context key pattern
+type contextKey string
+
+var (
+	contextKeySubject   = contextKey("subject")
+	contextKeyRequestID = contextKey("request id")
+)
+
+func (c contextKey) String() string {
+	return "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger " + string(c)
 }
 
 type logger struct {
@@ -65,4 +82,34 @@ func (l *logger) With(args ...interface{}) Logger {
 		return &logger{l.SugaredLogger.With(args...)}
 	}
 	return l
+}
+
+func (l *logger) WithContextFields(ctx context.Context) Logger {
+	fields := []interface{}{}
+
+	requestID, ok := ctx.Value(contextKeyRequestID).(string)
+	if ok {
+		fields = append(fields, "requestID", requestID)
+	}
+
+	subject, ok := ctx.Value(contextKeySubject).(string)
+	if ok {
+		fields = append(fields, "subject", subject)
+	}
+
+	if len(fields) > 0 {
+		return l.With(fields...)
+	}
+
+	return l
+}
+
+// WithSubject adds the subject to the context
+func WithSubject(ctx context.Context, subject string) context.Context {
+	return context.WithValue(ctx, contextKeySubject, subject)
+}
+
+// WithRequestID adds the request ID to the context
+func WithRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, contextKeyRequestID, id)
 }

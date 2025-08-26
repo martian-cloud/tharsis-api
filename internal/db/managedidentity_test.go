@@ -375,7 +375,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			name:           "invalid workspace ID",
 			workspaceID:    invalidID,
 			addToWorkspace: true,
-			expectAddFail:  invalidUUIDMsg1,
+			expectAddFail:  invalidUUIDMsg,
 		},
 		{
 			name:                      "non-existent managed identity ID",
@@ -388,7 +388,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 			name:                      "invalid managed identity ID",
 			addToWorkspace:            true,
 			overrideManagedIdentityID: ptr.String(invalidID),
-			expectAddFail:             invalidUUIDMsg1,
+			expectAddFail:             invalidUUIDMsg,
 		},
 	}
 
@@ -408,7 +408,7 @@ func TestAddManagedIdentityToWorkspace(t *testing.T) {
 					assert.Nil(t, err)
 				} else {
 					require.NotNil(t, err)
-					assert.Equal(t, *test.expectAddFail, err.Error())
+					assert.Contains(t, err.Error(), *test.expectAddFail)
 					// If expected to fail to add, don't bother doing the fetch.
 					return
 				}
@@ -506,7 +506,7 @@ func TestRemoveManagedIdentityFromWorkspace(t *testing.T) {
 			name:                      "invalid managed identity ID",
 			workspaceID:               workspace1.Metadata.ID,
 			overrideManagedIdentityID: ptr.String(invalidID),
-			expectMsg:                 invalidUUIDMsg1,
+			expectMsg:                 invalidUUIDMsg,
 		},
 	}
 
@@ -676,7 +676,7 @@ func TestCreateManagedIdentity(t *testing.T) {
 				Name:    "non-existent-group-id",
 				GroupID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1549,7 +1549,7 @@ func TestDeleteManagedIdentity(t *testing.T) {
 				},
 				Description: "looking for a defective ID",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1659,7 +1659,7 @@ func TestGetManagedIdentityAccessRules(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: invalidUUIDMsg2,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1983,7 +1983,7 @@ func TestCreateManagedIdentityAccessRule(t *testing.T) {
 			toCreate: &models.ManagedIdentityAccessRule{
 				ManagedIdentityID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -2154,7 +2154,7 @@ func TestUpdateManagedIdentityAccessRule(t *testing.T) {
 					Version: positiveRule.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -2269,7 +2269,7 @@ func TestDeleteManagedIdentityAccessRule(t *testing.T) {
 					Version: createdRule.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

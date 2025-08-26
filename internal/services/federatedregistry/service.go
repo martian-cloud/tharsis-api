@@ -317,8 +317,7 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 		return nil, err
 	}
 
-	s.logger.Infow("Requested creation of a federated registry.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested creation of a federated registry.",
 		"groupID", federatedRegistry.GroupID,
 		"registryHostname", federatedRegistry.Hostname,
 	)
@@ -330,7 +329,7 @@ func (s *service) CreateFederatedRegistry(ctx context.Context,
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateFederatedRegistry: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateFederatedRegistry: %v", txErr)
 		}
 	}()
 
@@ -406,8 +405,7 @@ func (s *service) UpdateFederatedRegistry(ctx context.Context,
 		return nil, err
 	}
 
-	s.logger.Infow("Requested update of a federated registry.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested update of a federated registry.",
 		"groupID", federatedRegistry.GroupID,
 		"registryHostname", federatedRegistry.Hostname,
 	)
@@ -419,7 +417,7 @@ func (s *service) UpdateFederatedRegistry(ctx context.Context,
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateFederatedRegistry: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateFederatedRegistry: %v", txErr)
 		}
 	}()
 
@@ -473,8 +471,7 @@ func (s *service) DeleteFederatedRegistry(ctx context.Context, federatedRegistry
 		return err
 	}
 
-	s.logger.Infow("Requested deletion of a federated registry.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a federated registry.",
 		"groupID", federatedRegistry.GroupID,
 		"federatedRegistryID", federatedRegistry.Metadata.ID,
 	)
@@ -486,7 +483,7 @@ func (s *service) DeleteFederatedRegistry(ctx context.Context, federatedRegistry
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteFederatedRegistry: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteFederatedRegistry: %v", txErr)
 		}
 	}()
 

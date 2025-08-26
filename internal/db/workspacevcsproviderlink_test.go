@@ -434,7 +434,7 @@ func TestCreateLink(t *testing.T) {
 				AutoSpeculativePlan: false,
 				// Rest of the fields can be empty.
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 		{
 			name: "defective provider ID",
@@ -447,7 +447,7 @@ func TestCreateLink(t *testing.T) {
 				AutoSpeculativePlan: false,
 				// Rest of the fields can be empty.
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -562,7 +562,7 @@ func TestUpdateLink(t *testing.T) {
 					Version: positiveLink.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -638,7 +638,7 @@ func TestDeleteLink(t *testing.T) {
 					ID: invalidID,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

@@ -510,7 +510,7 @@ func TestGetProviders(t *testing.T) {
 					// TerraformProvidersIDs: []string{},
 				},
 			},
-			expectMsg:                  emptyUUIDMsg2,
+			expectMsg:                  invalidUUIDMsg,
 			expectTerraformProviderIDs: []string{},
 			expectPageInfo:             pagination.PageInfo{},
 		},
@@ -645,7 +645,7 @@ func TestGetProviders(t *testing.T) {
 					RootGroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                  invalidUUIDMsg2,
+			expectMsg:                  invalidUUIDMsg,
 			expectTerraformProviderIDs: []string{},
 			expectPageInfo:             pagination.PageInfo{},
 		},
@@ -684,7 +684,7 @@ func TestGetProviders(t *testing.T) {
 					GroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                  invalidUUIDMsg2,
+			expectMsg:                  invalidUUIDMsg,
 			expectTerraformProviderIDs: []string{},
 			expectPageInfo:             pagination.PageInfo{},
 		},
@@ -727,7 +727,7 @@ func TestGetProviders(t *testing.T) {
 					UserID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                  invalidUUIDMsg2,
+			expectMsg:                  invalidUUIDMsg,
 			expectTerraformProviderIDs: []string{},
 			expectPageInfo:             pagination.PageInfo{},
 		},
@@ -770,7 +770,7 @@ func TestGetProviders(t *testing.T) {
 					ServiceAccountID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:                  invalidUUIDMsg2,
+			expectMsg:                  invalidUUIDMsg,
 			expectTerraformProviderIDs: []string{},
 			expectPageInfo:             pagination.PageInfo{},
 		},
@@ -815,7 +815,7 @@ func TestGetProviders(t *testing.T) {
 					TerraformProviderIDs: []string{invalidID},
 				},
 			},
-			expectMsg:                  invalidUUIDMsg2,
+			expectMsg:                  invalidUUIDMsg,
 			expectTerraformProviderIDs: []string{},
 			expectPageInfo:             pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:       true,
@@ -983,7 +983,7 @@ func TestCreateProvider(t *testing.T) {
 				RootGroupID: invalidID,
 				GroupID:     warmupItems.groups[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		{
@@ -993,7 +993,7 @@ func TestCreateProvider(t *testing.T) {
 				RootGroupID: warmupItems.groups[0].Metadata.ID,
 				GroupID:     invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1109,7 +1109,7 @@ func TestUpdateProvider(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1188,7 +1188,7 @@ func TestDeleteProvider(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

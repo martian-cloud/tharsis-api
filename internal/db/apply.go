@@ -226,7 +226,7 @@ func (a *applies) CreateApply(ctx context.Context, apply *models.Apply) (*models
 	createdApply, err := scanApply(a.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
-		a.dbClient.logger.Error(err)
+		a.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (a *applies) UpdateApply(ctx context.Context, apply *models.Apply) (*models
 			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		a.dbClient.logger.Error(err)
+		a.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}

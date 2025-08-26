@@ -63,16 +63,7 @@ var (
 	resourceVersionMismatch = ptr.String(ErrOptimisticLockError.Error())
 
 	// returned for some invalid UUID cases
-	invalidUUIDMsg1 = ptr.String("ERROR: invalid input syntax for type uuid: \"" + invalidID + "\" (SQLSTATE 22P02)")
-
-	// returned for some other invalid UUID cases
-	invalidUUIDMsg2 = ptr.String(fmt.Sprintf("failed to scan query count result: %s", *invalidUUIDMsg1))
-
-	// returned for some other invalid UUID cases
-	emptyUUIDMsg2 = ptr.String("failed to scan query count result: ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
-
-	// returned for some invalid UUID cases
-	invalidUUIDMsg4 = ptr.String("ERROR: invalid input syntax for type uuid: \"\" (SQLSTATE 22P02)")
+	invalidUUIDMsg = ptr.String("invalid input syntax for type uuid")
 )
 
 type testClient struct {

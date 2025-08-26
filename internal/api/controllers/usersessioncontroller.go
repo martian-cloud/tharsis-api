@@ -91,7 +91,7 @@ func (c *userSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 	// Parse the request body
 	var req createSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respWriter.RespondWithError(w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "failed to parse request body", errors.WithErrorCode(errors.EInvalid)))
 		return
 	}
 
@@ -105,7 +105,7 @@ func (c *userSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 			"user_agent", userAgent,
 			"subject", ptr.ToString(auth.GetSubject(r.Context())),
 		)
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (c *userSessionController) RefreshSession(w http.ResponseWriter, r *http.Re
 	// Get refresh token from cookie
 	refreshTokenCookie, err := r.Cookie(auth.GetUserSessionRefreshTokenCookieName(c.enableSecureCookies))
 	if err != nil {
-		c.respWriter.RespondWithError(w, errors.New("refresh token not found in cookie", errors.WithErrorCode(errors.EUnauthorized)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("refresh token not found in cookie", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
@@ -141,7 +141,7 @@ func (c *userSessionController) RefreshSession(w http.ResponseWriter, r *http.Re
 				"error", err,
 				"subject", ptr.ToString(auth.GetSubject(r.Context())),
 			)
-			c.respWriter.RespondWithError(w, err)
+			c.respWriter.RespondWithError(r.Context(), w, err)
 		}
 		return
 	}
@@ -173,7 +173,7 @@ func (c *userSessionController) Logout(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 			"subject", ptr.ToString(auth.GetSubject(r.Context())),
 		)
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 

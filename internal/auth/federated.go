@@ -50,17 +50,12 @@ func NewFederatedRegistryAuth(
 
 // Use checks if the token is a federated registry token and if the issuer is trusted
 func (f *FederatedRegistryAuth) Use(token jwt.Token) bool {
-	if typ, ok := token.Get("typ"); ok {
-		if tokenTypeClaim, ok := typ.(string); ok {
-			// Check token type claim
-			if tokenTypeClaim == FederatedRegistryTokenType {
-				// Check issuer
-				issuer := token.Issuer()
-				for _, policy := range f.trustPolicies {
-					if policy.IssuerURL == issuer {
-						return true
-					}
-				}
+	if tokenTypeClaim, ok := getPrivateClaim("type", token); ok && tokenTypeClaim == FederatedRegistryTokenType {
+		// Check issuer
+		issuer := token.Issuer()
+		for _, policy := range f.trustPolicies {
+			if policy.IssuerURL == issuer {
+				return true
 			}
 		}
 	}

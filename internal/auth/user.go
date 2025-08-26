@@ -297,7 +297,7 @@ func (u *UserAuth) Authenticate(ctx context.Context, tokenString string, useCach
 			Email:    strings.ToLower(email.(string)),
 		})
 		if err != nil {
-			u.logger.Errorf("Failed to create user in db: %v", err)
+			u.logger.WithContextFields(ctx).Errorf("Failed to create user in db: %v", err)
 			return nil, terrors.Wrap(err, "failed to create user in db")
 		}
 	}
@@ -382,7 +382,7 @@ func (u *UserAuth) createUserWithExternalID(ctx context.Context, identity *exter
 
 	defer func() {
 		if txErr := u.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			u.logger.Errorf("failed to rollback tx for createUserWithExternalID: %v", txErr)
+			u.logger.WithContextFields(ctx).Errorf("failed to rollback tx for createUserWithExternalID: %v", txErr)
 		}
 	}()
 

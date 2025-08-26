@@ -449,7 +449,7 @@ func TestGetConfigurationVersions(t *testing.T) {
 					ConfigurationVersionIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -628,7 +628,7 @@ func TestCreateConfigurationVersion(t *testing.T) {
 			toCreate: &models.ConfigurationVersion{
 				WorkspaceID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -721,7 +721,7 @@ func TestUpdateConfigurationVersion(t *testing.T) {
 					Version: positiveConfigurationVersion.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg4,
+			expectMsg: invalidUUIDMsg,
 		},
 		{
 			name: "defective-id",
@@ -731,7 +731,7 @@ func TestUpdateConfigurationVersion(t *testing.T) {
 					Version: positiveConfigurationVersion.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg4,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

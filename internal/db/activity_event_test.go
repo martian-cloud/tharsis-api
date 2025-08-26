@@ -439,7 +439,7 @@ func TestGetActivityEvents(t *testing.T) {
 					ActivityEventIDs: []string{invalidID},
 				},
 			},
-			expectMsg:              invalidUUIDMsg2,
+			expectMsg:              invalidUUIDMsg,
 			expectActivityEventIDs: []string{},
 			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
@@ -500,7 +500,7 @@ func TestGetActivityEvents(t *testing.T) {
 					UserID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:              invalidUUIDMsg2,
+			expectMsg:              invalidUUIDMsg,
 			expectActivityEventIDs: []string{},
 			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
@@ -561,7 +561,7 @@ func TestGetActivityEvents(t *testing.T) {
 					ServiceAccountID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:              invalidUUIDMsg2,
+			expectMsg:              invalidUUIDMsg,
 			expectActivityEventIDs: []string{},
 			expectPageInfo:         pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:   true,
@@ -878,7 +878,7 @@ func TestCreateActivityEvent(t *testing.T) {
 				TargetType: models.TargetVariable,
 				TargetID:   positiveTargetID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 			// expect activity event to be nil
 		},
 
@@ -902,7 +902,7 @@ func TestCreateActivityEvent(t *testing.T) {
 				TargetID:         positiveTargetID,
 				Payload:          positivePayload,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 			// expect activity event to be nil
 		},
 

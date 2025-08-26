@@ -249,7 +249,7 @@ func (p *plans) CreatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 	createdPlan, err := scanPlan(p.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
-		p.dbClient.logger.Error(err)
+		p.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (p *plans) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan
 			tracing.RecordError(span, err, "optimistic lock error")
 			return nil, ErrOptimisticLockError
 		}
-		p.dbClient.logger.Error(err)
+		p.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}

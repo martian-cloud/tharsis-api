@@ -51,13 +51,13 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 
 	token := chi.URLParam(r, "token")
 	if token == "" {
-		c.respWriter.RespondWithError(w, errors.New("Missing token query parameter in log URL", errors.WithErrorCode(errors.EUnauthorized)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.New("Missing token query parameter in log URL", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
 	// Validate token
 	if err := c.verifyJobLogToken(r.Context(), []byte(token), jobID); err != nil {
-		c.respWriter.RespondWithError(w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
+		c.respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
 
@@ -73,14 +73,14 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	// TODO: Remove when log endpoint token authentication is added
 	logs, err := c.jobService.ReadLogs(auth.WithCaller(r.Context(), &auth.SystemCaller{}), jobID, offset, limit)
 	if err != nil {
-		c.logger.Infof("Failed to get logs: %v", err)
-		c.respWriter.RespondWithError(w, err)
+		c.logger.WithContextFields(r.Context()).Infof("Failed to get logs: %v", err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
 	if _, err := w.Write(logs); err != nil {
-		c.logger.Infof("Failed to respond with log data: %v", err)
-		c.respWriter.RespondWithError(w, err)
+		c.logger.WithContextFields(r.Context()).Infof("Failed to respond with log data: %v", err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 	}
 }
 

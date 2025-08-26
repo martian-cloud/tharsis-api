@@ -35,6 +35,6 @@ func (c *healthController) RegisterRoutes(router chi.Router) {
 // @Produce  json
 // @Success 200 {object} Health
 // @Router /health [get]
-func (c *healthController) GetHealth(w http.ResponseWriter, _ *http.Request) {
-	c.respWriter.RespondWithJSON(w, healthy, 200)
+func (c *healthController) GetHealth(w http.ResponseWriter, r *http.Request) {
+	c.respWriter.RespondWithJSON(r.Context(), w, healthy, 200)
 }

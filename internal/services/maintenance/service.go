@@ -79,8 +79,7 @@ func (s *service) EnableMaintenanceMode(ctx context.Context) (*models.Maintenanc
 		return nil, err
 	}
 
-	s.logger.Infow("Enabled maintenance mode.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Enabled maintenance mode.",
 		"maintenance_mode_id", created.Metadata.ID,
 	)
 
@@ -118,8 +117,7 @@ func (s *service) DisableMaintenanceMode(ctx context.Context) error {
 		return err
 	}
 
-	s.logger.Infow("Disabled maintenance mode.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Disabled maintenance mode.",
 	)
 
 	return nil

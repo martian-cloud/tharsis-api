@@ -357,7 +357,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			w.dbClient.logger.Errorf("failed to rollback tx for CreateWorkspace: %v", txErr)
+			w.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateWorkspace: %v", txErr)
 		}
 	}()
 
@@ -527,7 +527,7 @@ func (w *workspaces) MigrateWorkspace(ctx context.Context, workspace *models.Wor
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			w.dbClient.logger.Errorf("failed to rollback tx for MigrateWorkspace: %v", txErr)
+			w.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for MigrateWorkspace: %v", txErr)
 		}
 	}()
 

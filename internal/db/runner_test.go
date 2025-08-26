@@ -1105,7 +1105,7 @@ func TestCreateRunner(t *testing.T) {
 				Name:    "runner-create-test-invalid-group-id",
 				GroupID: ptr.String(invalidID),
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1215,7 +1215,7 @@ func TestUpdateRunner(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -1295,7 +1295,7 @@ func TestDeleteRunner(t *testing.T) {
 					Version: initialResourceVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

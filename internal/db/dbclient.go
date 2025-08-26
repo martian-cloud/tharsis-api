@@ -134,19 +134,19 @@ func NewClient(
 		cfg.MaxConns = int32(dbMaxConnections)
 	}
 
-	logger.Infof("Connecting to DB (host=%s, maxConnections=%d)", dbHost, cfg.MaxConns)
+	logger.WithContextFields(ctx).Infof("Connecting to DB (host=%s, maxConnections=%d)", dbHost, cfg.MaxConns)
 
 	pool, err := pgxpool.ConnectConfig(ctx, cfg)
 	if err != nil {
-		logger.Errorf("Unable to connect to DB: %v\n", err)
+		logger.WithContextFields(ctx).Errorf("Unable to connect to DB: %v\n", err)
 		return nil, err
 	}
 
-	logger.Infof("Successfully connected to DB %s", dbHost)
+	logger.WithContextFields(ctx).Infof("Successfully connected to DB %s", dbHost)
 
 	// Auto migrate-up the DB if enabled.
 	if dbAutoMigrateEnabled {
-		logger.Info("Starting DB migrate")
+		logger.WithContextFields(ctx).Info("Starting DB migrate")
 
 		migrations, err := newMigrations(logger, cfg.ConnString())
 		if err != nil {
@@ -155,12 +155,12 @@ func NewClient(
 
 		err = migrations.migrateUp()
 		if err == migrate.ErrNoChange {
-			logger.Info("No migration necessary since DB is already on latest version")
+			logger.WithContextFields(ctx).Info("No migration necessary since DB is already on latest version")
 		} else if err != nil {
-			logger.Errorf("Unable to migrate DB: %v", err)
+			logger.WithContextFields(ctx).Errorf("Unable to migrate DB: %v", err)
 			return nil, err
 		} else {
-			logger.Info("Successfully migrated DB to latest version")
+			logger.WithContextFields(ctx).Info("Successfully migrated DB to latest version")
 		}
 	}
 
@@ -249,7 +249,7 @@ func (db *Client) RetryOnOLE(ctx context.Context, fn func() error) error {
 		retry.OnRetry(func(n uint, _ error) {
 			// Explicitly do nothing
 			if n > 100 {
-				db.logger.Errorf("Warning, OLE retry function has reached %d attempts", n)
+				db.logger.WithContextFields(ctx).Errorf("Warning, OLE retry function has reached %d attempts", n)
 			}
 		}),
 		retry.LastErrorOnly(true),

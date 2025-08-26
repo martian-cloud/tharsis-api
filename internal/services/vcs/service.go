@@ -538,7 +538,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateVCSProvider: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateVCSProvider: %v", txErr)
 		}
 	}()
 
@@ -603,8 +603,7 @@ func (s *service) CreateVCSProvider(ctx context.Context, input *CreateVCSProvide
 		return nil, err
 	}
 
-	s.logger.Infow("Created a VCS provider.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a VCS provider.",
 		"name", input.Name,
 		"groupID", input.GroupID,
 		"type", input.Type,
@@ -652,7 +651,7 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateVCSProvider: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateVCSProvider: %v", txErr)
 		}
 	}()
 
@@ -680,8 +679,7 @@ func (s *service) UpdateVCSProvider(ctx context.Context, input *UpdateVCSProvide
 		return nil, err
 	}
 
-	s.logger.Infow("Updated a VCS provider.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated a VCS provider.",
 		"name", input.Provider.Name,
 		"groupID", input.Provider.GroupID,
 		"type", input.Provider.Type,
@@ -733,7 +731,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteVCSProvider: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteVCSProvider: %v", txErr)
 		}
 	}()
 
@@ -789,8 +787,7 @@ func (s *service) DeleteVCSProvider(ctx context.Context, input *DeleteVCSProvide
 		return err
 	}
 
-	s.logger.Infow("Deleted a VCS provider.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Deleted a VCS provider.",
 		"name", input.Provider.Name,
 		"groupID", input.Provider.GroupID,
 		"type", input.Provider.Type,
@@ -984,7 +981,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateWorkspaceVCSProviderLink: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateWorkspaceVCSProviderLink: %v", txErr)
 		}
 	}()
 
@@ -1089,8 +1086,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 		return nil, err
 	}
 
-	s.logger.Infow("Created a workspace vcs provider link.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a workspace vcs provider link.",
 		"workspacePath", input.Workspace.FullPath,
 		"linkID", createdLink.Metadata.ID,
 		"providerTRN", vp.Metadata.TRN,
@@ -1121,8 +1117,7 @@ func (s *service) UpdateWorkspaceVCSProviderLink(ctx context.Context, input *Upd
 		return nil, err
 	}
 
-	s.logger.Infow("Requested an update to a workspace vcs provider link.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested an update to a workspace vcs provider link.",
 		"workspaceID", input.Link.WorkspaceID,
 		"linkID", input.Link.Metadata.ID,
 	)
@@ -1191,8 +1186,7 @@ func (s *service) DeleteWorkspaceVCSProviderLink(ctx context.Context, input *Del
 		}
 	}
 
-	s.logger.Infow("Requested to delete a workspace vcs provider link.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested to delete a workspace vcs provider link.",
 		"workspaceID", input.Link.WorkspaceID,
 		"providerName", vp.Name,
 	)
@@ -1438,10 +1432,10 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 			provider:      provider,
 		}); err != nil {
 			if errors.ErrorCode(err) != errors.EForbidden {
-				s.logger.Errorf("failed to process manual vcs run: %v", err)
+				s.logger.WithContextFields(ctx).Errorf("failed to process manual vcs run: %v", err)
 			} else {
 				// To avoid polluting the logs with false errors an Info level is used here.
-				s.logger.Info(err)
+				s.logger.WithContextFields(ctx).Info(err)
 			}
 
 			// Update the status and error message on the event.
@@ -1452,7 +1446,7 @@ func (s *service) CreateVCSRun(ctx context.Context, input *CreateVCSRunInput) er
 
 		// Update the vcs event. Returned model is not needed.
 		if _, err := s.dbClient.VCSEvents.UpdateEvent(ctx, createdEvent); err != nil {
-			s.logger.Error(
+			s.logger.WithContextFields(ctx).Error(
 				"failed to update event for repository %s archive for workspace %s and workspace vcs provider link ID %s: %v",
 				link.RepositoryPath,
 				input.Workspace.FullPath,
@@ -1501,7 +1495,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 	}
 
 	if vcsCaller.Link.WebhookDisabled {
-		s.logger.Infof("Skipping webhook event since webhook is disabled for link ID %s, workspace %s and repository %s",
+		s.logger.WithContextFields(ctx).Infof("Skipping webhook event since webhook is disabled for link ID %s, workspace %s and repository %s",
 			vcsCaller.Link.Metadata.ID,
 			workspace.FullPath,
 			vcsCaller.Link.RepositoryPath,
@@ -1594,10 +1588,10 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 			repositorySizeLimit: s.repositorySizeLimit,
 		}); err != nil {
 			if errors.ErrorCode(err) != errors.EForbidden {
-				s.logger.Errorf("failed to process %s webhook event: %v", vcsCaller.Provider.Type, err)
+				s.logger.WithContextFields(ctx).Errorf("failed to process %s webhook event: %v", vcsCaller.Provider.Type, err)
 			} else {
 				// To avoid polluting the logs with false errors an Info level is used here.
-				s.logger.Info(err)
+				s.logger.WithContextFields(ctx).Info(err)
 			}
 
 			// Update the status and error message on the event.
@@ -1608,7 +1602,7 @@ func (s *service) ProcessWebhookEvent(ctx context.Context, input *ProcessWebhook
 
 		// Update the vcs event. Returned model is not needed.
 		if _, err := s.dbClient.VCSEvents.UpdateEvent(ctx, createdEvent); err != nil {
-			s.logger.Error(
+			s.logger.WithContextFields(ctx).Error(
 				"failed to update event for repository %s archive for workspace %s and workspace vcs provider link ID %s: %v",
 				vcsCaller.Link.RepositoryPath,
 				workspace.FullPath,
@@ -1893,7 +1887,7 @@ func (s *service) handleVCSRun(ctx context.Context, input *handleVCSRunInput) er
 	// Defer removing temporary parent directory.
 	defer func() {
 		if err = os.RemoveAll(parentDirectory); err != nil {
-			s.logger.Errorf(
+			s.logger.WithContextFields(ctx).Errorf(
 				"failed to delete temp repository directory for repository %s for workspace %s and workspace vcs provider link ID %s: %v",
 				input.link.RepositoryPath,
 				input.workspace.FullPath,
@@ -1949,7 +1943,7 @@ func (s *service) handleEvent(ctx context.Context, input *handleEventInput) erro
 	if !input.vcsEvent.Type.Equals(models.TagEventType) && len(input.link.GlobPatterns) > 0 {
 		alteredFiles, err = getAlteredFiles(ctx, input)
 		if err != nil {
-			s.logger.Errorf(
+			s.logger.WithContextFields(ctx).Errorf(
 				"failed to get altered files for repository %s for workspace %s and workspace vcs provider link ID %s: %v",
 				input.link.RepositoryPath,
 				input.workspace.FullPath,
@@ -1991,7 +1985,7 @@ func (s *service) handleEvent(ctx context.Context, input *handleEventInput) erro
 	// Defer removing temporary parent directory.
 	defer func() {
 		if err = os.RemoveAll(parentDirectory); err != nil {
-			s.logger.Errorf(
+			s.logger.WithContextFields(ctx).Errorf(
 				"failed to delete temp repository directory for repository %s for workspace %s and workspace vcs provider link ID %s: %v",
 				input.link.RepositoryPath,
 				input.workspace.FullPath,

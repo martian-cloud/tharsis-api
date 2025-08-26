@@ -127,7 +127,7 @@ func TestGetUserByLinkUserWithExternalID(t *testing.T) {
 				externalID: "issuer-for-negative-link-invalid",
 				userID:     invalidID,
 			},
-			expectLinkMsg: invalidUUIDMsg1,
+			expectLinkMsg: invalidUUIDMsg,
 		},
 		testCase{
 			name: "negative: get issuer non-exist",
@@ -659,7 +659,7 @@ func TestGetUsers(t *testing.T) {
 					UserIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectUserIDs:        []string{},
 			expectPageInfo:       pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
@@ -904,7 +904,7 @@ func TestUpdateUser(t *testing.T) {
 					Version: newVersion,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 
@@ -1083,7 +1083,7 @@ func TestDeleteUser(t *testing.T) {
 					ID: invalidID,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 

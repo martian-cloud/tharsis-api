@@ -204,7 +204,7 @@ func TestGetRunByPlanID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: ptr.String("failed to get run for plan: failed to scan query count result: " + *invalidUUIDMsg1),
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -265,7 +265,7 @@ func TestGetRunByApplyID(t *testing.T) {
 		{
 			name:      "defective-id",
 			searchID:  invalidID,
-			expectMsg: ptr.String("failed to get run for apply: failed to scan query count result: " + *invalidUUIDMsg1),
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -382,7 +382,7 @@ func TestCreateRun(t *testing.T) {
 			toCreate: &models.Run{
 				WorkspaceID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -497,7 +497,7 @@ func TestUpdateRun(t *testing.T) {
 					Version: positiveRun.Metadata.Version,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -800,7 +800,7 @@ func TestGetRuns(t *testing.T) {
 					GroupID:     ptr.String(""),
 				},
 			},
-			expectMsg:      emptyUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectRunIDs:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -841,7 +841,7 @@ func TestGetRuns(t *testing.T) {
 					RunIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg2,
+			expectMsg:            invalidUUIDMsg,
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
 			expectHasEndCursor:   true,
@@ -881,7 +881,7 @@ func TestGetRuns(t *testing.T) {
 					PlanID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectRunIDs:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -920,7 +920,7 @@ func TestGetRuns(t *testing.T) {
 					ApplyID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectRunIDs:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -959,7 +959,7 @@ func TestGetRuns(t *testing.T) {
 					WorkspaceID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectRunIDs:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},
@@ -998,7 +998,7 @@ func TestGetRuns(t *testing.T) {
 					GroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg2,
+			expectMsg:      invalidUUIDMsg,
 			expectRunIDs:   []string{},
 			expectPageInfo: pagination.PageInfo{},
 		},

@@ -213,7 +213,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Rate limit query
 			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, *subject)
 			if qcErr != nil {
-				h.logger.Errorf("An error occurred while checking graphql query complexity; %v", qcErr)
+				h.logger.WithContextFields(ctx).Errorf("An error occurred while checking graphql query complexity; %v", qcErr)
 				err := errors.New(
 					"invalid graphql query: "+strings.TrimPrefix(qcErr.Error(), "graphql: syntax error: "),
 					errors.WithErrorCode(errors.EInvalid),
@@ -259,7 +259,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if !errors.IsContextCanceledError(e.Err) {
 					switch errors.ErrorCode(e.Err) {
 					case errors.EInternal:
-						h.logger.Errorf("Unexpected error occurred: %s", e.Err.Error())
+						h.logger.WithContextFields(ctx).Errorf("Unexpected error occurred: %s", e.Err.Error())
 						// Avoid exposing sensitive error messages
 						e.Message = errors.InternalErrorMessage
 					case errors.EUnauthorized:

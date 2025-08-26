@@ -251,7 +251,7 @@ func TestCreateStateVersionOutput(t *testing.T) {
 				Name:           "invalid-state-version-id",
 				StateVersionID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

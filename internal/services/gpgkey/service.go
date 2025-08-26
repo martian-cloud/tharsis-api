@@ -187,8 +187,7 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 		return err
 	}
 
-	s.logger.Infow("Requested deletion of a gpg key.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a gpg key.",
 		"groupID", gpgKey.GroupID,
 		"gpgKeyID", gpgKey.Metadata.ID,
 	)
@@ -201,7 +200,7 @@ func (s *service) DeleteGPGKey(ctx context.Context, gpgKey *models.GPGKey) error
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteGPGKey: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteGPGKey: %v", txErr)
 		}
 	}()
 
@@ -351,8 +350,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 		CreatedBy:   caller.GetSubject(),
 	}
 
-	s.logger.Infow("Requested creation of a gpg key.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested creation of a gpg key.",
 		"groupID", input.GroupID,
 		"gpgKeyID", toCreate.GetHexGPGKeyID(),
 	)
@@ -365,7 +363,7 @@ func (s *service) CreateGPGKey(ctx context.Context, input *CreateGPGKeyInput) (*
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateGPGKey: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateGPGKey: %v", txErr)
 		}
 	}()
 

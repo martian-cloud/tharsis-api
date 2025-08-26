@@ -65,11 +65,11 @@ func (c *providerMirrorController) GetAvailableProviderVersions(w http.ResponseW
 
 	versions, err := c.providerMirrorService.GetAvailableProviderVersions(r.Context(), input)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, &AvailableProviderVersionsResponse{Versions: versions}, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, &AvailableProviderVersionsResponse{Versions: versions}, http.StatusOK)
 }
 
 func (c *providerMirrorController) GetAvailableInstallationPackages(w http.ResponseWriter, r *http.Request) {
@@ -83,11 +83,11 @@ func (c *providerMirrorController) GetAvailableInstallationPackages(w http.Respo
 
 	packages, err := c.providerMirrorService.GetAvailableInstallationPackages(r.Context(), input)
 	if err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, &AvailableInstallationPackagesResponse{Archives: packages}, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, &AvailableInstallationPackagesResponse{Archives: packages}, http.StatusOK)
 }
 
 func (c *providerMirrorController) UploadInstallationPackage(w http.ResponseWriter, r *http.Request) {
@@ -99,9 +99,9 @@ func (c *providerMirrorController) UploadInstallationPackage(w http.ResponseWrit
 	}
 
 	if err := c.providerMirrorService.UploadInstallationPackage(r.Context(), input); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, nil, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, nil, http.StatusOK)
 }

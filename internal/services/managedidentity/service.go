@@ -224,8 +224,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 		return err
 	}
 
-	s.logger.Infow("Requested to delete a managed identity.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested to delete a managed identity.",
 		"groupID", input.ManagedIdentity.GroupID,
 		"managedIdentityID", input.ManagedIdentity.Metadata.ID,
 	)
@@ -254,7 +253,7 @@ func (s *service) DeleteManagedIdentity(ctx context.Context, input *DeleteManage
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteManagedIdentity: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteManagedIdentity: %v", txErr)
 		}
 	}()
 
@@ -373,7 +372,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer AddManagedIdentityToWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer AddManagedIdentityToWorkspace: %v", txErr)
 		}
 	}()
 
@@ -421,8 +420,7 @@ func (s *service) AddManagedIdentityToWorkspace(ctx context.Context, managedIden
 		return err
 	}
 
-	s.logger.Infow("Added a managed identity to a workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Added a managed identity to a workspace.",
 		"workspaceID", workspace.Metadata.ID,
 		"fullPath", workspace.FullPath,
 		"managedIdentityID", managedIdentityID,
@@ -469,7 +467,7 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer RemoveManagedIdentityFromWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer RemoveManagedIdentityFromWorkspace: %v", txErr)
 		}
 	}()
 
@@ -495,8 +493,7 @@ func (s *service) RemoveManagedIdentityFromWorkspace(ctx context.Context, manage
 		return err
 	}
 
-	s.logger.Infow("Removed a managed identity from workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Removed a managed identity from workspace.",
 		"workspaceID", workspaceID,
 		"managedIdentityID", managedIdentityID,
 	)
@@ -631,7 +628,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateMangedIdentityAlias: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateMangedIdentityAlias: %v", txErr)
 		}
 	}()
 
@@ -709,8 +706,7 @@ func (s *service) CreateManagedIdentityAlias(ctx context.Context, input *CreateM
 		return nil, err
 	}
 
-	s.logger.Infow("Created a managed identity alias.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a managed identity alias.",
 		"groupID", newGroup.Metadata.ID,
 		"aliasID", createdAlias.Metadata.ID,
 	)
@@ -751,8 +747,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 
 	}
 
-	s.logger.Infow("Requested to delete a managed identity alias.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested to delete a managed identity alias.",
 		"groupID", input.ManagedIdentity.GroupID,
 		"aliasID", input.ManagedIdentity.Metadata.ID,
 	)
@@ -781,7 +776,7 @@ func (s *service) DeleteManagedIdentityAlias(ctx context.Context, input *DeleteM
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteManagedIdentityAlias: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteManagedIdentityAlias: %v", txErr)
 		}
 	}()
 
@@ -850,8 +845,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 		return nil, err
 	}
 
-	s.logger.Infow("Requested to create a new managed identity.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested to create a new managed identity.",
 		"groupID", input.GroupID,
 		"managedIdentityName", managedIdentity.Name,
 	)
@@ -864,7 +858,7 @@ func (s *service) CreateManagedIdentity(ctx context.Context, input *CreateManage
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateManagedIdentity: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateManagedIdentity: %v", txErr)
 		}
 	}()
 
@@ -1043,8 +1037,7 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 		return nil, errors.Wrap(sErr, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	s.logger.Infow("Updated a managed identity.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated a managed identity.",
 		"groupID", managedIdentity.GroupID,
 		"managedIdentityID", managedIdentity.Metadata.ID,
 	)
@@ -1057,7 +1050,7 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateManagedIdentity: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateManagedIdentity: %v", txErr)
 		}
 	}()
 
@@ -1280,7 +1273,7 @@ func (s *service) CreateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateManagedIdentityAccessRule: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateManagedIdentityAccessRule: %v", txErr)
 		}
 	}()
 
@@ -1379,7 +1372,7 @@ func (s *service) UpdateManagedIdentityAccessRule(ctx context.Context, input *mo
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateManagedIdentityAccessRule: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateManagedIdentityAccessRule: %v", txErr)
 		}
 	}()
 
@@ -1447,7 +1440,7 @@ func (s *service) DeleteManagedIdentityAccessRule(ctx context.Context, rule *mod
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for DeleteManagedIdentityAccessRule: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for DeleteManagedIdentityAccessRule: %v", txErr)
 		}
 	}()
 
@@ -1526,8 +1519,7 @@ func (s *service) CreateCredentials(ctx context.Context, identity *models.Manage
 		return nil, err
 	}
 
-	s.logger.Infow("Created credentials for a managed identity.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created credentials for a managed identity.",
 		"groupID", identity.GroupID,
 		"managedIdentityID", identity.Metadata.ID,
 	)
@@ -1594,8 +1586,7 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 		return nil, err
 	}
 
-	s.logger.Infow("Requested to move a managed identity.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested to move a managed identity.",
 		"managedIdentityName", managedIdentity.Name,
 		"groupPath", newGroup.FullPath,
 	)
@@ -1608,7 +1599,7 @@ func (s *service) MoveManagedIdentity(ctx context.Context, input *MoveManagedIde
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for MoveManagedIdentity: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for MoveManagedIdentity: %v", txErr)
 		}
 	}()
 

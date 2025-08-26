@@ -207,7 +207,7 @@ func (m *variables) CreateVariable(ctx context.Context, input *models.Variable) 
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			m.dbClient.logger.Errorf("failed to rollback tx for CreateVariable: %v", txErr)
+			m.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateVariable: %v", txErr)
 		}
 	}()
 
@@ -319,7 +319,7 @@ func (m *variables) CreateVariables(ctx context.Context, namespacePath string, v
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			m.dbClient.logger.Errorf("failed to rollback tx for CreateVariables: %v", txErr)
+			m.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateVariables: %v", txErr)
 		}
 	}()
 
@@ -408,7 +408,7 @@ func (m *variables) UpdateVariable(ctx context.Context, variable *models.Variabl
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			m.dbClient.logger.Errorf("failed to rollback tx for UpdateVariable: %v", txErr)
+			m.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for UpdateVariable: %v", txErr)
 		}
 	}()
 

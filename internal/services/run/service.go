@@ -363,14 +363,14 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
-					s.logger.Errorf("Error occurred while waiting for run events: %v", err)
+					s.logger.WithContextFields(ctx).Errorf("Error occurred while waiting for run events: %v", err)
 				}
 				return
 			}
 
 			eventData, err := event.ToRunEventData()
 			if err != nil {
-				s.logger.Errorf("failed to get run event data in run event subscription: %v", err)
+				s.logger.WithContextFields(ctx).Errorf("failed to get run event data in run event subscription: %v", err)
 				continue
 			}
 
@@ -398,7 +398,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				if errors.IsContextCanceledError(err) || errors.IsDeadlineExceededError(err) {
 					return
 				}
-				s.logger.Errorf("Error occurred while querying for run associated with run event %s: %v", event.ID, err)
+				s.logger.WithContextFields(ctx).Errorf("Error occurred while querying for run associated with run event %s: %v", event.ID, err)
 				continue
 			}
 
@@ -513,7 +513,7 @@ func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateAssessmentRunForWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateAssessmentRunForWorkspace: %v", txErr)
 		}
 	}()
 
@@ -857,7 +857,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for claimJob: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for claimJob: %v", txErr)
 		}
 	}()
 
@@ -1044,8 +1044,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 		return nil, err
 	}
 
-	s.logger.Infow("Created a new run.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a new run.",
 		"workspaceID", run.WorkspaceID,
 		"runID", run.Metadata.ID,
 	)
@@ -1152,7 +1151,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for ApplyRun: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for ApplyRun: %v", txErr)
 		}
 	}()
 
@@ -1212,8 +1211,7 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		return nil, err
 	}
 
-	s.logger.Infow("Applied a run.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Applied a run.",
 		"workspaceID", run.WorkspaceID,
 		"runStatus", run.Status,
 		"runID", runID,
@@ -1348,7 +1346,7 @@ func (s *service) CancelRun(ctx context.Context, options *CancelRunInput) (*mode
 	}
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CancelRun: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CancelRun: %v", txErr)
 		}
 	}()
 

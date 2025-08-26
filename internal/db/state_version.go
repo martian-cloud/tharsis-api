@@ -234,7 +234,7 @@ func (s *stateVersions) CreateStateVersion(ctx context.Context, stateVersion *mo
 	createdStateVersion, err := scanStateVersion(s.dbClient.getConnection(ctx).QueryRow(ctx, sql, args...))
 
 	if err != nil {
-		s.dbClient.logger.Error(err)
+		s.dbClient.logger.WithContextFields(ctx).Error(err)
 		tracing.RecordError(span, err, "failed to execute query")
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -198,11 +199,11 @@ func (c *scimController) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := c.userService.GetUserByID(r.Context(), userID)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, TharsisUserToSCIMUser(user), http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, TharsisUserToSCIMUser(user), http.StatusOK)
 }
 
 func (c *scimController) GetUsers(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +213,7 @@ func (c *scimController) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	value, err := parseFilter(filter)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -222,7 +223,7 @@ func (c *scimController) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	users, err := c.scimService.GetSCIMUsers(r.Context(), input)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -235,17 +236,17 @@ func (c *scimController) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	response, err := toListResponse(scimUsers, startIndex, count)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, response, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, response, http.StatusOK)
 }
 
 func (c *scimController) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateSCIMUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -266,11 +267,11 @@ func (c *scimController) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := c.scimService.CreateSCIMUser(r.Context(), input)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, TharsisUserToSCIMUser(user), http.StatusCreated)
+	c.respWriter.RespondWithJSON(r.Context(), w, TharsisUserToSCIMUser(user), http.StatusCreated)
 }
 
 func (c *scimController) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +279,7 @@ func (c *scimController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	var req SCIMUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -290,11 +291,11 @@ func (c *scimController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	updatedUser, err := c.scimService.UpdateSCIMUser(r.Context(), input)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, TharsisUserToSCIMUser(updatedUser), http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, TharsisUserToSCIMUser(updatedUser), http.StatusOK)
 }
 
 func (c *scimController) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -302,11 +303,11 @@ func (c *scimController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	err := c.scimService.DeleteSCIMUser(r.Context(), &scim.DeleteSCIMResourceInput{ID: userID})
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, nil, http.StatusNoContent)
+	c.respWriter.RespondWithJSON(r.Context(), w, nil, http.StatusNoContent)
 }
 
 /* Teams (SCIM groups) CRUD */
@@ -316,11 +317,11 @@ func (c *scimController) GetGroup(w http.ResponseWriter, r *http.Request) {
 
 	team, err := c.teamService.GetTeamByID(r.Context(), teamID)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, TharsisTeamToSCIMGroup(team), http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, TharsisTeamToSCIMGroup(team), http.StatusOK)
 }
 
 func (c *scimController) GetGroups(w http.ResponseWriter, r *http.Request) {
@@ -330,7 +331,7 @@ func (c *scimController) GetGroups(w http.ResponseWriter, r *http.Request) {
 
 	value, err := parseFilter(filter)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -340,7 +341,7 @@ func (c *scimController) GetGroups(w http.ResponseWriter, r *http.Request) {
 
 	groups, err := c.scimService.GetSCIMGroups(r.Context(), input)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -353,17 +354,17 @@ func (c *scimController) GetGroups(w http.ResponseWriter, r *http.Request) {
 
 	response, err := toListResponse(scimGroups, startIndex, count)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, response, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, response, http.StatusOK)
 }
 
 func (c *scimController) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	var req CreateSCIMGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respWriter.RespondWithError(w, err)
+		c.respWriter.RespondWithError(r.Context(), w, err)
 		return
 	}
 
@@ -374,11 +375,11 @@ func (c *scimController) CreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	team, err := c.scimService.CreateSCIMGroup(r.Context(), input)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, TharsisTeamToSCIMGroup(team), http.StatusCreated)
+	c.respWriter.RespondWithJSON(r.Context(), w, TharsisTeamToSCIMGroup(team), http.StatusCreated)
 }
 
 func (c *scimController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
@@ -386,7 +387,7 @@ func (c *scimController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 
 	var req SCIMUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
@@ -398,12 +399,12 @@ func (c *scimController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	// Returned model is not needed since SCIM never wants it.
 	_, err := c.scimService.UpdateSCIMGroup(r.Context(), input)
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
 	// Contrary to UpdateUsers, SCIM requires no content for group updates.
-	c.respWriter.RespondWithJSON(w, nil, http.StatusNoContent)
+	c.respWriter.RespondWithJSON(r.Context(), w, nil, http.StatusNoContent)
 }
 
 func (c *scimController) DeleteGroup(w http.ResponseWriter, r *http.Request) {
@@ -411,11 +412,11 @@ func (c *scimController) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 	err := c.scimService.DeleteSCIMGroup(r.Context(), &scim.DeleteSCIMResourceInput{ID: teamID})
 	if err != nil {
-		c.respondWithSCIMError(w, err)
+		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	c.respWriter.RespondWithJSON(w, nil, http.StatusNoContent)
+	c.respWriter.RespondWithJSON(r.Context(), w, nil, http.StatusNoContent)
 }
 
 /* Conversions */
@@ -464,12 +465,12 @@ func TharsisTeamToSCIMGroup(team *models.Team) *SCIMGroup {
 /* Custom responses */
 
 // respondWithSCIMError responds to an http request with a SCIM error message.
-func (c *scimController) respondWithSCIMError(w http.ResponseWriter, err error) {
+func (c *scimController) respondWithSCIMError(ctx context.Context, w http.ResponseWriter, err error) {
 	if !errors.IsContextCanceledError(err) &&
 		errors.ErrorCode(err) != errors.EUnauthorized &&
 		errors.ErrorCode(err) != errors.EForbidden &&
 		errors.ErrorCode(err) != errors.ENotFound {
-		c.logger.Errorf("Unexpected error occurred: %s", err.Error())
+		c.logger.WithContextFields(ctx).Errorf("Unexpected error occurred: %s", err.Error())
 	}
 
 	code := response.ErrorCodeToStatusCode(errors.ErrorCode(err))
@@ -479,7 +480,7 @@ func (c *scimController) respondWithSCIMError(w http.ResponseWriter, err error) 
 		Status:     fmt.Sprintf("%d", code), // Must be a string.
 	}
 
-	c.respWriter.RespondWithJSON(w, scimErr, code)
+	c.respWriter.RespondWithJSON(ctx, w, scimErr, code)
 }
 
 // toListResponse converts value to a SCIMListResponse with pagination,

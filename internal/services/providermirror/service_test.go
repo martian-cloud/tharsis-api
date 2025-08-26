@@ -1013,7 +1013,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 			}
 
 			if test.expectErrorCode == "" {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -1373,7 +1373,7 @@ func TestDeleteProviderPlatformMirror(t *testing.T) {
 				}, nil)
 
 			if test.expectErrorCode == "" {
-				mockCaller.On("GetSubject").Return("testSubject")
+				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
 				mockPlatformMirrors.On("DeletePlatformMirror", mock.Anything, samplePlatformMirror).Return(nil)
 			}

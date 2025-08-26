@@ -256,7 +256,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
-					s.logger.Errorf("error occurred while waiting for workspace events: %v", err)
+					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for workspace events: %v", err)
 				}
 				return
 			}
@@ -266,7 +266,7 @@ func (s *service) SubscribeToWorkspaceEvents(ctx context.Context, options *Event
 				if errors.IsContextCanceledError(err) || errors.IsDeadlineExceededError(err) {
 					return
 				}
-				s.logger.Errorf("error occurred while querying for workspace associated with workspace event %s: %v", event.ID, err)
+				s.logger.WithContextFields(ctx).Errorf("error occurred while querying for workspace associated with workspace event %s: %v", event.ID, err)
 				continue
 			}
 
@@ -487,8 +487,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		}
 	}
 
-	s.logger.Infow("Requested deletion of a workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a workspace.",
 		"fullPath", workspace.FullPath,
 		"workspaceID", workspace.Metadata.ID,
 	)
@@ -501,7 +500,7 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteWorkspace: %v", txErr)
 		}
 	}()
 
@@ -596,12 +595,11 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateWorkspace: %v", txErr)
 		}
 	}()
 
-	s.logger.Infow("Requested creation of a new workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested creation of a new workspace.",
 		"groupID", workspace.GroupID,
 		"workspaceName", workspace.Name,
 	)
@@ -689,8 +687,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	s.logger.Infow("Requested an update to a workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested an update to a workspace.",
 		"fullPath", workspace.FullPath,
 		"workspaceID", workspace.Metadata.ID,
 	)
@@ -703,7 +700,7 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateWorkspace: %v", txErr)
 		}
 	}()
 
@@ -758,8 +755,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 	// Update the field.
 	workspace.Locked = true
 
-	s.logger.Infow("Requested a lock on workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested a lock on workspace.",
 		"fullPath", workspace.FullPath,
 		"workspaceID", workspace.Metadata.ID,
 	)
@@ -772,7 +768,7 @@ func (s *service) LockWorkspace(ctx context.Context, workspace *models.Workspace
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer LockWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer LockWorkspace: %v", txErr)
 		}
 	}()
 
@@ -833,8 +829,7 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 	// Update the field.
 	workspace.Locked = false
 
-	s.logger.Infow("Requested an unlock on workspace.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested an unlock on workspace.",
 		"fullPath", workspace.FullPath,
 		"workspaceID", workspace.Metadata.ID,
 	)
@@ -847,7 +842,7 @@ func (s *service) UnlockWorkspace(ctx context.Context, workspace *models.Workspa
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UnlockWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UnlockWorkspace: %v", txErr)
 		}
 	}()
 
@@ -1088,7 +1083,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateStateVersion: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateStateVersion: %v", txErr)
 		}
 	}()
 
@@ -1197,8 +1192,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 		return nil, err
 	}
 
-	s.logger.Infow("Created a new state version",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a new state version",
 		"stateVersionID", createdStateVersion.Metadata.ID,
 		"workspaceID", createdStateVersion.WorkspaceID,
 		"workspaceFullPath", workspace.FullPath,
@@ -1517,7 +1511,7 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateConfigurationVersion: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateConfigurationVersion: %v", txErr)
 		}
 	}()
 
@@ -1559,8 +1553,7 @@ func (s *service) CreateConfigurationVersion(ctx context.Context, options *Creat
 		return nil, err
 	}
 
-	s.logger.Infow("Created a configuration version.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a configuration version.",
 		"workspaceID", options.WorkspaceID,
 		"configurationVersionID", cv.Metadata.ID,
 	)
@@ -1941,8 +1934,7 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 	// Because the workspace to be moved and the new parent group have been fetched from the DB,
 	// there's no need to validate them.
 
-	s.logger.Infow("Requested a workspace migration.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested a workspace migration.",
 		"fullPath", workspace.FullPath, // This is the full path of the workspace prior to migration.
 		"workspaceID", workspace.Metadata.ID,
 		"newGroupPath", newGroup.FullPath,
@@ -1955,7 +1947,7 @@ func (s *service) MigrateWorkspace(ctx context.Context, workspaceID string, newG
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer MigrateWorkspace: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer MigrateWorkspace: %v", txErr)
 		}
 	}()
 

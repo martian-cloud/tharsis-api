@@ -220,7 +220,9 @@ func NewFederatedRegistryToken(ctx context.Context, input *FederatedRegistryToke
 		Expiration: &expiration,
 		Subject:    input.FederatedRegistry.GetGlobalID(),
 		Audience:   input.FederatedRegistry.Audience,
-		Typ:        auth.FederatedRegistryTokenType,
+		Claims: map[string]string{
+			"type": auth.FederatedRegistryTokenType,
+		},
 	})
 	if err != nil {
 		return "", err

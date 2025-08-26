@@ -302,7 +302,7 @@ func TestGetStateVersions(t *testing.T) {
 					// StateVersionIDs: []string{},
 				},
 			},
-			expectMsg:             emptyUUIDMsg2,
+			expectMsg:             invalidUUIDMsg,
 			expectStateVersionIDs: []string{},
 			expectPageInfo:        pagination.PageInfo{},
 		},
@@ -341,7 +341,7 @@ func TestGetStateVersions(t *testing.T) {
 					WorkspaceID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:             invalidUUIDMsg2,
+			expectMsg:             invalidUUIDMsg,
 			expectStateVersionIDs: []string{},
 			expectPageInfo:        pagination.PageInfo{},
 		},
@@ -386,7 +386,7 @@ func TestGetStateVersions(t *testing.T) {
 					StateVersionIDs: []string{invalidID},
 				},
 			},
-			expectMsg:             invalidUUIDMsg2,
+			expectMsg:             invalidUUIDMsg,
 			expectStateVersionIDs: []string{},
 			expectPageInfo:        pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
 			expectHasStartCursor:  true,
@@ -685,7 +685,7 @@ func TestCreateStateVersion(t *testing.T) {
 				RunID:       ptr.String(warmupRuns[0].Metadata.ID),
 				CreatedBy:   "defective-workspace-id-test-case",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		{
@@ -695,7 +695,7 @@ func TestCreateStateVersion(t *testing.T) {
 				RunID:       ptr.String(invalidID),
 				CreatedBy:   "defective-run-id",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

@@ -317,12 +317,12 @@ func (p *PaginatedQueryBuilder) Execute(ctx context.Context, conn Connection, qu
 
 	var count int32
 	if err = row.Scan(&count); err != nil {
-		return nil, fmt.Errorf("failed to scan query count result: %w", err)
+		return nil, fmt.Errorf("failed to scan query count result: %s: %w", countSQL, err)
 	}
 
 	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("paginated query failed: %s: %w", sql, err)
 	}
 
 	return &cursorPaginatedRows{

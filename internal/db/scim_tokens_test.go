@@ -41,7 +41,7 @@ func TestGetTokenByNonce(t *testing.T) {
 		{
 			name:        "defective-nonce",
 			searchNonce: invalidID,
-			expectMsg:   invalidUUIDMsg1,
+			expectMsg:   invalidUUIDMsg,
 		},
 	}
 
@@ -139,7 +139,7 @@ func TestCreateToken(t *testing.T) {
 				Nonce:     invalidID,
 				CreatedBy: "some-admin@example.com",
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 
@@ -212,7 +212,7 @@ func TestDeleteToken(t *testing.T) {
 					ID: invalidID,
 				},
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	}
 

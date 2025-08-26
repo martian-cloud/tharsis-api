@@ -107,7 +107,7 @@ func (e *EventManager) Start(ctx context.Context) {
 				case event := <-ch:
 					e.notifyEvent(ctx, event)
 				case err := <-errorCh:
-					e.logger.Errorf("received error when listening for db event: %v", err)
+					e.logger.WithContextFields(ctx).Errorf("received error when listening for db event: %v", err)
 
 					// Notify subscribers of error
 					e.notifyError(err)
@@ -193,7 +193,7 @@ func (e *EventManager) sendEventToSubscriber(ctx context.Context, subscriber *Su
 	// Send event to subscriber
 	select {
 	case <-sendContext.Done():
-		e.logger.Error("event manager failed to send event to subscriber due to timeout")
+		e.logger.WithContextFields(ctx).Error("event manager failed to send event to subscriber due to timeout")
 		// unsubscribe subscriber here to prevent further issues
 		e.Unsubscribe(subscriber)
 	case subscriber.events <- event:

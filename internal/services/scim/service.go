@@ -152,7 +152,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for CreateSCIMToken: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateSCIMToken: %v", txErr)
 		}
 	}()
 
@@ -206,9 +206,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 		return nil, err
 	}
 
-	s.logger.Infow("Created a new SCIM token.",
-		"caller", caller.GetSubject(),
-	)
+	s.logger.WithContextFields(ctx).Infow("Created a new SCIM token.")
 
 	return scimToken, nil
 }
@@ -632,7 +630,7 @@ func (s *service) processSCIMGroupOperations(ctx context.Context, ops []Operatio
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for processSCIMGroupOperations: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for processSCIMGroupOperations: %v", txErr)
 		}
 	}()
 

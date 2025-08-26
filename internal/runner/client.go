@@ -66,9 +66,9 @@ func (i *InternalTokenProvider) GetToken(ctx context.Context) (string, error) {
 		Expiration: &expiration,
 		Subject:    i.runnerName,
 		Audience:   internalRunnerJWTAudience,
-		Typ:        internalRunnerJWTType,
 		Claims: map[string]string{
 			"runner_id": i.runnerGID,
+			"type":      internalRunnerJWTType,
 		},
 	})
 	if err != nil {

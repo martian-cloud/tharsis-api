@@ -42,11 +42,11 @@ func NewCSRFMiddleware(
 			// Only check CSRF token if this is a user session authenticated request and if it's not a graphql subscription websocket request
 			if requestSessionID, ok := auth.GetRequestUserSessionID(r); ok && !isGraphqlSubscriptionRequest(r) {
 				if err := validateCSRFToken(ctx, r, requestSessionID, sessionManager); err != nil {
-					logger.Infow("Request has invalid CSRF token",
+					logger.WithContextFields(ctx).Infow("Request has invalid CSRF token",
 						"error", err,
 						"subject", ptr.ToString(auth.GetSubject(r.Context())),
 					)
-					respWriter.RespondWithError(w, err)
+					respWriter.RespondWithError(r.Context(), w, err)
 					return
 				}
 			}

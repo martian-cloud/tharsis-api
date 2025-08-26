@@ -69,7 +69,7 @@ require (
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/vanng822/go-premailer v1.22.0
 	github.com/zclconf/go-cty v1.15.0
-	gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws v1.0.0
+	gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws v1.1.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.4.0

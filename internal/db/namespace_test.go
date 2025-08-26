@@ -81,7 +81,7 @@ func TestGetNamespaceByGroupID(t *testing.T) {
 		testCase{
 			name:      "negative: invalid",
 			input:     invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 
@@ -158,7 +158,7 @@ func TestGetNamespaceByWorkspaceID(t *testing.T) {
 		testCase{
 			name:      "negative: invalid",
 			input:     invalidID,
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 
@@ -344,7 +344,7 @@ func TestCreateNamespace(t *testing.T) {
 				path:    "group/ID/invalid",
 				groupID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 
 		testCase{
@@ -353,7 +353,7 @@ func TestCreateNamespace(t *testing.T) {
 				path:        "workspace/ID/invalid",
 				workspaceID: invalidID,
 			},
-			expectMsg: invalidUUIDMsg1,
+			expectMsg: invalidUUIDMsg,
 		},
 	)
 

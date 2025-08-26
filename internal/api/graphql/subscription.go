@@ -65,6 +65,34 @@ func newSubscriptionHandler(
 		graphqlws.WithReadLimit(graphqlSubscriptionMaxMessageSize),
 		graphqlws.WithWriteTimeout(graphqlSubscriptionWriteTimeout),
 		graphqlws.WithConnectionTimeout(maxConnectionDuration),
+		graphqlws.WithConnectionInitHandler(func(ctx context.Context, message json.RawMessage) (context.Context, error) {
+			caller := auth.GetCaller(ctx)
+			// A caller may already be set if this connection was authenticated using a cookie based user session. If a caller is not set,
+			// we'll verify that a valid authorization token is present in the connection params.
+			if caller == nil {
+				// Verify that the connection params are valid if a caller is not already set
+				var params connectionParams
+				if err := json.Unmarshal(message, &params); err != nil {
+					return nil, errors.New("Failed to decode connection params", errors.WithErrorCode(errors.EInvalid))
+				}
+
+				token := params.findToken()
+
+				if token == "" {
+					return nil, errors.New("missing authorization token in connection params", errors.WithErrorCode(errors.EUnauthorized))
+				}
+
+				caller, err := authenticator.Authenticate(ctx, token, false)
+				if err != nil {
+					return nil, errors.Wrap(err, "unauthorized", errors.WithErrorCode(errors.EUnauthorized))
+				}
+
+				// Add caller to context so that subscriptions will be authenticated
+				return auth.WithCaller(ctx, caller), nil
+			}
+
+			return ctx, nil
+		}),
 	)
 }
 
@@ -89,26 +117,6 @@ type graphqlSubscriptions struct {
 var graphqlSubscriptionCount = metric.NewCounter("graphql_subscription_count", "Amount of GraphQL Subscriptions.")
 
 func (g *graphqlSubscriptions) Subscribe(ctx context.Context, document string, operationName string, variableValues map[string]interface{}) (payloads <-chan interface{}, err error) {
-	caller := auth.GetCaller(ctx)
-	if caller == nil {
-		// Attempt to authenticate this request using connection params
-		msg, ok := ctx.Value("Header").(json.RawMessage)
-		if !ok {
-			return nil, errors.New("Missing Authorization header", errors.WithErrorCode(errors.EUnauthorized))
-		}
-		var params connectionParams
-		if err = json.Unmarshal(msg, &params); err != nil {
-			return nil, errors.New("Failed to decode connection params", errors.WithErrorCode(errors.EInvalid))
-		}
-
-		caller, err = g.authenticator.Authenticate(ctx, params.findToken(), false)
-		if err != nil {
-			return nil, errors.Wrap(err, "unauthorized", errors.WithErrorCode(errors.EUnauthorized))
-		}
-
-		ctx = auth.WithCaller(ctx, caller)
-	}
-
 	graphqlSubscriptionCount.Inc()
 	return g.schema.Subscribe(ctx, document, operationName, variableValues)
 }

@@ -281,7 +281,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			g.dbClient.logger.Errorf("failed to rollback tx for CreateGroup: %v", txErr)
+			g.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateGroup: %v", txErr)
 		}
 	}()
 
@@ -478,7 +478,7 @@ func (g *groups) MigrateGroup(ctx context.Context, group, newParentGroup *models
 	// the tx commits successfully, this is a no-op
 	defer func() {
 		if txErr := tx.Rollback(ctx); txErr != nil && txErr != pgx.ErrTxClosed {
-			g.dbClient.logger.Errorf("failed to rollback tx for MigrateGroup: %v", txErr)
+			g.dbClient.logger.WithContextFields(ctx).Errorf("failed to rollback tx for MigrateGroup: %v", txErr)
 		}
 	}()
 

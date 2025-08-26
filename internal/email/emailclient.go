@@ -51,7 +51,7 @@ func (c *client) SendMail(_ context.Context, input *SendMailInput) {
 	c.taskManager.StartTask(func(ctx context.Context) {
 		if err := c.sendMail(ctx, input); err != nil {
 			// Log an error if the email(s) failed to send
-			c.logger.Errorf("failed to send email of type %s: %v", string(input.Builder.Type()), err)
+			c.logger.WithContextFields(ctx).Errorf("failed to send email of type %s: %v", string(input.Builder.Type()), err)
 		}
 	})
 }
@@ -116,7 +116,7 @@ func (c *client) sendMail(ctx context.Context, input *SendMailInput) error {
 	// Send email to each recipient, eventually this can be optimized to send each recipient in a separate goroutine
 	for _, recipient := range addresses {
 		if err = c.emailProvider.SendMail(ctx, []string{recipient}, input.Subject, emailBody); err != nil {
-			c.logger.Errorf("failed to send email to %s: %v", recipient, err)
+			c.logger.WithContextFields(ctx).Errorf("failed to send email to %s: %v", recipient, err)
 		}
 	}
 

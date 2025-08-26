@@ -96,7 +96,7 @@ func (r *runStateManager) fireEvent(ctx context.Context, eventType EventType, ol
 				return errors.ErrorCode(err) == errors.EOptimisticLock
 			}),
 			retry.OnRetry(func(n uint, err error) {
-				r.logger.Infof("Retrying event handler for event type %s: attempt= %d error=%s", eventType, n+1, err)
+				r.logger.WithContextFields(ctx).Infof("Retrying event handler for event type %s: attempt= %d error=%s", eventType, n+1, err)
 			}),
 			retry.LastErrorOnly(true),
 			retry.Context(ctx),
@@ -109,7 +109,7 @@ func (r *runStateManager) fireEvent(ctx context.Context, eventType EventType, ol
 
 // UpdateJob handles the state transitions for updating a job resource
 func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*models.Job, error) {
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 
 	defer func() {
 		if txErr := r.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			r.logger.Errorf("failed to rollback tx for updateJob: %v", txErr)
+			r.logger.WithContextFields(ctx).Errorf("failed to rollback tx for updateJob: %v", txErr)
 		}
 	}()
 
@@ -144,8 +144,7 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 		return nil, err
 	}
 
-	r.logger.Infow("Updated a job.",
-		"caller", caller.GetSubject(),
+	r.logger.WithContextFields(ctx).Infow("Updated a job.",
 		"workspaceID", job.WorkspaceID,
 		"oldJobStatus", oldJob.Status,
 		"newJobStatus", updatedJob.Status,
@@ -157,7 +156,7 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 
 // UpdateRun handles the state transitions for updating a run resource
 func (r *runStateManager) UpdateRun(ctx context.Context, run *models.Run) (*models.Run, error) {
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +169,7 @@ func (r *runStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 
 	defer func() {
 		if txErr := r.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			r.logger.Errorf("failed to rollback tx for updateRun: %v", txErr)
+			r.logger.WithContextFields(ctx).Errorf("failed to rollback tx for updateRun: %v", txErr)
 		}
 	}()
 
@@ -200,8 +199,7 @@ func (r *runStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 		return nil, err
 	}
 
-	r.logger.Infow("Updated a run.",
-		"caller", caller.GetSubject(),
+	r.logger.WithContextFields(ctx).Infow("Updated a run.",
 		"workspaceID", run.WorkspaceID,
 		"oldRunStatus", oldRun.Status,
 		"newRunStatus", updatedRun.Status,
@@ -213,7 +211,7 @@ func (r *runStateManager) UpdateRun(ctx context.Context, run *models.Run) (*mode
 
 // UpdatePlan handles the state transitions for updating a plan resource
 func (r *runStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*models.Plan, error) {
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +224,7 @@ func (r *runStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*m
 
 	defer func() {
 		if txErr := r.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			r.logger.Errorf("failed to rollback tx for updatePlan: %v", txErr)
+			r.logger.WithContextFields(ctx).Errorf("failed to rollback tx for updatePlan: %v", txErr)
 		}
 	}()
 
@@ -255,8 +253,7 @@ func (r *runStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*m
 		return nil, err
 	}
 
-	r.logger.Infow("Updated a plan.",
-		"caller", caller.GetSubject(),
+	r.logger.WithContextFields(ctx).Infow("Updated a plan.",
 		"workspaceID", plan.WorkspaceID,
 		"oldPlanStatus", oldPlan.Status,
 		"newPlanStatus", updatedPlan.Status,
@@ -268,7 +265,7 @@ func (r *runStateManager) UpdatePlan(ctx context.Context, plan *models.Plan) (*m
 
 // UpdateApply handles the state transitions for updating an apply resource
 func (r *runStateManager) UpdateApply(ctx context.Context, apply *models.Apply) (*models.Apply, error) {
-	caller, err := auth.AuthorizeCaller(ctx)
+	_, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +278,7 @@ func (r *runStateManager) UpdateApply(ctx context.Context, apply *models.Apply) 
 
 	defer func() {
 		if txErr := r.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			r.logger.Errorf("failed to rollback tx for updateApply: %v", txErr)
+			r.logger.WithContextFields(ctx).Errorf("failed to rollback tx for updateApply: %v", txErr)
 		}
 	}()
 
@@ -310,8 +307,7 @@ func (r *runStateManager) UpdateApply(ctx context.Context, apply *models.Apply) 
 		return nil, err
 	}
 
-	r.logger.Infow("Updated an apply.",
-		"caller", caller.GetSubject(),
+	r.logger.WithContextFields(ctx).Infow("Updated an apply.",
 		"workspaceID", apply.WorkspaceID,
 		"oldApplyStatus", oldApply.Status,
 		"newApplyStatus", updatedApply.Status,

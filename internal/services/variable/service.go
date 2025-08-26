@@ -541,7 +541,7 @@ func (s *service) SetVariables(ctx context.Context, input *SetVariablesInput) er
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for SetVariables: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for SetVariables: %v", txErr)
 		}
 	}()
 
@@ -658,7 +658,7 @@ func (s *service) CreateVariable(ctx context.Context, input *CreateVariableInput
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateVariable: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateVariable: %v", txErr)
 		}
 	}()
 
@@ -698,8 +698,7 @@ func (s *service) CreateVariable(ctx context.Context, input *CreateVariableInput
 		return nil, errors.Wrap(err, "failed to commit DB transaction", errors.WithSpan(span))
 	}
 
-	s.logger.Infow("Created a new variable.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Created a new variable.",
 		"namespacePath", input.NamespacePath,
 		"variableID", variable.Metadata.ID,
 	)
@@ -788,7 +787,7 @@ func (s *service) UpdateVariable(ctx context.Context, input *UpdateVariableInput
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateVariable: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateVariable: %v", txErr)
 		}
 	}()
 
@@ -814,8 +813,7 @@ func (s *service) UpdateVariable(ctx context.Context, input *UpdateVariableInput
 		return nil, err
 	}
 
-	s.logger.Infow("Updated a variable.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Updated a variable.",
 		"namespacePath", variable.NamespacePath,
 		"variableID", updatedVariable.Metadata.ID,
 	)
@@ -856,12 +854,11 @@ func (s *service) DeleteVariable(ctx context.Context, input *DeleteVariableInput
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteVariable: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteVariable: %v", txErr)
 		}
 	}()
 
-	s.logger.Infow("Requested deletion of a variable.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a variable.",
 		"namespacePath", variable.NamespacePath,
 		"variableID", variable.Metadata.ID,
 	)

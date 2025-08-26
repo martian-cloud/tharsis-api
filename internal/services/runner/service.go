@@ -286,8 +286,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 		}
 	}
 
-	s.logger.Infow("Requested deletion of a runner.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested deletion of a runner.",
 		"runnerID", runner.Metadata.ID,
 	)
 
@@ -299,7 +298,7 @@ func (s *service) DeleteRunner(ctx context.Context, runner *models.Runner) error
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer DeleteRunner: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer DeleteRunner: %v", txErr)
 		}
 	}()
 
@@ -491,7 +490,7 @@ func (s *service) CreateRunnerSession(ctx context.Context, input *CreateRunnerSe
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateRunnerSession: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateRunnerSession: %v", txErr)
 		}
 	}()
 
@@ -681,8 +680,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 		return nil, err
 	}
 
-	s.logger.Infow("Requested creation of a runner.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested creation of a runner.",
 		"groupID", input.GroupID,
 		"runnerName", input.Name,
 	)
@@ -695,7 +693,7 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer CreateRunner: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer CreateRunner: %v", txErr)
 		}
 	}()
 
@@ -787,8 +785,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 		return nil, err
 	}
 
-	s.logger.Infow("Requested an update to a runner.",
-		"caller", caller.GetSubject(),
+	s.logger.WithContextFields(ctx).Infow("Requested an update to a runner.",
 		"runnerID", runner.Metadata.ID,
 	)
 
@@ -800,7 +797,7 @@ func (s *service) UpdateRunner(ctx context.Context, runner *models.Runner) (*mod
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.Errorf("failed to rollback tx for service layer UpdateRunner: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for service layer UpdateRunner: %v", txErr)
 		}
 	}()
 
@@ -968,7 +965,7 @@ func (s *service) CreateRunnerSessionError(ctx context.Context, runnerSessionID 
 
 		defer func() {
 			if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-				s.logger.Errorf("failed to rollback tx: %v", txErr)
+				s.logger.WithContextFields(ctx).Errorf("failed to rollback tx: %v", txErr)
 			}
 		}()
 
@@ -1170,14 +1167,14 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 			event, err := subscriber.GetEvent(ctx)
 			if err != nil {
 				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
-					s.logger.Errorf("error occurred while waiting for runner session events: %v", err)
+					s.logger.WithContextFields(ctx).Errorf("error occurred while waiting for runner session events: %v", err)
 				}
 				return
 			}
 
 			eventData, err := event.ToRunnerSessionEventData()
 			if err != nil {
-				s.logger.Errorf("failed to get runner session event data in run session event subscription: %v", err)
+				s.logger.WithContextFields(ctx).Errorf("failed to get runner session event data in run session event subscription: %v", err)
 				continue
 			}
 
@@ -1190,7 +1187,7 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 				// We need to query the runner to check if it belongs to the organization
 				runner, err := s.getRunnerByID(ctx, span, eventData.RunnerID)
 				if err != nil {
-					s.logger.Errorf("error querying for runner in subscription goroutine: %v", err)
+					s.logger.WithContextFields(ctx).Errorf("error querying for runner in subscription goroutine: %v", err)
 					continue
 				}
 				if options.GroupID != nil && *runner.GroupID != *options.GroupID {
@@ -1203,11 +1200,11 @@ func (s *service) SubscribeToRunnerSessions(ctx context.Context, options *Subscr
 
 			session, err := s.dbClient.RunnerSessions.GetRunnerSessionByID(ctx, event.ID)
 			if err != nil {
-				s.logger.Errorf("error querying for runner session in subscription goroutine: %v", err)
+				s.logger.WithContextFields(ctx).Errorf("error querying for runner session in subscription goroutine: %v", err)
 				continue
 			}
 			if session == nil {
-				s.logger.Errorf("Received event for runner session that does not exist %s", event.ID)
+				s.logger.WithContextFields(ctx).Errorf("Received event for runner session that does not exist %s", event.ID)
 				continue
 			}
 
