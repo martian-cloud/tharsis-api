@@ -36,7 +36,7 @@ func TestValidateContentType(t *testing.T) {
 		{
 			name:        "missing content type",
 			contentType: "",
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "invalid content type",
@@ -214,7 +214,7 @@ func TestParse(t *testing.T) {
 			name:        "POST with missing content type",
 			method:      "POST",
 			body:        `{"query": "{ __typename }"}`,
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "POST with invalid content type",

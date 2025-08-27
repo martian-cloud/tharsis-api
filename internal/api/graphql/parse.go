@@ -40,7 +40,7 @@ func parse(r *http.Request) (request, error) {
 func validateContentType(r *http.Request) error {
 	contentType := r.Header.Get("Content-Type")
 	if contentType == "" {
-		return errors.New("header Content-Type is required for POST requests")
+		return nil
 	}
 
 	// Parse the media type, ignoring parameters like charset
