@@ -80,6 +80,7 @@ type JobDispatcher struct {
 	memoryLimit            resource.Quantity
 	securityContext        *corev1.SecurityContext
 	nodeSelector           map[string]string
+	hostAliases            []corev1.HostAlias
 }
 
 // New creates a JobDispatcher
@@ -217,6 +218,19 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		}
 	}
 
+	var hostAliases []corev1.HostAlias
+	if hostAliasesStr, ok := pluginData["host_aliases"]; ok {
+		for _, hostEntry := range strings.Split(hostAliasesStr, ",") {
+			parts := strings.SplitN(strings.TrimSpace(hostEntry), ":", 2)
+			if len(parts) == 2 {
+				hostAliases = append(hostAliases, corev1.HostAlias{
+					IP:        strings.TrimSpace(parts[1]),
+					Hostnames: []string{strings.TrimSpace(parts[0])},
+				})
+			}
+		}
+	}
+
 	return &JobDispatcher{
 		logger:                 logger,
 		image:                  pluginData["image"],
@@ -225,6 +239,7 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		memoryRequest:          memoryRequest,
 		memoryLimit:            memoryLimit,
 		nodeSelector:           nodeSelector,
+		hostAliases:            hostAliases,
 		securityContext: &corev1.SecurityContext{
 			Privileged:               ptr.Bool(false),
 			AllowPrivilegeEscalation: ptr.Bool(false),
@@ -273,6 +288,7 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 				Spec: corev1.PodSpec{
 					AutomountServiceAccountToken: ptr.Bool(false),
 					NodeSelector:                 j.nodeSelector,
+					HostAliases:                  j.hostAliases,
 					Containers: []corev1.Container{
 						{
 							Name:            "main",
