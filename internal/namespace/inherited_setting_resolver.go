@@ -78,10 +78,16 @@ func (r *inheritedSettingsResolver) GetNotificationPreference(ctx context.Contex
 
 func (r *inheritedSettingsResolver) GetNotificationPreferences(ctx context.Context, userIDs []string, namespacePath *string) (map[string]*NotificationPreferenceSetting, error) {
 	var globalFilter *bool
+
+	if len(userIDs) == 0 {
+		return map[string]*NotificationPreferenceSetting{}, nil
+	}
+
 	if namespacePath == nil {
 		// If namespace path is nil, we need only need to get global preferences
 		globalFilter = ptr.Bool(true)
 	}
+
 	response, err := r.dbClient.NotificationPreferences.GetNotificationPreferences(ctx, &db.GetNotificationPreferencesInput{
 		Filter: &db.NotificationPreferenceFilter{
 			UserIDs: userIDs,
