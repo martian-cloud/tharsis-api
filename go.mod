@@ -232,7 +232,7 @@ require (
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/swaggo/swag v1.16.3 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
-	github.com/ulikunitz/xz v0.5.12 // indirect
+	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/vanng822/css v1.0.1 // indirect
 	github.com/vektra/mockery/v2 v2.53.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
