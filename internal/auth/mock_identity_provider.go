@@ -5,6 +5,7 @@ package auth
 import (
 	context "context"
 
+	jwt "github.com/lestrrat-go/jwx/v2/jwt"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -43,9 +44,66 @@ func (_m *MockIdentityProvider) GenerateToken(ctx context.Context, input *TokenI
 	return r0, r1
 }
 
-// VerifyToken provides a mock function with given fields: ctx, token
-func (_m *MockIdentityProvider) VerifyToken(ctx context.Context, token string) (*VerifyTokenOutput, error) {
-	ret := _m.Called(ctx, token)
+// GetKeys provides a mock function with given fields: ctx
+func (_m *MockIdentityProvider) GetKeys(ctx context.Context) ([]byte, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetKeys")
+	}
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]byte, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []byte); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetOpenIDConfig provides a mock function with no fields
+func (_m *MockIdentityProvider) GetOpenIDConfig() *OpenIDConfig {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOpenIDConfig")
+	}
+
+	var r0 *OpenIDConfig
+	if rf, ok := ret.Get(0).(func() *OpenIDConfig); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*OpenIDConfig)
+		}
+	}
+
+	return r0
+}
+
+// VerifyToken provides a mock function with given fields: ctx, token, validateOptions
+func (_m *MockIdentityProvider) VerifyToken(ctx context.Context, token string, validateOptions ...jwt.ValidateOption) (*VerifyTokenOutput, error) {
+	_va := make([]interface{}, len(validateOptions))
+	for _i := range validateOptions {
+		_va[_i] = validateOptions[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, token)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for VerifyToken")
@@ -53,19 +111,19 @@ func (_m *MockIdentityProvider) VerifyToken(ctx context.Context, token string) (
 
 	var r0 *VerifyTokenOutput
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*VerifyTokenOutput, error)); ok {
-		return rf(ctx, token)
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...jwt.ValidateOption) (*VerifyTokenOutput, error)); ok {
+		return rf(ctx, token, validateOptions...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *VerifyTokenOutput); ok {
-		r0 = rf(ctx, token)
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...jwt.ValidateOption) *VerifyTokenOutput); ok {
+		r0 = rf(ctx, token, validateOptions...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*VerifyTokenOutput)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, token)
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...jwt.ValidateOption) error); ok {
+		r1 = rf(ctx, token, validateOptions...)
 	} else {
 		r1 = ret.Error(1)
 	}

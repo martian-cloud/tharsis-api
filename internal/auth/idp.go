@@ -29,12 +29,26 @@ type VerifyTokenOutput struct {
 	PrivateClaims map[string]string
 }
 
+// OpenIDConfig represents the OpenID Connect configuration
+type OpenIDConfig struct {
+	Issuer                           string   `json:"issuer"`
+	JwksURI                          string   `json:"jwks_uri"`
+	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
+	ResponseTypesSupported           []string `json:"response_types_supported"`
+	SubjectTypesSupported            []string `json:"subject_types_supported"`
+	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
+}
+
 // IdentityProvider is an interface for generating and verifying JWT tokens
 type IdentityProvider interface {
 	// GenerateToken creates a new JWT token
 	GenerateToken(ctx context.Context, input *TokenInput) ([]byte, error)
 	// VerifyToken verifies that the token is valid
-	VerifyToken(ctx context.Context, token string) (*VerifyTokenOutput, error)
+	VerifyToken(ctx context.Context, token string, validateOptions ...jwt.ValidateOption) (*VerifyTokenOutput, error)
+	// GetKeys returns the JSON Web Key Set (JWKS)
+	GetKeys(ctx context.Context) ([]byte, error)
+	// GetOpenIDConfig returns the OpenID Connect configuration
+	GetOpenIDConfig() *OpenIDConfig
 }
 
 type identityProvider struct {
@@ -50,7 +64,6 @@ func NewIdentityProvider(jwsPlugin jws.Provider, issuerURL string) IdentityProvi
 	}
 }
 
-// GenerateToken creates a new service account token
 func (s *identityProvider) GenerateToken(ctx context.Context, input *TokenInput) ([]byte, error) {
 	currentTimestamp := time.Now().Unix()
 
@@ -102,8 +115,7 @@ func (s *identityProvider) GenerateToken(ctx context.Context, input *TokenInput)
 	return s.jwsPlugin.Sign(ctx, payload)
 }
 
-// VerifyToken verifies that the token is a valid service account token
-func (s *identityProvider) VerifyToken(ctx context.Context, token string) (*VerifyTokenOutput, error) {
+func (s *identityProvider) VerifyToken(ctx context.Context, token string, validateOptions ...jwt.ValidateOption) (*VerifyTokenOutput, error) {
 	tokenBytes := []byte(token)
 
 	// Verify token signature
@@ -111,8 +123,17 @@ func (s *identityProvider) VerifyToken(ctx context.Context, token string) (*Veri
 		return nil, err
 	}
 
+	options := []jwt.ParseOption{
+		jwt.WithVerify(false),
+		jwt.WithValidate(true),
+		jwt.WithIssuer(s.issuerURL),
+	}
+	for _, o := range validateOptions {
+		options = append(options, o)
+	}
+
 	// Parse and validate jwt
-	decodedToken, err := jwt.Parse(tokenBytes, jwt.WithVerify(false), jwt.WithValidate(true), jwt.WithIssuer(s.issuerURL))
+	decodedToken, err := jwt.Parse(tokenBytes, options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode token %w", err)
 	}
@@ -121,6 +142,21 @@ func (s *identityProvider) VerifyToken(ctx context.Context, token string) (*Veri
 		Token:         decodedToken,
 		PrivateClaims: getPrivateClaims(decodedToken),
 	}, nil
+}
+
+func (s *identityProvider) GetOpenIDConfig() *OpenIDConfig {
+	return &OpenIDConfig{
+		Issuer:                           s.issuerURL,
+		JwksURI:                          fmt.Sprintf("%s/oauth/discovery/keys", s.issuerURL),
+		AuthorizationEndpoint:            "", // Explicitly set to empty string
+		ResponseTypesSupported:           []string{"id_token"},
+		SubjectTypesSupported:            []string{}, // Explicitly set to empty list
+		IDTokenSigningAlgValuesSupported: []string{"RS256"},
+	}
+}
+
+func (s *identityProvider) GetKeys(ctx context.Context) ([]byte, error) {
+	return s.jwsPlugin.GetKeySet(ctx)
 }
 
 // GetPrivateClaims returns a map of the token's private claims

@@ -117,8 +117,7 @@ func (s *service) DisableMaintenanceMode(ctx context.Context) error {
 		return err
 	}
 
-	s.logger.WithContextFields(ctx).Infow("Disabled maintenance mode.",
-	)
+	s.logger.WithContextFields(ctx).Infow("Disabled maintenance mode.")
 
 	return nil
 }

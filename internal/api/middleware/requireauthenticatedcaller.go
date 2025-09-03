@@ -5,7 +5,6 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -18,18 +17,16 @@ func NewRequireAuthenticatedCallerMiddleware(
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			caller := auth.GetCaller(ctx)
-			if caller == nil {
+			caller, err := auth.AuthorizeCaller(ctx)
+			if err != nil {
 				subject := auth.GetSubject(ctx)
 				if subject != nil {
-					logger.WithContextFields(ctx).Infof("Unauthorized request to %s %s by %s", r.Method, r.URL.Path, *subject)
+					logger.WithContextFields(ctx).Infof("Unauthorized request to %s %s by %s: %v", r.Method, r.URL.Path, *subject, err)
 				} else {
-					logger.WithContextFields(ctx).Infof("Unauthorized request to %s %s by unknown subject", r.Method, r.URL.Path)
+					logger.WithContextFields(ctx).Infof("Unauthorized request to %s %s by unknown subject: %v", r.Method, r.URL.Path, err)
 				}
 
-				respWriter.RespondWithError(r.Context(), w,
-					// At this point, we no longer had the original error to wrap.
-					errors.New("Unauthorized", errors.WithErrorCode(errors.EUnauthorized)))
+				respWriter.RespondWithError(r.Context(), w, err)
 				return
 			}
 

@@ -2,20 +2,14 @@ package azurefederated
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"testing"
-	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 func TestValidateManagedIdentityData(t *testing.T) {
@@ -59,7 +53,7 @@ func TestValidateManagedIdentityData(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			delegate, err := New(ctx, &jwsprovider.MockProvider{}, "http://test")
+			delegate, err := New(ctx, auth.NewMockIdentityProvider(t))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -103,25 +97,14 @@ func TestCreateCredentials(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	issuer := "http://test"
+	mockIDP := auth.NewMockIdentityProvider(t)
 
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	matcher := mock.MatchedBy(func(input *auth.TokenInput) bool {
+		return input.Subject == "sub-123" && input.Audience == "azure" && input.Expiration != nil
+	})
+	mockIDP.On("GenerateToken", ctx, matcher).Return([]byte("signedtoken"), nil)
 
-	mockJWSProvider := jwsprovider.MockProvider{}
-	mockJWSProvider.Test(t)
-
-	mockJWSProvider.On("Sign", ctx, mock.Anything).Return(func(_ context.Context, token []byte) []byte {
-		signed, sErr := jws.Sign(token, jws.WithKey(jwa.RS256, privKey))
-		if sErr != nil {
-			t.Fatal(sErr)
-		}
-		return signed
-	}, nil)
-
-	delegate, err := New(ctx, &mockJWSProvider, issuer)
+	delegate, err := New(ctx, mockIDP)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,14 +132,5 @@ func TestCreateCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedToken, err := jwt.Parse(payload, jwt.WithVerify(false))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	maxJobDuration := time.Duration(job.MaxJobDuration) * time.Minute
-	assert.Equal(t, parsedToken.Subject(), "sub-123")
-	assert.Equal(t, parsedToken.Issuer(), issuer)
-	assert.Equal(t, parsedToken.Audience(), []string{"azure"})
-	assert.True(t, parsedToken.Expiration().After(time.Now()) && parsedToken.Expiration().Before(time.Now().Add(maxJobDuration)))
+	assert.Equal(t, []byte("signedtoken"), payload)
 }

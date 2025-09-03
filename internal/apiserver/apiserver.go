@@ -148,7 +148,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	logStreamStore := logstream.NewLogStore(pluginCatalog.ObjectStore, dbClient)
 	logStreamManager := logstream.New(logStreamStore, dbClient, eventManager, logger)
 
-	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, cfg, pluginCatalog)
+	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, tharsisIDP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize managed identity delegate map %v", err)
 	}
@@ -279,7 +279,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		}
 	}
 
-	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, userSessionManager)
+	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, userSessionManager, tharsisIDP)
 	if err != nil {
 		return nil, err
 	}

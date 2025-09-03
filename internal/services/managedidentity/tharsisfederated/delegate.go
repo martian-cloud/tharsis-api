@@ -8,10 +8,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/aws/smithy-go/ptr"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	te "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 )
 
 // InputData contains the input data fields specific to this managed identity type
@@ -29,15 +29,13 @@ type Data struct {
 
 // Delegate for the Tharsis OIDC Federated managed identity type
 type Delegate struct {
-	jwsProvider jws.Provider
-	issuerURL   string
+	idp auth.IdentityProvider
 }
 
 // New creates a new Delegate instance
-func New(_ context.Context, jwsProvider jws.Provider, issuerURL string) (*Delegate, error) {
+func New(_ context.Context, idp auth.IdentityProvider) (*Delegate, error) {
 	return &Delegate{
-		jwsProvider: jwsProvider,
-		issuerURL:   issuerURL,
+		idp: idp,
 	}, nil
 }
 
@@ -48,39 +46,15 @@ func (d *Delegate) CreateCredentials(ctx context.Context, identity *models.Manag
 		return nil, nil
 	}
 
-	currentTimestamp := time.Now().Unix()
-
-	token := jwt.New()
-
 	maxJobDuration := time.Duration(job.MaxJobDuration) * time.Minute
-	if err = token.Set(jwt.ExpirationKey, time.Now().Add(maxJobDuration).Unix()); err != nil {
-		return nil, err
-	}
-	if err = token.Set(jwt.NotBeforeKey, currentTimestamp); err != nil {
-		return nil, err
-	}
-	if err = token.Set(jwt.IssuedAtKey, currentTimestamp); err != nil {
-		return nil, err
-	}
-	if err = token.Set(jwt.IssuerKey, d.issuerURL); err != nil {
-		return nil, err
-	}
-	if err = token.Set(jwt.AudienceKey, "tharsis"); err != nil {
-		return nil, err
-	}
-	if err = token.Set(jwt.SubjectKey, federatedData.Subject); err != nil {
-		return nil, err
-	}
-	if err = token.Set("tharsis_job_id", job.GetGlobalID()); err != nil {
-		return nil, err
-	}
 
-	payload, err := jwt.NewSerializer().Serialize(token)
-	if err != nil {
-		return nil, err
-	}
-
-	return d.jwsProvider.Sign(ctx, payload)
+	return d.idp.GenerateToken(ctx, &auth.TokenInput{
+		Subject:    federatedData.Subject,
+		Expiration: ptr.Time(time.Now().Add(maxJobDuration)),
+		Claims: map[string]string{
+			"job_id": job.GetGlobalID(),
+		},
+	})
 }
 
 // SetManagedIdentityData updates the managed identity custom data payload
