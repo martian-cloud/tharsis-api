@@ -1,12 +1,11 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 )
 
 type openIDConfig struct {
@@ -19,17 +18,15 @@ type openIDConfig struct {
 }
 
 type oidcController struct {
-	respWriter    response.Writer
-	jwsProvider   jws.Provider
-	tharsisAPIURL string
+	respWriter response.Writer
+	idp        auth.IdentityProvider
 }
 
 // NewOIDCController creates an instance of oidcController
-func NewOIDCController(respWriter response.Writer, jwsProvider jws.Provider, tharsisAPIURL string) Controller {
+func NewOIDCController(respWriter response.Writer, idp auth.IdentityProvider) Controller {
 	return &oidcController{
-		respWriter:    respWriter,
-		jwsProvider:   jwsProvider,
-		tharsisAPIURL: tharsisAPIURL,
+		respWriter: respWriter,
+		idp:        idp,
 	}
 }
 
@@ -40,19 +37,11 @@ func (c *oidcController) RegisterRoutes(router chi.Router) {
 }
 
 func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, r *http.Request) {
-	oidcConfig := &openIDConfig{
-		Issuer:                           c.tharsisAPIURL,
-		JwksURI:                          fmt.Sprintf("%s/oauth/discovery/keys", c.tharsisAPIURL),
-		AuthorizationEndpoint:            "", // Explicitly set to empty string
-		ResponseTypesSupported:           []string{"id_token"},
-		SubjectTypesSupported:            []string{}, // Explicitly set to empty list
-		IDTokenSigningAlgValuesSupported: []string{"RS256"},
-	}
-	c.respWriter.RespondWithJSON(r.Context(), w, oidcConfig, http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, c.idp.GetOpenIDConfig(), http.StatusOK)
 }
 
 func (c *oidcController) GetKeys(w http.ResponseWriter, r *http.Request) {
-	keys, err := c.jwsProvider.GetKeySet(r.Context())
+	keys, err := c.idp.GetKeys(r.Context())
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return

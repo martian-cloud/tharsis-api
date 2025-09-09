@@ -434,10 +434,10 @@ func TestGetUserSessionByTRN(t *testing.T) {
 
 	// Create a user session
 	userSession := &models.UserSession{
-		UserID:          createdUser.Metadata.ID,
-		RefreshTokenID:  uuid.New().String(),
-		UserAgent:       "test-agent",
-		Expiration:      time.Now().Add(24 * time.Hour),
+		UserID:         createdUser.Metadata.ID,
+		RefreshTokenID: uuid.New().String(),
+		UserAgent:      "test-agent",
+		Expiration:     time.Now().Add(24 * time.Hour),
 	}
 
 	createdSession, err := testClient.client.UserSessions.CreateUserSession(ctx, userSession)

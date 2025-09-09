@@ -757,10 +757,10 @@ func TestGetUserSessions(t *testing.T) {
 	userSessionID := "user-session-id"
 
 	testCases := []struct {
-		name          string
-		input         *GetUserSessionsInput
-		caller        auth.Caller
-		expectError   bool
+		name            string
+		input           *GetUserSessionsInput
+		caller          auth.Caller
+		expectError     bool
 		expectErrorCode errors.CodeType
 	}{
 		{
@@ -866,10 +866,10 @@ func TestGetUserSessionByID(t *testing.T) {
 	userSessionID := "user-session-id"
 
 	testCases := []struct {
-		name          string
-		userSessionID string
-		caller        auth.Caller
-		expectError   bool
+		name            string
+		userSessionID   string
+		caller          auth.Caller
+		expectError     bool
 		expectErrorCode errors.CodeType
 	}{
 		{
@@ -905,10 +905,10 @@ func TestGetUserSessionByID(t *testing.T) {
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:          "service account cannot access user sessions",
-			userSessionID: userSessionID,
-			caller:        &auth.ServiceAccountCaller{},
-			expectError:   true,
+			name:            "service account cannot access user sessions",
+			userSessionID:   userSessionID,
+			caller:          &auth.ServiceAccountCaller{},
+			expectError:     true,
 			expectErrorCode: errors.EForbidden,
 		},
 	}
@@ -970,10 +970,10 @@ func TestGetUserSessionByTRN(t *testing.T) {
 	sessionTRN := "trn:user_session:" + username + "/US_" + userSessionID
 
 	testCases := []struct {
-		name          string
-		trn           string
-		caller        auth.Caller
-		expectError   bool
+		name            string
+		trn             string
+		caller          auth.Caller
+		expectError     bool
 		expectErrorCode errors.CodeType
 	}{
 		{
@@ -1009,15 +1009,15 @@ func TestGetUserSessionByTRN(t *testing.T) {
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name: "service account cannot access user sessions by TRN",
-			trn:  sessionTRN,
-			caller:        &auth.ServiceAccountCaller{},
-			expectError:   true,
+			name:            "service account cannot access user sessions by TRN",
+			trn:             sessionTRN,
+			caller:          &auth.ServiceAccountCaller{},
+			expectError:     true,
 			expectErrorCode: errors.EForbidden,
 		},
 		{
-			name:          "invalid TRN format",
-			trn:           "invalid-trn",
+			name: "invalid TRN format",
+			trn:  "invalid-trn",
 			caller: &auth.UserCaller{
 				User: &models.User{
 					Metadata: models.ResourceMetadata{ID: adminUserID},

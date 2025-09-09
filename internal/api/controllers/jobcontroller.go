@@ -15,7 +15,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/job"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -24,7 +23,7 @@ const defaultLogReadLimit = 1024 * 1024 // 1 MiB
 type jobController struct {
 	respWriter        response.Writer
 	jwtAuthMiddleware middleware.Handler
-	jwsProvider       jws.Provider
+	idp               auth.IdentityProvider
 	logger            logger.Logger
 	jobService        job.Service
 }
@@ -34,10 +33,10 @@ func NewJobController(
 	logger logger.Logger,
 	respWriter response.Writer,
 	jwtAuthMiddleware middleware.Handler,
-	jwsProvider jws.Provider,
+	idp auth.IdentityProvider,
 	jobService job.Service,
 ) Controller {
-	return &jobController{respWriter, jwtAuthMiddleware, jwsProvider, logger, jobService}
+	return &jobController{respWriter, jwtAuthMiddleware, idp, logger, jobService}
 }
 
 // RegisterRoutes adds health routes to the router
@@ -56,7 +55,7 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate token
-	if err := c.verifyJobLogToken(r.Context(), []byte(token), jobID); err != nil {
+	if err := c.verifyJobLogToken(r.Context(), token, jobID); err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "invalid token", errors.WithErrorCode(errors.EUnauthorized)))
 		return
 	}
@@ -84,15 +83,9 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *jobController) verifyJobLogToken(ctx context.Context, token []byte, jobID string) error {
-	// Validate token
-	if err := c.jwsProvider.Verify(ctx, token); err != nil {
-		return err
-	}
-
-	// Parse and validate jwt
-	if _, err := jwt.Parse(token, jwt.WithVerify(false), jwt.WithValidate(true), jwt.WithSubject(jobID)); err != nil {
-		return fmt.Errorf("failed to decode token %w", err)
+func (c *jobController) verifyJobLogToken(ctx context.Context, token string, jobID string) error {
+	if _, err := c.idp.VerifyToken(ctx, token, jwt.WithSubject(jobID)); err != nil {
+		return fmt.Errorf("job log token is invalid: %w", err)
 	}
 
 	return nil
