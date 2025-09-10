@@ -211,6 +211,13 @@ func BuildRouter(
 			tharsisUIURL.Hostname(),
 			logger,
 		))
+
+		AddRoutes(r, controllers.NewVCSController(
+			logger,
+			respWriter,
+			authenticator,
+			serviceCatalog.VCSService,
+		))
 	})
 
 	v1Router.Group(func(r chi.Router) {
@@ -255,12 +262,6 @@ func BuildRouter(
 			serviceCatalog.UserService,
 			serviceCatalog.TeamService,
 			serviceCatalog.SCIMService,
-		))
-		AddRoutes(r, controllers.NewVCSController(
-			logger,
-			respWriter,
-			authenticator,
-			serviceCatalog.VCSService,
 		))
 		AddRoutes(r, controllers.NewProviderMirrorController(
 			logger,
