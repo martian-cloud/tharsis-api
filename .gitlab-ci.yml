@@ -119,6 +119,7 @@ variables:
   GOPATH_RELATIVE_PATH: .go
   GOPATH: "$CI_PROJECT_DIR/$GOPATH_RELATIVE_PATH"
   GOCACHE: "$GOPATH/cache"
+  GITLAB_ADVANCED_SAST_ENABLED: "true"
   SAST_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH, docker-compose"
   SECRET_DETECTION_EXCLUDED_PATHS: "$GOPATH_RELATIVE_PATH"
   # Used for test builds of the container and scanning
@@ -469,10 +470,7 @@ gemnasium-dependency_scanning:
   rules:
     - !reference [.on_merge_request_and_merged_events, rules]
 
-semgrep-sast:
-  before_script:
-    - |
-      echo "*_test.go" >> /semgrepignore
+gitlab-advanced-sast:
   rules:
     - !reference [.on_merge_request_and_merged_events, rules]
 
