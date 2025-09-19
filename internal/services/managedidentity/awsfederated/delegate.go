@@ -28,13 +28,13 @@ type Data struct {
 
 // Delegate for the AWS OIDC Federated managed identity type
 type Delegate struct {
-	idp auth.IdentityProvider
+	signingKeyManager auth.SigningKeyManager
 }
 
 // New creates a new Delegate instance
-func New(_ context.Context, idp auth.IdentityProvider) (*Delegate, error) {
+func New(_ context.Context, signingKeyManager auth.SigningKeyManager) (*Delegate, error) {
 	return &Delegate{
-		idp: idp,
+		signingKeyManager: signingKeyManager,
 	}, nil
 }
 
@@ -47,7 +47,7 @@ func (d *Delegate) CreateCredentials(ctx context.Context, identity *models.Manag
 
 	maxJobDuration := time.Duration(job.MaxJobDuration) * time.Minute
 
-	return d.idp.GenerateToken(ctx, &auth.TokenInput{
+	return d.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 		Subject:    federatedData.Subject,
 		Expiration: ptr.Time(time.Now().Add(maxJobDuration)),
 		Audience:   "aws",

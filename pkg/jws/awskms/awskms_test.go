@@ -8,64 +8,66 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 func TestNewPlugin(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	keyID := "123"
+	mockKMSClient := newMockKmsClient(t)
+	mockSTSClient := newMockStsClient(t)
 
-	c := mockClient{}
-	c.Test(t)
-
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
+	clientBuilder := func(_ context.Context, _ string) (kmsClient, stsClient, error) {
+		return mockKMSClient, mockSTSClient, nil
 	}
 
-	pubKey, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.On("GetPublicKey", ctx, &kms.GetPublicKeyInput{KeyId: &keyID}).Return(&kms.GetPublicKeyOutput{
-		PublicKey: pubKey,
-	}, nil)
-
-	clientBuilder := func(_ context.Context, _ string) (client, error) {
-		return &c, nil
-	}
+	mockLogger, _ := logger.NewForTest()
 
 	jwsProvider, err := newPlugin(
 		ctx,
+		mockLogger,
 		map[string]string{
-			"region": "us-east-1",
-			"key_id": keyID,
+			"region":       "us-east-1",
+			"tags":         "env=test,service=tharsis",
+			"alias_prefix": "test-key",
 		},
 		clientBuilder,
-		getPublicKey,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.NotNil(t, jwsProvider.client)
-	assert.NotNil(t, jwsProvider.keyID)
-	assert.NotNil(t, jwsProvider.pubKey)
-	assert.NotNil(t, jwsProvider.keySet)
+	assert.NotNil(t, jwsProvider.kmsClient)
+	assert.NotNil(t, jwsProvider.stsClient)
+	assert.NotNil(t, jwsProvider.logger)
+	assert.NotNil(t, jwsProvider.tags)
+	assert.Equal(t, 2, len(jwsProvider.tags))
+	// Verify tags
+	assert.Equal(t, "env", *jwsProvider.tags[0].TagKey)
+	assert.Equal(t, "test", *jwsProvider.tags[0].TagValue)
+	assert.Equal(t, "service", *jwsProvider.tags[1].TagKey)
+	assert.Equal(t, "tharsis", *jwsProvider.tags[1].TagValue)
+	assert.Equal(t, "test-key", jwsProvider.keyAliasPrefix)
 }
 
 func TestNewPluginWithMissingConfig(t *testing.T) {
+	mockLogger, _ := logger.NewForTest()
+
 	_, err := newPlugin(
 		context.Background(),
+		mockLogger,
 		map[string]string{},
-		nil,
 		nil,
 	)
 	if err == nil {
@@ -79,11 +81,6 @@ func TestSignWithValidKey(t *testing.T) {
 	defer cancel()
 
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pubKey, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,35 +121,32 @@ func TestSignWithValidKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := mockClient{}
-	c.Test(t)
+	mockKMSClient := newMockKmsClient(t)
+	mockSTSClient := newMockStsClient(t)
 
-	c.On("GetPublicKey", ctx, &kms.GetPublicKeyInput{KeyId: &keyID}).Return(&kms.GetPublicKeyOutput{
-		PublicKey: pubKey,
-	}, nil)
-
-	c.On("Sign", ctx, mock.Anything).Return(&kms.SignOutput{
+	mockKMSClient.On("Sign", ctx, mock.Anything).Return(&kms.SignOutput{
 		Signature: signature,
 	}, nil)
 
-	mockClientBuilder := func(_ context.Context, _ string) (client, error) {
-		return &c, nil
+	clientBuilder := func(_ context.Context, _ string) (kmsClient, stsClient, error) {
+		return mockKMSClient, mockSTSClient, nil
 	}
+
+	mockLogger, _ := logger.NewForTest()
 
 	jwsProvider, err := newPlugin(
 		ctx,
+		mockLogger,
 		map[string]string{
 			"region": "us-east-1",
-			"key_id": keyID,
 		},
-		mockClientBuilder,
-		getPublicKey,
+		clientBuilder,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	signedToken, err := jwsProvider.Sign(ctx, payload)
+	signedToken, err := jwsProvider.Sign(ctx, payload, keyID, nil, jwkKey.KeyID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,111 +157,187 @@ func TestSignWithValidKey(t *testing.T) {
 	}
 }
 
-func TestVerify(t *testing.T) {
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	invalidPrivKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pubKeyDerFormat, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	jwkKey, err := jwk.FromRaw(privKey.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = jwk.AssignKeyID(jwkKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestJWSProvider_Create(t *testing.T) {
+	ctx := context.Background()
 	keyID := "test-key"
 
-	// Test cases
-	tests := []struct {
-		name      string
-		privKey   *rsa.PrivateKey
-		kid       string
-		expectErr string
-	}{
-		{
-			name:    "Valid Signature",
-			privKey: privKey,
-			kid:     jwkKey.KeyID(),
-		},
-		{
-			name:      "Invalid Key ID",
-			privKey:   privKey,
-			kid:       "invalid",
-			expectErr: `key provider 0 failed: failed to find key with key ID "invalid" in key set`,
-		},
-		{
-			name:      "Invalid Signature",
-			privKey:   invalidPrivKey,
-			kid:       jwkKey.KeyID(),
-			expectErr: "could not verify message using any of the signatures or keys",
-		},
-	}
+	t.Run("successful key creation", func(t *testing.T) {
+		mockSTS := newMockStsClient(t)
+		mockKMS := newMockKmsClient(t)
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+		mockSTS.On("GetCallerIdentity", ctx, mock.Anything).Return(&sts.GetCallerIdentityOutput{
+			Account: ptr.String("123456789012"),
+			Arn:     ptr.String("arn:aws:iam::123456789012:user/test-user"),
+		}, nil)
 
-			c := mockClient{}
-			c.Test(t)
+		mockKMS.On("CreateKey", ctx, mock.Anything).Return(&kms.CreateKeyOutput{
+			KeyMetadata: &types.KeyMetadata{
+				KeyId: ptr.String("test-key-id"),
+			},
+		}, nil)
 
-			c.On("GetPublicKey", ctx, &kms.GetPublicKeyInput{KeyId: &keyID}).Return(&kms.GetPublicKeyOutput{
-				PublicKey: pubKeyDerFormat,
-			}, nil)
+		mockKMS.On("CreateAlias", ctx, mock.Anything).Return(&kms.CreateAliasOutput{}, nil)
 
-			token := jwt.New()
-			_ = token.Set(jwt.SubjectKey, "123")
+		privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
 
-			payload, err := jwt.NewSerializer().Serialize(token)
-			if err != nil {
-				t.Fatal(err)
-			}
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+		require.NoError(t, err)
 
-			hdrs := jws.NewHeaders()
-			_ = hdrs.Set(jws.TypeKey, "JWT")
-			_ = hdrs.Set(jws.KeyIDKey, test.kid)
-			signed, err := jws.Sign(payload, jws.WithKey(jwa.RS256, test.privKey, jws.WithProtectedHeaders(hdrs)))
-			if err != nil {
-				t.Fatal(err)
-			}
+		mockKMS.On("GetPublicKey", ctx, mock.Anything).Return(&kms.GetPublicKeyOutput{
+			PublicKey: pubKeyBytes,
+		}, nil)
 
-			mockClientBuilder := func(_ context.Context, _ string) (client, error) {
-				return &c, nil
-			}
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			stsClient:      mockSTS,
+			keyAliasPrefix: "test-prefix",
+		}
 
-			jwsProvider, err := newPlugin(
-				ctx,
-				map[string]string{
-					"region": "us-east-1",
-					"key_id": keyID,
-				},
-				mockClientBuilder,
-				getPublicKey,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
+		result, err := provider.Create(ctx, keyID)
+		require.NoError(t, err)
+		
+		expectedJWK, err := jwk.FromRaw(&privKey.PublicKey)
+		require.NoError(t, err)
+		require.NoError(t, jwk.AssignKeyID(expectedJWK))
+		require.NoError(t, expectedJWK.Set(jwk.AlgorithmKey, jwa.RS256))
+		require.NoError(t, expectedJWK.Set(jwk.KeyUsageKey, jwk.ForSignature))
 
-			err = jwsProvider.Verify(ctx, signed)
-			if test.expectErr != "" {
-				assert.EqualError(t, err, test.expectErr)
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
+		assert.Equal(t, expectedJWK.Algorithm(), result.PublicKey.Algorithm())
+		assert.Equal(t, expectedJWK.KeyUsage(), result.PublicKey.KeyUsage())
+		assert.Equal(t, expectedJWK.KeyType(), result.PublicKey.KeyType())
+	})
+
+	t.Run("key policy creation fails", func(t *testing.T) {
+		mockSTS := newMockStsClient(t)
+		mockKMS := newMockKmsClient(t)
+
+		mockSTS.On("GetCallerIdentity", ctx, mock.Anything).Return(nil, assert.AnError)
+
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			stsClient:      mockSTS,
+			keyAliasPrefix: "test-prefix",
+		}
+
+		_, err := provider.Create(ctx, keyID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create key policy")
+	})
+
+	t.Run("create key fails", func(t *testing.T) {
+		mockSTS := newMockStsClient(t)
+		mockKMS := newMockKmsClient(t)
+
+		mockSTS.On("GetCallerIdentity", ctx, mock.Anything).Return(&sts.GetCallerIdentityOutput{
+			Account: ptr.String("123456789012"),
+			Arn:     ptr.String("arn:aws:iam::123456789012:user/test-user"),
+		}, nil)
+
+		mockKMS.On("CreateKey", ctx, mock.Anything).Return(nil, assert.AnError)
+
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			stsClient:      mockSTS,
+			keyAliasPrefix: "test-prefix",
+		}
+
+		_, err := provider.Create(ctx, keyID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create KMS key")
+	})
+
+	t.Run("create alias fails", func(t *testing.T) {
+		mockSTS := newMockStsClient(t)
+		mockKMS := newMockKmsClient(t)
+
+		mockSTS.On("GetCallerIdentity", ctx, mock.Anything).Return(&sts.GetCallerIdentityOutput{
+			Account: ptr.String("123456789012"),
+			Arn:     ptr.String("arn:aws:iam::123456789012:user/test-user"),
+		}, nil)
+
+		mockKMS.On("CreateKey", ctx, mock.Anything).Return(&kms.CreateKeyOutput{
+			KeyMetadata: &types.KeyMetadata{
+				KeyId: ptr.String("test-key-id"),
+			},
+		}, nil)
+
+		mockKMS.On("CreateAlias", ctx, mock.Anything).Return(nil, assert.AnError)
+
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			stsClient:      mockSTS,
+			keyAliasPrefix: "test-prefix",
+		}
+
+		_, err := provider.Create(ctx, keyID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create alias for KMS key")
+	})
+}
+
+func TestJWSProvider_Delete(t *testing.T) {
+	ctx := context.Background()
+	keyID := "test-key"
+
+	t.Run("successful key deletion", func(t *testing.T) {
+		mockKMS := newMockKmsClient(t)
+
+		mockKMS.On("DescribeKey", ctx, mock.Anything).Return(&kms.DescribeKeyOutput{
+			KeyMetadata: &types.KeyMetadata{
+				KeyId: ptr.String("test-key-id"),
+			},
+		}, nil)
+
+		mockKMS.On("ScheduleKeyDeletion", ctx, mock.Anything).Return(&kms.ScheduleKeyDeletionOutput{}, nil)
+
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			keyAliasPrefix: "test-prefix",
+		}
+
+		err := provider.Delete(ctx, keyID, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("describe key fails", func(t *testing.T) {
+		mockKMS := newMockKmsClient(t)
+
+		mockKMS.On("DescribeKey", ctx, mock.Anything).Return(nil, assert.AnError)
+
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			keyAliasPrefix: "test-prefix",
+		}
+
+		err := provider.Delete(ctx, keyID, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to describe KMS key")
+	})
+
+	t.Run("schedule key deletion fails", func(t *testing.T) {
+		mockKMS := newMockKmsClient(t)
+
+		mockKMS.On("DescribeKey", ctx, mock.Anything).Return(&kms.DescribeKeyOutput{
+			KeyMetadata: &types.KeyMetadata{
+				KeyId: ptr.String("test-key-id"),
+			},
+		}, nil)
+
+		mockKMS.On("ScheduleKeyDeletion", ctx, mock.Anything).Return(nil, assert.AnError)
+
+		provider := &JWSProvider{
+			kmsClient:      mockKMS,
+			keyAliasPrefix: "test-prefix",
+		}
+
+		err := provider.Delete(ctx, keyID, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to schedule KMS key deletion")
+	})
+}
+
+func TestJWSProvider_SupportsKeyRotation(t *testing.T) {
+	provider := &JWSProvider{}
+	assert.True(t, provider.SupportsKeyRotation())
 }

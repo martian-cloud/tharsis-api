@@ -54,7 +54,7 @@ type service struct {
 	dbClient         *db.Client
 	limitChecker     limits.LimitChecker
 	activityService  activityevent.Service
-	identityProvider auth.IdentityProvider
+	identityProvider auth.SigningKeyManager
 }
 
 // NewService creates an instance of Service
@@ -63,7 +63,7 @@ func NewService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
-	identityProvider auth.IdentityProvider,
+	identityProvider auth.SigningKeyManager,
 ) Service {
 	return newService(
 		logger,
@@ -79,7 +79,7 @@ func newService(
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
-	identityProvider auth.IdentityProvider,
+	identityProvider auth.SigningKeyManager,
 ) Service {
 	return &service{
 		logger,

@@ -155,7 +155,7 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 	return store, err
 }
 
-func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Config) (jws.Provider, error) {
+func newJWSProviderPlugin(ctx context.Context, logger logger.Logger, cfg *config.Config) (jws.Provider, error) {
 	var (
 		plugin jws.Provider
 		err    error
@@ -165,7 +165,7 @@ func newJWSProviderPlugin(ctx context.Context, _ logger.Logger, cfg *config.Conf
 	case "memory":
 		plugin, err = memory.New(cfg.JWSProviderPluginData)
 	case "awskms":
-		plugin, err = jwsawskms.New(ctx, cfg.JWSProviderPluginData)
+		plugin, err = jwsawskms.New(ctx, logger, cfg.JWSProviderPluginData)
 	default:
 		err = errors.New(
 			"The specified JWS Provider plugin %q is not currently supported", cfg.JWSProviderPluginType,

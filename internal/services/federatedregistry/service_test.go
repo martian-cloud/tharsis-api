@@ -1043,13 +1043,13 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		setupMocks      func(*auth.MockCaller, *db.MockJobs, *db.MockWorkspaces, *db.MockFederatedRegistries, *auth.MockIdentityProvider)
+		setupMocks      func(*auth.MockCaller, *db.MockJobs, *db.MockWorkspaces, *db.MockFederatedRegistries, *auth.MockSigningKeyManager)
 		expectTokens    []*Token
 		expectErrorCode errors.CodeType
 	}{
 		{
 			name: "authorization fails",
-			setupMocks: func(mockCaller *auth.MockCaller, _ *db.MockJobs, _ *db.MockWorkspaces, _ *db.MockFederatedRegistries, _ *auth.MockIdentityProvider) {
+			setupMocks: func(mockCaller *auth.MockCaller, _ *db.MockJobs, _ *db.MockWorkspaces, _ *db.MockFederatedRegistries, _ *auth.MockSigningKeyManager) {
 				mockCaller.On("RequirePermission", mock.Anything, models.CreateFederatedRegistryTokenPermission, mock.Anything).
 					Return(errors.New("caller lacks permission", errors.WithErrorCode(errors.EForbidden)))
 			},
@@ -1057,7 +1057,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 		},
 		{
 			name: "successful token creation",
-			setupMocks: func(mockCaller *auth.MockCaller, mockJobs *db.MockJobs, mockWorkspaces *db.MockWorkspaces, mockFederatedRegistries *db.MockFederatedRegistries, mockIDP *auth.MockIdentityProvider) {
+			setupMocks: func(mockCaller *auth.MockCaller, mockJobs *db.MockJobs, mockWorkspaces *db.MockWorkspaces, mockFederatedRegistries *db.MockFederatedRegistries, mockIDP *auth.MockSigningKeyManager) {
 				mockCaller.On("RequirePermission", mock.Anything, models.CreateFederatedRegistryTokenPermission, mock.Anything).
 					Return(nil)
 				mockJobs.On("GetJobByID", mock.Anything, jobID).Return(&models.Job{
@@ -1102,7 +1102,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 			mockJobs := db.NewMockJobs(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockFederatedRegistries := db.NewMockFederatedRegistries(t)
-			mockIDP := auth.NewMockIdentityProvider(t)
+			mockIDP := auth.NewMockSigningKeyManager(t)
 
 			mockDBClient := &db.Client{
 				Jobs:                mockJobs,

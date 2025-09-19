@@ -17,24 +17,25 @@ import (
 )
 
 const (
-	defaultServerPort                               = "8000"
-	envOidcProviderConfigPrefix                     = "THARSIS_OAUTH_PROVIDERS_"
-	envRunnerConfigPrefix                           = "THARSIS_INTERNAL_RUNNERS_"
-	envFederatedRegistryTrustPolicyName             = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
-	defaultMaxGraphQLComplexity                     = 0
-	defaultRateLimitStorePluginType                 = "memory"
-	defaultModuleRegistryMaxUploadSize              = 1024 * 1024 * 128 // 128 MiB
-	defaultVCSRepositorySizeLimit                   = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
-	defaultAsyncTaskTimeout                         = 180               // seconds
-	defaultDBAutoMigrateEnabled                     = true
-	defaultOtelTraceEnabled                         = false
-	defaultHTTPRateLimit                            = 60 // in calls per second
-	defaultTerraformCLIVersions                     = ">= 1.0.0"
-	defaultWorkspaceAssessmentIntervalHours         = 24
-	defaultWorkspaceAssessmentRunLimit              = 20
-	defaultUserSessionAccessTokenExpirationMinutes  = 5
-	defaultUserSessionRefreshTokenExpirationMinutes = 60 * 12 // 12 hours
-	defaultUserSessionMaxSessionsPerUser            = 20
+	defaultServerPort                                 = "8000"
+	envOidcProviderConfigPrefix                       = "THARSIS_OAUTH_PROVIDERS_"
+	envRunnerConfigPrefix                             = "THARSIS_INTERNAL_RUNNERS_"
+	envFederatedRegistryTrustPolicyName               = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
+	defaultMaxGraphQLComplexity                       = 0
+	defaultRateLimitStorePluginType                   = "memory"
+	defaultModuleRegistryMaxUploadSize                = 1024 * 1024 * 128 // 128 MiB
+	defaultVCSRepositorySizeLimit                     = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
+	defaultAsyncTaskTimeout                           = 180               // seconds
+	defaultDBAutoMigrateEnabled                       = true
+	defaultOtelTraceEnabled                           = false
+	defaultHTTPRateLimit                              = 60 // in calls per second
+	defaultTerraformCLIVersions                       = ">= 1.0.0"
+	defaultWorkspaceAssessmentIntervalHours           = 24
+	defaultWorkspaceAssessmentRunLimit                = 20
+	defaultUserSessionAccessTokenExpirationMinutes    = 5
+	defaultUserSessionRefreshTokenExpirationMinutes   = 60 * 12 // 12 hours
+	defaultUserSessionMaxSessionsPerUser              = 20
+	defaultAsymmetricSigningKeyDecommissionPeriodDays = 7
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -173,6 +174,12 @@ type Config struct {
 
 	// CorsAllowedOrigins is a comma delimited list of allowed origins (defaults to the UI URL)
 	CorsAllowedOrigins string `yaml:"cors_allowed_origins" env:"CORS_ALLOWED_ORIGINS"`
+
+	// AsymmetricSigningKeyRotationPeriodDays is the number of days after which an asymmetric signing key should be rotated (0 means no rotation)
+	AsymmetricSigningKeyRotationPeriodDays int `yaml:"asymmetric_signing_key_rotation_period_days" env:"ASYMMETRIC_SIGNING_KEY_ROTATION_PERIOD_DAYS"`
+
+	// AsymmetricSigningKeyDecommissionPeriodDays is the number of days after which an asymmetric signing key should be decommissioned
+	AsymmetricSigningKeyDecommissionPeriodDays int `yaml:"asymmetric_signing_key_decommission_period_days" env:"ASYMMETRIC_SIGNING_KEY_DECOMMISSION_PERIOD_DAYS"`
 }
 
 // Validate validates the application configuration.
@@ -190,21 +197,22 @@ func (c Config) Validate() error {
 func Load(file string, logger logger.Logger) (*Config, error) {
 	// default config
 	c := Config{
-		ServerPort:                               defaultServerPort,
-		MaxGraphQLComplexity:                     defaultMaxGraphQLComplexity,
-		RateLimitStorePluginType:                 defaultRateLimitStorePluginType,
-		ModuleRegistryMaxUploadSize:              defaultModuleRegistryMaxUploadSize,
-		VCSRepositorySizeLimit:                   defaultVCSRepositorySizeLimit,
-		AsyncTaskTimeout:                         defaultAsyncTaskTimeout,
-		DBAutoMigrateEnabled:                     defaultDBAutoMigrateEnabled,
-		OtelTraceEnabled:                         defaultOtelTraceEnabled,
-		HTTPRateLimit:                            defaultHTTPRateLimit,
-		TerraformCLIVersionConstraint:            defaultTerraformCLIVersions,
-		WorkspaceAssessmentIntervalHours:         defaultWorkspaceAssessmentIntervalHours,
-		WorkspaceAssessmentRunLimit:              defaultWorkspaceAssessmentRunLimit,
-		UserSessionAccessTokenExpirationMinutes:  defaultUserSessionAccessTokenExpirationMinutes,
-		UserSessionRefreshTokenExpirationMinutes: defaultUserSessionRefreshTokenExpirationMinutes,
-		UserSessionMaxSessionsPerUser:            defaultUserSessionMaxSessionsPerUser,
+		ServerPort:                                 defaultServerPort,
+		MaxGraphQLComplexity:                       defaultMaxGraphQLComplexity,
+		RateLimitStorePluginType:                   defaultRateLimitStorePluginType,
+		ModuleRegistryMaxUploadSize:                defaultModuleRegistryMaxUploadSize,
+		VCSRepositorySizeLimit:                     defaultVCSRepositorySizeLimit,
+		AsyncTaskTimeout:                           defaultAsyncTaskTimeout,
+		DBAutoMigrateEnabled:                       defaultDBAutoMigrateEnabled,
+		OtelTraceEnabled:                           defaultOtelTraceEnabled,
+		HTTPRateLimit:                              defaultHTTPRateLimit,
+		TerraformCLIVersionConstraint:              defaultTerraformCLIVersions,
+		WorkspaceAssessmentIntervalHours:           defaultWorkspaceAssessmentIntervalHours,
+		WorkspaceAssessmentRunLimit:                defaultWorkspaceAssessmentRunLimit,
+		UserSessionAccessTokenExpirationMinutes:    defaultUserSessionAccessTokenExpirationMinutes,
+		UserSessionRefreshTokenExpirationMinutes:   defaultUserSessionRefreshTokenExpirationMinutes,
+		UserSessionMaxSessionsPerUser:              defaultUserSessionMaxSessionsPerUser,
+		AsymmetricSigningKeyDecommissionPeriodDays: defaultAsymmetricSigningKeyDecommissionPeriodDays,
 	}
 
 	// load from YAML config file

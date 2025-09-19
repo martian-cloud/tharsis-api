@@ -64,6 +64,7 @@ type Client struct {
 	conn                             *pgxpool.Pool
 	logger                           logger.Logger
 	Announcements                    Announcements
+	AsymSigningKeys                  AsymSigningKeys
 	Events                           Events
 	Groups                           Groups
 	Runs                             Runs
@@ -170,6 +171,7 @@ func NewClient(
 	}
 
 	dbClient.Announcements = NewAnnouncements(dbClient)
+	dbClient.AsymSigningKeys = NewAsymSigningKeys(dbClient)
 	dbClient.Events = NewEvents(dbClient)
 	dbClient.Groups = NewGroups(dbClient)
 	dbClient.Runs = NewRuns(dbClient)

@@ -29,12 +29,12 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		setupMocks         func(*MockAuthenticator, *MockIdentityProvider, *db.Client)
+		setupMocks         func(*MockAuthenticator, *MockSigningKeyManager, *db.Client)
 		expectErrorMessage string
 	}{
 		{
 			name: "successful session creation",
-			setupMocks: func(mockAuth *MockAuthenticator, mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockAuth *MockAuthenticator, mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				mockAuth.On("Authenticate", mock.Anything, token, false).Return(&UserCaller{
 					User: &models.User{
 						Metadata: models.ResourceMetadata{ID: userID},
@@ -90,21 +90,21 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 		},
 		{
 			name: "authentication fails",
-			setupMocks: func(mockAuth *MockAuthenticator, _ *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockAuth *MockAuthenticator, _ *MockSigningKeyManager, _ *db.Client) {
 				mockAuth.On("Authenticate", mock.Anything, token, false).Return(nil, errors.New("authentication failed"))
 			},
 			expectErrorMessage: "oidc token is invalid",
 		},
 		{
 			name: "invalid caller type",
-			setupMocks: func(mockAuth *MockAuthenticator, _ *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockAuth *MockAuthenticator, _ *MockSigningKeyManager, _ *db.Client) {
 				mockAuth.On("Authenticate", mock.Anything, token, false).Return(&ServiceAccountCaller{}, nil)
 			},
 			expectErrorMessage: "invalid caller type",
 		},
 		{
 			name: "removes oldest session when limit exceeded",
-			setupMocks: func(mockAuth *MockAuthenticator, mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockAuth *MockAuthenticator, mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				mockAuth.On("Authenticate", mock.Anything, token, false).Return(&UserCaller{
 					User: &models.User{
 						Metadata: models.ResourceMetadata{ID: userID},
@@ -176,7 +176,7 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 		},
 		{
 			name: "removes expired session during cleanup",
-			setupMocks: func(mockAuth *MockAuthenticator, mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockAuth *MockAuthenticator, mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				mockAuth.On("Authenticate", mock.Anything, token, false).Return(&UserCaller{
 					User: &models.User{
 						Metadata: models.ResourceMetadata{ID: userID},
@@ -248,7 +248,7 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 		},
 		{
 			name: "database transaction fails",
-			setupMocks: func(mockAuth *MockAuthenticator, _ *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockAuth *MockAuthenticator, _ *MockSigningKeyManager, mockDBClient *db.Client) {
 				mockAuth.On("Authenticate", mock.Anything, token, false).Return(&UserCaller{
 					User: &models.User{
 						Metadata: models.ResourceMetadata{ID: userID},
@@ -267,7 +267,7 @@ func TestUserSessionManager_CreateSession(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mockAuth := NewMockAuthenticator(t)
-			mockIDP := NewMockIdentityProvider(t)
+			mockIDP := NewMockSigningKeyManager(t)
 			logger, _ := logger.NewForTest()
 
 			mockDBClient := &db.Client{}
@@ -313,12 +313,12 @@ func TestUserSessionManager_RefreshSession(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		setupMocks         func(*MockIdentityProvider, *db.Client)
+		setupMocks         func(*MockSigningKeyManager, *db.Client)
 		expectErrorMessage string
 	}{
 		{
 			name: "successful session refresh",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, refreshTokenID)
 				require.NoError(t, err)
@@ -377,14 +377,14 @@ func TestUserSessionManager_RefreshSession(t *testing.T) {
 		},
 		{
 			name: "token verification fails",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, refreshToken).Return(nil, errors.New("token verification failed"))
 			},
 			expectErrorMessage: "refresh token is invalid",
 		},
 		{
 			name: "token is not a refresh token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				token := jwt.New()
 				mockIDP.On("VerifyToken", mock.Anything, refreshToken).Return(&VerifyTokenOutput{
 					Token: token,
@@ -397,7 +397,7 @@ func TestUserSessionManager_RefreshSession(t *testing.T) {
 		},
 		{
 			name: "no user session found",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, refreshTokenID)
 				require.NoError(t, err)
@@ -421,7 +421,7 @@ func TestUserSessionManager_RefreshSession(t *testing.T) {
 		},
 		{
 			name: "session is expired",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, refreshTokenID)
 				require.NoError(t, err)
@@ -454,7 +454,7 @@ func TestUserSessionManager_RefreshSession(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mockIDP := NewMockIdentityProvider(t)
+			mockIDP := NewMockSigningKeyManager(t)
 			logger, _ := logger.NewForTest()
 
 			mockDBClient := &db.Client{}
@@ -498,13 +498,13 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 		name               string
 		accessToken        string
 		refreshToken       string
-		setupMocks         func(*MockIdentityProvider, *db.Client)
+		setupMocks         func(*MockSigningKeyManager, *db.Client)
 		expectErrorMessage string
 	}{
 		{
 			name:         "successful invalidation with refresh token",
 			refreshToken: refreshToken,
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				mockIDP.On("VerifyToken", mock.Anything, refreshToken).Return(&VerifyTokenOutput{
 					Token: token,
@@ -528,7 +528,7 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 		{
 			name:        "successful invalidation with access token",
 			accessToken: accessToken,
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				mockIDP.On("VerifyToken", mock.Anything, accessToken).Return(&VerifyTokenOutput{
 					Token: token,
@@ -552,7 +552,7 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 		{
 			name:         "expired refresh token is handled gracefully",
 			refreshToken: refreshToken,
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, refreshToken).Return(nil, jwt.ErrTokenExpired())
 			},
 		},
@@ -562,7 +562,7 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 		{
 			name:         "session not found",
 			refreshToken: refreshToken,
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				mockIDP.On("VerifyToken", mock.Anything, refreshToken).Return(&VerifyTokenOutput{
 					Token: token,
@@ -581,7 +581,7 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 		{
 			name:         "refresh token verification fails",
 			refreshToken: refreshToken,
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, refreshToken).Return(nil, errors.New("verification failed"))
 			},
 			expectErrorMessage: "failed to verify refresh token",
@@ -589,7 +589,7 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 		{
 			name:        "access token verification fails",
 			accessToken: accessToken,
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, accessToken).Return(nil, errors.New("verification failed"))
 			},
 			expectErrorMessage: "failed to verify access token",
@@ -598,7 +598,7 @@ func TestUserSessionManager_InvalidateSession(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mockIDP := NewMockIdentityProvider(t)
+			mockIDP := NewMockSigningKeyManager(t)
 			logger, _ := logger.NewForTest()
 
 			mockDBClient := &db.Client{}
@@ -689,14 +689,14 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 		name               string
 		requestSessionID   string
 		csrfToken          string
-		setupMocks         func(*MockIdentityProvider)
+		setupMocks         func(*MockSigningKeyManager)
 		expectErrorMessage string
 	}{
 		{
 			name:             "successful csrf token verification",
 			requestSessionID: requestSessionID,
 			csrfToken:        csrfToken,
-			setupMocks: func(mockIDP *MockIdentityProvider) {
+			setupMocks: func(mockIDP *MockSigningKeyManager) {
 				mockIDP.On("VerifyToken", mock.Anything, csrfToken).Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type":         UserSessionCSRFTokenType,
@@ -709,7 +709,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 			name:             "token verification fails",
 			requestSessionID: requestSessionID,
 			csrfToken:        csrfToken,
-			setupMocks: func(mockIDP *MockIdentityProvider) {
+			setupMocks: func(mockIDP *MockSigningKeyManager) {
 				mockIDP.On("VerifyToken", mock.Anything, csrfToken).Return(nil, errors.New("token verification failed"))
 			},
 			expectErrorMessage: "csrf token is invalid",
@@ -718,7 +718,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 			name:             "token type is missing",
 			requestSessionID: requestSessionID,
 			csrfToken:        csrfToken,
-			setupMocks: func(mockIDP *MockIdentityProvider) {
+			setupMocks: func(mockIDP *MockSigningKeyManager) {
 				mockIDP.On("VerifyToken", mock.Anything, csrfToken).Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						SessionIDClaim: sessionGID,
@@ -731,7 +731,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 			name:             "token type is invalid",
 			requestSessionID: requestSessionID,
 			csrfToken:        csrfToken,
-			setupMocks: func(mockIDP *MockIdentityProvider) {
+			setupMocks: func(mockIDP *MockSigningKeyManager) {
 				mockIDP.On("VerifyToken", mock.Anything, csrfToken).Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type":         "invalid_type",
@@ -745,7 +745,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 			name:             "session id claim is missing",
 			requestSessionID: requestSessionID,
 			csrfToken:        csrfToken,
-			setupMocks: func(mockIDP *MockIdentityProvider) {
+			setupMocks: func(mockIDP *MockSigningKeyManager) {
 				mockIDP.On("VerifyToken", mock.Anything, csrfToken).Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type": UserSessionCSRFTokenType,
@@ -758,7 +758,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 			name:             "session id does not match",
 			requestSessionID: requestSessionID,
 			csrfToken:        csrfToken,
-			setupMocks: func(mockIDP *MockIdentityProvider) {
+			setupMocks: func(mockIDP *MockSigningKeyManager) {
 				differentSessionID := gid.ToGlobalID(types.UserSessionModelType, uuid.NewString())
 				mockIDP.On("VerifyToken", mock.Anything, csrfToken).Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
@@ -773,7 +773,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mockIDP := NewMockIdentityProvider(t)
+			mockIDP := NewMockSigningKeyManager(t)
 			logger, _ := logger.NewForTest()
 
 			if test.setupMocks != nil {
@@ -805,7 +805,7 @@ func TestUserSessionManager_VerifyCSRFToken(t *testing.T) {
 func TestNewUserSessionManager(t *testing.T) {
 	t.Run("creates user session manager with correct configuration", func(t *testing.T) {
 		mockDBClient := &db.Client{}
-		mockIDP := NewMockIdentityProvider(t)
+		mockIDP := NewMockSigningKeyManager(t)
 		mockAuth := NewMockAuthenticator(t)
 		logger, _ := logger.NewForTest()
 

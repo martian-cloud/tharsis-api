@@ -65,7 +65,7 @@ type UserSessionManager interface {
 // userSessionManager implements the UserSessionManager interface
 type userSessionManager struct {
 	dbClient                      *db.Client
-	idp                           IdentityProvider
+	signingKeyManager             SigningKeyManager
 	authenticator                 Authenticator
 	logger                        logger.Logger
 	accessTokenExpirationMinutes  time.Duration
@@ -76,7 +76,7 @@ type userSessionManager struct {
 // NewUserSessionManager creates a new UserSessionManager instance
 func NewUserSessionManager(
 	dbClient *db.Client,
-	idp IdentityProvider,
+	signingKeyManager SigningKeyManager,
 	authenticator Authenticator,
 	logger logger.Logger,
 	accessTokenExpirationMinutes int,
@@ -85,7 +85,7 @@ func NewUserSessionManager(
 ) UserSessionManager {
 	return &userSessionManager{
 		dbClient:                      dbClient,
-		idp:                           idp,
+		signingKeyManager:             signingKeyManager,
 		authenticator:                 authenticator,
 		logger:                        logger,
 		accessTokenExpirationMinutes:  time.Duration(accessTokenExpirationMinutes) * time.Minute,
@@ -173,7 +173,7 @@ func (u *userSessionManager) CreateSession(ctx context.Context, token string, us
 // RefreshSession validates a refresh token and returns new tokens
 func (u *userSessionManager) RefreshSession(ctx context.Context, refreshToken string) (*RefreshSessionResponse, error) {
 	// Decode and validate the jwt refresh token
-	verifyOutput, err := u.idp.VerifyToken(ctx, refreshToken)
+	verifyOutput, err := u.signingKeyManager.VerifyToken(ctx, refreshToken)
 	if err != nil {
 		return nil, errors.Wrap(err, "refresh token is invalid", errors.WithErrorCode(errors.EUnauthorized))
 	}
@@ -246,7 +246,7 @@ func (u *userSessionManager) InvalidateSession(ctx context.Context, accessToken,
 
 	// Check refresh token first if it's provided
 	if refreshToken != "" {
-		verifyOutput, err := u.idp.VerifyToken(ctx, refreshToken)
+		verifyOutput, err := u.signingKeyManager.VerifyToken(ctx, refreshToken)
 		if err != nil {
 			// Check if the returned error is because the token is expired
 			if goerrors.Is(err, jwt.ErrTokenExpired()) {
@@ -264,7 +264,7 @@ func (u *userSessionManager) InvalidateSession(ctx context.Context, accessToken,
 		sessionID = verifyOutput.PrivateClaims[SessionIDClaim]
 	} else if accessToken != "" {
 		// Decode and validate the jwt access token
-		verifyOutput, err := u.idp.VerifyToken(ctx, accessToken)
+		verifyOutput, err := u.signingKeyManager.VerifyToken(ctx, accessToken)
 		if err != nil {
 			return errors.New("failed to verify access token", errors.WithErrorCode(errors.EUnauthorized))
 		}
@@ -308,7 +308,7 @@ func (u *userSessionManager) InvalidateSession(ctx context.Context, accessToken,
 // VerifyCSRFToken verifies that the CSRF token is valid and matches the specified session ID
 func (u *userSessionManager) VerifyCSRFToken(ctx context.Context, requestSessionID string, csrfToken string) error {
 	// Decode and validate the jwt access token
-	verifyOutput, err := u.idp.VerifyToken(ctx, csrfToken)
+	verifyOutput, err := u.signingKeyManager.VerifyToken(ctx, csrfToken)
 	if err != nil {
 		return errors.New("csrf token is invalid %v", err, errors.WithErrorCode(errors.EUnauthorized))
 	}
@@ -363,7 +363,7 @@ func (u *userSessionManager) cleanupOldSessions(ctx context.Context, userID stri
 
 // generateCSRFToken creates a CSRF token
 func (u *userSessionManager) generateCSRFToken(ctx context.Context, session *models.UserSession) (string, error) {
-	token, err := u.idp.GenerateToken(ctx, &TokenInput{
+	token, err := u.signingKeyManager.GenerateToken(ctx, &TokenInput{
 		Expiration: &session.Expiration,
 		Subject:    gid.ToGlobalID(types.UserModelType, session.UserID),
 		Audience:   tokenAudience,
@@ -382,7 +382,7 @@ func (u *userSessionManager) generateCSRFToken(ctx context.Context, session *mod
 // generateAccessToken creates a short-lived access token
 func (u *userSessionManager) generateAccessToken(ctx context.Context, session *models.UserSession) (string, error) {
 	expiration := time.Now().Add(u.accessTokenExpirationMinutes).UTC()
-	token, err := u.idp.GenerateToken(ctx, &TokenInput{
+	token, err := u.signingKeyManager.GenerateToken(ctx, &TokenInput{
 		Expiration: &expiration,
 		Subject:    gid.ToGlobalID(types.UserModelType, session.UserID),
 		Audience:   tokenAudience,
@@ -400,7 +400,7 @@ func (u *userSessionManager) generateAccessToken(ctx context.Context, session *m
 
 // generateRefreshToken creates a long-lived refresh token
 func (u *userSessionManager) generateRefreshToken(ctx context.Context, session *models.UserSession) (string, error) {
-	token, err := u.idp.GenerateToken(ctx, &TokenInput{
+	token, err := u.signingKeyManager.GenerateToken(ctx, &TokenInput{
 		Expiration: &session.Expiration,
 		JwtID:      session.RefreshTokenID,
 		Subject:    gid.ToGlobalID(types.UserModelType, session.UserID),

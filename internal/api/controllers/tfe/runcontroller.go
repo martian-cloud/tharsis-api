@@ -27,7 +27,7 @@ import (
 type runController struct {
 	respWriter        response.Writer
 	jwtAuthMiddleware middleware.Handler
-	idp               auth.IdentityProvider
+	signingKeyManager auth.SigningKeyManager
 	logger            logger.Logger
 	runService        run.Service
 	tharsisAPIURL     string
@@ -38,14 +38,14 @@ func NewRunController(
 	logger logger.Logger,
 	respWriter response.Writer,
 	jwtAuthMiddleware middleware.Handler,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	runService run.Service,
 	tharsisAPIURL string,
 ) controllers.Controller {
 	return &runController{
 		respWriter,
 		jwtAuthMiddleware,
-		idp,
+		signingKeyManager,
 		logger,
 		runService,
 		tharsisAPIURL,
@@ -313,7 +313,7 @@ func (c *runController) GetApply(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *runController) createJobLogToken(ctx context.Context, job *models.Job) ([]byte, error) {
-	return c.idp.GenerateToken(ctx, &auth.TokenInput{
+	return c.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 		Subject:    job.Metadata.ID,
 		Expiration: ptr.Time(time.Now().Add(5 * time.Minute)),
 	})

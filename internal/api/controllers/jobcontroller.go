@@ -23,7 +23,7 @@ const defaultLogReadLimit = 1024 * 1024 // 1 MiB
 type jobController struct {
 	respWriter        response.Writer
 	jwtAuthMiddleware middleware.Handler
-	idp               auth.IdentityProvider
+	signingKeyManager auth.SigningKeyManager
 	logger            logger.Logger
 	jobService        job.Service
 }
@@ -33,10 +33,10 @@ func NewJobController(
 	logger logger.Logger,
 	respWriter response.Writer,
 	jwtAuthMiddleware middleware.Handler,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	jobService job.Service,
 ) Controller {
-	return &jobController{respWriter, jwtAuthMiddleware, idp, logger, jobService}
+	return &jobController{respWriter, jwtAuthMiddleware, signingKeyManager, logger, jobService}
 }
 
 // RegisterRoutes adds health routes to the router
@@ -84,7 +84,7 @@ func (c *jobController) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *jobController) verifyJobLogToken(ctx context.Context, token string, jobID string) error {
-	if _, err := c.idp.VerifyToken(ctx, token, jwt.WithSubject(jobID)); err != nil {
+	if _, err := c.signingKeyManager.VerifyToken(ctx, token, jwt.WithSubject(jobID)); err != nil {
 		return fmt.Errorf("job log token is invalid: %w", err)
 	}
 

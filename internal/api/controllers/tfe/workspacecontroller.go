@@ -34,7 +34,7 @@ type workspaceController struct {
 	workspaceService       workspace.Service
 	groupService           group.Service
 	managedIdentityService managedidentity.Service
-	idp                    auth.IdentityProvider
+	signingKeyManager      auth.SigningKeyManager
 	variableService        variable.Service
 	tharsisAPIURL          string
 	tfeVersionedPath       string
@@ -48,7 +48,7 @@ func NewWorkspaceController(
 	workspaceService workspace.Service,
 	groupService group.Service,
 	managedIdentityService managedidentity.Service,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	variableService variable.Service,
 	tharsisAPIURL string,
 	tfeVersionedPath string,
@@ -60,7 +60,7 @@ func NewWorkspaceController(
 		workspaceService,
 		groupService,
 		managedIdentityService,
-		idp,
+		signingKeyManager,
 		variableService,
 		tharsisAPIURL,
 		tfeVersionedPath,
@@ -427,14 +427,14 @@ func (c *workspaceController) UploadConfigurationVersion(w http.ResponseWriter, 
 }
 
 func (c *workspaceController) createUploadToken(ctx context.Context, subjectClaim string) ([]byte, error) {
-	return c.idp.GenerateToken(ctx, &auth.TokenInput{
+	return c.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 		Subject:    subjectClaim,
 		Expiration: ptr.Time(time.Now().Add(5 * time.Minute)),
 	})
 }
 
 func (c *workspaceController) verifyUploadToken(ctx context.Context, token string) (string, error) {
-	output, err := c.idp.VerifyToken(ctx, token)
+	output, err := c.signingKeyManager.VerifyToken(ctx, token)
 	if err != nil {
 		return "", fmt.Errorf("configuration version upload token is invalid: %w", err)
 	}

@@ -17,7 +17,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run/state"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -97,7 +96,7 @@ func TestClaimJob(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockTransactions := db.NewMockTransactions(t)
-			mockJWSProvider := jws.NewMockProvider(t)
+			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
 			mockRunners.On("GetRunnerByID", mock.Anything, runnerID).
 				Return(test.existingRunner, nil)
@@ -140,7 +139,7 @@ func TestClaimJob(t *testing.T) {
 
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte(token), nil)
+				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte(token), nil)
 			}
 
 			dbClient := &db.Client{
@@ -150,15 +149,13 @@ func TestClaimJob(t *testing.T) {
 				Transactions: mockTransactions,
 			}
 
-			identityProvider := auth.NewIdentityProvider(mockJWSProvider, "http://tharsis.domain")
-
 			logger, _ := logger.NewForTest()
 			service := &service{
-				dbClient:        dbClient,
-				logger:          logger,
-				idp:             identityProvider,
-				eventManager:    events.NewEventManager(dbClient, logger),
-				runStateManager: state.NewRunStateManager(dbClient, logger),
+				dbClient:          dbClient,
+				logger:            logger,
+				signingKeyManager: MockSigningKeyManager,
+				eventManager:      events.NewEventManager(dbClient, logger),
+				runStateManager:   state.NewRunStateManager(dbClient, logger),
 			}
 
 			actualResponse, err := service.ClaimJob(auth.WithCaller(ctx, mockCaller), runnerID)

@@ -129,11 +129,22 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	maintenanceMonitor := maintenance.NewMonitor(logger, dbClient, eventManager)
 	maintenanceMonitor.Start(ctx)
 
-	tharsisIDP := auth.NewIdentityProvider(pluginCatalog.JWSProvider, cfg.JWTIssuerURL)
+	signingKeyManager, err := auth.NewSigningKeyManager(
+		ctx,
+		logger,
+		pluginCatalog.JWSProvider,
+		dbClient,
+		eventManager,
+		cfg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize identity provider: %w", err)
+	}
+
 	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher)
 	federatedRegistryAuth := auth.NewFederatedRegistryAuth(ctx, cfg.FederatedRegistryTrustPolicies, logger, openIDConfigFetcher, dbClient)
-	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, tharsisIDP, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
-	userSessionManager := auth.NewUserSessionManager(dbClient, tharsisIDP, authenticator, logger, cfg.UserSessionAccessTokenExpirationMinutes, cfg.UserSessionRefreshTokenExpirationMinutes, cfg.UserSessionMaxSessionsPerUser)
+	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, signingKeyManager, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
+	userSessionManager := auth.NewUserSessionManager(dbClient, signingKeyManager, authenticator, logger, cfg.UserSessionAccessTokenExpirationMinutes, cfg.UserSessionRefreshTokenExpirationMinutes, cfg.UserSessionMaxSessionsPerUser)
 
 	respWriter := response.NewWriter(logger)
 
@@ -148,7 +159,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	logStreamStore := logstream.NewLogStore(pluginCatalog.ObjectStore, dbClient)
 	logStreamManager := logstream.New(logStreamStore, dbClient, eventManager, logger)
 
-	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, tharsisIDP)
+	managedIdentityDelegates, err := managedidentity.NewManagedIdentityDelegateMap(ctx, signingKeyManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize managed identity delegate map %v", err)
 	}
@@ -156,7 +167,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	limits := limits.NewLimitChecker(dbClient)
 	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
-	federatedRegistryClient := registry.NewFederatedRegistryClient(tharsisIDP)
+	federatedRegistryClient := registry.NewFederatedRegistryClient(signingKeyManager)
 
 	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
 	runStateManager := state.NewRunStateManager(dbClient, logger)
@@ -172,17 +183,17 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		groupService               = group.NewService(logger, dbClient, limits, namespaceMembershipService, activityService, inheritedSettingsResolver)
 		cliService                 = cli.NewService(logger, httpClient, taskManager, cliStore, cfg.TerraformCLIVersionConstraint)
 		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService, inheritedSettingsResolver)
-		jobService                 = job.NewService(logger, dbClient, tharsisIDP, logStreamManager, eventManager, runStateManager)
+		jobService                 = job.NewService(logger, dbClient, signingKeyManager, logStreamManager, eventManager, runStateManager)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
-		saService                  = serviceaccount.NewService(logger, dbClient, limits, tharsisIDP, openIDConfigFetcher, activityService)
+		saService                  = serviceaccount.NewService(logger, dbClient, limits, signingKeyManager, openIDConfigFetcher, activityService)
 		variableService            = variable.NewService(logger, dbClient, limits, activityService, pluginCatalog.SecretManager, cfg.DisableSensitiveVariableFeature)
 		teamService                = team.NewService(logger, dbClient, activityService)
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore, activityService)
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, activityService, taskManager)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
-		scimService                = scim.NewService(logger, dbClient, tharsisIDP)
-		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, activityService, tharsisIDP)
-		moduleResolver             = registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, tharsisIDP)
+		scimService                = scim.NewService(logger, dbClient, signingKeyManager)
+		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, activityService, signingKeyManager)
+		moduleResolver             = registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, signingKeyManager)
 		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleResolver, runStateManager, limits, pluginCatalog.SecretManager)
 		runnerService              = runner.NewService(logger, dbClient, limits, activityService, logStreamManager, eventManager)
 		roleService                = role.NewService(logger, dbClient, activityService)
@@ -201,7 +212,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		logger,
 		dbClient,
 		limits,
-		tharsisIDP,
+		signingKeyManager,
 		httpClient,
 		activityService,
 		runService,
@@ -279,7 +290,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		}
 	}
 
-	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, userSessionManager, tharsisIDP)
+	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, userSessionManager, signingKeyManager)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +324,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 			DispatcherType:       r.JobDispatcherType,
 			ServiceDiscoveryHost: cfg.ServiceDiscoveryHost,
 			PluginData:           r.JobDispatcherData,
-			TokenGetterFunc:      rnr.NewInternalTokenProvider(r.Name, runnerModel.Metadata.ID, tharsisIDP).GetToken,
+			TokenGetterFunc:      rnr.NewInternalTokenProvider(r.Name, runnerModel.Metadata.ID, signingKeyManager).GetToken,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create runner %v", err)
