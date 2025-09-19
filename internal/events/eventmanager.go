@@ -25,6 +25,7 @@ type SubscriptionType string
 
 // SubscriptionType constants
 const (
+	AsymSigningKeySubscription  SubscriptionType = "asym_signing_keys"
 	JobSubscription             SubscriptionType = "jobs"
 	LogStreamSubscription       SubscriptionType = "log_streams"
 	RunSubscription             SubscriptionType = "runs"

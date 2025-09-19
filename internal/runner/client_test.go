@@ -47,7 +47,7 @@ func TestInternalTokenProvider_GetToken(t *testing.T) {
 			ctx := context.Background()
 
 			// Create mock identity provider
-			mockIDP := auth.NewMockIdentityProvider(t)
+			mockIDP := auth.NewMockSigningKeyManager(t)
 
 			// Set up expectations for the mock
 			mockIDP.On("GenerateToken", ctx, mock.MatchedBy(func(input *auth.TokenInput) bool {
@@ -93,7 +93,7 @@ func TestInternalTokenProvider_isTokenExpired(t *testing.T) {
 		runnerID := "runner-123"
 
 		// Create mock identity provider
-		mockIDP := auth.NewMockIdentityProvider(t)
+		mockIDP := auth.NewMockSigningKeyManager(t)
 
 		// First token generation
 		mockIDP.On("GenerateToken", ctx, mock.MatchedBy(func(input *auth.TokenInput) bool {

@@ -92,7 +92,7 @@ func TestNewAuthenticator(t *testing.T) {
 	t.Run("creates authenticator with correct token authenticators", func(t *testing.T) {
 		mockUserAuth := &UserAuth{}
 		mockFederatedRegistryAuth := &FederatedRegistryAuth{}
-		mockIDP := NewMockIdentityProvider(t)
+		mockIDP := NewMockSigningKeyManager(t)
 		mockDBClient := &db.Client{}
 		mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 		issuerURL := "https://test-issuer.com"
@@ -156,14 +156,14 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 	tests := []struct {
 		name               string
 		tokenString        string
-		setupMocks         func(*MockIdentityProvider, *db.Client)
+		setupMocks         func(*MockSigningKeyManager, *db.Client)
 		expectCaller       Caller
 		expectErrorMessage string
 	}{
 		{
 			name:        "token verification fails",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(nil, errors.New("exp not satisfied"))
 			},
 			expectErrorMessage: errExpired,
@@ -171,7 +171,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "token missing type claim",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{},
 				}, nil)
@@ -181,7 +181,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "unsupported token type",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type": "unsupported",
@@ -193,7 +193,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "service account token type",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type":                 ServiceAccountTokenType,
@@ -207,7 +207,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "job token type",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					PrivateClaims: map[string]string{
 						"type":         JobTokenType,
@@ -226,7 +226,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "scim token type with valid token",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, "test-jti")
 				require.NoError(t, err)
@@ -247,7 +247,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "scim token type with invalid token",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, "test-jti")
 				require.NoError(t, err)
@@ -268,7 +268,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "vcs token type missing link_id claim",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, _ *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
 				token := jwt.New()
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
 					Token: token,
@@ -282,7 +282,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "vcs token type with valid link",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, "test-jti")
 				require.NoError(t, err)
@@ -312,7 +312,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "vcs token type with invalid jti claim",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, "test-jti")
 				require.NoError(t, err)
@@ -338,7 +338,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 		{
 			name:        "vcs token type with missing provider",
 			tokenString: "test-token",
-			setupMocks: func(mockIDP *MockIdentityProvider, mockDBClient *db.Client) {
+			setupMocks: func(mockIDP *MockSigningKeyManager, mockDBClient *db.Client) {
 				token := jwt.New()
 				err := token.Set(jwt.JwtIDKey, "test-jti")
 				require.NoError(t, err)
@@ -369,7 +369,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mockIDP := NewMockIdentityProvider(t)
+			mockIDP := NewMockSigningKeyManager(t)
 			mockDBClient := &db.Client{}
 			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
 
@@ -379,7 +379,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 
 			authenticator := &tharsisIDPTokenAuthenticator{
 				issuerURL:          "https://test-issuer.com",
-				idp:                mockIDP,
+				signingKeyManager:  mockIDP,
 				dbClient:           mockDBClient,
 				maintenanceMonitor: mockMaintenanceMonitor,
 			}

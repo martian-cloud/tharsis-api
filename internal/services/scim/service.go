@@ -99,21 +99,21 @@ type Service interface {
 }
 
 type service struct {
-	logger   logger.Logger
-	dbClient *db.Client
-	idp      auth.IdentityProvider
+	logger            logger.Logger
+	dbClient          *db.Client
+	signingKeyManager auth.SigningKeyManager
 }
 
 // NewService creates an instance of Service
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
-		idp,
+		signingKeyManager,
 	}
 }
 
@@ -177,7 +177,7 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 
 	// Generate a token with a UUID claim.
 	jwtID := uuid.New().String()
-	scimToken, err := s.idp.GenerateToken(txContext, &auth.TokenInput{
+	scimToken, err := s.signingKeyManager.GenerateToken(txContext, &auth.TokenInput{
 		Subject: "scim",
 		JwtID:   jwtID,
 		Claims: map[string]string{

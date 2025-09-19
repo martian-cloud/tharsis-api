@@ -6,7 +6,7 @@ PACKAGES := $(shell go list ./... | grep -v /vendor/)
 LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_TIMESTAMP}"
 
 DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable#gitleaks:allow
-MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.15.2 -path=/migrations/ -database "$(DB_URI)"
+MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.18.3 -path=/migrations/ -database "$(DB_URI)"
 
 .PHONY: build-api
 build-api:  ## build the binaries

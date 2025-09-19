@@ -47,7 +47,7 @@ type Client interface {
 type InternalTokenProvider struct {
 	runnerName string
 	runnerGID  string
-	idp        auth.IdentityProvider
+	signingKeyManager auth.SigningKeyManager
 	expires    *time.Time
 	token      string
 	mutex      sync.RWMutex
@@ -62,7 +62,7 @@ func (i *InternalTokenProvider) GetToken(ctx context.Context) (string, error) {
 	}
 
 	expiration := time.Now().Add(internalRunnerJWTExpiration)
-	token, err := i.idp.GenerateToken(ctx, &auth.TokenInput{
+	token, err := i.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 		Expiration: &expiration,
 		Subject:    i.runnerName,
 		Audience:   internalRunnerJWTAudience,
@@ -92,11 +92,11 @@ func (i *InternalTokenProvider) isTokenExpired() bool {
 }
 
 // NewInternalTokenProvider creates a new InternalTokenProvider for internal runners.
-func NewInternalTokenProvider(runnerName string, runnerID string, idp auth.IdentityProvider) *InternalTokenProvider {
+func NewInternalTokenProvider(runnerName string, runnerID string, signingKeyManager auth.SigningKeyManager) *InternalTokenProvider {
 	return &InternalTokenProvider{
-		runnerName: runnerName,
-		runnerGID:  gid.ToGlobalID(types.RunnerModelType, runnerID),
-		idp:        idp,
+		runnerName:        runnerName,
+		runnerGID:         gid.ToGlobalID(types.RunnerModelType, runnerID),
+		signingKeyManager: signingKeyManager,
 	}
 }
 

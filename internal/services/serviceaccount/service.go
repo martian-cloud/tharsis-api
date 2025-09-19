@@ -88,7 +88,7 @@ type service struct {
 	logger                 logger.Logger
 	dbClient               *db.Client
 	limitChecker           limits.LimitChecker
-	idp                    auth.IdentityProvider
+	signingKeyManager      auth.SigningKeyManager
 	openIDConfigFetcher    auth.OpenIDConfigFetcher
 	activityService        activityevent.Service
 	buildOIDCTokenVerifier func(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier
@@ -99,7 +99,7 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	openIDConfigFetcher auth.OpenIDConfigFetcher,
 	activityService activityevent.Service,
 ) Service {
@@ -107,7 +107,7 @@ func NewService(
 		logger,
 		dbClient,
 		limitChecker,
-		idp,
+		signingKeyManager,
 		openIDConfigFetcher,
 		activityService,
 		buildOIDCTokenVerifier,
@@ -118,7 +118,7 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	openIDConfigFetcher auth.OpenIDConfigFetcher,
 	activityService activityevent.Service,
 	buildOIDCTokenVerifier func(ctx context.Context, issuers []string, oidcConfigFetcher auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier,
@@ -127,7 +127,7 @@ func newService(
 		logger:                 logger,
 		dbClient:               dbClient,
 		limitChecker:           limitChecker,
-		idp:                    idp,
+		signingKeyManager:      signingKeyManager,
 		openIDConfigFetcher:    openIDConfigFetcher,
 		activityService:        activityService,
 		buildOIDCTokenVerifier: buildOIDCTokenVerifier,
@@ -585,7 +585,7 @@ func (s *service) CreateToken(ctx context.Context, input *CreateTokenInput) (*Cr
 
 			// Generate service account token
 			expiration := time.Now().Add(serviceAccountLoginDuration)
-			serviceAccountToken, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
+			serviceAccountToken, err := s.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 				Expiration: &expiration,
 				Subject:    serviceAccount.GetResourcePath(),
 				Claims: map[string]string{

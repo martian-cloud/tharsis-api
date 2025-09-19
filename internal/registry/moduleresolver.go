@@ -192,7 +192,7 @@ type federatedTharsisRegistrySource struct {
 	commonRegistrySource
 	federatedRegistry       *models.FederatedRegistry
 	federatedRegistryClient FederatedRegistryClient
-	identityProvider        auth.IdentityProvider
+	identityProvider        auth.SigningKeyManager
 }
 
 func (m *federatedTharsisRegistrySource) IsTharsisModule() bool {
@@ -391,7 +391,7 @@ type moduleResolver struct {
 	federatedRegistryClient FederatedRegistryClient
 	logger                  logger.Logger
 	tharsisAPIEndpoint      string
-	identityProvider        auth.IdentityProvider
+	identityProvider        auth.SigningKeyManager
 	getRegistryEndpoint     func(client *http.Client, host string) (*url.URL, error)
 }
 
@@ -402,7 +402,7 @@ func NewModuleResolver(
 	federatedRegistryClient FederatedRegistryClient,
 	logger logger.Logger,
 	tharsiAPIEndpoint string,
-	identityProvider auth.IdentityProvider,
+	identityProvider auth.SigningKeyManager,
 ) ModuleResolver {
 	return newModuleResolver(
 		dbClient,
@@ -421,7 +421,7 @@ func newModuleResolver(
 	federatedRegistryClient FederatedRegistryClient,
 	logger logger.Logger,
 	tharsiAPIEndpoint string,
-	identityProvider auth.IdentityProvider,
+	identityProvider auth.SigningKeyManager,
 	getRegistryEndpoint func(client *http.Client, host string) (*url.URL, error),
 ) ModuleResolver {
 	return &moduleResolver{

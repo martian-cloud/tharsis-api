@@ -611,30 +611,30 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 	testCases := []struct {
 		name                string
 		wantVersion         *string
-		tokenGeneratorSetup func(*auth.MockIdentityProvider)
+		tokenGeneratorSetup func(*auth.MockSigningKeyManager)
 		expectedVersion     string
 		expectErrorMessage  string
 	}{
 		{
 			name: "get latest version",
-			tokenGeneratorSetup: func(mockIdentityProvider *auth.MockIdentityProvider) {
-				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
+			tokenGeneratorSetup: func(MockSigningKeyManager *auth.MockSigningKeyManager) {
+				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 			},
 			expectedVersion: "1.0.0",
 		},
 		{
 			name:        "get specific version",
 			wantVersion: ptr.String("0.9.0"),
-			tokenGeneratorSetup: func(mockIdentityProvider *auth.MockIdentityProvider) {
-				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
+			tokenGeneratorSetup: func(MockSigningKeyManager *auth.MockSigningKeyManager) {
+				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 			},
 			expectedVersion: "0.9.0",
 		},
 		{
 			name:        "token generation error",
 			wantVersion: nil,
-			tokenGeneratorSetup: func(mockIdentityProvider *auth.MockIdentityProvider) {
-				mockIdentityProvider.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
+			tokenGeneratorSetup: func(MockSigningKeyManager *auth.MockSigningKeyManager) {
+				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
 			},
 			expectedVersion:    "",
 			expectErrorMessage: "token generation error",
@@ -644,10 +644,10 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mock identity provider
-			mockIdentityProvider := auth.NewMockIdentityProvider(t)
+			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
 			// Setup mocks
-			tc.tokenGeneratorSetup(mockIdentityProvider)
+			tc.tokenGeneratorSetup(MockSigningKeyManager)
 
 			// Create the federatedTharsisRegistrySource
 			source := &federatedTharsisRegistrySource{
@@ -663,7 +663,7 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 				federatedRegistry: &models.FederatedRegistry{
 					Hostname: "registry.example.com",
 				},
-				identityProvider: mockIdentityProvider,
+				identityProvider: MockSigningKeyManager,
 			}
 
 			// Call the method

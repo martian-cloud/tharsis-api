@@ -18,15 +18,15 @@ type openIDConfig struct {
 }
 
 type oidcController struct {
-	respWriter response.Writer
-	idp        auth.IdentityProvider
+	respWriter        response.Writer
+	signingKeyManager auth.SigningKeyManager
 }
 
 // NewOIDCController creates an instance of oidcController
-func NewOIDCController(respWriter response.Writer, idp auth.IdentityProvider) Controller {
+func NewOIDCController(respWriter response.Writer, signingKeyManager auth.SigningKeyManager) Controller {
 	return &oidcController{
-		respWriter: respWriter,
-		idp:        idp,
+		respWriter:        respWriter,
+		signingKeyManager: signingKeyManager,
 	}
 }
 
@@ -37,11 +37,11 @@ func (c *oidcController) RegisterRoutes(router chi.Router) {
 }
 
 func (c *oidcController) GetOpenIDConfig(w http.ResponseWriter, r *http.Request) {
-	c.respWriter.RespondWithJSON(r.Context(), w, c.idp.GetOpenIDConfig(), http.StatusOK)
+	c.respWriter.RespondWithJSON(r.Context(), w, c.signingKeyManager.GetOpenIDConfig(), http.StatusOK)
 }
 
 func (c *oidcController) GetKeys(w http.ResponseWriter, r *http.Request) {
-	keys, err := c.idp.GetKeys(r.Context())
+	keys, err := c.signingKeyManager.GetKeys(r.Context())
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return

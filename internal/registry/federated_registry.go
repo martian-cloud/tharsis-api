@@ -70,13 +70,13 @@ type FederatedRegistryClient interface {
 
 type federatedRegistryClient struct {
 	httpClient       *http.Client
-	identityProvider auth.IdentityProvider
+	identityProvider auth.SigningKeyManager
 	sdkClientBuilder func(cfg *config.Config) (sdkClient, error)
 	endpointResolver func(httpClient *http.Client, host string) (*url.URL, error)
 }
 
 // NewFederatedRegistryClient returns a new FederatedRegistryClient registry.
-func NewFederatedRegistryClient(identityProvider auth.IdentityProvider) FederatedRegistryClient {
+func NewFederatedRegistryClient(identityProvider auth.SigningKeyManager) FederatedRegistryClient {
 	return &federatedRegistryClient{
 		httpClient:       tharsishttp.NewHTTPClient(),
 		identityProvider: identityProvider,
@@ -210,7 +210,7 @@ func sdkClientBuilder(cfg *config.Config) (sdkClient, error) {
 // FederatedRegistryTokenInput is the input for generating a federated registry token.
 type FederatedRegistryTokenInput struct {
 	FederatedRegistry *models.FederatedRegistry
-	IdentityProvider  auth.IdentityProvider
+	IdentityProvider  auth.SigningKeyManager
 }
 
 // NewFederatedRegistryToken generates a new federated registry token.

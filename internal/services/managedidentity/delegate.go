@@ -21,16 +21,16 @@ type Delegate interface {
 }
 
 // NewManagedIdentityDelegateMap creates a map containing a delegate for each managed identity type
-func NewManagedIdentityDelegateMap(ctx context.Context, idp auth.IdentityProvider) (map[models.ManagedIdentityType]Delegate, error) {
-	azureHandler, err := azurefederated.New(ctx, idp)
+func NewManagedIdentityDelegateMap(ctx context.Context, signingKeyManager auth.SigningKeyManager) (map[models.ManagedIdentityType]Delegate, error) {
+	azureHandler, err := azurefederated.New(ctx, signingKeyManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize %s managed identity handler %v", models.ManagedIdentityAzureFederated, err)
 	}
-	awsHandler, err := awsfederated.New(ctx, idp)
+	awsHandler, err := awsfederated.New(ctx, signingKeyManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize %s managed identity handler %v", models.ManagedIdentityAWSFederated, err)
 	}
-	tharsisHandler, err := tharsisfederated.New(ctx, idp)
+	tharsisHandler, err := tharsisfederated.New(ctx, signingKeyManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize %s managed identity handler %v", models.ManagedIdentityTharsisFederated, err)
 	}

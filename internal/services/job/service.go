@@ -122,7 +122,7 @@ type Service interface {
 type service struct {
 	logger           logger.Logger
 	dbClient         *db.Client
-	idp              auth.IdentityProvider
+	signingKeyManager auth.SigningKeyManager
 	logStreamManager logstream.Manager
 	eventManager     *events.EventManager
 	runStateManager  state.RunStateManager
@@ -132,12 +132,12 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	logStreamManager logstream.Manager,
 	eventManager *events.EventManager,
 	runStateManager state.RunStateManager,
 ) Service {
-	return &service{logger, dbClient, idp, logStreamManager, eventManager, runStateManager}
+	return &service{logger, dbClient, signingKeyManager, logStreamManager, eventManager, runStateManager}
 }
 
 func (s *service) GetJobByID(ctx context.Context, jobID string) (*models.Job, error) {
@@ -581,7 +581,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 		if job != nil {
 			maxJobDuration := time.Duration(job.MaxJobDuration) * time.Minute
 			expiration := time.Now().Add(maxJobDuration + time.Hour)
-			token, err := s.idp.GenerateToken(ctx, &auth.TokenInput{
+			token, err := s.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 				// Expiration is job timeout plus 1 hour to give the job time to gracefully exit
 				Expiration: &expiration,
 				Subject:    fmt.Sprintf("job-%s", job.Metadata.ID),

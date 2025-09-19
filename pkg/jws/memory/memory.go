@@ -14,71 +14,82 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
+
+	jwsplugin "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
+)
+
+const (
+	keyBits = 2048
 )
 
 // InMemoryJWSProvider uses a secret key stored in memory to sign JWT tokens
 // using a SHA-256 HMAC signature algorithm
-type InMemoryJWSProvider struct {
-	privKey *rsa.PrivateKey
-	pubKey  jwk.Key
-	keySet  []byte
-}
+type InMemoryJWSProvider struct{}
 
 // New creates an InMemoryJWSProvider
-func New(pluginData map[string]string) (*InMemoryJWSProvider, error) {
-	var privKey *rsa.PrivateKey
-	var err error
-	b64Key, ok := pluginData["signing_key_b64"]
+func New(_ map[string]string) (*InMemoryJWSProvider, error) {
+	return &InMemoryJWSProvider{}, nil
+}
 
-	if ok {
-		privKey, err = parseBase64Key(b64Key)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Generate random key if one is not provided
-		privKey, err = rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			return nil, err
-		}
-	}
+// SupportsKeyRotation indicates if the plugin supports key rotation
+func (im *InMemoryJWSProvider) SupportsKeyRotation() bool {
+	return true
+}
 
-	pubKey, err := jwk.FromRaw(privKey.PublicKey)
+// Create creates a new signing key
+func (im *InMemoryJWSProvider) Create(_ context.Context, _ string) (*jwsplugin.CreateKeyResponse, error) {
+	// Generate random key if one is not provided
+	privKey, err := rsa.GenerateKey(rand.Reader, keyBits)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = jwk.AssignKeyID(pubKey); err != nil {
-		return nil, err
-	}
-	if err = pubKey.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
-		return nil, err
-	}
-	if err = pubKey.Set(jwk.KeyUsageKey, jwk.ForSignature); err != nil {
-		return nil, err
-	}
-
-	keySet, err := buildKeySet(pubKey)
+	privJWK, err := jwk.FromRaw(privKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build JWK key set %v", err)
+		return nil, err
 	}
 
-	return &InMemoryJWSProvider{
-		privKey: privKey,
-		pubKey:  pubKey,
-		keySet:  keySet,
+	if err = jwk.AssignKeyID(privJWK); err != nil {
+		return nil, err
+	}
+
+	pubJWK, err := jwk.FromRaw(privKey.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = jwk.AssignKeyID(pubJWK); err != nil {
+		return nil, err
+	}
+	if err = pubJWK.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+		return nil, err
+	}
+	if err = pubJWK.Set(jwk.KeyUsageKey, jwk.ForSignature); err != nil {
+		return nil, err
+	}
+
+	privKeyBytes, err := json.Marshal(privJWK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal JWK key %v", err)
+	}
+
+	return &jwsplugin.CreateKeyResponse{
+		KeyData:   privKeyBytes,
+		PublicKey: pubJWK,
 	}, nil
 }
 
-// Sign signs a JWT payload
-func (im *InMemoryJWSProvider) Sign(_ context.Context, token []byte) ([]byte, error) {
-	key, err := jwk.FromRaw(im.privKey)
-	if err != nil {
-		return nil, err
-	}
+// Delete deletes a signing key (no-op for in-memory plugin)
+func (im *InMemoryJWSProvider) Delete(_ context.Context, _ string, _ []byte) error {
+	// Nothing to do since keys are not stored externally
+	return nil
+}
 
-	if err = jwk.AssignKeyID(key); err != nil {
-		return nil, err
+// Sign signs a JWT payload
+func (im *InMemoryJWSProvider) Sign(_ context.Context, token []byte, _ string, keyData []byte, _ string) ([]byte, error) {
+	key, err := jwk.ParseKey(keyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JWK key %v", err)
 	}
 
 	hdrs := jws.NewHeaders()
@@ -92,38 +103,6 @@ func (im *InMemoryJWSProvider) Sign(_ context.Context, token []byte) ([]byte, er
 	}
 
 	return signed, nil
-}
-
-// GetKeySet returns the JWK key set in JSON format
-func (im *InMemoryJWSProvider) GetKeySet(_ context.Context) ([]byte, error) {
-	return im.keySet, nil
-}
-
-// Verify will return an error if the JWT does not have a valid signature
-func (im *InMemoryJWSProvider) Verify(_ context.Context, token []byte) error {
-	keySet := jwk.NewSet()
-	if err := keySet.AddKey(jwk.Key(im.pubKey)); err != nil {
-		return err
-	}
-
-	if _, err := jws.Verify(token, jws.WithKeySet(keySet)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func buildKeySet(pubKey jwk.Key) ([]byte, error) {
-	keySet := jwk.NewSet()
-	if err := keySet.AddKey(pubKey); err != nil {
-		return nil, err
-	}
-	buf, err := json.Marshal(keySet)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf, nil
 }
 
 func parseBase64Key(b64Key string) (*rsa.PrivateKey, error) {

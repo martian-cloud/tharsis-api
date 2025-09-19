@@ -12,7 +12,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -92,14 +91,13 @@ func TestCreateSCIMToken(t *testing.T) {
 				Transactions: &mockTransactions,
 			}
 
-			mockJWSProvider := jws.MockProvider{}
-			mockJWSProvider.Test(t)
+			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
-			mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil)
+			MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
 
 			logger, _ := logger.NewForTest()
-			identityProvider := auth.NewIdentityProvider(&mockJWSProvider, "https://tharsis.domain")
-			service := NewService(logger, dbClient, identityProvider)
+
+			service := NewService(logger, dbClient, MockSigningKeyManager)
 
 			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, test.caller))
 			if test.expectErrorCode != "" {

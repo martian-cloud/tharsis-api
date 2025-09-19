@@ -13,29 +13,29 @@ type MockProvider struct {
 	mock.Mock
 }
 
-// GetKeySet provides a mock function with given fields: ctx
-func (_m *MockProvider) GetKeySet(ctx context.Context) ([]byte, error) {
-	ret := _m.Called(ctx)
+// Create provides a mock function with given fields: ctx, keyID
+func (_m *MockProvider) Create(ctx context.Context, keyID string) (*CreateKeyResponse, error) {
+	ret := _m.Called(ctx, keyID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetKeySet")
+		panic("no return value specified for Create")
 	}
 
-	var r0 []byte
+	var r0 *CreateKeyResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]byte, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*CreateKeyResponse, error)); ok {
+		return rf(ctx, keyID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []byte); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *CreateKeyResponse); ok {
+		r0 = rf(ctx, keyID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(*CreateKeyResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, keyID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -43,9 +43,27 @@ func (_m *MockProvider) GetKeySet(ctx context.Context) ([]byte, error) {
 	return r0, r1
 }
 
-// Sign provides a mock function with given fields: ctx, token
-func (_m *MockProvider) Sign(ctx context.Context, token []byte) ([]byte, error) {
-	ret := _m.Called(ctx, token)
+// Delete provides a mock function with given fields: ctx, keyID, keyData
+func (_m *MockProvider) Delete(ctx context.Context, keyID string, keyData []byte) error {
+	ret := _m.Called(ctx, keyID, keyData)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Delete")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) error); ok {
+		r0 = rf(ctx, keyID, keyData)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Sign provides a mock function with given fields: ctx, token, keyID, keyData, publicKeyID
+func (_m *MockProvider) Sign(ctx context.Context, token []byte, keyID string, keyData []byte, publicKeyID string) ([]byte, error) {
+	ret := _m.Called(ctx, token, keyID, keyData, publicKeyID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Sign")
@@ -53,19 +71,19 @@ func (_m *MockProvider) Sign(ctx context.Context, token []byte) ([]byte, error) 
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) ([]byte, error)); ok {
-		return rf(ctx, token)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, string, []byte, string) ([]byte, error)); ok {
+		return rf(ctx, token, keyID, keyData, publicKeyID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) []byte); ok {
-		r0 = rf(ctx, token)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, string, []byte, string) []byte); ok {
+		r0 = rf(ctx, token, keyID, keyData, publicKeyID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte) error); ok {
-		r1 = rf(ctx, token)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, string, []byte, string) error); ok {
+		r1 = rf(ctx, token, keyID, keyData, publicKeyID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -73,19 +91,19 @@ func (_m *MockProvider) Sign(ctx context.Context, token []byte) ([]byte, error) 
 	return r0, r1
 }
 
-// Verify provides a mock function with given fields: ctx, token
-func (_m *MockProvider) Verify(ctx context.Context, token []byte) error {
-	ret := _m.Called(ctx, token)
+// SupportsKeyRotation provides a mock function with no fields
+func (_m *MockProvider) SupportsKeyRotation() bool {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for Verify")
+		panic("no return value specified for SupportsKeyRotation")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) error); ok {
-		r0 = rf(ctx, token)
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

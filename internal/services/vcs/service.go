@@ -254,7 +254,7 @@ type service struct {
 	logger              logger.Logger
 	dbClient            *db.Client
 	limitChecker        limits.LimitChecker
-	idp                 auth.IdentityProvider
+	signingKeyManager   auth.SigningKeyManager
 	vcsProviderMap      map[models.VCSProviderType]Provider
 	activityService     activityevent.Service
 	runService          run.Service
@@ -271,7 +271,7 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	httpClient *http.Client,
 	activityService activityevent.Service,
 	runService run.Service,
@@ -289,7 +289,7 @@ func NewService(
 		logger,
 		dbClient,
 		limitChecker,
-		idp,
+		signingKeyManager,
 		vcsProviderMap,
 		activityService,
 		runService,
@@ -305,7 +305,7 @@ func newService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	limitChecker limits.LimitChecker,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 	vcsProviderMap map[models.VCSProviderType]Provider,
 	activityService activityevent.Service,
 	runService run.Service,
@@ -319,7 +319,7 @@ func newService(
 		logger,
 		dbClient,
 		limitChecker,
-		idp,
+		signingKeyManager,
 		vcsProviderMap,
 		activityService,
 		runService,
@@ -1022,7 +1022,7 @@ func (s *service) CreateWorkspaceVCSProviderLink(ctx context.Context, input *Cre
 
 	// Create the token and configure webhook if using them.
 	// Generate a token with a UUID claim.
-	token, gErr := s.idp.GenerateToken(ctx, &auth.TokenInput{
+	token, gErr := s.signingKeyManager.GenerateToken(ctx, &auth.TokenInput{
 		Subject: vp.GetResourcePath(),
 		JwtID:   createdLink.TokenNonce,
 		Claims: map[string]string{

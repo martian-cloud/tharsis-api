@@ -53,7 +53,7 @@ func TestValidateManagedIdentityData(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			delegate, err := New(ctx, auth.NewMockIdentityProvider(t))
+			delegate, err := New(ctx, auth.NewMockSigningKeyManager(t))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -97,7 +97,7 @@ func TestCreateCredentials(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mockIDP := auth.NewMockIdentityProvider(t)
+	mockIDP := auth.NewMockSigningKeyManager(t)
 
 	matcher := mock.MatchedBy(func(input *auth.TokenInput) bool {
 		return input.Subject == "sub-123" && input.Audience == "azure" && input.Expiration != nil

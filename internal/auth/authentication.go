@@ -56,7 +56,7 @@ type authenticator struct {
 func NewAuthenticator(
 	userAuth *UserAuth,
 	federatedRegistryAuth *FederatedRegistryAuth,
-	idp IdentityProvider,
+	signingKeyManager SigningKeyManager,
 	dbClient *db.Client,
 	maintenanceMonitor maintenance.Monitor,
 	issuerURL string,
@@ -65,7 +65,7 @@ func NewAuthenticator(
 		[]tokenAuthenticator{
 			&tharsisIDPTokenAuthenticator{
 				issuerURL:          issuerURL,
-				idp:                idp,
+				signingKeyManager:  signingKeyManager,
 				dbClient:           dbClient,
 				maintenanceMonitor: maintenanceMonitor,
 			},
@@ -110,7 +110,7 @@ func (a *authenticator) Authenticate(ctx context.Context, tokenString string, us
 
 type tharsisIDPTokenAuthenticator struct {
 	issuerURL          string
-	idp                IdentityProvider
+	signingKeyManager  SigningKeyManager
 	dbClient           *db.Client
 	maintenanceMonitor maintenance.Monitor
 }
@@ -120,7 +120,7 @@ func (t *tharsisIDPTokenAuthenticator) Use(token jwt.Token) bool {
 }
 
 func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenString string, useCache bool) (Caller, error) {
-	output, vtErr := t.idp.VerifyToken(ctx, tokenString)
+	output, vtErr := t.signingKeyManager.VerifyToken(ctx, tokenString)
 	if vtErr != nil {
 		return nil, errors.New(errorReason(vtErr), errors.WithErrorCode(errors.EUnauthorized))
 	}

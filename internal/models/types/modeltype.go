@@ -21,6 +21,7 @@ type ModelType struct {
 
 // All possible ModelTypes
 var (
+	AsymSigningKeyModelType                  = ModelType{name: "asym_signing_key", gidCode: "ASK"}
 	ActivityEventModelType                   = ModelType{name: "activity_event", gidCode: "AE"}
 	AnnouncementModelType                    = ModelType{name: "announcement", gidCode: "AN"}
 	ApplyModelType                           = ModelType{name: "apply", gidCode: "A"}

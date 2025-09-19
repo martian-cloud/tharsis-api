@@ -46,7 +46,7 @@ func BuildRouter(
 	openIDConfigFetcher auth.OpenIDConfigFetcher,
 	serviceCatalog *services.Catalog,
 	userSessionManager auth.UserSessionManager,
-	idp auth.IdentityProvider,
+	signingKeyManager auth.SigningKeyManager,
 ) (chi.Router, error) {
 	resolverState := resolver.State{
 		Config:         cfg,
@@ -134,7 +134,7 @@ func BuildRouter(
 
 	AddRoutes(router, controllers.NewOIDCController(
 		respWriter,
-		idp,
+		signingKeyManager,
 	))
 
 	if tfeHandler != nil {
@@ -172,7 +172,7 @@ func BuildRouter(
 		logger,
 		respWriter,
 		requireAuthenticatedCallerMiddleware,
-		idp,
+		signingKeyManager,
 		serviceCatalog.RunService,
 		cfg.TharsisAPIURL,
 	))
@@ -190,7 +190,7 @@ func BuildRouter(
 		serviceCatalog.WorkspaceService,
 		serviceCatalog.GroupService,
 		serviceCatalog.ManagedIdentityService,
-		idp,
+		signingKeyManager,
 		serviceCatalog.VariableService,
 		cfg.TharsisAPIURL,
 		tfeBasePath+tfeVersionPath,
@@ -234,7 +234,7 @@ func BuildRouter(
 			logger,
 			respWriter,
 			requireAuthenticatedCallerMiddleware,
-			idp,
+			signingKeyManager,
 			serviceCatalog.JobService,
 		))
 		AddRoutes(r, controllers.NewServiceAccountController(

@@ -27,7 +27,6 @@ import (
 	types "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -1546,15 +1545,15 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockProviders := MockProvider{}
 			mockTransactions := db.MockTransactions{}
 			mockVCSProviders := db.MockVCSProviders{}
-			mockJWSProvider := jws.MockProvider{}
+
 			mockWorkspaceVCSProviderLinks := db.MockWorkspaceVCSProviderLinks{}
 
 			mockCaller.Test(t)
 			mockProviders.Test(t)
 			mockTransactions.Test(t)
 			mockVCSProviders.Test(t)
-			mockJWSProvider.Test(t)
 			mockWorkspaceVCSProviderLinks.Test(t)
+			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
 			mockCaller.On("GetSubject").Return("testsubject")
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(nil)
@@ -1579,7 +1578,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 
 			mockVCSProviders.On("GetProviderByID", mock.Anything, "provider-id").Return(test.existingProvider, nil)
 
-			mockJWSProvider.On("Sign", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil)
+			MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
 
 			mockWorkspaceVCSProviderLinks.On("CreateLink", mock.Anything, mock.Anything).Return(test.createdLink, nil)
 			mockWorkspaceVCSProviderLinks.On("UpdateLink", mock.Anything, test.createdLink).Return(test.updatedLink, nil)
@@ -1595,15 +1594,13 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 				models.GitHubProviderType: &mockProviders,
 			}
 
-			identityProvider := auth.NewIdentityProvider(&mockJWSProvider, tharsisURL)
-
 			// Override state generator.
 			stateGeneratorFunc := func() (uuid.UUID, error) {
 				return sampleOAuthState, nil
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, identityProvider, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, MockSigningKeyManager, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			response, err := service.CreateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -2923,7 +2920,7 @@ func Test_handleEvent(t *testing.T) {
 			s := service{
 				logger:              logger,
 				dbClient:            nil,
-				idp:                 nil,
+				signingKeyManager:   nil,
 				vcsProviderMap:      nil,
 				activityService:     nil,
 				runService:          &mockRunService,

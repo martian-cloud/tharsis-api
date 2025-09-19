@@ -25,7 +25,6 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	terrs "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
-	jwsprovider "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -555,21 +554,18 @@ func TestCreateToken(t *testing.T) {
 				}
 			}
 
-			mockJWSProvider := jwsprovider.NewMockProvider(t)
+			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
-			mockJWSProvider.On("Sign", mock.Anything, mock.MatchedBy(func(payload []byte) bool {
-				parsedToken, err := jwt.Parse(payload, jwt.WithVerify(false))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if parsedToken.Subject() != sa.GetResourcePath() {
+			MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
+
+				if input.Subject != sa.GetResourcePath() {
 					return false
 				}
-				privClaims := parsedToken.PrivateClaims()
+				privClaims := input.Claims
 
-				return privClaims["tharsis_service_account_id"] == gid.ToGlobalID(types.ServiceAccountModelType, sa.Metadata.ID) &&
-					privClaims["tharsis_service_account_name"] == sa.Name &&
-					privClaims["tharsis_service_account_path"] == sa.GetResourcePath()
+				return privClaims["service_account_id"] == gid.ToGlobalID(types.ServiceAccountModelType, sa.Metadata.ID) &&
+					privClaims["service_account_name"] == sa.Name &&
+					privClaims["service_account_path"] == sa.GetResourcePath()
 			})).Return([]byte("signedtoken"), nil).Maybe()
 
 			mockResourceLimits := db.NewMockResourceLimits(t)
@@ -578,8 +574,6 @@ func TestCreateToken(t *testing.T) {
 				ServiceAccounts: mockServiceAccounts,
 				ResourceLimits:  mockResourceLimits,
 			}
-
-			serviceAccountAuth := auth.NewIdentityProvider(mockJWSProvider, "https://tharsis.io")
 
 			mockConfigFetcher := auth.NewMockOpenIDConfigFetcher(t)
 
@@ -607,7 +601,7 @@ func TestCreateToken(t *testing.T) {
 				testLogger,
 				&dbClient,
 				limits.NewLimitChecker(&dbClient),
-				serviceAccountAuth,
+				MockSigningKeyManager,
 				mockConfigFetcher,
 				mockActivityEvents,
 				func(_ context.Context, _ []string, _ auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier {
