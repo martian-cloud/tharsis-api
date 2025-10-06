@@ -81,9 +81,9 @@ services:
       minio:
         condition: service_healthy
 
-  api:
-    image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/api:latest
-    container_name: tharsis-api
+  tharsis:
+    image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/tharsis:latest
+    container_name: tharsis
     restart: unless-stopped
     user: 0:0
     environment:
@@ -109,8 +109,6 @@ services:
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_ENDPOINT=http://localhost:9000
       - THARSIS_JWS_PROVIDER_PLUGIN_TYPE=memory
       - THARSIS_API_URL=http://localhost:6560
-      - THARSIS_UI_URL=http://localhost:3000
-      - THARSIS_JWT_ISSUER_URL=http://localhost:6560
       - THARSIS_INTERNAL_RUNNERS_0_NAME=default-shared-runner
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_TYPE=docker
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_API_URL=http://localhost:6560
@@ -137,19 +135,6 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_started
-
-  ui:
-    image: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-ui:latest
-    container_name: tharsis-ui
-    restart: unless-stopped
-    environment:
-      - THARSIS_API_ENDPOINT=http://localhost:6560
-    networks:
-      - tharsis
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - api
 
   jaeger:
     image: jaegertracing/all-in-one:1.44

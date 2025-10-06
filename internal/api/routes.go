@@ -24,6 +24,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ui"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -127,6 +128,17 @@ func BuildRouter(
 	router.Use(commonMiddleware...)
 
 	router.Method("GET", "/swagger/*", httpSwagger.WrapHandler)
+
+	// UI routes - serve at base path with SPA fallback
+	uiHandler, err := ui.NewHandler()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize UI handler %v", err)
+	}
+
+	if uiHandler != nil {
+		logger.Info("Serving UI at base path")
+		router.Handle("/*", uiHandler)
+	}
 
 	AddRoutes(router, controllers.NewHealthController(
 		respWriter,

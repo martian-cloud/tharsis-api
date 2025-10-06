@@ -25,7 +25,7 @@ func TestNewService(t *testing.T) {
 
 	expect := &service{
 		dbClient:       dbClient,
-		apiVersion:     apiVersion,
+		version:        apiVersion,
 		buildTimestamp: buildTimestamp,
 	}
 
@@ -83,7 +83,7 @@ func TestGetCurrentVersion(t *testing.T) {
 
 			service := &service{
 				dbClient:       dbClient,
-				apiVersion:     "1.0.0",
+				version:        "1.0.0",
 				buildTimestamp: buildTimestamp,
 			}
 
@@ -102,7 +102,7 @@ func TestGetCurrentVersion(t *testing.T) {
 				expectedInfo := &Info{
 					DBMigrationVersion: strconv.Itoa(test.dbMigration.Version),
 					DBMigrationDirty:   test.dbMigration.Dirty,
-					APIVersion:         "1.0.0",
+					Version:            "1.0.0",
 					BuildTimestamp:     buildTimestamp,
 				}
 				assert.Equal(t, expectedInfo, actualInfo)

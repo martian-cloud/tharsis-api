@@ -120,12 +120,12 @@ type Service interface {
 }
 
 type service struct {
-	logger           logger.Logger
-	dbClient         *db.Client
+	logger            logger.Logger
+	dbClient          *db.Client
 	signingKeyManager auth.SigningKeyManager
-	logStreamManager logstream.Manager
-	eventManager     *events.EventManager
-	runStateManager  state.RunStateManager
+	logStreamManager  logstream.Manager
+	eventManager      *events.EventManager
+	runStateManager   state.RunStateManager
 }
 
 // NewService creates an instance of Service

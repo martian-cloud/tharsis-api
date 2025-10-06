@@ -64,11 +64,11 @@ type FederatedRegistryTrustPolicy struct {
 // Config represents an application configuration.
 type Config struct {
 	// Plugin Data
-	ObjectStorePluginData    map[string]string `yaml:"object_store_plugin_data"`
-	RateLimitStorePluginData map[string]string `yaml:"rate_limit_store_plugin_data" env:"RATE_LIMIT_STORE_PLUGIN_DATA"`
-	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data"`
-	SecretManagerPluginData  map[string]string `yaml:"secret_manager_plugin_data"`
-	EmailClientPluginData    map[string]string `yaml:"email_client_plugin_data"`
+	ObjectStorePluginData    map[string]string `yaml:"object_store_plugin_data" sensitive:"true"`
+	RateLimitStorePluginData map[string]string `yaml:"rate_limit_store_plugin_data" env:"RATE_LIMIT_STORE_PLUGIN_DATA" sensitive:"true"`
+	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data" sensitive:"true"`
+	SecretManagerPluginData  map[string]string `yaml:"secret_manager_plugin_data" sensitive:"true"`
+	EmailClientPluginData    map[string]string `yaml:"email_client_plugin_data" sensitive:"true"`
 
 	// Plugin Type
 	ObjectStorePluginType    string `yaml:"object_store_plugin_type" env:"OBJECT_STORE_PLUGIN_TYPE"`
@@ -87,11 +87,13 @@ type Config struct {
 	// The external facing URL for the Tharsis Frontend UI
 	TharsisUIURL string `yaml:"tharsis_ui_url" env:"UI_URL"`
 
+	TharsisSupportURL string `yaml:"tharsis_support_url" env:"SUPPORT_URL"`
+
 	TLSEnabled bool `yaml:"tls_enabled" env:"TLS_ENABLED"`
 
-	TLSCertFile string `yaml:"tls_cert_file" env:"TLS_CERT_FILE"`
+	TLSCertFile string `yaml:"tls_cert_file" env:"TLS_CERT_FILE" sensitive:"true"`
 
-	TLSKeyFile string `yaml:"tls_key_file" env:"TLS_KEY_FILE"`
+	TLSKeyFile string `yaml:"tls_key_file" env:"TLS_KEY_FILE" sensitive:"true"`
 
 	// the server port. Defaults to 8000
 	ServerPort string `yaml:"server_port" env:"SERVER_PORT"`
@@ -102,8 +104,8 @@ type Config struct {
 	DBHost     string `yaml:"db_host" env:"DB_HOST"`
 	DBName     string `yaml:"db_name" env:"DB_NAME"`
 	DBSSLMode  string `yaml:"db_ssl_mode" env:"DB_SSL_MODE"`
-	DBUsername string `yaml:"db_username" env:"DB_USERNAME,secret"`
-	DBPassword string `yaml:"db_password" env:"DB_PASSWORD,secret"`
+	DBUsername string `yaml:"db_username" env:"DB_USERNAME,secret" sensitive:"true"`
+	DBPassword string `yaml:"db_password" env:"DB_PASSWORD,secret" sensitive:"true"`
 
 	// TFE Login
 	TFELoginClientID string `yaml:"tfe_login_client_id" env:"TFE_LOGIN_CLIENT_ID"`
@@ -113,7 +115,7 @@ type Config struct {
 	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
 
 	// AdminUserEmail is optional and will create a system admin user with this email.
-	AdminUserEmail string `yaml:"admin_user_email" env:"ADMIN_USER_EMAIL"`
+	AdminUserEmail string `yaml:"admin_user_email" env:"ADMIN_USER_EMAIL" sensitive:"true"`
 
 	// Otel
 	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
@@ -126,9 +128,9 @@ type Config struct {
 	OauthProviders []IdpConfig `yaml:"oauth_providers"`
 
 	// Federated Registry Trust Policies.
-	FederatedRegistryTrustPolicies []FederatedRegistryTrustPolicy `yaml:"federated_registry_trust_policies"`
+	FederatedRegistryTrustPolicies []FederatedRegistryTrustPolicy `yaml:"federated_registry_trust_policies" sensitive:"true"`
 
-	InternalRunners []RunnerConfig `yaml:"internal_runners"`
+	InternalRunners []RunnerConfig `yaml:"internal_runners" sensitive:"true"`
 
 	// Database Configuration
 	DBMaxConnections int `yaml:"db_max_connections" env:"DB_MAX_CONNECTIONS"`
@@ -188,8 +190,6 @@ func (c Config) Validate() error {
 		validation.Field(&c.ServerPort, is.Port),
 		validation.Field(&c.ObjectStorePluginType, validation.Required),
 		validation.Field(&c.JWSProviderPluginType, validation.Required),
-		validation.Field(&c.TharsisAPIURL, validation.Required),
-		validation.Field(&c.TharsisUIURL, validation.Required),
 	)
 }
 
@@ -229,6 +229,10 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// load from environment variables prefixed with "THARSIS_"
 	if err := env.New("THARSIS_", logger.Infof).Load(&c); err != nil {
 		return nil, fmt.Errorf("failed to load env variables: %w", err)
+	}
+
+	if c.TharsisAPIURL == "" {
+		c.TharsisAPIURL = fmt.Sprintf("http://localhost:%s", c.ServerPort)
 	}
 
 	// Set service discovery host if it's not defined
@@ -316,6 +320,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Default JWTIssuerURL to TharsisURL
 	if c.JWTIssuerURL == "" {
 		c.JWTIssuerURL = c.TharsisAPIURL
+	}
+
+	// Default TharsisUIURL to the API since we are running the UI from the API
+	if c.TharsisUIURL == "" {
+		c.TharsisUIURL = c.TharsisAPIURL
 	}
 
 	// Default to UI URL

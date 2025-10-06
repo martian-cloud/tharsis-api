@@ -196,7 +196,7 @@ func TestJWSProvider_Create(t *testing.T) {
 
 		result, err := provider.Create(ctx, keyID)
 		require.NoError(t, err)
-		
+
 		expectedJWK, err := jwk.FromRaw(&privKey.PublicKey)
 		require.NoError(t, err)
 		require.NoError(t, jwk.AssignKeyID(expectedJWK))

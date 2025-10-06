@@ -6,6 +6,7 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: API-Security.gitlab-ci.yml
   - template: API-Fuzzing.gitlab-ci.yml
+  - template: DAST.gitlab-ci.yml
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
@@ -26,8 +27,7 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-go.json
-    rules:
-      - if: $CI_COMMIT_TAG
+      rules: !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
@@ -48,8 +48,7 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-go.json
-    rules:
-      - if: $CI_COMMIT_TAG
+      rules: !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
@@ -70,13 +69,23 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-go.json
-    rules:
-      - if: $CI_COMMIT_TAG
+      rules: !reference [.on_tag_events, rules]
+  - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-npm@$SBOM_COMPONENT_VERSION
+    inputs:
+      stage: container_scanning
+      package_manifest: "frontend/package.json"
+      validate: true
+      verbose: true
+      remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
+      remote_sbom_component_mapping_file_branch: main
+      remote_sbom_component_mapping_file_path: mapping-node.json
+      rules: !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/merge-sboms@$SBOM_COMPONENT_VERSION
     inputs:
       hierarchical: true
-      name: tharsis-api
+      name: tharsis
       version: $CI_COMMIT_TAG
+      rules: !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@$SBOM_COMPONENT_VERSION
     inputs:
       stage: container_scanning
@@ -85,14 +94,12 @@ include:
       remote_sbom_component_mapping_file_paths:
         ["mapping-alpine.json", "mapping-debian.json"]
       report_filenames:
-        - "gl-sbom-api-report.cdx.json"
+        - "gl-sbom-tharsis-report.cdx.json"
         - "gl-sbom-job-report.cdx.json"
         - "gl-sbom-runner-report.cdx.json"
       needs: [container_scanning]
-    rules:
-      - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-      - if: '$CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"'
-      - if: $CI_COMMIT_TAG
+      rules:
+        !reference [.on_default_branch_and_merge_train_and_tag_events, rules]
 
 stages:
   - test
@@ -143,6 +150,26 @@ default:
     - ".go/pkg/mod"
     - ".go/cache"
 
+# Use SHA of .gitlab-ci.yml and package-lock.json for cache key
+.ui-cache-template: &ui-cache-template
+  paths:
+    - frontend/node_modules/
+  key:
+    files:
+      - .gitlab-ci.yml
+      - frontend/package-lock.json
+    prefix: node_modules
+
+.node:
+  image: node:18-alpine
+  before_script:
+    - cd frontend
+    - npm install
+    - cd ..
+  cache:
+    <<: *ui-cache-template
+    policy: pull
+
 #################################
 ##            RULES            ##
 #################################
@@ -172,12 +199,33 @@ default:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
 
+.on_default_branch_and_merge_train_and_tag_events:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+    - if: $CI_COMMIT_TAG
+
 #################################
 ##            BUILD            ##
 #################################
 
-publish api docker:
-  image: docker:latest
+populate_npm_cache:
+  extends: .node
+  stage: .pre
+  script:
+    - echo "successfully installed dependencies"
+  cache:
+    <<: *ui-cache-template
+    policy: push
+  rules:
+    - changes:
+        - .gitlab-ci.yml
+        - frontend/package-lock.json
+      when: always
+    - when: never
+
+publish tharsis docker:
+  image: docker:28.4.0
   needs: []
   services:
     - docker:dind
@@ -186,23 +234,23 @@ publish api docker:
     - oss
     - docker
   variables:
-    KUBERNETES_SERVICE_MEMORY_LIMIT: 2Gi
-    KUBERNETES_SERVICE_CPU_LIMIT: "2"
+    KUBERNETES_MEMORY_REQUEST: 6Gi
+    KUBERNETES_MEMORY_LIMIT: 6Gi
+    KUBERNETES_NODE_SELECTOR_FAMILY: "node.kubernetes.io/instance-type=c6a.xlarge"
   before_script:
     - apk add git
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
-    - !reference [.on_tag_events, rules]
+    - !reference [.on_default_branch_and_merge_train_and_tag_events, rules]
   script:
     - |
       # Build registry URIs.
       registry_uri="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
-      api_uri="$registry_uri"/api
+      tharsis_uri="$registry_uri"/tharsis
 
       docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
-      echo "Building tharsis-api image"
-      docker build --target api -t api:latest --build-arg goversion=$GO_VERSION --no-cache .
+      echo "Building tharsis image"
+      docker build --target tharsis -t tharsis:latest --no-cache .
 
       if [ ! -z "$CI_COMMIT_TAG" ]; then
         echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
@@ -212,33 +260,33 @@ publish api docker:
         major_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x | grep -Eo '[0-9\.].*$')
         major_minor_version=$(docker run --rm -v "$(pwd)":/git-semver mdomke/git-semver -format x.y | grep -Eo '[0-9\.].*$')
 
-        # Version tag API images.
-        echo "Version tagging the api image"
-        docker image tag api:latest $api_uri:$full_version
-        docker image tag api:latest $api_uri:$major_version
-        docker image tag api:latest $api_uri:$major_minor_version
+        # Version tag tharsis images.
+        echo "Version tagging the tharsis image"
+        docker image tag tharsis:latest $tharsis_uri:$full_version
+        docker image tag tharsis:latest $tharsis_uri:$major_version
+        docker image tag tharsis:latest $tharsis_uri:$major_minor_version
 
-        echo "Pushing tharsis-api versioned image to registry"
-        docker image push $api_uri:$full_version
-        docker image push $api_uri:$major_version
-        docker image push $api_uri:$major_minor_version
+        echo "Pushing tharsis-tharsis versioned image to registry"
+        docker image push $tharsis_uri:$full_version
+        docker image push $tharsis_uri:$major_version
+        docker image push $tharsis_uri:$major_minor_version
 
         latest_version=$(git tag | tr - \~ | sort -rV | tr \~ - | head -n1)
         if [[ "$CI_COMMIT_TAG" == "$latest_version" ]]
           then
             echo "Build is latest, tagging and pushing image as latest"
-            docker image tag api:latest $api_uri:latest
-            docker image push $api_uri:latest
+            docker image tag tharsis:latest $tharsis_uri:latest
+            docker image push $tharsis_uri:latest
         fi
       else
         echo "This is a normal commit so $IMAGE_TAG tag will be pushed to GitLab registry"
-        docker image tag api:latest $api_uri:$IMAGE_TAG
-        docker image push $api_uri:$IMAGE_TAG
+        docker image tag tharsis:latest $tharsis_uri:$IMAGE_TAG
+        docker image push $tharsis_uri:$IMAGE_TAG
       fi
   interruptible: false
 
 publish job-executor docker:
-  image: docker:latest
+  image: docker:28.4.0
   needs: []
   services:
     - docker:dind
@@ -252,8 +300,7 @@ publish job-executor docker:
   before_script:
     - apk add git
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
-    - !reference [.on_tag_events, rules]
+    - !reference [.on_default_branch_and_merge_train_and_tag_events, rules]
   script:
     - |
       # Build registry URIs.
@@ -263,7 +310,7 @@ publish job-executor docker:
       docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
       echo "Building job-executor image"
-      docker build --target job-executor -t job-executor:latest --build-arg goversion=$GO_VERSION --no-cache .
+      docker build --target job-executor -t job-executor:latest --no-cache .
 
       if [ ! -z "$CI_COMMIT_TAG" ]; then
         echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
@@ -299,7 +346,7 @@ publish job-executor docker:
   interruptible: false
 
 publish runner docker:
-  image: docker:latest
+  image: docker:28.4.0
   needs: []
   services:
     - docker:dind
@@ -313,8 +360,7 @@ publish runner docker:
   before_script:
     - apk add git
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
-    - !reference [.on_tag_events, rules]
+    - !reference [.on_default_branch_and_merge_train_and_tag_events, rules]
   script:
     - |
       # Build registry URIs.
@@ -324,7 +370,7 @@ publish runner docker:
       docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
       echo "Building runner image"
-      docker build --target runner -t runner:latest --build-arg goversion=$GO_VERSION --no-cache .
+      docker build --target runner -t runner:latest --no-cache .
 
         if [ ! -z "$CI_COMMIT_TAG" ]; then
         echo "This is a tagged commit so major, major.minor and full tags will be pushed to GitLab registry"
@@ -378,9 +424,9 @@ tests:
     KUBERNETES_MEMORY_LIMIT: 4Gi
   before_script:
     - export PATH=$PATH:$GOPATH/bin
-    - apk add postgresql-client libpq-dev git bash openssh ca-certificates
-    - go install github.com/jstemmer/go-junit-report@latest
-    - go install github.com/boumenot/gocover-cobertura@latest
+    - apk add postgresql16-client libpq-dev git bash openssh ca-certificates
+    - go install github.com/jstemmer/go-junit-report@v2.1.0
+    - go install github.com/boumenot/gocover-cobertura@v1.4.0
     - wget -O - https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
   script:
     - |
@@ -407,27 +453,31 @@ tests:
         path: coverage.xml
   coverage: '/\(statements\)\s*(\d+(?:\.\d+)?%)/'
   cache:
-    <<: *cache-template
+    - <<: *cache-template
+    - <<: *ui-cache-template
+      policy: pull
 
 lint:
   image: golang:${GO_VERSION}-alpine
   stage: test
   before_script:
     - export PATH=$PATH:$GOPATH/bin
-    - apk add git bash openssh ca-certificates
+    - apk add git bash openssh ca-certificates nodejs npm
     - go install github.com/mgechev/revive@$GO_LINTER_VERSION
   script:
     - go mod download
-    - revive -set_exit_status ./...
+    - make lint
   cache:
-    <<: *cache-template
+    - <<: *cache-template
+    - <<: *ui-cache-template
+      policy: pull
 
 build_aio_container_image:
   stage: trigger
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   needs:
-    - publish api docker
+    - publish tharsis docker
   trigger:
     project: infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker
     strategy: depend
@@ -449,9 +499,9 @@ container_scanning:
   after_script: mv -i gl-sbom-report.cdx.json gl-sbom-$COMPONENT-report.cdx.json
   parallel:
     matrix:
-      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/api:${IMAGE_TAG}"
+      - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/tharsis:${IMAGE_TAG}"
         CS_DOCKERFILE_PATH: "Dockerfile"
-        COMPONENT: api
+        COMPONENT: tharsis
       - CS_IMAGE: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/job-executor:${IMAGE_TAG}"
         CS_DOCKERFILE_PATH: "Dockerfile"
         COMPONENT: job
@@ -489,7 +539,7 @@ license_scanning:
   before_script:
     - export PATH=$PATH:$GOPATH/bin
     - apk add git bash openssh ca-certificates make jq
-    - go install github.com/uw-labs/lichen@latest
+    - go install github.com/uw-labs/lichen@v0.1.7
   script:
     - make build-api
     - |
@@ -527,6 +577,7 @@ merge-cyclonedx-sboms:
       optional: true
     - job: "go-sbom (cmd/runner,0)"
       optional: true
+    - job: "npm-sbom (frontend/package.json)"
 
 api_security:
   services:
@@ -568,7 +619,7 @@ api_security_1:
   variables:
     APISEC_PROFILE: Profile_1
   rules:
-      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 api_security_2:
   extends: api_security
@@ -615,3 +666,31 @@ apifuzzer_fuzz:
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+dast:
+  services:
+    - name: registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-all-in-one-docker:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+      alias: tharsis
+  needs:
+    - build_aio_container_image
+  variables:
+    DAST_WEBSITE: "http://tharsis:8000"
+    DAST_AUTH_URL: "http://tharsis:8080/realms/tharsis/protocol/openid-connect/auth?client_id=tharsis&redirect_uri=http%3A%2F%2Ftharsis%3A8000%2F&response_type=id_token&scope=openid%20profile%20email"
+    DAST_USERNAME: martian
+    DAST_PASSWORD: martian
+    DAST_USERNAME_FIELD: "css:[name=username]"
+    DAST_PASSWORD_FIELD: "css:[name=password]"
+    DAST_SUBMIT_FIELD: "css:[name=login]"
+    DAST_BROWSER_SCAN: "true"
+    DAST_FULL_SCAN_ENABLED: "true"
+    DAST_EXCLUDE_URLS: "http://tharsis:8000/static/.*"
+    KUBERNETES_SERVICE_CPU_REQUEST: "250m"
+    KUBERNETES_SERVICE_CPU_LIMIT: "500m"
+    KUBERNETES_SERVICE_MEMORY_REQUEST: "500Mi"
+    KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
+    JAVA_OPTS_APPEND: "-Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
+  before_script:
+    - |
+      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
+  rules:
+    - !reference [.on_default_branch_and_merge_train, rules]

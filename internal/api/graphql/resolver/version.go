@@ -12,9 +12,9 @@ type VersionResolver struct {
 	versionInfo *version.Info
 }
 
-// APIVersion resolver
-func (r *VersionResolver) APIVersion() string {
-	return r.versionInfo.APIVersion
+// Version resolver
+func (r *VersionResolver) Version() string {
+	return r.versionInfo.Version
 }
 
 // DBMigrationVersion resolver
@@ -27,8 +27,8 @@ func (r *VersionResolver) DBMigrationDirty() bool {
 	return r.versionInfo.DBMigrationDirty
 }
 
-// APIBuildTimestamp resolver
-func (r *VersionResolver) APIBuildTimestamp() graphql.Time {
+// BuildTimestamp resolver
+func (r *VersionResolver) BuildTimestamp() graphql.Time {
 	return graphql.Time{Time: r.versionInfo.BuildTimestamp}
 }
 
