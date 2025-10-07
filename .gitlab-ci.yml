@@ -27,7 +27,8 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-go.json
-      rules: !reference [.on_tag_events, rules]
+      rules:
+        - !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
@@ -48,7 +49,8 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-go.json
-      rules: !reference [.on_tag_events, rules]
+      rules:
+        - !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-go@$SBOM_COMPONENT_VERSION
     inputs:
       module_path: .
@@ -69,7 +71,8 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-go.json
-      rules: !reference [.on_tag_events, rules]
+      rules:
+        - !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/generate-sbom-npm@$SBOM_COMPONENT_VERSION
     inputs:
       stage: container_scanning
@@ -79,13 +82,15 @@ include:
       remote_sbom_component_mapping_file_namespace_path: infor-cloud/martian-cloud/sbom-component-mapping
       remote_sbom_component_mapping_file_branch: main
       remote_sbom_component_mapping_file_path: mapping-node.json
-      rules: !reference [.on_tag_events, rules]
+      rules:
+        - !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/merge-sboms@$SBOM_COMPONENT_VERSION
     inputs:
       hierarchical: true
       name: tharsis
       version: $CI_COMMIT_TAG
-      rules: !reference [.on_tag_events, rules]
+      rules:
+        - !reference [.on_tag_events, rules]
   - component: gitlab.com/infor-cloud/gitlab-components/software-bill-of-materials/add-container-sbom-details@$SBOM_COMPONENT_VERSION
     inputs:
       stage: container_scanning
@@ -99,7 +104,7 @@ include:
         - "gl-sbom-runner-report.cdx.json"
       needs: [container_scanning]
       rules:
-        !reference [.on_default_branch_and_merge_train_and_tag_events, rules]
+        - !reference [.on_default_branch_and_merge_train_and_tag_events, rules]
 
 stages:
   - test
