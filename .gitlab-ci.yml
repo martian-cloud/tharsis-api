@@ -414,9 +414,11 @@ tests:
   image: golang:${GO_VERSION}-alpine
   needs: []
   services:
-    - postgres:16
+    - name: postgres:16
+      alias: postgres
   stage: test
   variables:
+    DOCKER_HOST: tcp://localhost:2375/
     POSTGRES_DB: tharsisdbtest
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: $CI_JOB_TOKEN
@@ -430,7 +432,7 @@ tests:
   before_script:
     - export PATH=$PATH:$GOPATH/bin
     - apk add postgresql16-client libpq-dev git bash openssh ca-certificates
-    - go install github.com/jstemmer/go-junit-report@v2.1.0
+    - go install github.com/jstemmer/go-junit-report/v2@v2.1.0
     - go install github.com/boumenot/gocover-cobertura@v1.4.0
     - wget -O - https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
   script:
@@ -438,17 +440,16 @@ tests:
       set -x
       /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
       go test \
-        -tags=integration \
+        -tags=integration,noui \
         --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
         -covermode=atomic \
         -coverpkg gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/... \
-        -v \
         -coverprofile .coverage \
         ./... 2>&1 | tee .test-results
 
       go tool cover -func .coverage | tail
-      go-junit-report -set-exit-code < .test-results > .xunit-results.xml
-      gocover-cobertura < .coverage > coverage.xml
+      go-junit-report -in .test-results -out .xunit-results.xml -set-exit-code
+      GOFLAGS="-tags=noui" gocover-cobertura < .coverage > coverage.xml
   artifacts:
     when: always
     reports:
@@ -467,7 +468,7 @@ lint:
   stage: test
   before_script:
     - export PATH=$PATH:$GOPATH/bin
-    - apk add git bash openssh ca-certificates nodejs npm
+    - apk add git bash openssh ca-certificates make nodejs npm
     - go install github.com/mgechev/revive@$GO_LINTER_VERSION
   script:
     - go mod download
