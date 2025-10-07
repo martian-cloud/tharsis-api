@@ -699,4 +699,4 @@ dast:
     - |
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
   rules:
-    - !reference [.on_default_branch_and_merge_train, rules]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
