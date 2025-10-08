@@ -5,7 +5,7 @@ RUN apk update --no-cache && \
     apk add --no-cache \
     build-base=0.5-r3 \
     git=2.49.1-r0 \
-    curl=8.14.1-r1 \
+    curl=8.14.1-r2 \
     nodejs=22.16.0-r2 \
     npm=11.3.0-r1 && \
     rm -rf /var/cache/apk/*
@@ -43,7 +43,7 @@ FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac
 RUN apk update --no-cache && \
     apk add --no-cache \
     git=2.47.3-r0 \
-    curl=8.12.1-r1 \
+    curl=8.14.1-r2 \
     python3=3.12.11-r0 \
     py3-pip=24.3.1-r0 \
     jq=1.7.1-r0 && \
@@ -68,7 +68,7 @@ FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac
 RUN apk update --no-cache && \
     apk add --no-cache \
     git=2.47.3-r0 \
-    curl=8.12.1-r1 \
+    curl=8.14.1-r2 \
     python3=3.12.11-r0 \
     py3-pip=24.3.1-r0 \
     jq=1.7.1-r0 && \
