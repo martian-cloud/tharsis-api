@@ -22,6 +22,7 @@
 
 # Martian Cloud Common Ignore
 testdata/postgres/*
+**/.env*
 .env*
 .coverage
 .test-results
@@ -32,6 +33,7 @@ apiserver
 job
 !internal/**
 !cmd/*
+internal/**/.env*
 
 # Go language Ignore (https://github.com/github/gitignore/blob/master/Go.gitignore)
 ## Binaries for programs and plugins
@@ -332,3 +334,19 @@ Temporary Items
 **/debug.test*
 
 oss/
+
+# UI specific
+**/node_modules
+**/.pnp
+*.pnp.js
+
+# testing
+**/coverage
+
+# production
+**/build
+**/dist
+
+*npm-debug.log*
+*yarn-debug.log*
+*yarn-error.log*

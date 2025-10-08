@@ -1,0 +1,9 @@
+.diff-unified {
+    --diff-code-delete-background-color: rgba(248, 81, 73, 0.15);
+    --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
+}
+
+code[class*='language-'],
+pre[class*='language-'] {
+	background: inherit;
+}

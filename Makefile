@@ -8,9 +8,17 @@ LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_T
 DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable#gitleaks:allow
 MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --network host migrate/migrate:v4.18.3 -path=/migrations/ -database "$(DB_URI)"
 
-.PHONY: build-api
-build-api:  ## build the binaries
+# Build targets
+.PHONY: build-tharsis
+build-tharsis:  ## build the tharsis binary (includes UI)
+	@echo "Building UI..."
+	@cd frontend && npm install >/dev/null && npm run build
+	@echo "Building tharsis binary..."
 	CGO_ENABLED=0 go build ${LDFLAGS} -a -o apiserver $(MODULE)/cmd/apiserver
+
+.PHONY: build-api
+build-api:  ## build the API binary (no UI)
+	CGO_ENABLED=0 go build ${LDFLAGS} -tags noui -a -o apiserver $(MODULE)/cmd/apiserver
 
 .PHONY: build-job-executor
 build-job-executor:  ## build the binaries
@@ -20,9 +28,13 @@ build-job-executor:  ## build the binaries
 build-runner:  ## build the binaries
 	CGO_ENABLED=0 go build ${LDFLAGS} -a -o runner $(MODULE)/cmd/runner
 
+# Code quality targets
 .PHONY: lint
-lint: ## run golint on all Go package
+lint: ## run linting on Go and UI code
+	@echo "Linting Go code..."
 	@revive -set_exit_status $(PACKAGES)
+	@echo "Linting UI code..."
+	@cd frontend && npm install >/dev/null && npm run lint
 
 .PHONY: vet
 vet: ## run golint on all Go package
@@ -32,21 +44,40 @@ vet: ## run golint on all Go package
 fmt: ## run "go fmt" on all Go packages
 	@go fmt $(PACKAGES)
 
+.PHONY: generate
+generate: ## run go generate
+	go generate -v ./...
+
+# Test targets
 .PHONY: test
 test: ## run unit tests
-	go test ./...
+	go test -tags noui ./...
 
 .PHONY: integration
 integration: ## run DB layer integration tests
 	test/integration/run-integration-tests.sh
 
-.PHONY: generate
-generate: ## run go generate
-	go generate -v ./...
+# UI targets
+.PHONY: build-ui
+build-ui: ## build the UI for production
+	cd frontend && npm install >/dev/null && npm run build
 
-.PHONY: build-api-docker
-build-api-docker:
-	docker build --build-arg goversion=$(GO_VERSION) --target api -t tharsis/api .
+.PHONY: dev-ui
+dev-ui: ## start the UI development server
+	cd frontend && npm install && npm start
+
+.PHONY: relay
+relay: ## run the UI relay compiler
+	cd frontend && npm run relay
+
+.PHONY: update-schema
+update-schema: ## update the GraphQL schema
+	cd frontend && npm run update-schema
+
+# Docker targets
+.PHONY: build-tharsis-docker
+build-tharsis-docker:
+	docker build --build-arg goversion=$(GO_VERSION) --target tharsis -t tharsis/tharsis .
 
 .PHONY: build-job-docker
 build-job-docker:
@@ -56,10 +87,11 @@ build-job-docker:
 build-runner-docker:
 	docker build --build-arg goversion=$(GO_VERSION) --target runner -t tharsis/runner .
 
-.PHONY: run-api-docker
-run-api-docker:
-	docker run -it -p 8000:8000 -p 9090:9090 -v ~/.aws:/root/.aws --env-file .env.docker tharsis/api
+.PHONY: run-tharsis-docker
+run-tharsis-docker:
+	docker run -it -p 8000:8000 -p 9090:9090 -v ~/.aws:/root/.aws --env-file .env.docker tharsis/tharsis
 
+# Database targets
 .PHONY: db-start
 db-start: ## start the database server
 	@mkdir -p testdata/postgres

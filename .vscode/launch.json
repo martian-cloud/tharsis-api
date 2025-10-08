@@ -13,6 +13,7 @@
             "env": {},
             "envFile": "${workspaceFolder}/.env",
             "args": [],
+            "buildFlags": "-tags=noui",
             "stopOnEntry": false,
         },
         {

@@ -1,56 +1,90 @@
-ARG goversion=1.24
+FROM golang:1.24-alpine@sha256:fc2cff6625f3c1c92e6c85938ac5bd09034ad0d4bc2dfb08278020b68540dbb5 AS builder
 
-FROM golang:${goversion}-alpine AS builder
+# Install dependencies with specific versions and clean up
 RUN apk update --no-cache && \
-    apk upgrade --no-cache && \
-    apk add --no-cache build-base git curl
-COPY go.mod /app/
+    apk add --no-cache \
+    build-base=0.5-r3 \
+    git=2.49.1-r0 \
+    curl=8.14.1-r2 \
+    nodejs=22.16.0-r2 \
+    npm=11.3.0-r1 && \
+    rm -rf /var/cache/apk/*
+
 WORKDIR /app
-RUN go mod download
-COPY . /app
-RUN curl --fail --silent --show-error -L --output iamoidccredhelper https://gitlab.com/api/v4/projects/44551702/packages/generic/iam-oidc-credential-helper/v0.1.1/iamoidccredhelper_v0.1.1_linux_amd64 && \
-    make build-api && \
+
+# Copy dependency files first for better layer caching
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Download credential helper
+RUN curl --fail --silent --show-error -L \
+    --output iamoidccredhelper \
+    https://gitlab.com/api/v4/projects/44551702/packages/generic/iam-oidc-credential-helper/v0.1.1/iamoidccredhelper_v0.1.1_linux_amd64 && \
+    chmod +x iamoidccredhelper
+
+# Build binaries
+RUN make build-tharsis && \
     make build-job-executor && \
     make build-runner
 
-FROM gcr.io/distroless/static-debian12:nonroot AS distroless-base
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:e8a4044e0b4ae4257efa45fc026c0bc30ad320d43bd4c1a7d5271bd241e386d0 AS distroless-base
 WORKDIR /app/
 
-FROM distroless-base AS api
-COPY --from=builder /app/apiserver .
-USER nonroot
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "curl", "-f", "http://localhost:8000/health", "||", "exit", "1" ]
+FROM distroless-base AS tharsis
+COPY --from=builder --chown=nonroot:nonroot /app/apiserver .
+USER 65532:65532
 EXPOSE 8000
 CMD ["./apiserver"]
 
-FROM alpine:3.21 AS runner
+FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac6da80685 AS runner
 RUN apk update --no-cache && \
-    apk upgrade --no-cache && \
-    apk add --no-cache git curl python3 py3-pip jq && \
-    adduser tharsis -D && \
+    apk add --no-cache \
+    git=2.47.3-r0 \
+    curl=8.14.1-r2 \
+    python3=3.12.11-r0 \
+    py3-pip=24.3.1-r0 \
+    jq=1.7.1-r0 && \
+    adduser tharsis -D -u 1001 -g 1001 && \
+    mkdir -p /app /opt/credhelpers && \
+    chown -R tharsis:tharsis /app /opt/credhelpers && \
     addgroup docker && \
     adduser tharsis docker && \
-    mkdir -p /app /opt/credhelpers && \
-    chown tharsis:tharsis /app
+    find /usr /bin /sbin -perm /6000 -type f -exec rm -f {} \; && \
+    rm -rf /var/cache/apk/* && \
+    rm -rf /etc/apk && \
+    rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/*
+
 WORKDIR /app/
-COPY --from=builder /app/runner .
-COPY --chmod=0755 --from=builder /app/iamoidccredhelper /opt/credhelpers/iamoidccredhelper
+COPY --from=builder --chown=tharsis:tharsis /app/runner .
+COPY --from=builder --chown=tharsis:tharsis --chmod=0755 /app/iamoidccredhelper /opt/credhelpers/iamoidccredhelper
 USER tharsis
 HEALTHCHECK NONE
 CMD ["./runner"]
 
-FROM alpine:3.21 AS job-executor
-WORKDIR /app/
-COPY --from=builder /app/job .
+FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac6da80685 AS job-executor
 RUN apk update --no-cache && \
-    apk upgrade --no-cache && \
-    apk add --no-cache git curl python3 py3-pip jq && \
-    adduser tharsis -D && \
-    chown tharsis:tharsis /app && \
+    apk add --no-cache \
+    git=2.47.3-r0 \
+    curl=8.14.1-r2 \
+    python3=3.12.11-r0 \
+    py3-pip=24.3.1-r0 \
+    jq=1.7.1-r0 && \
+    adduser tharsis -D -u 1001 -g 1001 && \
+    mkdir -p /app /etc && \
+    chown -R tharsis:tharsis /app && \
     # Maintain backward compatibility for users that are installing packages such as the aws cli w/o a virtual env using pip3
-    mkdir -p /etc && \
     echo "[global]" > /etc/pip.conf && \
-    echo "break-system-packages = true" >> /etc/pip.conf
+    echo "break-system-packages = true" >> /etc/pip.conf && \
+    find /usr /bin /sbin -perm /6000 -type f -exec rm -f {} \; && \
+    rm -rf /var/cache/apk/* && \
+    rm -rf /etc/apk && \
+    rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/*
+
+WORKDIR /app/
+COPY --from=builder --chown=tharsis:tharsis /app/job .
 USER tharsis
 HEALTHCHECK NONE
 CMD ["./job"]

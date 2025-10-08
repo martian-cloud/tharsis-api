@@ -13,7 +13,7 @@ import (
 
 // Info is a struct that represents version information of the API and its components
 type Info struct {
-	APIVersion         string
+	Version            string
 	DBMigrationVersion string
 	DBMigrationDirty   bool
 	BuildTimestamp     time.Time
@@ -26,18 +26,18 @@ type Service interface {
 
 type service struct {
 	dbClient       *db.Client
-	apiVersion     string
+	version        string
 	buildTimestamp time.Time
 }
 
 // NewService creates a new version service
-func NewService(dbClient *db.Client, apiVersion string, buildTimestamp string) (Service, error) {
+func NewService(dbClient *db.Client, version string, buildTimestamp string) (Service, error) {
 	timestamp, err := time.Parse(time.RFC3339, buildTimestamp)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse build timestamp")
 	}
 
-	return &service{dbClient, apiVersion, timestamp}, nil
+	return &service{dbClient, version, timestamp}, nil
 }
 
 // GetCurrentVersion returns version information of the API and its components
@@ -58,7 +58,7 @@ func (s *service) GetCurrentVersion(ctx context.Context) (*Info, error) {
 	return &Info{
 		DBMigrationVersion: strconv.Itoa(dbMigration.Version),
 		DBMigrationDirty:   dbMigration.Dirty,
-		APIVersion:         s.apiVersion,
+		Version:            s.version,
 		BuildTimestamp:     s.buildTimestamp,
 	}, nil
 }

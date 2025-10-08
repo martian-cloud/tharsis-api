@@ -45,12 +45,12 @@ type Client interface {
 
 // InternalTokenProvider is a token provider for internal runners
 type InternalTokenProvider struct {
-	runnerName string
-	runnerGID  string
+	runnerName        string
+	runnerGID         string
 	signingKeyManager auth.SigningKeyManager
-	expires    *time.Time
-	token      string
-	mutex      sync.RWMutex
+	expires           *time.Time
+	token             string
+	mutex             sync.RWMutex
 }
 
 // GetToken retrieves an ID token for the internal runner, generating a new one if the current one is expired.

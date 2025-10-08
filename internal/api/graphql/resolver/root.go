@@ -1434,6 +1434,11 @@ func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
 	return versionQuery(ctx)
 }
 
+// Config returns the API configuration
+func (r RootResolver) Config(ctx context.Context) (*ConfigResolver, error) {
+	return configQuery(ctx)
+}
+
 /* Namespace Variable Version Queries */
 
 // NamespaceVariableVersion query returns a namespace variable version by ID

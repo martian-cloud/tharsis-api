@@ -47,15 +47,10 @@ func BuildTFEServiceDiscoveryHandler(
 		}
 	}
 
-	respStr, err := json.Marshal(resp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal TFE discovery document %v", err)
-	}
-
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		if _, err := w.Write([]byte(respStr)); err != nil {
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			logger.WithContextFields(ctx).Errorf("Failed to response with service discovery document %v", err)
 		}
 	}, nil

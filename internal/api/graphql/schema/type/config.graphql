@@ -1,0 +1,81 @@
+type Config {
+  serverPort: String!
+  tharsisApiUrl: String!
+  tharsisUiUrl: String!
+  tharsisSupportUrl: String!
+  tlsEnabled: Boolean!
+  jwtIssuerUrl: String!
+  dbHost: String!
+  dbName: String!
+  dbSslMode: String!
+  dbPort: Int!
+  dbMaxConnections: Int!
+  dbAutoMigrateEnabled: Boolean!
+  maxGraphQlComplexity: Int!
+  moduleRegistryMaxUploadSize: Int!
+  asyncTaskTimeout: Int!
+  vcsRepositorySizeLimit: Int!
+  httpRateLimit: Int!
+  otelTraceEnabled: Boolean!
+  otelTraceType: String
+  otelTraceCollectorHost: String
+  otelTraceCollectorPort: Int!
+  tfeLoginEnabled: Boolean!
+  tfeLoginScopes: String
+  serviceDiscoveryHost: String!
+  terraformCliVersionConstraint: String!
+  workspaceAssessmentIntervalHours: Int!
+  workspaceAssessmentRunLimit: Int!
+  userSessionAccessTokenExpirationMinutes: Int!
+  userSessionRefreshTokenExpirationMinutes: Int!
+  userSessionMaxSessionsPerUser: Int!
+  corsAllowedOrigins: String!
+  asymmetricSigningKeyRotationPeriodDays: Int!
+  asymmetricSigningKeyDecommissionPeriodDays: Int!
+  disableSensitiveVariableFeature: Boolean!
+  emailFooter: String
+  objectStorePluginType: String!
+  rateLimitStorePluginType: String!
+  jwsProviderPluginType: String!
+  secretManagerPluginType: String!
+  emailClientPluginType: String!
+  oauthProviders: [IdpConfig!]!
+  federatedRegistryTrustPolicies: [FederatedRegistryTrustPolicy!]!
+  internalRunners: [RunnerConfig!]!
+
+  # Sensitive fields - always returned but masked for non-admin users
+  tlsCertFile: String!
+  tlsKeyFile: String!
+  tfeLoginClientId: String!
+  adminUserEmail: String!
+  objectStorePluginData: [PluginDataEntry!]!
+  rateLimitStorePluginData: [PluginDataEntry!]!
+  jwsProviderPluginData: [PluginDataEntry!]!
+  secretManagerPluginData: [PluginDataEntry!]!
+  emailClientPluginData: [PluginDataEntry!]!
+}
+
+type IdpConfig {
+  issuerUrl: String!
+  clientId: String!
+  usernameClaim: String!
+  scope: String!
+}
+
+type RunnerConfig {
+  name: String!
+  jobDispatcherType: String!
+  jobDispatcherData: [PluginDataEntry!]!
+}
+
+type FederatedRegistryTrustPolicy {
+  issuerUrl: String!
+  subject: String
+  audience: String
+  groupGlobPatterns: [String!]!
+}
+
+type PluginDataEntry {
+  key: String!
+  value: String!
+}
