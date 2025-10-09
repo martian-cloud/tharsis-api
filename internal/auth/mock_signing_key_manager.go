@@ -74,26 +74,6 @@ func (_m *MockSigningKeyManager) GetKeys(ctx context.Context) ([]byte, error) {
 	return r0, r1
 }
 
-// GetOpenIDConfig provides a mock function with no fields
-func (_m *MockSigningKeyManager) GetOpenIDConfig() *OpenIDConfig {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetOpenIDConfig")
-	}
-
-	var r0 *OpenIDConfig
-	if rf, ok := ret.Get(0).(func() *OpenIDConfig); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*OpenIDConfig)
-		}
-	}
-
-	return r0
-}
-
 // VerifyToken provides a mock function with given fields: ctx, token, validateOptions
 func (_m *MockSigningKeyManager) VerifyToken(ctx context.Context, token string, validateOptions ...jwt.ValidateOption) (*VerifyTokenOutput, error) {
 	_va := make([]interface{}, len(validateOptions))

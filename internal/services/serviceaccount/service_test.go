@@ -554,9 +554,9 @@ func TestCreateToken(t *testing.T) {
 				}
 			}
 
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
-			MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
+			mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
 
 				if input.Subject != sa.GetResourcePath() {
 					return false
@@ -601,7 +601,7 @@ func TestCreateToken(t *testing.T) {
 				testLogger,
 				&dbClient,
 				limits.NewLimitChecker(&dbClient),
-				MockSigningKeyManager,
+				mockSigningKeyManager,
 				mockConfigFetcher,
 				mockActivityEvents,
 				func(_ context.Context, _ []string, _ auth.OpenIDConfigFetcher) auth.OIDCTokenVerifier {

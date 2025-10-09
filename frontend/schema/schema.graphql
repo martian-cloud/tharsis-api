@@ -240,10 +240,8 @@ type AssignServiceAccountToRunnerPayload {
 }
 
 type AuthSettings {
-  oidcClientId: String
-  oidcIssuerUrl: String
-  oidcScope: String
-  oidcUsernameClaim: String
+  authType: UserAuthType!
+  oidc: OidcAuthSettings
 }
 
 enum BoundClaimsType {
@@ -309,9 +307,6 @@ type Config {
   serverPort: String!
   serviceDiscoveryHost: String!
   terraformCliVersionConstraint: String!
-  tfeLoginClientId: String!
-  tfeLoginEnabled: Boolean!
-  tfeLoginScopes: String
   tharsisApiUrl: String!
   tharsisSupportUrl: String!
   tharsisUiUrl: String!
@@ -710,6 +705,19 @@ type CreateTerraformProviderVersionPayload {
   providerVersion: TerraformProviderVersion
 }
 
+input CreateUserInput {
+  admin: Boolean!
+  email: String!
+  password: String
+  username: String!
+}
+
+type CreateUserPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  user: User
+}
+
 input CreateVCSProviderInput {
   autoCreateWebhooks: Boolean!
   clientMutationId: String
@@ -1011,6 +1019,15 @@ type DeleteTerraformProviderVersionPayload {
   clientMutationId: String
   problems: [Problem!]!
   providerVersion: TerraformProviderVersion
+}
+
+input DeleteUserInput {
+  userId: String!
+}
+
+type DeleteUserPayload {
+  clientMutationId: String
+  problems: [Problem!]!
 }
 
 input DeleteVCSProviderInput {
@@ -1499,6 +1516,7 @@ type Mutation {
   createTerraformProviderPlatform(input: CreateTerraformProviderPlatformInput): CreateTerraformProviderPlatformPayload!
   createTerraformProviderVersion(input: CreateTerraformProviderVersionInput): CreateTerraformProviderVersionPayload!
   createTerraformProviderVersionMirror(input: CreateTerraformProviderVersionMirrorInput!): CreateTerraformProviderVersionMirrorPayload!
+  createUser(input: CreateUserInput!): CreateUserPayload!
   createVCSProvider(input: CreateVCSProviderInput!): CreateVCSProviderPayload!
   createVCSRun(input: CreateVCSRunInput!): CreateVCSRunPayload!
   createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload!
@@ -1524,6 +1542,7 @@ type Mutation {
   deleteTerraformProviderPlatformMirror(input: DeleteTerraformProviderPlatformMirrorInput!): DeleteTerraformProviderPlatformMirrorPayload!
   deleteTerraformProviderVersion(input: DeleteTerraformProviderVersionInput): DeleteTerraformProviderVersionPayload!
   deleteTerraformProviderVersionMirror(input: DeleteTerraformProviderVersionMirrorInput!): DeleteTerraformProviderVersionMirrorPayload!
+  deleteUser(input: DeleteUserInput!): DeleteUserPayload!
   deleteVCSProvider(input: DeleteVCSProviderInput!): DeleteVCSProviderPayload!
   deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload!
   deleteWorkspaceVCSProviderLink(input: DeleteWorkspaceVCSProviderLinkInput!): DeleteWorkspaceVCSProviderLinkPayload!
@@ -1542,6 +1561,7 @@ type Mutation {
   serviceAccountCreateToken(input: ServiceAccountCreateTokenInput!): ServiceAccountCreateTokenPayload!
   setNamespaceVariables(input: SetNamespaceVariablesInput!): NamespaceVariableMutationPayload!
   setUserNotificationPreference(input: SetUserNotificationPreferenceInput!): SetUserNotificationPreferencePayload!
+  setUserPassword(input: SetUserPasswordInput!): SetUserPasswordPayload!
   setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload!
   unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   unassignServiceAccountFromRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
@@ -1703,6 +1723,12 @@ input OIDCTrustPolicyInput {
   boundClaims: [JWTClaimInput!]!
   boundClaimsType: BoundClaimsType
   issuer: String!
+}
+
+type OidcAuthSettings {
+  clientId: String!
+  issuerUrl: String!
+  scope: String!
 }
 
 type PageInfo {
@@ -2240,6 +2266,18 @@ type SetUserNotificationPreferencePayload {
   clientMutationId: String
   preference: UserNotificationPreference
   problems: [Problem!]!
+}
+
+input SetUserPasswordInput {
+  currentPassword: String!
+  newPassword: String!
+  userId: String!
+}
+
+type SetUserPasswordPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  user: User
 }
 
 input SetVariablesIncludedInTFConfigInput {
@@ -2982,6 +3020,11 @@ type User implements Node {
   username: String!
 }
 
+enum UserAuthType {
+  BASIC
+  OIDC
+}
+
 type UserConnection {
   edges: [UserEdge]
   pageInfo: PageInfo!
@@ -3040,6 +3083,7 @@ type UserPreferences {
 }
 
 type UserSession implements Node {
+  current: Boolean!
   expiration: Time!
   expired: Boolean!
   id: ID!

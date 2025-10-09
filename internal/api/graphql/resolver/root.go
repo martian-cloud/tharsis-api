@@ -683,6 +683,36 @@ func (r RootResolver) RevokeUserSession(ctx context.Context, args *struct{ Input
 	return response, nil
 }
 
+// CreateUser creates a new user.
+func (r RootResolver) CreateUser(ctx context.Context, args *struct{ Input *CreateUserInput }) (*UserMutationPayloadResolver, error) {
+	response, err := createUserMutation(ctx, args.Input)
+	if err != nil {
+		return handleUserMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// DeleteUser deletes a user.
+func (r RootResolver) DeleteUser(ctx context.Context, args *struct{ Input *DeleteUserInput }) (*UserMutationPayloadResolver, error) {
+	response, err := deleteUserMutation(ctx, args.Input)
+	if err != nil {
+		return handleUserMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
+// SetUserPassword sets a user's password.
+func (r RootResolver) SetUserPassword(ctx context.Context, args *struct{ Input *SetUserPasswordInput }) (*UserMutationPayloadResolver, error) {
+	response, err := setUserPasswordMutation(ctx, args.Input)
+	if err != nil {
+		return handleUserMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 /* Teams Queries and Mutations */
 
 // Team query returns a team by name

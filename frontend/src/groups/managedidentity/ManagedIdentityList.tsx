@@ -35,7 +35,7 @@ export function GetConnections(groupId: string): [string] {
     const connectionId = ConnectionHandler.getConnectionID(
         groupId,
         'ManagedIdentityList_managedIdentities',
-        { sort: 'UPDATED_AT_DESC' }
+        { sort: 'GROUP_LEVEL_DESC' }
     );
     return [connectionId];
 }

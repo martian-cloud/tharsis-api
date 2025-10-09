@@ -51,6 +51,21 @@ var (
 	dialect           = goqu.Dialect("postgres")
 )
 
+// RetryOnOLEOption is used to configure the retry on optimistic lock error behavior
+type RetryOnOLEOption func(*retryOnOLEOptions)
+
+// WithRetryOnOLEAttempts sets the number of attempts to retry on optimistic lock error
+func WithRetryOnOLEAttempts(attempts uint) func(*retryOnOLEOptions) {
+	return func(o *retryOnOLEOptions) {
+		o.attempts = attempts
+	}
+}
+
+type retryOnOLEOptions struct {
+	attempts uint
+	delay    time.Duration
+}
+
 // connection is used to represent a DB connection
 type connection interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
@@ -236,14 +251,23 @@ func (db *Client) getConnection(ctx context.Context) connection {
 }
 
 // RetryOnOLE will retry the given function if an optimistic lock error occurs
-func (db *Client) RetryOnOLE(ctx context.Context, fn func() error) error {
+func (db *Client) RetryOnOLE(ctx context.Context, fn func() error, options ...RetryOnOLEOption) error {
+	opts := &retryOnOLEOptions{
+		attempts: 1000,
+		delay:    10 * time.Millisecond,
+	}
+
+	for _, o := range options {
+		o(opts)
+	}
+
 	return retry.Do(
 		func() error {
 			return fn()
 		},
-		retry.Attempts(1000),
+		retry.Attempts(opts.attempts),
 		retry.DelayType(retry.FixedDelay),
-		retry.Delay(10*time.Millisecond),
+		retry.Delay(opts.delay),
 		retry.RetryIf(func(err error) bool {
 			// Only retry on optimistic lock errors
 			return te.ErrorCode(err) == te.EOptimisticLock

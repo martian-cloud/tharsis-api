@@ -20,6 +20,11 @@ export default defineConfig(({ mode }) => {
         build: {
             sourcemap: false
         },
+        define: {
+            'import.meta.env.VITE_THARSIS_API_URL': JSON.stringify(
+                env.VITE_THARSIS_API_URL || ''
+            ),
+        },
         plugins: [
             ...plugins,
             relay,

@@ -30,8 +30,8 @@ func TestFederatedRegistryClient_GetModuleVersion(t *testing.T) {
 	}{
 		{
 			name: "successful module version retrieval",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
 					return input.Claims["type"] == auth.FederatedRegistryTokenType &&
 						input.Audience == "test-audience"
 				})).Return([]byte("test-token"), nil)
@@ -65,8 +65,8 @@ func TestFederatedRegistryClient_GetModuleVersion(t *testing.T) {
 		},
 		{
 			name: "sdk client error",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 				mockSDKClient.On("GetModuleVersion", mock.Anything, mock.Anything).Return(nil, errors.New("sdk client error"))
 			},
 			input: &GetModuleVersionInput{
@@ -84,15 +84,15 @@ func TestFederatedRegistryClient_GetModuleVersion(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mocks
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 			mockSDKClient := newMockSdkClient(t)
 
 			// Setup mocks
-			tc.setupMocks(MockSigningKeyManager, mockSDKClient)
+			tc.setupMocks(mockSigningKeyManager, mockSDKClient)
 
 			// Create client with mock SDK client builder
 			client := &federatedRegistryClient{
-				identityProvider: MockSigningKeyManager,
+				identityProvider: mockSigningKeyManager,
 				sdkClientBuilder: func(_ *config.Config) (sdkClient, error) {
 					return mockSDKClient, nil
 				},
@@ -126,9 +126,9 @@ func TestFederatedRegistryClient_GetModuleAttestations(t *testing.T) {
 	}{
 		{
 			name: "successful attestation retrieval - single page",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
 				// Mock token generation
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 
 				// Mock SDK client response - single page
 				mockSDKClient.On("GetModuleAttestations", mock.Anything, mock.MatchedBy(func(input *types.GetTerraformModuleAttestationsInput) bool {
@@ -159,9 +159,9 @@ func TestFederatedRegistryClient_GetModuleAttestations(t *testing.T) {
 		},
 		{
 			name: "successful attestation retrieval - multiple pages",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
 				// Mock token generation
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 
 				// Mock SDK client response - first page
 				mockSDKClient.On("GetModuleAttestations", mock.Anything, mock.MatchedBy(func(input *types.GetTerraformModuleAttestationsInput) bool {
@@ -209,8 +209,8 @@ func TestFederatedRegistryClient_GetModuleAttestations(t *testing.T) {
 		},
 		{
 			name: "token generation error",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager, _ *mockSdkClient) {
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager, _ *mockSdkClient) {
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
 			},
 			input: &GetModuleAttestationsInput{
 				FederatedRegistry: &models.FederatedRegistry{
@@ -224,8 +224,8 @@ func TestFederatedRegistryClient_GetModuleAttestations(t *testing.T) {
 		},
 		{
 			name: "sdk client error",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager, mockSDKClient *mockSdkClient) {
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("test-token"), nil)
 				mockSDKClient.On("GetModuleAttestations", mock.Anything, mock.Anything).Return(nil, errors.New("sdk client error"))
 			},
 			input: &GetModuleAttestationsInput{
@@ -243,15 +243,15 @@ func TestFederatedRegistryClient_GetModuleAttestations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mocks
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 			mockSDKClient := &mockSdkClient{}
 
 			// Setup mocks
-			tc.setupMocks(MockSigningKeyManager, mockSDKClient)
+			tc.setupMocks(mockSigningKeyManager, mockSDKClient)
 
 			// Create client with mock SDK client builder
 			client := &federatedRegistryClient{
-				identityProvider: MockSigningKeyManager,
+				identityProvider: mockSigningKeyManager,
 				sdkClientBuilder: func(_ *config.Config) (sdkClient, error) {
 					return mockSDKClient, nil
 				},
@@ -287,8 +287,8 @@ func TestNewFederatedRegistryToken(t *testing.T) {
 	}{
 		{
 			name: "successful token generation",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager) {
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager) {
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.MatchedBy(func(input *auth.TokenInput) bool {
 					return input.Subject == gid.ToGlobalID(mtypes.FederatedRegistryModelType, "registry-id") &&
 						input.Audience == "test-audience" &&
 						input.Claims["type"] == auth.FederatedRegistryTokenType
@@ -303,8 +303,8 @@ func TestNewFederatedRegistryToken(t *testing.T) {
 		},
 		{
 			name: "token generation error",
-			setupMocks: func(MockSigningKeyManager *auth.MockSigningKeyManager) {
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
+			setupMocks: func(mockSigningKeyManager *auth.MockSigningKeyManager) {
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return(nil, errors.New("token generation error"))
 			},
 			input: &FederatedRegistryTokenInput{
 				FederatedRegistry: &models.FederatedRegistry{
@@ -319,13 +319,13 @@ func TestNewFederatedRegistryToken(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mocks
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
 			// Setup mocks
-			tc.setupMocks(MockSigningKeyManager)
+			tc.setupMocks(mockSigningKeyManager)
 
 			// Set identity provider in input
-			tc.input.IdentityProvider = MockSigningKeyManager
+			tc.input.IdentityProvider = mockSigningKeyManager
 
 			// Call the function
 			token, err := NewFederatedRegistryToken(context.Background(), tc.input)

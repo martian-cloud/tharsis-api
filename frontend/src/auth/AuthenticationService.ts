@@ -8,18 +8,14 @@ const CSRF_TOKEN_HEADER = 'X-Csrf-Token';
 
 const cookies = new Cookies();
 
-class AuthenticationService {
-    private oidcClient: OidcClient;
-    private pendingPromise: Promise<void> | null = null;
+interface CreateSessionOptions {
+    token?: string;
+    username?: string;
+    password?: string;
+}
 
-    constructor(issuerUrl: string, clientId: string, scope: string) {
-        this.oidcClient = new OidcClient({
-            authority: issuerUrl,
-            client_id: clientId,
-            scope: scope,
-            redirect_uri: `${window.location.protocol}//${window.location.host}`
-        });
-    }
+abstract class AuthenticationService {
+    private pendingPromise: Promise<void> | null = null;
 
     async fetchWithAuth(input: string | URL | globalThis.Request, init: RequestInit | undefined): Promise<Response> {
         const csrfToken = cookies.get(CSRF_TOKEN_COOKIE_NAME);
@@ -58,9 +54,7 @@ class AuthenticationService {
                 throw new Error(`Failed to logout session: ${session.statusText}`);
             }
 
-            const req = await this.oidcClient.createSignoutRequest();
-
-            window.location.assign(req.url);
+            await this._logout()
         } catch (error) {
             console.error('Failed to logout session:', error);
         }
@@ -84,7 +78,7 @@ class AuthenticationService {
             })
                 .then(response => {
                     if (response.status === 401) {
-                        this.startLogin();
+                        this.redirectToLogin();
                         return;
                     }
 
@@ -105,23 +99,76 @@ class AuthenticationService {
         return this.pendingPromise;
     }
 
-    async startLogin(): Promise<void> {
+    async redirectToLogin(): Promise<void> {
         try {
             window.sessionStorage.setItem(LOGIN_RETURN_TO, location.pathname + location.search);
 
-            // Generate the signin request
-            const request: SigninRequest = await this.oidcClient.createSigninRequest({
-                state: { some: 'data' }, // Optional state to pass through
-            });
-
-            // Redirect the user to the OIDC provider's login page
-            window.location.assign(request.url);
+            await this._redirectToLogin()
         } catch (error) {
             console.error('Failed to initiate oauth authorization code flow:', error);
         }
     }
 
-    async finishLogin(): Promise<void> {
+    async login({ token, username, password }: CreateSessionOptions): Promise<void> {
+        const session = await fetch(`${cfg.apiUrl}/v1/sessions`, {
+            credentials: 'include',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                token,
+                username,
+                password
+            }),
+        });
+
+        if (!session.ok) {
+            // Read response body for more details
+            const errorMessage = await session.text();
+            throw new Error(`Failed to create session: ${session.statusText}: ${errorMessage}`);
+        }
+
+        // Verify that csrf token has been set
+        const csrfToken = cookies.get(CSRF_TOKEN_COOKIE_NAME);
+        if (!csrfToken) {
+            throw new Error('missing csrf token cookie');
+        }
+
+        const returnToPath = window.sessionStorage.getItem(LOGIN_RETURN_TO);
+
+        if (returnToPath) {
+            window.sessionStorage.removeItem(LOGIN_RETURN_TO);
+        }
+
+        this._redirectAfterLogin(returnToPath ?? '/')
+    }
+
+    initialize(): Promise<void> {
+        // noop
+        return Promise.resolve();
+    }
+
+    abstract _redirectToLogin(): Promise<void>;
+    abstract _redirectAfterLogin(path: string): void;
+    abstract _logout(): Promise<void>;
+}
+
+export class OidcAuthenticationService extends AuthenticationService {
+    private oidcClient: OidcClient;
+
+    constructor(issuerUrl: string, clientId: string, scope: string) {
+        super();
+
+        this.oidcClient = new OidcClient({
+            authority: issuerUrl,
+            client_id: clientId,
+            scope: scope,
+            redirect_uri: `${window.location.protocol}//${window.location.host}`
+        });
+    }
+
+    async initialize(): Promise<void> {
         try {
             if (!this._hasAuthRedirectParams()) {
                 return
@@ -130,43 +177,38 @@ class AuthenticationService {
             // Process the signin response
             const response = await this.oidcClient.processSigninResponse(window.location.href);
 
-            const returnToPath = window.sessionStorage.getItem(LOGIN_RETURN_TO);
-
-            window.history.replaceState(
-                {},
-                document.title,
-                returnToPath ?? window.location.pathname
-            );
-
             if (!response.id_token) {
                 throw new Error('Failed to login user because ID token is undefined. Ensure that the openid scope is specified in the oauth settings for the identity provider.');
             }
 
-            // Make post request to api to create session
-            const session = await fetch(`${cfg.apiUrl}/v1/sessions`, {
-                credentials: 'include',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    token: response.id_token
-                }),
-            });
-
-            if (!session.ok) {
-                throw new Error(`Failed to create session: ${session.statusText}`);
-            }
-
-            // Verify that csrf token has been set
-            const csrfToken = cookies.get(CSRF_TOKEN_COOKIE_NAME);
-            if (!csrfToken) {
-                throw new Error('missing csrf token cookie');
-            }
+            await this.login({ token: response.id_token });
         } catch (error) {
             console.error('Failed to complete oauth authorization code flow:', error);
             throw error;
         }
+    }
+
+    async _redirectToLogin(): Promise<void> {
+        // Generate the signin request
+        const request: SigninRequest = await this.oidcClient.createSigninRequest({
+            state: { some: 'data' }, // Optional state to pass through
+        });
+
+        // Redirect the user to the OIDC provider's login page
+        window.location.assign(request.url);
+    }
+
+    _redirectAfterLogin(path: string) {
+        window.history.replaceState(
+            {},
+            document.title,
+            path
+        );
+    }
+
+    async _logout(): Promise<void> {
+        const req = await this.oidcClient.createSignoutRequest();
+        window.location.assign(req.url);
     }
 
     _hasAuthRedirectParams(): boolean {
@@ -185,6 +227,23 @@ class AuthenticationService {
         }
 
         return false;
+    }
+}
+
+export class BasicAuthenticationService extends AuthenticationService {
+
+    _redirectAfterLogin(path: string) {
+        window.location.assign(path);
+    }
+
+    _redirectToLogin(): Promise<void> {
+        window.location.assign('/login');
+        return Promise.resolve()
+    }
+
+    _logout(): Promise<void> {
+        window.location.assign('/login');
+        return Promise.resolve();
     }
 }
 

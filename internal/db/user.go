@@ -87,7 +87,7 @@ type users struct {
 	dbClient *Client
 }
 
-var userFieldList = append(metadataFieldList, "username", "email", "admin", "scim_external_id", "active")
+var userFieldList = append(metadataFieldList, "username", "email", "admin", "scim_external_id", "active", "password_hash")
 
 // NewUsers returns an instance of the Users interface
 func NewUsers(dbClient *Client) Users {
@@ -306,6 +306,7 @@ func (u *users) UpdateUser(ctx context.Context, user *models.User) (*models.User
 				"scim_external_id": nullableString(user.SCIMExternalID),
 				"active":           user.Active,
 				"admin":            user.Admin,
+				"password_hash":    user.PasswordHash,
 			},
 		).Where(goqu.Ex{"id": user.Metadata.ID, "version": user.Metadata.Version}).Returning(userFieldList...).ToSQL()
 	if err != nil {
@@ -351,6 +352,7 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 			"admin":            user.Admin,
 			"scim_external_id": nullableString(user.SCIMExternalID),
 			"active":           user.Active,
+			"password_hash":    user.PasswordHash,
 		}).
 		Returning(userFieldList...).ToSQL()
 	if err != nil {
@@ -362,8 +364,12 @@ func (u *users) CreateUser(ctx context.Context, user *models.User) (*models.User
 	if err != nil {
 		if pgErr := asPgError(err); pgErr != nil {
 			if isUniqueViolation(pgErr) {
-				tracing.RecordError(span, nil, "user with username %s already exists", user.Username)
-				return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict))
+				switch pgErr.ConstraintName {
+				case "index_users_on_username":
+					return nil, errors.New("user with username %s already exists", user.Username, errors.WithErrorCode(errors.EConflict))
+				case "index_users_on_email":
+					return nil, errors.New("user with email %s already exists", user.Email, errors.WithErrorCode(errors.EConflict))
+				}
 			}
 		}
 		tracing.RecordError(span, err, "failed to execute query")
@@ -459,6 +465,7 @@ func scanUser(row scanner) (*models.User, error) {
 		&user.Admin,
 		&scimExternalID,
 		&user.Active,
+		&user.PasswordHash,
 	}
 
 	err := row.Scan(fields...)

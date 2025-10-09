@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fde781313cfbf70484efd73bfec42df0>>
+ * @generated SignedSource<<6fafe1aa43e09f333d46f96d5b0d261c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -47,7 +47,7 @@ v2 = [
   {
     "kind": "Literal",
     "name": "sort",
-    "value": "UPDATED_AT_DESC"
+    "value": "CREATED_AT_DESC"
   },
   {
     "kind": "Literal",
@@ -259,12 +259,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "0ce2eebc162ca703f8b8eeb6b4a1268d",
+    "cacheID": "32219cac4d620105397286e3713f75d3",
     "id": null,
     "metadata": {},
     "name": "HomeRunListQuery",
     "operationKind": "query",
-    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: UPDATED_AT_DESC, workspaceAssessment: false) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "query HomeRunListQuery(\n  $first: Int!\n  $after: String\n) {\n  ...HomeRunListFragment_runs\n}\n\nfragment HomeRunListFragment_runs on Query {\n  runs(first: $first, after: $after, sort: CREATED_AT_DESC, workspaceAssessment: false) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeRunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
   }
 };
 })();

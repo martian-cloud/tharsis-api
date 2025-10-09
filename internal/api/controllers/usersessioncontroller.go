@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"encoding/json"
+	goerrors "errors"
 	"net/http"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/go-chi/chi/v5"
@@ -14,49 +14,31 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-const (
-	emptyCookieValue = ""
-)
-
 type createSessionRequest struct {
-	Token string `json:"token"`
-}
-
-type setTokenCookiesInput struct {
-	accessToken       string
-	refreshToken      string
-	csrfToken         *string
-	sessionExpiration time.Time
+	Token    *string `json:"token"`
+	Username *string `json:"username"`
+	Password *string `json:"password"`
 }
 
 type userSessionController struct {
-	respWriter                   response.Writer
-	userSessionManager           auth.UserSessionManager
-	enableSecureCookies          bool
-	accessTokenExpirationMinutes time.Duration
-	csrfMiddleware               middleware.Handler
-	tharsisUIDomain              string
-	logger                       logger.Logger
+	respWriter         response.Writer
+	userSessionManager auth.UserSessionManager
+	csrfMiddleware     middleware.Handler
+	logger             logger.Logger
 }
 
 // NewUserSessionController creates a new controller for user session management
 func NewUserSessionController(
 	respWriter response.Writer,
 	userSessionManager auth.UserSessionManager,
-	accessTokenExpirationMinutes int,
 	csrfMiddleware middleware.Handler,
-	enableSecureCookies bool,
-	tharsisUIDomain string,
 	logger logger.Logger,
 ) Controller {
 	return &userSessionController{
-		respWriter:                   respWriter,
-		userSessionManager:           userSessionManager,
-		enableSecureCookies:          enableSecureCookies,
-		accessTokenExpirationMinutes: time.Duration(accessTokenExpirationMinutes) * time.Minute,
-		csrfMiddleware:               csrfMiddleware,
-		tharsisUIDomain:              tharsisUIDomain,
-		logger:                       logger,
+		respWriter:         respWriter,
+		userSessionManager: userSessionManager,
+		csrfMiddleware:     csrfMiddleware,
+		logger:             logger,
 	}
 }
 
@@ -76,18 +58,6 @@ func (c *userSessionController) RegisterRoutes(router chi.Router) {
 
 // CreateSession handles user login and session creation
 func (c *userSessionController) CreateSession(w http.ResponseWriter, r *http.Request) {
-	// If a user has multiple browser tabs open, they may end up sending concurrent create session requests; therefore,
-	// if we already have a valid session from a previous create session request, we will return here without creating
-	// a new session
-	if requestSessionID, ok := auth.GetRequestUserSessionID(r); ok {
-		// Verify that CSRF token is valid and matches session ID
-		csrfTokenCookie, _ := r.Cookie(auth.GetUserSessionCSRFTokenCookieName())
-		if csrfTokenCookie != nil && c.userSessionManager.VerifyCSRFToken(r.Context(), requestSessionID, csrfTokenCookie.Value) == nil {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-	}
-
 	// Parse the request body
 	var req createSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -95,14 +65,27 @@ func (c *userSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	userAgent := r.Header.Get("User-Agent")
+	createSessionInput := &auth.CreateSessionInput{
+		UserAgent: r.Header.Get("User-Agent"),
+		Token:     req.Token,
+		Username:  req.Username,
+		Password:  req.Password,
+	}
 
 	// Create session using the session manager
-	tokens, err := c.userSessionManager.CreateSession(r.Context(), req.Token, userAgent)
+	tokens, err := c.userSessionManager.CreateSession(r.Context(), createSessionInput)
 	if err != nil {
+		if goerrors.Is(err, auth.ErrSessionAlreadyExists) {
+			// If a user has multiple browser tabs open, they may end up sending concurrent create session requests; therefore,
+			// if we already have a valid session from a previous create session request, we will return here without creating
+			// a new session
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		c.logger.Infow("Invalid request to create new user session",
 			"error", err,
-			"user_agent", userAgent,
+			"user_agent", createSessionInput.UserAgent,
 			"subject", ptr.ToString(auth.GetSubject(r.Context())),
 		)
 		c.respWriter.RespondWithError(r.Context(), w, err)
@@ -110,11 +93,11 @@ func (c *userSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 	}
 
 	// Set cookies and respond
-	c.setTokenCookies(w, &setTokenCookiesInput{
-		accessToken:       tokens.AccessToken,
-		refreshToken:      tokens.RefreshToken,
-		csrfToken:         &tokens.CSRFToken,
-		sessionExpiration: tokens.SessionExpiration,
+	c.userSessionManager.SetUserSessionCookies(w, &auth.SetUserSessionCookiesInput{
+		AccessToken:       tokens.AccessToken,
+		RefreshToken:      tokens.RefreshToken,
+		CsrfToken:         &tokens.CSRFToken,
+		SessionExpiration: tokens.Session.Expiration,
 	})
 
 	w.WriteHeader(http.StatusNoContent)
@@ -123,7 +106,7 @@ func (c *userSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 // RefreshSession handles session token refresh
 func (c *userSessionController) RefreshSession(w http.ResponseWriter, r *http.Request) {
 	// Get refresh token from cookie
-	refreshTokenCookie, err := r.Cookie(auth.GetUserSessionRefreshTokenCookieName(c.enableSecureCookies))
+	refreshTokenCookie, err := r.Cookie(c.userSessionManager.GetUserSessionRefreshTokenCookieName())
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, errors.New("refresh token not found in cookie", errors.WithErrorCode(errors.EUnauthorized)))
 		return
@@ -147,10 +130,10 @@ func (c *userSessionController) RefreshSession(w http.ResponseWriter, r *http.Re
 	}
 
 	// Set new cookies and respond
-	c.setTokenCookies(w, &setTokenCookiesInput{
-		accessToken:       tokens.AccessToken,
-		refreshToken:      tokens.RefreshToken,
-		sessionExpiration: tokens.SessionExpiration,
+	c.userSessionManager.SetUserSessionCookies(w, &auth.SetUserSessionCookiesInput{
+		AccessToken:       tokens.AccessToken,
+		RefreshToken:      tokens.RefreshToken,
+		SessionExpiration: tokens.Session.Expiration,
 	})
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -160,10 +143,10 @@ func (c *userSessionController) Logout(w http.ResponseWriter, r *http.Request) {
 	var accessToken, refreshToken string
 
 	// Get tokens from cookies
-	if accessTokenCookie, _ := r.Cookie(auth.GetUserSessionAccessTokenCookieName(c.enableSecureCookies)); accessTokenCookie != nil {
+	if accessTokenCookie, _ := r.Cookie(c.userSessionManager.GetUserSessionAccessTokenCookieName()); accessTokenCookie != nil {
 		accessToken = accessTokenCookie.Value
 	}
-	if refreshTokenCookie, _ := r.Cookie(auth.GetUserSessionRefreshTokenCookieName(c.enableSecureCookies)); refreshTokenCookie != nil {
+	if refreshTokenCookie, _ := r.Cookie(c.userSessionManager.GetUserSessionRefreshTokenCookieName()); refreshTokenCookie != nil {
 		refreshToken = refreshTokenCookie.Value
 	}
 
@@ -178,81 +161,6 @@ func (c *userSessionController) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clear cookies
-	c.clearTokenCookies(w)
+	c.userSessionManager.ClearUserSessionCookies(w)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// setTokenCookies sets the access and refresh token cookies
-func (c *userSessionController) setTokenCookies(w http.ResponseWriter, input *setTokenCookiesInput) {
-	accessExpiration := time.Now().Add(c.accessTokenExpirationMinutes)
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.GetUserSessionAccessTokenCookieName(c.enableSecureCookies),
-		Value:    input.accessToken,
-		HttpOnly: true,
-		Secure:   c.enableSecureCookies,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  accessExpiration,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.GetUserSessionRefreshTokenCookieName(c.enableSecureCookies),
-		Value:    input.refreshToken,
-		HttpOnly: true,
-		Secure:   c.enableSecureCookies,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  input.sessionExpiration,
-	})
-
-	if input.csrfToken != nil {
-		http.SetCookie(w, &http.Cookie{
-			Name:     auth.GetUserSessionCSRFTokenCookieName(),
-			Value:    *input.csrfToken,
-			HttpOnly: false, // http only is false here to support the double submit cookie for csrf token
-			Secure:   c.enableSecureCookies,
-			SameSite: http.SameSiteStrictMode,
-			Path:     "/",
-			Expires:  input.sessionExpiration,
-			Domain:   c.tharsisUIDomain,
-		})
-	}
-}
-
-// clearTokenCookies clears the token cookies
-func (c *userSessionController) clearTokenCookies(w http.ResponseWriter) {
-	// Set cookies with empty value and past expiration date to clear them
-	expiredTime := time.Now().Add(-24 * time.Hour)
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.GetUserSessionAccessTokenCookieName(c.enableSecureCookies),
-		Value:    emptyCookieValue,
-		HttpOnly: true,
-		Secure:   c.enableSecureCookies,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  expiredTime,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.GetUserSessionRefreshTokenCookieName(c.enableSecureCookies),
-		Value:    emptyCookieValue,
-		HttpOnly: true,
-		Secure:   c.enableSecureCookies,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  expiredTime,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.GetUserSessionCSRFTokenCookieName(),
-		Value:    emptyCookieValue,
-		HttpOnly: false,
-		Secure:   c.enableSecureCookies,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  expiredTime,
-		Domain:   c.tharsisUIDomain,
-	})
 }

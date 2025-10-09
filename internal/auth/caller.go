@@ -276,7 +276,7 @@ func HandleCaller(
 }
 
 // FindToken returns the bearer token from an HTTP request or from the cookie.
-func FindToken(r *http.Request, secureUserSessionCookiesEnabled bool) (string, error) {
+func FindToken(r *http.Request, userSessionManager UserSessionManager) (string, error) {
 	var tokenFromHeader, tokenFromCookie string
 	// Get token from authorization header.
 	bearer := r.Header.Get("Authorization")
@@ -285,7 +285,7 @@ func FindToken(r *http.Request, secureUserSessionCookiesEnabled bool) (string, e
 	}
 
 	// Check for token stored in request cookie
-	accessTokenCookie, _ := r.Cookie(GetUserSessionAccessTokenCookieName(secureUserSessionCookiesEnabled))
+	accessTokenCookie, _ := r.Cookie(userSessionManager.GetUserSessionAccessTokenCookieName())
 	if accessTokenCookie != nil {
 		tokenFromCookie = accessTokenCookie.Value
 	}

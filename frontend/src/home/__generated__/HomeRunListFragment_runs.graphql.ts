@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4f3a894c68809945d540e310cf0df518>>
+ * @generated SignedSource<<d23758603a7e974df8c52cf14e467944>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -75,7 +75,7 @@ return {
         {
           "kind": "Literal",
           "name": "sort",
-          "value": "UPDATED_AT_DESC"
+          "value": "CREATED_AT_DESC"
         },
         {
           "kind": "Literal",
@@ -169,7 +169,7 @@ return {
           "storageKey": null
         }
       ],
-      "storageKey": "__HomeRunList_runs_connection(sort:\"UPDATED_AT_DESC\",workspaceAssessment:false)"
+      "storageKey": "__HomeRunList_runs_connection(sort:\"CREATED_AT_DESC\",workspaceAssessment:false)"
     }
   ],
   "type": "Query",
@@ -177,6 +177,6 @@ return {
 };
 })();
 
-(node as any).hash = "c16569127c66edb21ba55ee4130d0d96";
+(node as any).hash = "75c03ebdbca29479db14594ff29f174b";
 
 export default node;

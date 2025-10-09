@@ -3,10 +3,8 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -63,37 +61,9 @@ func BuildRouter(
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}
 
-	tharsisUIURL, err := url.Parse(cfg.TharsisUIURL)
+	tfeHandler, err := tfe.BuildTFEServiceDiscoveryHandler(ctx, logger, tfeBasePath, openIDConfigFetcher, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse tharsis ui url: %v", err)
-	}
-
-	var tfeHandler http.HandlerFunc
-	if cfg.TFELoginEnabled {
-		var loginIdp *config.IdpConfig
-		// Find IDP that matches client ID
-		for _, idp := range cfg.OauthProviders {
-			if idp.ClientID == cfg.TFELoginClientID {
-				idp := idp
-				loginIdp = &idp
-				break
-			}
-		}
-
-		if loginIdp == nil {
-			return nil, errors.New("OIDC Identity Provider not found for TFE login")
-		}
-
-		tfeHandler, err = tfe.BuildTFEServiceDiscoveryHandler(ctx, logger, loginIdp, cfg.TFELoginScopes, cfg.TharsisAPIURL, tfeBasePath, openIDConfigFetcher)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build TFE discovery document handler %v", err)
-		}
-	}
-
-	// Check if external url uses https to determine if secure cookies should be enabled
-	enableSecureCookies := false
-	if parsedURL, err := url.Parse(cfg.TharsisAPIURL); err == nil && parsedURL.Scheme == "https" {
-		enableSecureCookies = true
+		return nil, fmt.Errorf("failed to build TFE discovery document handler %v", err)
 	}
 
 	allowedOrigins := strings.Split(cfg.CorsAllowedOrigins, ",")
@@ -110,7 +80,7 @@ func BuildRouter(
 		}),
 		middleware.NewRequestIDMiddleware(),
 		middleware.PrometheusMiddleware,
-		middleware.NewAuthenticationMiddleware(authenticator, respWriter, enableSecureCookies),
+		middleware.NewAuthenticationMiddleware(authenticator, respWriter, userSessionManager),
 		middleware.NewSubjectMiddleware(logger, respWriter),
 		middleware.HTTPRateLimiterMiddleware(
 			logger,
@@ -144,10 +114,19 @@ func BuildRouter(
 		respWriter,
 	))
 
-	AddRoutes(router, controllers.NewOIDCController(
+	oidcController, err := controllers.NewOIDCController(
 		respWriter,
 		signingKeyManager,
-	))
+		userSessionManager,
+		cfg.TharsisAPIURL,
+		cfg.TharsisUIURL,
+		cfg.OIDCInternalIdentityProviderClientID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OIDC controller: %v", err)
+	}
+
+	AddRoutes(router, oidcController)
 
 	if tfeHandler != nil {
 		router.Method("GET", "/.well-known/terraform.json", tfeHandler)
@@ -217,10 +196,7 @@ func BuildRouter(
 		AddRoutes(r, controllers.NewUserSessionController(
 			respWriter,
 			userSessionManager,
-			cfg.UserSessionAccessTokenExpirationMinutes,
 			csrfMiddleware,
-			enableSecureCookies,
-			tharsisUIURL.Hostname(),
 			logger,
 		))
 

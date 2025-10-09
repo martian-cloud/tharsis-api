@@ -2,18 +2,24 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import graphQLFetcher from './api/fetchGraphQL';
 import App from './App';
-import AuthenticationService from './auth/AuthenticationService';
+import { BasicAuthenticationService, OidcAuthenticationService } from './auth/AuthenticationService';
 import config from './common/config';
 import environment from './RelayEnvironment';
 import reportWebVitals from './reportWebVitals';
 
 const authSettingsQuery = `query srcQuery {
   authSettings {
-    oidcIssuerUrl
-    oidcClientId
-    oidcScope
+    authType
+    oidc {
+        issuerUrl
+        clientId
+        scope
+    }
   }
 }`;
+
+// oidcAuthType will be set to OIDC when an OIDC provider is configured
+const oidcAuthType = 'OIDC';
 
 const container = document.getElementById('root');
 
@@ -25,10 +31,10 @@ const graphqlEndpoint = `${config.apiUrl}/graphql`;
 
 fetch(graphqlEndpoint, {
     method: 'POST',
-    credentials: 'omit',
     headers: {
         'Content-Type': 'application/json',
     },
+    credentials: 'omit',
     body: JSON.stringify({
         query: authSettingsQuery,
         variables: {},
@@ -36,13 +42,13 @@ fetch(graphqlEndpoint, {
 }).then(async response => {
     const { authSettings } = (await response.json()).data;
 
-    const authService = new AuthenticationService(
-        authSettings.oidcIssuerUrl,
-        authSettings.oidcClientId,
-        authSettings.oidcScope
-    );
+    const authService = authSettings.authType === oidcAuthType ? new OidcAuthenticationService(
+        authSettings.oidc.issuerUrl,
+        authSettings.oidc.clientId,
+        authSettings.oidc.scope
+    ) : new BasicAuthenticationService();
 
-    await authService.finishLogin();
+    await authService.initialize();
 
     const fetchGraphQL = graphQLFetcher(authService);
 

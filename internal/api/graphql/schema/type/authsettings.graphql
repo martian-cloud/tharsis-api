@@ -1,6 +1,15 @@
+enum UserAuthType {
+  BASIC
+  OIDC
+}
+
+type OidcAuthSettings {
+  issuerUrl: String!
+  clientId: String!
+  scope: String!
+}
+
 type AuthSettings {
-  oidcIssuerUrl: String
-  oidcClientId: String
-  oidcUsernameClaim: String
-  oidcScope: String
+  authType: UserAuthType!
+  oidc: OidcAuthSettings
 }

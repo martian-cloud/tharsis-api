@@ -216,6 +216,9 @@ type Mutation {
   revokeUserSession(
     input: RevokeUserSessionInput!
   ): RevokeUserSessionPayload!
+  createUser(input: CreateUserInput!): CreateUserPayload!
+  deleteUser(input: DeleteUserInput!): DeleteUserPayload!
+  setUserPassword(input: SetUserPasswordInput!): SetUserPasswordPayload!
   createFederatedRegistry(
     input: CreateFederatedRegistryInput!
   ): FederatedRegistryMutationPayload!

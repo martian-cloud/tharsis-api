@@ -1209,3 +1209,409 @@ func TestRevokeUserSession(t *testing.T) {
 		})
 	}
 }
+
+func TestService_CreateUser(t *testing.T) {
+	userID := "user-id-1"
+	adminUserID := "admin-user-id"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *CreateUserInput
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "admin creates user successfully",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &CreateUserInput{
+				Username: "newuser",
+				Email:    "newuser@test.com",
+				Password: ptr.String("password123"),
+				Admin:    false,
+			},
+		},
+		{
+			name: "admin creates user without password",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &CreateUserInput{
+				Username: "newuser",
+				Email:    "newuser@test.com",
+				Admin:    false,
+			},
+		},
+		{
+			name: "non-admin user cannot create user",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			input: &CreateUserInput{
+				Username: "newuser",
+				Email:    "newuser@test.com",
+				Password: ptr.String("password123"),
+				Admin:    false,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "service account cannot create user",
+			caller: &auth.ServiceAccountCaller{
+				ServiceAccountID: "sa-id",
+			},
+			input: &CreateUserInput{
+				Username: "newuser",
+				Email:    "newuser@test.com",
+				Password: ptr.String("password123"),
+				Admin:    false,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "validation fails for empty username",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &CreateUserInput{
+				Username: "",
+				Email:    "newuser@test.com",
+				Password: ptr.String("password123"),
+				Admin:    false,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "validation fails for empty email",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &CreateUserInput{
+				Username: "newuser",
+				Email:    "",
+				Password: ptr.String("password123"),
+				Admin:    false,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			mockUsers := db.NewMockUsers(t)
+
+			if !tc.expectError {
+				mockUsers.On("CreateUser", mock.Anything, mock.MatchedBy(func(user *models.User) bool {
+					return user.Username == tc.input.Username && user.Email == tc.input.Email && user.Admin == tc.input.Admin
+				})).Return(&models.User{
+					Metadata: models.ResourceMetadata{ID: "new-user-id"},
+					Username: tc.input.Username,
+					Email:    tc.input.Email,
+					Admin:    tc.input.Admin,
+					Active:   true,
+				}, nil)
+			}
+
+			dbClient := &db.Client{
+				Users: mockUsers,
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			result, err := testService.CreateUser(ctx, tc.input)
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.expectErrorCode != "" {
+					assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.input.Username, result.Username)
+			assert.Equal(t, tc.input.Email, result.Email)
+			assert.Equal(t, tc.input.Admin, result.Admin)
+			assert.True(t, result.Active)
+		})
+	}
+}
+
+func TestService_DeleteUser(t *testing.T) {
+	userID := "user-id-1"
+	adminUserID := "admin-user-id"
+	targetUserID := "target-user-id"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *DeleteUserInput
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "admin deletes user successfully",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &DeleteUserInput{
+				UserID: targetUserID,
+			},
+		},
+		{
+			name: "non-admin user cannot delete user",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			input: &DeleteUserInput{
+				UserID: targetUserID,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "admin cannot delete themselves",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &DeleteUserInput{
+				UserID: adminUserID,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "user not found",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &DeleteUserInput{
+				UserID: "nonexistent-user-id",
+			},
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			mockUsers := db.NewMockUsers(t)
+
+			if tc.name == "user not found" {
+				mockUsers.On("GetUserByID", mock.Anything, tc.input.UserID).Return(nil, nil)
+			} else if tc.name != "admin cannot delete themselves" && tc.name != "non-admin user cannot delete user" {
+				targetUser := &models.User{
+					Metadata: models.ResourceMetadata{ID: tc.input.UserID},
+					Username: "targetuser",
+					Email:    "target@test.com",
+				}
+				mockUsers.On("GetUserByID", mock.Anything, tc.input.UserID).Return(targetUser, nil)
+				if !tc.expectError {
+					mockUsers.On("DeleteUser", mock.Anything, targetUser).Return(nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				Users: mockUsers,
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			err := testService.DeleteUser(ctx, tc.input)
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.expectErrorCode != "" {
+					assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				}
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestService_SetUserPassword(t *testing.T) {
+	userID := "user-id-1"
+	adminUserID := "admin-user-id"
+	targetUserID := "target-user-id"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *SetUserPasswordInput
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "admins cannot set user password",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: adminUserID},
+					Admin:    true,
+				},
+			},
+			input: &SetUserPasswordInput{
+				UserID:      targetUserID,
+				NewPassword: "newpassword123",
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "user sets own password with correct current password",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			input: &SetUserPasswordInput{
+				UserID:          userID,
+				CurrentPassword: "currentpassword",
+				NewPassword:     "newpassword123",
+			},
+		},
+		{
+			name: "user sets own password without current password",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			input: &SetUserPasswordInput{
+				UserID:      userID,
+				NewPassword: "newpassword123",
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "user sets own password with incorrect current password",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			input: &SetUserPasswordInput{
+				UserID:          userID,
+				CurrentPassword: "wrongpassword",
+				NewPassword:     "newpassword123",
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "non-admin user cannot set other user password",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+					Admin:    false,
+				},
+			},
+			input: &SetUserPasswordInput{
+				UserID:      targetUserID,
+				NewPassword: "newpassword123",
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx = auth.WithCaller(ctx, tc.caller)
+
+			mockUsers := db.NewMockUsers(t)
+
+			if !tc.expectError || tc.expectErrorCode == errors.EInvalid {
+				targetUser := &models.User{
+					Metadata: models.ResourceMetadata{ID: tc.input.UserID},
+					Username: "targetuser",
+					Email:    "target@test.com",
+				}
+
+				targetUser.SetPassword("currentpassword")
+
+				mockUsers.On("GetUserByID", mock.Anything, tc.input.UserID).Return(targetUser, nil)
+
+				if !tc.expectError {
+					mockUsers.On("UpdateUser", mock.Anything, mock.MatchedBy(func(user *models.User) bool {
+						return user.Metadata.ID == tc.input.UserID
+					})).Return(targetUser, nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				Users: mockUsers,
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			result, err := testService.SetUserPassword(ctx, tc.input)
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.expectErrorCode != "" {
+					assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.input.UserID, result.Metadata.ID)
+		})
+	}
+}

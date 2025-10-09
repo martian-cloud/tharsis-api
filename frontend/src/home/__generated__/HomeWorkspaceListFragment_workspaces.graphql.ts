@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d79522fdd56582c6b0141162fcccd0f0>>
+ * @generated SignedSource<<c2691206d02266cebb1260c2d2338464>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -84,7 +84,7 @@ return {
         {
           "kind": "Literal",
           "name": "sort",
-          "value": "UPDATED_AT_DESC"
+          "value": "FULL_PATH_ASC"
         }
       ],
       "concreteType": "WorkspaceConnection",
@@ -181,6 +181,6 @@ return {
 };
 })();
 
-(node as any).hash = "fe07a26bcadfe46ad69720537499fa52";
+(node as any).hash = "f9d2d0f08007c5caa220d281fb0b9f42";
 
 export default node;

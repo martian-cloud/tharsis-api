@@ -11,6 +11,9 @@ type Config {
   dbPort: Int!
   dbMaxConnections: Int!
   dbAutoMigrateEnabled: Boolean!
+  cliLoginOIDCClientID: String
+  cliLoginOIDCScopes: String
+  oidcInternalIdentityProviderClientID: String!
   maxGraphQlComplexity: Int!
   moduleRegistryMaxUploadSize: Int!
   asyncTaskTimeout: Int!
@@ -20,8 +23,6 @@ type Config {
   otelTraceType: String
   otelTraceCollectorHost: String
   otelTraceCollectorPort: Int!
-  tfeLoginEnabled: Boolean!
-  tfeLoginScopes: String
   serviceDiscoveryHost: String!
   terraformCliVersionConstraint: String!
   workspaceAssessmentIntervalHours: Int!
@@ -46,7 +47,6 @@ type Config {
   # Sensitive fields - always returned but masked for non-admin users
   tlsCertFile: String!
   tlsKeyFile: String!
-  tfeLoginClientId: String!
   adminUserEmail: String!
   objectStorePluginData: [PluginDataEntry!]!
   rateLimitStorePluginData: [PluginDataEntry!]!

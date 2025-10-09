@@ -6,6 +6,9 @@ import graphql from 'babel-plugin-relay/macro';
 import Timestamp from '../common/Timestamp';
 import { UserSessionFragment_session$key } from './__generated__/UserSessionFragment_session.graphql';
 import { UserSessionRevokeMutation } from './__generated__/UserSessionRevokeMutation.graphql';
+import AuthenticationService from '../auth/AuthenticationService';
+import { useContext } from 'react';
+import AuthServiceContext from '../auth/AuthServiceContext';
 
 interface Props {
     fragmentRef: UserSessionFragment_session$key;
@@ -13,6 +16,7 @@ interface Props {
 
 function UserSession({ fragmentRef }: Props) {
     const { enqueueSnackbar } = useSnackbar();
+    const authService = useContext<AuthenticationService>(AuthServiceContext);
 
     const data = useFragment<UserSessionFragment_session$key>(
         graphql`
@@ -21,6 +25,7 @@ function UserSession({ fragmentRef }: Props) {
                 userAgent
                 expiration
                 expired
+                current
                 metadata {
                     createdAt
                 }
@@ -40,28 +45,32 @@ function UserSession({ fragmentRef }: Props) {
         }
     `);
 
-    const handleRevoke = () => {
-        commit({
-            variables: {
-                input: {
-                    userSessionId: data.id
+    const handleRevoke = async () => {
+        if (data.current) {
+            await authService.logout();
+        } else {
+            commit({
+                variables: {
+                    input: {
+                        userSessionId: data.id
+                    }
+                },
+                updater: (store) => {
+                    // Remove the session from the cache
+                    store.delete(data.id);
+                },
+                onCompleted: (response) => {
+                    if (response.revokeUserSession.problems.length) {
+                        enqueueSnackbar(response.revokeUserSession.problems.map(p => p.message).join('; '), { variant: 'warning' });
+                    } else {
+                        enqueueSnackbar('Session revoked successfully', { variant: 'success' });
+                    }
+                },
+                onError: () => {
+                    enqueueSnackbar('Failed to revoke session', { variant: 'error' });
                 }
-            },
-            updater: (store) => {
-                // Remove the session from the cache
-                store.delete(data.id);
-            },
-            onCompleted: (response) => {
-                if (response.revokeUserSession.problems.length) {
-                    enqueueSnackbar(response.revokeUserSession.problems.map(p => p.message).join('; '), { variant: 'warning' });
-                } else {
-                    enqueueSnackbar('Session revoked successfully', { variant: 'success' });
-                }
-            },
-            onError: () => {
-                enqueueSnackbar('Failed to revoke session', { variant: 'error' });
-            }
-        });
+            });
+        }
     };
 
     return (
