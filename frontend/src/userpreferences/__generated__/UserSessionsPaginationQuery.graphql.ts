@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a13808278477f6e0341285c4ee858bde>>
+ * @generated SignedSource<<ae5a8343ecb8d51e8858871033384286>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -176,6 +176,13 @@ return {
                           {
                             "alias": null,
                             "args": null,
+                            "kind": "ScalarField",
+                            "name": "current",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
                             "concreteType": "ResourceMetadata",
                             "kind": "LinkedField",
                             "name": "metadata",
@@ -254,12 +261,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "e18bc360fa045124ade18a75c7cea5ba",
+    "cacheID": "d91bd9d1aaee24e2ff7a3f33774642db",
     "id": null,
     "metadata": {},
     "name": "UserSessionsPaginationQuery",
     "operationKind": "query",
-    "text": "query UserSessionsPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...UserSessionsFragment_user\n    id\n  }\n}\n\nfragment UserSessionFragment_session on UserSession {\n  id\n  userAgent\n  expiration\n  expired\n  metadata {\n    createdAt\n  }\n}\n\nfragment UserSessionsFragment_user on User {\n  userSessions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...UserSessionFragment_session\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
+    "text": "query UserSessionsPaginationQuery(\n  $after: String\n  $first: Int\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...UserSessionsFragment_user\n    id\n  }\n}\n\nfragment UserSessionFragment_session on UserSession {\n  id\n  userAgent\n  expiration\n  expired\n  current\n  metadata {\n    createdAt\n  }\n}\n\nfragment UserSessionsFragment_user on User {\n  userSessions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...UserSessionFragment_session\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
   }
 };
 })();

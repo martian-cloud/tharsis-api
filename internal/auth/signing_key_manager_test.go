@@ -319,26 +319,6 @@ func TestSigningKeyManager_GetKeys(t *testing.T) {
 	}
 }
 
-func TestSigningKeyManager_GetOpenIDConfig(t *testing.T) {
-	t.Run("returns correct OpenID configuration", func(t *testing.T) {
-		logger, _ := logger.NewForTest()
-
-		manager := &signingKeyManager{
-			issuerURL: "https://test.example.com",
-			logger:    logger,
-		}
-
-		config := manager.GetOpenIDConfig()
-
-		assert.Equal(t, "https://test.example.com", config.Issuer)
-		assert.Equal(t, "https://test.example.com/oauth/discovery/keys", config.JwksURI)
-		assert.Equal(t, "", config.AuthorizationEndpoint)
-		assert.Equal(t, []string{"id_token"}, config.ResponseTypesSupported)
-		assert.Equal(t, []string{}, config.SubjectTypesSupported)
-		assert.Equal(t, []string{"RS256"}, config.IDTokenSigningAlgValuesSupported)
-	})
-}
-
 func TestNewSigningKeyManager(t *testing.T) {
 	testCases := []struct {
 		name               string

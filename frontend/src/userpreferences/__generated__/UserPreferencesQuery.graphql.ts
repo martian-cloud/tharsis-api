@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<305ed1ac5be25023991a3a9315b66e80>>
+ * @generated SignedSource<<3e8cf778b5447bbe6ca532b3550fa3fc>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -232,6 +232,13 @@ return {
                           {
                             "alias": null,
                             "args": null,
+                            "kind": "ScalarField",
+                            "name": "current",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
                             "concreteType": "ResourceMetadata",
                             "kind": "LinkedField",
                             "name": "metadata",
@@ -319,12 +326,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "88b3fb9eda8572587e11c66732c15740",
+    "cacheID": "cd62b808705f13ae0e47159088188c43",
     "id": null,
     "metadata": {},
     "name": "UserPreferencesQuery",
     "operationKind": "query",
-    "text": "query UserPreferencesQuery(\n  $first: Int\n  $after: String\n) {\n  ...UserPreferencesFragment_preferences\n}\n\nfragment GlobalNotificationPreferenceFragment_notificationPreference on GlobalUserPreferences {\n  notificationPreference {\n    ...NotificationButtonFragment_notificationPreference\n  }\n}\n\nfragment NotificationButtonFragment_notificationPreference on UserNotificationPreference {\n  scope\n  inherited\n  namespacePath\n  global\n  customEvents {\n    failedRun\n  }\n}\n\nfragment UserPreferencesFragment_preferences on Query {\n  userPreferences {\n    globalPreferences {\n      ...GlobalNotificationPreferenceFragment_notificationPreference\n    }\n  }\n  me {\n    __typename\n    ... on User {\n      ...UserSessionsFragment_user\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment UserSessionFragment_session on UserSession {\n  id\n  userAgent\n  expiration\n  expired\n  metadata {\n    createdAt\n  }\n}\n\nfragment UserSessionsFragment_user on User {\n  userSessions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...UserSessionFragment_session\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
+    "text": "query UserPreferencesQuery(\n  $first: Int\n  $after: String\n) {\n  ...UserPreferencesFragment_preferences\n}\n\nfragment GlobalNotificationPreferenceFragment_notificationPreference on GlobalUserPreferences {\n  notificationPreference {\n    ...NotificationButtonFragment_notificationPreference\n  }\n}\n\nfragment NotificationButtonFragment_notificationPreference on UserNotificationPreference {\n  scope\n  inherited\n  namespacePath\n  global\n  customEvents {\n    failedRun\n  }\n}\n\nfragment UserPreferencesFragment_preferences on Query {\n  userPreferences {\n    globalPreferences {\n      ...GlobalNotificationPreferenceFragment_notificationPreference\n    }\n  }\n  me {\n    __typename\n    ... on User {\n      ...UserSessionsFragment_user\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment UserSessionFragment_session on UserSession {\n  id\n  userAgent\n  expiration\n  expired\n  current\n  metadata {\n    createdAt\n  }\n}\n\nfragment UserSessionsFragment_user on User {\n  userSessions(first: $first, after: $after, sort: CREATED_AT_DESC) {\n    edges {\n      node {\n        id\n        ...UserSessionFragment_session\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n  id\n}\n"
   }
 };
 })();

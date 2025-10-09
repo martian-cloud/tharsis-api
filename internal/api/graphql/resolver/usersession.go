@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -131,4 +132,12 @@ func (r *UserSessionResolver) Expiration() graphql.Time {
 // Expired resolver
 func (r *UserSessionResolver) Expired() bool {
 	return r.userSession.IsExpired()
+}
+
+// Current resolver
+func (r *UserSessionResolver) Current(ctx context.Context) bool {
+	if sessionID, ok := auth.GetRequestUserSessionID(ctx); ok {
+		return sessionID == r.userSession.Metadata.ID
+	}
+	return false
 }

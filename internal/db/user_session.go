@@ -65,6 +65,7 @@ type UserSessionFilter struct {
 	UserID         *string
 	UserSessionIDs []string
 	RefreshTokenID *string
+	OAuthCode      *string
 }
 
 // GetUserSessionsInput is the input for listing user sessions
@@ -87,7 +88,7 @@ type userSessions struct {
 	dbClient *Client
 }
 
-var userSessionFieldList = append(metadataFieldList, "user_id", "refresh_token_id", "expiration", "user_agent")
+var userSessionFieldList = append(metadataFieldList, "user_id", "refresh_token_id", "expiration", "user_agent", "oauth_code", "oauth_code_challenge", "oauth_code_challenge_method", "oauth_code_expiration", "oauth_redirect_uri")
 
 // NewUserSessions returns an instance of the UserSessions interface
 func NewUserSessions(dbClient *Client) UserSessions {
@@ -149,6 +150,10 @@ func (u *userSessions) GetUserSessions(ctx context.Context, input *GetUserSessio
 
 		if input.Filter.RefreshTokenID != nil {
 			ex = ex.Append(goqu.I("user_sessions.refresh_token_id").Eq(*input.Filter.RefreshTokenID))
+		}
+
+		if input.Filter.OAuthCode != nil {
+			ex = ex.Append(goqu.I("user_sessions.oauth_code").Eq(*input.Filter.OAuthCode))
 		}
 	}
 
@@ -216,14 +221,19 @@ func (u *userSessions) CreateUserSession(ctx context.Context, session *models.Us
 		With("user_sessions",
 			dialect.Insert("user_sessions").Rows(
 				goqu.Record{
-					"id":               newResourceID(),
-					"version":          initialResourceVersion,
-					"created_at":       timestamp,
-					"updated_at":       timestamp,
-					"user_id":          session.UserID,
-					"refresh_token_id": session.RefreshTokenID,
-					"expiration":       session.Expiration,
-					"user_agent":       session.UserAgent,
+					"id":                          newResourceID(),
+					"version":                     initialResourceVersion,
+					"created_at":                  timestamp,
+					"updated_at":                  timestamp,
+					"user_id":                     session.UserID,
+					"refresh_token_id":            session.RefreshTokenID,
+					"expiration":                  session.Expiration,
+					"user_agent":                  session.UserAgent,
+					"oauth_code":                  session.OAuthCode,
+					"oauth_code_challenge":        session.OAuthCodeChallenge,
+					"oauth_code_challenge_method": session.OAuthCodeChallengeMethod,
+					"oauth_code_expiration":       session.OAuthCodeExpiration,
+					"oauth_redirect_uri":          session.OAuthRedirectURI,
 				}).Returning("*"),
 		).Select(u.getSelectFields()...).
 		InnerJoin(goqu.T("users"), goqu.On(goqu.Ex{"user_sessions.user_id": goqu.I("users.id")})).
@@ -259,10 +269,15 @@ func (u *userSessions) UpdateUserSession(ctx context.Context, session *models.Us
 		With("user_sessions",
 			dialect.Update("user_sessions").
 				Set(goqu.Record{
-					"version":          goqu.L("? + ?", goqu.C("version"), 1),
-					"updated_at":       timestamp,
-					"refresh_token_id": session.RefreshTokenID,
-					"expiration":       session.Expiration,
+					"version":                     goqu.L("? + ?", goqu.C("version"), 1),
+					"updated_at":                  timestamp,
+					"refresh_token_id":            session.RefreshTokenID,
+					"expiration":                  session.Expiration,
+					"oauth_code":                  session.OAuthCode,
+					"oauth_code_challenge":        session.OAuthCodeChallenge,
+					"oauth_code_challenge_method": session.OAuthCodeChallengeMethod,
+					"oauth_code_expiration":       session.OAuthCodeExpiration,
+					"oauth_redirect_uri":          session.OAuthRedirectURI,
 				}).Where(goqu.Ex{"id": session.Metadata.ID, "version": session.Metadata.Version}).
 				Returning("*"),
 		).Select(u.getSelectFields()...).
@@ -370,6 +385,11 @@ func scanUserSession(row scanner) (*models.UserSession, error) {
 		&session.RefreshTokenID,
 		&session.Expiration,
 		&session.UserAgent,
+		&session.OAuthCode,
+		&session.OAuthCodeChallenge,
+		&session.OAuthCodeChallengeMethod,
+		&session.OAuthCodeExpiration,
+		&session.OAuthRedirectURI,
 		&username,
 	}
 

@@ -299,6 +299,29 @@ type RevokeUserSessionInput struct {
 	UserSessionID    string
 }
 
+// CreateUserInput is the input for creating a user.
+type CreateUserInput struct {
+	ClientMutationID *string
+	Username         string
+	Email            string
+	Password         *string
+	Admin            bool
+}
+
+// DeleteUserInput is the input for deleting a user.
+type DeleteUserInput struct {
+	ClientMutationID *string
+	UserID           string
+}
+
+// SetUserPasswordInput is the input for setting a user's password.
+type SetUserPasswordInput struct {
+	ClientMutationID *string
+	UserID           string
+	CurrentPassword  string
+	NewPassword      string
+}
+
 func handleUserMutationProblem(e error, clientMutationID *string) (*UserMutationPayloadResolver, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
@@ -354,6 +377,63 @@ func revokeUserSessionMutation(ctx context.Context, input *RevokeUserSessionInpu
 
 	payload := RevokeUserSessionPayload{ClientMutationID: input.ClientMutationID, Problems: []Problem{}}
 	return &RevokeUserSessionPayloadResolver{RevokeUserSessionPayload: payload}, nil
+}
+
+func createUserMutation(ctx context.Context, input *CreateUserInput) (*UserMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	user, err := serviceCatalog.UserService.CreateUser(ctx, &user.CreateUserInput{
+		Username: input.Username,
+		Email:    input.Email,
+		Password: input.Password,
+		Admin:    input.Admin,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, User: user, Problems: []Problem{}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
+}
+
+func deleteUserMutation(ctx context.Context, input *DeleteUserInput) (*UserMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	userID, err := serviceCatalog.FetchModelID(ctx, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = serviceCatalog.UserService.DeleteUser(ctx, &user.DeleteUserInput{
+		UserID: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, Problems: []Problem{}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
+}
+
+func setUserPasswordMutation(ctx context.Context, input *SetUserPasswordInput) (*UserMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	userID, err := serviceCatalog.FetchModelID(ctx, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := serviceCatalog.UserService.SetUserPassword(ctx, &user.SetUserPasswordInput{
+		UserID:          userID,
+		CurrentPassword: input.CurrentPassword,
+		NewPassword:     input.NewPassword,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := UserMutationPayload{ClientMutationID: input.ClientMutationID, User: user, Problems: []Problem{}}
+	return &UserMutationPayloadResolver{UserMutationPayload: payload}, nil
 }
 
 /* User loader */

@@ -12,9 +12,10 @@ import (
 )
 
 func validateCSRFToken(ctx context.Context, r *http.Request, requestSessionID string, sessionManager auth.UserSessionManager) error {
-	csrfTokenCookie, err := r.Cookie(auth.GetUserSessionCSRFTokenCookieName())
-	if err != nil {
-		return errors.New("csrf token not found in cookie", errors.WithErrorCode(errors.EUnauthorized))
+	csrfTokenCookie, _ := r.Cookie(sessionManager.GetUserSessionCSRFTokenCookieName())
+	if csrfTokenCookie == nil {
+		// Return here since we only need to verify the csrf header if the cookie is included in the request
+		return nil
 	}
 
 	csrfTokenHeader := r.Header.Get(auth.CSRFTokenHeader)
@@ -40,7 +41,7 @@ func NewCSRFMiddleware(
 			ctx := r.Context()
 
 			// Only check CSRF token if this is a user session authenticated request and if it's not a graphql subscription websocket request
-			if requestSessionID, ok := auth.GetRequestUserSessionID(r); ok && !isGraphqlSubscriptionRequest(r) {
+			if requestSessionID, ok := auth.GetRequestUserSessionID(r.Context()); ok && !isGraphqlSubscriptionRequest(r) {
 				if err := validateCSRFToken(ctx, r, requestSessionID, sessionManager); err != nil {
 					logger.WithContextFields(ctx).Infow("Request has invalid CSRF token",
 						"error", err,

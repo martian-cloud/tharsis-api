@@ -1553,7 +1553,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			mockTransactions.Test(t)
 			mockVCSProviders.Test(t)
 			mockWorkspaceVCSProviderLinks.Test(t)
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
 			mockCaller.On("GetSubject").Return("testsubject")
 			mockCaller.On("RequirePermission", mock.Anything, models.UpdateWorkspacePermission, mock.Anything).Return(nil)
@@ -1578,7 +1578,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 
 			mockVCSProviders.On("GetProviderByID", mock.Anything, "provider-id").Return(test.existingProvider, nil)
 
-			MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
+			mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
 
 			mockWorkspaceVCSProviderLinks.On("CreateLink", mock.Anything, mock.Anything).Return(test.createdLink, nil)
 			mockWorkspaceVCSProviderLinks.On("UpdateLink", mock.Anything, test.createdLink).Return(test.updatedLink, nil)
@@ -1600,7 +1600,7 @@ func TestCreateWorkspaceVCSProviderLink(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := newService(logger, dbClient, nil, MockSigningKeyManager, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
+			service := newService(logger, dbClient, nil, mockSigningKeyManager, providerMap, nil, nil, nil, nil, stateGeneratorFunc, tharsisURL, 0)
 
 			response, err := service.CreateWorkspaceVCSProviderLink(ctx, test.input)
 			if test.expectedErrorCode != "" {

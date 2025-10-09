@@ -25,6 +25,23 @@ type RevokeUserSessionPayload {
   problems: [Problem!]!
 }
 
+type CreateUserPayload {
+  clientMutationId: String
+  user: User
+  problems: [Problem!]!
+}
+
+type DeleteUserPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+}
+
+type SetUserPasswordPayload {
+  clientMutationId: String
+  user: User
+  problems: [Problem!]!
+}
+
 type User implements Node {
   id: ID!
   metadata: ResourceMetadata!
@@ -74,4 +91,21 @@ input UpdateUserAdminStatusInput {
 
 input RevokeUserSessionInput {
   userSessionId: String!
+}
+
+input CreateUserInput {
+  username: String!
+  email: String!
+  password: String
+  admin: Boolean!
+}
+
+input DeleteUserInput {
+  userId: String!
+}
+
+input SetUserPasswordInput {
+  userId: String!
+  currentPassword: String!
+  newPassword: String!
 }

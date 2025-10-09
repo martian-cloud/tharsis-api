@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 )
@@ -74,6 +73,27 @@ func (r *ConfigResolver) DBAutoMigrateEnabled() bool {
 	return r.cfg.DBAutoMigrateEnabled
 }
 
+// CLILoginOIDCClientID resolver
+func (r *ConfigResolver) CLILoginOIDCClientID() *string {
+	if r.cfg.CLILoginOIDCClientID == "" {
+		return nil
+	}
+	return &r.cfg.CLILoginOIDCClientID
+}
+
+// CLILoginOIDCScopes resolver
+func (r *ConfigResolver) CLILoginOIDCScopes() *string {
+	if r.cfg.CLILoginOIDCScopes == "" {
+		return nil
+	}
+	return &r.cfg.CLILoginOIDCScopes
+}
+
+// OIDCInternalIdentityProviderClientID resolver
+func (r *ConfigResolver) OIDCInternalIdentityProviderClientID() string {
+	return r.cfg.OIDCInternalIdentityProviderClientID
+}
+
 // MaxGraphQLComplexity resolver
 func (r *ConfigResolver) MaxGraphQLComplexity() int32 {
 	return int32(r.cfg.MaxGraphQLComplexity)
@@ -106,27 +126,23 @@ func (r *ConfigResolver) OtelTraceEnabled() bool {
 
 // OtelTraceType resolver
 func (r *ConfigResolver) OtelTraceType() *string {
-	return aws.String(r.cfg.OtelTraceType)
+	if r.cfg.OtelTraceType == "" {
+		return nil
+	}
+	return &r.cfg.OtelTraceType
 }
 
 // OtelTraceCollectorHost resolver
 func (r *ConfigResolver) OtelTraceCollectorHost() *string {
-	return aws.String(r.cfg.OtelTraceCollectorHost)
+	if r.cfg.OtelTraceCollectorHost == "" {
+		return nil
+	}
+	return &r.cfg.OtelTraceCollectorHost
 }
 
 // OtelTraceCollectorPort resolver
 func (r *ConfigResolver) OtelTraceCollectorPort() int32 {
 	return int32(r.cfg.OtelTraceCollectorPort)
-}
-
-// TFELoginEnabled resolver
-func (r *ConfigResolver) TFELoginEnabled() bool {
-	return r.cfg.TFELoginEnabled
-}
-
-// TFELoginScopes resolver
-func (r *ConfigResolver) TFELoginScopes() *string {
-	return aws.String(r.cfg.TFELoginScopes)
 }
 
 // ServiceDiscoveryHost resolver
@@ -186,7 +202,10 @@ func (r *ConfigResolver) DisableSensitiveVariableFeature() bool {
 
 // EmailFooter resolver
 func (r *ConfigResolver) EmailFooter() *string {
-	return aws.String(r.cfg.EmailFooter)
+	if r.cfg.EmailFooter == "" {
+		return nil
+	}
+	return &r.cfg.EmailFooter
 }
 
 // ObjectStorePluginType resolver
@@ -222,11 +241,6 @@ func (r *ConfigResolver) TLSCertFile() string {
 // TLSKeyFile resolver
 func (r *ConfigResolver) TLSKeyFile() string {
 	return r.cfg.TLSKeyFile
-}
-
-// TFELoginClientID resolver
-func (r *ConfigResolver) TFELoginClientID() string {
-	return r.cfg.TFELoginClientID
 }
 
 // AdminUserEmail resolver

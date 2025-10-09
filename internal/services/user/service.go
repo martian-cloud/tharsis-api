@@ -48,6 +48,26 @@ type RevokeUserSessionInput struct {
 	UserSessionID string
 }
 
+// CreateUserInput is the input for creating a user.
+type CreateUserInput struct {
+	Username string
+	Email    string
+	Password *string
+	Admin    bool
+}
+
+// DeleteUserInput is the input for deleting a user.
+type DeleteUserInput struct {
+	UserID string
+}
+
+// SetUserPasswordInput is the input for setting a user's password.
+type SetUserPasswordInput struct {
+	UserID          string
+	CurrentPassword string
+	NewPassword     string
+}
+
 // SetNotificationPreferenceInput is the input for setting notification preferences
 type SetNotificationPreferenceInput struct {
 	Inherit       bool
@@ -102,6 +122,9 @@ type Service interface {
 	GetUserSessionByTRN(ctx context.Context, trn string) (*models.UserSession, error)
 	UpdateAdminStatusForUser(ctx context.Context, input *UpdateAdminStatusForUserInput) (*models.User, error)
 	RevokeUserSession(ctx context.Context, input *RevokeUserSessionInput) error
+	CreateUser(ctx context.Context, input *CreateUserInput) (*models.User, error)
+	DeleteUser(ctx context.Context, input *DeleteUserInput) error
+	SetUserPassword(ctx context.Context, input *SetUserPasswordInput) (*models.User, error)
 	SetNotificationPreference(ctx context.Context, input *SetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error)
 	GetNotificationPreference(ctx context.Context, input *GetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error)
 }
@@ -560,4 +583,139 @@ func (s *service) RevokeUserSession(ctx context.Context, input *RevokeUserSessio
 	)
 
 	return nil
+}
+
+func (s *service) CreateUser(ctx context.Context, input *CreateUserInput) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateUser")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	if !caller.IsAdmin() {
+		return nil, errors.New("only admin users can create other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	user := &models.User{
+		Username: input.Username,
+		Email:    input.Email,
+		Admin:    input.Admin,
+		Active:   true,
+	}
+
+	if err = user.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid user", errors.WithSpan(span))
+	}
+
+	if input.Password != nil {
+		if err = user.SetPassword(*input.Password); err != nil {
+			return nil, errors.Wrap(err, "failed to set password", errors.WithSpan(span))
+		}
+	}
+
+	createdUser, err := s.dbClient.Users.CreateUser(ctx, user)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create user", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Created a new user.",
+		"username", input.Username,
+		"admin", input.Admin,
+	)
+
+	return createdUser, nil
+}
+
+func (s *service) DeleteUser(ctx context.Context, input *DeleteUserInput) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteUser")
+	span.SetAttributes(attribute.String("userID", input.UserID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	if !caller.IsAdmin() {
+		return errors.New("only admin users can delete other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return errors.New("only users can delete other users", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	// Prevent self-deletion
+	if input.UserID == userCaller.User.Metadata.ID {
+		return errors.New("a user cannot delete themselves", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	user, err := s.dbClient.Users.GetUserByID(ctx, input.UserID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get user by ID", errors.WithSpan(span))
+	}
+
+	if user == nil {
+		return errors.New("user with id %s not found", input.UserID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if err := s.dbClient.Users.DeleteUser(ctx, user); err != nil {
+		return errors.Wrap(err, "failed to delete user", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Deleted a user.",
+		"username", user.Username,
+	)
+
+	return nil
+}
+
+func (s *service) SetUserPassword(ctx context.Context, input *SetUserPasswordInput) (*models.User, error) {
+	ctx, span := tracer.Start(ctx, "svc.SetUserPassword")
+	span.SetAttributes(attribute.String("userID", input.UserID))
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can set passwords", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if userCaller.User.Metadata.ID != input.UserID {
+		return nil, errors.New("users can only set their own password", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	user, err := s.dbClient.Users.GetUserByID(ctx, input.UserID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user by ID", errors.WithSpan(span))
+	}
+
+	if user == nil {
+		return nil, errors.New("user with id %s not found", input.UserID, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if !user.VerifyPassword(input.CurrentPassword) {
+		return nil, errors.New("current password is incorrect", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	if err = user.SetPassword(input.NewPassword); err != nil {
+		return nil, errors.Wrap(err, "failed to set password", errors.WithSpan(span))
+	}
+
+	updatedUser, err := s.dbClient.Users.UpdateUser(ctx, user)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
+	}
+
+	s.logger.WithContextFields(ctx).Infow("Updated user password.",
+		"username", user.Username,
+	)
+
+	return updatedUser, nil
 }

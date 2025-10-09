@@ -12,11 +12,16 @@ var _ Model = (*UserSession)(nil)
 
 // UserSession represents a session for a user.
 type UserSession struct {
-	UserID         string
-	RefreshTokenID string
-	UserAgent      string
-	Expiration     time.Time
-	Metadata       ResourceMetadata
+	UserID                   string
+	RefreshTokenID           string
+	UserAgent                string
+	Expiration               time.Time
+	Metadata                 ResourceMetadata
+	OAuthCode                *string
+	OAuthCodeChallenge       *string
+	OAuthCodeChallengeMethod *string
+	OAuthCodeExpiration      *time.Time
+	OAuthRedirectURI         *string
 }
 
 // GetID returns the Metadata ID.

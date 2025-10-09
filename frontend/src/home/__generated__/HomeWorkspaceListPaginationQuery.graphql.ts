@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f830e1492dd811ecb05bd6fc59a74637>>
+ * @generated SignedSource<<2a8844ac669d7ca70da79f7f68e3a44a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -60,7 +60,7 @@ v1 = [
   {
     "kind": "Literal",
     "name": "sort",
-    "value": "UPDATED_AT_DESC"
+    "value": "FULL_PATH_ASC"
   }
 ];
 return {
@@ -200,16 +200,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "4c129df9c71e6943cbebb8b339505654",
+    "cacheID": "7b1babaf512bb6977b8746dab2901520",
     "id": null,
     "metadata": {},
     "name": "HomeWorkspaceListPaginationQuery",
     "operationKind": "query",
-    "text": "query HomeWorkspaceListPaginationQuery(\n  $after: String\n  $first: Int\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: UPDATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
+    "text": "query HomeWorkspaceListPaginationQuery(\n  $after: String\n  $first: Int\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
   }
 };
 })();
 
-(node as any).hash = "fe07a26bcadfe46ad69720537499fa52";
+(node as any).hash = "f9d2d0f08007c5caa220d281fb0b9f42";
 
 export default node;

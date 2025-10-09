@@ -31,12 +31,6 @@ const (
 	expiredKeyCheckPeriod = time.Hour
 	// keyCreationTimeout is the duration to wait before considering a key creation failed and cleaning it up
 	keyCreationTimeout = 1 * time.Minute
-	// jwksPath is the path to the JWKS endpoint
-	jwksPath = "oauth/discovery/keys"
-)
-
-var (
-	idTokenSigningAlgValuesSupported = []string{"RS256"}
 )
 
 // TokenInput provides options for creating a new service account token
@@ -54,16 +48,6 @@ type VerifyTokenOutput struct {
 	PrivateClaims map[string]string
 }
 
-// OpenIDConfig represents the OpenID Connect configuration
-type OpenIDConfig struct {
-	Issuer                           string   `json:"issuer"`
-	JwksURI                          string   `json:"jwks_uri"`
-	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
-	ResponseTypesSupported           []string `json:"response_types_supported"`
-	SubjectTypesSupported            []string `json:"subject_types_supported"`
-	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
-}
-
 // SigningKeyManager is an interface for generating and verifying JWT tokens
 type SigningKeyManager interface {
 	// GenerateToken creates a new JWT token
@@ -72,8 +56,6 @@ type SigningKeyManager interface {
 	VerifyToken(ctx context.Context, token string, validateOptions ...jwt.ValidateOption) (*VerifyTokenOutput, error)
 	// GetKeys returns the JSON Web Key Set (JWKS)
 	GetKeys(ctx context.Context) ([]byte, error)
-	// GetOpenIDConfig returns the OpenID Connect configuration
-	GetOpenIDConfig() *OpenIDConfig
 }
 
 type signingKeyManager struct {
@@ -244,17 +226,6 @@ func (s *signingKeyManager) VerifyToken(ctx context.Context, token string, valid
 		Token:         decodedToken,
 		PrivateClaims: getPrivateClaims(decodedToken),
 	}, nil
-}
-
-func (s *signingKeyManager) GetOpenIDConfig() *OpenIDConfig {
-	return &OpenIDConfig{
-		Issuer:                           s.issuerURL,
-		JwksURI:                          fmt.Sprintf("%s/%s", s.issuerURL, jwksPath),
-		AuthorizationEndpoint:            "", // Explicitly set to empty string
-		ResponseTypesSupported:           []string{"id_token"},
-		SubjectTypesSupported:            []string{}, // Explicitly set to empty list
-		IDTokenSigningAlgValuesSupported: idTokenSigningAlgValuesSupported,
-	}
 }
 
 func (s *signingKeyManager) GetKeys(_ context.Context) ([]byte, error) {

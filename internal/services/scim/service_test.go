@@ -91,13 +91,13 @@ func TestCreateSCIMToken(t *testing.T) {
 				Transactions: &mockTransactions,
 			}
 
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
-			MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
+			mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte("signed-token"), nil).Maybe()
 
 			logger, _ := logger.NewForTest()
 
-			service := NewService(logger, dbClient, MockSigningKeyManager)
+			service := NewService(logger, dbClient, mockSigningKeyManager)
 
 			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, test.caller))
 			if test.expectErrorCode != "" {

@@ -22,7 +22,6 @@
     ],
     "go.toolsManagement.autoUpdate": true,
     "go.useLanguageServer": true,
-    "go.buildTags": "integration",
     "go.buildFlags": [
         "-tags=integration -ldflags='-X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBHost=localhost -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBPort=5432 -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBName=tharsis-test -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBMode=disable -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBUser=postgres -X gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db.TestDBPass=postgres'"
     ],
@@ -50,7 +49,13 @@
             "unusedparams": true,
             "unusedwrite": true,
             "unusedvariable": true,
-        }
+        },
+        "build.buildFlags": [
+            "-tags=noui"
+        ],
+        "build.directoryFilters": [
+            "-frontend"
+        ]
     },
     "[go]": {
         "editor.insertSpaces": false,

@@ -15,7 +15,7 @@ function GetConnections(): [string] {
     const connectionId = ConnectionHandler.getConnectionID(
         "root",
         "HomeRunList_runs",
-        { sort: 'UPDATED_AT_DESC', workspaceAssessment: false }
+        { sort: 'CREATED_AT_DESC', workspaceAssessment: false }
     );
     return [connectionId];
 }
@@ -48,7 +48,7 @@ function HomeRunList() {
             runs(
                 first: $first
                 after: $after
-                sort: UPDATED_AT_DESC
+                sort: CREATED_AT_DESC
                 workspaceAssessment: false
                 ) @connection(key: "HomeRunList_runs") {
                     totalCount

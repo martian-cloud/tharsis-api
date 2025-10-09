@@ -144,7 +144,21 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher)
 	federatedRegistryAuth := auth.NewFederatedRegistryAuth(ctx, cfg.FederatedRegistryTrustPolicies, logger, openIDConfigFetcher, dbClient)
 	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, signingKeyManager, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
-	userSessionManager := auth.NewUserSessionManager(dbClient, signingKeyManager, authenticator, logger, cfg.UserSessionAccessTokenExpirationMinutes, cfg.UserSessionRefreshTokenExpirationMinutes, cfg.UserSessionMaxSessionsPerUser)
+	userSessionManager, err := auth.NewUserSessionManager(
+		dbClient,
+		signingKeyManager,
+		authenticator,
+		logger,
+		cfg.UserSessionAccessTokenExpirationMinutes,
+		cfg.UserSessionRefreshTokenExpirationMinutes,
+		cfg.UserSessionMaxSessionsPerUser,
+		cfg.TharsisAPIURL,
+		cfg.TharsisUIURL,
+		len(cfg.OauthProviders) == 0,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize user session manager: %w", err)
+	}
 
 	respWriter := response.NewWriter(logger)
 
@@ -267,26 +281,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	// Create the admin user if an email is provided.
 	if cfg.AdminUserEmail != "" {
-		user, uErr := dbClient.Users.GetUserByEmail(ctx, cfg.AdminUserEmail)
-		if uErr != nil {
-			return nil, uErr
-		}
-		if user == nil {
-			if _, err = dbClient.Users.CreateUser(ctx, &models.User{
-				Username: auth.ParseUsername(cfg.AdminUserEmail),
-				Email:    cfg.AdminUserEmail,
-				Admin:    true,
-				Active:   true,
-			}); err != nil {
-				return nil, fmt.Errorf("failed to create admin user: %v", err)
-			}
-			logger.Infof("User with email %s created.", cfg.AdminUserEmail)
-		} else if !user.Admin {
-			user.Admin = true
-			if _, err = dbClient.Users.UpdateUser(ctx, user); err != nil {
-				return nil, fmt.Errorf("failed to set user to admin: %v", err)
-			}
-			logger.Infof("User with email %s has been granted admin privileges.", cfg.AdminUserEmail)
+		if err = configureDefaultAdminUser(ctx, cfg.AdminUserEmail, cfg.AdminUserPassword, dbClient, logger); err != nil {
+			return nil, fmt.Errorf("failed to configure default admin user: %w", err)
 		}
 	}
 
@@ -414,4 +410,52 @@ func (api *APIServer) Shutdown(ctx context.Context) {
 
 		api.logger.Info("Completed graceful shutdown")
 	})
+}
+
+func configureDefaultAdminUser(ctx context.Context, email string, password string, dbClient *db.Client, logger logger.Logger) error {
+	user, err := dbClient.Users.GetUserByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		user = &models.User{
+			Username: auth.ParseUsername(email),
+			Email:    email,
+			Admin:    true,
+			Active:   true,
+		}
+
+		if password != "" {
+			if err = user.SetPassword(password); err != nil {
+				return err
+			}
+		}
+
+		if _, err = dbClient.Users.CreateUser(ctx, user); err != nil {
+			return fmt.Errorf("failed to create admin user: %v", err)
+		}
+		logger.Infof("User with email %s created.", email)
+	} else {
+		updateUser := false
+
+		if !user.Admin {
+			user.Admin = true
+			updateUser = true
+		}
+
+		if password != "" && !user.VerifyPassword(password) {
+			if err = user.SetPassword(password); err != nil {
+				return err
+			}
+			updateUser = true
+		}
+
+		if updateUser {
+			if _, err = dbClient.Users.UpdateUser(ctx, user); err != nil {
+				return fmt.Errorf("failed to set user to admin: %v", err)
+			}
+			logger.Infof("User with email %s has been granted admin privileges.", email)
+		}
+	}
+	return nil
 }

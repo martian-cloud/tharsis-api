@@ -96,7 +96,7 @@ func TestClaimJob(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
 			mockTransactions := db.NewMockTransactions(t)
-			MockSigningKeyManager := auth.NewMockSigningKeyManager(t)
+			mockSigningKeyManager := auth.NewMockSigningKeyManager(t)
 
 			mockRunners.On("GetRunnerByID", mock.Anything, runnerID).
 				Return(test.existingRunner, nil)
@@ -139,7 +139,7 @@ func TestClaimJob(t *testing.T) {
 
 				mockCaller.On("GetSubject").Return("testSubject").Maybe()
 
-				MockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte(token), nil)
+				mockSigningKeyManager.On("GenerateToken", mock.Anything, mock.Anything).Return([]byte(token), nil)
 			}
 
 			dbClient := &db.Client{
@@ -153,7 +153,7 @@ func TestClaimJob(t *testing.T) {
 			service := &service{
 				dbClient:          dbClient,
 				logger:            logger,
-				signingKeyManager: MockSigningKeyManager,
+				signingKeyManager: mockSigningKeyManager,
 				eventManager:      events.NewEventManager(dbClient, logger),
 				runStateManager:   state.NewRunStateManager(dbClient, logger),
 			}

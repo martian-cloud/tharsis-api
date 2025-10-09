@@ -22,4 +22,5 @@ type UserSession implements Node {
   userAgent: String!
   expiration: Time!
   expired: Boolean!
+  current: Boolean!
 }

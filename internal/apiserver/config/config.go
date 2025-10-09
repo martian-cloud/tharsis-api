@@ -36,6 +36,9 @@ const (
 	defaultUserSessionRefreshTokenExpirationMinutes   = 60 * 12 // 12 hours
 	defaultUserSessionMaxSessionsPerUser              = 20
 	defaultAsymmetricSigningKeyDecommissionPeriodDays = 7
+	defaultCLILoginOIDCScopes                         = "openid tharsis"
+	defaultJWSProviderPluginType                      = "memory"
+	defaultOIDCInternalIdentityProviderClientID       = "tharsis"
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -107,15 +110,18 @@ type Config struct {
 	DBUsername string `yaml:"db_username" env:"DB_USERNAME,secret" sensitive:"true"`
 	DBPassword string `yaml:"db_password" env:"DB_PASSWORD,secret" sensitive:"true"`
 
-	// TFE Login
-	TFELoginClientID string `yaml:"tfe_login_client_id" env:"TFE_LOGIN_CLIENT_ID"`
-	TFELoginScopes   string `yaml:"tfe_login_scopes" env:"TFE_LOGIN_SCOPES"`
+	// CLI Login
+	CLILoginOIDCClientID string `yaml:"cli_login_oidc_client_id" env:"CLI_LOGIN_OIDC_CLIENT_ID"`
+	CLILoginOIDCScopes   string `yaml:"cli_login_oidc_scopes" env:"CLI_LOGIN_OIDC_SCOPES"`
 
 	// ServiceDiscoveryHost is optional and will default to the API URL host if it's not defined
 	ServiceDiscoveryHost string `yaml:"service_discovery_host" env:"SERVICE_DISCOVERY_HOST"`
 
 	// AdminUserEmail is optional and will create a system admin user with this email.
 	AdminUserEmail string `yaml:"admin_user_email" env:"ADMIN_USER_EMAIL" sensitive:"true"`
+
+	// AdminUserPassword is optional and will set the password for the user specified in the AdminUserEmail config field
+	AdminUserPassword string `yaml:"admin_user_password" env:"ADMIN_USER_PASSWORD"`
 
 	// Otel
 	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
@@ -153,9 +159,6 @@ type Config struct {
 	OtelTraceCollectorPort int  `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT"`
 	OtelTraceEnabled       bool `yaml:"otel_trace_enabled" env:"OTEL_TRACE_ENABLED"`
 
-	// Enable TFE
-	TFELoginEnabled bool `yaml:"tfe_login_enabled" env:"TFE_LOGIN_ENABLED"`
-
 	// Whether to auto migrate the database
 	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED"`
 
@@ -182,6 +185,9 @@ type Config struct {
 
 	// AsymmetricSigningKeyDecommissionPeriodDays is the number of days after which an asymmetric signing key should be decommissioned
 	AsymmetricSigningKeyDecommissionPeriodDays int `yaml:"asymmetric_signing_key_decommission_period_days" env:"ASYMMETRIC_SIGNING_KEY_DECOMMISSION_PERIOD_DAYS"`
+
+	// OIDCInternalIdentityProviderClientID is the client ID to use for OIDC authentication flows with the internal identity provider
+	OIDCInternalIdentityProviderClientID string `yaml:"oidc_internal_identity_provider_client_id" env:"OIDC_INTERNAL_IDENTITY_PROVIDER_CLIENT_ID"`
 }
 
 // Validate validates the application configuration.
@@ -189,6 +195,8 @@ func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.ServerPort, is.Port),
 		validation.Field(&c.ObjectStorePluginType, validation.Required),
+		validation.Field(&c.TharsisAPIURL, validation.Required),
+		validation.Field(&c.TharsisUIURL, validation.Required),
 		validation.Field(&c.JWSProviderPluginType, validation.Required),
 	)
 }
@@ -213,6 +221,9 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		UserSessionRefreshTokenExpirationMinutes:   defaultUserSessionRefreshTokenExpirationMinutes,
 		UserSessionMaxSessionsPerUser:              defaultUserSessionMaxSessionsPerUser,
 		AsymmetricSigningKeyDecommissionPeriodDays: defaultAsymmetricSigningKeyDecommissionPeriodDays,
+		CLILoginOIDCScopes:                         defaultCLILoginOIDCScopes,
+		JWSProviderPluginType:                      defaultJWSProviderPluginType,
+		OIDCInternalIdentityProviderClientID:       defaultOIDCInternalIdentityProviderClientID,
 	}
 
 	// load from YAML config file

@@ -32,7 +32,7 @@ function HomeWorkspaceList() {
                 first: $first
                 after: $after
                 search: $search
-                sort: UPDATED_AT_DESC
+                sort: FULL_PATH_ASC
                 ) @connection(key: "HomeWorkspaceList_workspaces") {
                     totalCount
                     edges {

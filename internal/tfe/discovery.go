@@ -4,6 +4,7 @@ package tfe
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -16,34 +17,61 @@ import (
 func BuildTFEServiceDiscoveryHandler(
 	ctx context.Context,
 	logger logger.Logger,
-	idp *config.IdpConfig,
-	loginScopes string,
-	apiEndpoint string,
 	tfeBasePath string,
 	oidcConfigFetcher auth.OpenIDConfigFetcher,
+	cfg *config.Config,
 ) (http.HandlerFunc, error) {
 	// Build response
 	resp := map[string]interface{}{
-		"modules.v1":   fmt.Sprintf("%s/v1/module-registry/modules/", apiEndpoint),
-		"providers.v1": fmt.Sprintf("%s/v1/provider-registry/providers/", apiEndpoint),
-		"state.v2":     fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
-		"tfe.v2":       fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
-		"tfe.v2.1":     fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
-		"tfe.v2.2":     fmt.Sprintf("%s%s/v2/", apiEndpoint, tfeBasePath),
+		"modules.v1":   fmt.Sprintf("%s/v1/module-registry/modules/", cfg.TharsisAPIURL),
+		"providers.v1": fmt.Sprintf("%s/v1/provider-registry/providers/", cfg.TharsisAPIURL),
+		"state.v2":     fmt.Sprintf("%s%s/v2/", cfg.TharsisAPIURL, tfeBasePath),
+		"tfe.v2":       fmt.Sprintf("%s%s/v2/", cfg.TharsisAPIURL, tfeBasePath),
+		"tfe.v2.1":     fmt.Sprintf("%s%s/v2/", cfg.TharsisAPIURL, tfeBasePath),
+		"tfe.v2.2":     fmt.Sprintf("%s%s/v2/", cfg.TharsisAPIURL, tfeBasePath),
 	}
 
-	if idp != nil {
-		cfg, err := oidcConfigFetcher.GetOpenIDConfig(ctx, idp.IssuerURL)
+	loginScopes := cfg.CLILoginOIDCScopes
+
+	if len(cfg.OauthProviders) > 0 {
+		var loginIdp *config.IdpConfig
+
+		if cfg.CLILoginOIDCClientID != "" {
+			// Find IDP that matches client ID
+			for _, idp := range cfg.OauthProviders {
+				if idp.ClientID == cfg.CLILoginOIDCClientID {
+					idp := idp
+					loginIdp = &idp
+					break
+				}
+			}
+
+			if loginIdp == nil {
+				return nil, errors.New("OIDC Identity Provider not found for TFE login")
+			}
+		} else {
+			loginIdp = &cfg.OauthProviders[0]
+		}
+
+		oidcConfig, err := oidcConfigFetcher.GetOpenIDConfig(ctx, loginIdp.IssuerURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get OIDC config for issuer %s %v", idp.IssuerURL, err)
+			return nil, fmt.Errorf("failed to get OIDC config for issuer %s %v", loginIdp.IssuerURL, err)
 		}
 
 		resp["login.v1"] = map[string]interface{}{
-			"client":      idp.ClientID,
+			"client":      loginIdp.ClientID,
 			"grant_types": []string{"authz_code"},
 			"scopes":      []string{loginScopes},
-			"authz":       cfg.AuthEndpoint,
-			"token":       cfg.TokenEndpoint,
+			"authz":       oidcConfig.AuthEndpoint,
+			"token":       oidcConfig.TokenEndpoint,
+		}
+	} else {
+		resp["login.v1"] = map[string]interface{}{
+			"client":      cfg.OIDCInternalIdentityProviderClientID,
+			"grant_types": []string{"authz_code"},
+			"scopes":      []string{loginScopes},
+			"authz":       fmt.Sprintf("%s/oauth/authorize", cfg.TharsisAPIURL),
+			"token":       fmt.Sprintf("%s/oauth/token", cfg.TharsisAPIURL),
 		}
 	}
 

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<78a94996b21397ea51152f6b706972ed>>
+ * @generated SignedSource<<baf6c2d9b0a8be357a638df56c8bdafd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -58,7 +58,7 @@ v3 = [
   {
     "kind": "Literal",
     "name": "sort",
-    "value": "UPDATED_AT_DESC"
+    "value": "FULL_PATH_ASC"
   }
 ];
 return {
@@ -206,12 +206,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "4574cbdd9552cd356126aed0520bd974",
+    "cacheID": "66173cab18dfa764cae25ea71ebced91",
     "id": null,
     "metadata": {},
     "name": "HomeWorkspaceListQuery",
     "operationKind": "query",
-    "text": "query HomeWorkspaceListQuery(\n  $first: Int!\n  $after: String\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: UPDATED_AT_DESC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
+    "text": "query HomeWorkspaceListQuery(\n  $first: Int!\n  $after: String\n  $search: String\n) {\n  ...HomeWorkspaceListFragment_workspaces\n}\n\nfragment HomeWorkspaceListFragment_workspaces on Query {\n  workspaces(first: $first, after: $after, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...HomeWorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n    }\n  }\n}\n\nfragment HomeWorkspaceListItemFragment_workspace on Workspace {\n  name\n  fullPath\n}\n"
   }
 };
 })();

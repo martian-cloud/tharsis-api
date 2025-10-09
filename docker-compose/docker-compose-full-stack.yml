@@ -14,6 +14,39 @@ services:
     networks:
       - tharsis
 
+  # Keycloak database
+  kc_postgres:
+    image: postgres:16-alpine
+    container_name: keycloak-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - PGDATA=/var/lib/postgresql/data
+    volumes:
+      - kc_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tharsis
+
+  # Identity provider.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: tharsis-idp
+    restart: unless-stopped
+    command: "start-dev --db=postgres --db-url-host=keycloak-db --db-username=postgres --db-password=postgres --import-realm"
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+    volumes:
+      - ./tharsis-realm.json:/opt/keycloak/data/import/tharsis-realm.json:ro
+    networks:
+      - tharsis
+    ports:
+      - "127.0.0.1:6530:8080"
+    depends_on:
+      - kc_postgres
+
   # Object storage.
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -54,9 +87,12 @@ services:
     restart: unless-stopped
     user: 0:0
     environment:
+      - THARSIS_OAUTH_PROVIDERS_0_ISSUER_URL=http://localhost:6530/realms/tharsis
+      - THARSIS_OAUTH_PROVIDERS_0_CLIENT_ID=tharsis
+      - THARSIS_OAUTH_PROVIDERS_0_USERNAME_CLAIM=preferred_username
+      - THARSIS_OAUTH_PROVIDERS_0_SCOPE=openid profile email
+      - THARSIS_CLI_LOGIN_OIDC_SCOPES=openid tharsis
       - THARSIS_ADMIN_USER_EMAIL=martian@tharsis.local
-      - THARSIS_ADMIN_USER_PASSWORD=martian
-      - THARSIS_USER_SESSION_ACCESS_TOKEN_EXPIRATION_MINUTES=60
       - THARSIS_DB_USERNAME=postgres
       - THARSIS_DB_NAME=tharsis
       - THARSIS_DB_PASSWORD=postgres
@@ -69,6 +105,7 @@ services:
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_AWS_ACCESS_KEY_ID=minioadmin
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_AWS_SECRET_ACCESS_KEY=miniopassword
       - THARSIS_OBJECT_STORE_PLUGIN_DATA_ENDPOINT=http://localhost:9000
+      - THARSIS_JWS_PROVIDER_PLUGIN_TYPE=memory
       - THARSIS_API_URL=http://localhost:6560
       - THARSIS_INTERNAL_RUNNERS_0_NAME=default-shared-runner
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_TYPE=docker
@@ -77,6 +114,10 @@ services:
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_EXTRA_HOSTS=localhost:host-gateway
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_IMAGE=registry.gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/job-executor:latest
       - THARSIS_INTERNAL_RUNNERS_0_JOB_DISPATCHER_DATA_LOCAL_IMAGE=false # Set to true if using local image.
+      - THARSIS_OTEL_TRACE_ENABLED=true
+      - THARSIS_OTEL_TRACE_TYPE=otlp
+      - THARSIS_OTEL_TRACE_HOST=jaeger
+      - THARSIS_OTEL_TRACE_PORT=4317
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Required for job-executor.
     networks:
@@ -90,7 +131,21 @@ services:
         condition: service_started
       minio:
         condition: service_healthy
+      keycloak:
+        condition: service_started
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.44
+    container_name: tharsis-jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - tharsis
+    ports:
+      - "127.0.0.1:16686:16686" # Jaeger UI
+    expose:
+      - "4317" # OTEL port
 
 networks:
   tharsis:
@@ -98,4 +153,5 @@ networks:
 
 volumes:
   postgres_data:
+  kc_postgres_data:
   minio:

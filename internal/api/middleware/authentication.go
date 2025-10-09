@@ -14,13 +14,13 @@ import (
 func NewAuthenticationMiddleware(
 	authenticator auth.Authenticator,
 	respWriter response.Writer,
-	secureUserSessionCookiesEnabled bool,
+	userSessionManager auth.UserSessionManager,
 ) Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			token, err := auth.FindToken(r, secureUserSessionCookiesEnabled)
+			token, err := auth.FindToken(r, userSessionManager)
 			if err != nil {
 				respWriter.RespondWithError(r.Context(), w, err)
 				return

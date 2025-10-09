@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#000000" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src *; img-src 'self' data: https: http:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:; child-src 'self'; base-uri 'self'; form-action 'self';"
+      content="default-src 'self'; connect-src *; img-src 'self' data: https: http:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:; child-src 'self'; base-uri 'self'; form-action 'self' %VITE_THARSIS_API_URL% http://localhost:*;"
     />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
