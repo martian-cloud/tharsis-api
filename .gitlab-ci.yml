@@ -482,6 +482,9 @@ build_aio_container_image:
   stage: trigger
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+      variables:
+        IMAGE_TAG: latest
   needs:
     - publish tharsis docker
   trigger:
@@ -608,11 +611,19 @@ api_security:
   before_script:
     - |
       sudo apk add curl jq
-      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
-      THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
-        -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
-        --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
-        --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
+      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
+      THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/login' \
+        -H 'Content-Type: application/x-www-form-urlencoded' \
+        --data-urlencode 'username=martian' \
+        --data-urlencode 'password=martian' \
+        --data-urlencode 'client_id=tharsis' \
+        --data-urlencode 'redirect_uri=http://localhost:3000/callback' \
+        --data-urlencode 'response_type=code' \
+        --data-urlencode 'state=test' \
+        --data-urlencode 'scope=openid tharsis' \
+        --data-urlencode 'code_challenge=test_challenge' \
+        --data-urlencode 'code_challenge_method=S256' \
+        -D - | grep 'tharsis_access_token=' | sed 's/.*tharsis_access_token=\([^;]*\).*/\1/')
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $APISEC_OVERRIDES_FILE
   rules:
@@ -663,11 +674,19 @@ apifuzzer_fuzz:
   before_script:
     - |
       sudo apk add curl jq
-      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8000/health)" != "200" ]]; do sleep 5; done' || false
-      THARSIS_STATIC_TOKEN=$(curl -L -X POST 'http://tharsis:8080/realms/tharsis/protocol/openid-connect/token' \
-        -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'client_id=tharsis' \
-        --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid profile email' \
-        --data-urlencode 'username=martian' --data-urlencode 'password=martian' | jq -r '.access_token')
+      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
+      THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/login' \
+        -H 'Content-Type: application/x-www-form-urlencoded' \
+        --data-urlencode 'username=martian' \
+        --data-urlencode 'password=martian' \
+        --data-urlencode 'client_id=tharsis' \
+        --data-urlencode 'redirect_uri=http://localhost:3000/callback' \
+        --data-urlencode 'response_type=code' \
+        --data-urlencode 'state=test' \
+        --data-urlencode 'scope=openid tharsis' \
+        --data-urlencode 'code_challenge=test_challenge' \
+        --data-urlencode 'code_challenge_method=S256' \
+        -D - | grep 'tharsis_access_token=' | sed 's/.*tharsis_access_token=\([^;]*\).*/\1/')
       export THARSIS_STATIC_TOKEN
       echo "{\"headers\":{\"Authorization\":\"Bearer $THARSIS_STATIC_TOKEN\"}}" > $FUZZAPI_OVERRIDES_FILE
   rules:
@@ -681,12 +700,12 @@ dast:
     - build_aio_container_image
   variables:
     DAST_WEBSITE: "http://tharsis:8000"
-    DAST_AUTH_URL: "http://tharsis:8080/realms/tharsis/protocol/openid-connect/auth?client_id=tharsis&redirect_uri=http%3A%2F%2Ftharsis%3A8000%2F&response_type=id_token&scope=openid%20profile%20email"
-    DAST_USERNAME: martian
-    DAST_PASSWORD: martian
-    DAST_USERNAME_FIELD: "css:[name=username]"
-    DAST_PASSWORD_FIELD: "css:[name=password]"
-    DAST_SUBMIT_FIELD: "css:[name=login]"
+    DAST_AUTH_URL: "http://tharsis:8000/login"
+    DAST_AUTH_USERNAME: martian
+    DAST_AUTH_PASSWORD: martian
+    DAST_AUTH_USERNAME_FIELD: "css:[name=username]"
+    DAST_AUTH_PASSWORD_FIELD: "css:[name=password]"
+    DAST_AUTH_SUBMIT_FIELD: "css:button[type=submit]"
     DAST_BROWSER_SCAN: "true"
     DAST_FULL_SCAN_ENABLED: "true"
     DAST_EXCLUDE_URLS: "http://tharsis:8000/static/.*"
