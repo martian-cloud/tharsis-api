@@ -150,9 +150,15 @@ func (j *JobExecutor) buildJobHandler(ctx context.Context, workspaceDir string, 
 
 	switch job.Type {
 	case types.JobPlanType:
-		handler = NewPlanHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, j.logger, jobLogger, j.client)
+		handler, err = NewPlanHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, j.logger, jobLogger, j.client)
+		if err != nil {
+			return nil, err
+		}
 	case types.JobApplyType:
-		handler = NewApplyHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, j.logger, jobLogger, j.client)
+		handler, err = NewApplyHandler(cancellableCtx, j.cfg, workspaceDir, ws, run, j.logger, jobLogger, j.client)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		j.logger.Infof("Invalid job type %s", job.Type)
 	}

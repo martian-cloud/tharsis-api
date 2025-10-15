@@ -35,8 +35,11 @@ func NewApplyHandler(
 	logger logger.Logger,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
-) *ApplyHandler {
-	terraformWorkspace := newTerraformWorkspace(cancellableCtx, jobCfg, workspaceDir, workspace, run, jobLogger, client)
+) (*ApplyHandler, error) {
+	terraformWorkspace, err := newTerraformWorkspace(cancellableCtx, jobCfg, workspaceDir, workspace, run, jobLogger, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize terraform workspace: %w", err)
+	}
 
 	return &ApplyHandler{
 		workspaceDir:       workspaceDir,
@@ -46,7 +49,7 @@ func NewApplyHandler(
 		jobLogger:          jobLogger,
 		client:             client,
 		cancellableCtx:     cancellableCtx,
-	}
+	}, nil
 }
 
 // Cleanup is called after the job has been executed
@@ -118,6 +121,15 @@ func (a *ApplyHandler) Execute(ctx context.Context) error {
 	}
 	for _, target := range a.run.TargetAddresses {
 		applyOptions = append(applyOptions, tfexec.Target(target))
+	}
+
+	// Var file can only be passed during apply stage if this terraform cli supports ephemeral inputs
+	if a.terraformWorkspace.capabilities.ephemeralInputs {
+		tfVarsFilePath, _, err := a.terraformWorkspace.createVarsFile()
+		if err != nil {
+			return fmt.Errorf("failed to process variables: %v", err)
+		}
+		applyOptions = append(applyOptions, tfexec.VarFile(tfVarsFilePath))
 	}
 
 	// Run Apply Cmd
