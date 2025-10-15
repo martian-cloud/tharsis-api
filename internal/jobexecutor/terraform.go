@@ -3,12 +3,15 @@ package jobexecutor
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
@@ -18,7 +21,11 @@ import (
 	"github.com/hashicorp/hc-install/fs"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/src"
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/martian-cloud/terraform-exec/tfexec"
+	"github.com/zclconf/go-cty/cty"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor/jobclient"
@@ -39,7 +46,28 @@ terraform {
 
 	// Env variable name prefix used by Terraform for tokens. Format is TF_TOKEN_<host>
 	tfTokenVarPrefix = "TF_TOKEN_"
+
+	// Terraform variable suffix for write-only version variables that are automatically injected
+	writeOnlyVariableSuffix = "_wo_version"
+
+	// Ephemeral input minimum version
+	ephemeralInputCapabilityMinimumTerraformVersion = "1.11"
 )
+
+type capabilities struct {
+	ephemeralInputs bool
+}
+
+func newCapabilities(terraformVersion *version.Version) (*capabilities, error) {
+	minimumEphemeralInputsVersion, err := version.NewVersion(ephemeralInputCapabilityMinimumTerraformVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return &capabilities{
+		ephemeralInputs: terraformVersion.GreaterThanOrEqual(minimumEphemeralInputsVersion),
+	}, nil
+}
 
 type terraformWorkspace struct {
 	cliDownloader     cliDownloader
@@ -55,6 +83,8 @@ type terraformWorkspace struct {
 	variables         []types.RunVariable
 	pathsToRemove     []string
 	credentialHelper  *credentialHelper
+	capabilities      *capabilities
+	terraformVersion  *version.Version
 }
 
 func newTerraformWorkspace(
@@ -65,13 +95,23 @@ func newTerraformWorkspace(
 	run *types.Run,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
-) *terraformWorkspace {
+) (*terraformWorkspace, error) {
 	managedIdentities := newManagedIdentities(
 		workspace.Metadata.ID,
 		jobLogger,
 		client,
 		jobCfg,
 	)
+
+	terraformVersion, err := version.NewVersion(run.TerraformVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	capabilities, err := newCapabilities(terraformVersion)
+	if err != nil {
+		return nil, err
+	}
 
 	return &terraformWorkspace{
 		cancellableCtx:    cancellableCtx,
@@ -88,7 +128,9 @@ func newTerraformWorkspace(
 			client,
 		),
 		credentialHelper: newCredentialHelper(),
-	}
+		capabilities:     capabilities,
+		terraformVersion: terraformVersion,
+	}, nil
 }
 
 func (t *terraformWorkspace) close(ctx context.Context) error {
@@ -221,15 +263,9 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 		t.fullEnv["PATH"] = val
 	}
 
-	// Convert Terraform version to hcInstall equivalent.
-	version, err := version.NewVersion(t.run.TerraformVersion)
-	if err != nil {
-		return nil, err
-	}
-
 	execPath, err := hcInstall.NewInstaller().Ensure(ctx, []src.Source{&fs.ExactVersion{
 		Product: product.Terraform,
-		Version: version,
+		Version: t.terraformVersion,
 	}})
 	if err != nil {
 		// Ensure command returns a custom error,
@@ -510,6 +546,127 @@ func (t *terraformWorkspace) setDiscoveryProtocolHostTfTokenEnvVars(hostCredenti
 
 func (t *terraformWorkspace) deletePathWhenJobCompletes(path string) {
 	t.pathsToRemove = append(t.pathsToRemove, path)
+}
+
+func (t *terraformWorkspace) createVarsFile() (string, []string, error) {
+	// Get all variables in the module
+	hclVariables := []types.RunVariable{}
+	stringVariables := []types.RunVariable{}
+	variablesIncludedInTFConfig := []string{}
+
+	// Parse terraform config
+	terraformModule, diagnostics := tfconfig.LoadModule(t.workspaceDir)
+	if diagnostics.HasErrors() {
+		return "", nil, fmt.Errorf("failed to load terraform module %v", diagnostics)
+	}
+
+	// Create map of variables for faster lookup
+	inputVarMap := map[string]*types.RunVariable{}
+	for _, v := range t.variables {
+		inputVarMap[v.Key] = &v
+	}
+
+	for _, v := range t.variables {
+		if v.Category != types.TerraformVariableCategory {
+			continue
+		}
+
+		// Check if there is an hcl definition for this variable
+		variable, ok := terraformModule.Variables[v.Key]
+		if !ok {
+			// Make it easier for the user to identity where the variable is coming from.
+			if v.NamespacePath != nil && *v.NamespacePath == t.workspace.FullPath {
+				t.jobLogger.Warningf("WARNING: Workspace variable %q has a value but is not defined in the terraform module.", v.Key)
+			}
+
+			if v.NamespacePath == nil {
+				t.jobLogger.Warningf("WARNING: Run variable %q has a value but is not defined in the terraform module.", v.Key)
+			}
+
+			continue
+		}
+
+		// Verify that the variable definition is marked as sensitive
+		if v.Sensitive && !variable.Sensitive {
+			return "", nil, fmt.Errorf(
+				"variable %q is marked as sensitive but the hcl definition in the terraform file %q is not sensitive, sensitive variables can only be passed to variable definitions with sensitive set to true",
+				v.Key,
+				filepath.Base(variable.Pos.Filename),
+			)
+		}
+
+		variablesIncludedInTFConfig = append(variablesIncludedInTFConfig, v.Key)
+
+		if isHCLVariable(v.Value, variable) {
+			hclVariables = append(hclVariables, v)
+		} else {
+			stringVariables = append(stringVariables, v)
+		}
+
+		// Check if wo_version attribute needs to be injected
+		variableVersionKey := fmt.Sprintf("%s%s", v.Key, writeOnlyVariableSuffix)
+		_, includedInInputVars := inputVarMap[variableVersionKey]
+		_, includedInConfig := terraformModule.Variables[variableVersionKey]
+
+		// Only inject the write-only variable value if it's defined in the tf config and not explicitly passed
+		// as an input variable
+		if !includedInInputVars && includedInConfig {
+			if v.VersionID != nil {
+				// Since this is a versioned input variable, we need to inject a variable for the hashed version if it's defined
+				// in the config but not included in the input variables
+				hasher := fnv.New64a()
+				hasher.Write([]byte(*v.VersionID))
+
+				// Write-only attribute needs to be an integer so we will use the numerical hashed value
+				hashedStr := strconv.FormatUint(hasher.Sum64()%math.MaxInt32, 10)
+
+				hclVariables = append(hclVariables, types.RunVariable{
+					Key:      variableVersionKey,
+					Value:    &hashedStr,
+					Category: types.TerraformVariableCategory,
+				})
+			} else {
+				t.jobLogger.Warningf(
+					"WARNING: Variable %s%s will not be injected because write-only version variables are only injected for group/workspace variables and not run scoped variables",
+					v.Key,
+					writeOnlyVariableSuffix,
+				)
+			}
+		}
+	}
+
+	// First write HCL variables
+	fileContents := ""
+	for _, v := range hclVariables {
+		fileContents += fmt.Sprintf("%s = %s\n", v.Key, *v.Value)
+	}
+
+	// Parse buffer contents
+	f, diag := hclwrite.ParseConfig([]byte(fileContents), "", hcl.InitialPos)
+	if diag != nil {
+		return "", nil, diag
+	}
+	rootBody := f.Body()
+
+	// Use hclwriter for string values to provide HCL character escaping
+	for _, v := range stringVariables {
+		rootBody.SetAttributeValue(v.Key, cty.StringVal(*v.Value))
+	}
+
+	filePath := fmt.Sprintf("%s/run-%s.tfvars", t.workspaceDir, t.run.Metadata.ID)
+	tfVarsFile, err := os.Create(filePath)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to create temporary file for tfvars %v", err)
+	}
+
+	defer tfVarsFile.Close()
+
+	// Save file
+	if _, err := f.WriteTo(tfVarsFile); err != nil {
+		return "", nil, err
+	}
+
+	return filePath, variablesIncludedInTFConfig, nil
 }
 
 func parseTfExecError(err error) *string {

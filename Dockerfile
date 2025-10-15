@@ -1,13 +1,12 @@
 FROM golang:1.24-alpine@sha256:fc2cff6625f3c1c92e6c85938ac5bd09034ad0d4bc2dfb08278020b68540dbb5 AS builder
 
-# Install dependencies with specific versions and clean up
 RUN apk update --no-cache && \
     apk add --no-cache \
-    build-base=0.5-r3 \
-    git=2.49.1-r0 \
-    curl=8.14.1-r2 \
-    nodejs=22.16.0-r2 \
-    npm=11.3.0-r1 && \
+    build-base \
+    git \
+    curl \
+    nodejs \
+    npm && \
     rm -rf /var/cache/apk/*
 
 WORKDIR /app
@@ -42,11 +41,11 @@ CMD ["./apiserver"]
 FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac6da80685 AS runner
 RUN apk update --no-cache && \
     apk add --no-cache \
-    git=2.47.3-r0 \
-    curl=8.14.1-r2 \
-    python3=3.12.11-r0 \
-    py3-pip=24.3.1-r0 \
-    jq=1.7.1-r0 && \
+    git \
+    curl \
+    python3 \
+    py3-pip \
+    jq && \
     adduser tharsis -D -u 1001 -g 1001 && \
     mkdir -p /app /opt/credhelpers && \
     chown -R tharsis:tharsis /app /opt/credhelpers && \
@@ -67,11 +66,11 @@ CMD ["./runner"]
 FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac6da80685 AS job-executor
 RUN apk update --no-cache && \
     apk add --no-cache \
-    git=2.47.3-r0 \
-    curl=8.14.1-r2 \
-    python3=3.12.11-r0 \
-    py3-pip=24.3.1-r0 \
-    jq=1.7.1-r0 && \
+    git \
+    curl \
+    python3 \
+    py3-pip \
+    jq && \
     adduser tharsis -D -u 1001 -g 1001 && \
     mkdir -p /app /etc && \
     chown -R tharsis:tharsis /app && \
