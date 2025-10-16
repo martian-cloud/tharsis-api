@@ -34,6 +34,7 @@ import FederatedRegistries from './federatedregistry/FederatedRegistries';
 import GPGKeys from './keys/GPGKeys';
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import GroupNotificationPreference from '../notifications/GroupNotificationPreference';
+import TerraformModules from './terraformmodule/TerraformModules';
 
 const TABS = ['workspaces', 'subgroups'];
 
@@ -92,6 +93,7 @@ function GroupDetails(props: Props) {
             ...ManagedIdentitiesFragment_group
             ...GroupRunnersFragment_group
             ...ServiceAccountsFragment_group
+            ...TerraformModulesFragment_group
             ...VCSProvidersFragment_group
             ...FederatedRegistriesFragment_group
             ...VariablesFragment_variables
@@ -127,6 +129,7 @@ function GroupDetails(props: Props) {
                             <Route path={`${groupPath}/-/managed_identities/*`} element={<ManagedIdentities fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/runners/*`} element={<GroupRunners fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/service_accounts/*`} element={<ServiceAccounts fragmentRef={data} />} />
+                            <Route path={`${groupPath}/-/terraform_modules/*`} element={<TerraformModules fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/vcs_providers/*`} element={<VCSProviders fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/federated_registries/*`} element={<FederatedRegistries fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/variables/*`} element={<Variables fragmentRef={data} />} />

@@ -1197,6 +1197,7 @@ type Group implements Namespace & Node {
   runnerTags: NamespaceRunnerTags!
   runners(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: RunnerSort): RunnerConnection!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ServiceAccountSort): ServiceAccountConnection!
+  terraformModules(after: String, before: String, first: Int, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
   terraformProviderMirrors(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
   terraformProviders(after: String, before: String, first: Int, last: Int, search: String): TerraformProviderConnection!
   variables: [NamespaceVariable!]!
