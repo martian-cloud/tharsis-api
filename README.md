@@ -111,6 +111,8 @@ The Tharsis API provides a comprehensive set of GraphQL operations:
 
 ## Get started
 
+Check out this quick intro and demo to Tharsis on YouTube [here](https://www.youtube.com/watch?v=zhkfyRugk_I)
+
 For comprehensive documentation, visit the [Tharsis Documentation Site](https://tharsis.martian-cloud.io/).
 
 Instructions on building a binary from source can be found [here](https://tharsis.martian-cloud.io/setup).
