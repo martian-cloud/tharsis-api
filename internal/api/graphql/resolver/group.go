@@ -13,6 +13,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/gpgkey"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/group"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
@@ -279,6 +280,31 @@ func (r *GroupResolver) TerraformProviders(ctx context.Context, args *TerraformP
 	}
 
 	return NewTerraformProviderConnectionResolver(ctx, input)
+}
+
+// TerraformModules resolver
+func (r *GroupResolver) TerraformModules(ctx context.Context, args *TerraformModuleConnectionQueryArgs) (*TerraformModuleConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := &moduleregistry.GetModulesInput{
+		PaginationOptions: &pagination.Options{
+			First:  args.First,
+			Last:   args.Last,
+			Before: args.Before,
+			After:  args.After,
+		},
+		Group:  r.group,
+		Search: args.Search,
+	}
+
+	if args.Sort != nil {
+		sort := db.TerraformModuleSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewTerraformModuleConnectionResolver(ctx, input)
 }
 
 // ServiceAccounts resolver

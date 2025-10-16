@@ -97,6 +97,14 @@ type Group implements Node, Namespace {
     last: Int
     search: String
   ): TerraformProviderConnection!
+  terraformModules(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    search: String
+    sort: TerraformModuleSort
+  ): TerraformModuleConnection!
   runners(
     after: String
     before: String
