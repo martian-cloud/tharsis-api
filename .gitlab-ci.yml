@@ -13,6 +13,7 @@ include:
       assert_licenses: true
       main: cmd/apiserver
       std: true
+      go_flags: "-tags=noui"
       go_arch_os:
         - GO_ARCH: "386"
           GO_OS: [freebsd, linux, openbsd, windows]
@@ -147,6 +148,7 @@ default:
       - api_failure
       - stuck_or_timeout_failure
       - runner_system_failure
+      - job_execution_timeout
   interruptible: true
 
 .cache-template: &cache-template
@@ -611,7 +613,7 @@ api_security:
   before_script:
     - |
       sudo apk add curl jq
-      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
+      timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || (echo "Health check failed, showing service logs:" && docker logs tharsis && false)
       THARSIS_STATIC_TOKEN=$(curl -s -X POST 'http://tharsis:8000/oauth/login' \
         -H 'Content-Type: application/x-www-form-urlencoded' \
         --data-urlencode 'username=martian' \
@@ -703,9 +705,7 @@ dast:
     DAST_AUTH_URL: "http://tharsis:8000/login"
     DAST_AUTH_USERNAME: martian
     DAST_AUTH_PASSWORD: martian
-    DAST_AUTH_USERNAME_FIELD: "css:[name=username]"
-    DAST_AUTH_PASSWORD_FIELD: "css:[name=password]"
-    DAST_AUTH_SUBMIT_FIELD: "css:button[type=submit]"
+    DAST_AUTH_COOKIE_NAMES: "tharsis_access_token,tharsis_refresh_token"
     DAST_BROWSER_SCAN: "true"
     DAST_FULL_SCAN_ENABLED: "true"
     DAST_EXCLUDE_URLS: "http://tharsis:8000/static/.*"
@@ -719,3 +719,9 @@ dast:
       timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://tharsis:8000/health)" != "200" ]]; do sleep 5; done' || false
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Override npm SBOM job to add cache configuration
+npm-sbom (frontend/package.json):
+  cache:
+    <<: *ui-cache-template
+    policy: pull
