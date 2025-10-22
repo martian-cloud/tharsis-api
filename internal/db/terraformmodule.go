@@ -31,10 +31,12 @@ type TerraformModuleSortableField string
 
 // TerraformModuleSortableField constants
 const (
-	TerraformModuleSortableFieldNameAsc       TerraformModuleSortableField = "NAME_ASC"
-	TerraformModuleSortableFieldNameDesc      TerraformModuleSortableField = "NAME_DESC"
-	TerraformModuleSortableFieldUpdatedAtAsc  TerraformModuleSortableField = "UPDATED_AT_ASC"
-	TerraformModuleSortableFieldUpdatedAtDesc TerraformModuleSortableField = "UPDATED_AT_DESC"
+	TerraformModuleSortableFieldNameAsc             TerraformModuleSortableField = "NAME_ASC"
+	TerraformModuleSortableFieldNameDesc            TerraformModuleSortableField = "NAME_DESC"
+	TerraformModuleSortableFieldUpdatedAtAsc        TerraformModuleSortableField = "UPDATED_AT_ASC"
+	TerraformModuleSortableFieldUpdatedAtDesc       TerraformModuleSortableField = "UPDATED_AT_DESC"
+	TerraformModuleSortableFieldFieldGroupLevelAsc  TerraformModuleSortableField = "GROUP_LEVEL_ASC"
+	TerraformModuleSortableFieldFieldGroupLevelDesc TerraformModuleSortableField = "GROUP_LEVEL_DESC"
 )
 
 func (ts TerraformModuleSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
@@ -43,6 +45,8 @@ func (ts TerraformModuleSortableField) getFieldDescriptor() *pagination.FieldDes
 		return &pagination.FieldDescriptor{Key: "name", Table: "terraform_modules", Col: "name"}
 	case TerraformModuleSortableFieldUpdatedAtAsc, TerraformModuleSortableFieldUpdatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "updated_at", Table: "terraform_modules", Col: "updated_at"}
+	case TerraformModuleSortableFieldFieldGroupLevelAsc, TerraformModuleSortableFieldFieldGroupLevelDesc:
+		return &pagination.FieldDescriptor{Key: "group_path", Table: "namespaces", Col: "path"}
 	default:
 		return nil
 	}
@@ -55,6 +59,17 @@ func (ts TerraformModuleSortableField) getSortDirection() pagination.SortDirecti
 	return pagination.AscSort
 }
 
+func (ts TerraformModuleSortableField) getTransformFunc() pagination.SortTransformFunc {
+	switch ts {
+	case TerraformModuleSortableFieldFieldGroupLevelAsc, TerraformModuleSortableFieldFieldGroupLevelDesc:
+		return func(s string) string {
+			return fmt.Sprintf("array_length(string_to_array(%s, '/'), 1)", s)
+		}
+	default:
+		return nil
+	}
+}
+
 // TerraformModuleFilter contains the supported fields for filtering TerraformModule resources
 type TerraformModuleFilter struct {
 	Search             *string
@@ -65,6 +80,7 @@ type TerraformModuleFilter struct {
 	UserID             *string
 	ServiceAccountID   *string
 	TerraformModuleIDs []string
+	NamespacePaths    []string
 }
 
 // GetModulesInput is the input for listing terraform modules
@@ -129,8 +145,11 @@ func (t *terraformModules) GetModuleByTRN(ctx context.Context, trn string) (*mod
 
 func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInput) (*ModulesResult, error) {
 	ctx, span := tracer.Start(ctx, "db.GetModules")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
+
+	query := dialect.From(goqu.T("terraform_modules")).
+		Select(t.getSelectFields()...).
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")}))
 
 	ex := goqu.And()
 
@@ -139,38 +158,14 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 			ex = ex.Append(goqu.I("terraform_modules.id").In(input.Filter.TerraformModuleIDs))
 		}
 		if input.Filter.Search != nil && *input.Filter.Search != "" {
-			search := *input.Filter.Search
+			// Add join on root group ID so that we can include it in the search
+			query = query.InnerJoin(goqu.T("namespaces").As("root_namespace"), goqu.On(goqu.Ex{"terraform_modules.root_group_id": goqu.I("root_namespace.group_id")}))
 
-			lastDelimiterIndex := strings.LastIndex(search, "/")
-
-			if lastDelimiterIndex != -1 {
-				// TODO: do we need to include system in the search?
-				registryNamespace := search[:lastDelimiterIndex]
-				moduleName := search[lastDelimiterIndex+1:]
-
-				if moduleName != "" {
-					// An AND condition is used here since the first part of the search is the registry namespace path
-					// and the second part is the module name
-					ex = ex.Append(
-						goqu.And(
-							goqu.I("namespaces.path").ILike(registryNamespace+"%"),
-							goqu.I("terraform_modules.name").ILike(moduleName+"%"),
-						),
-					)
-				} else {
-					// We know the search is a namespace path since it ends with a "/"
-					ex = ex.Append(goqu.I("namespaces.path").ILike(registryNamespace + "%"))
-				}
-			} else {
-				// We don't know if the search is for a namespace path or module name; therefore, use
-				// an OR condition to search both
-				ex = ex.Append(
-					goqu.Or(
-						goqu.I("namespaces.path").ILike(search+"%"),
-						goqu.I("terraform_modules.name").ILike(search+"%"),
-					),
-				)
-			}
+			searchExp := goqu.L("CONCAT(root_namespace.path, '/', terraform_modules.name, '/', terraform_modules.system)")
+			ex = ex.Append(searchExp.ILike("%" + *input.Filter.Search + "%"))
+		}
+		if input.Filter.NamespacePaths != nil {
+			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.NamespacePaths))
 		}
 		if input.Filter.GroupID != nil {
 			ex = ex.Append(goqu.I("terraform_modules.group_id").Eq(*input.Filter.GroupID))
@@ -204,23 +199,23 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 		}
 	}
 
-	query := dialect.From(goqu.T("terraform_modules")).
-		Select(t.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
-		Where(ex)
+	query = query.Where(ex)
 
 	sortDirection := pagination.AscSort
 
 	var sortBy *pagination.FieldDescriptor
+	var sortTransformFunc pagination.SortTransformFunc
 	if input.Sort != nil {
 		sortDirection = input.Sort.getSortDirection()
 		sortBy = input.Sort.getFieldDescriptor()
+		sortTransformFunc = input.Sort.getTransformFunc()
 	}
 
 	qBuilder, err := pagination.NewPaginatedQueryBuilder(
 		input.PaginationOptions,
 		&pagination.FieldDescriptor{Key: "id", Table: "terraform_modules", Col: "id"},
 		pagination.WithSortByField(sortBy, sortDirection),
+		pagination.WithSortByTransform(sortTransformFunc),
 	)
 
 	if err != nil {

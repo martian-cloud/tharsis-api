@@ -23,7 +23,8 @@ import (
 // TerraformModuleConnectionQueryArgs are used to query a module connection
 type TerraformModuleConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	Search *string
+	Search           *string
+	IncludeInherited *bool
 }
 
 // TerraformModuleQueryArgs are used to query a terraform module

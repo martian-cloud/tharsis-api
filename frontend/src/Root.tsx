@@ -9,6 +9,7 @@ import { PreloadedQuery, usePreloadedQuery, useQueryLoader } from 'react-relay/h
 import { RootQuery } from './__generated__/RootQuery.graphql';
 import { User, UserContext } from './UserContext';
 import { AppHeaderHeightProvider, useAppHeaderHeight } from './contexts/AppHeaderHeightProvider';
+import { ApiConfig, ApiConfigContext } from './ApiConfigContext';
 
 const query = graphql`
     query RootQuery {
@@ -19,6 +20,10 @@ const query = graphql`
                 email
                 admin
             }
+        }
+        config {
+            tharsisSupportUrl
+            serviceDiscoveryHost
         }
         ...AppHeaderFragment
     }
@@ -43,11 +48,13 @@ function Root({ queryRef }: Props) {
 
     return (
         <React.Fragment>
-            <UserContext.Provider value={queryData.me as User}>
-                <AppHeaderHeightProvider>
-                    <RootContent fragmentRef={queryData} />
-                </AppHeaderHeightProvider>
-            </UserContext.Provider>
+            <ApiConfigContext.Provider value={queryData.config as ApiConfig}>
+                <UserContext.Provider value={queryData.me as User}>
+                    <AppHeaderHeightProvider>
+                        <RootContent fragmentRef={queryData} />
+                    </AppHeaderHeightProvider>
+                </UserContext.Provider>
+            </ApiConfigContext.Provider>
         </React.Fragment>
     );
 }

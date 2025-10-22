@@ -3,6 +3,8 @@ enum TerraformModuleSort {
   NAME_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
+  GROUP_LEVEL_ASC
+  GROUP_LEVEL_DESC
 }
 
 type TerraformModuleConnection {

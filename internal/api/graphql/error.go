@@ -2,9 +2,14 @@
 package graphql
 
 import (
+	grapherrors "github.com/graph-gophers/graphql-go/errors"
 	graphqlgo "github.com/graph-gophers/graphql-go/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+// This is the graphql error rule name for when a query requests fields that don't exist
+// on the graphql type
+const graphqlFieldsOnCorrectTypeError = "FieldsOnCorrectType"
 
 var tharsisErrorToStatusCode = map[errors.CodeType]string{
 	errors.EInternal:           "INTERNAL_SERVER_ERROR",
@@ -20,8 +25,16 @@ var tharsisErrorToStatusCode = map[errors.CodeType]string{
 	errors.EServiceUnavailable: "SERVICE_UNAVAILABLE",
 }
 
-func getErrExtensions(err error) map[string]interface{} {
-	code := errors.ErrorCode(err)
+func getErrExtensions(queryError *grapherrors.QueryError) map[string]interface{} {
+	code := errors.EInternal
+	if queryError.Err != nil {
+		code = errors.ErrorCode(queryError.Err)
+	} else if queryError.Rule == graphqlFieldsOnCorrectTypeError {
+		// Return the not implemented code here because the client is requesting a graphql field
+		// which doesn't exist. This can occur during rolling updates when a newer UI version attempts to
+		// query a field that doesn't exist on the older API version.
+		code = errors.ENotImplemented
+	}
 	return map[string]interface{}{
 		"code": tharsisErrorToStatusCode[code],
 	}

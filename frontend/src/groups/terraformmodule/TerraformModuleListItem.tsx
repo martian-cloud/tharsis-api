@@ -10,6 +10,7 @@ import { TerraformModuleListItemFragment_terraformModule$key } from './__generat
 
 interface Props {
     fragmentRef: TerraformModuleListItemFragment_terraformModule$key
+    inherited: boolean
 }
 
 function TerraformModuleListItem(props: Props) {
@@ -24,6 +25,7 @@ function TerraformModuleListItem(props: Props) {
             system
             registryNamespace
             private
+            groupPath
             latestVersion {
                 version
             }
@@ -57,7 +59,7 @@ function TerraformModuleListItem(props: Props) {
                         color="textPrimary"
                         sx={{ fontWeight: "500" }}
                     >
-                        {data.registryNamespace}/{data.name}/{data.system}
+                        {data.name}/{data.system}
                     </Link>
                     <Box>
                         {data.latestVersion && <Box display="flex" alignItems="center">
@@ -69,6 +71,7 @@ function TerraformModuleListItem(props: Props) {
                             0 versions
                         </Typography>}
                     </Box>
+                    {props.inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
                 </Box>
                 {data.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
             </Box>

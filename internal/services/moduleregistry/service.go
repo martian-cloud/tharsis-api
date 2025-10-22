@@ -67,6 +67,8 @@ type GetModulesInput struct {
 	Group *models.Group
 	// Search filters module list by modules with a name that contains the search query
 	Search *string
+	// IncludeInherited will include inherited modules in the results when true
+	IncludeInherited bool
 }
 
 // GetModuleVersionsInput is the input for getting a list of module versions
@@ -286,7 +288,6 @@ func (s *service) GetModuleByAddress(ctx context.Context, namespace string, name
 
 func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.ModulesResult, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetModules")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -309,7 +310,12 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 			tracing.RecordError(span, err, "permission check failed")
 			return nil, err
 		}
-		dbInput.Filter.GroupID = &input.Group.Metadata.ID
+
+		if input.IncludeInherited {
+			dbInput.Filter.NamespacePaths = input.Group.ExpandPath()
+		} else {
+			dbInput.Filter.GroupID = &input.Group.Metadata.ID
+		}
 	} else {
 		policy, napErr := caller.GetNamespaceAccessPolicy(ctx)
 		if napErr != nil {
