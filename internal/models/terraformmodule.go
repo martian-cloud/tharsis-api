@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -43,6 +44,8 @@ func (t *TerraformModule) ResolveMetadata(key string) (*string, error) {
 		switch key {
 		case "name":
 			return &t.Name, nil
+		case "group_path":
+			return ptr.String(t.GetGroupPath()), nil
 		default:
 			return nil, err
 		}

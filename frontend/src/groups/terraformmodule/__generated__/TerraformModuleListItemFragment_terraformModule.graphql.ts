@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b431fcea555ef0a3b759e55bf5ef17c9>>
+ * @generated SignedSource<<303b26a42bd050040877015551b7eb0e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,6 +11,7 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type TerraformModuleListItemFragment_terraformModule$data = {
+  readonly groupPath: string;
   readonly id: string;
   readonly latestVersion: {
     readonly version: string;
@@ -70,6 +71,13 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
+      "kind": "ScalarField",
+      "name": "groupPath",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "TerraformModuleVersion",
       "kind": "LinkedField",
       "name": "latestVersion",
@@ -90,6 +98,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "b8be7092ae9629a147e6fcff9c0799ca";
+(node as any).hash = "362565c0c50545debc530b58b19ca68f";
 
 export default node;

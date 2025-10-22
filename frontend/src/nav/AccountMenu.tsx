@@ -15,6 +15,8 @@ import Gravatar from '../common/Gravatar';
 import config from '../common/config';
 import { AccountMenuFragment$key } from './__generated__/AccountMenuFragment.graphql';
 import AboutDialog from './AboutDialog';
+import { ApiConfigContext } from '../ApiConfigContext';
+import { UserContext } from '../UserContext';
 
 interface Props {
     fragmentRef: AccountMenuFragment$key
@@ -25,26 +27,18 @@ function AccountMenu({ fragmentRef }: Props) {
     const authService = useContext<AuthenticationService>(AuthServiceContext);
     const [showAboutDialog, setShowAboutDialog] = useState(false);
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+    const apiConfig = useContext(ApiConfigContext);
+    const user = useContext(UserContext);
 
     const data = useFragment<AccountMenuFragment$key>(
         graphql`
         fragment AccountMenuFragment on Query
         {
-            me {
-                ... on User {
-                    email
-                    username
-                    admin
-                }
-            }
             version {
                 version
                 dbMigrationVersion
                 dbMigrationDirty
                 buildTimestamp
-            }
-            config {
-                tharsisSupportUrl
             }
         }
         `, fragmentRef);
@@ -77,11 +71,9 @@ function AccountMenu({ fragmentRef }: Props) {
         navigate('preferences');
     }
 
-    const isAdmin = data.me?.admin;
-
     return (
         <div>
-            <IconButton onClick={onMenuOpen}><Gravatar width={32} height={32} email={data.me?.email as string} /></IconButton>
+            <IconButton onClick={onMenuOpen}><Gravatar width={32} height={32} email={user.email} /></IconButton>
             <Popover
                 id="account-menu"
                 open={Boolean(menuAnchorEl)}
@@ -98,14 +90,14 @@ function AccountMenu({ fragmentRef }: Props) {
             >
                 <div>
                     <Box padding={2}>
-                        <Typography>{data.me?.username}</Typography>
+                        <Typography>{user.username}</Typography>
                     </Box>
                     <Divider />
                     <List dense>
                         <ListItemButton onClick={onShowPreferences}>
                             <ListItemText primary="Preferences" />
                         </ListItemButton>
-                        {isAdmin && <ListItemButton>
+                        {user.admin && <ListItemButton>
                             <ListItemText onClick={onShowAdminArea}>
                                 Admin Area
                             </ListItemText>
@@ -130,20 +122,21 @@ function AccountMenu({ fragmentRef }: Props) {
                                 <ListItemText primary="Documentation" />
                             </ListItemButton>
                         </ListItem>
-                        {data.config.tharsisSupportUrl !== '' && <ListItem secondaryAction={
-                            <IconButton LinkComponent={Link}
-                                edge='end'
-                                href={data.config.tharsisSupportUrl}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                disableRipple
-                            >
-                                <Launch fontSize='small' />
-                            </IconButton>
-                        }
+                        {apiConfig.tharsisSupportUrl !== '' && <ListItem
+                            secondaryAction={
+                                <IconButton LinkComponent={Link}
+                                    edge='end'
+                                    href={apiConfig.tharsisSupportUrl}
+                                    target='_blank'
+                                    rel='noopener noreferrer'
+                                    disableRipple
+                                >
+                                    <Launch fontSize='small' />
+                                </IconButton>
+                            }
                             disablePadding
                         >
-                            <ListItemButton LinkComponent={Link} href={data.config.tharsisSupportUrl} target='_blank' rel='noopener noreferrer' dense>
+                            <ListItemButton LinkComponent={Link} href={apiConfig.tharsisSupportUrl} target='_blank' rel='noopener noreferrer' dense>
                                 <ListItemText primary="Support" />
                             </ListItemButton>
                         </ListItem>}

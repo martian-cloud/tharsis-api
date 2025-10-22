@@ -299,6 +299,10 @@ func (r *GroupResolver) TerraformModules(ctx context.Context, args *TerraformMod
 		Search: args.Search,
 	}
 
+	if args.IncludeInherited != nil && *args.IncludeInherited {
+		input.IncludeInherited = true
+	}
+
 	if args.Sort != nil {
 		sort := db.TerraformModuleSortableField(*args.Sort)
 		input.Sort = &sort

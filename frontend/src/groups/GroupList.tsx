@@ -114,7 +114,7 @@ function GroupList(props: Props) {
         }
     };
 
-    const edgeCount = (data.groups.edges?.length ?? 0) - 1
+    const edgeCount = (data.groups?.edges?.length ?? 0) - 1
 
     return (
         <Box>
@@ -125,7 +125,7 @@ function GroupList(props: Props) {
                 onChange={onSearchChange}
                 onKeyPress={onKeyPress}
             />
-            {(data.groups.edges?.length === 0) && search !== '' && <Typography
+            {(data.groups?.edges?.length === 0) && search !== '' && <Typography
                 sx={{ p: 4 }}
                 align="center"
                 color="textSecondary"

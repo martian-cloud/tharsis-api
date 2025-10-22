@@ -215,7 +215,7 @@ function ServiceAccountList({ fragmentRef }: Props) {
                     <Button component={RouterLink} variant="outlined" to="new">New Service Account</Button>
                 </Box>
             </Box>}
-        </Box >
+        </Box>
     );
 }
 

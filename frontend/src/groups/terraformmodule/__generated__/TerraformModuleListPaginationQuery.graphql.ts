@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0ee314c841600522fb5d1f6cc68d9a62>>
+ * @generated SignedSource<<3e90aeec3788463161d4a0c80df4db17>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -97,6 +97,11 @@ v9 = [
     "variableName": "first"
   },
   {
+    "kind": "Literal",
+    "name": "includeInherited",
+    "value": true
+  },
+  {
     "kind": "Variable",
     "name": "last",
     "variableName": "last"
@@ -109,7 +114,7 @@ v9 = [
   {
     "kind": "Literal",
     "name": "sort",
-    "value": "NAME_ASC"
+    "value": "GROUP_LEVEL_DESC"
   }
 ];
 return {
@@ -204,6 +209,13 @@ return {
                         "plural": false,
                         "selections": [
                           (v8/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "groupPath",
+                            "storageKey": null
+                          },
                           {
                             "alias": null,
                             "args": null,
@@ -312,7 +324,8 @@ return {
                 "args": (v9/*: any*/),
                 "filters": [
                   "search",
-                  "sort"
+                  "sort",
+                  "includeInherited"
                 ],
                 "handle": "connection",
                 "key": "TerraformModuleList_terraformModules",
@@ -329,16 +342,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "ae1dec12f590237dcaf401cd06723c98",
+    "cacheID": "53359b794783abaac2441c99cd42ef7e",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleListPaginationQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $search: String\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...TerraformModuleListFragment_terraformModules\n    id\n  }\n}\n\nfragment TerraformModuleListFragment_terraformModules on Group {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformModuleListItemFragment_terraformModule\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment TerraformModuleListItemFragment_terraformModule on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  latestVersion {\n    version\n    id\n  }\n}\n"
+    "text": "query TerraformModuleListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $search: String\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...TerraformModuleListFragment_terraformModules\n    id\n  }\n}\n\nfragment TerraformModuleListFragment_terraformModules on Group {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: GROUP_LEVEL_DESC, includeInherited: true) {\n    totalCount\n    edges {\n      node {\n        id\n        groupPath\n        ...TerraformModuleListItemFragment_terraformModule\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment TerraformModuleListItemFragment_terraformModule on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  groupPath\n  latestVersion {\n    version\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "eb4bc03ae4b52fcf061ccb92fb3fc10d";
+(node as any).hash = "4ebdc62314c97ec89ab6e8e65e72e966";
 
 export default node;

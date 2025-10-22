@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7dce59d349176ec60a82768313d5d08b>>
+ * @generated SignedSource<<4fbfaff9eb48dd002ef7ad926fe3c4a9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,6 +12,10 @@ import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type RootQuery$variables = Record<PropertyKey, never>;
 export type RootQuery$data = {
+  readonly config: {
+    readonly serviceDiscoveryHost: string;
+    readonly tharsisSupportUrl: string;
+  };
   readonly me: {
     readonly admin?: boolean;
     readonly email?: string;
@@ -61,6 +65,31 @@ v1 = {
   ],
   "type": "User",
   "abstractKey": null
+},
+v2 = {
+  "alias": null,
+  "args": null,
+  "concreteType": "Config",
+  "kind": "LinkedField",
+  "name": "config",
+  "plural": false,
+  "selections": [
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "tharsisSupportUrl",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "serviceDiscoveryHost",
+      "storageKey": null
+    }
+  ],
+  "storageKey": null
 };
 return {
   "fragment": {
@@ -81,6 +110,7 @@ return {
         ],
         "storageKey": null
       },
+      (v2/*: any*/),
       {
         "args": null,
         "kind": "FragmentSpread",
@@ -123,6 +153,7 @@ return {
         ],
         "storageKey": null
       },
+      (v2/*: any*/),
       {
         "alias": null,
         "args": null,
@@ -161,38 +192,20 @@ return {
           }
         ],
         "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "concreteType": "Config",
-        "kind": "LinkedField",
-        "name": "config",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "tharsisSupportUrl",
-            "storageKey": null
-          }
-        ],
-        "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "c6823fb1fefa7666b0382162aa2c0ac8",
+    "cacheID": "0040ddaba047d565d51d049782520e82",
     "id": null,
     "metadata": {},
     "name": "RootQuery",
     "operationKind": "query",
-    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  me {\n    __typename\n    ... on User {\n      email\n      username\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n  config {\n    tharsisSupportUrl\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
+    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
   }
 };
 })();
 
-(node as any).hash = "3ee9a95b37ba5ec08b645bd9605f9b5f";
+(node as any).hash = "65471eabac7d3aaad671f1e41148e4d9";
 
 export default node;

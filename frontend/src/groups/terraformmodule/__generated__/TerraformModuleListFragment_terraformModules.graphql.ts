@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<06749c4c0c0e045207bcada0cf300f02>>
+ * @generated SignedSource<<f201be4b286261b0ae790f98b55e6fcc>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,7 @@ export type TerraformModuleListFragment_terraformModules$data = {
   readonly terraformModules: {
     readonly edges: ReadonlyArray<{
       readonly node: {
+        readonly groupPath: string;
         readonly id: string;
         readonly " $fragmentSpreads": FragmentRefs<"TerraformModuleListItemFragment_terraformModule">;
       } | null | undefined;
@@ -102,6 +103,11 @@ return {
       "alias": "terraformModules",
       "args": [
         {
+          "kind": "Literal",
+          "name": "includeInherited",
+          "value": true
+        },
+        {
           "kind": "Variable",
           "name": "search",
           "variableName": "search"
@@ -109,7 +115,7 @@ return {
         {
           "kind": "Literal",
           "name": "sort",
-          "value": "NAME_ASC"
+          "value": "GROUP_LEVEL_DESC"
         }
       ],
       "concreteType": "TerraformModuleConnection",
@@ -141,6 +147,13 @@ return {
               "plural": false,
               "selections": [
                 (v1/*: any*/),
+                {
+                  "alias": null,
+                  "args": null,
+                  "kind": "ScalarField",
+                  "name": "groupPath",
+                  "storageKey": null
+                },
                 {
                   "args": null,
                   "kind": "FragmentSpread",
@@ -215,6 +228,6 @@ return {
 };
 })();
 
-(node as any).hash = "eb4bc03ae4b52fcf061ccb92fb3fc10d";
+(node as any).hash = "4ebdc62314c97ec89ab6e8e65e72e966";
 
 export default node;

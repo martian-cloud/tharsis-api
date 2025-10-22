@@ -1,6 +1,6 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import { LoadingButton } from '@mui/lab';
-import { Chip, Link, List, Stack, Tooltip, Typography } from '@mui/material';
+import { Chip, List, Link as MuiLink, Stack, Tooltip, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import { red } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
@@ -8,9 +8,10 @@ import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import graphql from 'babel-plugin-relay/macro';
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Link as LinkRouter } from 'react-router-dom';
+import { ApiConfigContext } from '../../ApiConfigContext';
 import AuthenticationService from '../../auth/AuthenticationService';
 import AuthServiceContext from '../../auth/AuthServiceContext';
 import cfg from '../../common/config';
@@ -19,9 +20,11 @@ import { MutationError } from '../../common/error';
 import downloadFile from '../../common/filedownload';
 import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
+import Link from '../../routes/Link';
 import { RunDetailsSidebarCancelRunMutation } from './__generated__/RunDetailsSidebarCancelRunMutation.graphql';
 import { RunDetailsSidebarFragment_details$key } from './__generated__/RunDetailsSidebarFragment_details.graphql';
 import RunStageStatusTypes from './RunStageStatusTypes';
+import React from 'react';
 
 interface Props {
     fragmentRef: RunDetailsSidebarFragment_details$key
@@ -32,13 +35,14 @@ interface Props {
     onError: (error: MutationError) => void
 }
 
-export const SidebarWidth = 240;
+export const SidebarWidth = 300;
 
 const RUN_FINALITY_STATES = ['planned_and_finished', 'applied', 'errored', 'canceled']
 
 function RunDetailsSidebar(props: Props) {
     const { stage, open, temporary, onClose, onError } = props;
     const authService = useContext<AuthenticationService>(AuthServiceContext);
+    const apiConfig = useContext(ApiConfigContext);
 
     const data = useFragment<RunDetailsSidebarFragment_details$key>(
         graphql`
@@ -139,6 +143,14 @@ function RunDetailsSidebar(props: Props) {
         }
     }
 
+    // If module source references a module in the tharsis registry than strip the host
+    const moduleSource = useMemo(
+        () => (data.moduleSource && data.moduleSource?.startsWith(apiConfig.serviceDiscoveryHost)) ? data.moduleSource.substring(apiConfig.serviceDiscoveryHost.length + 1) : data.moduleSource,
+        [data.moduleSource, apiConfig.serviceDiscoveryHost]
+    );
+
+    const isTharsisModule = useMemo(() => moduleSource && moduleSource.length != data.moduleSource?.length, [moduleSource, data.moduleSource]);
+
     const PlanStatusIcon = RunStageStatusTypes[data.plan.status].icon;
     const ApplyStatusIcon = data.apply ? RunStageStatusTypes[data.apply.status].icon : null;
 
@@ -181,32 +193,43 @@ function RunDetailsSidebar(props: Props) {
                     <Typography sx={{ marginBottom: 1 }}>Configuration Version</Typography>
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Tooltip title="download">
-                            <Link
+                            <MuiLink
                                 color="textPrimary"
                                 underline="none"
                                 sx={{ wordBreak: 'break-all', cursor: 'pointer' }}
                                 onClick={() => onDownloadConfigVersion(data.configurationVersion?.id as string)}
                             >
                                 {data.configurationVersion.id.substring(0, 8)}...
-                            </Link>
+                            </MuiLink>
                         </Tooltip>
                         <IconButton sx={{ padding: 0 }} onClick={() => navigator.clipboard.writeText(data.configurationVersion?.id ?? '')}>
                             <CopyIcon sx={{ width: 16, height: 16 }} />
                         </IconButton>
                     </Stack>
                 </Box>}
-                {data.moduleSource && <Box marginBottom={3}>
+                {moduleSource && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Module Source</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                        <Tooltip title={data.moduleSource}>
-                            <Typography sx={{ wordBreak: 'break-all' }}>
-                                {`${data.moduleSource.substring(0, 16)}...`}
+                    {!isTharsisModule && <React.Fragment>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Tooltip title={data.moduleSource}>
+                                <Typography sx={{ wordBreak: 'break-all' }}>
+                                    {`${moduleSource.substring(0, 24)}...`}
+                                </Typography>
+                            </Tooltip>
+                            <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(data.moduleSource ?? '')}>
+                                <CopyIcon sx={{ width: 16, height: 16 }} />
+                            </IconButton>
+                        </Stack>
+                    </React.Fragment>}
+                    {isTharsisModule && <React.Fragment>
+                        <Tooltip title={moduleSource}>
+                            <Typography color="secondary" component="p" noWrap>
+                                <Link color="inherit" noWrap underline="hover" to={`/module-registry/${moduleSource}/${data.moduleVersion}`}>
+                                    {moduleSource}
+                                </Link>
                             </Typography>
                         </Tooltip>
-                        <IconButton sx={{ padding: '4px' }} onClick={() => navigator.clipboard.writeText(data.moduleSource ?? '')}>
-                            <CopyIcon sx={{ width: 16, height: 16 }} />
-                        </IconButton>
-                    </Stack>
+                    </React.Fragment>}
                 </Box>}
                 {data.moduleVersion && <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Module Version</Typography>

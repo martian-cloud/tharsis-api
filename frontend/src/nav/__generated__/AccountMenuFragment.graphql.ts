@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fbd3b54ef1c3e18bc6cc8fb8e58569e3>>
+ * @generated SignedSource<<c4e151a4a0d514f8c97f22619f0e4bb4>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,14 +11,6 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type AccountMenuFragment$data = {
-  readonly config: {
-    readonly tharsisSupportUrl: string;
-  };
-  readonly me: {
-    readonly admin?: boolean;
-    readonly email?: string;
-    readonly username?: string;
-  } | null | undefined;
   readonly version: {
     readonly buildTimestamp: any;
     readonly dbMigrationDirty: boolean;
@@ -38,45 +30,6 @@ const node: ReaderFragment = {
   "metadata": null,
   "name": "AccountMenuFragment",
   "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": null,
-      "kind": "LinkedField",
-      "name": "me",
-      "plural": false,
-      "selections": [
-        {
-          "kind": "InlineFragment",
-          "selections": [
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "email",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "username",
-              "storageKey": null
-            },
-            {
-              "alias": null,
-              "args": null,
-              "kind": "ScalarField",
-              "name": "admin",
-              "storageKey": null
-            }
-          ],
-          "type": "User",
-          "abstractKey": null
-        }
-      ],
-      "storageKey": null
-    },
     {
       "alias": null,
       "args": null,
@@ -115,30 +68,12 @@ const node: ReaderFragment = {
         }
       ],
       "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "Config",
-      "kind": "LinkedField",
-      "name": "config",
-      "plural": false,
-      "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "tharsisSupportUrl",
-          "storageKey": null
-        }
-      ],
-      "storageKey": null
     }
   ],
   "type": "Query",
   "abstractKey": null
 };
 
-(node as any).hash = "fad28a6d97c0d1795deec740d59d281b";
+(node as any).hash = "e4846a5efb9d41d1e9a02bcb936dee83";
 
 export default node;

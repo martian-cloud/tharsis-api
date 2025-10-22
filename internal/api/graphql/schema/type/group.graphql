@@ -103,6 +103,7 @@ type Group implements Node, Namespace {
     first: Int
     last: Int
     search: String
+    includeInherited: Boolean
     sort: TerraformModuleSort
   ): TerraformModuleConnection!
   runners(

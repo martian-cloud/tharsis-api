@@ -44,8 +44,8 @@ function TerraformModuleList({ fragmentRef }: Props) {
         `, fragmentRef);
 
     const queryData = useLazyLoadQuery<TerraformModuleListQuery>(
-        query, 
-        { first: INITIAL_ITEM_COUNT, groupId: group.id }, 
+        query,
+        { first: INITIAL_ITEM_COUNT, groupId: group.id },
         { fetchPolicy: 'store-and-network' }
     );
 
@@ -59,12 +59,14 @@ function TerraformModuleList({ fragmentRef }: Props) {
                 first: $first
                 last: $last
                 search: $search
-                sort: NAME_ASC
+                sort: GROUP_LEVEL_DESC
+                includeInherited: true
             ) @connection(key: "TerraformModuleList_terraformModules") {
                 totalCount
                 edges {
                     node {
                         id
+                        groupPath
                         ...TerraformModuleListItemFragment_terraformModule
                     }
                 }
@@ -84,7 +86,7 @@ function TerraformModuleList({ fragmentRef }: Props) {
                 (input?: string) => {
                     setIsRefreshing(true);
 
-                    fetchQuery(environment, query, { 
+                    fetchQuery(environment, query, {
                         first: INITIAL_ITEM_COUNT,
                         groupId: group.id,
                         search: input
@@ -194,6 +196,7 @@ function TerraformModuleList({ fragmentRef }: Props) {
                         {edges.map((edge: any) => <TerraformModuleListItem
                             key={edge.node.id}
                             fragmentRef={edge.node}
+                            inherited={edge.node.groupPath !== group.fullPath}
                         />)}
                     </List>
                 </InfiniteScroll>

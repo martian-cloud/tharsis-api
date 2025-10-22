@@ -255,7 +255,11 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Add extensions to errors
 	for _, response := range responses {
 		for _, e := range response.Errors {
-			if e != nil && e.Err != nil {
+			if e == nil {
+				continue
+			}
+
+			if e.Err != nil {
 				if !errors.IsContextCanceledError(e.Err) {
 					switch errors.ErrorCode(e.Err) {
 					case errors.EInternal:
@@ -266,9 +270,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						responseStatusCode = http.StatusUnauthorized
 					}
 				}
-
-				e.Extensions = getErrExtensions(e.Err)
 			}
+			e.Extensions = getErrExtensions(e)
 		}
 	}
 
