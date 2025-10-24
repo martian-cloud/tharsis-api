@@ -79,7 +79,6 @@ RUN apk update --no-cache && \
     echo "break-system-packages = true" >> /etc/pip.conf && \
     find /usr /bin /sbin -perm /6000 -type f -exec rm -f {} \; && \
     rm -rf /var/cache/apk/* && \
-    rm -rf /etc/apk && \
     rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/*
 
 WORKDIR /app/
