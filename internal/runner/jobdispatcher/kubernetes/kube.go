@@ -5,9 +5,11 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	v1 "k8s.io/api/batch/v1"
@@ -81,6 +83,8 @@ type JobDispatcher struct {
 	securityContext        *corev1.SecurityContext
 	nodeSelector           map[string]string
 	hostAliases            []corev1.HostAlias
+	extraAnnotations       map[string]string
+	labels                 map[string]string
 }
 
 // New creates a JobDispatcher
@@ -231,6 +235,20 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		}
 	}
 
+	extraAnnotations := map[string]string{}
+	if extraAnnotationsStr, ok := pluginData["pod_annotations"]; ok && extraAnnotationsStr != "" {
+		if err := json.Unmarshal([]byte(extraAnnotationsStr), &extraAnnotations); err != nil {
+			return nil, fmt.Errorf("pod annotations options is invalid: %w", err)
+		}
+	}
+
+	labels := map[string]string{}
+	if labelsStr, ok := pluginData["pod_labels"]; ok && labelsStr != "" {
+		if err := json.Unmarshal([]byte(labelsStr), &labels); err != nil {
+			return nil, fmt.Errorf("pod labels options is invalid: %w", err)
+		}
+	}
+
 	return &JobDispatcher{
 		logger:                 logger,
 		image:                  pluginData["image"],
@@ -239,6 +257,8 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		memoryRequest:          memoryRequest,
 		memoryLimit:            memoryLimit,
 		nodeSelector:           nodeSelector,
+		extraAnnotations:       extraAnnotations,
+		labels:                 labels,
 		hostAliases:            hostAliases,
 		securityContext: &corev1.SecurityContext{
 			Privileged:               ptr.Bool(false),
@@ -246,8 +266,6 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 			RunAsUser:                runAsUser,
 			RunAsGroup:               runAsGroup,
 			RunAsNonRoot:             runAsNonRoot,
-			// TODO: Add host users option when user namespace feature is generally available
-			//HostUsers:                    ptr.Bool(false),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"NET_RAW"},
 			},
@@ -267,6 +285,14 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 	// Remove once completed
 	ttlSecondsAfterFinished := int32(0)
 
+	annotations := map[string]string{
+		"job.phobos.io/id": jobID,
+	}
+
+	for k, v := range j.extraAnnotations {
+		annotations[k] = v
+	}
+
 	k8sJob := &v1.Job{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "batch/v1",
@@ -278,12 +304,8 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 		Spec: v1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"cluster-autoscaler.kubernetes.io/safe-to-evict": "false",
-					},
-					Annotations: map[string]string{
-						"job.tharsis.io/id": jobID,
-					},
+					Labels:      j.labels,
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					AutomountServiceAccountToken: ptr.Bool(false),
@@ -326,7 +348,8 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 							},
 						},
 					},
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:                 corev1.RestartPolicyNever,
+					TerminationGracePeriodSeconds: ptr.Int64(int64(time.Hour.Seconds())),
 				},
 			},
 			BackoffLimit:            &backoffLimit,
