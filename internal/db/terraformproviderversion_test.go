@@ -4,170 +4,538 @@ package db
 
 import (
 	"context"
-	"sort"
+	"fmt"
 	"testing"
-	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// Some constants and pseudo-constants are declared/defined in dbclient_test.go.
-
-// terraformProviderVersionInfo aids convenience in accessing the information
-// TestGetTerraformProviderVersions needs about the warmup objects.
-type terraformProviderVersionInfo struct {
-	updateTime time.Time
-	id         string
+// getValue implements the sortableField interface for TerraformProviderVersionSortableField
+func (tpv TerraformProviderVersionSortableField) getValue() string {
+	return string(tpv)
 }
 
-// terraformProviderVersionInfoIDSlice makes a slice of terraformProviderVersionInfo sortable by ID string
-type terraformProviderVersionInfoIDSlice []terraformProviderVersionInfo
-
-// terraformProviderVersionInfoUpdateSlice makes a slice of terraformProviderVersionInfo sortable by last updated time
-type terraformProviderVersionInfoUpdateSlice []terraformProviderVersionInfo
-
-// warmupTerraformProviderVersions holds the inputs to and outputs from createWarmupTerraformProviderVersions.
-type warmupTerraformProviderVersions struct {
-	groups                    []models.Group
-	workspaces                []models.Workspace
-	teams                     []models.Team
-	users                     []models.User
-	teamMembers               []models.TeamMember
-	serviceAccounts           []models.ServiceAccount
-	namespaceMembershipsIn    []CreateNamespaceMembershipInput
-	namespaceMembershipsOut   []models.NamespaceMembership
-	terraformProviders        []models.TerraformProvider
-	terraformProviderVersions []models.TerraformProviderVersion
-}
-
-func TestGetProviderVersionByID(t *testing.T) {
+func TestTerraformProviderVersions_CreateProviderVersion(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := time.Now()
-	warmupItems, err := createWarmupTerraformProviderVersions(ctx, testClient, warmupTerraformProviderVersions{
-		groups:                    standardWarmupGroupsForTerraformProviderVersions,
-		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
-		terraformProviderVersions: standardWarmupTerraformProviderVersions,
+	// Create a group and provider for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-provider-version",
+		Description: "test group for provider version",
+		FullPath:    "test-group-provider-version",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.Nil(t, err)
-	createdHigh := time.Now()
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-version",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
 
 	type testCase struct {
-		expectMsg                      *string
-		expectTerraformProviderVersion *models.TerraformProviderVersion
-		name                           string
-		searchID                       string
+		name            string
+		expectErrorCode errors.CodeType
+		version         string
+		providerID      string
 	}
 
-	positiveTerraformProviderVersion := warmupItems.terraformProviderVersions[0]
-	now := time.Now()
 	testCases := []testCase{
 		{
-			name:     "positive",
-			searchID: positiveTerraformProviderVersion.Metadata.ID,
-			expectTerraformProviderVersion: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:                positiveTerraformProviderVersion.Metadata.ID,
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				SemanticVersion:          positiveTerraformProviderVersion.SemanticVersion,
-				GPGASCIIArmor:            positiveTerraformProviderVersion.GPGASCIIArmor,
-				GPGKeyID:                 positiveTerraformProviderVersion.GPGKeyID,
-				ProviderID:               positiveTerraformProviderVersion.ProviderID,
-				Protocols:                positiveTerraformProviderVersion.Protocols,
-				SHASumsUploaded:          positiveTerraformProviderVersion.SHASumsUploaded,
-				SHASumsSignatureUploaded: positiveTerraformProviderVersion.SHASumsSignatureUploaded,
-				CreatedBy:                positiveTerraformProviderVersion.CreatedBy,
-			},
+			name:       "create provider version",
+			version:    "1.0.0",
+			providerID: provider.Metadata.ID,
 		},
-
 		{
-			name:     "negative, non-existent Terraform provider version ID",
-			searchID: nonExistentID,
-			// expect terraform provider version and error to be nil
-		},
-
-		{
-			name:      "defective-ID",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
+			name:            "create provider version with invalid provider ID",
+			version:         "1.0.1",
+			providerID:      invalidID,
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualTerraformProviderVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, test.searchID)
+			providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+				SemanticVersion: test.version,
+				ProviderID:      test.providerID,
+				CreatedBy:       "db-integration-tests",
+			})
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectTerraformProviderVersion != nil {
-				require.NotNil(t, actualTerraformProviderVersion)
-				compareTerraformProviderVersions(t, test.expectTerraformProviderVersion, actualTerraformProviderVersion, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
+			require.Nil(t, err)
+			require.NotNil(t, providerVersion)
+
+			assert.Equal(t, test.version, providerVersion.SemanticVersion)
+			assert.Equal(t, test.providerID, providerVersion.ProviderID)
+			assert.NotEmpty(t, providerVersion.Metadata.ID)
+		})
+	}
+}
+
+func TestTerraformProviderVersions_UpdateProviderVersion(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group, provider, and provider version for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-provider-version-update",
+		Description: "test group for provider version update",
+		FullPath:    "test-group-provider-version-update",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-version-update",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+		SemanticVersion: "1.0.0",
+		ProviderID:      provider.Metadata.ID,
+		CreatedBy:       "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name              string
+		expectErrorCode   errors.CodeType
+		version           int
+		providerVersionID string
+		protocols         []string
+	}
+
+	testCases := []testCase{
+		{
+			name:              "update provider version",
+			providerVersionID: createdProviderVersion.Metadata.ID,
+			version:           createdProviderVersion.Metadata.Version,
+			protocols:         []string{"5.0"},
+		},
+		{
+			name:              "would-be_duplicate_provider_ID_and_semantic_version",
+			providerVersionID: createdProviderVersion.Metadata.ID,
+			expectErrorCode:   errors.EOptimisticLock,
+			version:           -1,
+			protocols:         []string{"4.0"},
+		},
+		{
+			name:              "negative, non-existent Terraform provider version ID",
+			providerVersionID: invalidID,
+			expectErrorCode:   errors.EInternal,
+			version:           1,
+			protocols:         []string{"4.0"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			providerVersionToUpdate := *createdProviderVersion
+			providerVersionToUpdate.Metadata.ID = test.providerVersionID
+			providerVersionToUpdate.Metadata.Version = test.version
+			providerVersionToUpdate.Protocols = test.protocols
+
+			updatedProviderVersion, err := testClient.client.TerraformProviderVersions.UpdateProviderVersion(ctx, &providerVersionToUpdate)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+			require.NotNil(t, updatedProviderVersion)
+
+			assert.Equal(t, test.protocols, updatedProviderVersion.Protocols)
+			assert.Equal(t, createdProviderVersion.Metadata.Version+1, updatedProviderVersion.Metadata.Version)
+		})
+	}
+}
+
+func TestTerraformProviderVersions_DeleteProviderVersion(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group, provider, and provider version for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-provider-version-delete",
+		Description: "test group for provider version delete",
+		FullPath:    "test-group-provider-version-delete",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-version-delete",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+		SemanticVersion: "1.0.0",
+		ProviderID:      provider.Metadata.ID,
+		CreatedBy:       "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		id              string
+		version         int
+	}
+
+	testCases := []testCase{
+		{
+			name:    "delete provider version",
+			id:      createdProviderVersion.Metadata.ID,
+			version: createdProviderVersion.Metadata.Version,
+		},
+		{
+			name:            "delete will fail because resource version doesn't match",
+			id:              createdProviderVersion.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+		},
+		{
+			name:            "negative, non-existent Terraform provider version ID",
+			id:              invalidID,
+			expectErrorCode: errors.EInternal,
+			version:         1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.TerraformProviderVersions.DeleteProviderVersion(ctx, &models.TerraformProviderVersion{
+				Metadata: models.ResourceMetadata{
+					ID:      test.id,
+					Version: test.version,
+				},
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+
+			// Verify provider version was deleted
+			providerVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, test.id)
+			assert.Nil(t, providerVersion)
+			assert.Nil(t, err)
+		})
+	}
+}
+
+func TestTerraformProviderVersions_GetProviderVersionByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for the terraform provider
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-provider-version-get-by-id",
+		Description: "test group for provider version get by id",
+		FullPath:    "test-group-provider-version-get-by-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform provider for the version
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-version-get-by-id",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		Private:     false,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform provider version for testing
+	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+		SemanticVersion: "1.0.0",
+		ProviderID:      provider.Metadata.ID,
+		CreatedBy:       "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode       errors.CodeType
+		name                  string
+		id                    string
+		expectProviderVersion bool
+	}
+
+	testCases := []testCase{
+		{
+			name:                  "get resource by id",
+			id:                    createdProviderVersion.Metadata.ID,
+			expectProviderVersion: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			providerVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectProviderVersion {
+				require.NotNil(t, providerVersion)
+				assert.Equal(t, test.id, providerVersion.Metadata.ID)
 			} else {
-				assert.Nil(t, actualTerraformProviderVersion)
+				assert.Nil(t, providerVersion)
 			}
 		})
 	}
 }
 
-func TestGetProviderVersionByTRN(t *testing.T) {
-	ctx := t.Context()
+func TestTerraformProviderVersions_GetProviderVersions(t *testing.T) {
+	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
+	// Create a group for the terraform provider
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "test-group",
+		Name:        "test-group-provider-versions-list",
+		Description: "test group for provider versions list",
+		FullPath:    "test-group-provider-versions-list",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.NoError(t, err)
 
+	// Create a terraform provider for the versions
 	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
-		Name:        "test-provider",
-		RootGroupID: group.Metadata.ID,
+		Name:        "test-provider-versions-list",
 		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		Private:     false,
+		CreatedBy:   "db-integration-tests",
 	})
 	require.NoError(t, err)
 
-	providerVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
-		ProviderID:      provider.Metadata.ID,
-		SemanticVersion: "1.0.0",
-	})
-	require.NoError(t, err)
+	// Create test terraform provider versions
+	versions := []models.TerraformProviderVersion{
+		{
+			SemanticVersion: "1.0.0",
+			ProviderID:      provider.Metadata.ID,
+			CreatedBy:       "db-integration-tests",
+		},
+		{
+			SemanticVersion: "1.1.0",
+			ProviderID:      provider.Metadata.ID,
+			CreatedBy:       "db-integration-tests",
+		},
+	}
+
+	createdVersions := []models.TerraformProviderVersion{}
+	for _, version := range versions {
+		created, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &version)
+		require.NoError(t, err)
+		createdVersions = append(createdVersions, *created)
+	}
 
 	type testCase struct {
 		name            string
-		trn             string
-		expectVersion   bool
 		expectErrorCode errors.CodeType
+		input           *GetProviderVersionsInput
+		expectCount     int
 	}
 
 	testCases := []testCase{
 		{
-			name:          "get provider version by TRN",
-			trn:           providerVersion.Metadata.TRN,
-			expectVersion: true,
+			name:        "get all provider versions",
+			input:       &GetProviderVersionsInput{},
+			expectCount: len(createdVersions),
+		},
+		{
+			name: "filter by provider ID",
+			input: &GetProviderVersionsInput{
+				Filter: &TerraformProviderVersionFilter{
+					ProviderID: &provider.Metadata.ID,
+				},
+			},
+			expectCount: len(createdVersions),
+		},
+		{
+			name: "filter by semantic version",
+			input: &GetProviderVersionsInput{
+				Filter: &TerraformProviderVersionFilter{
+					SemanticVersion: &createdVersions[0].SemanticVersion,
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "filter by provider version IDs",
+			input: &GetProviderVersionsInput{
+				Filter: &TerraformProviderVersionFilter{
+					ProviderVersionIDs: []string{createdVersions[0].Metadata.ID},
+				},
+			},
+			expectCount: 1,
+		}}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.TerraformProviderVersions.GetProviderVersions(ctx, test.input)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result.ProviderVersions, test.expectCount)
+		})
+	}
+}
+
+func TestTerraformProviderVersions_GetProviderVersionsWithPaginationAndSorting(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for the terraform provider
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-provider-versions-pagination",
+		Description: "test group for provider versions pagination",
+		FullPath:    "test-group-provider-versions-pagination",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform provider for the versions
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-versions-pagination",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		Private:     false,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		_, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+			SemanticVersion: fmt.Sprintf("1.%d.0", i),
+			ProviderID:      provider.Metadata.ID,
+			CreatedBy:       "db-integration-tests",
+		})
+		require.NoError(t, err)
+	}
+
+	sortableFields := []sortableField{
+		TerraformProviderVersionSortableFieldVersionAsc,
+		TerraformProviderVersionSortableFieldVersionDesc,
+		TerraformProviderVersionSortableFieldUpdatedAtAsc,
+		TerraformProviderVersionSortableFieldUpdatedAtDesc,
+		TerraformProviderVersionSortableFieldCreatedAtAsc,
+		TerraformProviderVersionSortableFieldCreatedAtDesc,
+	}
+
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := TerraformProviderVersionSortableField(sortByField.getValue())
+
+		result, err := testClient.client.TerraformProviderVersions.GetProviderVersions(ctx, &GetProviderVersionsInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		resources := []pagination.CursorPaginatable{}
+		for _, resource := range result.ProviderVersions {
+			resourceCopy := resource
+			resources = append(resources, &resourceCopy)
+		}
+
+		return result.PageInfo, resources, nil
+	})
+}
+
+func TestTerraformProviderVersions_GetProviderVersionByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for the terraform provider
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-provider-version-trn",
+		Description: "test group for provider version trn",
+		FullPath:    "test-group-provider-version-trn",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform provider for the version
+	provider, err := testClient.client.TerraformProviders.CreateProvider(ctx, &models.TerraformProvider{
+		Name:        "test-provider-version-trn",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		Private:     false,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform provider version for testing
+	createdProviderVersion, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, &models.TerraformProviderVersion{
+		SemanticVersion: "1.0.0",
+		ProviderID:      provider.Metadata.ID,
+		CreatedBy:       "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode       errors.CodeType
+		name                  string
+		trn                   string
+		expectProviderVersion bool
+	}
+
+	testCases := []testCase{
+		{
+			name:                  "get resource by TRN",
+			trn:                   createdProviderVersion.Metadata.TRN,
+			expectProviderVersion: true,
 		},
 		{
 			name: "resource with TRN not found",
-			trn:  types.TerraformProviderVersionModelType.BuildTRN(group.FullPath, provider.Name, "2.0.0"),
-		},
-		{
-			name:            "provider version TRN has less than 3 parts",
-			trn:             types.TerraformProviderVersionModelType.BuildTRN("test-group"),
-			expectErrorCode: errors.EInvalid,
+			trn:  "trn:tharsis:terraform-provider-version:non-existent",
 		},
 		{
 			name:            "get resource with invalid TRN will return an error",
@@ -178,1069 +546,19 @@ func TestGetProviderVersionByTRN(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByTRN(ctx, test.trn)
+			providerVersion, err := testClient.client.TerraformProviderVersions.GetProviderVersionByTRN(ctx, test.trn)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			require.NoError(t, err)
-
-			if test.expectVersion {
-				require.NotNil(t, actualVersion)
-				assert.Equal(t,
-					types.TerraformProviderVersionModelType.BuildTRN(
-						group.FullPath,
-						provider.Name,
-						providerVersion.SemanticVersion,
-					),
-					actualVersion.Metadata.TRN,
-				)
+			if test.expectProviderVersion {
+				require.NotNil(t, providerVersion)
+				assert.Equal(t, test.trn, providerVersion.Metadata.TRN)
 			} else {
-				assert.Nil(t, actualVersion)
+				assert.Nil(t, providerVersion)
 			}
 		})
-	}
-}
-
-func TestGetProviderVersions(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformProviderVersions(ctx, testClient, warmupTerraformProviderVersions{
-		groups:                    standardWarmupGroupsForTerraformProviderVersions,
-		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
-		terraformProviderVersions: standardWarmupTerraformProviderVersions,
-	})
-	require.Nil(t, err)
-	allTerraformProviderVersionInfos := terraformProviderVersionInfoFromTerraformProviderVersions(warmupItems.terraformProviderVersions)
-
-	// Sort by Terraform provider version IDs.
-	sort.Sort(terraformProviderVersionInfoIDSlice(allTerraformProviderVersionInfos))
-	allTerraformProviderVersionIDs := terraformProviderVersionIDsFromTerraformProviderVersionInfos(allTerraformProviderVersionInfos)
-
-	// Sort by last update times.
-	sort.Sort(terraformProviderVersionInfoUpdateSlice(allTerraformProviderVersionInfos))
-	allTerraformProviderVersionIDsByTime := terraformProviderVersionIDsFromTerraformProviderVersionInfos(allTerraformProviderVersionInfos)
-	reverseTerraformProviderVersionIDsByTime := reverseStringSlice(allTerraformProviderVersionIDsByTime)
-
-	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
-
-	type testCase struct {
-		expectStartCursorError            error
-		expectEndCursorError              error
-		input                             *GetProviderVersionsInput
-		expectMsg                         *string
-		name                              string
-		expectPageInfo                    pagination.PageInfo
-		expectTerraformProviderVersionIDs []string
-		getBeforeCursorFromPrevious       bool
-		sortedDescending                  bool
-		expectHasStartCursor              bool
-		getAfterCursorFromPrevious        bool
-		expectHasEndCursor                bool
-	}
-
-	/*
-		template test case:
-
-		{
-			name: "",
-			input: &GetProviderVersionsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			sortedDescending             bool
-			getBeforeCursorFromPrevious: false,
-			getAfterCursorFromPrevious:  false,
-			expectMsg:                   nil,
-			expectTerraformProviderVersionIDs:  []string{},
-			expectPageInfo: pagination.PageInfo{
-				Cursor:          nil,
-				TotalCount:      0,
-				HasNextPage:     false,
-				HasPreviousPage: false,
-			},
-			expectStartCursorError: nil,
-			expectHasStartCursor:   false,
-			expectEndCursorError:   nil,
-			expectHasEndCursor:     false,
-		}
-	*/
-
-	testCases := []testCase{
-		// nil input likely causes a nil pointer dereference in GetProviderVersions, so don't try it.
-
-		{
-			name: "non-nil but mostly empty input",
-			input: &GetProviderVersionsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDs,
-			expectPageInfo:                    pagination.PageInfo{TotalCount: int32(len(allTerraformProviderVersionIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "populated sort and pagination, nil filter",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime,
-			expectPageInfo:                    pagination.PageInfo{TotalCount: int32(len(allTerraformProviderVersionIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "sort in ascending order of time of last update",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime,
-			expectPageInfo:                    pagination.PageInfo{TotalCount: int32(len(allTerraformProviderVersionIDsByTime)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "sort in descending order of time of last update",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtDesc),
-			},
-			sortedDescending:                  true,
-			expectTerraformProviderVersionIDs: reverseTerraformProviderVersionIDsByTime,
-			expectPageInfo:                    pagination.PageInfo{TotalCount: int32(len(allTerraformProviderVersionIDsByTime)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "pagination: everything at once",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime,
-			expectPageInfo:                    pagination.PageInfo{TotalCount: int32(len(allTerraformProviderVersionIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "pagination: first two",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(2),
-				},
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime[:2],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allTerraformProviderVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "pagination: middle two",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(2),
-				},
-			},
-			getAfterCursorFromPrevious:        true,
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime[2:4],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allTerraformProviderVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "pagination: final one",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-			},
-			getAfterCursorFromPrevious:        true,
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime[4:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allTerraformProviderVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		// When Last is supplied, the sort order is intended to be reversed.
-		{
-			name: "pagination: last three",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					Last: ptr.Int32(3),
-				},
-			},
-			sortedDescending:                  true,
-			expectTerraformProviderVersionIDs: reverseTerraformProviderVersionIDsByTime[:3],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allTerraformProviderVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		/*
-
-			The input.PaginationOptions.After field is tested earlier via getAfterCursorFromPrevious.
-
-			The input.PaginationOptions.Before field is not really supported and does not work.
-			If it did work, it could be tested by adapting the test cases corresponding to the
-			next few cases after a similar block of text from group_test.go
-
-		*/
-
-		{
-			name: "pagination, before and after, expect error",
-			input: &GetProviderVersionsInput{
-				Sort:              ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{},
-			},
-			getAfterCursorFromPrevious:        true,
-			getBeforeCursorFromPrevious:       true,
-			expectMsg:                         ptr.String("only before or after can be defined, not both"),
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{},
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
-			},
-			expectMsg:                         ptr.String("only first or last can be defined, not both"),
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDs[4:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allTerraformProviderVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "fully-populated types, nothing allowed through filters",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: &TerraformProviderVersionFilter{
-					ProviderID:               ptr.String(""),
-					SHASumsUploaded:          ptr.Bool(true),
-					SHASumsSignatureUploaded: ptr.Bool(true),
-					SemanticVersion:          ptr.String(""),
-					// Passing an empty slice to ProviderVersionIDs likely causes
-					// an SQL syntax error ("... IN ()"), so don't try it.
-					// ProviderVersionsIDs: []string{},
-				},
-			},
-			expectMsg:                         invalidUUIDMsg,
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, provider ID, positive",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					ProviderID: ptr.String(warmupItems.terraformProviderVersions[0].ProviderID),
-				},
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime[0:2],
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "filter, provider ID, non-existent",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					ProviderID: ptr.String(nonExistentID),
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, provider ID, invalid",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					ProviderID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:                         invalidUUIDMsg,
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, SHA sums uploaded, true",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SHASumsUploaded: ptr.Bool(true),
-				},
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime[2:4],
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "filter, SHA sums uploaded, false",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SHASumsUploaded: ptr.Bool(false),
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{
-				allTerraformProviderVersionIDsByTime[0],
-				allTerraformProviderVersionIDsByTime[1],
-				allTerraformProviderVersionIDsByTime[4],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, SHA sums signature uploaded, true",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SHASumsSignatureUploaded: ptr.Bool(true),
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{
-				allTerraformProviderVersionIDsByTime[1],
-				allTerraformProviderVersionIDsByTime[3],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, SHA sums signature uploaded, false",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SHASumsSignatureUploaded: ptr.Bool(false),
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{
-				allTerraformProviderVersionIDsByTime[0],
-				allTerraformProviderVersionIDsByTime[2],
-				allTerraformProviderVersionIDsByTime[4],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, semantic version, positive",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SemanticVersion: ptr.String("3.4.5"),
-				},
-			},
-			expectTerraformProviderVersionIDs: allTerraformProviderVersionIDsByTime[2:3],
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 1, Cursor: dummyCursorFunc},
-			expectHasStartCursor:              true,
-			expectHasEndCursor:                true,
-		},
-
-		{
-			name: "filter, semantic version, non-existent",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SemanticVersion: ptr.String("9.8.7"),
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, semantic version, invalid",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					SemanticVersion: ptr.String("this-is-not-a-valid-semantic-version"),
-				},
-			},
-			// expect no error, just an empty return slice
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, provider version IDs, positive",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					ProviderVersionIDs: []string{
-						allTerraformProviderVersionIDsByTime[0],
-						allTerraformProviderVersionIDsByTime[3],
-					},
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{
-				allTerraformProviderVersionIDsByTime[0],
-				allTerraformProviderVersionIDsByTime[3],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: 2, Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, provider version IDs, non-existent",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					ProviderVersionIDs: []string{nonExistentID},
-				},
-			},
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, provider version IDs, invalid",
-			input: &GetProviderVersionsInput{
-				Sort: ptrTerraformProviderVersionSortableField(TerraformProviderVersionSortableFieldUpdatedAtAsc),
-				Filter: &TerraformProviderVersionFilter{
-					ProviderVersionIDs: []string{invalidID},
-				},
-			},
-			expectMsg:                         invalidUUIDMsg,
-			expectTerraformProviderVersionIDs: []string{},
-			expectPageInfo:                    pagination.PageInfo{},
-		},
-	}
-
-	var (
-		previousEndCursorValue   *string
-		previousStartCursorValue *string
-	)
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			// For some pagination tests, a previous case's cursor value gets piped into the next case.
-			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
-
-				// Make sure there's a place to put it.
-				require.NotNil(t, test.input.PaginationOptions)
-
-				if test.getAfterCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousEndCursorValue)
-					test.input.PaginationOptions.After = previousEndCursorValue
-				}
-
-				if test.getBeforeCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousStartCursorValue)
-					test.input.PaginationOptions.Before = previousStartCursorValue
-				}
-
-				// Clear the values so they won't be used twice.
-				previousEndCursorValue = nil
-				previousStartCursorValue = nil
-			}
-
-			terraformProviderVersionsResult, err := testClient.client.TerraformProviderVersions.GetProviderVersions(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			// If there was no error, check the results.
-			if err == nil {
-
-				// Never returns nil if error is nil.
-				require.NotNil(t, terraformProviderVersionsResult.PageInfo)
-				assert.NotNil(t, terraformProviderVersionsResult.ProviderVersions)
-				pageInfo := terraformProviderVersionsResult.PageInfo
-				terraformProviderVersions := terraformProviderVersionsResult.ProviderVersions
-
-				// Check the terraform provider versions result by comparing a list of the terraform provider version IDs.
-				actualTerraformProviderVersionIDs := []string{}
-				for _, terraformProviderVersion := range terraformProviderVersions {
-					actualTerraformProviderVersionIDs = append(actualTerraformProviderVersionIDs, terraformProviderVersion.Metadata.ID)
-				}
-
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(actualTerraformProviderVersionIDs)
-				}
-
-				assert.Equal(t, len(test.expectTerraformProviderVersionIDs), len(actualTerraformProviderVersionIDs))
-				assert.Equal(t, test.expectTerraformProviderVersionIDs, actualTerraformProviderVersionIDs)
-
-				assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
-				assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
-				assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
-				assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
-
-				// Compare the cursor function results only if there is at least one terraform provider version returned.
-				// If there are no terraform provider versions returned, there is no argument to pass to the cursor function.
-				// Also, don't try to reverse engineer to compare the cursor string values.
-				if len(terraformProviderVersions) > 0 {
-					resultStartCursor, resultStartCursorError := pageInfo.Cursor(&terraformProviderVersions[0])
-					resultEndCursor, resultEndCursorError := pageInfo.Cursor(&terraformProviderVersions[len(terraformProviderVersions)-1])
-					assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
-					assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
-					assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
-					assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
-
-					// Capture the ending cursor values for the next case.
-					previousEndCursorValue = resultEndCursor
-					previousStartCursorValue = resultStartCursor
-				}
-			}
-		})
-	}
-}
-
-func TestCreateProviderVersion(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformProviderVersions(ctx, testClient, warmupTerraformProviderVersions{
-		groups:             standardWarmupGroupsForTerraformProviderVersions,
-		terraformProviders: standardWarmupTerraformProvidersForTerraformProviderVersions,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		toCreate      *models.TerraformProviderVersion
-		expectCreated *models.TerraformProviderVersion
-		expectMsg     *string
-		name          string
-	}
-
-	now := time.Now()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toCreate: &models.TerraformProviderVersion{
-				ProviderID:               warmupItems.terraformProviders[0].Metadata.ID,
-				SemanticVersion:          "2.4.6",
-				GPGASCIIArmor:            ptr.String("chain-mail-test-create"),
-				GPGKeyID:                 ptr.Uint64(888222333444555666),
-				Protocols:                []string{"protocol-42", "protocol-43"},
-				SHASumsUploaded:          false,
-				SHASumsSignatureUploaded: true,
-				CreatedBy:                "TestCreateProviderVersion",
-			},
-			expectCreated: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				ProviderID:               warmupItems.terraformProviders[0].Metadata.ID,
-				SemanticVersion:          "2.4.6",
-				GPGASCIIArmor:            ptr.String("chain-mail-test-create"),
-				GPGKeyID:                 ptr.Uint64(888222333444555666),
-				Protocols:                []string{"protocol-42", "protocol-43"},
-				SHASumsUploaded:          false,
-				SHASumsSignatureUploaded: true,
-				CreatedBy:                "TestCreateProviderVersion",
-			},
-		},
-
-		{
-			name: "duplicate provider ID and semantic version",
-			toCreate: &models.TerraformProviderVersion{
-				ProviderID:      warmupItems.terraformProviders[0].Metadata.ID,
-				SemanticVersion: "2.4.6",
-				CreatedBy:       "would-be-duplicate-provider-id-and-semantic-version",
-			},
-			expectMsg: ptr.String("terraform provider version 2.4.6 already exists"),
-		},
-
-		{
-			name: "negative, non-existent provider ID",
-			toCreate: &models.TerraformProviderVersion{
-				ProviderID:      nonExistentID,
-				SemanticVersion: "2.4.9",
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_provider_versions\" violates foreign key constraint \"fk_provider_id\" (SQLSTATE 23503)"),
-		},
-
-		{
-			name: "negative, invalid provider ID",
-			toCreate: &models.TerraformProviderVersion{
-				ProviderID:      invalidID,
-				SemanticVersion: "2.5.9",
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.TerraformProviderVersions.CreateProviderVersion(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := time.Now()
-
-				compareTerraformProviderVersions(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualCreated)
-			}
-		})
-	}
-}
-
-func TestUpdateProviderVersion(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformProviderVersions(ctx, testClient, warmupTerraformProviderVersions{
-		groups:                    standardWarmupGroupsForTerraformProviderVersions,
-		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
-		terraformProviderVersions: standardWarmupTerraformProviderVersions,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg     *string
-		toUpdate      *models.TerraformProviderVersion
-		expectUpdated *models.TerraformProviderVersion
-		name          string
-	}
-
-	// Looks up by ID and version.
-	// Updates GPGKeyID, GPGASCIIArmor, protocols, SHASumsUploaded, SHASumsSignatureUploaded.
-	positiveTerraformProviderVersion := warmupItems.terraformProviderVersions[0]
-	otherTerraformProviderVersion := warmupItems.terraformProviderVersions[1]
-	now := time.Now()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toUpdate: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveTerraformProviderVersion.Metadata.ID,
-					Version: initialResourceVersion,
-				},
-				GPGASCIIArmor:            ptr.String("chain-mail-test-update"),
-				GPGKeyID:                 ptr.Uint64(999222333444555666),
-				Protocols:                []string{"protocol-95", "protocol-96"},
-				SHASumsUploaded:          true,
-				SHASumsSignatureUploaded: true,
-			},
-			expectUpdated: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:                   positiveTerraformProviderVersion.Metadata.ID,
-					Version:              initialResourceVersion + 1,
-					CreationTimestamp:    positiveTerraformProviderVersion.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				ProviderID:               positiveTerraformProviderVersion.ProviderID,
-				SemanticVersion:          "1.2.3",
-				GPGASCIIArmor:            ptr.String("chain-mail-test-update"),
-				GPGKeyID:                 ptr.Uint64(999222333444555666),
-				Protocols:                []string{"protocol-95", "protocol-96"},
-				SHASumsUploaded:          true,
-				SHASumsSignatureUploaded: true,
-				CreatedBy:                "someone-tpv0",
-			},
-		},
-
-		{
-			name: "would-be duplicate provider ID and semantic version",
-			toUpdate: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveTerraformProviderVersion.Metadata.ID,
-					Version: initialResourceVersion,
-				},
-				// Would duplicate a different Terraform provider version.
-				SemanticVersion: otherTerraformProviderVersion.SemanticVersion,
-			},
-			expectMsg: ptr.String("resource version does not match specified version"),
-		},
-
-		{
-			name: "negative, non-existent Terraform provider version ID",
-			toUpdate: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-ID",
-			toUpdate: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualTerraformProviderVersion, err := testClient.client.TerraformProviderVersions.UpdateProviderVersion(ctx, test.toUpdate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectUpdated != nil {
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectUpdated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				require.NotNil(t, actualTerraformProviderVersion)
-				compareTerraformProviderVersions(t, test.expectUpdated, actualTerraformProviderVersion, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualTerraformProviderVersion)
-			}
-		})
-	}
-}
-
-func TestDeleteProviderVersion(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformProviderVersions(ctx, testClient, warmupTerraformProviderVersions{
-		groups:                    standardWarmupGroupsForTerraformProviderVersions,
-		terraformProviders:        standardWarmupTerraformProvidersForTerraformProviderVersions,
-		terraformProviderVersions: standardWarmupTerraformProviderVersions,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg *string
-		toDelete  *models.TerraformProviderVersion
-		name      string
-	}
-
-	// Looks up by ID and version.
-	positiveTerraformProviderVersion := warmupItems.terraformProviderVersions[0]
-	testCases := []testCase{
-		{
-			name: "positive",
-			toDelete: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveTerraformProviderVersion.Metadata.ID,
-					Version: initialResourceVersion,
-				},
-			},
-		},
-
-		{
-			name: "negative, non-existent Terraform provider version ID",
-			toDelete: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-ID",
-			toDelete: &models.TerraformProviderVersion{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			err := testClient.client.TerraformProviderVersions.DeleteProviderVersion(ctx, test.toDelete)
-
-			checkError(t, test.expectMsg, err)
-		})
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup group(s) for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForTerraformProviderVersions = []models.Group{
-	// Top-level groups:
-	{
-		Description: "top level group 0 for testing terraform provider version functions",
-		FullPath:    "top-level-group-0-for-terraform-provider-versions",
-		CreatedBy:   "someone-g0",
-	},
-}
-
-// Standard warmup terraform providers for tests in this module:
-// The ID fields will be replaced by the real IDs during the create function.
-var standardWarmupTerraformProvidersForTerraformProviderVersions = []models.TerraformProvider{
-	{
-		Name:        "terraform-provider-0",
-		RootGroupID: "top-level-group-0-for-terraform-provider-versions",
-		GroupID:     "top-level-group-0-for-terraform-provider-versions",
-		Private:     false,
-		CreatedBy:   "someone-tp0",
-		// ResourcePath: "top-level-group-0-for-terraform-provider-versions/terraform-provider-0",
-	},
-	{
-		Name:        "terraform-provider-1",
-		RootGroupID: "top-level-group-0-for-terraform-provider-versions",
-		GroupID:     "top-level-group-0-for-terraform-provider-versions",
-		Private:     false,
-		CreatedBy:   "someone-tp1",
-		// ResourcePath: "top-level-group-0-for-terraform-provider-versions/terraform-provider-1",
-	},
-}
-
-// Standard warmup terraform provider versions for tests in this module:
-// The necessary ID fields will be replaced by the real IDs during the create function.
-var standardWarmupTerraformProviderVersions = []models.TerraformProviderVersion{
-	{
-		ProviderID:               "top-level-group-0-for-terraform-provider-versions/terraform-provider-0",
-		SemanticVersion:          "1.2.3",
-		GPGASCIIArmor:            ptr.String("chain-mail-0"),
-		GPGKeyID:                 ptr.Uint64(111222333444555666),
-		Protocols:                []string{"protocol-0", "protocol-1"},
-		SHASumsUploaded:          false,
-		SHASumsSignatureUploaded: false,
-		CreatedBy:                "someone-tpv0",
-	},
-	{
-		ProviderID:               "top-level-group-0-for-terraform-provider-versions/terraform-provider-0",
-		SemanticVersion:          "2.3.4",
-		GPGASCIIArmor:            ptr.String("chain-mail-1"),
-		GPGKeyID:                 ptr.Uint64(111222333444555666),
-		Protocols:                []string{"protocol-2", "protocol-3"},
-		SHASumsUploaded:          false,
-		SHASumsSignatureUploaded: true,
-		CreatedBy:                "someone-tpv1",
-	},
-	{
-		ProviderID:               "top-level-group-0-for-terraform-provider-versions/terraform-provider-1",
-		SemanticVersion:          "3.4.5",
-		GPGASCIIArmor:            ptr.String("chain-mail-2"),
-		GPGKeyID:                 ptr.Uint64(111222333444555666),
-		Protocols:                []string{"protocol-4", "protocol-5"},
-		SHASumsUploaded:          true,
-		SHASumsSignatureUploaded: false,
-		CreatedBy:                "someone-tpv2",
-	},
-	{
-		ProviderID:               "top-level-group-0-for-terraform-provider-versions/terraform-provider-1",
-		SemanticVersion:          "4.5.6",
-		GPGASCIIArmor:            ptr.String("chain-mail-3"),
-		GPGKeyID:                 ptr.Uint64(111222333444555666),
-		Protocols:                []string{"protocol-6", "protocol-7"},
-		SHASumsUploaded:          true,
-		SHASumsSignatureUploaded: true,
-		CreatedBy:                "someone-tpv3",
-	},
-	{
-		ProviderID:               "top-level-group-0-for-terraform-provider-versions/terraform-provider-1",
-		SemanticVersion:          "5.6.7",
-		GPGASCIIArmor:            ptr.String("chain-mail-4"),
-		GPGKeyID:                 ptr.Uint64(111222333444555666),
-		Protocols:                []string{"protocol-8", "protocol-9"},
-		SHASumsUploaded:          false,
-		SHASumsSignatureUploaded: false,
-		CreatedBy:                "someone-tpv4",
-	},
-}
-
-// createWarmupTerraformProviderVersions creates some warmup terraform provider versions for a test
-// The warmup terraform provider versions to create can be standard or otherwise.
-func createWarmupTerraformProviderVersions(ctx context.Context, testClient *testClient,
-	input warmupTerraformProviderVersions,
-) (*warmupTerraformProviderVersions, error) {
-	// It is necessary to create at least one group in order to
-	// provide the necessary IDs for the terraform provider versions.
-
-	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTerraformProviders, providerResourcePath2ID, err := createInitialTerraformProviders(ctx, testClient,
-		input.terraformProviders, parentPath2ID)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTerraformProviderVersions, _, err := createInitialTerraformProviderVersions(ctx, testClient,
-		input.terraformProviderVersions, providerResourcePath2ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &warmupTerraformProviderVersions{
-		groups:                    resultGroups,
-		terraformProviders:        resultTerraformProviders,
-		terraformProviderVersions: resultTerraformProviderVersions,
-	}, nil
-}
-
-func ptrTerraformProviderVersionSortableField(arg TerraformProviderVersionSortableField) *TerraformProviderVersionSortableField {
-	return &arg
-}
-
-func (wis terraformProviderVersionInfoIDSlice) Len() int {
-	return len(wis)
-}
-
-func (wis terraformProviderVersionInfoIDSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformProviderVersionInfoIDSlice) Less(i, j int) bool {
-	return wis[i].id < wis[j].id
-}
-
-func (wis terraformProviderVersionInfoUpdateSlice) Len() int {
-	return len(wis)
-}
-
-func (wis terraformProviderVersionInfoUpdateSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformProviderVersionInfoUpdateSlice) Less(i, j int) bool {
-	return wis[i].updateTime.Before(wis[j].updateTime)
-}
-
-// terraformProviderVersionInfoFromTerraformProviderVersions returns a slice of terraformProviderVersionInfo, not necessarily sorted in any order.
-func terraformProviderVersionInfoFromTerraformProviderVersions(terraformProviderVersions []models.TerraformProviderVersion) []terraformProviderVersionInfo {
-	result := []terraformProviderVersionInfo{}
-
-	for _, tp := range terraformProviderVersions {
-		result = append(result, terraformProviderVersionInfo{
-			id:         tp.Metadata.ID,
-			updateTime: *tp.Metadata.LastUpdatedTimestamp,
-		})
-	}
-
-	return result
-}
-
-// terraformProviderVersionIDsFromTerraformProviderVersionInfos preserves order
-func terraformProviderVersionIDsFromTerraformProviderVersionInfos(terraformProviderVersionInfos []terraformProviderVersionInfo) []string {
-	result := []string{}
-	for _, terraformProviderVersionInfo := range terraformProviderVersionInfos {
-		result = append(result, terraformProviderVersionInfo.id)
-	}
-	return result
-}
-
-// compareTerraformProviderVersions compares two terraform provider version objects, including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareTerraformProviderVersions(t *testing.T, expected, actual *models.TerraformProviderVersion,
-	checkID bool, times *timeBounds,
-) {
-	assert.Equal(t, expected.ProviderID, actual.ProviderID)
-	assert.Equal(t, expected.GPGASCIIArmor, actual.GPGASCIIArmor)
-	assert.Equal(t, expected.GPGKeyID, actual.GPGKeyID)
-	assert.Equal(t, expected.Protocols, actual.Protocols)
-	assert.Equal(t, expected.SHASumsUploaded, actual.SHASumsUploaded)
-	assert.Equal(t, expected.SHASumsSignatureUploaded, actual.SHASumsSignatureUploaded)
-	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
 	}
 }

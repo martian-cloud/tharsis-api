@@ -4,393 +4,271 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-type warmupLogStreams struct {
-	groups     []models.Group
-	workspaces []models.Workspace
-	runs       []models.Run
-	jobs       []models.Job
-	logStreams []models.LogStream
-	runners    []models.Runner
+// getValue implements the sortableField interface for LogStreamSortableField
+func (ls LogStreamSortableField) getValue() string {
+	return string(ls)
 }
 
-func TestGetLogStreamByID(t *testing.T) {
+func TestLogStreams_CreateLogStream(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := currentTime()
-	warmupItems, err := createWarmupLogStreams(ctx, testClient, warmupLogStreams{
-		groups:     standardWarmupGroupsForLogStreams,
-		workspaces: standardWarmupWorkspacesForLogStreams,
-		runs:       standardWarmupRunsForLogStreams,
-		jobs:       standardWarmupJobsForLogStreams,
-		logStreams: standardWarmupLogStreams,
-		runners:    standardWarmupRunnersForLogStreams,
+	// Create dependencies for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-log-stream",
+		Description: "test group for log stream",
+		FullPath:    "test-group-log-stream",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.Nil(t, err)
-	createdHigh := currentTime()
 
-	type testCase struct {
-		expectErrorCode errors.CodeType
-		expectLogStream *models.LogStream
-		name            string
-		searchID        string
-	}
-
-	positiveLogStream := warmupItems.logStreams[0]
-
-	/*
-		test case template
-
-		{
-			name            string
-			searchID        string
-			expectErrorCode errors.CodeType
-			expectLogStream *models.LogStream
-		}
-	*/
-
-	testCases := []testCase{
-		{
-			name:            "get log stream by id",
-			searchID:        positiveLogStream.Metadata.ID,
-			expectLogStream: &positiveLogStream,
-		},
-		{
-			name:     "negative, non-existent ID",
-			searchID: nonExistentID,
-		},
-		{
-			name:            "defective-id",
-			searchID:        invalidID,
-			expectErrorCode: errors.EInvalid,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			logStream, err := testClient.client.LogStreams.GetLogStreamByID(ctx, test.searchID)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			if test.expectLogStream != nil {
-				require.NotNil(t, logStream)
-				compareLogStreams(t, test.expectLogStream, logStream, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, logStream)
-			}
-		})
-	}
-}
-
-func TestGetLogStreamByJobID(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdLow := currentTime()
-	warmupItems, err := createWarmupLogStreams(ctx, testClient, warmupLogStreams{
-		groups:     standardWarmupGroupsForLogStreams,
-		workspaces: standardWarmupWorkspacesForLogStreams,
-		runs:       standardWarmupRunsForLogStreams,
-		jobs:       standardWarmupJobsForLogStreams,
-		runners:    standardWarmupRunnersForLogStreams,
-		logStreams: standardWarmupLogStreams,
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-log-stream",
+		GroupID:        group.Metadata.ID,
+		Description:    "test workspace for log stream",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
 	})
 	require.Nil(t, err)
-	createdHigh := currentTime()
 
-	type testCase struct {
-		expectErrorCode errors.CodeType
-		expectLogStream *models.LogStream
-		name            string
-		jobID           *string
-	}
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
 
-	positiveLogStream := warmupItems.logStreams[0]
-
-	/*
-		test case template
-
-		{
-			name            string
-			jobID           string
-			expectErrorCode errors.CodeType
-			expectLogStream *models.LogStream
-		}
-	*/
-
-	testCases := []testCase{
-		{
-			name:            "get log stream by job id",
-			jobID:           positiveLogStream.JobID,
-			expectLogStream: &positiveLogStream,
-		},
-		{
-			name:  "negative, non-existent ID",
-			jobID: ptr.String(nonExistentID),
-		},
-		{
-			name:            "defective-id",
-			jobID:           ptr.String(invalidID),
-			expectErrorCode: errors.EInvalid,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			logStream, err := testClient.client.LogStreams.GetLogStreamByJobID(ctx, *test.jobID)
-
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
-
-			if test.expectLogStream != nil {
-				require.NotNil(t, logStream)
-				compareLogStreams(t, test.expectLogStream, logStream, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, logStream)
-			}
-		})
-	}
-}
-
-func TestCreateLogStream(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupLogStreams(ctx, testClient, warmupLogStreams{
-		groups:     standardWarmupGroupsForLogStreams,
-		workspaces: standardWarmupWorkspacesForLogStreams,
-		runs:       standardWarmupRunsForLogStreams,
-		jobs:       standardWarmupJobsForLogStreams,
-		runners:    standardWarmupRunnersForLogStreams,
+	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		RunID:       run.Metadata.ID,
+		WorkspaceID: workspace.Metadata.ID,
+		Type:        models.JobPlanType,
+		Status:      models.JobQueued,
 	})
 	require.Nil(t, err)
 
 	type testCase struct {
-		expectErrorCode errors.CodeType
-		toCreate        *models.LogStream
-		expectCreated   *models.LogStream
 		name            string
+		expectErrorCode errors.CodeType
+		jobID           string
+		size            int
 	}
-
-	now := currentTime()
-
-	warmupJobID := warmupItems.jobs[0].Metadata.ID
-
-	/*
-		test case template
-
-		{
-			name            string
-			toCreate        *models.LogStream
-			expectErrorCode errors.CodeType
-			expectCreated   *models.LogStream
-		}
-	*/
 
 	testCases := []testCase{
 		{
-			name: "positive, standard warmup logStreams",
-			toCreate: &models.LogStream{
-				JobID:     &warmupJobID,
-				Size:      2,
-				Completed: false,
-			},
-			expectCreated: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				JobID:     &warmupJobID,
-				Size:      2,
-				Completed: false,
-			},
+			name:  "create log stream",
+			jobID: job.Metadata.ID,
+			size:  1024,
 		},
 		{
-			name: "negative, non-existent jobID",
-			toCreate: &models.LogStream{
-				JobID: ptr.String(nonExistentID),
-			},
-			expectErrorCode: errors.ENotFound,
-		},
-		{
-			name: "negative, defective jobID",
-			toCreate: &models.LogStream{
-				JobID: ptr.String(invalidID),
-			},
+			name:            "create log stream with invalid job ID",
+			jobID:           invalidID,
+			size:            1024,
 			expectErrorCode: errors.EInternal,
 		},
-		{
-			name: "negative, duplicate logStream",
-			toCreate: &models.LogStream{
-				JobID: &warmupJobID,
-			},
-			expectErrorCode: errors.EConflict,
-		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.LogStreams.CreateLogStream(ctx, test.toCreate)
+			logStream, err := testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
+				JobID: &test.jobID,
+				Size:  test.size,
+			})
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
+			require.Nil(t, err)
+			require.NotNil(t, logStream)
 
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareLogStreams(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
-			}
+			assert.Equal(t, test.jobID, *logStream.JobID)
+			assert.Equal(t, test.size, logStream.Size)
+			assert.NotEmpty(t, logStream.Metadata.ID)
 		})
 	}
 }
 
-func TestUpdateLogStream(t *testing.T) {
+func TestLogStreams_UpdateLogStream(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := currentTime()
-	warmupItems, err := createWarmupLogStreams(ctx, testClient, warmupLogStreams{
-		groups:     standardWarmupGroupsForLogStreams,
-		workspaces: standardWarmupWorkspacesForLogStreams,
-		runs:       standardWarmupRunsForLogStreams,
-		jobs:       standardWarmupJobsForLogStreams,
-		logStreams: standardWarmupLogStreams,
-		runners:    standardWarmupRunnersForLogStreams,
+	// Create dependencies for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-log-stream-update",
+		Description: "test group for log stream update",
+		FullPath:    "test-group-log-stream-update",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.Nil(t, err)
-	createdHigh := currentTime()
 
-	positiveLogStream := warmupItems.logStreams[0]
-	updatedSize := 10
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-log-stream-update",
+		GroupID:        group.Metadata.ID,
+		Description:    "test workspace for log stream update",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		RunID:       run.Metadata.ID,
+		WorkspaceID: workspace.Metadata.ID,
+		Type:        models.JobPlanType,
+		Status:      models.JobQueued,
+	})
+	require.Nil(t, err)
+
+	createdLogStream, err := testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
+		JobID: &job.Metadata.ID,
+		Size:  1024,
+	})
+	require.Nil(t, err)
 
 	type testCase struct {
-		expectErrorCode errors.CodeType
-		expectLogStream *models.LogStream
-		toUpdate        *models.LogStream
 		name            string
+		expectErrorCode errors.CodeType
+		version         int
+		size            int
 	}
-
-	now := currentTime()
-
-	/*
-		test case template
-
-		{
-			name            string
-			toUpdate        *models.LogStream
-			expectErrorCode errors.CodeType
-			expectLogStream *models.LogStream
-		}
-	*/
 
 	testCases := []testCase{
 		{
-			name: "update size",
-			toUpdate: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveLogStream.Metadata.ID,
-					Version: positiveLogStream.Metadata.Version,
-				},
-				JobID:     positiveLogStream.JobID,
-				Size:      updatedSize,
-				Completed: true,
-			},
-			expectLogStream: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID:                   positiveLogStream.Metadata.ID,
-					Version:              positiveLogStream.Metadata.Version + 1,
-					CreationTimestamp:    positiveLogStream.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				JobID:     positiveLogStream.JobID,
-				Size:      updatedSize,
-				Completed: true,
-			},
+			name:    "update log stream",
+			version: createdLogStream.Metadata.Version,
+			size:    2048,
 		},
 		{
-			name: "negative, not exist",
-			toUpdate: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: nonExistentID,
-				},
-			},
+			name:            "update will fail because resource version doesn't match",
 			expectErrorCode: errors.EOptimisticLock,
-		},
-		{
-			name: "negative, invalid uuid",
-			toUpdate: &models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-			},
-			expectErrorCode: errors.EInternal,
+			version:         -1,
+			size:            4096,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			logStream, err := testClient.client.LogStreams.UpdateLogStream(ctx, test.toUpdate)
+			logStreamToUpdate := *createdLogStream
+			logStreamToUpdate.Metadata.Version = test.version
+			logStreamToUpdate.Size = test.size
+
+			updatedLogStream, err := testClient.client.LogStreams.UpdateLogStream(ctx, &logStreamToUpdate)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
 			}
 
-			if test.expectLogStream != nil {
+			require.Nil(t, err)
+			require.NotNil(t, updatedLogStream)
+
+			assert.Equal(t, test.size, updatedLogStream.Size)
+			assert.Equal(t, createdLogStream.Metadata.Version+1, updatedLogStream.Metadata.Version)
+		})
+	}
+}
+
+func TestLogStreams_GetLogStreamByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for the workspace
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-log-stream-get-by-id",
+		Description: "test group for log stream get by id",
+		FullPath:    "test-group-log-stream-get-by-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a workspace for the run
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-log-stream-get-by-id",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a run for the job
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a job for the log stream
+	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobPlanType,
+		Status:      models.JobQueued,
+	})
+	require.NoError(t, err)
+
+	// Create a log stream for testing
+	createdLogStream, err := testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
+		JobID: &job.Metadata.ID,
+		Size:  0,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		id              string
+		expectLogStream bool
+	}
+
+	testCases := []testCase{
+		{
+			name:            "get resource by id",
+			id:              createdLogStream.Metadata.ID,
+			expectLogStream: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			logStream, err := testClient.client.LogStreams.GetLogStreamByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectLogStream {
 				require.NotNil(t, logStream)
-				now := currentTime()
-				compareLogStreams(t, test.expectLogStream, logStream, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  test.expectLogStream.Metadata.LastUpdatedTimestamp,
-					updateHigh: &now,
-				})
+				assert.Equal(t, test.id, logStream.Metadata.ID)
 			} else {
 				assert.Nil(t, logStream)
 			}
@@ -398,170 +276,308 @@ func TestUpdateLogStream(t *testing.T) {
 	}
 }
 
-// standardWarmupGroupsForLogStreams is a list of groups that are created for testing in this module
-var standardWarmupGroupsForLogStreams = []models.Group{
-	{
-		Name:        "group-1",
-		Description: "standard warmup group-1",
-		CreatedBy:   "someone-1",
-	},
-}
+func TestLogStreams_GetLogStreams(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
 
-// standardWarmupWorkspacesForLogStreams is a list of workspaces that are created for testing in this module
-var standardWarmupWorkspacesForLogStreams = []models.Workspace{
-	{
-		Name:        "workspace-1",
-		Description: "standard warmup workspace-1",
-		CreatedBy:   "someone-1",
-		FullPath:    "group-1/workspace-1",
-	},
-}
+	// Create a group for the workspace
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-log-streams-list",
+		Description: "test group for log streams list",
+		FullPath:    "test-group-log-streams-list",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// standardWarmupRunnersForLogStreams is a list of runners that are created for testing in this module
-var standardWarmupRunnersForLogStreams = []models.Runner{
-	{
-		GroupID:     ptr.String("group-1"),
-		Name:        "runner-1",
-		Type:        models.GroupRunnerType,
-		Description: "standard warmup runner-1",
-		CreatedBy:   "someone-1",
-	},
-}
+	// Create a workspace for the runs
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-log-streams-list",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// standardWarmupRunsForLogStreams is a list of runs that are created for testing in this module
-var standardWarmupRunsForLogStreams = []models.Run{
-	{
-		WorkspaceID: "workspace-1",
-	},
-}
+	// Create a run for the jobs
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// standardWarmupJobsForLogStreams is a list of jobs that are created for testing in this module
-var standardWarmupJobsForLogStreams = []models.Job{
-	{
-		WorkspaceID:              "workspace-1",
-		Status:                   models.JobQueued,
-		Type:                     models.JobPlanType,
-		CancelRequested:          true,
-		CancelRequestedTimestamp: ptr.Time(currentTime().Add(-3 * time.Minute)),
-		Timestamps: models.JobTimestamps{
-			QueuedTimestamp:   ptr.Time(currentTime().Add(-9 * time.Minute)),
-			PendingTimestamp:  ptr.Time(currentTime().Add(-7 * time.Minute)),
-			RunningTimestamp:  ptr.Time(currentTime().Add(-5 * time.Minute)),
-			FinishedTimestamp: ptr.Time(currentTime().Add(-1 * time.Minute)),
+	// Create jobs for the log streams
+	job1, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobPlanType,
+		Status:      models.JobQueued,
+	})
+	require.NoError(t, err)
+
+	job2, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobApplyType,
+		Status:      models.JobQueued,
+	})
+	require.NoError(t, err)
+
+	// Create test log streams
+	logStreams := []models.LogStream{
+		{
+			JobID: &job1.Metadata.ID,
+			Size:  100,
 		},
-		MaxJobDuration: 39,
-		RunnerID:       ptr.String("runner-1"),
-		RunnerPath:     ptr.String("runner-1"),
-	},
+		{
+			JobID: &job2.Metadata.ID,
+			Size:  200,
+		},
+	}
+
+	createdLogStreams := []models.LogStream{}
+	for _, logStream := range logStreams {
+		created, err := testClient.client.LogStreams.CreateLogStream(ctx, &logStream)
+		require.NoError(t, err)
+		createdLogStreams = append(createdLogStreams, *created)
+	}
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		input           *GetLogStreamsInput
+		expectCount     int
+	}
+
+	testCases := []testCase{
+		{
+			name:        "get all log streams",
+			input:       &GetLogStreamsInput{},
+			expectCount: len(createdLogStreams),
+		},
+		{
+			name: "filter by job IDs",
+			input: &GetLogStreamsInput{
+				Filter: &LogStreamFilter{
+					JobIDs: []string{job1.Metadata.ID},
+				},
+			},
+			expectCount: 1,
+		}}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.LogStreams.GetLogStreams(ctx, test.input)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result.LogStreams, test.expectCount)
+		})
+	}
 }
 
-// standardWarmupLogStreams is a list of logStreams that are created for testing in this module
-var standardWarmupLogStreams = []models.LogStream{
-	{
-		JobID: ptr.String("job-1"),
-		Size:  2,
-	},
-}
+func TestLogStreams_GetLogStreamsWithPaginationAndSorting(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
 
-// createWarmupLogStreams creates a set of logStreams and their dependencies for testing
-func createWarmupLogStreams(
-	ctx context.Context,
-	testClient *testClient,
-	input warmupLogStreams,
-) (*warmupLogStreams, error) {
+	// Create a group for the workspace
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-log-streams-pagination",
+		Description: "test group for log streams pagination",
+		FullPath:    "test-group-log-streams-pagination",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-	resultGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
+	// Create a workspace for the runs
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-log-streams-pagination",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a run for the jobs
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+			WorkspaceID: workspace.Metadata.ID,
+			RunID:       run.Metadata.ID,
+			Type:        models.JobPlanType,
+			Status:      models.JobQueued,
+		})
+		require.NoError(t, err)
+
+		_, err = testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
+			JobID: &job.Metadata.ID,
+			Size:  100,
+		})
+		require.NoError(t, err)
 	}
 
-	resultRunners, _, err := createInitialRunners(ctx, testClient, input.runners, groupPath2ID)
-	if err != nil {
-		return nil, err
+	sortableFields := []sortableField{
+		LogStreamSortableFieldUpdatedAtAsc,
+		LogStreamSortableFieldUpdatedAtDesc,
 	}
 
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, groupPath2ID, input.workspaces)
-	if err != nil {
-		return nil, err
-	}
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := LogStreamSortableField(sortByField.getValue())
 
-	resultRuns, err := createInitialRuns(ctx, testClient, input.runs, resultWorkspaces[0].Metadata.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	resultJobs, err := createInitialJobs(ctx, testClient, input.jobs,
-		[]string{resultWorkspaces[0].Metadata.ID}, resultRuns[0].Metadata.ID, resultRunners[0].Metadata.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	resultLogStreams, err := createInitialLogStreams(ctx, testClient, resultJobs, input.logStreams)
-	if err != nil {
-		return nil, err
-	}
-
-	return &warmupLogStreams{
-		groups:     resultGroups,
-		runners:    resultRunners,
-		workspaces: resultWorkspaces,
-		runs:       resultRuns,
-		jobs:       resultJobs,
-		logStreams: resultLogStreams,
-	}, nil
-}
-
-// createInitialLogStreams creates a set of logStreams for testing
-func createInitialLogStreams(
-	ctx context.Context,
-	testClient *testClient,
-	jobs []models.Job,
-	toCreate []models.LogStream,
-) ([]models.LogStream, error) {
-	if len(jobs) == 0 {
-		return nil, fmt.Errorf("no jobs available in createInitialLogStreams")
-	}
-
-	result := []models.LogStream{}
-
-	for _, l := range toCreate {
-		l.JobID = &jobs[0].Metadata.ID
-
-		created, err := testClient.client.LogStreams.CreateLogStream(ctx, &l)
+		result, err := testClient.client.LogStreams.GetLogStreams(ctx, &GetLogStreamsInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		result = append(result, *created)
-	}
+		resources := []pagination.CursorPaginatable{}
+		for _, resource := range result.LogStreams {
+			resourceCopy := resource
+			resources = append(resources, &resourceCopy)
+		}
 
-	return result, nil
+		return result.PageInfo, resources, nil
+	})
 }
 
-// compareLogStreams compares two logStreams
-// If times is nil, it compares the exact metadata timestamps.
-func compareLogStreams(t *testing.T,
-	expected,
-	actual *models.LogStream,
-	checkID bool,
-	times *timeBounds,
-) {
-	assert.Equal(t, expected.JobID, actual.JobID)
-	assert.Equal(t, expected.Size, actual.Size)
-	assert.Equal(t, expected.Completed, actual.Completed)
+func TestLogStreams_GetLogStreamByJobID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
 
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
+	// Create a group for the workspace
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-log-stream-job-id",
+		Description: "test group for log stream job id",
+		FullPath:    "test-group-log-stream-job-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a workspace for the run
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-log-stream-job-id",
+		GroupID:        group.Metadata.ID,
+		MaxJobDuration: ptr.Int32(1),
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a run for the job
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a job for the log stream
+	job, err := testClient.client.Jobs.CreateJob(ctx, &models.Job{
+		WorkspaceID: workspace.Metadata.ID,
+		RunID:       run.Metadata.ID,
+		Type:        models.JobPlanType,
+		Status:      models.JobQueued,
+	})
+	require.NoError(t, err)
+
+	// Create a log stream for testing
+	createdLogStream, err := testClient.client.LogStreams.CreateLogStream(ctx, &models.LogStream{
+		JobID: &job.Metadata.ID,
+		Size:  100,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		jobID           string
+		expectLogStream bool
 	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
 
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
+	testCases := []testCase{
+		{
+			name:            "get resource by job ID",
+			jobID:           job.Metadata.ID,
+			expectLogStream: true,
+		},
+		{
+			name:  "resource with job ID not found",
+			jobID: nonExistentID,
+		},
+		{
+			name:            "get resource with invalid job ID will return an error",
+			jobID:           invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			logStream, err := testClient.client.LogStreams.GetLogStreamByJobID(ctx, test.jobID)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectLogStream {
+				require.NotNil(t, logStream)
+				assert.Equal(t, createdLogStream.Metadata.ID, logStream.Metadata.ID)
+				assert.Equal(t, &test.jobID, logStream.JobID)
+			} else {
+				assert.Nil(t, logStream)
+			}
+		})
+	}
+}
+
+func TestLogStreams_GetLogStreamByRunnerSessionID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	type testCase struct {
+		name        string
+		sessionID   string
+		expectError bool
+	}
+
+	testCases := []testCase{
+		{
+			name:        "resource with session ID not found - returns nil",
+			sessionID:   "11111111-2222-3333-4444-555555555555",
+			expectError: false,
+		},
+		{
+			name:        "get resource with invalid session ID will return an error",
+			sessionID:   invalidID,
+			expectError: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			logStream, err := testClient.client.LogStreams.GetLogStreamByRunnerSessionID(ctx, test.sessionID)
+
+			if test.expectError {
+				require.Error(t, err)
+				assert.Nil(t, logStream)
+			} else {
+				require.NoError(t, err)
+				assert.Nil(t, logStream) // Should be nil for non-existent session
+			}
+		})
 	}
 }

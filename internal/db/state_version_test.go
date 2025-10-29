@@ -4,603 +4,323 @@ package db
 
 import (
 	"context"
-	"sort"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// Some constants and pseudo-constants are declared/defined in dbclient_test.go.
-
-// stateVersionInfo aids convenience in accessing the information
-// TestGetStateVersions needs about the warmup state versions.
-type stateVersionInfo struct {
-	updateTime     time.Time
-	stateVersionID string
+// getValue implements the sortableField interface for StateVersionSortableField
+func (sv StateVersionSortableField) getValue() string {
+	return string(sv)
 }
 
-// stateVersionInfoIDSlice makes a slice of stateVersionInfo sortable by ID string
-type stateVersionInfoIDSlice []stateVersionInfo
-
-// stateVersionInfoUpdateSlice makes a slice of stateVersionInfo sortable by last updated time
-type stateVersionInfoUpdateSlice []stateVersionInfo
-
-func TestGetStateVersions(t *testing.T) {
+func TestStateVersions_CreateStateVersion(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupWorkspaces, _, warmupStateVersions, err := createWarmupStateVersions(ctx, testClient,
-		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
-		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	require.Nil(t, err)
-	allStateVersionInfos := stateVersionInfoFromStateVersions(warmupStateVersions)
-
-	// Sort by state version IDs.
-	sort.Sort(stateVersionInfoIDSlice(allStateVersionInfos))
-	allStateVersionIDs := stateVersionIDsFromStateVersionInfos(allStateVersionInfos)
-
-	// Sort by last update times.
-	sort.Sort(stateVersionInfoUpdateSlice(allStateVersionInfos))
-	allStateVersionIDsByTime := stateVersionIDsFromStateVersionInfos(allStateVersionInfos)
-	reverseStateVersionIDsByTime := reverseStringSlice(allStateVersionIDsByTime)
-
-	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
-
-	type testCase struct {
-		expectStartCursorError      error
-		expectEndCursorError        error
-		input                       *GetStateVersionsInput
-		expectMsg                   *string
-		name                        string
-		expectPageInfo              pagination.PageInfo
-		expectStateVersionIDs       []string
-		getBeforeCursorFromPrevious bool
-		sortedDescending            bool
-		expectHasStartCursor        bool
-		getAfterCursorFromPrevious  bool
-		expectHasEndCursor          bool
-	}
-
-	/*
-		template test case:
-
-		{
-			name: "",
-			input: &GetStateVersionsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			sortedDescending             bool
-			getBeforeCursorFromPrevious: false,
-			getAfterCursorFromPrevious:  false,
-			expectMsg:                   nil,
-			expectStateVersionIDs:       []string{},
-			expectPageInfo: pagination.PageInfo{
-				Cursor:          nil,
-				TotalCount:      0,
-				HasNextPage:     false,
-				HasPreviousPage: false,
-			},
-			expectStartCursorError: nil,
-			expectHasStartCursor:   false,
-			expectEndCursorError:   nil,
-			expectHasEndCursor:     false,
-		}
-	*/
-
-	testCases := []testCase{
-		// nil input likely causes a nil pointer dereference in GetStateVersions, so don't try it.
-
-		{
-			name: "non-nil but mostly empty input",
-			input: &GetStateVersionsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			expectStateVersionIDs: allStateVersionIDs,
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "populated sort and pagination, nil filter",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectStateVersionIDs: allStateVersionIDsByTime,
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "sort in ascending order of time of last update",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-			},
-			expectStateVersionIDs: allStateVersionIDsByTime,
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDsByTime)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "sort in descending order of time of last update",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtDesc),
-			},
-			sortedDescending:      true,
-			expectStateVersionIDs: reverseStateVersionIDsByTime,
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDsByTime)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "pagination: everything at once",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-			},
-			expectStateVersionIDs: allStateVersionIDsByTime,
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(len(allStateVersionIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "pagination: first two",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(2),
-				},
-			},
-			expectStateVersionIDs: allStateVersionIDsByTime[:2],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allStateVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "pagination: middle two",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(2),
-				},
-			},
-			getAfterCursorFromPrevious: true,
-			expectStateVersionIDs:      allStateVersionIDsByTime[2:4],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allStateVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "pagination: final one",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-			},
-			getAfterCursorFromPrevious: true,
-			expectStateVersionIDs:      allStateVersionIDsByTime[4:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allStateVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		// When Last is supplied, the sort order is intended to be reversed.
-		{
-			name: "pagination: last three",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					Last: ptr.Int32(3),
-				},
-			},
-			sortedDescending:      true,
-			expectStateVersionIDs: reverseStateVersionIDsByTime[:3],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allStateVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		/*
-
-			The input.PaginationOptions.After field is tested earlier via getAfterCursorFromPrevious.
-
-			The input.PaginationOptions.Before field is not really supported and does not work.
-			If it did work, it could be tested by adapting the test cases corresponding to the
-			next few cases after a similar block of text from group_test.go
-
-		*/
-
-		{
-			name: "pagination, before and after, expect error",
-			input: &GetStateVersionsInput{
-				Sort:              ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{},
-			},
-			getAfterCursorFromPrevious:  true,
-			getBeforeCursorFromPrevious: true,
-			expectMsg:                   ptr.String("only before or after can be defined, not both"),
-			expectStateVersionIDs:       []string{},
-			expectPageInfo:              pagination.PageInfo{},
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
-			},
-			expectMsg:             ptr.String("only first or last can be defined, not both"),
-			expectStateVersionIDs: allStateVersionIDs[4:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allStateVersionIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "fully-populated types, nothing allowed through filters",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: &StateVersionFilter{
-					WorkspaceID: ptr.String(""),
-					// Passing an empty slice to StateVersionIDs causes an SQL syntax error ("... IN ()"), so don't try it.
-					// StateVersionIDs: []string{},
-				},
-			},
-			expectMsg:             invalidUUIDMsg,
-			expectStateVersionIDs: []string{},
-			expectPageInfo:        pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, workspace ID, positive",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				Filter: &StateVersionFilter{
-					WorkspaceID: ptr.String(warmupWorkspaces[0].Metadata.ID),
-				},
-			},
-			expectStateVersionIDs: allStateVersionIDsByTime[:3],
-			expectPageInfo:        pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "filter, workspace ID, non-existent",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				Filter: &StateVersionFilter{
-					WorkspaceID: ptr.String(nonExistentID),
-				},
-			},
-			expectStateVersionIDs: []string{},
-			expectPageInfo:        pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
-		},
-
-		{
-			name: "filter, workspace ID, invalid",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				Filter: &StateVersionFilter{
-					WorkspaceID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:             invalidUUIDMsg,
-			expectStateVersionIDs: []string{},
-			expectPageInfo:        pagination.PageInfo{},
-		},
-
-		{
-			name: "filter, state versionIDs, positive",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				Filter: &StateVersionFilter{
-					StateVersionIDs: []string{
-						allStateVersionIDsByTime[0], allStateVersionIDsByTime[1], allStateVersionIDsByTime[3],
-					},
-				},
-			},
-			expectStateVersionIDs: []string{
-				allStateVersionIDsByTime[0], allStateVersionIDsByTime[1], allStateVersionIDsByTime[3],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, state versionIDs, non-existent",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				Filter: &StateVersionFilter{
-					StateVersionIDs: []string{nonExistentID},
-				},
-			},
-			expectStateVersionIDs: []string{},
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-
-		{
-			name: "filter, state versionIDs, invalid ID",
-			input: &GetStateVersionsInput{
-				Sort: ptrStateVersionSortableField(StateVersionSortableFieldUpdatedAtAsc),
-				Filter: &StateVersionFilter{
-					StateVersionIDs: []string{invalidID},
-				},
-			},
-			expectMsg:             invalidUUIDMsg,
-			expectStateVersionIDs: []string{},
-			expectPageInfo:        pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor:  true,
-			expectHasEndCursor:    true,
-		},
-	}
-
-	var (
-		previousEndCursorValue   *string
-		previousStartCursorValue *string
-	)
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			// For some pagination tests, a previous case's cursor value gets piped into the next case.
-			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
-
-				// Make sure there's a place to put it.
-				require.NotNil(t, test.input.PaginationOptions)
-
-				if test.getAfterCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousEndCursorValue)
-					test.input.PaginationOptions.After = previousEndCursorValue
-				}
-
-				if test.getBeforeCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousStartCursorValue)
-					test.input.PaginationOptions.Before = previousStartCursorValue
-				}
-
-				// Clear the values so they won't be used twice.
-				previousEndCursorValue = nil
-				previousStartCursorValue = nil
-			}
-
-			stateVersionsResult, err := testClient.client.StateVersions.GetStateVersions(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			// If there was no error, check the results.
-			if err == nil {
-
-				// Never returns nil if error is nil.
-				require.NotNil(t, stateVersionsResult.PageInfo)
-				assert.NotNil(t, stateVersionsResult.StateVersions)
-				pageInfo := stateVersionsResult.PageInfo
-				stateVersions := stateVersionsResult.StateVersions
-
-				// Check the state versions result by comparing a list of the state version IDs.
-				actualStateVersionIDs := []string{}
-				for _, stateVersion := range stateVersions {
-					actualStateVersionIDs = append(actualStateVersionIDs, stateVersion.Metadata.ID)
-				}
-
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(actualStateVersionIDs)
-				}
-
-				assert.Equal(t, len(test.expectStateVersionIDs), len(actualStateVersionIDs))
-				assert.Equal(t, test.expectStateVersionIDs, actualStateVersionIDs)
-
-				assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
-				assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
-				assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
-				assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
-
-				// Compare the cursor function results only if there is at least one state version returned.
-				// If there are no state versions returned, there is no argument to pass to the cursor function.
-				// Also, don't try to reverse engineer to compare the cursor string values.
-				if len(stateVersions) > 0 {
-					resultStartCursor, resultStartCursorError := pageInfo.Cursor(&stateVersions[0])
-					resultEndCursor, resultEndCursorError := pageInfo.Cursor(&stateVersions[len(stateVersions)-1])
-					assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
-					assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
-					assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
-					assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
-
-					// Capture the ending cursor values for the next case.
-					previousEndCursorValue = resultEndCursor
-					previousStartCursorValue = resultStartCursor
-				}
-			}
-		})
-	}
-}
-
-func TestGetStateVersionByID(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdLow := time.Now()
-	_, _, warmupStateVersions, err := createWarmupStateVersions(ctx, testClient,
-		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
-		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	require.Nil(t, err)
-	createdHigh := time.Now()
-
-	type testCase struct {
-		expectMsg          *string
-		expectStateVersion *models.StateVersion
-		name               string
-		searchID           string
-	}
-
-	positiveStateVersion := warmupStateVersions[0]
-	now := time.Now()
-	testCases := []testCase{
-		{
-			name:     "positive",
-			searchID: positiveStateVersion.Metadata.ID,
-			expectStateVersion: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					ID:                positiveStateVersion.Metadata.ID,
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				WorkspaceID: positiveStateVersion.WorkspaceID,
-				RunID:       positiveStateVersion.RunID,
-				CreatedBy:   positiveStateVersion.CreatedBy,
-			},
-		},
-
-		{
-			name:     "negative, non-existent state version ID",
-			searchID: nonExistentID,
-			// expect state version and error to be nil
-		},
-
-		{
-			name:      "defective-ID",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualStateVersion, err := testClient.client.StateVersions.GetStateVersionByID(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectStateVersion != nil {
-				require.NotNil(t, actualStateVersion)
-				compareStateVersions(t, test.expectStateVersion, actualStateVersion, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, actualStateVersion)
-			}
-		})
-	}
-}
-
-func TestGetStateVersionByTRN(t *testing.T) {
-	ctx := t.Context()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
+	// Create a group, workspace, and run for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "test-group",
+		Name:        "test-group-state-version",
+		Description: "test group for state version",
+		FullPath:    "test-group-state-version",
+		CreatedBy:   "db-integration-tests",
 	})
-	require.NoError(t, err)
+	require.Nil(t, err)
 
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
-		Name:           "test-workspace",
+		Name:           "test-workspace-state-version",
 		GroupID:        group.Metadata.ID,
-		MaxJobDuration: ptr.Int32(20),
+		Description:    "test workspace for state version",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
 	})
-	require.NoError(t, err)
+	require.Nil(t, err)
 
-	stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
 		WorkspaceID: workspace.Metadata.ID,
-		CreatedBy:   "test-user",
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
 	})
-	require.NoError(t, err)
+	require.Nil(t, err)
 
 	type testCase struct {
 		name            string
-		trn             string
-		expectVersion   bool
 		expectErrorCode errors.CodeType
+		runID           string
+		workspaceID     string
 	}
 
 	testCases := []testCase{
 		{
-			name:          "get state version by TRN",
-			trn:           stateVersion.Metadata.TRN,
-			expectVersion: true,
+			name:        "create state version",
+			runID:       run.Metadata.ID,
+			workspaceID: workspace.Metadata.ID,
 		},
 		{
-			name: "resource with TRN not found",
-			trn:  types.StateVersionModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+			name:            "create state version with invalid workspace ID",
+			runID:           run.Metadata.ID,
+			workspaceID:     invalidID,
+			expectErrorCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			stateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+				RunID:       &test.runID,
+				WorkspaceID: test.workspaceID,
+				CreatedBy:   "db-integration-tests",
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+			require.NotNil(t, stateVersion)
+
+			assert.Equal(t, test.runID, *stateVersion.RunID)
+			assert.Equal(t, test.workspaceID, stateVersion.WorkspaceID)
+			assert.NotEmpty(t, stateVersion.Metadata.ID)
+		})
+	}
+}
+
+func TestStateVersions_GetStateVersionByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-state-version-get-by-id",
+		Description: "test group for state version get by id",
+		FullPath:    "test-group-state-version-get-by-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a workspace for testing
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-state-version-get-by-id",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	// Create a state version for testing
+	createdStateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode    errors.CodeType
+		name               string
+		id                 string
+		expectStateVersion bool
+	}
+
+	testCases := []testCase{
+		{
+			name:               "get resource by id",
+			id:                 createdStateVersion.Metadata.ID,
+			expectStateVersion: true,
 		},
 		{
-			name:            "state version TRN cannot have less than two parts",
-			trn:             types.StateVersionModelType.BuildTRN(nonExistentGlobalID),
-			expectErrorCode: errors.EInvalid,
+			name: "resource with id not found",
+			id:   nonExistentID,
 		},
 		{
-			name:            "get resource with invalid TRN will return an error",
-			trn:             "trn:invalid",
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
 			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualVersion, err := testClient.client.StateVersions.GetStateVersionByTRN(ctx, test.trn)
+			stateVersion, err := testClient.client.StateVersions.GetStateVersionByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectStateVersion {
+				require.NotNil(t, stateVersion)
+				assert.Equal(t, test.id, stateVersion.Metadata.ID)
+			} else {
+				assert.Nil(t, stateVersion)
+			}
+		})
+	}
+}
+
+func TestStateVersions_GetStateVersionByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-state-version-get-by-trn",
+		Description: "test group for state version get by trn",
+		FullPath:    "test-group-state-version-get-by-trn",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a workspace for testing
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-state-version-get-by-trn",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	// Create a state version for testing
+	createdStateVersion, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+		WorkspaceID: workspace.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode    errors.CodeType
+		name               string
+		trn                string
+		expectStateVersion bool
+	}
+
+	testCases := []testCase{
+		{
+			name:               "get resource by TRN",
+			trn:                createdStateVersion.Metadata.TRN,
+			expectStateVersion: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  "trn:tharsis:state_version:non-existent-id",
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "invalid-trn",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			stateVersion, err := testClient.client.StateVersions.GetStateVersionByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectStateVersion {
+				require.NotNil(t, stateVersion)
+				assert.Equal(t, createdStateVersion.Metadata.ID, stateVersion.Metadata.ID)
+			} else {
+				assert.Nil(t, stateVersion)
+			}
+		})
+	}
+}
+
+func TestStateVersions_GetStateVersions(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-state-versions-list",
+		Description: "test group for state versions list",
+		FullPath:    "test-group-state-versions-list",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a workspace for testing
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-state-versions-list",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	// Create test state versions
+	stateVersions := []models.StateVersion{
+		{
+			WorkspaceID: workspace.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
+		},
+		{
+			WorkspaceID: workspace.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
+		},
+	}
+
+	createdStateVersions := []models.StateVersion{}
+	for _, stateVersion := range stateVersions {
+		created, err := testClient.client.StateVersions.CreateStateVersion(ctx, &stateVersion)
+		require.NoError(t, err)
+		createdStateVersions = append(createdStateVersions, *created)
+	}
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		input           *GetStateVersionsInput
+		expectCount     int
+	}
+
+	testCases := []testCase{
+		{
+			name: "get all state versions for workspace",
+			input: &GetStateVersionsInput{
+				Filter: &StateVersionFilter{
+					WorkspaceID: &workspace.Metadata.ID,
+				},
+			},
+			expectCount: len(createdStateVersions),
+		},
+		{
+			name: "filter by state version IDs",
+			input: &GetStateVersionsInput{
+				Filter: &StateVersionFilter{
+					StateVersionIDs: []string{createdStateVersions[0].Metadata.ID},
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "filter by time range start",
+			input: &GetStateVersionsInput{
+				Filter: &StateVersionFilter{
+					WorkspaceID:    &workspace.Metadata.ID,
+					TimeRangeStart: createdStateVersions[0].Metadata.CreationTimestamp,
+				},
+			},
+			expectCount: len(createdStateVersions),
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.StateVersions.GetStateVersions(ctx, test.input)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -608,339 +328,76 @@ func TestGetStateVersionByTRN(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-
-			if test.expectVersion {
-				require.NotNil(t, actualVersion)
-				assert.Equal(t, types.StateVersionModelType.BuildTRN(workspace.FullPath, stateVersion.GetGlobalID()), actualVersion.Metadata.TRN)
-			} else {
-				assert.Nil(t, actualVersion)
-			}
+			assert.Len(t, result.StateVersions, test.expectCount)
 		})
 	}
 }
 
-func TestCreateStateVersion(t *testing.T) {
+func TestStateVersions_GetStateVersionsWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupWorkspaces, warmupRuns, _, err := createWarmupStateVersions(ctx, testClient,
-		standardWarmupGroupsForStateVersions, standardWarmupWorkspacesForStateVersions,
-		standardWarmupRunsForStateVersions, standardWarmupStateVersions)
-	require.Nil(t, err)
+	// Create a group, workspace, and run for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-state-versions-pagination",
+		Description: "test group for state versions pagination",
+		FullPath:    "test-group-state-versions-pagination",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-	type testCase struct {
-		toCreate      *models.StateVersion
-		expectCreated *models.StateVersion
-		expectMsg     *string
-		name          string
-	}
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-state-versions-pagination",
+		GroupID:        group.Metadata.ID,
+		Description:    "test workspace for state versions pagination",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
 
-	now := currentTime()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toCreate: &models.StateVersion{
-				WorkspaceID: warmupWorkspaces[1].Metadata.ID,
-				RunID:       ptr.String(warmupRuns[0].Metadata.ID),
-				CreatedBy:   "positive-test-case",
-			},
-			expectCreated: &models.StateVersion{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				WorkspaceID: warmupWorkspaces[1].Metadata.ID,
-				RunID:       ptr.String(warmupRuns[0].Metadata.ID),
-				CreatedBy:   "positive-test-case",
-			},
-		},
+	run, err := testClient.client.Runs.CreateRun(ctx, &models.Run{
+		WorkspaceID: workspace.Metadata.ID,
+		Status:      models.RunPending,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-		// Duplicates are not prohibited by the DB, so don't do a duplicate test case.
-
-		{
-			name: "non-existent workspace ID",
-			toCreate: &models.StateVersion{
-				WorkspaceID: nonExistentID,
-				RunID:       ptr.String(warmupRuns[0].Metadata.ID),
-				CreatedBy:   "non-existent-workspace-id-test-case",
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"state_versions\" violates foreign key constraint \"fk_workspace_id\" (SQLSTATE 23503)"),
-		},
-
-		{
-			name: "non-existent run ID",
-			toCreate: &models.StateVersion{
-				WorkspaceID: warmupWorkspaces[1].Metadata.ID,
-				RunID:       ptr.String(nonExistentID),
-				CreatedBy:   "non-existent-run-id",
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"state_versions\" violates foreign key constraint \"fk_run_id\" (SQLSTATE 23503)"),
-		},
-
-		{
-			name: "defective workspace ID",
-			toCreate: &models.StateVersion{
-				WorkspaceID: invalidID,
-				RunID:       ptr.String(warmupRuns[0].Metadata.ID),
-				CreatedBy:   "defective-workspace-id-test-case",
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-
-		{
-			name: "defective run ID",
-			toCreate: &models.StateVersion{
-				WorkspaceID: warmupWorkspaces[1].Metadata.ID,
-				RunID:       ptr.String(invalidID),
-				CreatedBy:   "defective-run-id",
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.StateVersions.CreateStateVersion(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := time.Now()
-
-				compareStateVersions(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
-			}
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		_, err := testClient.client.StateVersions.CreateStateVersion(ctx, &models.StateVersion{
+			RunID:       &run.Metadata.ID,
+			WorkspaceID: workspace.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
 		})
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup group(s) for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForStateVersions = []models.Group{
-	{
-		Description: "top level group 0 for testing state version functions",
-		FullPath:    "top-level-group-0-for-state-versions",
-		CreatedBy:   "someone-g0",
-	},
-}
-
-// Standard warmup workspace(s) for tests in this module:
-var standardWarmupWorkspacesForStateVersions = []models.Workspace{
-	{
-		Description: "workspace 0 for testing state version functions",
-		FullPath:    "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-		CreatedBy:   "someone-w0",
-	},
-	{
-		Description: "workspace 1 for testing state version functions",
-		FullPath:    "top-level-group-0-for-state-versions/workspace-1-for-state-versions",
-		CreatedBy:   "someone-w1",
-	},
-}
-
-// Standard warmup run(s) for tests in this module
-// The ID fields will be replaced by the ID(s) during the create function.
-// Please note: The double nesting is required to support multiple workspaces.
-var standardWarmupRunsForStateVersions = [][]models.Run{
-	{
-		{
-			WorkspaceID: "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-			Comment:     "standard warmup run 0 for testing state versions",
-		},
-		{
-			WorkspaceID: "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-			Comment:     "standard warmup run 1 for testing state versions",
-		},
-		{
-			WorkspaceID: "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-			Comment:     "standard warmup run 2 for testing state versions",
-		},
-	},
-	{
-		{
-			WorkspaceID: "top-level-group-0-for-state-versions/workspace-1-for-state-versions",
-			Comment:     "standard warmup run 3 for testing state versions",
-		},
-		{
-			WorkspaceID: "top-level-group-0-for-state-versions/workspace-1-for-state-versions",
-			Comment:     "standard warmup run 4 for testing state versions",
-		},
-	},
-}
-
-// Standard warmup state versions for tests in this module:
-// The ID fields will be replaced by the real IDs during the create function.
-// Please note: Even though RunID is a pointer, it cannot be nil due to a not-null constraint.
-var standardWarmupStateVersions = []models.StateVersion{
-	{
-		WorkspaceID: "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-		RunID:       ptr.String("standard warmup run 0 for testing state versions"),
-		CreatedBy:   "someone-sv0",
-	},
-	{
-		WorkspaceID: "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-		RunID:       ptr.String("standard warmup run 1 for testing state versions"),
-		CreatedBy:   "someone-sv1",
-	},
-	{
-		WorkspaceID: "top-level-group-0-for-state-versions/workspace-0-for-state-versions",
-		RunID:       ptr.String("standard warmup run 2 for testing state versions"),
-		CreatedBy:   "someone-sv2",
-	},
-	{
-		WorkspaceID: "top-level-group-0-for-state-versions/workspace-1-for-state-versions",
-		RunID:       ptr.String("standard warmup run 3 for testing state versions"),
-		CreatedBy:   "someone-sv3",
-	},
-	{
-		WorkspaceID: "top-level-group-0-for-state-versions/workspace-1-for-state-versions",
-		RunID:       ptr.String("standard warmup run 4 for testing state versions"),
-		CreatedBy:   "someone-sv4",
-	},
-}
-
-// createWarmupStateVersions creates some warmup state versions for a test
-// The warmup state versions to create can be standard or otherwise.
-func createWarmupStateVersions(ctx context.Context, testClient *testClient,
-	newGroups []models.Group,
-	newWorkspaces []models.Workspace,
-	newRuns [][]models.Run,
-	newStateVersions []models.StateVersion) (
-	[]models.Workspace,
-	[]models.Run,
-	[]models.StateVersion,
-	error,
-) {
-	// It is necessary to create at least one group, workspace, and run
-	// in order to provide the necessary IDs for the state versions.
-
-	_, parentPath2ID, err := createInitialGroups(ctx, testClient, newGroups)
-	if err != nil {
-		return nil, nil, nil, err
+		require.NoError(t, err)
 	}
 
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, parentPath2ID, newWorkspaces)
-	if err != nil {
-		return nil, nil, nil, err
+	sortableFields := []sortableField{
+		StateVersionSortableFieldUpdatedAtAsc,
+		StateVersionSortableFieldUpdatedAtDesc,
 	}
 
-	workspaceMap := map[string]string{}
-	for _, ws := range resultWorkspaces {
-		workspaceMap[ws.FullPath] = ws.Metadata.ID
-	}
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := StateVersionSortableField(sortByField.getValue())
 
-	var resultRuns []models.Run
-	for ix := range resultWorkspaces {
-		partialResultRuns, err2 := createInitialRuns(ctx, testClient, newRuns[ix], resultWorkspaces[ix].Metadata.ID)
-		if err2 != nil {
-			return nil, nil, nil, err2
+		result, err := testClient.client.StateVersions.GetStateVersions(ctx, &GetStateVersionsInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+			Filter: &StateVersionFilter{
+				WorkspaceID: &workspace.Metadata.ID,
+			},
+		})
+		if err != nil {
+			return nil, nil, err
 		}
-		resultRuns = append(resultRuns, partialResultRuns...)
-	}
 
-	runMap := map[string]string{}
-	for _, run := range resultRuns {
-		runMap[run.Comment] = run.Metadata.ID
-	}
+		resources := []pagination.CursorPaginatable{}
+		for _, resource := range result.StateVersions {
+			resourceCopy := resource
+			resources = append(resources, &resourceCopy)
+		}
 
-	resultStateVersions, err := createInitialStateVersions(ctx, testClient, workspaceMap, runMap, newStateVersions)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return resultWorkspaces, resultRuns, resultStateVersions, nil
-}
-
-func ptrStateVersionSortableField(arg StateVersionSortableField) *StateVersionSortableField {
-	return &arg
-}
-
-func (wis stateVersionInfoIDSlice) Len() int {
-	return len(wis)
-}
-
-func (wis stateVersionInfoIDSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis stateVersionInfoIDSlice) Less(i, j int) bool {
-	return wis[i].stateVersionID < wis[j].stateVersionID
-}
-
-func (wis stateVersionInfoUpdateSlice) Len() int {
-	return len(wis)
-}
-
-func (wis stateVersionInfoUpdateSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis stateVersionInfoUpdateSlice) Less(i, j int) bool {
-	return wis[i].updateTime.Before(wis[j].updateTime)
-}
-
-// stateVersionInfoFromStateVersions returns a slice of stateVersionInfo, not necessarily sorted in any order.
-func stateVersionInfoFromStateVersions(stateVersions []models.StateVersion) []stateVersionInfo {
-	result := []stateVersionInfo{}
-
-	for _, stateVersion := range stateVersions {
-		result = append(result, stateVersionInfo{
-			stateVersionID: stateVersion.Metadata.ID,
-			updateTime:     *stateVersion.Metadata.LastUpdatedTimestamp,
-		})
-	}
-
-	return result
-}
-
-// stateVersionIDsFromStateVersionInfos preserves order
-func stateVersionIDsFromStateVersionInfos(stateVersionInfos []stateVersionInfo) []string {
-	result := []string{}
-	for _, stateVersionInfo := range stateVersionInfos {
-		result = append(result, stateVersionInfo.stateVersionID)
-	}
-	return result
-}
-
-// compareStateVersions compares two state version objects, including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareStateVersions(t *testing.T, expected, actual *models.StateVersion,
-	checkID bool, times *timeBounds,
-) {
-	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
-	assert.Equal(t, expected.RunID, actual.RunID)
-	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
-	}
+		return result.PageInfo, resources, nil
+	})
 }

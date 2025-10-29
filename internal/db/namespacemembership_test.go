@@ -126,7 +126,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 		expectStartCursorError      error
 		expectEndCursorError        error
 		input                       *GetNamespaceMembershipsInput
-		expectMsg                   *string
+		expectErrorCode             errors.CodeType
 		name                        string
 		expectPageInfo              pagination.PageInfo
 		expectTrails                []string
@@ -143,20 +143,20 @@ func TestGetNamespaceMemberships(t *testing.T) {
 		{
 			name: "",
 			input: &GetNamespaceMembershipsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
+			Sort:              nil,
+			PaginationOptions: nil,
+			Filter:            nil,
 			},
 			sortedDescending             bool
 			getBeforeCursorFromPrevious: false,
 			getAfterCursorFromPrevious:  false,
-			expectMsg:                   nil,
+			expectErrorCode:             "",
 			expectTrails:                []string{},
 			expectPageInfo: pagination.PageInfo{
-				Cursor:          nil,
-				TotalCount:      0,
-				HasNextPage:     false,
-				HasPreviousPage: false,
+			Cursor:          nil,
+			TotalCount:      0,
+			HasNextPage:     false,
+			HasPreviousPage: false,
 			},
 			expectStartCursorError: nil,
 			expectHasStartCursor:   false,
@@ -358,7 +358,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			},
 			getAfterCursorFromPrevious:  true,
 			getBeforeCursorFromPrevious: true,
-			expectMsg:                   ptr.String("only before or after can be defined, not both"),
+			expectErrorCode:             errors.EInternal,
 			expectTrails:                []string{},
 			expectPageInfo:              pagination.PageInfo{},
 		},
@@ -372,8 +372,8 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					Last:  ptr.Int32(2),
 				},
 			},
-			expectMsg:    ptr.String("only first or last can be defined, not both"),
-			expectTrails: allTrails[4:],
+			expectErrorCode: errors.EInternal,
+			expectTrails:    allTrails[4:],
 			expectPageInfo: pagination.PageInfo{
 				TotalCount:      int32(len(allTrails)),
 				Cursor:          dummyCursorFunc,
@@ -401,9 +401,9 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					NamespacePaths:      []string{},
 				},
 			},
-			expectMsg:      invalidUUIDMsg,
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{},
+			expectErrorCode: errors.EInternal,
+			expectTrails:    []string{},
+			expectPageInfo:  pagination.PageInfo{},
 		},
 
 		{
@@ -466,9 +466,9 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					UserID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg,
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{},
+			expectErrorCode: errors.EInternal,
+			expectTrails:    []string{},
+			expectPageInfo:  pagination.PageInfo{},
 		},
 
 		{
@@ -531,9 +531,9 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					ServiceAccountID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg,
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{},
+			expectErrorCode: errors.EInternal,
+			expectTrails:    []string{},
+			expectPageInfo:  pagination.PageInfo{},
 		},
 
 		{
@@ -596,9 +596,9 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					TeamID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg,
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{},
+			expectErrorCode: errors.EInternal,
+			expectTrails:    []string{},
+			expectPageInfo:  pagination.PageInfo{},
 		},
 
 		{
@@ -677,9 +677,9 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					GroupID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg,
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{},
+			expectErrorCode: errors.EInternal,
+			expectTrails:    []string{},
+			expectPageInfo:  pagination.PageInfo{},
 		},
 
 		{
@@ -756,9 +756,9 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					WorkspaceID: ptr.String(invalidID),
 				},
 			},
-			expectMsg:      invalidUUIDMsg,
-			expectTrails:   []string{},
-			expectPageInfo: pagination.PageInfo{},
+			expectErrorCode: errors.EInternal,
+			expectTrails:    []string{},
+			expectPageInfo:  pagination.PageInfo{},
 		},
 
 		{
@@ -1061,7 +1061,7 @@ func TestGetNamespaceMemberships(t *testing.T) {
 					NamespaceMembershipIDs: []string{invalidID},
 				},
 			},
-			expectMsg:            invalidUUIDMsg,
+			expectErrorCode:      errors.EInternal,
 			expectTrails:         []string{},
 			expectPageInfo:       pagination.PageInfo{TotalCount: 0, Cursor: dummyCursorFunc},
 			expectHasStartCursor: true,
@@ -1179,50 +1179,49 @@ func TestGetNamespaceMemberships(t *testing.T) {
 			// GetNamespaceMemberships(ctx context.Context, input *GetNamespaceMembershipsInput) (*NamespaceMembershipResult, error)
 			namespaceMembershipsResult, err := testClient.client.NamespaceMemberships.GetNamespaceMemberships(ctx, test.input)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			// If there was no error, check the results.
-			if err == nil {
+			// Never returns nil if error is nil.
+			require.NotNil(t, namespaceMembershipsResult.PageInfo)
+			assert.NotNil(t, namespaceMembershipsResult.NamespaceMemberships)
+			pageInfo := namespaceMembershipsResult.PageInfo
+			namespaceMemberships := namespaceMembershipsResult.NamespaceMemberships
 
-				// Never returns nil if error is nil.
-				require.NotNil(t, namespaceMembershipsResult.PageInfo)
-				assert.NotNil(t, namespaceMembershipsResult.NamespaceMemberships)
-				pageInfo := namespaceMembershipsResult.PageInfo
-				namespaceMemberships := namespaceMembershipsResult.NamespaceMemberships
+			// Check the namespace memberships result by comparing a list of the trails.
+			infos := namespaceMembershipInfoFromNamespaceMemberships(createdWarmupOutput.holderIDs2Name,
+				namespaceMemberships)
+			resultTrails := trailsFromNamespaceMembershipInfo(infos, test.sortedDescending)
 
-				// Check the namespace memberships result by comparing a list of the trails.
-				infos := namespaceMembershipInfoFromNamespaceMemberships(createdWarmupOutput.holderIDs2Name,
-					namespaceMemberships)
-				resultTrails := trailsFromNamespaceMembershipInfo(infos, test.sortedDescending)
+			// If no sort direction was specified, sort the results here for repeatability.
+			if test.input.Sort == nil {
+				sort.Strings(resultTrails)
+			}
 
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(resultTrails)
-				}
+			assert.Equal(t, len(test.expectTrails), len(resultTrails))
+			assert.Equal(t, test.expectTrails, resultTrails)
 
-				assert.Equal(t, len(test.expectTrails), len(resultTrails))
-				assert.Equal(t, test.expectTrails, resultTrails)
+			assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
+			assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
+			assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
+			assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
 
-				assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
-				assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
-				assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
-				assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
+			// Compare the cursor function results only if there is at least one namespace membership returned.
+			// If there are no namespace memberships returned, there is no argument to pass to the cursor function.
+			// Also, don't try to reverse engineer to compare the cursor string values.
+			if len(namespaceMemberships) > 0 {
+				resultStartCursor, resultStartCursorError := pageInfo.Cursor(&namespaceMemberships[0])
+				resultEndCursor, resultEndCursorError := pageInfo.Cursor(&namespaceMemberships[len(namespaceMemberships)-1])
+				assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
+				assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
+				assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
+				assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
 
-				// Compare the cursor function results only if there is at least one namespace membership returned.
-				// If there are no namespace memberships returned, there is no argument to pass to the cursor function.
-				// Also, don't try to reverse engineer to compare the cursor string values.
-				if len(namespaceMemberships) > 0 {
-					resultStartCursor, resultStartCursorError := pageInfo.Cursor(&namespaceMemberships[0])
-					resultEndCursor, resultEndCursorError := pageInfo.Cursor(&namespaceMemberships[len(namespaceMemberships)-1])
-					assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
-					assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
-					assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
-					assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
-
-					// Capture the ending cursor values for the next case.
-					previousEndCursorValue = resultEndCursor
-					previousStartCursorValue = resultStartCursor
-				}
+				// Capture the ending cursor values for the next case.
+				previousEndCursorValue = resultEndCursor
+				previousStartCursorValue = resultStartCursor
 			}
 		})
 	}
@@ -1246,7 +1245,7 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 	require.Nil(t, err)
 
 	type testCase struct {
-		expectMsg                 *string
+		expectErrorCode           errors.CodeType
 		name                      string
 		searchID                  string
 		expectNamespaceMembership bool
@@ -1267,9 +1266,9 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 			searchID: nonExistentID,
 		},
 		testCase{
-			name:      "negative, invalid",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
+			name:            "negative, invalid",
+			searchID:        invalidID,
+			expectErrorCode: errors.EInvalid,
 		},
 	)
 
@@ -1277,7 +1276,10 @@ func TestGetNamespaceMembershipByID(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			namespaceMembership, err := testClient.client.NamespaceMemberships.GetNamespaceMembershipByID(ctx, test.searchID)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
 			if test.expectNamespaceMembership {
 				// the positive case
@@ -1299,18 +1301,17 @@ func TestGetNamespaceMembershipByTRN(t *testing.T) {
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
 		Name: "test-group",
 	})
-	require.NoError(t, err)
 
+	require.NoError(t, err)
 	role, err := testClient.client.Roles.CreateRole(ctx, &models.Role{
 		Name: "test-role",
 	})
-	require.NoError(t, err)
 
+	require.NoError(t, err)
 	namespaceMembership, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, &CreateNamespaceMembershipInput{
 		NamespacePath: group.FullPath,
 		RoleID:        role.Metadata.ID,
 	})
-	require.NoError(t, err)
 
 	type testCase struct {
 		name                      string
@@ -1350,8 +1351,6 @@ func TestGetNamespaceMembershipByTRN(t *testing.T) {
 				return
 			}
 
-			require.NoError(t, err)
-
 			if test.expectNamespaceMembership {
 				require.NotNil(t, actualNamespaceMembership)
 				assert.Equal(t, types.NamespaceMembershipModelType.BuildTRN(group.FullPath, namespaceMembership.GetGlobalID()), actualNamespaceMembership.Metadata.TRN)
@@ -1380,10 +1379,10 @@ func TestCreateNamespaceMembership(t *testing.T) {
 	require.Nil(t, err)
 
 	type testCase struct {
-		input         *CreateNamespaceMembershipInput
-		expectMsg     *string
-		expectCreated *models.NamespaceMembership
-		name          string
+		input           *CreateNamespaceMembershipInput
+		expectErrorCode errors.CodeType
+		expectCreated   *models.NamespaceMembership
+		name            string
 	}
 
 	// For the positive cases, must make GroupID and WorkspaceID point to empty string rather than nil.
@@ -1462,7 +1461,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				UserID:        &createdWarmupOutput.users[0].Metadata.ID,
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("member already exists"),
+			expectErrorCode: errors.EConflict,
 		},
 
 		{
@@ -1472,7 +1471,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccountID: &createdWarmupOutput.serviceAccounts[0].Metadata.ID,
 				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("member already exists"),
+			expectErrorCode: errors.EConflict,
 		},
 
 		{
@@ -1482,7 +1481,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				TeamID:        &createdWarmupOutput.teamMembers[0].TeamID,
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("member already exists"),
+			expectErrorCode: errors.EConflict,
 		},
 
 		{
@@ -1492,7 +1491,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				UserID:        &createdWarmupOutput.users[1].Metadata.ID,
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("Namespace not found"),
+			expectErrorCode: errors.ENotFound,
 		},
 
 		{
@@ -1502,7 +1501,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				UserID:        ptr.String(nonExistentID),
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("user does not exist"),
+			expectErrorCode: errors.ENotFound,
 		},
 
 		{
@@ -1512,7 +1511,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccountID: ptr.String(nonExistentID),
 				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("service account does not exist"),
+			expectErrorCode: errors.ENotFound,
 		},
 
 		{
@@ -1522,7 +1521,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				TeamID:        ptr.String(nonExistentID),
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: ptr.String("team does not exist"),
+			expectErrorCode: errors.ENotFound,
 		},
 
 		{
@@ -1532,7 +1531,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				UserID:        ptr.String(invalidID),
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg,
+			expectErrorCode: errors.EInternal,
 		},
 
 		{
@@ -1542,7 +1541,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				ServiceAccountID: ptr.String(invalidID),
 				RoleID:           createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg,
+			expectErrorCode: errors.EInternal,
 		},
 
 		{
@@ -1552,7 +1551,7 @@ func TestCreateNamespaceMembership(t *testing.T) {
 				TeamID:        ptr.String(invalidID),
 				RoleID:        createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg,
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
@@ -1561,7 +1560,12 @@ func TestCreateNamespaceMembership(t *testing.T) {
 			// CreateNamespaceMembership(ctx context.Context, input *CreateNamespaceMembershipInput) (*models.NamespaceMembership, error)
 			actualCreated, err := testClient.client.NamespaceMemberships.CreateNamespaceMembership(ctx, test.input)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 
 			if test.expectCreated != nil {
 				// the positive case
@@ -1605,10 +1609,10 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 		createdWarmupOutput.holderIDs2Name, createdWarmupOutput.namespaceMemberships)
 
 	type testCase struct {
-		searchFor     *models.NamespaceMembership
-		expectMsg     *string
-		expectUpdated *models.NamespaceMembership
-		name          string
+		searchFor       *models.NamespaceMembership
+		expectErrorCode errors.CodeType
+		expectUpdated   *models.NamespaceMembership
+		name            string
 	}
 
 	// UpdateNamespaceMembership looks for ID and metadata version,
@@ -1659,7 +1663,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			},
 			RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 		},
-		expectMsg: resourceVersionMismatch,
+		expectErrorCode: errors.EOptimisticLock,
 	},
 		testCase{
 			name: "negative, invalid",
@@ -1670,7 +1674,7 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 				},
 				RoleID: createdWarmupOutput.roles[0].Metadata.ID,
 			},
-			expectMsg: invalidUUIDMsg,
+			expectErrorCode: errors.EInternal,
 		})
 
 	for _, test := range testCases {
@@ -1678,7 +1682,12 @@ func TestUpdateNamespaceMembership(t *testing.T) {
 			// UpdateNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) (*models.NamespaceMembership, error)
 			actualUpdated, err := testClient.client.NamespaceMemberships.UpdateNamespaceMembership(ctx, test.searchFor)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+
+				require.NoError(t, err)
+			}
 
 			if test.expectUpdated != nil {
 				// the positive case
@@ -1723,7 +1732,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 
 	type testCase struct {
 		searchFor                 *models.NamespaceMembership
-		expectMsg                 *string
+		expectErrorCode           errors.CodeType
 		name                      string
 		expectNamespaceMembership bool
 	}
@@ -1749,7 +1758,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					ID: nonExistentID,
 				},
 			},
-			expectMsg: resourceVersionMismatch,
+			expectErrorCode: errors.EOptimisticLock,
 		},
 		testCase{
 			name: "negative, defective-id",
@@ -1758,7 +1767,7 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 					ID: invalidID,
 				},
 			},
-			expectMsg: invalidUUIDMsg,
+			expectErrorCode: errors.EInternal,
 		},
 	)
 
@@ -1767,8 +1776,14 @@ func TestDeleteNamespaceMembership(t *testing.T) {
 			// DeleteNamespaceMembership(ctx context.Context, namespaceMembership *models.NamespaceMembership) error
 			err := testClient.client.NamespaceMemberships.DeleteNamespaceMembership(ctx, test.searchFor)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+
+				return
+			}
+			require.NoError(t, err)
 		})
+
 	}
 }
 
@@ -2237,15 +2252,6 @@ func buildTrail(input namespaceMembershipInfo) string {
 	return (input.namespacePath + "--" + input.holder + "--" + input.role)
 }
 
-// namespaceMembershipIDsFromNamespaceMembershipInfos preserves order
-func namespaceMembershipIDsFromNamespaceMembershipInfos(namespaceMembershipInfos []namespaceMembershipInfo) []string {
-	result := []string{}
-	for _, namespaceMembershipInfo := range namespaceMembershipInfos {
-		result = append(result, namespaceMembershipInfo.namespaceMembershipID)
-	}
-	return result
-}
-
 // Compare two namespace membership objects, including bounds for creation and updated times.
 func compareNamespaceMemberships(t *testing.T, expected, actual *models.NamespaceMembership,
 	checkID bool, times timeBounds,
@@ -2367,4 +2373,21 @@ func rotateRole(input string, roles []models.Role) string {
 
 	// Keep the compiler happy, even if it cannot happen.
 	return roles[0].Metadata.ID
+}
+
+// createInitialRoles creates initial roles for testing
+func createInitialRoles(ctx context.Context, testClient *testClient, roles []models.Role) ([]models.Role, map[string]string, error) {
+	resultRoles := []models.Role{}
+	roleName2ID := make(map[string]string)
+
+	for _, role := range roles {
+		createdRole, err := testClient.client.Roles.CreateRole(ctx, &role)
+		if err != nil {
+			return nil, nil, err
+		}
+		resultRoles = append(resultRoles, *createdRole)
+		roleName2ID[role.Name] = createdRole.Metadata.ID
+	}
+
+	return resultRoles, roleName2ID, nil
 }

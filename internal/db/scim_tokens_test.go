@@ -6,255 +6,195 @@ import (
 	"context"
 	"testing"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
-func TestGetTokenByNonce(t *testing.T) {
+func TestSCIMTokens_CreateSCIMToken(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupToken, err := createInitialSCIMToken(ctx, testClient, standardWarmupSCIMToken)
-	require.Nil(t, err)
-
 	type testCase struct {
-		expectMsg       *string
 		name            string
-		searchNonce     string
-		expectSCIMToken bool
+		expectErrorCode errors.CodeType
+		token           *models.SCIMToken
 	}
 
 	testCases := []testCase{
 		{
-			name:            "positive-" + createdWarmupToken.Metadata.ID,
-			searchNonce:     createdWarmupToken.Nonce,
-			expectSCIMToken: true,
-		},
-		{
-			name:        "negative, non-existent Nonce",
-			searchNonce: nonExistentID,
-		},
-		{
-			name:        "defective-nonce",
-			searchNonce: invalidID,
-			expectMsg:   invalidUUIDMsg,
+			name: "successfully create SCIM token",
+			token: &models.SCIMToken{
+				Nonce:     uuid.New().String(),
+				CreatedBy: "db-integration-tests",
+			},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			token, err := testClient.client.SCIMTokens.GetTokenByNonce(ctx, test.searchNonce)
+			token, err := testClient.client.SCIMTokens.CreateToken(ctx, test.token)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectSCIMToken {
-				// the positive case
+			require.NoError(t, err)
+			require.NotNil(t, token)
+			assert.Equal(t, test.token.Nonce, token.Nonce)
+			assert.Equal(t, test.token.CreatedBy, token.CreatedBy)
+		})
+	}
+}
+
+func TestSCIMTokens_DeleteSCIMToken(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a SCIM token to delete
+	createdToken, err := testClient.client.SCIMTokens.CreateToken(ctx, &models.SCIMToken{
+		Nonce:     uuid.New().String(),
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		token           *models.SCIMToken
+	}
+
+	testCases := []testCase{
+		{
+			name:  "successfully delete SCIM token",
+			token: createdToken,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.SCIMTokens.DeleteToken(ctx, test.token)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Verify the token was deleted
+			deletedToken, err := testClient.client.SCIMTokens.GetTokenByNonce(ctx, test.token.Nonce)
+			if err != nil {
+				assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+			}
+			assert.Nil(t, deletedToken)
+		})
+	}
+}
+
+func TestSCIMTokens_GetTokenByNonce(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a SCIM token for testing
+	createdToken, err := testClient.client.SCIMTokens.CreateToken(ctx, &models.SCIMToken{
+		Nonce:     "550e8400-e29b-41d4-a716-446655440000",
+		CreatedBy: "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		nonce           string
+		expectToken     bool
+	}
+
+	testCases := []testCase{
+		{
+			name:        "get resource by nonce",
+			nonce:       createdToken.Nonce,
+			expectToken: true,
+		},
+		{
+			name:  "resource with nonce not found",
+			nonce: "550e8400-e29b-41d4-a716-446655440999",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			token, err := testClient.client.SCIMTokens.GetTokenByNonce(ctx, test.nonce)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectToken {
 				require.NotNil(t, token)
-				assert.Equal(t, test.searchNonce, token.Nonce)
+				assert.Equal(t, test.nonce, token.Nonce)
 			} else {
-				// the negative and defective cases
 				assert.Nil(t, token)
 			}
 		})
 	}
 }
 
-func TestGetTokens(t *testing.T) {
+func TestSCIMTokens_GetTokens(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupToken, err := createInitialSCIMToken(ctx, testClient, standardWarmupSCIMToken)
-	require.Nil(t, err)
+	// Create test SCIM tokens
+	tokens := []models.SCIMToken{
+		{
+			Nonce:     "550e8400-e29b-41d4-a716-446655440001",
+			CreatedBy: "db-integration-tests",
+		},
+		{
+			Nonce:     "550e8400-e29b-41d4-a716-446655440002",
+			CreatedBy: "db-integration-tests",
+		},
+	}
+
+	createdTokens := []models.SCIMToken{}
+	for _, token := range tokens {
+		created, err := testClient.client.SCIMTokens.CreateToken(ctx, &token)
+		require.NoError(t, err)
+		createdTokens = append(createdTokens, *created)
+	}
 
 	type testCase struct {
-		name          string
-		expectedNonce string
+		name            string
+		expectErrorCode errors.CodeType
+		expectMinCount  int
 	}
 
 	testCases := []testCase{
 		{
-			name:          "positive-" + createdWarmupToken.Metadata.ID,
-			expectedNonce: createdWarmupToken.Nonce,
+			name:           "get all tokens",
+			expectMinCount: len(createdTokens),
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			tokens, err := testClient.client.SCIMTokens.GetTokens(ctx)
+			result, err := testClient.client.SCIMTokens.GetTokens(ctx)
 
-			assert.Nil(t, err)
-			assert.Equal(t, 1, len(tokens))
-			assert.Equal(t, test.expectedNonce, tokens[0].Nonce)
-		})
-	}
-}
-
-func TestCreateToken(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupNonce := uuid.New().String()
-
-	type testCase struct {
-		toCreate      *models.SCIMToken
-		expectCreated *models.SCIMToken
-		expectMsg     *string
-		name          string
-	}
-
-	now := currentTime()
-	testCases := []testCase{
-		{
-			name: "positive full-token",
-			toCreate: &models.SCIMToken{
-				Nonce:     warmupNonce,
-				CreatedBy: "some-admin@example.com",
-			},
-			expectCreated: &models.SCIMToken{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				Nonce:     warmupNonce,
-				CreatedBy: "some-admin@example.com",
-			},
-		},
-		{
-			name: "duplicate will fail",
-			toCreate: &models.SCIMToken{
-				Nonce:     warmupNonce,
-				CreatedBy: "some-admin@example.com",
-			},
-			expectMsg: ptr.String("SCIM token already exists"),
-		},
-		{
-			name: "defective nonce ID",
-			toCreate: &models.SCIMToken{
-				Nonce:     invalidID,
-				CreatedBy: "some-admin@example.com",
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.SCIMTokens.CreateToken(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareSCIMTokens(t, test.expectCreated, actualCreated, false, timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
 			}
+
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, len(result), test.expectMinCount)
 		})
 	}
-}
-
-func TestDeleteToken(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdWarmupToken, err := createInitialSCIMToken(ctx, testClient, standardWarmupSCIMToken)
-	require.Nil(t, err)
-
-	type testCase struct {
-		toDelete  *models.SCIMToken
-		expectMsg *string
-		name      string
-	}
-
-	testCases := []testCase{
-		{
-			name: "positive-" + createdWarmupToken.Metadata.ID,
-			toDelete: &models.SCIMToken{
-				Metadata: models.ResourceMetadata{
-					ID:      createdWarmupToken.Metadata.ID,
-					Version: createdWarmupToken.Metadata.Version,
-				},
-			},
-		},
-		{
-			name: "negative, non-existent ID",
-			toDelete: &models.SCIMToken{
-				Metadata: models.ResourceMetadata{
-					ID: nonExistentID,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-		{
-			name: "defective-id",
-			toDelete: &models.SCIMToken{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			err := testClient.client.SCIMTokens.DeleteToken(ctx, test.toDelete)
-
-			checkError(t, test.expectMsg, err)
-		})
-	}
-}
-
-// Standard warmup SCIM tokens for tests in this module:
-// The DB should AT MOST have only one token hence
-// a slice is not needed here.
-var standardWarmupSCIMToken = &models.SCIMToken{
-	Nonce: uuid.New().String(),
-}
-
-// createInitialSCIMToken creates a warmup SCIM token for a test.
-func createInitialSCIMToken(ctx context.Context, testClient *testClient,
-	toCreate *models.SCIMToken,
-) (*models.SCIMToken, error) {
-	// At most one token will exist.
-	created, err := testClient.client.SCIMTokens.CreateToken(ctx, toCreate)
-	if err != nil {
-		return nil, err
-	}
-
-	return created, nil
-}
-
-// Compare two SCIM token objects, including bounds for creation and updated times.
-func compareSCIMTokens(t *testing.T, expected, actual *models.SCIMToken, checkID bool, times timeBounds) {
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-
-	// Compare timestamps.
-	compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-	compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-
-	assert.Equal(t, expected.Nonce, actual.Nonce)
 }

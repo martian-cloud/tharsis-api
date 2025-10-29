@@ -19,6 +19,7 @@ import (
 
 // TeamMembers encapsulates the logic to access team members from the database
 type TeamMembers interface {
+	GetTeamMemberByID(ctx context.Context, id string) (*models.TeamMember, error)
 	GetTeamMember(ctx context.Context, userID, teamID string) (*models.TeamMember, error)
 	GetTeamMembers(ctx context.Context, input *GetTeamMembersInput) (*TeamMembersResult, error)
 	AddUserToTeam(ctx context.Context, teamMember *models.TeamMember) (*models.TeamMember, error)
