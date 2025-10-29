@@ -4,7 +4,7 @@ package db
 
 import (
 	"context"
-	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -12,152 +12,88 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
-// warmupWorkspaceVCSProviderLinks holds the inputs to and outputs from createWarmupWorkspaceVCSProviderLinks.
-type warmupWorkspaceVCSProviderLinks struct {
-	groups     []models.Group
-	workspaces []models.Workspace
-	providers  []models.VCSProvider
-	links      []models.WorkspaceVCSProviderLink
-}
-
-func TestGetLinksByProviderID(t *testing.T) {
+func TestWorkspaceVCSProviderLinks_CreateLink(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a link with a specific ID without going into the really
-	// low-level stuff, create the warmup links and then find the relevant ID.
-	createdLow := currentTime()
-	warmupItems, err := createWarmupWorkspaceVCSProviderLinks(ctx, testClient,
-		warmupWorkspaceVCSProviderLinks{
-			standardWarmupGroupsForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspacesForWorkspaceVCSProviderLinks,
-			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspaceVCSProviderLinks,
-		})
-	require.Nil(t, err)
-
-	createdHigh := currentTime()
-
-	type testCase struct {
-		expectMsg   *string
-		name        string
-		searchID    string
-		expectLinks []models.WorkspaceVCSProviderLink
-	}
-
-	positiveProvider := warmupItems.providers[0]
-	testCases := []testCase{
-		{
-			name:        "positive",
-			searchID:    positiveProvider.Metadata.ID,
-			expectLinks: []models.WorkspaceVCSProviderLink{warmupItems.links[0]},
-		},
-		{
-			name:     "negative, non-existent ID",
-			searchID: nonExistentID,
-			// expect error to be nil
-		},
-		{
-			name:     "defective-id",
-			searchID: invalidID,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualLinks, err := testClient.client.WorkspaceVCSProviderLinks.GetLinksByProviderID(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectLinks != nil {
-				require.Equal(t, len(actualLinks), 1) // There should only be one result.
-				compareWorkspaceVCSProviderLinks(t, &test.expectLinks[0], &actualLinks[0], false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Empty(t, actualLinks)
-			}
-		})
-	}
-}
-
-func TestGetLinkByTRN(t *testing.T) {
-	ctx := t.Context()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "test-group",
+		Name:        "test-group-vcs-link",
+		Description: "test group for vcs provider link",
+		FullPath:    "test-group-vcs-link",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.NoError(t, err)
 
 	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
-		Name:           "test-workspace",
+		Name:           "test-workspace-vcs-link",
+		Description:    "test workspace for vcs provider link",
 		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
 		MaxJobDuration: ptr.Int32(1),
 	})
 	require.NoError(t, err)
 
-	provider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
-		Name:              "test-provider",
-		Description:       "test provider",
-		GroupID:           group.Metadata.ID,
-		URL:               gitHubURL,
-		OAuthClientID:     "client-id",
-		OAuthClientSecret: "client-secret",
-		Type:              models.GitHubProviderType,
-	})
-	require.NoError(t, err)
-
-	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
-		WorkspaceID:    workspace.Metadata.ID,
-		ProviderID:     provider.Metadata.ID,
-		TokenNonce:     uuid.New().String(),
-		RepositoryPath: "owner/repository",
-		Branch:         "main",
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-link",
+		Description: "test vcs provider for link",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
 	})
 	require.NoError(t, err)
 
 	type testCase struct {
 		name            string
-		trn             string
-		expectLink      bool
 		expectErrorCode errors.CodeType
+		workspaceID     string
+		providerID      string
+		repositoryPath  string
+		branch          string
 	}
 
 	testCases := []testCase{
 		{
-			name:       "get resource by TRN",
-			trn:        link.Metadata.TRN,
-			expectLink: true,
+			name:           "successfully create resource",
+			workspaceID:    workspace.Metadata.ID,
+			providerID:     vcsProvider.Metadata.ID,
+			repositoryPath: "test-org/test-repo",
+			branch:         "main",
 		},
 		{
-			name: "resource with TRN not found",
-			trn:  types.WorkspaceVCSProviderLinkModelType.BuildTRN(workspace.FullPath, nonExistentGlobalID),
+			name:            "create will fail because workspace does not exist",
+			workspaceID:     nonExistentID,
+			providerID:      vcsProvider.Metadata.ID,
+			repositoryPath:  "test-org/test-repo",
+			branch:          "main",
+			expectErrorCode: errors.ENotFound,
 		},
 		{
-			name:            "workspace vcs provider link TRN must not be less than two parts",
-			trn:             types.WorkspaceVCSProviderLinkModelType.BuildTRN(nonExistentGlobalID),
-			expectErrorCode: errors.EInvalid,
-		},
-		{
-			name:            "get resource with invalid TRN will return an error",
-			trn:             "trn:invalid",
-			expectErrorCode: errors.EInvalid,
+			name:            "create will fail because provider does not exist",
+			workspaceID:     workspace.Metadata.ID,
+			providerID:      nonExistentID,
+			repositoryPath:  "test-org/test-repo",
+			branch:          "main",
+			expectErrorCode: errors.EConflict,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByTRN(ctx, test.trn)
+			link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+				WorkspaceID:         test.workspaceID,
+				ProviderID:          test.providerID,
+				TokenNonce:          uuid.New().String(),
+				RepositoryPath:      test.repositoryPath,
+				Branch:              test.branch,
+				CreatedBy:           "db-integration-tests",
+				AutoSpeculativePlan: true,
+				WebhookDisabled:     false,
+			})
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -165,683 +101,474 @@ func TestGetLinkByTRN(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			require.NotNil(t, link)
+			assert.Equal(t, test.workspaceID, link.WorkspaceID)
+			assert.Equal(t, test.providerID, link.ProviderID)
+			assert.Equal(t, test.repositoryPath, link.RepositoryPath)
+			assert.Equal(t, test.branch, link.Branch)
+		})
+	}
+}
+
+func TestWorkspaceVCSProviderLinks_GetLinkByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-get-link",
+		Description: "test group for get link",
+		FullPath:    "test-group-get-link",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-get-link",
+		Description:    "test workspace for get link",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-get-link",
+		Description: "test vcs provider for get link",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
+		TokenNonce:     uuid.New().String(),
+		RepositoryPath: "test-org/test-repo",
+		Branch:         "main",
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		id              string
+		expectLink      bool
+	}
+
+	testCases := []testCase{
+		{
+			name:       "get resource by id",
+			id:         link.Metadata.ID,
+			expectLink: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
 			if test.expectLink {
-				require.NotNil(t, actualLink)
-				assert.Equal(t, test.trn, actualLink.Metadata.TRN)
+				require.NotNil(t, result)
+				assert.Equal(t, test.id, result.Metadata.ID)
 			} else {
-				assert.Nil(t, actualLink)
+				assert.Nil(t, result)
 			}
 		})
 	}
 }
 
-func TestGetLinkByID(t *testing.T) {
+func TestWorkspaceVCSProviderLinks_GetLinksByProviderID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Because we cannot create a link with a specific ID without going into the really
-	// low-level stuff, create the warmup links and then find the relevant ID.
-	createdLow := currentTime()
-	warmupItems, err := createWarmupWorkspaceVCSProviderLinks(ctx, testClient,
-		warmupWorkspaceVCSProviderLinks{
-			standardWarmupGroupsForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspacesForWorkspaceVCSProviderLinks,
-			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspaceVCSProviderLinks,
-		})
-	require.Nil(t, err)
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-get-links",
+		Description: "test group for get links",
+		FullPath:    "test-group-get-links",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-	createdHigh := currentTime()
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-get-links",
+		Description:    "test workspace for get links",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
 
-	type testCase struct {
-		expectLink *models.WorkspaceVCSProviderLink
-		expectMsg  *string
-		name       string
-		searchID   string
-	}
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-get-links",
+		Description: "test vcs provider for get links",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
 
-	positiveLink := warmupItems.links[0]
-	testCases := []testCase{
-		{
-			name:       "positive",
-			searchID:   positiveLink.Metadata.ID,
-			expectLink: &positiveLink,
-		},
-		{
-			name:     "negative, non-existent ID",
-			searchID: nonExistentID,
-			// expect link and error to be nil
-		},
-		{
-			name:      "defective-id",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByID(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectLink != nil {
-				require.NotNil(t, actualLink)
-				compareWorkspaceVCSProviderLinks(t, test.expectLink, actualLink, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, actualLink)
-			}
-		})
-	}
-}
-
-func TestGetLinkByWorkspaceID(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a link with a specific ID without going into the really
-	// low-level stuff, create the warmup links and then find the relevant ID.
-	createdLow := currentTime()
-	warmupItems, err := createWarmupWorkspaceVCSProviderLinks(ctx, testClient,
-		warmupWorkspaceVCSProviderLinks{
-			standardWarmupGroupsForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspacesForWorkspaceVCSProviderLinks,
-			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspaceVCSProviderLinks,
-		})
-	require.Nil(t, err)
-
-	createdHigh := currentTime()
-
-	type testCase struct {
-		expectLink *models.WorkspaceVCSProviderLink
-		expectMsg  *string
-		name       string
-		searchID   string
-	}
-
-	positiveWorkspace := warmupItems.workspaces[0]
-	testCases := []testCase{
-		{
-			name:       "positive",
-			searchID:   positiveWorkspace.Metadata.ID,
-			expectLink: &warmupItems.links[0],
-		},
-		{
-			name:     "negative, non-existent ID",
-			searchID: nonExistentID,
-			// expect link and error to be nil
-		},
-		{
-			name:      "defective-id",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByWorkspaceID(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectLink != nil {
-				require.NotNil(t, actualLink)
-				compareWorkspaceVCSProviderLinks(t, test.expectLink, actualLink, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
-			} else {
-				assert.Nil(t, actualLink)
-			}
-		})
-	}
-}
-
-func TestCreateLink(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a link with a specific ID without going into the really
-	// low-level stuff, create the warmup links and then find the relevant ID.
-	warmupItems, err := createWarmupWorkspaceVCSProviderLinks(ctx, testClient,
-		warmupWorkspaceVCSProviderLinks{
-			standardWarmupGroupsForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspacesForWorkspaceVCSProviderLinks,
-			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
-			[]models.WorkspaceVCSProviderLink{},
-		})
-	require.Nil(t, err)
-
-	moduleDirectory := "this/is/where/configuration/is"
-	tagRegex := "\\d+.\\d+$"
-	tokenNonce := uuid.New().String()
-	webhookID := uuid.New().String()
-
-	type testCase struct {
-		toCreate       *models.WorkspaceVCSProviderLink
-		expectCreated  *models.WorkspaceVCSProviderLink
-		expectMsg      *string
-		expectErrorMsg string // For Tharsis errors.
-		name           string
-	}
-
-	now := currentTime()
-	testCases := []testCase{
-		{
-			name: "positive: nearly empty",
-			toCreate: &models.WorkspaceVCSProviderLink{
-				WorkspaceID:         warmupItems.workspaces[0].Metadata.ID,
-				ProviderID:          warmupItems.providers[0].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				// Rest of the fields can be empty.
-			},
-			expectCreated: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				WorkspaceID:         warmupItems.workspaces[0].Metadata.ID,
-				ProviderID:          warmupItems.providers[0].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				GlobPatterns:        []string(nil),
-			},
-		},
-		{
-			name: "positive: full",
-			toCreate: &models.WorkspaceVCSProviderLink{
-				WorkspaceID:         warmupItems.workspaces[1].Metadata.ID,
-				ProviderID:          warmupItems.providers[1].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				CreatedBy:           "creator-of-workspace-vcs-provider-links",
-				WebhookID:           webhookID,
-				ModuleDirectory:     &moduleDirectory,
-				TagRegex:            &tagRegex,
-				GlobPatterns:        []string{"**/**"},
-			},
-			expectCreated: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				WorkspaceID:         warmupItems.workspaces[1].Metadata.ID,
-				ProviderID:          warmupItems.providers[1].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				CreatedBy:           "creator-of-workspace-vcs-provider-links",
-				WebhookID:           webhookID,
-				ModuleDirectory:     &moduleDirectory,
-				TagRegex:            &tagRegex,
-				GlobPatterns:        []string{"**/**"},
-			},
-		},
-		{
-			name: "duplicate name in same group",
-			toCreate: &models.WorkspaceVCSProviderLink{
-				WorkspaceID:         warmupItems.workspaces[0].Metadata.ID,
-				ProviderID:          warmupItems.providers[0].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				// Rest of the fields can be empty.
-			},
-			expectErrorMsg: "workspace is already linked with a vcs provider",
-		},
-		{
-			name: "non-existent workspace ID",
-			toCreate: &models.WorkspaceVCSProviderLink{
-				WorkspaceID:         nonExistentID,
-				ProviderID:          warmupItems.providers[0].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				// Rest of the fields can be empty.
-			},
-			expectErrorMsg: "workspace does not exist",
-		},
-		{
-			name: "defective workspace ID",
-			toCreate: &models.WorkspaceVCSProviderLink{
-				WorkspaceID:         invalidID,
-				ProviderID:          warmupItems.providers[0].Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				// Rest of the fields can be empty.
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-		{
-			name: "defective provider ID",
-			toCreate: &models.WorkspaceVCSProviderLink{
-				WorkspaceID:         warmupItems.workspaces[0].Metadata.ID,
-				ProviderID:          invalidID,
-				RepositoryPath:      "owner/repository",
-				TokenNonce:          tokenNonce,
-				Branch:              "main",
-				AutoSpeculativePlan: false,
-				// Rest of the fields can be empty.
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, test.toCreate)
-
-			if test.expectErrorMsg != "" {
-				assert.Equal(t, test.expectErrorMsg, errors.ErrorMessage(err))
-			} else {
-				checkError(t, test.expectMsg, err)
-			}
-
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareWorkspaceVCSProviderLinks(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
-			}
-		})
-	}
-}
-
-func TestUpdateLink(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a link with a specific ID without going into the really
-	// low-level stuff, create the warmup links and then find the relevant ID.
-	createdLow := currentTime()
-	warmupItems, err := createWarmupWorkspaceVCSProviderLinks(ctx, testClient,
-		warmupWorkspaceVCSProviderLinks{
-			standardWarmupGroupsForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspacesForWorkspaceVCSProviderLinks,
-			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspaceVCSProviderLinks,
-		})
-	require.Nil(t, err)
-	createdHigh := currentTime()
-	warmupWorkspace := warmupItems.workspaces[0]
-	warmupProvider := warmupItems.providers[0]
-
-	type testCase struct {
-		toUpdate   *models.WorkspaceVCSProviderLink
-		expectLink *models.WorkspaceVCSProviderLink
-		expectMsg  *string
-		name       string
-	}
-
-	// Do only one positive test case, because the logic is theoretically the same for all workspace vcs provider links.
-	now := currentTime()
-	positiveLink := warmupItems.links[0]
-	testCases := []testCase{
-		{
-			name: "positive",
-			toUpdate: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveLink.Metadata.ID,
-					Version: positiveLink.Metadata.Version,
-				},
-				WorkspaceID:         warmupWorkspace.Metadata.ID,
-				ProviderID:          warmupProvider.Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				Branch:              "updated/branch",
-				AutoSpeculativePlan: false,
-			},
-			expectLink: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID:                   positiveLink.Metadata.ID,
-					Version:              positiveLink.Metadata.Version + 1,
-					CreationTimestamp:    positiveLink.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				WorkspaceID:         warmupWorkspace.Metadata.ID,
-				ProviderID:          warmupProvider.Metadata.ID,
-				RepositoryPath:      "owner/repository",
-				Branch:              "updated/branch",
-				TokenNonce:          positiveLink.TokenNonce,
-				AutoSpeculativePlan: false,
-				CreatedBy:           positiveLink.CreatedBy,
-			},
-		},
-		{
-			name: "negative, non-existent ID",
-			toUpdate: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: positiveLink.Metadata.Version,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-		{
-			name: "defective-id",
-			toUpdate: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: positiveLink.Metadata.Version,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualLink, err := testClient.client.WorkspaceVCSProviderLinks.UpdateLink(ctx, test.toUpdate)
-
-			checkError(t, test.expectMsg, err)
-
-			now := currentTime()
-			if test.expectLink != nil {
-				require.NotNil(t, actualLink)
-				compareWorkspaceVCSProviderLinks(t, test.expectLink, actualLink, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualLink)
-			}
-		})
-	}
-}
-
-func TestDeleteLink(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	// Because we cannot create a link with a specific ID without going into the really
-	// low-level stuff, create the warmup links and then find the relevant ID.
-	warmupItems, err := createWarmupWorkspaceVCSProviderLinks(ctx, testClient,
-		warmupWorkspaceVCSProviderLinks{
-			standardWarmupGroupsForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspacesForWorkspaceVCSProviderLinks,
-			standardWarmupVCSProvidersForWorkspaceVCSProviderLinks,
-			standardWarmupWorkspaceVCSProviderLinks,
-		})
-	require.Nil(t, err)
-
-	type testCase struct {
-		toDelete  *models.WorkspaceVCSProviderLink
-		expectMsg *string
-		name      string
-	}
-
-	testCases := []testCase{
-		{
-			name: "positive",
-			toDelete: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID:      warmupItems.links[0].Metadata.ID,
-					Version: warmupItems.links[0].Metadata.Version,
-				},
-			},
-		},
-
-		{
-			name: "negative, non-existent ID",
-			toDelete: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID: nonExistentID,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-id",
-			toDelete: &models.WorkspaceVCSProviderLink{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			err := testClient.client.WorkspaceVCSProviderLinks.DeleteLink(ctx, test.toDelete)
-
-			checkError(t, test.expectMsg, err)
-		})
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup group(s) for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForWorkspaceVCSProviderLinks = []models.Group{
-	{
-		Description: "top level group 0 for testing workspace vcs provider link functions",
-		FullPath:    "top-level-group-0-for-workspace-vcs-provider-links",
-		CreatedBy:   "someone-g0",
-	},
-}
-
-// Standard warmup workspace(s) for tests in this module:
-var standardWarmupWorkspacesForWorkspaceVCSProviderLinks = []models.Workspace{
-	{
-		Description: "workspace 0 for testing workspace vcs provider link functions",
-		FullPath:    "top-level-group-0-for-workspace-vcs-provider-links/workspace-0-for-workspace-vcs-provider-links",
-		CreatedBy:   "someone-w0",
-	},
-	{
-		Description: "workspace 1 for testing workspace vcs provider link functions",
-		FullPath:    "top-level-group-0-for-workspace-vcs-provider-links/workspace-1-for-workspace-vcs-provider-links",
-		CreatedBy:   "someone-w1",
-	},
-}
-
-// standard warmup vcs provider(s) for tests in this module:
-var standardWarmupVCSProvidersForWorkspaceVCSProviderLinks = []models.VCSProvider{
-	{
-		Name:              "0-vcs-provider-0",
-		Description:       "vcs provider 0 for testing workspace vcs provider links",
-		GroupID:           "top-level-group-0-for-workspace-vcs-provider-links",
-		CreatedBy:         "someone-vp0",
-		URL:               gitHubURL,
-		OAuthClientID:     "a-client-id",
-		OAuthClientSecret: "a-client-secret",
-		OAuthState:        ptr.String(uuid.New().String()),
-		Type:              models.GitHubProviderType,
-		// Resource path is not used when creating the object, but it is returned.
-	},
-	{
-		Name:              "1-vcs-provider-1",
-		Description:       "vcs provider 1 for testing workspace vcs provider links",
-		GroupID:           "top-level-group-0-for-workspace-vcs-provider-links",
-		CreatedBy:         "someone-vp0",
-		URL:               gitHubURL,
-		OAuthClientID:     "a-client-id",
-		OAuthClientSecret: "a-client-secret",
-		OAuthState:        ptr.String(uuid.New().String()),
-		Type:              models.GitLabProviderType,
-		// Resource path is not used when creating the object, but it is returned.
-	},
-}
-
-var standardWarmupWorkspaceVCSProviderLinks = []models.WorkspaceVCSProviderLink{
-	{
-		WorkspaceID:    "top-level-group-0-for-workspace-vcs-provider-links/workspace-0-for-workspace-vcs-provider-links",
-		ProviderID:     "top-level-group-0-for-workspace-vcs-provider-links/0-vcs-provider-0",
+	_, err = testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
 		TokenNonce:     uuid.New().String(),
-		RepositoryPath: "owner/repository",
-		CreatedBy:      "someone-wpl0",
+		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-	},
-	{
-		WorkspaceID:    "top-level-group-0-for-workspace-vcs-provider-links/workspace-1-for-workspace-vcs-provider-links",
-		ProviderID:     "top-level-group-0-for-workspace-vcs-provider-links/1-vcs-provider-1",
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name              string
+		providerID        string
+		expectResultCount int
+	}
+
+	testCases := []testCase{
+		{
+			name:              "return links for existing provider",
+			providerID:        vcsProvider.Metadata.ID,
+			expectResultCount: 1,
+		},
+		{
+			name:              "return empty for non-existent provider",
+			providerID:        nonExistentID,
+			expectResultCount: 0,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			links, err := testClient.client.WorkspaceVCSProviderLinks.GetLinksByProviderID(ctx, test.providerID)
+
+			require.NoError(t, err)
+			assert.Len(t, links, test.expectResultCount)
+		})
+	}
+}
+
+func TestWorkspaceVCSProviderLinks_GetLinkByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-get-trn",
+		Description: "test group for get trn",
+		FullPath:    "test-group-get-trn",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-get-trn",
+		Description:    "test workspace for get trn",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-get-trn",
+		Description: "test vcs provider for get trn",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
 		TokenNonce:     uuid.New().String(),
-		RepositoryPath: "owner/repository",
-		CreatedBy:      "someone-wpl1",
+		RepositoryPath: "test-org/test-repo",
 		Branch:         "main",
-	},
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Test getting the link by TRN
+	retrievedLink, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByTRN(ctx, link.Metadata.TRN)
+	require.NoError(t, err)
+	require.NotNil(t, retrievedLink)
+
+	// Verify the retrieved link matches the created one
+	assert.Equal(t, link.Metadata.ID, retrievedLink.Metadata.ID)
+	assert.Equal(t, link.WorkspaceID, retrievedLink.WorkspaceID)
+	assert.Equal(t, link.ProviderID, retrievedLink.ProviderID)
+	assert.Equal(t, link.RepositoryPath, retrievedLink.RepositoryPath)
+	assert.Equal(t, link.Metadata.TRN, retrievedLink.Metadata.TRN)
+
+	// Test with invalid TRN
+	_, err = testClient.client.WorkspaceVCSProviderLinks.GetLinkByTRN(ctx, "invalid-trn")
+	assert.Error(t, err)
 }
 
-// createWarmupWorkspaceVCSProviderLinks creates workspace vcs provider links for testing.
-func createWarmupWorkspaceVCSProviderLinks(ctx context.Context, testClient *testClient,
-	input warmupWorkspaceVCSProviderLinks,
-) (*warmupWorkspaceVCSProviderLinks, error) {
-	// It is necessary to create at least one group and workspace
-	// in order to provide the necessary IDs for the workspace vcs provider links.
+func TestWorkspaceVCSProviderLinks_GetLinkByWorkspaceID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
 
-	resultGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-get-workspace",
+		Description: "test group for get workspace",
+		FullPath:    "test-group-get-workspace",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-get-workspace",
+		Description:    "test workspace for get workspace",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-get-workspace",
+		Description: "test vcs provider for get workspace",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
+		TokenNonce:     uuid.New().String(),
+		RepositoryPath: "test-org/test-repo",
+		Branch:         "main",
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		workspaceID     string
+		expectLink      bool
 	}
 
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, groupPath2ID, input.workspaces)
-	if err != nil {
-		return nil, err
+	testCases := []testCase{
+		{
+			name:        "get resource by workspace id",
+			workspaceID: workspace.Metadata.ID,
+			expectLink:  true,
+		},
+		{
+			name:        "resource with workspace id not found",
+			workspaceID: nonExistentID,
+		},
 	}
 
-	resultVCSProviders, err := createInitialVCSProviders(ctx, testClient,
-		groupPath2ID, input.providers)
-	if err != nil {
-		return nil, err
-	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.WorkspaceVCSProviderLinks.GetLinkByWorkspaceID(ctx, test.workspaceID)
 
-	workspacePath2ID := make(map[string]string, len(resultWorkspaces))
-	for _, workspace := range resultWorkspaces {
-		workspacePath2ID[workspace.FullPath] = workspace.Metadata.ID
-	}
-
-	providerPath2ID := make(map[string]string, len(resultVCSProviders))
-	for _, provider := range resultVCSProviders {
-		providerPath2ID[provider.GetResourcePath()] = provider.Metadata.ID
-	}
-
-	resultLinks, err := createInitialWorkspaceVCSProviderLinks(ctx, testClient,
-		workspacePath2ID, providerPath2ID, input.links)
-	if err != nil {
-		return nil, err
-	}
-
-	return &warmupWorkspaceVCSProviderLinks{
-		groups:     resultGroups,
-		workspaces: resultWorkspaces,
-		providers:  resultVCSProviders,
-		links:      resultLinks,
-	}, nil
-}
-
-// createInitialWorkspaceVCSProviderLinks creates some warmup workspace vcs provider links for a test.
-func createInitialWorkspaceVCSProviderLinks(
-	ctx context.Context,
-	testClient *testClient,
-	workspaceMap map[string]string,
-	vcsProviderMap map[string]string,
-	toCreate []models.WorkspaceVCSProviderLink,
-) (
-	[]models.WorkspaceVCSProviderLink, error,
-) {
-	result := []models.WorkspaceVCSProviderLink{}
-
-	for _, input := range toCreate {
-		input.WorkspaceID = workspaceMap[input.WorkspaceID]
-		input.ProviderID = vcsProviderMap[input.ProviderID]
-		created, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &input)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create initial workspace vcs provider link: %s", err)
-		}
-
-		result = append(result, *created)
-	}
-
-	// In order to make the created-at and last-updated-at orders differ,
-	// update every third object without changing any values.
-	for ix, toUpdate := range result {
-		if ix%3 == 0 {
-			updated, err := testClient.client.WorkspaceVCSProviderLinks.UpdateLink(ctx, &toUpdate)
-			if err != nil {
-				return nil, fmt.Errorf("failed to update initial workspace vcs provider link: %s", err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
 			}
-			result[ix] = *updated
-		}
-	}
 
-	return result, nil
+			if test.expectLink {
+				require.NotNil(t, result)
+				assert.Equal(t, link.Metadata.ID, result.Metadata.ID)
+				assert.Equal(t, link.WorkspaceID, result.WorkspaceID)
+			} else {
+				assert.Nil(t, result)
+			}
+		})
+	}
 }
 
-// compareWorkspaceVCSProviderLinks compares two workspace vcs provider link objects,
-// including bounds for creation and updated times. If times is nil, it compares
-// the exact metadata timestamps.
-func compareWorkspaceVCSProviderLinks(t *testing.T, expected, actual *models.WorkspaceVCSProviderLink,
-	checkID bool, times *timeBounds,
-) {
-	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)
-	assert.Equal(t, expected.AutoSpeculativePlan, actual.AutoSpeculativePlan)
-	assert.Equal(t, expected.Branch, actual.Branch)
-	assert.Equal(t, expected.GlobPatterns, actual.GlobPatterns)
-	assert.Equal(t, expected.ModuleDirectory, actual.ModuleDirectory)
-	assert.Equal(t, expected.ProviderID, actual.ProviderID)
-	assert.Equal(t, expected.RepositoryPath, actual.RepositoryPath)
-	assert.Equal(t, expected.TagRegex, actual.TagRegex)
-	assert.Equal(t, expected.TokenNonce, actual.TokenNonce)
-	assert.Equal(t, expected.WebhookID, actual.WebhookID)
-	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-	assert.Equal(t, expected.WebhookDisabled, actual.WebhookDisabled)
+func TestWorkspaceVCSProviderLinks_UpdateLink(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
 
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-update-link",
+		Description: "test group for update link",
+		FullPath:    "test-group-update-link",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-update-link",
+		Description:    "test workspace for update link",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-update-link",
+		Description: "test vcs provider for update link",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
+		TokenNonce:     uuid.New().String(),
+		RepositoryPath: "test-org/test-repo",
+		Branch:         "main",
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		version         int
+		branch          string
 	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
 
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
+	testCases := []testCase{
+		{
+			name:    "successfully update resource",
+			version: 1,
+			branch:  "develop",
+		},
+		{
+			name:            "update will fail because resource version doesn't match",
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+			branch:          "feature",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			updatedLink, err := testClient.client.WorkspaceVCSProviderLinks.UpdateLink(ctx, &models.WorkspaceVCSProviderLink{
+				Metadata: models.ResourceMetadata{
+					ID:      link.Metadata.ID,
+					Version: test.version,
+				},
+				Branch: test.branch,
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, updatedLink)
+			assert.Equal(t, test.branch, updatedLink.Branch)
+		})
+	}
+}
+
+func TestWorkspaceVCSProviderLinks_DeleteLink(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-delete-link",
+		Description: "test group for delete link",
+		FullPath:    "test-group-delete-link",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-delete-link",
+		Description:    "test workspace for delete link",
+		GroupID:        group.Metadata.ID,
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.NoError(t, err)
+
+	vcsProvider, err := testClient.client.VCSProviders.CreateProvider(ctx, &models.VCSProvider{
+		Name:        "test-vcs-provider-delete-link",
+		Description: "test vcs provider for delete link",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Type:        models.GitLabProviderType,
+		URL:         url.URL{Scheme: "https", Host: "gitlab.example.com"},
+	})
+	require.NoError(t, err)
+
+	link, err := testClient.client.WorkspaceVCSProviderLinks.CreateLink(ctx, &models.WorkspaceVCSProviderLink{
+		WorkspaceID:    workspace.Metadata.ID,
+		ProviderID:     vcsProvider.Metadata.ID,
+		TokenNonce:     uuid.New().String(),
+		RepositoryPath: "test-org/test-repo",
+		Branch:         "main",
+		CreatedBy:      "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		id              string
+		version         int
+	}
+
+	testCases := []testCase{
+		{
+			name:            "delete will fail because resource version doesn't match",
+			id:              link.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+		},
+		{
+			name:    "successfully delete resource",
+			id:      link.Metadata.ID,
+			version: 1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.WorkspaceVCSProviderLinks.DeleteLink(ctx, &models.WorkspaceVCSProviderLink{
+				Metadata: models.ResourceMetadata{
+					ID:      test.id,
+					Version: test.version,
+				},
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
 	}
 }

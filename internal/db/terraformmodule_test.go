@@ -5,154 +5,409 @@ package db
 import (
 	"context"
 	"fmt"
-	"sort"
-	"testing"
-	"time"
-
 	"github.com/aws/smithy-go/ptr"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// terraformModuleInfo aids convenience in accessing the information
-// TestGetModules needs about the warmup objects.
-type terraformModuleInfo struct {
-	updateTime time.Time
-	id         string
-	name       string
+// getValue implements the sortableField interface for TerraformModuleSortableField
+func (tm TerraformModuleSortableField) getValue() string {
+	return string(tm)
 }
 
-// terraformModuleInfoIDSlice makes a slice of terraformModuleInfo sortable by ID string
-type terraformModuleInfoIDSlice []terraformModuleInfo
-
-// terraformModuleInfoNameSlice makes a slice of terraformModuleInfo sortable by name string
-type terraformModuleInfoNameSlice []terraformModuleInfo
-
-// terraformModuleInfoUpdateSlice makes a slice of terraformModuleInfo sortable by last updated time
-type terraformModuleInfoUpdateSlice []terraformModuleInfo
-
-// warmupTerraformModules holds the inputs to and outputs from createWarmupTerraformModules.
-type warmupTerraformModules struct {
-	groups                  []models.Group
-	workspaces              []models.Workspace
-	teams                   []models.Team
-	users                   []models.User
-	teamMembers             []models.TeamMember
-	serviceAccounts         []models.ServiceAccount
-	namespaceMembershipsIn  []CreateNamespaceMembershipInput
-	namespaceMembershipsOut []models.NamespaceMembership
-	terraformModules        []models.TerraformModule
-}
-
-func TestGetModuleByID(t *testing.T) {
-
+func TestTerraformModules_CreateModule(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups:           standardWarmupGroupsForTerraformModules,
-		terraformModules: standardWarmupTerraformModules,
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module",
+		Description: "test group for module",
+		FullPath:    "test-group-module",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.Nil(t, err)
 
 	type testCase struct {
-		expectMsg             *string
-		expectTerraformModule *models.TerraformModule
-		name                  string
-		searchID              string
+		name            string
+		expectErrorCode errors.CodeType
+		moduleName      string
+		groupID         string
+		system          string
 	}
 
 	testCases := []testCase{
 		{
-			name:                  "get module by ID",
-			searchID:              warmupItems.terraformModules[0].Metadata.ID,
-			expectTerraformModule: &warmupItems.terraformModules[0],
+			name:       "create module",
+			moduleName: "test-module",
+			groupID:    group.Metadata.ID,
+			system:     "aws",
 		},
-
 		{
-			name:     "returns nil because module does not exist",
-			searchID: nonExistentID,
-		},
-
-		{
-			name:      "returns an error because the module ID is invalid",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
+			name:            "create module with invalid group ID",
+			moduleName:      "invalid-module",
+			groupID:         invalidID,
+			system:          "aws",
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+				Name:        test.moduleName,
+				GroupID:     test.groupID,
+				RootGroupID: group.Metadata.ID,
+				System:      test.system,
+				CreatedBy:   "db-integration-tests",
+			})
 
-			actualTerraformModule, err := testClient.client.TerraformModules.GetModuleByID(ctx, test.searchID)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			checkError(t, test.expectMsg, err)
+			require.Nil(t, err)
+			require.NotNil(t, module)
 
-			if test.expectTerraformModule != nil {
-				require.NotNil(t, actualTerraformModule)
-				assert.Equal(t, test.expectTerraformModule, actualTerraformModule)
+			assert.Equal(t, test.moduleName, module.Name)
+			assert.Equal(t, test.groupID, module.GroupID)
+			assert.Equal(t, test.system, module.System)
+			assert.NotEmpty(t, module.Metadata.ID)
+		})
+	}
+}
+
+func TestTerraformModules_UpdateModule(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-update",
+		Description: "test group for module update",
+		FullPath:    "test-group-module-update",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	// Create a module for testing
+	createdModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-update",
+		System:      "aws",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		version         int
+		moduleID        string
+		system          string
+	}
+
+	testCases := []testCase{
+		{
+			name:     "update module",
+			moduleID: createdModule.Metadata.ID,
+			version:  createdModule.Metadata.Version,
+			system:   "aws", // Keep the original system value
+		},
+		{
+			name:            "would-be-duplicate-group-id-and-module-name",
+			moduleID:        createdModule.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+			system:          "azure",
+		},
+		{
+			name:            "negative, non-existent Terraform module ID",
+			moduleID:        invalidID,
+			expectErrorCode: errors.EInternal,
+			version:         1,
+			system:          "aws",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			moduleToUpdate := *createdModule
+			moduleToUpdate.Metadata.ID = test.moduleID
+			moduleToUpdate.Metadata.Version = test.version
+			moduleToUpdate.System = test.system
+
+			updatedModule, err := testClient.client.TerraformModules.UpdateModule(ctx, &moduleToUpdate)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+			require.NotNil(t, updatedModule)
+
+			assert.Equal(t, test.system, updatedModule.System)
+			assert.Equal(t, createdModule.Metadata.Version+1, updatedModule.Metadata.Version)
+		})
+	}
+}
+
+func TestTerraformModules_DeleteModule(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-delete",
+		Description: "test group for module delete",
+		FullPath:    "test-group-module-delete",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	// Create a module for testing
+	createdModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-delete",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		id              string
+		version         int
+	}
+
+	testCases := []testCase{
+		{
+			name:    "delete module",
+			id:      createdModule.Metadata.ID,
+			version: createdModule.Metadata.Version,
+		},
+		{
+			name:            "delete will fail because resource version doesn't match",
+			id:              createdModule.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+		},
+		{
+			name:            "negative, non-existent Terraform module ID",
+			id:              invalidID,
+			expectErrorCode: errors.EInternal,
+			version:         1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.TerraformModules.DeleteModule(ctx, &models.TerraformModule{
+				Metadata: models.ResourceMetadata{
+					ID:      test.id,
+					Version: test.version,
+				},
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+
+			// Verify module was deleted
+			module, err := testClient.client.TerraformModules.GetModuleByID(ctx, test.id)
+			assert.Nil(t, module)
+			assert.Nil(t, err)
+		})
+	}
+}
+
+func TestTerraformModules_GetModuleByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-get-by-id",
+		Description: "test group for module get by id",
+		FullPath:    "test-group-module-get-by-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform module for testing
+	createdModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-get-by-id",
+		System:      "aws",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		id              string
+		expectModule    bool
+	}
+
+	testCases := []testCase{
+		{
+			name:         "get resource by id",
+			id:           createdModule.Metadata.ID,
+			expectModule: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			module, err := testClient.client.TerraformModules.GetModuleByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectModule {
+				require.NotNil(t, module)
+				assert.Equal(t, test.id, module.Metadata.ID)
 			} else {
-				assert.Nil(t, actualTerraformModule)
+				assert.Nil(t, module)
 			}
 		})
 	}
 }
 
-func TestGetModuleByTRN(t *testing.T) {
-	ctx := t.Context()
+func TestTerraformModules_GetModules(t *testing.T) {
+	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
+	// Create a group for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "test-group",
+		Name:        "test-group-modules-list",
+		Description: "test group for modules list",
+		FullPath:    "test-group-modules-list",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.NoError(t, err)
 
-	module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
-		Name:        "test-module",
-		System:      "aws",
-		RootGroupID: group.Metadata.ID,
-		GroupID:     group.Metadata.ID,
-	})
-	require.NoError(t, err)
+	// Create test terraform modules
+	modules := []models.TerraformModule{
+		{
+			Name:        "test-module-1",
+			System:      "aws",
+			GroupID:     group.Metadata.ID,
+			RootGroupID: group.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
+		},
+		{
+			Name:        "test-module-2",
+			System:      "gcp",
+			GroupID:     group.Metadata.ID,
+			RootGroupID: group.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
+		},
+	}
+
+	createdModules := []models.TerraformModule{}
+	for _, module := range modules {
+		created, err := testClient.client.TerraformModules.CreateModule(ctx, &module)
+		require.NoError(t, err)
+		createdModules = append(createdModules, *created)
+	}
 
 	type testCase struct {
 		name            string
-		trn             string
-		expectModule    bool
 		expectErrorCode errors.CodeType
+		input           *GetModulesInput
+		expectCount     int
 	}
 
 	testCases := []testCase{
 		{
-			name:         "get module by TRN",
-			trn:          module.Metadata.TRN,
-			expectModule: true,
+			name: "get all modules",
+			input: &GetModulesInput{
+				Filter: &TerraformModuleFilter{
+					GroupID: &group.Metadata.ID,
+				},
+			},
+			expectCount: len(createdModules),
 		},
 		{
-			name: "resource with TRN not found",
-			trn:  types.TerraformModuleModelType.BuildTRN(group.FullPath, "non-existent-module", "aws"),
+			name: "filter by search",
+			input: &GetModulesInput{
+				Filter: &TerraformModuleFilter{
+					Search: ptr.String("test-module-1"),
+				},
+			},
+			expectCount: 1,
 		},
 		{
-			name:            "module TRN has less than 3 parts",
-			trn:             types.TerraformModuleModelType.BuildTRN("test-group"),
-			expectErrorCode: errors.EInvalid,
+			name: "filter by name",
+			input: &GetModulesInput{
+				Filter: &TerraformModuleFilter{
+					Name: &createdModules[0].Name,
+				},
+			},
+			expectCount: 1,
 		},
 		{
-			name:            "get resource with invalid TRN will return an error",
-			trn:             "trn:invalid",
-			expectErrorCode: errors.EInvalid,
+			name: "filter by system",
+			input: &GetModulesInput{
+				Filter: &TerraformModuleFilter{
+					System: &createdModules[0].System,
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "filter by root group ID",
+			input: &GetModulesInput{
+				Filter: &TerraformModuleFilter{
+					RootGroupID: &group.Metadata.ID,
+				},
+			},
+			expectCount: len(createdModules),
+		},
+		{
+			name: "filter by terraform module IDs",
+			input: &GetModulesInput{
+				Filter: &TerraformModuleFilter{
+					TerraformModuleIDs: []string{createdModules[0].Metadata.ID},
+				},
+			},
+			expectCount: 1,
 		},
 	}
-
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualModule, err := testClient.client.TerraformModules.GetModuleByTRN(ctx, test.trn)
+			result, err := testClient.client.TerraformModules.GetModules(ctx, test.input)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -160,1263 +415,131 @@ func TestGetModuleByTRN(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-
-			if test.expectModule {
-				require.NotNil(t, actualModule)
-				assert.Equal(t,
-					types.TerraformModuleModelType.BuildTRN(
-						group.FullPath,
-						module.Name,
-						module.System,
-					),
-					actualModule.Metadata.TRN,
-				)
-			} else {
-				assert.Nil(t, actualModule)
-			}
+			assert.Len(t, result.Modules, test.expectCount)
 		})
 	}
 }
 
-func TestGetModulesWithPagination(t *testing.T) {
-
+func TestTerraformModules_GetModulesWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups:           standardWarmupGroupsForTerraformModules,
-		terraformModules: standardWarmupTerraformModules,
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-modules-pagination",
+		Description: "test group for modules pagination",
+		FullPath:    "test-group-modules-pagination",
+		CreatedBy:   "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	// Query for first page
-	middleIndex := len(warmupItems.terraformModules) / 2
-	page1, err := testClient.client.TerraformModules.GetModules(ctx, &GetModulesInput{
-		PaginationOptions: &pagination.Options{
-			First: ptr.Int32(int32(middleIndex)),
-		},
-	})
-	require.Nil(t, err)
-
-	assert.Equal(t, middleIndex, len(page1.Modules))
-	assert.True(t, page1.PageInfo.HasNextPage)
-	assert.False(t, page1.PageInfo.HasPreviousPage)
-
-	cursor, err := page1.PageInfo.Cursor(&page1.Modules[len(page1.Modules)-1])
-	require.Nil(t, err)
-
-	remaining := len(warmupItems.terraformModules) - middleIndex
-	page2, err := testClient.client.TerraformModules.GetModules(ctx, &GetModulesInput{
-		PaginationOptions: &pagination.Options{
-			First: ptr.Int32(int32(remaining)),
-			After: cursor,
-		},
-	})
-	require.Nil(t, err)
-
-	assert.Equal(t, remaining, len(page2.Modules))
-	assert.True(t, page2.PageInfo.HasPreviousPage)
-	assert.False(t, page2.PageInfo.HasNextPage)
-}
-
-func TestGetModules(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups:                 standardWarmupGroupsForTerraformModules,
-		workspaces:             standardWarmupWorkspacesForTerraformModules,
-		teams:                  standardWarmupTeamsForTerraformModules,
-		users:                  standardWarmupUsersForTerraformModules,
-		teamMembers:            standardWarmupTeamMembersForTerraformModules,
-		serviceAccounts:        standardWarmupServiceAccountsForTerraformModules,
-		namespaceMembershipsIn: standardWarmupNamespaceMembershipsForTerraformModules,
-		terraformModules:       standardWarmupTerraformModules,
-	})
-	require.Nil(t, err)
-
-	allTerraformModuleInfos := terraformModuleInfoFromTerraformModules(warmupItems.terraformModules)
-
-	// Sort by Terraform module IDs.
-	sort.Sort(terraformModuleInfoIDSlice(allTerraformModuleInfos))
-	allTerraformModuleIDs := terraformModuleIDsFromTerraformModuleInfos(allTerraformModuleInfos)
-
-	// Sort by names.
-	sort.Sort(terraformModuleInfoNameSlice(allTerraformModuleInfos))
-	allTerraformModuleIDsByName := terraformModuleIDsFromTerraformModuleInfos(allTerraformModuleInfos)
-	reverseTerraformModuleIDsByName := reverseStringSlice(allTerraformModuleIDsByName)
-
-	// Sort by last update times.
-	sort.Sort(terraformModuleInfoUpdateSlice(allTerraformModuleInfos))
-	allTerraformModuleIDsByTime := terraformModuleIDsFromTerraformModuleInfos(allTerraformModuleInfos)
-	reverseTerraformModuleIDsByTime := reverseStringSlice(allTerraformModuleIDsByTime)
-
-	type testCase struct {
-		input                    *GetModulesInput
-		expectMsg                *string
-		name                     string
-		expectTerraformModuleIDs []string
-	}
-
-	testCases := []testCase{
-		{
-			name: "non-nil but mostly empty input",
-			input: &GetModulesInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDs,
-		},
-
-		{
-			name: "populated sort and pagination, nil filter",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime,
-		},
-
-		{
-			name: "sort in ascending order of name",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldNameAsc),
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByName,
-		},
-
-		{
-			name: "sort in descending order of name",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldNameDesc),
-			},
-			expectTerraformModuleIDs: reverseTerraformModuleIDsByName,
-		},
-
-		{
-			name: "sort in ascending order of time of last update",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime,
-		},
-
-		{
-			name: "sort in descending order of time of last update",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtDesc),
-			},
-			expectTerraformModuleIDs: reverseTerraformModuleIDsByTime,
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
-			},
-			expectMsg:                ptr.String("only first or last can be defined, not both"),
-			expectTerraformModuleIDs: allTerraformModuleIDs[4:],
-		},
-
-		{
-			name: "fully-populated types, nothing allowed through filters",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: &TerraformModuleFilter{
-					Search:           ptr.String(""),
-					Name:             ptr.String(""),
-					RootGroupID:      ptr.String(""),
-					GroupID:          ptr.String(""),
-					UserID:           ptr.String(""),
-					ServiceAccountID: ptr.String(""),
-				},
-			},
-			expectMsg:                invalidUUIDMsg,
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, search field, empty string",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Search: ptr.String(""),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime,
-		},
-
-		{
-			name: "filter, search field, 1",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Search: ptr.String("1"),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime[0:2],
-		},
-
-		{
-			name: "filter, search field, 2",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Search: ptr.String("2"),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime[2:4],
-		},
-
-		{
-			name: "filter, search field, 5",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Search: ptr.String("5"),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime[4:],
-		},
-
-		{
-			name: "filter, search field, bogus",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Search: ptr.String("bogus"),
-				},
-			},
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, name, positive",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Name: ptr.String(warmupItems.terraformModules[0].Name),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime[0:1],
-		},
-
-		{
-			name: "filter, name, non-existent",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					Name: ptr.String(nonExistentID),
-				},
-			},
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, root group ID, positive",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					RootGroupID: ptr.String(warmupItems.terraformModules[0].RootGroupID),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime[0:1],
-		},
-
-		{
-			name: "filter, root group ID, non-existent",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					RootGroupID: ptr.String(nonExistentID),
-				},
-			},
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, root group ID, invalid",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					RootGroupID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:                invalidUUIDMsg,
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, group ID, positive",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					GroupID: ptr.String(warmupItems.terraformModules[0].GroupID),
-				},
-			},
-			expectTerraformModuleIDs: allTerraformModuleIDsByTime[0:1],
-		},
-
-		{
-			name: "filter, group ID, non-existent",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					GroupID: ptr.String(nonExistentID),
-				},
-			},
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, group ID, invalid",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					GroupID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:                invalidUUIDMsg,
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, user ID, positive",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					UserID: ptr.String(warmupItems.users[0].Metadata.ID),
-				},
-			},
-			// Gets 0 because it's public, 4 by user ID.
-			expectTerraformModuleIDs: []string{allTerraformModuleIDsByName[0], allTerraformModuleIDsByName[4]},
-		},
-
-		{
-			name: "filter, user ID, non-existent",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					UserID: ptr.String(nonExistentID),
-				},
-			},
-			// Gets 0 because it's public.
-			expectTerraformModuleIDs: []string{allTerraformModuleIDsByName[0]},
-		},
-
-		{
-			name: "filter, user, invalid",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					UserID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:                invalidUUIDMsg,
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, service account ID, positive",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					ServiceAccountID: ptr.String(warmupItems.serviceAccounts[0].Metadata.ID),
-				},
-			},
-			// Gets 0 because it's public, 4 by service account ID.
-			expectTerraformModuleIDs: []string{allTerraformModuleIDsByName[0], allTerraformModuleIDsByName[4]},
-		},
-
-		{
-			name: "filter, service account ID, non-existent",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					ServiceAccountID: ptr.String(nonExistentID),
-				},
-			},
-			// Gets 0 because it's public.
-			expectTerraformModuleIDs: []string{allTerraformModuleIDsByName[0]},
-		},
-
-		{
-			name: "filter, service account ID, invalid",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					ServiceAccountID: ptr.String(invalidID),
-				},
-			},
-			expectMsg:                invalidUUIDMsg,
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, terraform module IDs, positive",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					TerraformModuleIDs: []string{
-						allTerraformModuleIDsByTime[0], allTerraformModuleIDsByTime[1], allTerraformModuleIDsByTime[3]},
-				},
-			},
-			expectTerraformModuleIDs: []string{
-				allTerraformModuleIDsByTime[0], allTerraformModuleIDsByTime[1], allTerraformModuleIDsByTime[3],
-			},
-		},
-
-		{
-			name: "filter, terraform module IDs, non-existent",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					TerraformModuleIDs: []string{nonExistentID},
-				},
-			},
-			expectTerraformModuleIDs: []string{},
-		},
-
-		{
-			name: "filter, terraform module IDs, invalid ID",
-			input: &GetModulesInput{
-				Sort: ptrTerraformModuleSortableField(TerraformModuleSortableFieldUpdatedAtAsc),
-				Filter: &TerraformModuleFilter{
-					TerraformModuleIDs: []string{invalidID},
-				},
-			},
-			expectMsg:                invalidUUIDMsg,
-			expectTerraformModuleIDs: []string{},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			terraformModulesResult, err := testClient.client.TerraformModules.GetModules(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if err == nil {
-				// Never returns nil if error is nil.
-				require.NotNil(t, terraformModulesResult.PageInfo)
-
-				terraformModules := terraformModulesResult.Modules
-
-				// Check the terraform modules result by comparing a list of the terraform module IDs.
-				actualTerraformModuleIDs := []string{}
-				for _, terraformModule := range terraformModules {
-					actualTerraformModuleIDs = append(actualTerraformModuleIDs, terraformModule.Metadata.ID)
-				}
-
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(actualTerraformModuleIDs)
-				}
-
-				assert.Equal(t, len(test.expectTerraformModuleIDs), len(actualTerraformModuleIDs))
-				assert.Equal(t, test.expectTerraformModuleIDs, actualTerraformModuleIDs)
-			}
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		_, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+			Name:        fmt.Sprintf("test-module-%d", i),
+			System:      "aws",
+			GroupID:     group.Metadata.ID,
+			RootGroupID: group.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
 		})
-	}
-}
-
-func TestCreateModule(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups: standardWarmupGroupsForTerraformModules,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		toCreate      *models.TerraformModule
-		expectCreated *models.TerraformModule
-		expectMsg     *string
-		name          string
+		require.NoError(t, err)
 	}
 
-	now := time.Now()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test",
-				System:      "aws",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-				Private:     true,
-				CreatedBy:   "TestCreateModule",
-			},
-			expectCreated: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-					TRN:               types.TerraformModuleModelType.BuildTRN(warmupItems.groups[0].FullPath, "terraform-module-create-test", "aws"),
-				},
-				Name:        "terraform-module-create-test",
-				System:      "aws",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-				Private:     true,
-				CreatedBy:   "TestCreateModule",
-			},
-		},
-
-		{
-			name: "allow duplicate name but different system",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test",
-				System:      "azure",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-				Private:     true,
-				CreatedBy:   "TestCreateModule",
-			},
-			expectCreated: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-					TRN:               types.TerraformModuleModelType.BuildTRN(warmupItems.groups[0].FullPath, "terraform-module-create-test", "azure"),
-				},
-				Name:        "terraform-module-create-test",
-				System:      "azure",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-				Private:     true,
-				CreatedBy:   "TestCreateModule",
-			},
-		},
-
-		{
-			name: "duplicate group ID and Terraform module name",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test",
-				System:      "aws",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-			},
-			expectMsg: ptr.String("terraform module with name terraform-module-create-test and system aws already exists"),
-		},
-
-		{
-			name: "negative, non-existent root group ID",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test-non-existent-root-group-id",
-				System:      "aws",
-				RootGroupID: nonExistentID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_modules\" violates foreign key constraint \"fk_root_group_id\" (SQLSTATE 23503)"),
-		},
-
-		{
-			name: "negative, non-existent group ID",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test-non-existent-group-id",
-				System:      "aws",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     nonExistentID,
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_modules\" violates foreign key constraint \"fk_group_id\" (SQLSTATE 23503)"),
-		},
-
-		{
-			name: "negative, invalid root group ID",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test-invalid-root-group-id",
-				System:      "aws",
-				RootGroupID: invalidID,
-				GroupID:     warmupItems.groups[0].Metadata.ID,
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-
-		{
-			name: "negative, invalid group ID",
-			toCreate: &models.TerraformModule{
-				Name:        "terraform-module-create-test-invalid-group-id",
-				System:      "aws",
-				RootGroupID: warmupItems.groups[0].Metadata.ID,
-				GroupID:     invalidID,
-			},
-			expectMsg: invalidUUIDMsg,
-		},
+	sortableFields := []sortableField{
+		TerraformModuleSortableFieldNameAsc,
+		TerraformModuleSortableFieldNameDesc,
+		TerraformModuleSortableFieldUpdatedAtAsc,
+		TerraformModuleSortableFieldUpdatedAtDesc,
 	}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := TerraformModuleSortableField(sortByField.getValue())
 
-			actualCreated, err := testClient.client.TerraformModules.CreateModule(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := time.Now()
-
-				compareTerraformModules(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualCreated)
-			}
+		result, err := testClient.client.TerraformModules.GetModules(ctx, &GetModulesInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+			Filter: &TerraformModuleFilter{
+				GroupID: &group.Metadata.ID,
+			},
 		})
-	}
-}
-
-func TestUpdateModule(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups:           standardWarmupGroupsForTerraformModules,
-		terraformModules: standardWarmupTerraformModules,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg     *string
-		toUpdate      *models.TerraformModule
-		expectUpdated *models.TerraformModule
-		name          string
-	}
-
-	// Looks up by ID and version.  Also requires group ID.
-	// Updates private.
-	positiveTerraformModule := warmupItems.terraformModules[0]
-	positiveGroup := warmupItems.groups[9]
-	otherTerraformModule := warmupItems.terraformModules[1]
-	now := time.Now()
-	testCases := []testCase{
-
-		{
-			name: "positive",
-			toUpdate: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveTerraformModule.Metadata.ID,
-					Version: initialResourceVersion,
-				},
-				Name:    positiveTerraformModule.Name,
-				System:  positiveTerraformModule.System,
-				Private: !positiveTerraformModule.Private,
-				GroupID: positiveGroup.Metadata.ID,
-			},
-			expectUpdated: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:                   positiveTerraformModule.Metadata.ID,
-					Version:              initialResourceVersion + 1,
-					CreationTimestamp:    positiveTerraformModule.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-					TRN:                  types.TerraformModuleModelType.BuildTRN(positiveGroup.FullPath, positiveTerraformModule.Name, positiveTerraformModule.System),
-				},
-				Name:        positiveTerraformModule.Name,
-				System:      positiveTerraformModule.System,
-				RootGroupID: positiveTerraformModule.RootGroupID,
-				GroupID:     positiveTerraformModule.GroupID,
-				Private:     !positiveTerraformModule.Private,
-				CreatedBy:   positiveTerraformModule.CreatedBy,
-			},
-		},
-
-		{
-			name: "would-be-duplicate-group-id-and-module-name",
-			toUpdate: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveTerraformModule.Metadata.ID,
-					Version: initialResourceVersion,
-				},
-				// Would duplicate a different Terraform module.
-				Name: otherTerraformModule.Name,
-			},
-			expectMsg: ptr.String("resource version does not match specified version"),
-		},
-
-		{
-			name: "negative, non-existent Terraform module ID",
-			toUpdate: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-ID",
-			toUpdate: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			actualTerraformModule, err := testClient.client.TerraformModules.UpdateModule(ctx, test.toUpdate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectUpdated != nil {
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectUpdated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				require.NotNil(t, actualTerraformModule)
-				compareTerraformModules(t, test.expectUpdated, actualTerraformModule, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualTerraformModule)
-			}
-		})
-	}
-}
-
-func TestDeleteModule(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModules(ctx, testClient, warmupTerraformModules{
-		groups:           standardWarmupGroupsForTerraformModules,
-		terraformModules: standardWarmupTerraformModules,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg *string
-		toDelete  *models.TerraformModule
-		name      string
-	}
-
-	testCases := []testCase{
-
-		{
-			name: "positive",
-			toDelete: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      warmupItems.terraformModules[0].Metadata.ID,
-					Version: initialResourceVersion,
-				},
-			},
-		},
-
-		{
-			name: "negative, non-existent Terraform module ID",
-			toDelete: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-ID",
-			toDelete: &models.TerraformModule{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			err := testClient.client.TerraformModules.DeleteModule(ctx, test.toDelete)
-
-			checkError(t, test.expectMsg, err)
-		})
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup group(s) for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForTerraformModules = []models.Group{
-	// Top-level groups:
-	{
-		Description: "top level group 0 for testing terraform module functions",
-		FullPath:    "top-level-group-0-for-terraform-modules",
-		CreatedBy:   "someone-g0",
-	},
-	{
-		Description: "top level group 1 for testing terraform module functions",
-		FullPath:    "top-level-group-1-for-terraform-modules",
-		CreatedBy:   "someone-g1",
-	},
-	{
-		Description: "top level group 2 for testing terraform module functions",
-		FullPath:    "top-level-group-2-for-terraform-modules",
-		CreatedBy:   "someone-g2",
-	},
-	{
-		Description: "top level group 3 for testing terraform module functions",
-		FullPath:    "top-level-group-3-for-terraform-modules",
-		CreatedBy:   "someone-g3",
-	},
-	{
-		Description: "top level group 4 for testing terraform module functions",
-		FullPath:    "top-level-group-4-for-terraform-modules",
-		CreatedBy:   "someone-g4",
-	},
-	// Nested groups:
-	{
-		Description: "nested group 5 for testing terraform module functions",
-		FullPath:    "top-level-group-4-for-terraform-modules/nested-group-5-for-terraform-modules",
-		CreatedBy:   "someone-g5",
-	},
-	{
-		Description: "nested group 6 for testing terraform module functions",
-		FullPath:    "top-level-group-3-for-terraform-modules/nested-group-6-for-terraform-modules",
-		CreatedBy:   "someone-g6",
-	},
-	{
-		Description: "nested group 7 for testing terraform module functions",
-		FullPath:    "top-level-group-2-for-terraform-modules/nested-group-7-for-terraform-modules",
-		CreatedBy:   "someone-g7",
-	},
-	{
-		Description: "nested group 8 for testing terraform module functions",
-		FullPath:    "top-level-group-1-for-terraform-modules/nested-group-8-for-terraform-modules",
-		CreatedBy:   "someone-g8",
-	},
-	{
-		Description: "nested group 9 for testing terraform module functions",
-		FullPath:    "top-level-group-0-for-terraform-modules/nested-group-9-for-terraform-modules",
-		CreatedBy:   "someone-g9",
-	},
-}
-
-// Standard warmup workspaces for tests in this module:
-// The create function will derive the group ID and name from the namespace path.
-var standardWarmupWorkspacesForTerraformModules = []models.Workspace{
-	{
-		Description: "workspace 0 for testing terraform module functions",
-		FullPath:    "top-level-group-0-for-terraform-modules/workspace-0-in-group-0",
-		CreatedBy:   "someone-w0",
-	},
-	{
-		Description: "workspace 1 for testing terraform module functions",
-		FullPath:    "top-level-group-1-for-terraform-modules/workspace-1-in-group-1",
-		CreatedBy:   "someone-w1",
-	},
-	{
-		Description: "workspace 2 for testing terraform module functions",
-		FullPath:    "top-level-group-2-for-terraform-modules/workspace-2-in-group-2",
-		CreatedBy:   "someone-w2",
-	},
-}
-
-// Standard warmup teams for tests in this module:
-var standardWarmupTeamsForTerraformModules = []models.Team{
-	{
-		Name:        "team-a",
-		Description: "team a for terraform module tests",
-	},
-	{
-		Name:        "team-b",
-		Description: "team b for terraform module tests",
-	},
-}
-
-// Standard warmup users for tests in this module:
-// Please note: all users are _NON_-admin.
-var standardWarmupUsersForTerraformModules = []models.User{
-	{
-		Username: "user-0",
-		Email:    "user-0@example.com",
-	},
-	{
-		Username: "user-1",
-		Email:    "user-1@example.com",
-	},
-	{
-		Username: "user-team-a",
-		Email:    "user-2@example.com",
-	},
-	{
-		Username: "user-team-b",
-		Email:    "user-3@example.com",
-	},
-}
-
-// Standard warmup team member relationships for tests in this module:
-// Please note that the ID fields contain names, not IDs.
-var standardWarmupTeamMembersForTerraformModules = []models.TeamMember{
-	{
-		UserID: "user-team-a",
-		TeamID: "team-a",
-	},
-	{
-		UserID: "user-team-b",
-		TeamID: "team-b",
-	},
-}
-
-// Standard service account(s) for tests in this module:
-// The create function will convert the group name to group ID.
-var standardWarmupServiceAccountsForTerraformModules = []models.ServiceAccount{
-	{
-		Name:              "service-account-0",
-		Description:       "service account 0",
-		GroupID:           "top-level-group-2-for-terraform-modules/nested-group-7-for-terraform-modules",
-		CreatedBy:         "someone-sa0",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-	{
-		Name:              "service-account-1",
-		Description:       "service account 1",
-		GroupID:           "top-level-group-1-for-terraform-modules/nested-group-8-for-terraform-modules",
-		CreatedBy:         "someone-sa0",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-}
-
-// standardWarmupRolesForTerraformModules for tests in this module.
-var standardWarmupRolesForTerraformModules = []models.Role{
-	{
-		Name:        "role-a",
-		Description: "Warmup role-a for terraform modules",
-	},
-	{
-		Name:        "role-b",
-		Description: "Warmup role-b for terraform modules",
-	},
-}
-
-// Standard warmup namespace memberships for tests in this module:
-// In this variable, the ID field is the user, service account, and team _NAME_, NOT the ID.
-var standardWarmupNamespaceMembershipsForTerraformModules = []CreateNamespaceMembershipInput{
-
-	// Team access to group:
-	{
-		NamespacePath: "top-level-group-3-for-terraform-modules",
-		TeamID:        ptr.String("team-a"),
-		RoleID:        "role-a",
-	},
-
-	// User access to group:
-	{
-		NamespacePath: "top-level-group-4-for-terraform-modules",
-		UserID:        ptr.String("user-0"),
-		RoleID:        "role-b",
-	},
-
-	// Service accounts access to group:
-	{
-		NamespacePath:    "top-level-group-4-for-terraform-modules/nested-group-5-for-terraform-modules",
-		ServiceAccountID: ptr.String("service-account-0"),
-		RoleID:           "role-a",
-	},
-
-	// Team access to workspace:
-	{
-		NamespacePath: "top-level-group-0-for-terraform-modules/workspace-0-in-group-0",
-		TeamID:        ptr.String("team-b"),
-		RoleID:        "role-a",
-	},
-
-	// User access to workspace:
-	{
-		NamespacePath: "top-level-group-1-for-terraform-modules/workspace-1-in-group-1",
-		UserID:        ptr.String("user-1"),
-		RoleID:        "role-b",
-	},
-
-	// Service account access to workspace:
-	{
-		NamespacePath:    "top-level-group-2-for-terraform-modules/workspace-2-in-group-2",
-		ServiceAccountID: ptr.String("service-account-1"),
-		RoleID:           "role-a",
-	},
-}
-
-// Standard warmup terraform modules for tests in this module:
-// The ID fields will be replaced by the real IDs during the create function.
-var standardWarmupTerraformModules = []models.TerraformModule{
-	{
-		// This one is public.
-		Name:        "1-terraform-module-0",
-		System:      "aws",
-		RootGroupID: "top-level-group-0-for-terraform-modules",
-		GroupID:     "top-level-group-0-for-terraform-modules/nested-group-9-for-terraform-modules",
-		Private:     false,
-		CreatedBy:   "someone-sv0",
-	},
-	{
-		Name:        "1-terraform-module-1",
-		System:      "aws",
-		RootGroupID: "top-level-group-1-for-terraform-modules",
-		GroupID:     "top-level-group-1-for-terraform-modules",
-		Private:     true,
-		CreatedBy:   "someone-sv1",
-	},
-	{
-		Name:        "2-terraform-module-2",
-		System:      "aws",
-		RootGroupID: "top-level-group-2-for-terraform-modules",
-		GroupID:     "top-level-group-2-for-terraform-modules/nested-group-7-for-terraform-modules",
-		Private:     true,
-		CreatedBy:   "someone-sv2",
-	},
-	{
-		Name:        "2-terraform-module-3",
-		System:      "aws",
-		RootGroupID: "top-level-group-3-for-terraform-modules",
-		GroupID:     "top-level-group-3-for-terraform-modules",
-		Private:     true,
-		CreatedBy:   "someone-sv3",
-	},
-	{
-		Name:        "5-terraform-module-4",
-		System:      "aws",
-		RootGroupID: "top-level-group-4-for-terraform-modules",
-		GroupID:     "top-level-group-4-for-terraform-modules/nested-group-5-for-terraform-modules",
-		Private:     true,
-		CreatedBy:   "someone-sv4",
-	},
-}
-
-// createWarmupTerraformModules creates some warmup terraform modules for a test
-// The warmup terraform modules to create can be standard or otherwise.
-func createWarmupTerraformModules(ctx context.Context, testClient *testClient,
-	input warmupTerraformModules) (*warmupTerraformModules, error) {
-
-	// It is necessary to create several groups in order to provide the necessary IDs for the terraform modules.
-
-	// If doing get operations based on user ID or service account ID, it is necessary to create a bunch of other things.
-
-	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
-	}
-
-	resultWorkspaces, err := createInitialWorkspaces(ctx, testClient, parentPath2ID, input.workspaces)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTeams, teamName2ID, err := createInitialTeams(ctx, testClient, input.teams)
-	if err != nil {
-		return nil, err
-	}
-
-	resultUsers, username2ID, err := createInitialUsers(ctx, testClient, input.users)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTeamMembers, err := createInitialTeamMembers(ctx, testClient, teamName2ID, username2ID, input.teamMembers)
-	if err != nil {
-		return nil, err
-	}
-
-	resultServiceAccounts, serviceAccountName2ID, err := createInitialServiceAccounts(ctx, testClient,
-		parentPath2ID, input.serviceAccounts)
-	if err != nil {
-		return nil, err
-	}
-
-	_, roleName2ID, err := createInitialRoles(ctx, testClient, standardWarmupRolesForTerraformModules)
-	if err != nil {
-		return nil, err
-	}
-
-	resultNamespaceMemberships, err := createInitialNamespaceMemberships(ctx, testClient,
-		teamName2ID, username2ID, parentPath2ID, serviceAccountName2ID, roleName2ID, input.namespaceMembershipsIn)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTerraformModules, _, err := createInitialTerraformModules(ctx, testClient,
-		input.terraformModules, parentPath2ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &warmupTerraformModules{
-		groups:                  resultGroups,
-		workspaces:              resultWorkspaces,
-		teams:                   resultTeams,
-		users:                   resultUsers,
-		teamMembers:             resultTeamMembers,
-		serviceAccounts:         resultServiceAccounts,
-		namespaceMembershipsOut: resultNamespaceMemberships,
-		terraformModules:        resultTerraformModules,
-	}, nil
-}
-
-func ptrTerraformModuleSortableField(arg TerraformModuleSortableField) *TerraformModuleSortableField {
-	return &arg
-}
-
-func (wis terraformModuleInfoIDSlice) Len() int {
-	return len(wis)
-}
-
-func (wis terraformModuleInfoIDSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformModuleInfoIDSlice) Less(i, j int) bool {
-	return wis[i].id < wis[j].id
-}
-
-func (wis terraformModuleInfoUpdateSlice) Len() int {
-	return len(wis)
-}
-
-func (wis terraformModuleInfoUpdateSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformModuleInfoUpdateSlice) Less(i, j int) bool {
-	return wis[i].updateTime.Before(wis[j].updateTime)
-}
-
-func (wis terraformModuleInfoNameSlice) Len() int {
-	return len(wis)
-}
-
-func (wis terraformModuleInfoNameSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformModuleInfoNameSlice) Less(i, j int) bool {
-	return wis[i].name < wis[j].name
-}
-
-// terraformModuleInfoFromTerraformModules returns a slice of terraformModuleInfo, not necessarily sorted in any order.
-func terraformModuleInfoFromTerraformModules(terraformModules []models.TerraformModule) []terraformModuleInfo {
-	result := []terraformModuleInfo{}
-
-	for _, tp := range terraformModules {
-		result = append(result, terraformModuleInfo{
-			id:         tp.Metadata.ID,
-			name:       tp.Name,
-			updateTime: *tp.Metadata.LastUpdatedTimestamp,
-		})
-	}
-
-	return result
-}
-
-// terraformModuleIDsFromTerraformModuleInfos preserves order
-func terraformModuleIDsFromTerraformModuleInfos(terraformModuleInfos []terraformModuleInfo) []string {
-	result := []string{}
-	for _, terraformModuleInfo := range terraformModuleInfos {
-		result = append(result, terraformModuleInfo.id)
-	}
-	return result
-}
-
-// compareTerraformModules compares two terraform module objects, including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareTerraformModules(t *testing.T, expected, actual *models.TerraformModule,
-	checkID bool, times *timeBounds) {
-
-	assert.Equal(t, expected.Name, actual.Name)
-	assert.Equal(t, expected.RootGroupID, actual.RootGroupID)
-	assert.Equal(t, expected.GroupID, actual.GroupID)
-	assert.Equal(t, expected.Private, actual.Private)
-	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
-	}
-}
-
-// createInitialTerraformModules creates some warmup Terraform modules for a test.
-func createInitialTerraformModules(ctx context.Context, testClient *testClient,
-	toCreate []models.TerraformModule, groupPath2ID map[string]string) (
-	[]models.TerraformModule, map[string]string, error) {
-	result := []models.TerraformModule{}
-	resourcePath2ID := make(map[string]string)
-
-	for _, input := range toCreate {
-
-		rootGroupPath := input.RootGroupID
-		rootGroupID, ok := groupPath2ID[rootGroupPath]
-		if !ok {
-			return nil, nil,
-				fmt.Errorf("createInitialTerraformModules failed to look up root group path: %s", rootGroupPath)
-		}
-		input.RootGroupID = rootGroupID
-
-		groupPath := input.GroupID
-		groupID, ok := groupPath2ID[groupPath]
-		if !ok {
-			return nil, nil,
-				fmt.Errorf("createInitialTerraformModules failed to look up group path: %s", groupPath)
-		}
-		input.GroupID = groupID
-
-		created, err := testClient.client.TerraformModules.CreateModule(ctx, &input)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		result = append(result, *created)
-		resourcePath2ID[created.GetResourcePath()] = created.Metadata.ID
-	}
+		resources := []pagination.CursorPaginatable{}
+		for _, resource := range result.Modules {
+			resourceCopy := resource
+			resources = append(resources, &resourceCopy)
+		}
 
-	return result, resourcePath2ID, nil
+		return result.PageInfo, resources, nil
+	})
 }
 
-// The End.
+func TestTerraformModules_GetModuleByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-get-by-trn",
+		Description: "test group for module get by trn",
+		FullPath:    "test-group-module-get-by-trn",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform module for testing
+	createdModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-get-by-trn",
+		System:      "aws",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		trn             string
+		expectModule    bool
+	}
+
+	testCases := []testCase{
+		{
+			name:         "get resource by TRN",
+			trn:          createdModule.Metadata.TRN,
+			expectModule: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  "trn:tharsis:terraform_module:non-existent-id",
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "invalid-trn",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			module, err := testClient.client.TerraformModules.GetModuleByTRN(ctx, test.trn)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectModule {
+				require.NotNil(t, module)
+				assert.Equal(t, createdModule.Metadata.ID, module.Metadata.ID)
+			} else {
+				assert.Nil(t, module)
+			}
+		})
+	}
+}

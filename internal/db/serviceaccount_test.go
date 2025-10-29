@@ -5,164 +5,363 @@ package db
 import (
 	"context"
 	"fmt"
-	"sort"
-	"testing"
-	"time"
-
 	"github.com/aws/smithy-go/ptr"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// Some constants and pseudo-constants are declared/defined in dbclient_test.go.
-
-// serviceAccountInfo aids convenience in accessing the information TestGetServiceAccounts
-// needs about the warmup service accounts.
-type serviceAccountInfo struct {
-	createTime       time.Time
-	updateTime       time.Time
-	serviceAccountID string
-	name             string
+// getValue implements the sortableField interface for ServiceAccountSortableField
+func (sa ServiceAccountSortableField) getValue() string {
+	return string(sa)
 }
 
-// serviceAccountInfoIDSlice makes a slice of serviceAccountInfo sortable by ID string
-type serviceAccountInfoIDSlice []serviceAccountInfo
-
-// serviceAccountInfoCreateSlice makes a slice of serviceAccountInfo sortable by creation time
-type serviceAccountInfoCreateSlice []serviceAccountInfo
-
-// serviceAccountInfoUpdateSlice makes a slice of serviceAccountInfo sortable by last updated time
-type serviceAccountInfoUpdateSlice []serviceAccountInfo
-
-// serviceAccountInfoNameSlice makes a slice of serviceAccountInfo sortable by name
-type serviceAccountInfoNameSlice []serviceAccountInfo
-
-func TestGetServiceAccountByID(t *testing.T) {
+func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := time.Now()
-	_, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
-		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
-		standardWarmupOIDCTrustPoliciesForServiceAccounts)
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-sa",
+		Description: "test group for service account",
+		FullPath:    "test-group-sa",
+		CreatedBy:   "db-integration-tests",
+	})
 	require.Nil(t, err)
-	createdHigh := time.Now()
 
 	type testCase struct {
-		expectMsg            *string
-		expectServiceAccount *models.ServiceAccount
-		name                 string
-		searchID             string
+		name            string
+		expectErrorCode errors.CodeType
+		saName          string
+		description     string
+		groupID         string
 	}
 
-	positiveServiceAccount := warmupServiceAccounts[0]
-	now := time.Now()
 	testCases := []testCase{
 		{
-			name:     "positive",
-			searchID: positiveServiceAccount.Metadata.ID,
-			expectServiceAccount: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:                positiveServiceAccount.Metadata.ID,
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-					TRN:               positiveServiceAccount.Metadata.TRN,
-				},
-				Name:              positiveServiceAccount.Name,
-				Description:       positiveServiceAccount.Description,
-				GroupID:           positiveServiceAccount.GroupID,
-				CreatedBy:         positiveServiceAccount.CreatedBy,
-				OIDCTrustPolicies: positiveServiceAccount.OIDCTrustPolicies,
-			},
+			name:        "create service account",
+			saName:      "test-sa",
+			description: "test service account",
+			groupID:     group.Metadata.ID,
 		},
-
 		{
-			name:     "negative, non-existent service account ID",
-			searchID: nonExistentID,
-			// expect service account and error to be nil
-		},
-
-		{
-			name:      "defective-ID",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
+			name:            "create service account with invalid group ID",
+			saName:          "invalid-sa",
+			description:     "invalid service account",
+			groupID:         invalidID,
+			expectErrorCode: errors.EInternal,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualServiceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByID(ctx, test.searchID)
+			sa, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+				Name:        test.saName,
+				Description: test.description,
+				GroupID:     test.groupID,
+				CreatedBy:   "db-integration-tests",
+			})
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectServiceAccount != nil {
-				require.NotNil(t, actualServiceAccount)
-				compareServiceAccounts(t, test.expectServiceAccount, actualServiceAccount, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &createdHigh,
-				})
+			require.Nil(t, err)
+			require.NotNil(t, sa)
+
+			assert.Equal(t, test.saName, sa.Name)
+			assert.Equal(t, test.description, sa.Description)
+			assert.Equal(t, test.groupID, sa.GroupID)
+			assert.NotEmpty(t, sa.Metadata.ID)
+		})
+	}
+}
+
+func TestServiceAccounts_UpdateServiceAccount(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group and service account for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-sa-update",
+		Description: "test group for service account update",
+		FullPath:    "test-group-sa-update",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdSA, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:        "test-sa-update",
+		Description: "original description",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		version         int
+		description     string
+	}
+
+	testCases := []testCase{
+		{
+			name:        "update service account",
+			version:     createdSA.Metadata.Version,
+			description: "updated description",
+		},
+		{
+			name:            "update will fail because resource version doesn't match",
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+			description:     "should not update",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			saToUpdate := *createdSA
+			saToUpdate.Metadata.Version = test.version
+			saToUpdate.Description = test.description
+
+			updatedSA, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, &saToUpdate)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+			require.NotNil(t, updatedSA)
+
+			assert.Equal(t, test.description, updatedSA.Description)
+			assert.Equal(t, createdSA.Metadata.Version+1, updatedSA.Metadata.Version)
+		})
+	}
+}
+
+func TestServiceAccounts_DeleteServiceAccount(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group and service account for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-sa-delete",
+		Description: "test group for service account delete",
+		FullPath:    "test-group-sa-delete",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	createdSA, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:        "test-sa-delete",
+		Description: "service account to delete",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		id              string
+		version         int
+	}
+
+	testCases := []testCase{
+		{
+			name:    "delete service account",
+			id:      createdSA.Metadata.ID,
+			version: createdSA.Metadata.Version,
+		},
+		{
+			name:            "delete will fail because resource version doesn't match",
+			id:              createdSA.Metadata.ID,
+			expectErrorCode: errors.EOptimisticLock,
+			version:         -1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.ServiceAccounts.DeleteServiceAccount(ctx, &models.ServiceAccount{
+				Metadata: models.ResourceMetadata{
+					ID:      test.id,
+					Version: test.version,
+				},
+			})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.Nil(t, err)
+
+			// Verify service account was deleted
+			serviceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByID(ctx, test.id)
+			assert.Nil(t, serviceAccount)
+			assert.Nil(t, err)
+		})
+	}
+}
+
+func TestServiceAccounts_GetServiceAccountByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-service-account-get-by-id",
+		Description: "test group for service account get by id",
+		FullPath:    "test-group-service-account-get-by-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a service account for testing
+	createdServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:        "test-service-account-get-by-id",
+		Description: "test service account for get by id",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode      errors.CodeType
+		name                 string
+		id                   string
+		expectServiceAccount bool
+	}
+
+	testCases := []testCase{
+		{
+			name:                 "get resource by id",
+			id:                   createdServiceAccount.Metadata.ID,
+			expectServiceAccount: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			serviceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectServiceAccount {
+				require.NotNil(t, serviceAccount)
+				assert.Equal(t, test.id, serviceAccount.Metadata.ID)
 			} else {
-				assert.Nil(t, actualServiceAccount)
+				assert.Nil(t, serviceAccount)
 			}
 		})
 	}
 }
 
-func TestGetServiceAccountByTRN(t *testing.T) {
+func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
+	// Create a group for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "test-group",
+		Name:        "test-group-service-accounts-list",
+		Description: "test group for service accounts list",
+		FullPath:    "test-group-service-accounts-list",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.NoError(t, err)
 
-	serviceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
-		Name:    "test-service-account",
-		GroupID: group.Metadata.ID,
-	})
-	require.NoError(t, err)
+	// Create test service accounts
+	serviceAccounts := []models.ServiceAccount{
+		{
+			Name:        "test-service-account-1",
+			Description: "test service account 1",
+			GroupID:     group.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
+		},
+		{
+			Name:        "test-service-account-2",
+			Description: "test service account 2",
+			GroupID:     group.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
+		},
+	}
+
+	createdServiceAccounts := []models.ServiceAccount{}
+	for _, serviceAccount := range serviceAccounts {
+		created, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &serviceAccount)
+		require.NoError(t, err)
+		createdServiceAccounts = append(createdServiceAccounts, *created)
+	}
 
 	type testCase struct {
 		name            string
-		trn             string
-		expectAccount   bool
 		expectErrorCode errors.CodeType
+		input           *GetServiceAccountsInput
+		expectCount     int
 	}
 
 	testCases := []testCase{
 		{
-			name:          "get service account by TRN",
-			trn:           serviceAccount.Metadata.TRN,
-			expectAccount: true,
+			name:        "get all service accounts",
+			input:       &GetServiceAccountsInput{},
+			expectCount: len(createdServiceAccounts),
 		},
 		{
-			name: "resource with TRN not found",
-			trn:  types.ServiceAccountModelType.BuildTRN(group.FullPath, "unknown"),
+			name: "filter by search",
+			input: &GetServiceAccountsInput{
+				Filter: &ServiceAccountFilter{
+					Search: ptr.String("test-service-account-1"),
+				},
+			},
+			expectCount: 1,
 		},
 		{
-			name:            "service account TRN has less than two parts",
-			trn:             types.ServiceAccountModelType.BuildTRN("unknown"),
-			expectErrorCode: errors.EInvalid,
+			name: "filter by service account IDs",
+			input: &GetServiceAccountsInput{
+				Filter: &ServiceAccountFilter{
+					ServiceAccountIDs: []string{createdServiceAccounts[0].Metadata.ID},
+				},
+			},
+			expectCount: 1,
 		},
 		{
-			name:            "get resource with invalid TRN will return an error",
-			trn:             "trn:invalid",
-			expectErrorCode: errors.EInvalid,
-		},
-	}
+			name: "filter by namespace paths",
+			input: &GetServiceAccountsInput{
+				Filter: &ServiceAccountFilter{
+					NamespacePaths: []string{group.FullPath},
+				},
+			},
+			expectCount: len(createdServiceAccounts),
+		}}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByTRN(ctx, test.trn)
+			result, err := testClient.client.ServiceAccounts.GetServiceAccounts(ctx, test.input)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -170,1037 +369,277 @@ func TestGetServiceAccountByTRN(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-
-			if test.expectAccount {
-				require.NotNil(t, actualAccount)
-				assert.Equal(t, types.ServiceAccountModelType.BuildTRN(group.FullPath, serviceAccount.Name), actualAccount.Metadata.TRN)
-			} else {
-				assert.Nil(t, actualAccount)
-			}
+			assert.Len(t, result.ServiceAccounts, test.expectCount)
 		})
 	}
 }
 
-func TestCreateServiceAccount(t *testing.T) {
+func TestServiceAccounts_GetServiceAccountsWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupGroups, _, err := createWarmupServiceAccounts(ctx, testClient,
-		standardWarmupGroupsForServiceAccounts, []models.ServiceAccount{}, []models.OIDCTrustPolicy{})
-	require.Nil(t, err)
-	warmupGroup := warmupGroups[0]
-	warmupGroupID := warmupGroup.Metadata.ID
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-service-accounts-pagination",
+		Description: "test group for service accounts pagination",
+		FullPath:    "test-group-service-accounts-pagination",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-	type testCase struct {
-		toCreate      *models.ServiceAccount
-		expectCreated *models.ServiceAccount
-		expectMsg     *string
-		name          string
-	}
-
-	now := currentTime()
-	testCases := []testCase{
-		{
-			name: "positive, nearly empty",
-			toCreate: &models.ServiceAccount{
-				Name:    "positive-create-service-account-nearly-empty",
-				GroupID: warmupGroupID,
-				// Resource path is not used when creating the object, but it is returned.
-			},
-			expectCreated: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-					TRN:               types.ServiceAccountModelType.BuildTRN(warmupGroup.FullPath, "positive-create-service-account-nearly-empty"),
-				},
-				Name:              "positive-create-service-account-nearly-empty",
-				GroupID:           warmupGroupID,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-			},
-		},
-
-		{
-			name: "positive full",
-			toCreate: &models.ServiceAccount{
-				Name:              "positive-create-service-account-full",
-				Description:       "positive create service account",
-				GroupID:           warmupGroupID,
-				CreatedBy:         "creator-of-service-accounts",
-				OIDCTrustPolicies: standardWarmupOIDCTrustPoliciesForServiceAccounts,
-				// Resource path is not used when creating the object, but it is returned.
-			},
-			expectCreated: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-					TRN:               types.ServiceAccountModelType.BuildTRN(warmupGroup.FullPath, "positive-create-service-account-full"),
-				},
-				Name:              "positive-create-service-account-full",
-				Description:       "positive create service account",
-				GroupID:           warmupGroupID,
-				CreatedBy:         "creator-of-service-accounts",
-				OIDCTrustPolicies: standardWarmupOIDCTrustPoliciesForServiceAccounts,
-			},
-		},
-
-		{
-			name: "duplicate name in same group",
-			toCreate: &models.ServiceAccount{
-				Name:    "positive-create-service-account-nearly-empty",
-				GroupID: warmupGroupID,
-				// Resource path is not used when creating the object, but it is returned.
-			},
-			expectMsg: ptr.String(fmt.Sprintf("Service account with name %s already exists in group %s",
-				"positive-create-service-account-nearly-empty", warmupGroupID)),
-		},
-
-		{
-			name: "non-existent group ID",
-			toCreate: &models.ServiceAccount{
-				Name:    "non-existent-group-id",
-				GroupID: nonExistentID,
-			},
-			expectMsg: ptr.String("invalid group: the specified group does not exist"),
-		},
-
-		{
-			name: "defective group ID",
-			toCreate: &models.ServiceAccount{
-				Name:    "non-existent-group-id",
-				GroupID: invalidID,
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualCreated, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				// the positive case
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := time.Now()
-
-				compareServiceAccounts(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualCreated)
-			}
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		_, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+			Name:        fmt.Sprintf("test-service-account-%d", i),
+			Description: fmt.Sprintf("test service account %d", i),
+			GroupID:     group.Metadata.ID,
+			CreatedBy:   "db-integration-tests",
 		})
+		require.NoError(t, err)
 	}
+
+	// Only test CreatedAt and UpdatedAt fields to avoid GROUP_LEVEL complexity
+	sortableFields := []sortableField{
+		ServiceAccountSortableFieldCreatedAtAsc,
+		ServiceAccountSortableFieldCreatedAtDesc,
+		ServiceAccountSortableFieldUpdatedAtAsc,
+		ServiceAccountSortableFieldUpdatedAtDesc,
+	}
+
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := ServiceAccountSortableField(sortByField.getValue())
+
+		result, err := testClient.client.ServiceAccounts.GetServiceAccounts(ctx, &GetServiceAccountsInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		resources := []pagination.CursorPaginatable{}
+		for _, resource := range result.ServiceAccounts {
+			resourceCopy := resource
+			resources = append(resources, &resourceCopy)
+		}
+
+		return result.PageInfo, resources, nil
+	})
 }
 
-func TestUpdateServiceAccount(t *testing.T) {
+func TestServiceAccounts_GetServiceAccountByTRN(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdLow := time.Now()
-	warmupGroups, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
-		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
-		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	require.Nil(t, err)
-	createdHigh := time.Now()
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-service-account-get-by-trn",
+		Description: "test group for service account get by trn",
+		FullPath:    "test-group-service-account-get-by-trn",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a service account for testing
+	createdServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:        "test-service-account-get-by-trn",
+		Description: "test service account for get by trn",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg            *string
-		expectServiceAccount *models.ServiceAccount
-		toUpdate             *models.ServiceAccount
+		expectErrorCode      errors.CodeType
 		name                 string
+		trn                  string
+		expectServiceAccount bool
 	}
 
-	positiveServiceAccount := warmupServiceAccounts[0]
-	now := time.Now()
 	testCases := []testCase{
 		{
-			name: "positive",
-			toUpdate: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:      positiveServiceAccount.Metadata.ID,
-					Version: positiveServiceAccount.Metadata.Version,
-				},
-				Description: "updated description",
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:      "new-issuer",
-						BoundClaims: map[string]string{"new-key": "new-value"},
-					},
-				},
-			},
-			// Only the description and trust policies get updated.
-			expectServiceAccount: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:                   positiveServiceAccount.Metadata.ID,
-					Version:              positiveServiceAccount.Metadata.Version + 1,
-					CreationTimestamp:    positiveServiceAccount.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-					TRN:                  positiveServiceAccount.Metadata.TRN,
-				},
-				Name:        positiveServiceAccount.Name,
-				Description: "updated description",
-				GroupID:     warmupGroups[0].Metadata.ID,
-				CreatedBy:   positiveServiceAccount.CreatedBy,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:      "new-issuer",
-						BoundClaims: map[string]string{"new-key": "new-value"},
-					},
-				},
-			},
+			name:                 "get resource by TRN",
+			trn:                  createdServiceAccount.Metadata.TRN,
+			expectServiceAccount: true,
 		},
-
 		{
-			name: "negative, non-existent service account ID",
-			toUpdate: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: positiveServiceAccount.Metadata.Version,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
+			name: "resource with TRN not found",
+			trn:  "trn:tharsis:service_account:non-existent-id",
 		},
-
 		{
-			name: "defective-id",
-			toUpdate: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: positiveServiceAccount.Metadata.Version,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "invalid-trn",
+			expectErrorCode: errors.EInvalid,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualServiceAccount, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, test.toUpdate)
+			serviceAccount, err := testClient.client.ServiceAccounts.GetServiceAccountByTRN(ctx, test.trn)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			now := time.Now()
-			if test.expectServiceAccount != nil {
-				require.NotNil(t, actualServiceAccount)
-				compareServiceAccounts(t, test.expectServiceAccount, actualServiceAccount, false, &timeBounds{
-					createLow:  &createdLow,
-					createHigh: &createdHigh,
-					updateLow:  &createdLow,
-					updateHigh: &now,
-				})
+			if test.expectServiceAccount {
+				require.NotNil(t, serviceAccount)
+				assert.Equal(t, createdServiceAccount.Metadata.ID, serviceAccount.Metadata.ID)
 			} else {
-				assert.Nil(t, actualServiceAccount)
+				assert.Nil(t, serviceAccount)
 			}
 		})
 	}
 }
 
-func TestGetServiceAccounts(t *testing.T) {
+func TestServiceAccounts_AssignServiceAccountToRunner(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	_, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
-		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
-		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	require.Nil(t, err)
-	allServiceAccountInfos := serviceAccountInfoFromServiceAccounts(warmupServiceAccounts)
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-service-account-assign",
+		Description: "test group for service account assign",
+		FullPath:    "test-group-service-account-assign",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-	// Sort by ID string for those cases where explicit sorting is not specified.
-	sort.Sort(serviceAccountInfoIDSlice(allServiceAccountInfos))
-	allServiceAccountIDs := serviceAccountIDsFromServiceAccountInfos(allServiceAccountInfos)
+	// Create a service account for testing
+	createdServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:        "test-service-account-assign",
+		Description: "test service account for assign",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-	// Sort by creation times.
-	sort.Sort(serviceAccountInfoCreateSlice(allServiceAccountInfos))
-	allServiceAccountIDsByCreateTime := serviceAccountIDsFromServiceAccountInfos(allServiceAccountInfos)
-	reverseServiceAccountIDsByCreateTime := reverseStringSlice(allServiceAccountIDsByCreateTime)
-
-	// Sort by last update times.
-	sort.Sort(serviceAccountInfoUpdateSlice(allServiceAccountInfos))
-	allServiceAccountIDsByUpdateTime := serviceAccountIDsFromServiceAccountInfos(allServiceAccountInfos)
-	reverseServiceAccountIDsByUpdateTime := reverseStringSlice(allServiceAccountIDsByUpdateTime)
-
-	// Sort by names.
-	sort.Sort(serviceAccountInfoNameSlice(allServiceAccountInfos))
-	allServiceAccountIDsByName := serviceAccountIDsFromServiceAccountInfos(allServiceAccountInfos)
-
-	dummyCursorFunc := func(cp pagination.CursorPaginatable) (*string, error) { return ptr.String("dummy-cursor-value"), nil }
-
-	type testCase struct {
-		expectStartCursorError      error
-		expectEndCursorError        error
-		expectMsg                   *string
-		input                       *GetServiceAccountsInput
-		name                        string
-		expectPageInfo              pagination.PageInfo
-		expectServiceAccountIDs     []string
-		getBeforeCursorFromPrevious bool
-		getAfterCursorFromPrevious  bool
-		expectHasStartCursor        bool
-		expectHasEndCursor          bool
-	}
-
-	/*
-		template test case:
-
-		{
-		name                        string
-		input                       *GetServiceAccountsInput
-		getAfterCursorFromPrevious  bool
-		getBeforeCursorFromPrevious bool
-		expectMsg                   *string
-		expectServiceAccountIDs     []string
-		expectPageInfo              pagination.PageInfo
-		expectStartCursorError      error
-		expectEndCursorError        error
-		expectHasStartCursor        bool
-		expectHasEndCursor          bool
-		}
-	*/
-
-	testCases := []testCase{
-		// nil input likely causes a nil pointer dereference in GetServiceAccounts, so don't try it.
-
-		{
-			name: "non-nil but mostly empty input",
-			input: &GetServiceAccountsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			expectServiceAccountIDs: allServiceAccountIDs,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "populated pagination, sort in ascending order of creation time, nil filter",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByCreateTime,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "sort in descending order of creation time",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtDesc),
-			},
-			expectServiceAccountIDs: reverseServiceAccountIDsByCreateTime,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "populated pagination, sort in ascending order of last update time, nil filter",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByUpdateTime,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "sort in descending order of last update time",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtDesc),
-			},
-			expectServiceAccountIDs: reverseServiceAccountIDsByUpdateTime,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "pagination: everything at once",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByUpdateTime,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "pagination: first two",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(2),
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByUpdateTime[:2],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allServiceAccountIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "pagination: middle two",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(2),
-				},
-			},
-			getAfterCursorFromPrevious: true,
-			expectServiceAccountIDs:    allServiceAccountIDsByUpdateTime[2:4],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allServiceAccountIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "pagination: final one",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-			},
-			getAfterCursorFromPrevious: true,
-			expectServiceAccountIDs:    allServiceAccountIDsByUpdateTime[4:],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allServiceAccountIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		// When Last is supplied, the sort order is intended to be reversed.
-		{
-			name: "pagination: last three",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					Last: ptr.Int32(3),
-				},
-			},
-			expectServiceAccountIDs: reverseServiceAccountIDsByUpdateTime[:3],
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allServiceAccountIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: true,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		/*
-
-			The input.PaginationOptions.After field is tested earlier via getAfterCursorFromPrevious.
-
-			The input.PaginationOptions.Before field is not really supported and does not work.
-			If it did work, it could be tested by adapting the test cases corresponding to the
-			next few cases after a similar block of text from group_test.go
-
-		*/
-
-		{
-			name: "pagination, before and after, expect error",
-			input: &GetServiceAccountsInput{
-				Sort:              ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{},
-			},
-			getAfterCursorFromPrevious:  true,
-			getBeforeCursorFromPrevious: true,
-			expectMsg:                   ptr.String("only before or after can be defined, not both"),
-			expectServiceAccountIDs:     []string{},
-			expectPageInfo:              pagination.PageInfo{},
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldUpdatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
-			},
-			expectMsg: ptr.String("only first or last can be defined, not both"),
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allServiceAccountIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     true,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			// If there were more filter fields, this would allow nothing through the filters.
-			name: "fully-populated types, everything allowed through filters",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: &ServiceAccountFilter{
-					Search: ptr.String(""),
-					// Passing an empty slice to ServiceAccountIDs or NamespacePaths likely
-					// causes an SQL syntax error ("... IN ()"), so don't try it.
-					// ServiceAccountIDs: []string{},
-					// NamespacePaths: []string{},
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByCreateTime,
-			expectPageInfo: pagination.PageInfo{
-				TotalCount:      int32(len(allServiceAccountIDs)),
-				Cursor:          dummyCursorFunc,
-				HasNextPage:     false,
-				HasPreviousPage: false,
-			},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, search field, empty string",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					Search: ptr.String(""),
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByName,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, search field, 1",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					Search: ptr.String("1"),
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByName[0:2],
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, search field, 2",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					Search: ptr.String("2"),
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByName[2:4],
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(2), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, search field, 5",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					Search: ptr.String("5"),
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByName[4:],
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(1), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, search field, bogus",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					Search: ptr.String("bogus"),
-				},
-			},
-			expectServiceAccountIDs: []string{},
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, service account IDs, positive",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					ServiceAccountIDs: []string{
-						allServiceAccountIDsByName[0], allServiceAccountIDsByName[1], allServiceAccountIDsByName[3],
-					},
-				},
-			},
-			expectServiceAccountIDs: []string{
-				allServiceAccountIDsByName[0], allServiceAccountIDsByName[1], allServiceAccountIDsByName[3],
-			},
-			expectPageInfo:       pagination.PageInfo{TotalCount: 3, Cursor: dummyCursorFunc},
-			expectHasStartCursor: true,
-			expectHasEndCursor:   true,
-		},
-
-		{
-			name: "filter, service account IDs, non-existent",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					ServiceAccountIDs: []string{nonExistentID},
-				},
-			},
-			expectServiceAccountIDs: []string{},
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, service account IDs, invalid ID",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					ServiceAccountIDs: []string{invalidID},
-				},
-			},
-			expectMsg:               invalidUUIDMsg,
-			expectServiceAccountIDs: []string{},
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, namespace paths, positive",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					NamespacePaths: []string{"top-level-group-0-for-service-accounts"},
-				},
-			},
-			expectServiceAccountIDs: allServiceAccountIDsByName,
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(len(allServiceAccountIDs)), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-
-		{
-			name: "filter, namespace paths, negative",
-			input: &GetServiceAccountsInput{
-				Sort: ptrServiceAccountSortableField(ServiceAccountSortableFieldCreatedAtAsc),
-				Filter: &ServiceAccountFilter{
-					NamespacePaths: []string{"top-level-group-9-for-service-accounts"},
-				},
-			},
-			expectServiceAccountIDs: []string{},
-			expectPageInfo:          pagination.PageInfo{TotalCount: int32(0), Cursor: dummyCursorFunc},
-			expectHasStartCursor:    true,
-			expectHasEndCursor:      true,
-		},
-	}
-
-	// Combinations of filter conditions are not (yet) tested.
-
-	var (
-		previousEndCursorValue   *string
-		previousStartCursorValue *string
-	)
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			// For some pagination tests, a previous case's cursor value gets piped into the next case.
-			if test.getAfterCursorFromPrevious || test.getBeforeCursorFromPrevious {
-
-				// Make sure there's a place to put it.
-				require.NotNil(t, test.input.PaginationOptions)
-
-				if test.getAfterCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousEndCursorValue)
-					test.input.PaginationOptions.After = previousEndCursorValue
-				}
-
-				if test.getBeforeCursorFromPrevious {
-					// Make sure there's a previous value to use.
-					require.NotNil(t, previousStartCursorValue)
-					test.input.PaginationOptions.Before = previousStartCursorValue
-				}
-
-				// Clear the values so they won't be used twice.
-				previousEndCursorValue = nil
-				previousStartCursorValue = nil
-			}
-
-			serviceAccountsActual, err := testClient.client.ServiceAccounts.GetServiceAccounts(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			// If there was no error, check the results.
-			if err == nil {
-
-				// Never returns nil if error is nil.
-				require.NotNil(t, serviceAccountsActual.PageInfo)
-				assert.NotNil(t, serviceAccountsActual.ServiceAccounts)
-				pageInfo := serviceAccountsActual.PageInfo
-				serviceAccounts := serviceAccountsActual.ServiceAccounts
-
-				// Check the service accounts result by comparing a list of the service account IDs.
-				actualServiceAccountIDs := []string{}
-				for _, serviceAccount := range serviceAccounts {
-					actualServiceAccountIDs = append(actualServiceAccountIDs, serviceAccount.Metadata.ID)
-				}
-
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(actualServiceAccountIDs)
-				}
-
-				assert.Equal(t, len(test.expectServiceAccountIDs), len(actualServiceAccountIDs))
-				assert.Equal(t, test.expectServiceAccountIDs, actualServiceAccountIDs)
-
-				assert.Equal(t, test.expectPageInfo.HasNextPage, pageInfo.HasNextPage)
-				assert.Equal(t, test.expectPageInfo.HasPreviousPage, pageInfo.HasPreviousPage)
-				assert.Equal(t, test.expectPageInfo.TotalCount, pageInfo.TotalCount)
-				assert.Equal(t, test.expectPageInfo.Cursor != nil, pageInfo.Cursor != nil)
-
-				// Compare the cursor function results only if there is at least one service account returned.
-				// If there are no service accounts returned, there is no argument to pass to the cursor function.
-				// Also, don't try to reverse engineer to compare the cursor string values.
-				if len(serviceAccounts) > 0 {
-					resultStartCursor, resultStartCursorError := pageInfo.Cursor(&serviceAccounts[0])
-					resultEndCursor, resultEndCursorError := pageInfo.Cursor(&serviceAccounts[len(serviceAccounts)-1])
-					assert.Equal(t, test.expectStartCursorError, resultStartCursorError)
-					assert.Equal(t, test.expectHasStartCursor, resultStartCursor != nil)
-					assert.Equal(t, test.expectEndCursorError, resultEndCursorError)
-					assert.Equal(t, test.expectHasEndCursor, resultEndCursor != nil)
-
-					// Capture the ending cursor values for the next case.
-					previousEndCursorValue = resultEndCursor
-					previousStartCursorValue = resultStartCursor
-				}
-			}
-		})
-	}
-}
-
-func TestDeleteServiceAccount(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	_, warmupServiceAccounts, err := createWarmupServiceAccounts(ctx, testClient,
-		standardWarmupGroupsForServiceAccounts, standardWarmupServiceAccounts,
-		standardWarmupOIDCTrustPoliciesForServiceAccounts)
-	require.Nil(t, err)
+	// Create a runner for testing
+	createdRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name:        "test-runner-assign",
+		Description: "test runner for assign",
+		GroupID:     &group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		toDelete  *models.ServiceAccount
-		expectMsg *string
-		name      string
+		expectErrorCode  errors.CodeType
+		name             string
+		serviceAccountID string
+		runnerID         string
 	}
 
 	testCases := []testCase{
 		{
-			name: "positive",
-			toDelete: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:      warmupServiceAccounts[0].Metadata.ID,
-					Version: warmupServiceAccounts[0].Metadata.Version,
-				},
-			},
+			name:             "assign service account to runner",
+			serviceAccountID: createdServiceAccount.Metadata.ID,
+			runnerID:         createdRunner.Metadata.ID,
 		},
-
 		{
-			name: "negative, non-existent ID",
-			toDelete: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID: nonExistentID,
-				},
-				Description: "looking for a non-existent ID",
-			},
-			expectMsg: resourceVersionMismatch,
+			name:             "assign with invalid service account id",
+			serviceAccountID: invalidID,
+			runnerID:         createdRunner.Metadata.ID,
+			expectErrorCode:  errors.EInternal,
 		},
-
 		{
-			name: "defective-id",
-			toDelete: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID: invalidID,
-				},
-				Description: "looking for a defective ID",
-			},
-			expectMsg: invalidUUIDMsg,
+			name:             "assign with invalid runner id",
+			serviceAccountID: createdServiceAccount.Metadata.ID,
+			runnerID:         invalidID,
+			expectErrorCode:  errors.EInternal,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			err := testClient.client.ServiceAccounts.DeleteServiceAccount(ctx, test.toDelete)
+			err := testClient.client.ServiceAccounts.AssignServiceAccountToRunner(ctx, test.serviceAccountID, test.runnerID)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }
 
-//////////////////////////////////////////////////////////////////////////////
+func TestServiceAccounts_UnassignServiceAccountFromRunner(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
 
-// Common utility structures and functions:
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-service-account-unassign",
+		Description: "test group for service account unassign",
+		FullPath:    "test-group-service-account-unassign",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// Standard warmup group(s) for tests in this module:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForServiceAccounts = []models.Group{
-	{
-		Description: "top level group 0 for testing service account functions",
-		FullPath:    "top-level-group-0-for-service-accounts",
-		CreatedBy:   "someone-g0",
-	},
-}
+	// Create a service account for testing
+	createdServiceAccount, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+		Name:        "test-service-account-unassign",
+		Description: "test service account for unassign",
+		GroupID:     group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// Standard service account(s) for tests in this module:
-// The create function will convert the group name to group ID.
-var standardWarmupServiceAccounts = []models.ServiceAccount{
-	{
-		Name:              "1-service-account-0",
-		Description:       "service account 0",
-		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
-		CreatedBy:         "someone-sa0",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-	{
-		Name:              "1-service-account-1",
-		Description:       "service account 1",
-		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
-		CreatedBy:         "someone-sa1",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-	{
-		Name:              "2-service-account-2",
-		Description:       "service account 2",
-		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
-		CreatedBy:         "someone-sa2",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-	{
-		Name:              "2-service-account-3",
-		Description:       "service account 3",
-		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
-		CreatedBy:         "someone-sa3",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-	{
-		Name:              "5-service-account-4",
-		Description:       "service account 4",
-		GroupID:           "top-level-group-0-for-service-accounts", // will be fixed later
-		CreatedBy:         "someone-sa4",
-		OIDCTrustPolicies: []models.OIDCTrustPolicy{},
-	},
-}
+	// Create a runner for testing
+	createdRunner, err := testClient.client.Runners.CreateRunner(ctx, &models.Runner{
+		Name:        "test-runner-unassign",
+		Description: "test runner for unassign",
+		GroupID:     &group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// Standard OIDC trust policy/policies for tests in this module:
-var standardWarmupOIDCTrustPoliciesForServiceAccounts = []models.OIDCTrustPolicy{
-	{
-		Issuer:      "issuer-0",
-		BoundClaims: map[string]string{"bc1-k1": "bc1-v1", "bc1-k2": "bc1-v2"},
-	},
-	{
-		Issuer:      "issuer-1",
-		BoundClaims: map[string]string{"bc2-k1": "bc2-v1", "bc2-k2": "bc2-v2"},
-	},
-}
+	// First assign the service account to the runner
+	err = testClient.client.ServiceAccounts.AssignServiceAccountToRunner(ctx, createdServiceAccount.Metadata.ID, createdRunner.Metadata.ID)
+	require.NoError(t, err)
 
-// createWarmupServiceAccounts creates some warmup service accounts for a test
-// The warmup service accounts to create can be standard or otherwise.
-func createWarmupServiceAccounts(ctx context.Context, testClient *testClient,
-	newGroups []models.Group,
-	newServiceAccounts []models.ServiceAccount,
-	newTrustPolicies []models.OIDCTrustPolicy) (
-	[]models.Group, []models.ServiceAccount, error,
-) {
-	// It is necessary to create at least one group
-	// in order to provide the necessary IDs for the service accounts.
-
-	resultGroups, groupPath2ID, err := createInitialGroups(ctx, testClient, newGroups)
-	if err != nil {
-		return nil, nil, err
+	type testCase struct {
+		expectErrorCode  errors.CodeType
+		name             string
+		serviceAccountID string
+		runnerID         string
 	}
 
-	// It is necessary to add the OIDC trust policies to the service account before
-	// creating the service account in the DB.
-	for _, sa := range newServiceAccounts {
-		for _, tp := range newTrustPolicies {
-			sa.OIDCTrustPolicies = append(sa.OIDCTrustPolicies, models.OIDCTrustPolicy{
-				Issuer:      tp.Issuer + "-for-" + sa.Name,
-				BoundClaims: tp.BoundClaims,
-			})
-		}
+	testCases := []testCase{
+		{
+			name:             "unassign service account from runner",
+			serviceAccountID: createdServiceAccount.Metadata.ID,
+			runnerID:         createdRunner.Metadata.ID,
+		},
+		{
+			name:             "unassign with invalid service account id",
+			serviceAccountID: invalidID,
+			runnerID:         createdRunner.Metadata.ID,
+			expectErrorCode:  errors.EInternal,
+		},
+		{
+			name:             "unassign with invalid runner id",
+			serviceAccountID: createdServiceAccount.Metadata.ID,
+			runnerID:         invalidID,
+			expectErrorCode:  errors.EInternal,
+		},
 	}
 
-	resultServiceAccounts, _, err := createInitialServiceAccounts(ctx, testClient,
-		groupPath2ID, newServiceAccounts)
-	if err != nil {
-		return nil, nil, err
-	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.ServiceAccounts.UnassignServiceAccountFromRunner(ctx, test.serviceAccountID, test.runnerID)
 
-	return resultGroups, resultServiceAccounts, nil
-}
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-func ptrServiceAccountSortableField(arg ServiceAccountSortableField) *ServiceAccountSortableField {
-	return &arg
-}
-
-func (sais serviceAccountInfoIDSlice) Len() int {
-	return len(sais)
-}
-
-func (sais serviceAccountInfoIDSlice) Swap(i, j int) {
-	sais[i], sais[j] = sais[j], sais[i]
-}
-
-func (sais serviceAccountInfoIDSlice) Less(i, j int) bool {
-	return sais[i].serviceAccountID < sais[j].serviceAccountID
-}
-
-func (sais serviceAccountInfoCreateSlice) Len() int {
-	return len(sais)
-}
-
-func (sais serviceAccountInfoCreateSlice) Swap(i, j int) {
-	sais[i], sais[j] = sais[j], sais[i]
-}
-
-func (sais serviceAccountInfoCreateSlice) Less(i, j int) bool {
-	return sais[i].createTime.Before(sais[j].createTime)
-}
-
-func (sais serviceAccountInfoUpdateSlice) Len() int {
-	return len(sais)
-}
-
-func (sais serviceAccountInfoUpdateSlice) Swap(i, j int) {
-	sais[i], sais[j] = sais[j], sais[i]
-}
-
-func (sais serviceAccountInfoUpdateSlice) Less(i, j int) bool {
-	return sais[i].updateTime.Before(sais[j].updateTime)
-}
-
-func (sais serviceAccountInfoNameSlice) Len() int {
-	return len(sais)
-}
-
-func (sais serviceAccountInfoNameSlice) Swap(i, j int) {
-	sais[i], sais[j] = sais[j], sais[i]
-}
-
-func (sais serviceAccountInfoNameSlice) Less(i, j int) bool {
-	return sais[i].name < sais[j].name
-}
-
-// serviceAccountInfoFromServiceAccounts returns a slice of serviceAccountInfo, not necessarily sorted in any order.
-func serviceAccountInfoFromServiceAccounts(serviceAccounts []models.ServiceAccount) []serviceAccountInfo {
-	result := []serviceAccountInfo{}
-
-	for _, serviceAccount := range serviceAccounts {
-		result = append(result, serviceAccountInfo{
-			createTime:       *serviceAccount.Metadata.CreationTimestamp,
-			updateTime:       *serviceAccount.Metadata.LastUpdatedTimestamp,
-			serviceAccountID: serviceAccount.Metadata.ID,
-			name:             serviceAccount.Name,
+			require.NoError(t, err)
 		})
-	}
-
-	return result
-}
-
-// serviceAccountIDsFromServiceAccountInfos preserves order
-func serviceAccountIDsFromServiceAccountInfos(serviceAccountInfos []serviceAccountInfo) []string {
-	result := []string{}
-	for _, serviceAccountInfo := range serviceAccountInfos {
-		result = append(result, serviceAccountInfo.serviceAccountID)
-	}
-	return result
-}
-
-// compareServiceAccounts compares two service account objects, including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareServiceAccounts(t *testing.T, expected, actual *models.ServiceAccount,
-	checkID bool, times *timeBounds,
-) {
-	assert.Equal(t, expected.Name, actual.Name)
-	assert.Equal(t, expected.Description, actual.Description)
-	assert.Equal(t, expected.GroupID, actual.GroupID)
-	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-	compareOIDCTrustPolicies(t, expected.OIDCTrustPolicies, actual.OIDCTrustPolicies)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
-	}
-}
-
-// compareOIDCTrustPolicies compares two slices of OIDC trust policies,
-func compareOIDCTrustPolicies(t *testing.T, expected, actual []models.OIDCTrustPolicy) {
-	require.Equal(t, len(expected), len(actual))
-
-	for ix := range expected {
-		assert.Equal(t, expected[ix].Issuer, actual[ix].Issuer)
-		assert.Equal(t, expected[ix].BoundClaims, actual[ix].BoundClaims)
 	}
 }

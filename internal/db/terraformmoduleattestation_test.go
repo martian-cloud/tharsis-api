@@ -5,157 +5,71 @@ package db
 import (
 	"context"
 	"fmt"
-	"sort"
-	"testing"
-	"time"
-
 	"github.com/aws/smithy-go/ptr"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-// terraformModuleAttestationInfo aids convenience in accessing the information
-// TestGetModuleAttestations needs about the warmup objects.
-type terraformModuleAttestationInfo struct {
-	updateTime time.Time
-	id         string
+// getValue implements the sortableField interface for TerraformModuleAttestationSortableField
+func (tma TerraformModuleAttestationSortableField) getValue() string {
+	return string(tma)
 }
 
-// terraformModuleAttestationInfoIDSlice makes a slice of terraformModuleAttestationInfo sortable by ID string
-type terraformModuleAttestationInfoIDSlice []terraformModuleAttestationInfo
-
-// terraformModuleAttestationInfoUpdateSlice makes a slice of terraformModuleAttestationInfo sortable by last updated time
-type terraformModuleAttestationInfoUpdateSlice []terraformModuleAttestationInfo
-
-// warmupTerraformModuleAttestations holds the inputs to and outputs from createWarmupTerraformModuleAttestations.
-type warmupTerraformModuleAttestations struct {
-	groups                      []models.Group
-	terraformModules            []models.TerraformModule
-	terraformModuleAttestations []models.TerraformModuleAttestation
-}
-
-func TestGetModuleAttestationByID(t *testing.T) {
-
+func TestTerraformModuleAttestations_CreateTerraformModuleAttestation(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupTerraformModuleAttestations(ctx, testClient, warmupTerraformModuleAttestations{
-		groups:                      standardWarmupGroupsForTerraformModuleAttestations,
-		terraformModules:            standardWarmupTerraformModulesForTerraformModulesAttestations,
-		terraformModuleAttestations: standardWarmupTerraformModuleAttestations,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg                        *string
-		expectTerraformModuleAttestation *models.TerraformModuleAttestation
-		name                             string
-		searchID                         string
-	}
-
-	testCases := []testCase{
-		{
-			name:                             "get module attestation by ID",
-			searchID:                         warmupItems.terraformModuleAttestations[0].Metadata.ID,
-			expectTerraformModuleAttestation: &warmupItems.terraformModuleAttestations[0],
-		},
-
-		{
-			name:     "returns nil because module attestation does not exist",
-			searchID: nonExistentID,
-		},
-
-		{
-			name:      "returns an error because the module attestation ID is invalid",
-			searchID:  invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			actualTerraformModuleAttestation, err := testClient.client.TerraformModuleAttestations.GetModuleAttestationByID(ctx, test.searchID)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectTerraformModuleAttestation != nil {
-				require.NotNil(t, actualTerraformModuleAttestation)
-				assert.Equal(t, test.expectTerraformModuleAttestation, actualTerraformModuleAttestation)
-			} else {
-				assert.Nil(t, actualTerraformModuleAttestation)
-			}
-		})
-	}
-}
-
-func TestGetModuleAttestationByTRN(t *testing.T) {
-	ctx := t.Context()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
+	// Create a group for testing
 	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
-		Name: "test-group",
+		Name:        "test-group-module-attestation",
+		Description: "test group for module attestation",
+		FullPath:    "test-group-module-attestation",
+		CreatedBy:   "db-integration-tests",
 	})
 	require.NoError(t, err)
 
-	module, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
-		Name:        "test-module",
-		System:      "aws",
-		RootGroupID: group.Metadata.ID,
+	// Create a terraform module first (required dependency)
+	terraformModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-attestation",
+		System:      "terraform",
 		GroupID:     group.Metadata.ID,
-	})
-	require.NoError(t, err)
-
-	attestation, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &models.TerraformModuleAttestation{
-		ModuleID:      module.Metadata.ID,
-		Description:   "test attestation",
-		Data:          "testdata",
-		DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc34"),
-		SchemaType:    "https://in-toto.io/Statement/v0.1",
-		PredicateType: "cosign.sigstore.dev/attestation/v1",
-		Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-		CreatedBy:     "test",
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Private:     false,
 	})
 	require.NoError(t, err)
 
 	type testCase struct {
-		name              string
-		trn               string
-		expectAttestation bool
-		expectErrorCode   errors.CodeType
+		name            string
+		expectErrorCode errors.CodeType
+		attestation     *models.TerraformModuleAttestation
 	}
 
 	testCases := []testCase{
 		{
-			name:              "get attestation by TRN",
-			trn:               attestation.Metadata.TRN,
-			expectAttestation: true,
-		},
-		{
-			name: "resource with TRN not found",
-			trn:  types.TerraformModuleAttestationModelType.BuildTRN(group.FullPath, module.Name, module.System, "sha-sum"),
-		},
-		{
-			name:            "attestation TRN has less than 4 parts",
-			trn:             types.TerraformModuleAttestationModelType.BuildTRN("test-group"),
-			expectErrorCode: errors.EInvalid,
-		},
-		{
-			name:            "get resource with invalid TRN will return an error",
-			trn:             "trn:invalid",
-			expectErrorCode: errors.EInvalid,
+			name: "successfully create module attestation",
+			attestation: &models.TerraformModuleAttestation{
+				ModuleID:      terraformModule.Metadata.ID,
+				Description:   "test attestation",
+				SchemaType:    "https://in-toto.io/Statement/v0.1",
+				PredicateType: "https://slsa.dev/provenance/v0.2",
+				Data:          `{"test": "data"}`,
+				DataSHASum:    []byte("test-sha-sum"),
+				CreatedBy:     "db-integration-tests",
+				Digests:       []string{"sha256:abc123"},
+			},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			actualAttestation, err := testClient.client.TerraformModuleAttestations.GetModuleAttestationByTRN(ctx, test.trn)
+			attestation, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, test.attestation)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -163,750 +77,421 @@ func TestGetModuleAttestationByTRN(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			require.NotNil(t, attestation)
+			assert.Equal(t, test.attestation.ModuleID, attestation.ModuleID)
+			assert.Equal(t, test.attestation.Description, attestation.Description)
+			assert.Equal(t, test.attestation.SchemaType, attestation.SchemaType)
+		})
+	}
+}
 
-			if test.expectAttestation {
-				require.NotNil(t, actualAttestation)
-				assert.Equal(t,
-					types.TerraformModuleAttestationModelType.BuildTRN(
-						group.FullPath,
-						module.Name,
-						module.System,
-						string(attestation.DataSHASum),
-					),
-					actualAttestation.Metadata.TRN,
-				)
+func TestTerraformModuleAttestations_UpdateTerraformModuleAttestation(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-attestation-update",
+		Description: "test group for module attestation update",
+		FullPath:    "test-group-module-attestation-update",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a terraform module first (required dependency)
+	terraformModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-attestation-update",
+		System:      "terraform",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+		Private:     false,
+	})
+	require.NoError(t, err)
+
+	// Create a module attestation to update
+	createdAttestation, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &models.TerraformModuleAttestation{
+		ModuleID:      terraformModule.Metadata.ID,
+		Description:   "test attestation for update",
+		SchemaType:    "https://in-toto.io/Statement/v0.1",
+		PredicateType: "https://slsa.dev/provenance/v0.2",
+		Data:          `{"test": "data"}`,
+		DataSHASum:    []byte("test-sha-sum"),
+		CreatedBy:     "db-integration-tests",
+		Digests:       []string{"sha256:abc123"},
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name              string
+		expectErrorCode   errors.CodeType
+		updateAttestation *models.TerraformModuleAttestation
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully update module attestation",
+			updateAttestation: &models.TerraformModuleAttestation{
+				Metadata:      createdAttestation.Metadata,
+				ModuleID:      createdAttestation.ModuleID,
+				Description:   "updated attestation description",
+				SchemaType:    createdAttestation.SchemaType,
+				PredicateType: createdAttestation.PredicateType,
+				Data:          createdAttestation.Data,
+				DataSHASum:    createdAttestation.DataSHASum,
+				CreatedBy:     createdAttestation.CreatedBy,
+				Digests:       createdAttestation.Digests,
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			attestation, err := testClient.client.TerraformModuleAttestations.UpdateModuleAttestation(ctx, test.updateAttestation)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, attestation)
+			assert.Equal(t, test.updateAttestation.Description, attestation.Description)
+		})
+	}
+}
+
+func TestTerraformModuleAttestations_GetModuleAttestationByID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group and module for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-attestation-get-by-id",
+		Description: "test group for module attestation get by id",
+		FullPath:    "test-group-module-attestation-get-by-id",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	terraformModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-attestation-get-by-id",
+		System:      "aws",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a module attestation for testing
+	createdModuleAttestation, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &models.TerraformModuleAttestation{
+		ModuleID:      terraformModule.Metadata.ID,
+		Description:   "test attestation",
+		SchemaType:    "https://in-toto.io/Statement/v0.1",
+		PredicateType: "https://slsa.dev/provenance/v0.2",
+		Data:          `{"test": "data"}`,
+		DataSHASum:    []byte("test-sha-sum"),
+		Digests:       []string{"sha256:test"},
+		CreatedBy:     "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode         errors.CodeType
+		name                    string
+		id                      string
+		expectModuleAttestation bool
+	}
+
+	testCases := []testCase{
+		{
+			name:                    "get resource by id",
+			id:                      createdModuleAttestation.Metadata.ID,
+			expectModuleAttestation: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			moduleAttestation, err := testClient.client.TerraformModuleAttestations.GetModuleAttestationByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectModuleAttestation {
+				require.NotNil(t, moduleAttestation)
+				assert.Equal(t, test.id, moduleAttestation.Metadata.ID)
 			} else {
-				assert.Nil(t, actualAttestation)
+				assert.Nil(t, moduleAttestation)
 			}
 		})
 	}
 }
 
-func TestGetModuleAttestationsWithPagination(t *testing.T) {
-
+func TestTerraformModuleAttestations_GetModuleAttestations(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupTerraformModuleAttestations(ctx, testClient, warmupTerraformModuleAttestations{
-		groups:                      standardWarmupGroupsForTerraformModuleAttestations,
-		terraformModules:            standardWarmupTerraformModulesForTerraformModulesAttestations,
-		terraformModuleAttestations: standardWarmupTerraformModuleAttestations,
+	// Create a group and module for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-attestations-list",
+		Description: "test group for module attestations list",
+		FullPath:    "test-group-module-attestations-list",
+		CreatedBy:   "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	// Query for first page
-	middleIndex := len(warmupItems.terraformModuleAttestations) / 2
-	page1, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
-		PaginationOptions: &pagination.Options{
-			First: ptr.Int32(int32(middleIndex)),
+	terraformModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-attestations-list",
+		System:      "aws",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create test module attestations
+	moduleAttestations := []models.TerraformModuleAttestation{
+		{
+			ModuleID:      terraformModule.Metadata.ID,
+			Description:   "test attestation 1",
+			SchemaType:    "https://in-toto.io/Statement/v0.1",
+			PredicateType: "https://slsa.dev/provenance/v0.2",
+			Data:          `{"test": "data"}`,
+			DataSHASum:    []byte("test-sha-sum-1"),
+			Digests:       []string{"sha256:test1"},
+			CreatedBy:     "db-integration-tests",
 		},
-	})
-	require.Nil(t, err)
-
-	assert.Equal(t, middleIndex, len(page1.ModuleAttestations))
-	assert.True(t, page1.PageInfo.HasNextPage)
-	assert.False(t, page1.PageInfo.HasPreviousPage)
-
-	cursor, err := page1.PageInfo.Cursor(&page1.ModuleAttestations[len(page1.ModuleAttestations)-1])
-	require.Nil(t, err)
-
-	remaining := len(warmupItems.terraformModuleAttestations) - middleIndex
-	page2, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
-		PaginationOptions: &pagination.Options{
-			First: ptr.Int32(int32(remaining)),
-			After: cursor,
+		{
+			ModuleID:      terraformModule.Metadata.ID,
+			Description:   "test attestation 2",
+			SchemaType:    "https://in-toto.io/Statement/v0.1",
+			PredicateType: "https://slsa.dev/provenance/v0.2",
+			Data:          `{"test": "data"}`,
+			DataSHASum:    []byte("test-sha-sum-2"),
+			Digests:       []string{"sha256:test2"},
+			CreatedBy:     "db-integration-tests",
 		},
-	})
-	require.Nil(t, err)
+	}
 
-	assert.Equal(t, remaining, len(page2.ModuleAttestations))
-	assert.True(t, page2.PageInfo.HasPreviousPage)
-	assert.False(t, page2.PageInfo.HasNextPage)
-}
-
-func TestGetModuleAttestations(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModuleAttestations(ctx, testClient, warmupTerraformModuleAttestations{
-		groups:                      standardWarmupGroupsForTerraformModuleAttestations,
-		terraformModules:            standardWarmupTerraformModulesForTerraformModulesAttestations,
-		terraformModuleAttestations: standardWarmupTerraformModuleAttestations,
-	})
-	require.Nil(t, err)
-
-	allTerraformModuleAttestationInfos := terraformModuleAttestationInfoFromTerraformModuleAttestations(warmupItems.terraformModuleAttestations)
-
-	// Sort by Terraform module attestation IDs.
-	sort.Sort(terraformModuleAttestationInfoIDSlice(allTerraformModuleAttestationInfos))
-	allTerraformModuleAttestationIDs := terraformModuleAttestationIDsFromTerraformModuleAttestationInfos(allTerraformModuleAttestationInfos)
-
-	// Sort by last update times.
-	sort.Sort(terraformModuleAttestationInfoUpdateSlice(allTerraformModuleAttestationInfos))
-	allTerraformModuleAttestationIDsByTime := terraformModuleAttestationIDsFromTerraformModuleAttestationInfos(allTerraformModuleAttestationInfos)
-	reverseTerraformModuleAttestationIDsByTime := reverseStringSlice(allTerraformModuleAttestationIDsByTime)
+	createdModuleAttestations := []models.TerraformModuleAttestation{}
+	for _, moduleAttestation := range moduleAttestations {
+		created, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &moduleAttestation)
+		require.NoError(t, err)
+		createdModuleAttestations = append(createdModuleAttestations, *created)
+	}
 
 	type testCase struct {
-		input                               *GetModuleAttestationsInput
-		expectMsg                           *string
-		name                                string
-		expectTerraformModuleAttestationIDs []string
+		name            string
+		expectErrorCode errors.CodeType
+		input           *GetModuleAttestationsInput
+		expectCount     int
 	}
 
 	testCases := []testCase{
 		{
-			name: "non-nil but mostly empty input",
-			input: &GetModuleAttestationsInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			},
-			expectTerraformModuleAttestationIDs: allTerraformModuleAttestationIDs,
+			name:        "get all module attestations",
+			input:       &GetModuleAttestationsInput{},
+			expectCount: len(createdModuleAttestations),
 		},
-
 		{
-			name: "populated sort and pagination, nil filter",
+			name: "filter by module ID",
 			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(100),
-				},
-				Filter: nil,
-			},
-			expectTerraformModuleAttestationIDs: allTerraformModuleAttestationIDsByTime,
-		},
-
-		{
-			name: "sort in ascending order of created at time",
-			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
-			},
-			expectTerraformModuleAttestationIDs: allTerraformModuleAttestationIDsByTime,
-		},
-
-		{
-			name: "sort in descending order of created time",
-			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtDesc),
-			},
-			expectTerraformModuleAttestationIDs: reverseTerraformModuleAttestationIDsByTime,
-		},
-
-		{
-			name: "pagination, first one and last two, expect error",
-			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
-				PaginationOptions: &pagination.Options{
-					First: ptr.Int32(1),
-					Last:  ptr.Int32(2),
-				},
-			},
-			expectMsg:                           ptr.String("only first or last can be defined, not both"),
-			expectTerraformModuleAttestationIDs: allTerraformModuleAttestationIDs[4:],
-		},
-
-		{
-			name: "filter, terraform module attestation IDs, positive",
-			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
 				Filter: &TerraformModuleAttestationFilter{
-					ModuleAttestationIDs: []string{
-						allTerraformModuleAttestationIDsByTime[0], allTerraformModuleAttestationIDsByTime[1], allTerraformModuleAttestationIDsByTime[3]},
+					ModuleID: &terraformModule.Metadata.ID,
 				},
 			},
-			expectTerraformModuleAttestationIDs: []string{
-				allTerraformModuleAttestationIDsByTime[0], allTerraformModuleAttestationIDsByTime[1], allTerraformModuleAttestationIDsByTime[3],
-			},
+			expectCount: len(createdModuleAttestations),
 		},
-
 		{
 			name: "filter by digest",
 			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
 				Filter: &TerraformModuleAttestationFilter{
-					Digest: &standardWarmupTerraformModuleAttestations[0].Digests[0],
+					Digest: ptr.String("sha256:test1"),
 				},
 			},
-			expectTerraformModuleAttestationIDs: []string{
-				allTerraformModuleAttestationIDsByTime[0],
-				allTerraformModuleAttestationIDsByTime[1],
-			},
+			expectCount: 1,
 		},
-
 		{
-			name: "filter, terraform module attestation IDs, non-existent",
+			name: "filter by module attestation IDs",
 			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
 				Filter: &TerraformModuleAttestationFilter{
-					ModuleAttestationIDs: []string{nonExistentID},
+					ModuleAttestationIDs: []string{createdModuleAttestations[0].Metadata.ID},
 				},
 			},
-			expectTerraformModuleAttestationIDs: []string{},
-		},
-
-		{
-			name: "filter, terraform module attestation IDs, invalid ID",
-			input: &GetModuleAttestationsInput{
-				Sort: ptrTerraformModuleAttestationSortableField(TerraformModuleAttestationSortableFieldCreatedAtAsc),
-				Filter: &TerraformModuleAttestationFilter{
-					ModuleAttestationIDs: []string{invalidID},
-				},
-			},
-			expectMsg:                           invalidUUIDMsg,
-			expectTerraformModuleAttestationIDs: []string{},
-		},
-	}
+			expectCount: 1,
+		}}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, test.input)
 
-			terraformModuleAttestationsResult, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if err == nil {
-				// Never returns nil if error is nil.
-				require.NotNil(t, terraformModuleAttestationsResult.PageInfo)
-
-				terraformModuleAttestations := terraformModuleAttestationsResult.ModuleAttestations
-
-				// Check the terraform moduleAttestations result by comparing a list of the terraform module attestation IDs.
-				actualTerraformModuleAttestationIDs := []string{}
-				for _, terraformModuleAttestation := range terraformModuleAttestations {
-					actualTerraformModuleAttestationIDs = append(actualTerraformModuleAttestationIDs, terraformModuleAttestation.Metadata.ID)
-				}
-
-				// If no sort direction was specified, sort the results here for repeatability.
-				if test.input.Sort == nil {
-					sort.Strings(actualTerraformModuleAttestationIDs)
-				}
-
-				assert.Equal(t, len(test.expectTerraformModuleAttestationIDs), len(actualTerraformModuleAttestationIDs))
-				assert.Equal(t, test.expectTerraformModuleAttestationIDs, actualTerraformModuleAttestationIDs)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
 			}
+
+			require.NoError(t, err)
+			assert.Len(t, result.ModuleAttestations, test.expectCount)
 		})
 	}
 }
 
-func TestCreateModuleAttestation(t *testing.T) {
-
+func TestTerraformModuleAttestations_GetModuleAttestationsWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	warmupItems, err := createWarmupTerraformModuleAttestations(ctx, testClient, warmupTerraformModuleAttestations{
-		groups:           standardWarmupGroupsForTerraformModuleAttestations,
-		terraformModules: standardWarmupTerraformModulesForTerraformModulesAttestations,
+	// Create a group and module for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-attestations-pagination",
+		Description: "test group for module attestations pagination",
+		FullPath:    "test-group-module-attestations-pagination",
+		CreatedBy:   "db-integration-tests",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	type testCase struct {
-		toCreate      *models.TerraformModuleAttestation
-		expectCreated *models.TerraformModuleAttestation
-		expectMsg     *string
-		name          string
-	}
-
-	now := time.Now()
-	testCases := []testCase{
-		{
-			name: "positive",
-			toCreate: &models.TerraformModuleAttestation{
-				ModuleID:      warmupItems.terraformModules[0].Metadata.ID,
-				Description:   "test 1",
-				Data:          "testdata1",
-				DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc45"),
-				SchemaType:    "https://in-toto.io/Statement/v0.1",
-				PredicateType: "cosign.sigstore.dev/attestation/v1",
-				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-				CreatedBy:     "TestCreateModuleAttestation",
-			},
-			expectCreated: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					Version:           initialResourceVersion,
-					CreationTimestamp: &now,
-				},
-				ModuleID:      warmupItems.terraformModules[0].Metadata.ID,
-				Description:   "test 1",
-				Data:          "testdata1",
-				DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc45"),
-				SchemaType:    "https://in-toto.io/Statement/v0.1",
-				PredicateType: "cosign.sigstore.dev/attestation/v1",
-				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-				CreatedBy:     "TestCreateModuleAttestation",
-			},
-		},
-
-		{
-			name: "duplicate attestation",
-			toCreate: &models.TerraformModuleAttestation{
-				ModuleID:      warmupItems.terraformModules[0].Metadata.ID,
-				Description:   "test 1",
-				Data:          "testdata1",
-				DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc45"),
-				SchemaType:    "https://in-toto.io/Statement/v0.1",
-				PredicateType: "cosign.sigstore.dev/attestation/v1",
-				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-				CreatedBy:     "TestCreateModuleAttestation",
-			},
-			expectMsg: ptr.String("another module attestation with the same data already exists for this module"),
-		},
-
-		{
-			name: "module does not exist",
-			toCreate: &models.TerraformModuleAttestation{
-				ModuleID:      nonExistentID,
-				Description:   "test 1",
-				Data:          "testdata1",
-				DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc34"),
-				SchemaType:    "https://in-toto.io/Statement/v0.1",
-				PredicateType: "cosign.sigstore.dev/attestation/v1",
-				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-				CreatedBy:     "TestCreateModuleAttestation",
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"terraform_module_attestations\" violates foreign key constraint \"fk_module_id\" (SQLSTATE 23503)"),
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			actualCreated, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, test.toCreate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectCreated != nil {
-				require.NotNil(t, actualCreated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectCreated.Metadata.CreationTimestamp
-				now := time.Now()
-
-				compareTerraformModuleAttestations(t, test.expectCreated, actualCreated, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualCreated)
-			}
-		})
-	}
-}
-
-func TestUpdateModuleAttestation(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModuleAttestations(ctx, testClient, warmupTerraformModuleAttestations{
-		groups:                      standardWarmupGroupsForTerraformModuleAttestations,
-		terraformModules:            standardWarmupTerraformModulesForTerraformModulesAttestations,
-		terraformModuleAttestations: standardWarmupTerraformModuleAttestations,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg     *string
-		toUpdate      *models.TerraformModuleAttestation
-		expectUpdated *models.TerraformModuleAttestation
-		name          string
-	}
-
-	now := time.Now()
-	testCases := []testCase{
-
-		{
-			name: "positive",
-			toUpdate: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:      warmupItems.terraformModuleAttestations[0].Metadata.ID,
-					Version: initialResourceVersion,
-				},
-				Description: "test update",
-			},
-			expectUpdated: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:                   warmupItems.terraformModuleAttestations[0].Metadata.ID,
-					Version:              initialResourceVersion + 1,
-					CreationTimestamp:    warmupItems.terraformModuleAttestations[0].Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				ModuleID:      warmupItems.terraformModuleAttestations[0].ModuleID,
-				Description:   "test update",
-				Data:          "testdata1",
-				DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc34"),
-				SchemaType:    "https://in-toto.io/Statement/v0.1",
-				PredicateType: "cosign.sigstore.dev/attestation/v1",
-				Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-				CreatedBy:     "someone-0",
-			},
-		},
-
-		{
-			name: "negative, non-existent Terraform module attestation ID",
-			toUpdate: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-ID",
-			toUpdate: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			actualTerraformModuleAttestation, err := testClient.client.TerraformModuleAttestations.UpdateModuleAttestation(ctx, test.toUpdate)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectUpdated != nil {
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectUpdated.Metadata.CreationTimestamp
-				now := currentTime()
-
-				require.NotNil(t, actualTerraformModuleAttestation)
-				compareTerraformModuleAttestations(t, test.expectUpdated, actualTerraformModuleAttestation, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-			} else {
-				assert.Nil(t, actualTerraformModuleAttestation)
-			}
-		})
-	}
-}
-
-func TestDeleteModuleAttestation(t *testing.T) {
-
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	warmupItems, err := createWarmupTerraformModuleAttestations(ctx, testClient, warmupTerraformModuleAttestations{
-		groups:                      standardWarmupGroupsForTerraformModuleAttestations,
-		terraformModules:            standardWarmupTerraformModulesForTerraformModulesAttestations,
-		terraformModuleAttestations: standardWarmupTerraformModuleAttestations,
-	})
-	require.Nil(t, err)
-
-	type testCase struct {
-		expectMsg *string
-		toDelete  *models.TerraformModuleAttestation
-		name      string
-	}
-
-	testCases := []testCase{
-
-		{
-			name: "positive",
-			toDelete: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:      warmupItems.terraformModuleAttestations[0].Metadata.ID,
-					Version: initialResourceVersion,
-				},
-			},
-		},
-
-		{
-			name: "negative, non-existent Terraform module ID",
-			toDelete: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: resourceVersionMismatch,
-		},
-
-		{
-			name: "defective-ID",
-			toDelete: &models.TerraformModuleAttestation{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			err := testClient.client.TerraformModuleAttestations.DeleteModuleAttestation(ctx, test.toDelete)
-
-			checkError(t, test.expectMsg, err)
-		})
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup group(s) for tests in this moduleAttestation:
-// The create function will derive the parent path and name from the full path.
-var standardWarmupGroupsForTerraformModuleAttestations = []models.Group{
-	// Top-level groups:
-	{
-		Description: "top level group 0 for testing terraform module attestation functions",
-		FullPath:    "top-level-group-0-for-terraform-module-attestations",
-		CreatedBy:   "someone-g0",
-	},
-	{
-		Description: "top level group 1 for testing terraform module attestation functions",
-		FullPath:    "top-level-group-1-for-terraform-module-attestations",
-		CreatedBy:   "someone-g1",
-	},
-	{
-		Description: "top level group 2 for testing terraform module attestation functions",
-		FullPath:    "top-level-group-2-for-terraform-module-attestations",
-		CreatedBy:   "someone-g2",
-	},
-	{
-		Description: "top level group 3 for testing terraform module attestation functions",
-		FullPath:    "top-level-group-3-for-terraform-module-attestations",
-		CreatedBy:   "someone-g3",
-	},
-	{
-		Description: "top level group 4 for testing terraform module attestation functions",
-		FullPath:    "top-level-group-4-for-terraform-module-attestations",
-		CreatedBy:   "someone-g4",
-	},
-}
-
-// The ID fields will be replaced by the real IDs during the create function.
-var standardWarmupTerraformModulesForTerraformModulesAttestations = []models.TerraformModule{
-	{
-		Name:        "module-a",
+	terraformModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-attestations-pagination",
 		System:      "aws",
-		RootGroupID: "top-level-group-0-for-terraform-module-attestations",
-		GroupID:     "top-level-group-0-for-terraform-module-attestations",
-		Private:     false,
-		CreatedBy:   "someone-tp0",
-	},
-	{
-		Name:        "module-b",
-		System:      "azure",
-		RootGroupID: "top-level-group-0-for-terraform-module-attestations",
-		GroupID:     "top-level-group-0-for-terraform-module-attestations",
-		Private:     false,
-		CreatedBy:   "someone-tp1",
-	},
-	{
-		Name:        "module-c",
-		System:      "azure",
-		RootGroupID: "top-level-group-0-for-terraform-module-attestations",
-		GroupID:     "top-level-group-0-for-terraform-module-attestations",
-		Private:     false,
-		CreatedBy:   "someone-tp1",
-	},
-}
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
 
-// Standard warmup terraform moduleAttestations for tests in this moduleAttestation:
-// The ID fields will be replaced by the real IDs during the create function.
-var standardWarmupTerraformModuleAttestations = []models.TerraformModuleAttestation{
-	{
-		ModuleID:      "top-level-group-0-for-terraform-module-attestations/module-a/aws",
-		Description:   "test 1",
-		Data:          "testdata1",
-		DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc34"),
-		SchemaType:    "https://in-toto.io/Statement/v0.1",
-		PredicateType: "cosign.sigstore.dev/attestation/v1",
-		Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d"},
-		CreatedBy:     "someone-0",
-	},
-	{
-		ModuleID:      "top-level-group-0-for-terraform-module-attestations/module-a/aws",
-		Description:   "test 2",
-		Data:          "testdata2",
-		DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc35"),
-		SchemaType:    "https://in-toto.io/Statement/v0.1",
-		PredicateType: "cosign.sigstore.dev/attestation/v1",
-		Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7d", "7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7a"},
-		CreatedBy:     "someone-0",
-	},
-	{
-		ModuleID:      "top-level-group-0-for-terraform-module-attestations/module-b/azure",
-		Description:   "test 3",
-		Data:          "testdata3",
-		DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc36"),
-		SchemaType:    "https://in-toto.io/Statement/v0.1",
-		PredicateType: "cosign.sigstore.dev/attestation/v1",
-		Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7f"},
-		CreatedBy:     "someone-0",
-	},
-	{
-		ModuleID:      "top-level-group-0-for-terraform-module-attestations/module-c/azure",
-		Description:   "test 4",
-		Data:          "testdata4",
-		DataSHASum:    []byte("7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe442bc37"),
-		SchemaType:    "https://in-toto.io/Statement/v0.1",
-		PredicateType: "cosign.sigstore.dev/attestation/v1",
-		Digests:       []string{"7ae471ed18395339572f5265b835860e28a2f85016455214cb214bafe4422c7c"},
-		CreatedBy:     "someone-0",
-	},
-}
-
-// createWarmupTerraformModuleAttestations creates some warmup terraform moduleAttestations for a test
-// The warmup terraform moduleAttestations to create can be standard or otherwise.
-func createWarmupTerraformModuleAttestations(ctx context.Context, testClient *testClient,
-	input warmupTerraformModuleAttestations) (*warmupTerraformModuleAttestations, error) {
-
-	// It is necessary to create at least one group in order to
-	// provide the necessary IDs for the terraform module attestations.
-
-	resultGroups, parentPath2ID, err := createInitialGroups(ctx, testClient, input.groups)
-	if err != nil {
-		return nil, err
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		_, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &models.TerraformModuleAttestation{
+			ModuleID:      terraformModule.Metadata.ID,
+			Description:   fmt.Sprintf("test attestation %d", i),
+			SchemaType:    "https://in-toto.io/Statement/v0.1",
+			PredicateType: "https://slsa.dev/provenance/v0.2",
+			Data:          `{"test": "data"}`,
+			DataSHASum:    []byte(fmt.Sprintf("test-sha-sum-%d", i)),
+			Digests:       []string{fmt.Sprintf("sha256:test%d", i)},
+			CreatedBy:     "db-integration-tests",
+		})
+		require.NoError(t, err)
 	}
 
-	resultTerraformProviders, moduleResourcePath2ID, err := createInitialTerraformModules(ctx, testClient,
-		input.terraformModules, parentPath2ID)
-	if err != nil {
-		return nil, err
+	sortableFields := []sortableField{
+		TerraformModuleAttestationSortableFieldPredicateAsc,
+		TerraformModuleAttestationSortableFieldPredicateDesc,
+		TerraformModuleAttestationSortableFieldCreatedAtAsc,
+		TerraformModuleAttestationSortableFieldCreatedAtDesc,
 	}
 
-	resultTerraformProviderAttestations, err := createInitialTerraformModuleAttestations(ctx, testClient,
-		input.terraformModuleAttestations, moduleResourcePath2ID)
-	if err != nil {
-		return nil, err
+	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {
+		sortBy := TerraformModuleAttestationSortableField(sortByField.getValue())
+
+		result, err := testClient.client.TerraformModuleAttestations.GetModuleAttestations(ctx, &GetModuleAttestationsInput{
+			Sort:              &sortBy,
+			PaginationOptions: paginationOptions,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		resources := []pagination.CursorPaginatable{}
+		for _, resource := range result.ModuleAttestations {
+			resourceCopy := resource
+			resources = append(resources, &resourceCopy)
+		}
+
+		return result.PageInfo, resources, nil
+	})
+}
+
+func TestTerraformModuleAttestations_GetModuleAttestationByTRN(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group and module for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-module-attestation-get-by-trn",
+		Description: "test group for module attestation get by trn",
+		FullPath:    "test-group-module-attestation-get-by-trn",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	terraformModule, err := testClient.client.TerraformModules.CreateModule(ctx, &models.TerraformModule{
+		Name:        "test-module-attestation-get-by-trn",
+		System:      "aws",
+		GroupID:     group.Metadata.ID,
+		RootGroupID: group.Metadata.ID,
+		CreatedBy:   "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	// Create a module attestation for testing
+	createdModuleAttestation, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &models.TerraformModuleAttestation{
+		ModuleID:      terraformModule.Metadata.ID,
+		Description:   "test attestation",
+		SchemaType:    "https://in-toto.io/Statement/v0.1",
+		PredicateType: "https://slsa.dev/provenance/v0.2",
+		Data:          `{"test": "data"}`,
+		DataSHASum:    []byte("test-sha-sum"),
+		Digests:       []string{"sha256:test"},
+		CreatedBy:     "db-integration-tests",
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode         errors.CodeType
+		name                    string
+		trn                     string
+		expectModuleAttestation bool
 	}
 
-	return &warmupTerraformModuleAttestations{
-		groups:                      resultGroups,
-		terraformModules:            resultTerraformProviders,
-		terraformModuleAttestations: resultTerraformProviderAttestations,
-	}, nil
-}
+	testCases := []testCase{
+		{
+			name:                    "get resource by TRN",
+			trn:                     createdModuleAttestation.Metadata.TRN,
+			expectModuleAttestation: true,
+		},
+		{
+			name: "resource with TRN not found",
+			trn:  "trn:tharsis:terraform_module_attestation:non-existent-id",
+		},
+		{
+			name:            "get resource with invalid TRN will return an error",
+			trn:             "invalid-trn",
+			expectErrorCode: errors.EInvalid,
+		},
+	}
 
-func ptrTerraformModuleAttestationSortableField(arg TerraformModuleAttestationSortableField) *TerraformModuleAttestationSortableField {
-	return &arg
-}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			moduleAttestation, err := testClient.client.TerraformModuleAttestations.GetModuleAttestationByTRN(ctx, test.trn)
 
-func (wis terraformModuleAttestationInfoIDSlice) Len() int {
-	return len(wis)
-}
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-func (wis terraformModuleAttestationInfoIDSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformModuleAttestationInfoIDSlice) Less(i, j int) bool {
-	return wis[i].id < wis[j].id
-}
-
-func (wis terraformModuleAttestationInfoUpdateSlice) Len() int {
-	return len(wis)
-}
-
-func (wis terraformModuleAttestationInfoUpdateSlice) Swap(i, j int) {
-	wis[i], wis[j] = wis[j], wis[i]
-}
-
-func (wis terraformModuleAttestationInfoUpdateSlice) Less(i, j int) bool {
-	return wis[i].updateTime.Before(wis[j].updateTime)
-}
-
-// terraformModuleAttestationInfoFromTerraformModuleAttestations returns a slice of terraformModuleAttestationInfo, not necessarily sorted in any order.
-func terraformModuleAttestationInfoFromTerraformModuleAttestations(terraformModuleAttestations []models.TerraformModuleAttestation) []terraformModuleAttestationInfo {
-	result := []terraformModuleAttestationInfo{}
-
-	for _, tp := range terraformModuleAttestations {
-		result = append(result, terraformModuleAttestationInfo{
-			id:         tp.Metadata.ID,
-			updateTime: *tp.Metadata.LastUpdatedTimestamp,
+			if test.expectModuleAttestation {
+				require.NotNil(t, moduleAttestation)
+				assert.Equal(t, createdModuleAttestation.Metadata.ID, moduleAttestation.Metadata.ID)
+			} else {
+				assert.Nil(t, moduleAttestation)
+			}
 		})
 	}
-
-	return result
-}
-
-// terraformModuleAttestationIDsFromTerraformModuleAttestationInfos preserves order
-func terraformModuleAttestationIDsFromTerraformModuleAttestationInfos(terraformModuleAttestationInfos []terraformModuleAttestationInfo) []string {
-	result := []string{}
-	for _, terraformModuleAttestationInfo := range terraformModuleAttestationInfos {
-		result = append(result, terraformModuleAttestationInfo.id)
-	}
-	return result
-}
-
-// compareTerraformModuleAttestations compares two terraform module attestation objects, including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareTerraformModuleAttestations(t *testing.T, expected, actual *models.TerraformModuleAttestation,
-	checkID bool, times *timeBounds) {
-
-	assert.Equal(t, expected.ModuleID, actual.ModuleID)
-	assert.Equal(t, expected.Data, actual.Data)
-	assert.Equal(t, expected.DataSHASum, actual.DataSHASum)
-	assert.Equal(t, expected.Description, actual.Description)
-	assert.Equal(t, expected.Digests, actual.Digests)
-	assert.Equal(t, expected.SchemaType, actual.SchemaType)
-	assert.Equal(t, expected.PredicateType, actual.PredicateType)
-	assert.Equal(t, expected.CreatedBy, actual.CreatedBy)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
-	}
-}
-
-// createInitialTerraformModuleAttestations creates some warmup Terraform moduleAttestations for a test.
-func createInitialTerraformModuleAttestations(ctx context.Context, testClient *testClient,
-	toCreate []models.TerraformModuleAttestation, moduleResourcePath2ID map[string]string) ([]models.TerraformModuleAttestation, error) {
-	result := []models.TerraformModuleAttestation{}
-
-	for _, input := range toCreate {
-
-		moduleResourcePath := input.ModuleID
-		moduleID, ok := moduleResourcePath2ID[moduleResourcePath]
-		if !ok {
-			return nil,
-				fmt.Errorf("createInitialTerraformModuleAttestations failed to look up module resource path: %s",
-					moduleResourcePath)
-		}
-		input.ModuleID = moduleID
-
-		created, err := testClient.client.TerraformModuleAttestations.CreateModuleAttestation(ctx, &input)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, *created)
-	}
-
-	return result, nil
 }

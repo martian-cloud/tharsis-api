@@ -5,709 +5,472 @@ package db
 import (
 	"context"
 	"fmt"
-	"sort"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
-type teamMemberWarmupsInput struct {
-	users       []models.User
-	teams       []models.Team
-	teamMembers []models.TeamMember
+// getValue implements the sortableField interface for TeamMemberSortableField
+func (tm TeamMemberSortableField) getValue() string {
+	return string(tm)
 }
 
-type teamMemberWarmupsOutput struct {
-	userIDs2Name map[string]string
-	teamIDs2Name map[string]string
-	users        []models.User
-	teams        []models.Team
-	teamMembers  []models.TeamMember
-}
-
-// teamMemberNameSlice makes a slice of models.TeamMember sortable by name
-type teamMemberNameSlice struct {
-	warmupOutput *teamMemberWarmupsOutput
-	teamMembers  []models.TeamMember
-}
-
-func TestGetTeamMember(t *testing.T) {
+func TestTeamMembers_CreateTeamMember(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupTeamMembers(ctx, testClient, teamMemberWarmupsInput{
-		teams:       standardWarmupTeamsForTeamMembers,
-		users:       standardWarmupUsersForTeamMembers,
-		teamMembers: standardWarmupTeamMembers,
+	// Create a user for testing
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-teammember",
+		Email:    "test-teammember@example.com",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-member",
+		Description: "test team for team member",
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		expectMsg        *string
-		expectTeamMember *models.TeamMember
-		name             string
-		userID           string
-		teamID           string
+		name            string
+		expectErrorCode errors.CodeType
+		teamMember      *models.TeamMember
 	}
 
-	/*
-		template test case:
-
+	testCases := []testCase{
 		{
-		name             string
-		userID           string
-		teamID           string
-		expectMsg        *string
-		expectTeamMember *models.TeamMember
-		}
-	*/
+			name: "successfully add user to team",
+			teamMember: &models.TeamMember{
+				UserID:       user.Metadata.ID,
+				TeamID:       team.Metadata.ID,
+				IsMaintainer: false,
+			},
+		},
+	}
 
-	testCases := []testCase{}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			teamMember, err := testClient.client.TeamMembers.AddUserToTeam(ctx, test.teamMember)
 
-	// Positive case, one warmup team at a time.
-	for _, toGet := range createdWarmupOutput.teamMembers {
-		copyToGet := toGet
-		testCases = append(testCases, testCase{
-			name:             "positive--" + buildTeamMemberName(createdWarmupOutput, toGet),
-			userID:           toGet.UserID,
-			teamID:           toGet.TeamID,
-			expectTeamMember: &copyToGet,
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, teamMember)
+			assert.Equal(t, test.teamMember.UserID, teamMember.UserID)
+			assert.Equal(t, test.teamMember.TeamID, teamMember.TeamID)
+			assert.Equal(t, test.teamMember.IsMaintainer, teamMember.IsMaintainer)
 		})
 	}
-	toGet0 := createdWarmupOutput.teamMembers[0]
+}
 
-	testCases = append(testCases,
-		testCase{
-			name:   "negative: non-exist user ID",
+func TestTeamMembers_UpdateTeamMember(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a user for testing
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-teammember-update",
+		Email:    "test-teammember-update@example.com",
+	})
+	require.NoError(t, err)
+
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-member-update",
+		Description: "test team for team member update",
+	})
+	require.NoError(t, err)
+
+	// Create a team member to update
+	createdTeamMember, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+		UserID:       user.Metadata.ID,
+		TeamID:       team.Metadata.ID,
+		IsMaintainer: false,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		updateMember    *models.TeamMember
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully update team member",
+			updateMember: &models.TeamMember{
+				Metadata:     createdTeamMember.Metadata,
+				UserID:       createdTeamMember.UserID,
+				TeamID:       createdTeamMember.TeamID,
+				IsMaintainer: true, // Change to maintainer
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			teamMember, err := testClient.client.TeamMembers.UpdateTeamMember(ctx, test.updateMember)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, teamMember)
+			assert.Equal(t, test.updateMember.IsMaintainer, teamMember.IsMaintainer)
+		})
+	}
+}
+
+func TestTeamMembers_DeleteTeamMember(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a user for testing
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-teammember-delete",
+		Email:    "test-teammember-delete@example.com",
+	})
+	require.NoError(t, err)
+
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-member-delete",
+		Description: "test team for team member delete",
+	})
+	require.NoError(t, err)
+
+	// Create a team member to delete
+	createdTeamMember, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+		UserID:       user.Metadata.ID,
+		TeamID:       team.Metadata.ID,
+		IsMaintainer: false,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		teamMember      *models.TeamMember
+	}
+
+	testCases := []testCase{
+		{
+			name:       "successfully remove user from team",
+			teamMember: createdTeamMember,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := testClient.client.TeamMembers.RemoveUserFromTeam(ctx, test.teamMember)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Verify the team member was removed
+			deletedTeamMember, err := testClient.client.TeamMembers.GetTeamMember(ctx, test.teamMember.UserID, test.teamMember.TeamID)
+			if err != nil {
+				assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+			}
+			assert.Nil(t, deletedTeamMember)
+		})
+	}
+}
+
+func TestTeamMembers_GetTeamMember(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-member-get",
+		Description: "test team for member get",
+	})
+	require.NoError(t, err)
+
+	// Create a user for testing
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-member-get",
+		Email:    "test-user-member-get@example.com",
+	})
+	require.NoError(t, err)
+
+	// Create a team member for testing
+	createdMember, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+		UserID:       user.Metadata.ID,
+		TeamID:       team.Metadata.ID,
+		IsMaintainer: false,
+	})
+	require.NoError(t, err)
+
+	type testCase struct {
+		expectErrorCode errors.CodeType
+		name            string
+		userID          string
+		teamID          string
+		expectMember    bool
+	}
+
+	testCases := []testCase{
+		{
+			name:         "get team member",
+			userID:       user.Metadata.ID,
+			teamID:       team.Metadata.ID,
+			expectMember: true,
+		},
+		{
+			name:   "team member not found",
 			userID: nonExistentID,
-			teamID: toGet0.TeamID,
+			teamID: team.Metadata.ID,
 		},
-		testCase{
-			name:   "negative: non-exist team ID",
-			userID: toGet0.UserID,
-			teamID: nonExistentID,
+		{
+			name:            "get team member with invalid user ID will return an error",
+			userID:          invalidID,
+			teamID:          team.Metadata.ID,
+			expectErrorCode: errors.EInvalid,
 		},
-		testCase{
-			name:      "negative: invalid user ID",
-			userID:    invalidID,
-			teamID:    toGet0.TeamID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
-		},
-		testCase{
-			name:      "negative: invalid team ID",
-			userID:    toGet0.UserID,
-			teamID:    invalidID,
-			expectMsg: ptr.String(ErrInvalidID.Error()),
-		},
-	)
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			gotTeamMember, err := testClient.client.TeamMembers.GetTeamMember(ctx, test.userID, test.teamID)
+			member, err := testClient.client.TeamMembers.GetTeamMember(ctx, test.userID, test.teamID)
 
-			checkError(t, test.expectMsg, err)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
 
-			if test.expectTeamMember != nil {
-				require.NotNil(t, gotTeamMember)
-				compareTeamMembers(t, test.expectTeamMember, gotTeamMember, true, nil)
+			if test.expectMember {
+				require.NotNil(t, member)
+				assert.Equal(t, createdMember.Metadata.ID, member.Metadata.ID)
 			} else {
-				assert.Nil(t, gotTeamMember)
+				assert.Nil(t, member)
 			}
 		})
 	}
 }
 
-func TestGetTeamMembers(t *testing.T) {
+func TestTeamMembers_GetTeamMemberByID(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	createdWarmupOutput, err := createWarmupTeamMembers(ctx, testClient, teamMemberWarmupsInput{
-		teams:       standardWarmupTeamsForTeamMembers,
-		users:       standardWarmupUsersForTeamMembers,
-		teamMembers: standardWarmupTeamMembers,
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-member-get-by-id",
+		Description: "test team for member get by id",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	// Create a user for testing
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-member-get-by-id",
+		Email:    "test-user-member-get-by-id@example.com",
+	})
+	require.NoError(t, err)
+
+	// Create a team member for testing
+	createdMember, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+		UserID:       user.Metadata.ID,
+		TeamID:       team.Metadata.ID,
+		IsMaintainer: false,
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
-		name              string
-		input             *GetTeamMembersInput
-		expectMsg         *string
-		expectTeamMembers []models.TeamMember
+		expectErrorCode errors.CodeType
+		name            string
+		id              string
+		expectMember    bool
 	}
 
-	/*
-		template test case:
-
-		{
-		name              string
-		input             *GetTeamMembersInput
-		expectMsg         *string
-		expectTeamMembers []models.TeamMember
-		}
-	*/
-
-	// TODO: Add more cases:
 	testCases := []testCase{
 		{
-			name: "simple get team members test case",
+			name:         "get resource by id",
+			id:           createdMember.Metadata.ID,
+			expectMember: true,
+		},
+		{
+			name: "resource with id not found",
+			id:   nonExistentID,
+		},
+		{
+			name:            "get resource with invalid id will return an error",
+			id:              invalidID,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			member, err := testClient.client.TeamMembers.GetTeamMemberByID(ctx, test.id)
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			if test.expectMember {
+				require.NotNil(t, member)
+				assert.Equal(t, test.id, member.Metadata.ID)
+			} else {
+				assert.Nil(t, member)
+			}
+		})
+	}
+}
+
+func TestTeamMembers_GetTeamMembers(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-members-list",
+		Description: "test team for members list",
+	})
+	require.NoError(t, err)
+
+	// Create users for testing
+	users := []models.User{
+		{
+			Username: "test-user-member-1",
+			Email:    "test-user-member-1@example.com",
+		},
+		{
+			Username: "test-user-member-2",
+			Email:    "test-user-member-2@example.com",
+		},
+	}
+
+	createdUsers := []models.User{}
+	for _, user := range users {
+		created, err := testClient.client.Users.CreateUser(ctx, &user)
+		require.NoError(t, err)
+		createdUsers = append(createdUsers, *created)
+	}
+
+	// Create team members
+	createdMembers := []models.TeamMember{}
+	for i, user := range createdUsers {
+		member, err := testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+			UserID:       user.Metadata.ID,
+			TeamID:       team.Metadata.ID,
+			IsMaintainer: i == 0, // First user is maintainer
+		})
+		require.NoError(t, err)
+		createdMembers = append(createdMembers, *member)
+	}
+
+	type testCase struct {
+		name            string
+		expectErrorCode errors.CodeType
+		input           *GetTeamMembersInput
+		expectCount     int
+	}
+
+	testCases := []testCase{
+		{
+			name: "get all team members",
 			input: &GetTeamMembersInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
+				Filter: &TeamMemberFilter{
+					TeamIDs: []string{team.Metadata.ID},
+				},
 			},
-			expectTeamMembers: createdWarmupOutput.teamMembers,
+			expectCount: len(createdMembers),
+		},
+		{
+			name: "filter by user ID",
+			input: &GetTeamMembersInput{
+				Filter: &TeamMemberFilter{
+					UserID: &createdUsers[0].Metadata.ID,
+				},
+			},
+			expectCount: 1,
 		},
 	}
-
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			// TODO: Add checks for pagination, cursors, etc.
+			result, err := testClient.client.TeamMembers.GetTeamMembers(ctx, test.input)
 
-			gotResult, err := testClient.client.TeamMembers.GetTeamMembers(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectTeamMembers != nil {
-				actualTeamMembers := gotResult.TeamMembers
-				require.NotNil(t, actualTeamMembers)
-				require.Equal(t, len(test.expectTeamMembers), len(actualTeamMembers))
-
-				// TODO: When implementing test cases that do sorting other than ascending order by name,
-				// change this to handle all cases.
-
-				// For now, sort both expected and actual by synthesized name in order to compare.
-				sort.Sort(teamMemberNameSlice{
-					warmupOutput: createdWarmupOutput,
-					teamMembers:  test.expectTeamMembers,
-				})
-				sort.Sort(teamMemberNameSlice{
-					warmupOutput: createdWarmupOutput,
-					teamMembers:  actualTeamMembers,
-				})
-
-				// Compare the slices of teams, now that they should be sorted the same.
-				for ix := 0; ix < len(test.expectTeamMembers); ix++ {
-					compareTeamMembers(t, &test.expectTeamMembers[ix], &actualTeamMembers[ix], true, nil)
-				}
-
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
 			}
 
-			// TODO: Add code for pagination, cursors, etc.
+			require.NoError(t, err)
+			assert.Len(t, result.TeamMembers, test.expectCount)
 		})
 	}
 }
 
-func TestAddUserToTeam(t *testing.T) {
+func TestTeamMembers_GetTeamMembersWithPaginationAndSorting(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
 	defer testClient.close(ctx)
 
-	// Create warmup teams and users but _NOT_ team members relationships.
-	createdWarmupOutput, err := createWarmupTeamMembers(ctx, testClient, teamMemberWarmupsInput{
-		teams:       standardWarmupTeamsForTeamMembers,
-		users:       standardWarmupUsersForTeamMembers,
-		teamMembers: []models.TeamMember{},
+	// Create a team for testing
+	team, err := testClient.client.Teams.CreateTeam(ctx, &models.Team{
+		Name:        "test-team-members-pagination",
+		Description: "test team for members pagination",
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	usernames2IDs := reverseMap(createdWarmupOutput.userIDs2Name)
-	teamNames2IDs := reverseMap(createdWarmupOutput.teamIDs2Name)
-
-	type testCase struct {
-		input       *models.TeamMember
-		expectMsg   *string
-		expectAdded *models.TeamMember
-		name        string
-	}
-
-	/*
-		template test case:
-
-		{
-		name        string
-		input       *models.TeamMember
-		expectMsg   *string
-		expectAdded *models.TeamMember
-		}
-	*/
-
-	testCases := []testCase{}
-
-	// Positive case, one warmup team member relationship at a time.
-	for _, toAdd := range standardWarmupTeamMembers {
-		now := currentTime()
-		testCases = append(testCases, testCase{
-			name: "positive: " + buildTeamMemberName(createdWarmupOutput, toAdd),
-			input: &models.TeamMember{
-				UserID:       usernames2IDs[toAdd.UserID],
-				TeamID:       teamNames2IDs[toAdd.TeamID],
-				IsMaintainer: toAdd.IsMaintainer,
-			},
-			expectAdded: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					CreationTimestamp: &now,
-					Version:           initialResourceVersion,
-				},
-				UserID:       usernames2IDs[toAdd.UserID],
-				TeamID:       teamNames2IDs[toAdd.TeamID],
-				IsMaintainer: toAdd.IsMaintainer,
-			},
+	resourceCount := 10
+	for i := 0; i < resourceCount; i++ {
+		createdUser, err := testClient.client.Users.CreateUser(ctx, &models.User{
+			Username: fmt.Sprintf("test-user-member-%d", i),
+			Email:    fmt.Sprintf("test-user-member-%d@example.com", i),
 		})
-	}
+		require.NoError(t, err)
 
-	// Negative cases:
-	input0 := standardWarmupTeamMembers[0]
-	userID0 := usernames2IDs[input0.UserID]
-	teamID0 := teamNames2IDs[input0.TeamID]
-	testCases = append(testCases,
-
-		testCase{
-			name: "negative: duplicate",
-			input: &models.TeamMember{
-				UserID:       userID0,
-				TeamID:       teamID0,
-				IsMaintainer: input0.IsMaintainer,
-			},
-			expectMsg: ptr.String(fmt.Sprintf("team member of user %s in team %s already exists",
-				input0.UserID, input0.TeamID)),
-		},
-
-		testCase{
-			name: "negative: user ID does not exist",
-			input: &models.TeamMember{
-				UserID: nonExistentID,
-				TeamID: teamID0,
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"team_members\" violates foreign key constraint \"fk_team_members_user_id\" (SQLSTATE 23503)"),
-		},
-
-		testCase{
-			name: "negative: team ID does not exist",
-			input: &models.TeamMember{
-				UserID: userID0,
-				TeamID: nonExistentID,
-			},
-			expectMsg: ptr.String("ERROR: insert or update on table \"team_members\" violates foreign key constraint \"fk_team_members_team_id\" (SQLSTATE 23503)"),
-		},
-
-		testCase{
-			name: "negative: invalid user ID",
-			input: &models.TeamMember{
-				UserID: invalidID,
-				TeamID: teamID0,
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-
-		testCase{
-			name: "negative: invalid team ID",
-			input: &models.TeamMember{
-				UserID: userID0,
-				TeamID: invalidID,
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	)
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			claimedAdded, err := testClient.client.TeamMembers.AddUserToTeam(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectAdded != nil {
-				require.NotNil(t, claimedAdded)
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				whenCreated := test.expectAdded.Metadata.CreationTimestamp
-				now := currentTime()
-
-				compareTeamMembers(t, test.expectAdded, claimedAdded, false, &timeBounds{
-					createLow:  whenCreated,
-					createHigh: &now,
-					updateLow:  whenCreated,
-					updateHigh: &now,
-				})
-
-				// Verify that what the AddUserToTeam method claimed was added can fetched.
-				fetched, err := testClient.client.TeamMembers.GetTeamMember(ctx, test.input.UserID, test.input.TeamID)
-				assert.Nil(t, err)
-
-				if test.expectAdded != nil {
-					require.NotNil(t, fetched)
-					compareTeamMembers(t, claimedAdded, fetched, true, nil)
-				} else {
-					assert.Nil(t, fetched)
-				}
-			} else {
-				assert.Nil(t, claimedAdded)
-			}
+		_, err = testClient.client.TeamMembers.AddUserToTeam(ctx, &models.TeamMember{
+			UserID:       createdUser.Metadata.ID,
+			TeamID:       team.Metadata.ID,
+			IsMaintainer: false,
 		})
+		require.NoError(t, err)
 	}
-}
 
-func TestUpdateTeamMember(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdWarmupOutput, err := createWarmupTeamMembers(ctx, testClient, teamMemberWarmupsInput{
-		teams:       standardWarmupTeamsForTeamMembers,
-		users:       standardWarmupUsersForTeamMembers,
-		teamMembers: standardWarmupTeamMembers,
+	// Test basic pagination without sorting since TeamMemberSortableField.getFieldDescriptor() returns nil
+	result, err := testClient.client.TeamMembers.GetTeamMembers(ctx, &GetTeamMembersInput{
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(5),
+		},
+		Filter: &TeamMemberFilter{
+			TeamIDs: []string{team.Metadata.ID},
+		},
 	})
-	require.Nil(t, err)
+	require.NoError(t, err)
+	assert.Len(t, result.TeamMembers, 5)
 
-	type testCase struct {
-		input         *models.TeamMember
-		expectMsg     *string
-		expectUpdated *models.TeamMember
-		name          string
-	}
-
-	/*
-		template test case:
-
-		{
-		name        string
-		input       *models.TeamMember
-		expectMsg   *string
-		expectUpdated *models.TeamMember
-		}
-	*/
-
-	testCases := []testCase{}
-
-	// Positive case, one warmup team member relationship at a time.
-	// The only field that is modified is IsMaintainer.
-	for _, toUpdate := range createdWarmupOutput.teamMembers {
-		now := currentTime()
-		testCases = append(testCases, testCase{
-			name: "positive: " + buildTeamMemberName(createdWarmupOutput, toUpdate),
-			input: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					ID:      toUpdate.Metadata.ID,
-					Version: toUpdate.Metadata.Version,
-				},
-				IsMaintainer: false,
-			},
-			expectUpdated: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					Version:              initialResourceVersion + 1,
-					CreationTimestamp:    toUpdate.Metadata.CreationTimestamp,
-					LastUpdatedTimestamp: &now,
-				},
-				UserID:       toUpdate.UserID,
-				TeamID:       toUpdate.TeamID,
-				IsMaintainer: false,
-			},
-		})
-	}
-
-	// Negative cases:
-	// Version number will have been incremented by the positive test cases.
-	input0 := createdWarmupOutput.teamMembers[0]
-	newVersion := input0.Metadata.Version + 1
-	testCases = append(testCases,
-
-		testCase{
-			name: "negative: team member ID does not exist",
-			input: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: newVersion,
-				},
-				IsMaintainer: false,
-			},
-			expectMsg: resourceVersionMismatch,
+	// Test getting all members
+	result, err = testClient.client.TeamMembers.GetTeamMembers(ctx, &GetTeamMembersInput{
+		Filter: &TeamMemberFilter{
+			TeamIDs: []string{team.Metadata.ID},
 		},
-
-		testCase{
-			name: "negative: invalid team member ID",
-			input: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: newVersion,
-				},
-				IsMaintainer: false,
-			},
-			expectMsg: invalidUUIDMsg,
-		},
-	)
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			actualUpdated, err := testClient.client.TeamMembers.UpdateTeamMember(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			if test.expectUpdated != nil {
-				// the positive case
-				require.NotNil(t, actualUpdated)
-
-				// The creation process must set the creation and last updated timestamps
-				// between when the test case was created and when it the result is checked.
-				now := currentTime()
-
-				compareTeamMembers(t, test.expectUpdated, actualUpdated, false, &timeBounds{
-					createLow:  test.expectUpdated.Metadata.CreationTimestamp,
-					createHigh: test.expectUpdated.Metadata.CreationTimestamp,
-					updateLow:  test.expectUpdated.Metadata.LastUpdatedTimestamp,
-					updateHigh: &now,
-				})
-			} else {
-				// the negative and defective cases
-				assert.Nil(t, actualUpdated)
-			}
-		})
-	}
-}
-
-func TestRemoveUserFromTeam(t *testing.T) {
-	ctx := context.Background()
-	testClient := newTestClient(ctx, t)
-	defer testClient.close(ctx)
-
-	createdWarmupOutput, err := createWarmupTeamMembers(ctx, testClient, teamMemberWarmupsInput{
-		teams:       standardWarmupTeamsForTeamMembers,
-		users:       standardWarmupUsersForTeamMembers,
-		teamMembers: standardWarmupTeamMembers,
 	})
-	require.Nil(t, err)
-
-	warmupNames := []string{}
-	for _, warmupTeamMember := range createdWarmupOutput.teamMembers {
-		warmupNames = append(warmupNames, buildTeamMemberName(createdWarmupOutput, warmupTeamMember))
-	}
-
-	type testCase struct {
-		name                  string
-		input                 *models.TeamMember
-		expectMsg             *string
-		expectTeamMemberNames []string // names of teams left after the delete operation
-	}
-
-	/*
-		template test case:
-
-		{
-		name                  string
-		input                 *models.TeamMember
-		expectMsg             *string
-		expectTeamMemberNames []string // names of teams left after the delete operation
-		}
-	*/
-
-	// Because delete is destructive, start with negative cases and end with one
-	// positive case per warmup group.  Alternatively, the warmup team members could be
-	// created fresh for each test case.
-	testCases := []testCase{
-		{
-			name: "negative: team member ID does not exist",
-			input: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					ID:      nonExistentID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg:             resourceVersionMismatch,
-			expectTeamMemberNames: warmupNames,
-		},
-
-		{
-			name: "negative: invalid team member ID",
-			input: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					ID:      invalidID,
-					Version: initialResourceVersion,
-				},
-			},
-			expectMsg:             invalidUUIDMsg,
-			expectTeamMemberNames: warmupNames,
-		},
-	}
-
-	// Positive case, one warmup team member relationship at a time.
-	for ix, toDelete := range createdWarmupOutput.teamMembers {
-		testCases = append(testCases, testCase{
-			name: "positive: " + buildTeamMemberName(createdWarmupOutput, toDelete),
-			input: &models.TeamMember{
-				Metadata: models.ResourceMetadata{
-					ID:      toDelete.Metadata.ID,
-					Version: toDelete.Metadata.Version,
-				},
-				IsMaintainer: false,
-			},
-			expectTeamMemberNames: copyStringSlice(warmupNames[ix+1:]), // sort-in-place was likely to corrupt later test cases
-		})
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			err := testClient.client.TeamMembers.RemoveUserFromTeam(ctx, test.input)
-
-			checkError(t, test.expectMsg, err)
-
-			// Get the names of the actual team members that remain.
-			gotResult, err := testClient.client.TeamMembers.GetTeamMembers(ctx, &GetTeamMembersInput{
-				Sort:              nil,
-				PaginationOptions: nil,
-				Filter:            nil,
-			})
-			require.Nil(t, err)
-
-			actualNames := []string{}
-			for _, gotTeam := range gotResult.TeamMembers {
-				actualNames = append(actualNames, buildTeamMemberName(createdWarmupOutput, gotTeam))
-			}
-
-			// The sorting in place here is what makes the copying of the string slice necessary.
-			sort.Strings(test.expectTeamMemberNames)
-			sort.Strings(actualNames)
-
-			// Make sure the expected names remain.
-			assert.Equal(t, test.expectTeamMemberNames, actualNames)
-		})
-	}
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// Common utility structures and functions:
-
-// Standard warmup users for tests in this module:
-// Please note: all users are _NON_-admin.
-var standardWarmupUsersForTeamMembers = []models.User{
-	{
-		Username: "user-0",
-		Email:    "user-0@example.com",
-	},
-	{
-		Username: "user-1",
-		Email:    "user-1@example.com",
-	},
-	{
-		Username: "user-2",
-		Email:    "user-2@example.com",
-	},
-	{
-		Username: "user-99",
-		Email:    "user-99@example.com",
-	},
-}
-
-// Standard warmup teams for tests in this module:
-var standardWarmupTeamsForTeamMembers = []models.Team{
-	{
-		Name:        "team-a",
-		Description: "team a for namespace membership tests",
-	},
-	{
-		Name:        "team-b",
-		Description: "team b for namespace membership tests",
-	},
-	{
-		Name:        "team-c",
-		Description: "team c for namespace membership tests",
-	},
-	{
-		Name:        "team-99",
-		Description: "team 99 for namespace membership tests",
-	},
-}
-
-// Standard warmup team member objects for tests in this module:
-// Please note that the ID fields contain names, not IDs.
-var standardWarmupTeamMembers = []models.TeamMember{
-	{
-		UserID:       "user-0",
-		TeamID:       "team-a",
-		IsMaintainer: true,
-	},
-	{
-		UserID:       "user-1",
-		TeamID:       "team-b",
-		IsMaintainer: true,
-	},
-	{
-		UserID:       "user-2",
-		TeamID:       "team-c",
-		IsMaintainer: true,
-	},
-}
-
-// createWarmupTeamMembers creates some objects for a test
-// The objects to create can be standard or otherwise.
-func createWarmupTeamMembers(ctx context.Context, testClient *testClient,
-	input teamMemberWarmupsInput,
-) (*teamMemberWarmupsOutput, error) {
-	resultTeams, teamName2ID, err := createInitialTeams(ctx, testClient, input.teams)
-	if err != nil {
-		return nil, err
-	}
-
-	resultUsers, username2ID, err := createInitialUsers(ctx, testClient, input.users)
-	if err != nil {
-		return nil, err
-	}
-
-	resultTeamMembers, err := createInitialTeamMembers(ctx, testClient, teamName2ID, username2ID, input.teamMembers)
-	if err != nil {
-		return nil, err
-	}
-
-	return &teamMemberWarmupsOutput{
-		teams:        resultTeams,
-		users:        resultUsers,
-		teamMembers:  resultTeamMembers,
-		userIDs2Name: reverseMap(username2ID),
-		teamIDs2Name: reverseMap(teamName2ID),
-	}, nil
-}
-
-func buildTeamMemberName(warmups *teamMemberWarmupsOutput, teamMember models.TeamMember) string {
-	return fmt.Sprintf("%s--%s", warmups.teamIDs2Name[teamMember.TeamID], warmups.userIDs2Name[teamMember.UserID])
-}
-
-func (tmns teamMemberNameSlice) Len() int {
-	return len(tmns.teamMembers)
-}
-
-func (tmns teamMemberNameSlice) Swap(i, j int) {
-	tmns.teamMembers[i], tmns.teamMembers[j] = tmns.teamMembers[j], tmns.teamMembers[i]
-}
-
-func (tmns teamMemberNameSlice) Less(i, j int) bool {
-	return buildTeamMemberName(tmns.warmupOutput, tmns.teamMembers[i]) <
-		buildTeamMemberName(tmns.warmupOutput, tmns.teamMembers[j])
-}
-
-// compareTeamMembers compares two team member objects, including bounds for creation and updated times.
-// If times is nil, it compares the exact metadata timestamps.
-func compareTeamMembers(t *testing.T, expected, actual *models.TeamMember,
-	checkID bool, times *timeBounds,
-) {
-	assert.Equal(t, expected.UserID, actual.UserID)
-	assert.Equal(t, expected.TeamID, actual.TeamID)
-	assert.Equal(t, expected.IsMaintainer, actual.IsMaintainer)
-
-	if checkID {
-		assert.Equal(t, expected.Metadata.ID, actual.Metadata.ID)
-	}
-	assert.Equal(t, expected.Metadata.Version, actual.Metadata.Version)
-	assert.NotEmpty(t, actual.Metadata.TRN)
-
-	// Compare timestamps.
-	if times != nil {
-		compareTime(t, times.createLow, times.createHigh, actual.Metadata.CreationTimestamp)
-		compareTime(t, times.updateLow, times.updateHigh, actual.Metadata.LastUpdatedTimestamp)
-	} else {
-		assert.Equal(t, expected.Metadata.CreationTimestamp, actual.Metadata.CreationTimestamp)
-		assert.Equal(t, expected.Metadata.LastUpdatedTimestamp, actual.Metadata.LastUpdatedTimestamp)
-	}
+	require.NoError(t, err)
+	assert.Len(t, result.TeamMembers, resourceCount)
 }
