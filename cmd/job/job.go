@@ -5,7 +5,9 @@ import (
 	"context"
 	"flag"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/jobexecutor"
@@ -57,6 +59,20 @@ func main() {
 		if err := client.Close(); err != nil {
 			logger.Errorf("Error closing client %v", err)
 		}
+	}()
+
+	go func() {
+		sigint := make(chan os.Signal, 1)
+
+		signal.Notify(sigint, syscall.SIGTERM)
+
+		// Wait for signal
+		<-sigint
+
+		logger.Info("Job received SIGTERM signal and is attempting to gracefully cancel")
+
+		// Cancel context to give job the ability to gracefully cancel
+		cancel()
 	}()
 
 	// Create job config
