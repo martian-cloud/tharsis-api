@@ -79,6 +79,7 @@ func BuildRouter(
 			AllowCredentials: true,
 		}),
 		middleware.NewRequestIDMiddleware(),
+		middleware.NewUserAgentMiddleware(),
 		middleware.PrometheusMiddleware,
 		middleware.NewAuthenticationMiddleware(authenticator, respWriter, userSessionManager),
 		middleware.NewSubjectMiddleware(logger, respWriter),
