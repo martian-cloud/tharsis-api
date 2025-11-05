@@ -46,6 +46,7 @@ type contextKey string
 var (
 	contextKeySubject   = contextKey("subject")
 	contextKeyRequestID = contextKey("request id")
+	contextKeyUserAgent = contextKey("user agent")
 )
 
 func (c contextKey) String() string {
@@ -97,6 +98,10 @@ func (l *logger) WithContextFields(ctx context.Context) Logger {
 		fields = append(fields, "subject", subject)
 	}
 
+	userAgent, ok := ctx.Value(contextKeyUserAgent).(string)
+	if ok {
+		fields = append(fields, "userAgent", userAgent)
+	}
 	if len(fields) > 0 {
 		return l.With(fields...)
 	}
@@ -112,4 +117,9 @@ func WithSubject(ctx context.Context, subject string) context.Context {
 // WithRequestID adds the request ID to the context
 func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, contextKeyRequestID, id)
+}
+
+// WithUserAgent adds the user agent to the context
+func WithUserAgent(ctx context.Context, userAgent string) context.Context {
+	return context.WithValue(ctx, contextKeyUserAgent, userAgent)
 }
