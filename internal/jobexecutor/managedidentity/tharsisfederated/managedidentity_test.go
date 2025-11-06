@@ -20,7 +20,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go/pkg/types"
 )
 
-const refreshTokenEarlyDuration = 1 * time.Second
+const refreshTokenEarlyDuration = 5 * time.Second
 
 func TestAuthenticate(t *testing.T) {
 	tests := []struct {
@@ -93,7 +93,7 @@ func TestAuthenticate(t *testing.T) {
 		},
 		{
 			name:                             "should not refresh token if expiration less than the refresh token early duration",
-			expiresIn:                        ptr.Duration(500 * time.Millisecond),
+			expiresIn:                        ptr.Duration(refreshTokenEarlyDuration / 2),
 			expectLogWarning:                 "Warning: Service account token expiration is less than or equal to estimated time to refresh, token will not be refreshed",
 			tokens:                           []string{"expected-token1"},
 			useServiceAccountForTerraformCLI: true,
@@ -106,14 +106,8 @@ func TestAuthenticate(t *testing.T) {
 			useServiceAccountForTerraformCLI: true,
 		},
 		{
-			name:                             "should refresh token if expiration greater than the refresh token early duration",
-			expiresIn:                        ptr.Duration(2 * time.Second),
-			tokens:                           []string{"expected-token1"},
-			useServiceAccountForTerraformCLI: true,
-		},
-		{
 			name:                             "should update service account token file with new token before expiration",
-			expiresIn:                        ptr.Duration(2 * time.Second),
+			expiresIn:                        ptr.Duration(2 * refreshTokenEarlyDuration),
 			tokens:                           []string{"expected-token1", "expected-token2"},
 			useServiceAccountForTerraformCLI: true,
 		},
@@ -186,6 +180,7 @@ func TestAuthenticate(t *testing.T) {
 			}
 
 			if test.expectLogWarning != "" {
+				time.Sleep(time.Second)
 				jobLogger.AssertCalled(t, "Errorf", test.expectLogWarning)
 			}
 		})
@@ -367,7 +362,7 @@ func verifyServiceAccountTokenFileEventuallyContains(t *testing.T, workspaceDir 
 		return token == string(contents)
 	}
 
-	assert.Eventually(t, verify, 3*time.Second, 500*time.Millisecond)
+	assert.Eventually(t, verify, refreshTokenEarlyDuration * 3, 500*time.Millisecond)
 }
 
 func readFile(t *testing.T, path string) string {

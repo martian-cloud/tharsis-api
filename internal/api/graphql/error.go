@@ -60,6 +60,7 @@ func expandResolverErrors(errs []*graphqlgo.QueryError) []*graphqlgo.QueryError 
 					Message:   err.Message,
 					Locations: err.Locations,
 					Path:      err.Path,
+					Err:       err.Err,
 				}
 
 				if ic, ok := e.(indexedCauser); ok {
@@ -67,12 +68,24 @@ func expandResolverErrors(errs []*graphqlgo.QueryError) []*graphqlgo.QueryError 
 					qe.Message = ic.Cause().Error()
 				}
 
-				expanded = append(expanded, qe)
+				expanded = append(expanded, addErrorCode(qe))
 			}
 		default:
-			expanded = append(expanded, err)
+			expanded = append(expanded, addErrorCode(err))
 		}
 	}
 
 	return expanded
+}
+
+func addErrorCode(qe *graphqlgo.QueryError) *graphqlgo.QueryError {
+	if qe.Rule != "" {
+		// If the rule is set, we assume this is a bad request
+		if qe.Err == nil {
+			qe.Err = errors.New(qe.Message, errors.WithErrorCode(errors.EInvalid))
+		} else {
+			qe.Err = errors.Wrap(qe.Err, "invalid query", errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+	return qe
 }

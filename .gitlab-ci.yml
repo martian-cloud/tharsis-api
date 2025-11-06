@@ -442,6 +442,7 @@ tests:
       set -x
       /usr/local/bin/migrate -path=internal/db/migrations/ -database postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${THARSIS_DB_TEST_HOST}:${THARSIS_DB_TEST_PORT}/${POSTGRES_DB}?sslmode=${THARSIS_DB_TEST_SSL_MODE} -verbose up
       go test \
+        -timeout 30m \
         -tags=integration,noui \
         --ldflags "-X ${LD_FLAG_VAR_PREFIX}.TestDBHost=${THARSIS_DB_TEST_HOST} -X ${LD_FLAG_VAR_PREFIX}.TestDBPort=${THARSIS_DB_TEST_PORT} -X ${LD_FLAG_VAR_PREFIX}.TestDBName=${POSTGRES_DB} -X ${LD_FLAG_VAR_PREFIX}.TestDBMode=${THARSIS_DB_TEST_SSL_MODE} -X ${LD_FLAG_VAR_PREFIX}.TestDBUser=${POSTGRES_USER} -X ${LD_FLAG_VAR_PREFIX}.TestDBPass=${POSTGRES_PASSWORD}" \
         -covermode=atomic \

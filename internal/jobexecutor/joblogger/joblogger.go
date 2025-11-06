@@ -114,7 +114,8 @@ func (j *jobLogger) Flush() {
 	for j.anyLogsToSend() {
 		if err := j.sendPatch(); err != nil {
 			j.logger.Errorf("Failed to send logs %v", err)
-			time.Sleep(10 * time.Second)
+			// Return here if an error occurs to avoid potential infinite loop 
+			return
 		}
 	}
 }
