@@ -213,7 +213,6 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Rate limit query
 			queryComplexity, qcErr := h.calculateQueryComplexity(ctx, q, *subject)
 			if qcErr != nil {
-				h.logger.WithContextFields(ctx).Errorf("An error occurred while checking graphql query complexity; %v", qcErr)
 				err := errors.New(
 					"invalid graphql query: "+strings.TrimPrefix(qcErr.Error(), "graphql: syntax error: "),
 					errors.WithErrorCode(errors.EInvalid),

@@ -236,7 +236,7 @@ func (j *JWSProvider) Sign(ctx context.Context, payload []byte, keyID string, _ 
 
 	_, signedToken, err := sig.Sign(payload, &signer{kmsClient: j.kmsClient, keyID: j.buildAlias(keyID), ctx: ctx}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign token using AWS KMS JWS provider %v", err)
+		return nil, fmt.Errorf("failed to sign token using AWS KMS JWS provider %w", err)
 	}
 
 	return signedToken, nil

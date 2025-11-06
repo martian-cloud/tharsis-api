@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v4"
 )
@@ -64,12 +65,13 @@ func (t *transactions) RollbackTx(ctx context.Context) error {
 		return fmt.Errorf("transaction missing from context")
 	}
 
-	err := tx.Rollback(ctx)
-
-	// Avoid throwing unnecessary errors in caller.
-	if err == pgx.ErrTxClosed {
-		return nil
+	if err := tx.Rollback(ctx); err != nil {
+		// Avoid throwing unnecessary errors in caller.
+		if err == pgx.ErrTxClosed || strings.Contains(err.Error(), "conn closed") {
+			return nil
+		}
+		return err
 	}
 
-	return err
+	return nil
 }
