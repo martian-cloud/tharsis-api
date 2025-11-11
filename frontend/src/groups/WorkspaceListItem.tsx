@@ -7,6 +7,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import { Link as LinkRouter } from 'react-router-dom';
 import Timestamp from '../common/Timestamp';
+import LabelList from '../workspace/labels/LabelList';
 import { WorkspaceListItemFragment_workspace$key } from './__generated__/WorkspaceListItemFragment_workspace.graphql';
 
 interface Props {
@@ -27,6 +28,10 @@ function WorkspaceListItem(props: Props) {
             name
             description
             fullPath
+            labels {
+                key
+                value
+            }
         }
     `, props.workspaceKey)
 
@@ -49,7 +54,7 @@ function WorkspaceListItem(props: Props) {
                         justifyContent: 'space-between'
                     }
                 }}>
-                    <Box>
+                    <Box sx={{ flex: 1 }}>
                         <Link
                             component="div"
                             underline="hover"
@@ -60,8 +65,17 @@ function WorkspaceListItem(props: Props) {
                             {data.name}
                         </Link>
                         <Typography variant="body2" color="textSecondary">{data.description}</Typography>
+                        {data.labels.length > 0 && (
+                            <Box sx={{ mt: 0.5 }}>
+                                <LabelList
+                                    labels={data.labels as any}
+                                    size="xs"
+                                    maxVisible={3}
+                                />
+                            </Box>
+                        )}
                     </Box>
-                    <Stack direction="row" spacing={1}>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                         <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt} />
                     </Stack>
                 </Box>

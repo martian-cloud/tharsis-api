@@ -162,6 +162,99 @@ func TestWorkspaces_UpdateWorkspace(t *testing.T) {
 	}
 }
 
+func TestWorkspaces_UpdateWorkspaceWithLabels(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-workspace-update-labels",
+		Description: "test group for workspace update with labels",
+		FullPath:    "test-group-workspace-update-labels",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	// Create a workspace with initial labels for testing
+	createdWorkspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "test-workspace-update-labels",
+		GroupID:        group.Metadata.ID,
+		Description:    "workspace for label update testing",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+		Labels: map[string]string{
+			"environment": "development",
+			"team":        "backend",
+		},
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name           string
+		labels         map[string]string
+		expectedLabels map[string]string
+	}
+
+	testCases := []testCase{
+		{
+			name: "update workspace with new labels",
+			labels: map[string]string{
+				"environment": "production",
+				"team":        "platform",
+				"project":     "infrastructure",
+			},
+			expectedLabels: map[string]string{
+				"environment": "production",
+				"team":        "platform",
+				"project":     "infrastructure",
+			},
+		},
+		{
+			name:           "update workspace with empty labels",
+			labels:         map[string]string{},
+			expectedLabels: map[string]string{},
+		},
+		{
+			name:           "update workspace with nil labels",
+			labels:         nil,
+			expectedLabels: map[string]string{},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			workspaceToUpdate := *createdWorkspace
+			workspaceToUpdate.Labels = test.labels
+
+			updatedWorkspace, err := testClient.client.Workspaces.UpdateWorkspace(ctx, &workspaceToUpdate)
+
+			require.Nil(t, err)
+			require.NotNil(t, updatedWorkspace)
+
+			if len(test.expectedLabels) == 0 {
+				assert.Empty(t, updatedWorkspace.Labels)
+			} else {
+				assert.Equal(t, test.expectedLabels, updatedWorkspace.Labels)
+			}
+
+			// Verify labels persist when retrieving workspace
+			retrievedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, updatedWorkspace.Metadata.ID)
+			require.Nil(t, err)
+			require.NotNil(t, retrievedWorkspace)
+
+			if len(test.expectedLabels) == 0 {
+				assert.Empty(t, retrievedWorkspace.Labels)
+			} else {
+				assert.Equal(t, test.expectedLabels, retrievedWorkspace.Labels)
+			}
+
+			// Update createdWorkspace for next iteration
+			createdWorkspace = updatedWorkspace
+		})
+	}
+}
+
 func TestWorkspaces_DeleteWorkspace(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
@@ -547,6 +640,215 @@ func TestWorkspaces_GetWorkspaceByTRN(t *testing.T) {
 				assert.Equal(t, test.trn, workspace.Metadata.TRN)
 			} else {
 				assert.Nil(t, workspace)
+			}
+		})
+	}
+}
+
+func TestWorkspaces_GetWorkspacesWithLabelFiltering(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-label-filtering",
+		Description: "test group for label filtering",
+		FullPath:    "test-group-label-filtering",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	// Create workspaces with different labels
+	workspace1, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "workspace-prod",
+		GroupID:        group.Metadata.ID,
+		Description:    "production workspace",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+		Labels: map[string]string{
+			"environment": "production",
+			"team":        "platform",
+		},
+	})
+	require.Nil(t, err)
+
+	workspace2, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "workspace-dev",
+		GroupID:        group.Metadata.ID,
+		Description:    "development workspace",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+		Labels: map[string]string{
+			"environment": "development",
+			"team":        "platform",
+		},
+	})
+	require.Nil(t, err)
+
+	workspace3, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+		Name:           "workspace-no-labels",
+		GroupID:        group.Metadata.ID,
+		Description:    "workspace without labels",
+		CreatedBy:      "db-integration-tests",
+		MaxJobDuration: ptr.Int32(1),
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name          string
+		labelFilters  []WorkspaceLabelFilter
+		expectedCount int
+		expectedIDs   []string
+	}
+
+	testCases := []testCase{
+		{
+			name: "filter by environment=production",
+			labelFilters: []WorkspaceLabelFilter{
+				{Key: "environment", Value: "production"},
+			},
+			expectedCount: 1,
+			expectedIDs:   []string{workspace1.Metadata.ID},
+		},
+		{
+			name: "filter by team=platform",
+			labelFilters: []WorkspaceLabelFilter{
+				{Key: "team", Value: "platform"},
+			},
+			expectedCount: 2,
+			expectedIDs:   []string{workspace1.Metadata.ID, workspace2.Metadata.ID},
+		},
+		{
+			name: "filter by multiple labels (AND logic)",
+			labelFilters: []WorkspaceLabelFilter{
+				{Key: "environment", Value: "development"},
+				{Key: "team", Value: "platform"},
+			},
+			expectedCount: 1,
+			expectedIDs:   []string{workspace2.Metadata.ID},
+		},
+		{
+			name: "filter by non-existent label",
+			labelFilters: []WorkspaceLabelFilter{
+				{Key: "nonexistent", Value: "value"},
+			},
+			expectedCount: 0,
+			expectedIDs:   []string{},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := testClient.client.Workspaces.GetWorkspaces(ctx, &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					GroupID:      &group.Metadata.ID,
+					LabelFilters: test.labelFilters,
+				},
+			})
+
+			require.Nil(t, err)
+			require.NotNil(t, result)
+
+			assert.Equal(t, test.expectedCount, len(result.Workspaces))
+
+			if test.expectedCount > 0 {
+				actualIDs := make([]string, len(result.Workspaces))
+				for i, ws := range result.Workspaces {
+					actualIDs[i] = ws.Metadata.ID
+				}
+				assert.ElementsMatch(t, test.expectedIDs, actualIDs)
+			}
+		})
+	}
+
+	// Clean up test workspaces
+	_ = testClient.client.Workspaces.DeleteWorkspace(ctx, workspace1)
+	_ = testClient.client.Workspaces.DeleteWorkspace(ctx, workspace2)
+	_ = testClient.client.Workspaces.DeleteWorkspace(ctx, workspace3)
+}
+
+func TestWorkspaces_CreateWorkspaceWithLabels(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a group for testing
+	group, err := testClient.client.Groups.CreateGroup(ctx, &models.Group{
+		Name:        "test-group-create-labels",
+		Description: "test group for creating workspace with labels",
+		FullPath:    "test-group-create-labels",
+		CreatedBy:   "db-integration-tests",
+	})
+	require.Nil(t, err)
+
+	type testCase struct {
+		name           string
+		workspaceName  string
+		labels         map[string]string
+		expectedLabels map[string]string
+	}
+
+	testCases := []testCase{
+		{
+			name:          "create workspace with labels",
+			workspaceName: "workspace-with-labels",
+			labels: map[string]string{
+				"environment": "production",
+				"team":        "platform",
+				"project":     "infrastructure",
+			},
+			expectedLabels: map[string]string{
+				"environment": "production",
+				"team":        "platform",
+				"project":     "infrastructure",
+			},
+		},
+		{
+			name:           "create workspace with empty labels",
+			workspaceName:  "workspace-empty-labels",
+			labels:         map[string]string{},
+			expectedLabels: map[string]string{},
+		},
+		{
+			name:           "create workspace with nil labels",
+			workspaceName:  "workspace-nil-labels",
+			labels:         nil,
+			expectedLabels: map[string]string{},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			workspace, err := testClient.client.Workspaces.CreateWorkspace(ctx, &models.Workspace{
+				Name:           test.workspaceName,
+				GroupID:        group.Metadata.ID,
+				Description:    "test workspace with labels",
+				CreatedBy:      "db-integration-tests",
+				MaxJobDuration: ptr.Int32(1),
+				Labels:         test.labels,
+			})
+
+			require.Nil(t, err)
+			require.NotNil(t, workspace)
+
+			assert.Equal(t, test.workspaceName, workspace.Name)
+
+			if len(test.expectedLabels) == 0 {
+				assert.Empty(t, workspace.Labels)
+			} else {
+				assert.Equal(t, test.expectedLabels, workspace.Labels)
+			}
+
+			// Verify labels persist when retrieving workspace
+			retrievedWorkspace, err := testClient.client.Workspaces.GetWorkspaceByID(ctx, workspace.Metadata.ID)
+			require.Nil(t, err)
+			require.NotNil(t, retrievedWorkspace)
+
+			if len(test.expectedLabels) == 0 {
+				assert.Empty(t, retrievedWorkspace.Labels)
+			} else {
+				assert.Equal(t, test.expectedLabels, retrievedWorkspace.Labels)
 			}
 		})
 	}

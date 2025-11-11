@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e375a73e8a61a50b55f65ff5aaf085a4>>
+ * @generated SignedSource<<7780c427e1349421d94d8d9d8996a7d1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -198,6 +198,31 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "concreteType": "WorkspaceLabel",
+                    "kind": "LinkedField",
+                    "name": "labels",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "key",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "value",
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "kind": "ScalarField",
                     "name": "__typename",
                     "storageKey": null
@@ -273,12 +298,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2ccefa04ce1aab1f8c478d029c49b806",
+    "cacheID": "643c42c0e27b63d0f3e8879d8ba9b52a",
     "id": null,
     "metadata": {},
     "name": "WorkspaceListPaginationQuery",
     "operationKind": "query",
-    "text": "query WorkspaceListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $groupId: String\n  $last: Int\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n}\n"
+    "text": "query WorkspaceListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $groupId: String\n  $last: Int\n  $search: String\n) {\n  ...WorkspaceListFragment_workspaces\n}\n\nfragment WorkspaceListFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, groupId: $groupId, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
   }
 };
 })();

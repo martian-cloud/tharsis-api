@@ -9,6 +9,7 @@ import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import WorkspaceForm, { FormData } from './WorkspaceForm';
 import { NewWorkspaceMutation } from './__generated__/NewWorkspaceMutation.graphql';
 import { GetConnections } from '../groups/WorkspaceList';
+import { sanitizeLabels } from './labels/labelErrorHandling';
 
 function NewWorkspace(){
     const navigate = useNavigate();
@@ -17,7 +18,8 @@ function NewWorkspace(){
     const [error, setError] = React.useState<MutationError>()
     const [formData, setFormData] = useState<FormData>({
         name: '',
-        description: ''
+        description: '',
+        labels: []
     });
 
     const [commit, isInFlight] = useMutation<NewWorkspaceMutation>(graphql`
@@ -27,6 +29,10 @@ function NewWorkspace(){
                     id
                     name
                     fullPath
+                    labels {
+                        key
+                        value
+                    }
                 }
                 problems {
                     message
@@ -38,12 +44,18 @@ function NewWorkspace(){
     );
 
     const onCreate = () => {
+        const validLabels = sanitizeLabels(formData.labels || []);
+
         commit({
             variables: {
                 input: {
                     name: formData.name,
                     description: formData.description,
-                    groupPath: parentGroupPath
+                    groupPath: parentGroupPath,
+                    labels: validLabels.map((label: { key: string; value: string }) => ({
+                        key: label.key,
+                        value: label.value
+                    }))
                 },
                 connections: GetConnections(parentGroupPath)
             },
@@ -84,7 +96,7 @@ function NewWorkspace(){
                 onChange={(data: FormData) => setFormData(data)}
                 error={error}
             />
-            <Divider light />
+            <Divider />
             <Box marginTop={2}>
                 <LoadingButton
                     loading={isInFlight}

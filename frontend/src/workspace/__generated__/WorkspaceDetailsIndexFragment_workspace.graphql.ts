@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ed6d3bfa7ee95044cba534ba8183ce5c>>
+ * @generated SignedSource<<8e7ab016d29da6a0b730ce16df3c34e1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -62,6 +62,10 @@ export type WorkspaceDetailsIndexFragment_workspace$data = {
   readonly description: string;
   readonly fullPath: string;
   readonly id: string;
+  readonly labels: ReadonlyArray<{
+    readonly key: string;
+    readonly value: string;
+  }>;
   readonly metadata: {
     readonly trn: string;
   };
@@ -142,6 +146,31 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "preventDestroyPlan",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "WorkspaceLabel",
+      "kind": "LinkedField",
+      "name": "labels",
+      "plural": true,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "key",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "value",
+          "storageKey": null
+        }
+      ],
       "storageKey": null
     },
     {
@@ -373,6 +402,6 @@ return {
 };
 })();
 
-(node as any).hash = "5d246777a06694813b1238c8eebda652";
+(node as any).hash = "64ce27c0258c0d1e2cacd4617c8936c1";
 
 export default node;

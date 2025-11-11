@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1a758fc7b6d068ab843d03657a197593>>
+ * @generated SignedSource<<b4c1444593dab21c965231e26be88779>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -31,6 +31,12 @@ export type ActivityEventWorkspaceTargetFragment_event$data = {
     } | null | undefined;
     readonly role: string;
   } | {
+    readonly __typename: "ActivityEventCreateWorkspacePayload";
+    readonly labels: ReadonlyArray<{
+      readonly key: string;
+      readonly value: string;
+    }> | null | undefined;
+  } | {
     readonly __typename: "ActivityEventDeleteChildResourcePayload";
     readonly name: string;
     readonly type: string;
@@ -52,6 +58,19 @@ export type ActivityEventWorkspaceTargetFragment_event$data = {
       // This will never be '%other', but we need some
       // value in case none of the concrete values match.
       readonly __typename: "%other";
+    } | null | undefined;
+  } | {
+    readonly __typename: "ActivityEventUpdateWorkspacePayload";
+    readonly labelChanges: {
+      readonly added: ReadonlyArray<{
+        readonly key: string;
+        readonly value: string;
+      }> | null | undefined;
+      readonly removed: ReadonlyArray<string> | null | undefined;
+      readonly updated: ReadonlyArray<{
+        readonly key: string;
+        readonly value: string;
+      }> | null | undefined;
     } | null | undefined;
   } | {
     // This will never be '%other', but we need some
@@ -133,7 +152,23 @@ v2 = {
     }
   ],
   "storageKey": null
-};
+},
+v3 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "key",
+    "storageKey": null
+  },
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "value",
+    "storageKey": null
+  }
+];
 return {
   "argumentDefinitions": [],
   "kind": "Fragment",
@@ -240,6 +275,68 @@ return {
           ],
           "type": "ActivityEventMigrateWorkspacePayload",
           "abstractKey": null
+        },
+        {
+          "kind": "InlineFragment",
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "concreteType": "WorkspaceLabel",
+              "kind": "LinkedField",
+              "name": "labels",
+              "plural": true,
+              "selections": (v3/*: any*/),
+              "storageKey": null
+            }
+          ],
+          "type": "ActivityEventCreateWorkspacePayload",
+          "abstractKey": null
+        },
+        {
+          "kind": "InlineFragment",
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "concreteType": "LabelChangePayload",
+              "kind": "LinkedField",
+              "name": "labelChanges",
+              "plural": false,
+              "selections": [
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "WorkspaceLabel",
+                  "kind": "LinkedField",
+                  "name": "added",
+                  "plural": true,
+                  "selections": (v3/*: any*/),
+                  "storageKey": null
+                },
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "WorkspaceLabel",
+                  "kind": "LinkedField",
+                  "name": "updated",
+                  "plural": true,
+                  "selections": (v3/*: any*/),
+                  "storageKey": null
+                },
+                {
+                  "alias": null,
+                  "args": null,
+                  "kind": "ScalarField",
+                  "name": "removed",
+                  "storageKey": null
+                }
+              ],
+              "storageKey": null
+            }
+          ],
+          "type": "ActivityEventUpdateWorkspacePayload",
+          "abstractKey": null
         }
       ],
       "storageKey": null
@@ -255,6 +352,6 @@ return {
 };
 })();
 
-(node as any).hash = "715b2068ae689174e3ef120e679f5e02";
+(node as any).hash = "b2959287fd150a10316600ae72b78101";
 
 export default node;

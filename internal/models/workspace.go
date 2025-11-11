@@ -6,6 +6,14 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+)
+
+const (
+	// maxLabelsPerWorkspace is the maximum number of labels per workspace
+	maxLabelsPerWorkspace = 10
+	// maxLabelValueLength is the maximum length for a label value
+	maxLabelValueLength = 255
 )
 
 var _ Model = (*Workspace)(nil)
@@ -27,6 +35,7 @@ type Workspace struct {
 	PreventDestroyPlan    bool
 	RunnerTags            []string
 	EnableDriftDetection  *bool
+	Labels                map[string]string
 }
 
 // GetID returns the Metadata ID.
@@ -72,7 +81,12 @@ func (w *Workspace) Validate() error {
 	}
 
 	// Check for duplicate tags, too-long tags, and too many tags.
-	return verifyValidRunnerTags(w.RunnerTags)
+	if err := verifyValidRunnerTags(w.RunnerTags); err != nil {
+		return err
+	}
+
+	// Validate labels
+	return validateLabels(w.Labels)
 }
 
 // GetPath returns the full path for this workspace
@@ -118,4 +132,66 @@ func (w *Workspace) ExpandPath() []string {
 // IsDescendantOfGroup returns true if the workspace is a descendant of the specified ancestor group path.
 func (w *Workspace) IsDescendantOfGroup(groupPath string) bool {
 	return utils.IsDescendantOfPath(w.FullPath, groupPath)
+}
+
+// HasLabels returns true if the workspace has any labels
+func (w *Workspace) HasLabels() bool {
+	return len(w.Labels) > 0
+}
+
+// validateLabelKey validates a label key according to format and constraint rules
+func validateLabelKey(key string) error {
+	if key == "" {
+		return errors.New("Label key cannot be empty", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// Use the same validation as workspace names for consistency
+	if !nameRegex.MatchString(key) {
+		return errors.New("Invalid label key, key can only include lowercase letters and numbers with - and _ supported "+
+			"in non leading or trailing positions. Max length is 64 characters.", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	return nil
+}
+
+// validateLabelValue validates a label value according to format and constraint rules
+func validateLabelValue(value string) error {
+	if value == "" {
+		return errors.New("Label value cannot be empty", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	if len(value) > maxLabelValueLength {
+		return errors.New("Label value exceeds maximum length of %d characters", maxLabelValueLength, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// Label values must contain only alphanumeric characters, hyphens, underscores, and spaces
+	for _, char := range value {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_' || char == ' ') {
+			return errors.New("Label value contains invalid characters. Only alphanumeric characters, hyphens, underscores, and spaces are allowed", errors.WithErrorCode(errors.EInvalid))
+		}
+	}
+
+	return nil
+}
+
+// validateLabels validates all labels in a map according to format and constraint rules
+func validateLabels(labels map[string]string) error {
+	if labels == nil {
+		return nil
+	}
+
+	if len(labels) > maxLabelsPerWorkspace {
+		return errors.New("Maximum number of labels (%d) exceeded", maxLabelsPerWorkspace, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	for key, value := range labels {
+		if err := validateLabelKey(key); err != nil {
+			return err
+		}
+		if err := validateLabelValue(value); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

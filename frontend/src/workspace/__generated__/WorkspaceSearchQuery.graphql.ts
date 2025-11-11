@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<46fe8b7b13622d97347cbba199006080>>
+ * @generated SignedSource<<7d0c8bad7fa8ace008d0ec970eac5cc1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,10 +10,18 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type WorkspaceLabelsFilter = {
+  labels: ReadonlyArray<WorkspaceLabelInput>;
+};
+export type WorkspaceLabelInput = {
+  key: string;
+  value: string;
+};
 export type WorkspaceSearchQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
+  labelFilter?: WorkspaceLabelsFilter | null | undefined;
   last?: number | null | undefined;
   search?: string | null | undefined;
 };
@@ -44,14 +52,19 @@ v2 = {
 v3 = {
   "defaultValue": null,
   "kind": "LocalArgument",
-  "name": "last"
+  "name": "labelFilter"
 },
 v4 = {
   "defaultValue": null,
   "kind": "LocalArgument",
+  "name": "last"
+},
+v5 = {
+  "defaultValue": null,
+  "kind": "LocalArgument",
   "name": "search"
 },
-v5 = [
+v6 = [
   {
     "kind": "Variable",
     "name": "after",
@@ -66,6 +79,11 @@ v5 = [
     "kind": "Variable",
     "name": "first",
     "variableName": "first"
+  },
+  {
+    "kind": "Variable",
+    "name": "labelFilter",
+    "variableName": "labelFilter"
   },
   {
     "kind": "Variable",
@@ -90,7 +108,8 @@ return {
       (v1/*: any*/),
       (v2/*: any*/),
       (v3/*: any*/),
-      (v4/*: any*/)
+      (v4/*: any*/),
+      (v5/*: any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -109,17 +128,18 @@ return {
   "operation": {
     "argumentDefinitions": [
       (v2/*: any*/),
-      (v3/*: any*/),
+      (v4/*: any*/),
       (v0/*: any*/),
       (v1/*: any*/),
-      (v4/*: any*/)
+      (v5/*: any*/),
+      (v3/*: any*/)
     ],
     "kind": "Operation",
     "name": "WorkspaceSearchQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v6/*: any*/),
         "concreteType": "WorkspaceConnection",
         "kind": "LinkedField",
         "name": "workspaces",
@@ -197,6 +217,31 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "concreteType": "WorkspaceLabel",
+                    "kind": "LinkedField",
+                    "name": "labels",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "key",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "value",
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "kind": "ScalarField",
                     "name": "__typename",
                     "storageKey": null
@@ -258,9 +303,10 @@ return {
       },
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v6/*: any*/),
         "filters": [
           "search",
+          "labelFilter",
           "sort"
         ],
         "handle": "connection",
@@ -271,16 +317,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "69e123f5cb5d30451332bea70a46866d",
+    "cacheID": "ebdf137772dcc74487b684f2daab3612",
     "id": null,
     "metadata": {},
     "name": "WorkspaceSearchQuery",
     "operationKind": "query",
-    "text": "query WorkspaceSearchQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n) {\n  ...WorkspaceSearchFragment_workspaces\n}\n\nfragment WorkspaceSearchFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceSearchListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceSearchListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n}\n"
+    "text": "query WorkspaceSearchQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n  $labelFilter: WorkspaceLabelsFilter\n) {\n  ...WorkspaceSearchFragment_workspaces\n}\n\nfragment WorkspaceSearchFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, search: $search, labelFilter: $labelFilter, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceSearchListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceSearchListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "9c60184daed4fd738db3802242ed4c2d";
+(node as any).hash = "e27239c396810454777b2acc96fc7d58";
 
 export default node;

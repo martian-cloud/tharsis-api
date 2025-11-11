@@ -45,6 +45,10 @@ type ActivityEventCreateNamespaceMembershipPayload {
   role: String!
 }
 
+type ActivityEventCreateWorkspacePayload {
+  labels: [WorkspaceLabel!]
+}
+
 type ActivityEventDeleteChildResourcePayload {
   id: String!
   name: String!
@@ -68,7 +72,7 @@ type ActivityEventMoveManagedIdentityPayload {
   previousGroupPath: String!
 }
 
-union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateTeamMemberPayload
+union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateWorkspacePayload
 
 type ActivityEventRemoveNamespaceMembershipPayload {
   member: Member
@@ -119,6 +123,10 @@ type ActivityEventUpdateNamespaceMembershipPayload {
 type ActivityEventUpdateTeamMemberPayload {
   maintainer: Boolean!
   user: User
+}
+
+type ActivityEventUpdateWorkspacePayload {
+  labelChanges: LabelChangePayload
 }
 
 input AddUserToTeamInput {
@@ -760,6 +768,7 @@ input CreateWorkspaceInput {
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
   groupId: String
   groupPath: String
+  labels: [WorkspaceLabelInput!]
   maxJobDuration: Int
   name: String!
   preventDestroyPlan: Boolean
@@ -1331,6 +1340,12 @@ enum JobType {
   plan
 }
 
+type LabelChangePayload {
+  added: [WorkspaceLabel!]
+  removed: [String!]
+  updated: [WorkspaceLabel!]
+}
+
 input LockWorkspaceInput {
   clientMutationId: String
   workspaceId: String
@@ -1885,7 +1900,7 @@ type Query {
   users(after: String, before: String, first: Int, last: Int, search: String, sort: UserSort): UserConnection!
   version: Version!
   workspace(fullPath: String!): Workspace @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
-  workspaces(after: String, before: String, first: Int, groupId: String, groupPath: String, last: Int, search: String, sort: WorkspaceSort): WorkspaceConnection!
+  workspaces(after: String, before: String, first: Int, groupId: String, groupPath: String, labelFilter: WorkspaceLabelsFilter, last: Int, search: String, sort: WorkspaceSort): WorkspaceConnection!
 }
 
 input RemoveUserFromTeamInput {
@@ -2980,6 +2995,7 @@ input UpdateWorkspaceInput {
   description: String
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
   id: String
+  labels: [WorkspaceLabelInput!]
   maxJobDuration: Int
   metadata: ResourceMetadataInput
   preventDestroyPlan: Boolean
@@ -3215,6 +3231,7 @@ type Workspace implements Namespace & Node {
   group: Group!
   groupPath: String!
   id: ID!
+  labels: [WorkspaceLabel!]!
   locked: Boolean!
   managedIdentities(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ManagedIdentitySort): ManagedIdentityConnection!
   maxJobDuration: Int!
@@ -3255,6 +3272,21 @@ type WorkspaceEdge {
 type WorkspaceEvent {
   action: String!
   workspace: Workspace!
+}
+
+"""Workspace label types"""
+type WorkspaceLabel {
+  key: String!
+  value: String!
+}
+
+input WorkspaceLabelInput {
+  key: String!
+  value: String!
+}
+
+input WorkspaceLabelsFilter {
+  labels: [WorkspaceLabelInput!]!
 }
 
 enum WorkspaceSort {

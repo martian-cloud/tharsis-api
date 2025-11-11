@@ -46,6 +46,7 @@ type Query {
       )
     search: String
     sort: WorkspaceSort
+    labelFilter: WorkspaceLabelsFilter
   ): WorkspaceConnection!
   terraformProviders(
     after: String

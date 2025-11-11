@@ -123,6 +123,23 @@ type ActivityEventMoveManagedIdentityPayload struct {
 	PreviousGroupPath string `json:"previousGroupPath"`
 }
 
+// ActivityEventCreateWorkspacePayload is the custom payload for creating a workspace with labels.
+type ActivityEventCreateWorkspacePayload struct {
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// ActivityEventUpdateWorkspacePayload is the custom payload for updating workspace with label changes.
+type ActivityEventUpdateWorkspacePayload struct {
+	LabelChanges *LabelChangePayload `json:"labelChanges,omitempty"`
+}
+
+// LabelChangePayload represents changes made to workspace labels
+type LabelChangePayload struct {
+	Added   map[string]string `json:"added,omitempty"`
+	Updated map[string]string `json:"updated,omitempty"`
+	Removed []string          `json:"removed,omitempty"`
+}
+
 // ActivityEvent resource
 type ActivityEvent struct {
 	UserID           *string

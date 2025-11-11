@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b221ec7318d3229b03e490c502117211>>
+ * @generated SignedSource<<260468bf3529c463c4c1837852dd563b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type WorkspaceListItemFragment_workspace$data = {
+export type WorkspaceLabelSettingsFragment_workspace$data = {
   readonly description: string;
   readonly fullPath: string;
   readonly id: string;
@@ -18,41 +18,19 @@ export type WorkspaceListItemFragment_workspace$data = {
     readonly key: string;
     readonly value: string;
   }>;
-  readonly metadata: {
-    readonly updatedAt: any;
-  };
-  readonly name: string;
-  readonly " $fragmentType": "WorkspaceListItemFragment_workspace";
+  readonly " $fragmentType": "WorkspaceLabelSettingsFragment_workspace";
 };
-export type WorkspaceListItemFragment_workspace$key = {
-  readonly " $data"?: WorkspaceListItemFragment_workspace$data;
-  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceListItemFragment_workspace">;
+export type WorkspaceLabelSettingsFragment_workspace$key = {
+  readonly " $data"?: WorkspaceLabelSettingsFragment_workspace$data;
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceLabelSettingsFragment_workspace">;
 };
 
 const node: ReaderFragment = {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
-  "name": "WorkspaceListItemFragment_workspace",
+  "name": "WorkspaceLabelSettingsFragment_workspace",
   "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "ResourceMetadata",
-      "kind": "LinkedField",
-      "name": "metadata",
-      "plural": false,
-      "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "updatedAt",
-          "storageKey": null
-        }
-      ],
-      "storageKey": null
-    },
     {
       "alias": null,
       "args": null,
@@ -64,7 +42,7 @@ const node: ReaderFragment = {
       "alias": null,
       "args": null,
       "kind": "ScalarField",
-      "name": "name",
+      "name": "fullPath",
       "storageKey": null
     },
     {
@@ -72,13 +50,6 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "ScalarField",
       "name": "description",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "fullPath",
       "storageKey": null
     },
     {
@@ -111,6 +82,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "0b930344388ff47fe4f8ce0252e7e32d";
+(node as any).hash = "88cb594c8978349e1ed3ee3f51683ae1";
 
 export default node;

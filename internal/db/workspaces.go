@@ -77,6 +77,13 @@ type WorkspaceFilter struct {
 	Dirty                          *bool
 	HasStateVersion                *bool
 	WorkspacePath                  *string
+	LabelFilters                   []WorkspaceLabelFilter
+}
+
+// WorkspaceLabelFilter represents a label filter for workspace queries
+type WorkspaceLabelFilter struct {
+	Key   string
+	Value string
 }
 
 // GetWorkspacesInput is the input for listing workspaces
@@ -114,6 +121,7 @@ var workspaceFieldList = append(
 	"prevent_destroy_plan",
 	"runner_tags",
 	"drift_detection_enabled",
+	"labels",
 )
 
 // NewWorkspaces returns an instance of the Workspaces interface
@@ -194,6 +202,14 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 				ex = ex.Append(goqu.I("workspaces.current_state_version_id").IsNotNull())
 			} else {
 				ex = ex.Append(goqu.I("workspaces.current_state_version_id").IsNull())
+			}
+		}
+
+		if input.Filter.LabelFilters != nil && len(input.Filter.LabelFilters) > 0 {
+			// Use JSONB containment operator (@>) for label filtering
+			for _, labelFilter := range input.Filter.LabelFilters {
+				labelJSON := fmt.Sprintf(`{"%s": "%s"}`, labelFilter.Key, labelFilter.Value)
+				ex = ex.Append(goqu.L("workspaces.labels @> ?::jsonb", labelJSON))
 			}
 		}
 	}
@@ -280,12 +296,22 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 	defer span.End()
 
 	var runnerTags []byte
+	var labelsJSON []byte
 	var err error
 	if workspace.RunnerTags != nil {
 		runnerTags, err = json.Marshal(workspace.RunnerTags)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if workspace.Labels != nil {
+		labelsJSON, err = json.Marshal(workspace.Labels)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		labelsJSON = []byte("{}")
 	}
 
 	timestamp := currentTime()
@@ -308,6 +334,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 						"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 						"runner_tags":              runnerTags,
 						"drift_detection_enabled":  workspace.EnableDriftDetection,
+						"labels":                   labelsJSON,
 					},
 				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
 				Returning("*"),
@@ -338,12 +365,22 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 	defer span.End()
 
 	var runnerTags []byte
+	var labelsJSON []byte
 	var err error
 	if workspace.RunnerTags != nil {
 		runnerTags, err = json.Marshal(workspace.RunnerTags)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if workspace.Labels != nil {
+		labelsJSON, err = json.Marshal(workspace.Labels)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		labelsJSON = []byte("{}")
 	}
 
 	// Use transaction to update workspaces and namespaces tables
@@ -383,6 +420,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 			"runner_tags":              runnerTags,
 			"drift_detection_enabled":  workspace.EnableDriftDetection,
+			"labels":                   labelsJSON,
 		}).
 		Returning(workspaceFieldList...).ToSQL()
 	if err != nil {
@@ -736,6 +774,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 	var description sql.NullString
 	var currentJobID sql.NullString
 	var currentStateVersionID sql.NullString
+	var labelsJSON []byte
 
 	ws := &models.Workspace{}
 
@@ -757,6 +796,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.PreventDestroyPlan,
 		&ws.RunnerTags,
 		&ws.EnableDriftDetection,
+		&labelsJSON,
 	}
 
 	if withFullPath {
@@ -778,6 +818,13 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 
 	if currentStateVersionID.Valid {
 		ws.CurrentStateVersionID = currentStateVersionID.String
+	}
+
+	// Parse JSONB labels
+	if len(labelsJSON) > 0 {
+		if err := json.Unmarshal(labelsJSON, &ws.Labels); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal labels JSON: %w", err)
+		}
 	}
 
 	if withFullPath {

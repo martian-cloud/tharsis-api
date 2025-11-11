@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c7df1bd069a4e58930a2242c5abfa93d>>
+ * @generated SignedSource<<48fb837535a1f81d035b1f4a51597bd7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,6 +14,10 @@ export type WorkspaceSearchListItemFragment_workspace$data = {
   readonly description: string;
   readonly fullPath: string;
   readonly id: string;
+  readonly labels: ReadonlyArray<{
+    readonly key: string;
+    readonly value: string;
+  }>;
   readonly metadata: {
     readonly updatedAt: any;
   };
@@ -76,12 +80,37 @@ const node: ReaderFragment = {
       "kind": "ScalarField",
       "name": "fullPath",
       "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "WorkspaceLabel",
+      "kind": "LinkedField",
+      "name": "labels",
+      "plural": true,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "key",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "value",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
     }
   ],
   "type": "Workspace",
   "abstractKey": null
 };
 
-(node as any).hash = "70a0722548325660532cdfbad64885ee";
+(node as any).hash = "628057a6eae56f65e3e7fc24be74bac4";
 
 export default node;

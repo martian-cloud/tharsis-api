@@ -191,7 +191,8 @@ func TestActivityEvents_GetActivityEvents(t *testing.T) {
 				},
 			},
 			expectCount: len(createdActivityEvents),
-		}, {
+		},
+		{
 			name: "filter by user ID",
 			input: &GetActivityEventsInput{
 				Filter: &ActivityEventFilter{

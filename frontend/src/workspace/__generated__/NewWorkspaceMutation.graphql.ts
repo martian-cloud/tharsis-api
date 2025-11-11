@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<0492719a8c926cb688088cbd28793c31>>
+ * @generated SignedSource<<22b0b18e995ee2436dea3c5eef051db6>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type CreateWorkspaceInput = {
   driftDetectionEnabled?: NamespaceDriftDetectionEnabledInput | null | undefined;
   groupId?: string | null | undefined;
   groupPath?: string | null | undefined;
+  labels?: ReadonlyArray<WorkspaceLabelInput> | null | undefined;
   maxJobDuration?: number | null | undefined;
   name: string;
   preventDestroyPlan?: boolean | null | undefined;
@@ -25,6 +26,10 @@ export type CreateWorkspaceInput = {
 export type NamespaceDriftDetectionEnabledInput = {
   enabled?: boolean | null | undefined;
   inherit: boolean;
+};
+export type WorkspaceLabelInput = {
+  key: string;
+  value: string;
 };
 export type NamespaceRunnerTagsInput = {
   inherit: boolean;
@@ -44,6 +49,10 @@ export type NewWorkspaceMutation$data = {
     readonly workspace: {
       readonly fullPath: string;
       readonly id: string;
+      readonly labels: ReadonlyArray<{
+        readonly key: string;
+        readonly value: string;
+      }>;
       readonly name: string;
     } | null | undefined;
   };
@@ -98,6 +107,31 @@ v3 = {
       "args": null,
       "kind": "ScalarField",
       "name": "fullPath",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "WorkspaceLabel",
+      "kind": "LinkedField",
+      "name": "labels",
+      "plural": true,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "key",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "value",
+          "storageKey": null
+        }
+      ],
       "storageKey": null
     }
   ],
@@ -208,16 +242,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "0f98c2ca6beba426776559a62ebbe56a",
+    "cacheID": "58436ca59f0786b72d128d6dab622fa9",
     "id": null,
     "metadata": {},
     "name": "NewWorkspaceMutation",
     "operationKind": "mutation",
-    "text": "mutation NewWorkspaceMutation(\n  $input: CreateWorkspaceInput!\n) {\n  createWorkspace(input: $input) {\n    workspace {\n      id\n      name\n      fullPath\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
+    "text": "mutation NewWorkspaceMutation(\n  $input: CreateWorkspaceInput!\n) {\n  createWorkspace(input: $input) {\n    workspace {\n      id\n      name\n      fullPath\n      labels {\n        key\n        value\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "290b3a2f2a4537b02849d811a7f7d8ae";
+(node as any).hash = "d234474c49e74b4a3b2d54b2366cd47a";
 
 export default node;

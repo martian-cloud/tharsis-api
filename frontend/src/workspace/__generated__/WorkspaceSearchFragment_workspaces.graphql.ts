@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1d00ec660092af86188a9f31c847a47e>>
+ * @generated SignedSource<<5e31cb89c0ef0020fdcf6bf75d8aa0e5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -49,6 +49,10 @@ return {
     },
     {
       "kind": "RootArgument",
+      "name": "labelFilter"
+    },
+    {
+      "kind": "RootArgument",
       "name": "last"
     },
     {
@@ -87,6 +91,11 @@ return {
     {
       "alias": "workspaces",
       "args": [
+        {
+          "kind": "Variable",
+          "name": "labelFilter",
+          "variableName": "labelFilter"
+        },
         {
           "kind": "Variable",
           "name": "search",
@@ -206,6 +215,6 @@ return {
 };
 })();
 
-(node as any).hash = "f40a8ea7b58144c83ea3075f4ef57778";
+(node as any).hash = "bf05799adad70e9e1988659394b40352";
 
 export default node;
