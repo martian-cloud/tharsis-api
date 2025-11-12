@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine@sha256:fc2cff6625f3c1c92e6c85938ac5bd09034ad0d4bc2dfb08278020b68540dbb5 AS builder
+FROM golang:1.24.9-alpine@sha256:fc2cff6625f3c1c92e6c85938ac5bd09034ad0d4bc2dfb08278020b68540dbb5 AS builder
 
 RUN apk update --no-cache && \
     apk add --no-cache \
@@ -38,7 +38,7 @@ USER 65532:65532
 EXPOSE 8000
 CMD ["./apiserver"]
 
-FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac6da80685 AS runner
+FROM alpine:3.22@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS runner
 RUN apk update --no-cache && \
     apk add --no-cache \
     git \
@@ -63,7 +63,7 @@ USER tharsis
 HEALTHCHECK NONE
 CMD ["./runner"]
 
-FROM alpine:3.21@sha256:b6a6be0ff92ab6db8acd94f5d1b7a6c2f0f5d10ce3c24af348d333ac6da80685 AS job-executor
+FROM alpine:3.22@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS job-executor
 RUN apk update --no-cache && \
     apk add --no-cache \
     git \
