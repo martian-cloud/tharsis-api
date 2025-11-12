@@ -1,6 +1,8 @@
 # The Mutation type represents all of the entry points into the API.
 type Mutation {
-  setUserNotificationPreference(input: SetUserNotificationPreferenceInput!): SetUserNotificationPreferencePayload!
+  setUserNotificationPreference(
+    input: SetUserNotificationPreferenceInput!
+  ): SetUserNotificationPreferencePayload!
   createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload!
   updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload!
   deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload!
@@ -213,9 +215,7 @@ type Mutation {
   updateUserAdminStatus(
     input: UpdateUserAdminStatusInput!
   ): UpdateUserAdminStatusPayload!
-  revokeUserSession(
-    input: RevokeUserSessionInput!
-  ): RevokeUserSessionPayload!
+  revokeUserSession(input: RevokeUserSessionInput!): RevokeUserSessionPayload!
   createUser(input: CreateUserInput!): CreateUserPayload!
   deleteUser(input: DeleteUserInput!): DeleteUserPayload!
   setUserPassword(input: SetUserPasswordInput!): SetUserPasswordPayload!
@@ -231,7 +231,13 @@ type Mutation {
   createFederatedRegistryTokens(
     input: CreateFederatedRegistryTokensInput!
   ): CreateFederatedRegistryTokensPayload!
-  createAnnouncement(input: CreateAnnouncementInput!): CreateAnnouncementPayload!
-  updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
-  deleteAnnouncement(input: DeleteAnnouncementInput!): DeleteAnnouncementPayload!
+  createAnnouncement(
+    input: CreateAnnouncementInput!
+  ): CreateAnnouncementPayload!
+  updateAnnouncement(
+    input: UpdateAnnouncementInput!
+  ): UpdateAnnouncementPayload!
+  deleteAnnouncement(
+    input: DeleteAnnouncementInput!
+  ): DeleteAnnouncementPayload!
 }

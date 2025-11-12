@@ -73,6 +73,38 @@ func TestCreateWorkspace(t *testing.T) {
 			injectWorkspacesPerGroup: 5,
 		},
 		{
+			name: "create workspace with labels",
+			input: models.Workspace{
+				Name:               workspaceName,
+				GroupID:            groupID,
+				Description:        workspaceDescription,
+				MaxJobDuration:     ptr.Int32(1234),
+				PreventDestroyPlan: true,
+				TerraformVersion:   terraformVersion,
+				RunnerTags:         []string{"tag1"},
+				Labels: map[string]string{
+					"environment": "production",
+					"team":        "platform",
+				},
+			},
+			expectCreatedWorkspace: &models.Workspace{
+				Metadata:           models.ResourceMetadata{ID: workspaceID},
+				Name:               workspaceName,
+				GroupID:            groupID,
+				Description:        workspaceDescription,
+				MaxJobDuration:     ptr.Int32(1234),
+				PreventDestroyPlan: true,
+				TerraformVersion:   terraformVersion,
+				FullPath:           workspacePath,
+				Labels: map[string]string{
+					"environment": "production",
+					"team":        "platform",
+				},
+			},
+			limit:                    5,
+			injectWorkspacesPerGroup: 5,
+		},
+		{
 			name: "subject does not have permission",
 			input: models.Workspace{
 				Name:               workspaceName,
@@ -227,12 +259,13 @@ func TestUpdateWorkspace(t *testing.T) {
 	}
 
 	type testCase struct {
-		name            string
-		foundWorkspace  *models.Workspace
-		authError       error
-		updateError     error
-		expectWorkspace *models.Workspace
-		expectErrorCode errors.CodeType
+		name               string
+		foundWorkspace     *models.Workspace
+		authError          error
+		updateError        error
+		expectWorkspace    *models.Workspace
+		expectErrorCode    errors.CodeType
+		expectLabelChanges *models.LabelChangePayload
 	}
 
 	testCases := []testCase{
@@ -250,6 +283,49 @@ func TestUpdateWorkspace(t *testing.T) {
 			name:            "caller does not have permission",
 			authError:       errors.New("Forbidden", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "successfully update workspace with label changes",
+			foundWorkspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "workspace-id",
+				},
+				Name:             "workspace-name",
+				FullPath:         "parent-group/workspace-name",
+				Description:      "workspace description",
+				MaxJobDuration:   ptr.Int32(35),
+				TerraformVersion: terraformVersion,
+				Labels: map[string]string{
+					"environment": "staging",
+					"team":        "platform",
+					"version":     "1.0",
+				},
+			},
+			expectWorkspace: &models.Workspace{
+				Metadata: models.ResourceMetadata{
+					ID: "workspace-id",
+				},
+				Name:             "workspace-name",
+				FullPath:         "parent-group/workspace-name",
+				Description:      "workspace description",
+				MaxJobDuration:   ptr.Int32(35),
+				TerraformVersion: terraformVersion,
+				Labels: map[string]string{
+					"environment": "production",  // updated
+					"team":        "platform",    // unchanged
+					"project":     "new-project", // added
+					// "version" removed
+				},
+			},
+			expectLabelChanges: &models.LabelChangePayload{
+				Added: map[string]string{
+					"project": "new-project",
+				},
+				Updated: map[string]string{
+					"environment": "production",
+				},
+				Removed: []string{"version"},
+			},
 		},
 	}
 
@@ -276,17 +352,70 @@ func TestUpdateWorkspace(t *testing.T) {
 			mockTransactions.On("CommitTx", mock.Anything).
 				Return(nil).Maybe()
 
-			mockWorkspaces.On("UpdateWorkspace", mock.Anything, updatedWorkspace).
-				Return(updatedWorkspace, test.updateError).Maybe()
+			// Mock GetWorkspaceByID for label change detection
+			if test.foundWorkspace != nil {
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, mock.Anything).
+					Return(test.foundWorkspace, nil).Maybe()
+			} else if test.updateError != nil {
+				// For error cases, GetWorkspaceByID might still be called
+				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, mock.Anything).
+					Return(nil, test.updateError).Maybe()
+			}
 
-			mockActivityEvents.On("CreateActivityEvent", mock.Anything,
-				&activityevent.CreateActivityEventInput{
-					NamespacePath: &originalWorkspace.FullPath,
-					Action:        models.ActionUpdate,
-					TargetType:    models.TargetWorkspace,
-					TargetID:      originalWorkspace.Metadata.ID,
-				},
-			).Return(&models.ActivityEvent{}, nil).Maybe()
+			if test.expectWorkspace != nil {
+				mockWorkspaces.On("UpdateWorkspace", mock.Anything, test.expectWorkspace).
+					Return(test.expectWorkspace, test.updateError).Maybe()
+			} else if test.updateError != nil {
+				mockWorkspaces.On("UpdateWorkspace", mock.Anything, mock.Anything).
+					Return(nil, test.updateError).Maybe()
+			}
+
+			// Verify activity event with label changes if expected
+			if test.expectLabelChanges != nil {
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything,
+					mock.MatchedBy(func(input *activityevent.CreateActivityEventInput) bool {
+						if input.Action != models.ActionUpdate || input.TargetType != models.TargetWorkspace {
+							return false
+						}
+
+						payload, ok := input.Payload.(*models.ActivityEventUpdateWorkspacePayload)
+						if !ok || payload.LabelChanges == nil {
+							return false
+						}
+
+						// Check that label changes match expected
+						changes := payload.LabelChanges
+						if len(changes.Added) != len(test.expectLabelChanges.Added) ||
+							len(changes.Updated) != len(test.expectLabelChanges.Updated) ||
+							len(changes.Removed) != len(test.expectLabelChanges.Removed) {
+							return false
+						}
+
+						for k, v := range test.expectLabelChanges.Added {
+							if changes.Added[k] != v {
+								return false
+							}
+						}
+
+						for k, v := range test.expectLabelChanges.Updated {
+							if changes.Updated[k] != v {
+								return false
+							}
+						}
+
+						for i, key := range test.expectLabelChanges.Removed {
+							if changes.Removed[i] != key {
+								return false
+							}
+						}
+
+						return true
+					}),
+				).Return(&models.ActivityEvent{}, nil).Maybe()
+			} else {
+				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
+					Return(&models.ActivityEvent{}, nil).Maybe()
+			}
 
 			testLogger, _ := logger.NewForTest()
 			mockCLIStore := cli.NewMockTerraformCLIStore(t)
@@ -305,7 +434,12 @@ func TestUpdateWorkspace(t *testing.T) {
 				cliService:      mockCLIService,
 			}
 
-			actualUpdated, err := service.UpdateWorkspace(auth.WithCaller(ctx, mockCaller), updatedWorkspace)
+			workspaceToUpdate := updatedWorkspace
+			if test.expectWorkspace != nil {
+				workspaceToUpdate = test.expectWorkspace
+			}
+
+			actualUpdated, err := service.UpdateWorkspace(auth.WithCaller(ctx, mockCaller), workspaceToUpdate)
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
 				return
@@ -315,7 +449,7 @@ func TestUpdateWorkspace(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			assert.Equal(t, updatedWorkspace, actualUpdated)
+			assert.Equal(t, test.expectWorkspace, actualUpdated)
 		})
 	}
 }
@@ -859,6 +993,9 @@ func TestGetWorkspaces(t *testing.T) {
 		expectResult                    []models.Workspace
 		failAuthorization               bool
 		accessPolicyAllowAll            bool
+		dbResult                        *db.WorkspacesResult
+		dbError                         error
+		authError                       error
 	}
 
 	testCases := []testCase{
@@ -931,6 +1068,111 @@ func TestGetWorkspaces(t *testing.T) {
 			getWorkspacesError:   errors.New("failure", errors.WithErrorCode(errors.EInvalid)),
 			expectErrorCode:      errors.EInvalid,
 		},
+		{
+			name: "positive: filter workspaces by single label",
+			input: &GetWorkspacesInput{
+				GroupID: &groupID,
+				LabelFilters: []db.WorkspaceLabelFilter{
+					{Key: "environment", Value: "production"},
+				},
+			},
+			dbResult: &db.WorkspacesResult{
+				Workspaces: []models.Workspace{
+					{
+						Metadata: models.ResourceMetadata{ID: "workspace-1"},
+						Name:     "workspace-name",
+						FullPath: "group/workspace-name",
+						Labels: map[string]string{
+							"environment": "production",
+							"team":        "platform",
+						},
+					},
+				},
+				PageInfo: &pagination.PageInfo{TotalCount: 1},
+			},
+			expectResult: []models.Workspace{
+				{
+					Metadata: models.ResourceMetadata{ID: "workspace-1"},
+					Name:     "workspace-name",
+					FullPath: "group/workspace-name",
+					Labels: map[string]string{
+						"environment": "production",
+						"team":        "platform",
+					},
+				},
+			},
+		},
+		{
+			name: "positive: filter workspaces by multiple labels",
+			input: &GetWorkspacesInput{
+				GroupID: &groupID,
+				LabelFilters: []db.WorkspaceLabelFilter{
+					{Key: "environment", Value: "production"},
+					{Key: "team", Value: "platform"},
+				},
+			},
+			dbResult: &db.WorkspacesResult{
+				Workspaces: []models.Workspace{
+					{
+						Metadata: models.ResourceMetadata{ID: "workspace-1"},
+						Name:     "workspace-name",
+						FullPath: "group/workspace-name",
+						Labels: map[string]string{
+							"environment": "production",
+							"team":        "platform",
+						},
+					},
+				},
+				PageInfo: &pagination.PageInfo{TotalCount: 1},
+			},
+			expectResult: []models.Workspace{
+				{
+					Metadata: models.ResourceMetadata{ID: "workspace-1"},
+					Name:     "workspace-name",
+					FullPath: "group/workspace-name",
+					Labels: map[string]string{
+						"environment": "production",
+						"team":        "platform",
+					},
+				},
+			},
+		},
+		{
+			name: "positive: no matching workspaces with label filter",
+			input: &GetWorkspacesInput{
+				GroupID: &groupID,
+				LabelFilters: []db.WorkspaceLabelFilter{
+					{Key: "environment", Value: "development"},
+				},
+			},
+			dbResult: &db.WorkspacesResult{
+				Workspaces: []models.Workspace{},
+				PageInfo:   &pagination.PageInfo{TotalCount: 0},
+			},
+			expectResult: []models.Workspace{},
+		},
+		{
+			name: "negative: database error with label filter",
+			input: &GetWorkspacesInput{
+				GroupID: &groupID,
+				LabelFilters: []db.WorkspaceLabelFilter{
+					{Key: "environment", Value: "production"},
+				},
+			},
+			dbError:         errors.New("database error"),
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "negative: auth error with label filter",
+			input: &GetWorkspacesInput{
+				GroupID: &groupID,
+				LabelFilters: []db.WorkspaceLabelFilter{
+					{Key: "environment", Value: "production"},
+				},
+			},
+			authError:       errors.New("auth failed", errors.WithErrorCode(errors.EUnauthorized)),
+			expectErrorCode: errors.EUnauthorized,
+		},
 	}
 
 	for _, test := range testCases {
@@ -951,13 +1193,18 @@ func TestGetWorkspaces(t *testing.T) {
 				Filter: &db.WorkspaceFilter{
 					Search:                    test.input.Search,
 					AssignedManagedIdentityID: test.input.AssignedManagedIdentityID,
+					LabelFilters:              test.input.LabelFilters,
 				},
 			}
 
 			if test.input.GroupID != nil {
 				input.Filter.GroupID = test.input.GroupID
 
-				mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.requireWorkspacePermissionError)
+				if test.authError != nil {
+					mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+				} else {
+					mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.requireWorkspacePermissionError)
+				}
 			}
 
 			policy := auth.NamespaceAccessPolicy{AllowAll: test.accessPolicyAllowAll}
@@ -971,8 +1218,21 @@ func TestGetWorkspaces(t *testing.T) {
 				input.Filter.ServiceAccountMemberID = test.serviceAccountID
 			}
 
-			workspacesResult := db.WorkspacesResult{Workspaces: test.expectResult}
-			mockWorkspaces.On("GetWorkspaces", mock.Anything, &input).Return(&workspacesResult, test.getWorkspacesError).Maybe()
+			// Handle label filter test cases
+			if len(test.input.LabelFilters) > 0 {
+				if test.dbError != nil {
+					mockWorkspaces.On("GetWorkspaces", mock.Anything, mock.MatchedBy(func(input *db.GetWorkspacesInput) bool {
+						return input.Filter != nil && len(input.Filter.LabelFilters) > 0
+					})).Return(nil, test.dbError).Maybe()
+				} else if test.dbResult != nil {
+					mockWorkspaces.On("GetWorkspaces", mock.Anything, mock.MatchedBy(func(input *db.GetWorkspacesInput) bool {
+						return input.Filter != nil && len(input.Filter.LabelFilters) > 0
+					})).Return(test.dbResult, nil).Maybe()
+				}
+			} else {
+				workspacesResult := db.WorkspacesResult{Workspaces: test.expectResult}
+				mockWorkspaces.On("GetWorkspaces", mock.Anything, &input).Return(&workspacesResult, test.getWorkspacesError).Maybe()
+			}
 
 			dbClient := &db.Client{
 				Workspaces: mockWorkspaces,

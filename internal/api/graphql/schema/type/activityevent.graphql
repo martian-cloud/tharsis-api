@@ -110,6 +110,20 @@ type ActivityEventMoveManagedIdentityPayload {
   previousGroupPath: String!
 }
 
+type ActivityEventCreateWorkspacePayload {
+  labels: [WorkspaceLabel!]
+}
+
+type ActivityEventUpdateWorkspacePayload {
+  labelChanges: LabelChangePayload
+}
+
+type LabelChangePayload {
+  added: [WorkspaceLabel!]
+  updated: [WorkspaceLabel!]
+  removed: [String!]
+}
+
 union ActivityEventPayload =
     ActivityEventCreateNamespaceMembershipPayload
   | ActivityEventUpdateNamespaceMembershipPayload
@@ -121,6 +135,8 @@ union ActivityEventPayload =
   | ActivityEventMigrateGroupPayload
   | ActivityEventMigrateWorkspacePayload
   | ActivityEventMoveManagedIdentityPayload
+  | ActivityEventCreateWorkspacePayload
+  | ActivityEventUpdateWorkspacePayload
 
 type ActivityEvent implements Node {
   id: ID!

@@ -95,6 +95,8 @@ type GetWorkspacesInput struct {
 	Search *string
 	// WorkspacePath is used to search for a workspace by its full path
 	WorkspacePath *string
+	// LabelFilters filters workspaces by labels
+	LabelFilters []db.WorkspaceLabelFilter
 }
 
 // GetStateVersionsInput is the input for querying a list of state versions
@@ -333,6 +335,7 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 			Search:                    input.Search,
 			AssignedManagedIdentityID: input.AssignedManagedIdentityID,
 			WorkspacePath:             input.WorkspacePath,
+			LabelFilters:              input.LabelFilters,
 		},
 	}
 
@@ -549,9 +552,9 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	// Validate model
+	// Validate model (includes label validation)
 	if wErr := workspace.Validate(); wErr != nil {
-		tracing.RecordError(span, wErr, "failed to commit DB transaction")
+		tracing.RecordError(span, wErr, "failed to validate workspace model")
 		return nil, wErr
 	}
 
@@ -627,13 +630,18 @@ func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspa
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
-			NamespacePath: &createdWorkspace.FullPath,
-			Action:        models.ActionCreate,
-			TargetType:    models.TargetWorkspace,
-			TargetID:      createdWorkspace.Metadata.ID,
-		}); err != nil {
+	// Create activity event with label information if labels exist
+	activityEventInput := &activityevent.CreateActivityEventInput{
+		NamespacePath: &createdWorkspace.FullPath,
+		Action:        models.ActionCreate,
+		TargetType:    models.TargetWorkspace,
+		TargetID:      createdWorkspace.Metadata.ID,
+		Payload: &models.ActivityEventCreateWorkspacePayload{
+			Labels: createdWorkspace.Labels,
+		},
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext, activityEventInput); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
@@ -692,6 +700,18 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		"workspaceID", workspace.Metadata.ID,
 	)
 
+	// Get the current workspace to detect label changes
+	currentWorkspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, workspace.Metadata.ID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get current workspace")
+		return nil, err
+	}
+
+	if currentWorkspace == nil {
+		tracing.RecordError(span, nil, "workspace with ID %s not found", workspace.Metadata.ID)
+		return nil, errors.New("workspace with ID %s not found", workspace.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
+	}
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -704,19 +724,31 @@ func (s *service) UpdateWorkspace(ctx context.Context, workspace *models.Workspa
 		}
 	}()
 
+	// Detect label changes
+	labelChanges := detectLabelChanges(currentWorkspace.Labels, workspace.Labels)
+
 	updatedWorkspace, err := s.dbClient.Workspaces.UpdateWorkspace(txContext, workspace)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to update workspace")
 		return nil, err
 	}
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
-			NamespacePath: &updatedWorkspace.FullPath,
-			Action:        models.ActionUpdate,
-			TargetType:    models.TargetWorkspace,
-			TargetID:      updatedWorkspace.Metadata.ID,
-		}); err != nil {
+	// Create activity event with label change information if there are changes
+	activityEventInput := &activityevent.CreateActivityEventInput{
+		NamespacePath: &updatedWorkspace.FullPath,
+		Action:        models.ActionUpdate,
+		TargetType:    models.TargetWorkspace,
+		TargetID:      updatedWorkspace.Metadata.ID,
+	}
+
+	// Include label changes in activity event payload if there are any changes
+	if labelChanges != nil && (len(labelChanges.Added) > 0 || len(labelChanges.Updated) > 0 || len(labelChanges.Removed) > 0) {
+		activityEventInput.Payload = &models.ActivityEventUpdateWorkspacePayload{
+			LabelChanges: labelChanges,
+		}
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext, activityEventInput); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
@@ -1427,7 +1459,8 @@ func (s *service) GetWorkspaceAssessmentsByWorkspaceIDs(ctx context.Context, idL
 }
 
 func (s *service) GetStateVersionsByIDs(ctx context.Context,
-	idList []string) ([]models.StateVersion, error) {
+	idList []string,
+) ([]models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetStateVersionsByIDs")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -2020,4 +2053,45 @@ func validateMaxJobDuration(duration int32) error {
 	}
 
 	return nil
+}
+
+// detectLabelChanges compares old and new labels and returns the changes
+func detectLabelChanges(oldLabels, newLabels map[string]string) *models.LabelChangePayload {
+	if oldLabels == nil {
+		oldLabels = make(map[string]string)
+	}
+	if newLabels == nil {
+		newLabels = make(map[string]string)
+	}
+
+	changes := &models.LabelChangePayload{
+		Added:   make(map[string]string),
+		Updated: make(map[string]string),
+		Removed: []string{},
+	}
+
+	// Find added and updated labels
+	for key, newValue := range newLabels {
+		if oldValue, exists := oldLabels[key]; exists {
+			if oldValue != newValue {
+				changes.Updated[key] = newValue
+			}
+		} else {
+			changes.Added[key] = newValue
+		}
+	}
+
+	// Find removed labels
+	for key := range oldLabels {
+		if _, exists := newLabels[key]; !exists {
+			changes.Removed = append(changes.Removed, key)
+		}
+	}
+
+	// Return nil if no changes detected
+	if len(changes.Added) == 0 && len(changes.Updated) == 0 && len(changes.Removed) == 0 {
+		return nil
+	}
+
+	return changes
 }

@@ -88,6 +88,7 @@ type Workspace implements Node, Namespace {
   dirtyState: Boolean!
   locked: Boolean!
   assignedManagedIdentities: [ManagedIdentity!]!
+  labels: [WorkspaceLabel!]!
   assessment: WorkspaceAssessment
   managedIdentities(
     after: String
@@ -177,6 +178,7 @@ input CreateWorkspaceInput {
   preventDestroyPlan: Boolean
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
+  labels: [WorkspaceLabelInput!]
 }
 
 input UpdateWorkspaceInput {
@@ -193,6 +195,7 @@ input UpdateWorkspaceInput {
   preventDestroyPlan: Boolean
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
+  labels: [WorkspaceLabelInput!]
 }
 
 input DeleteWorkspaceInput {
@@ -254,4 +257,19 @@ input MigrateWorkspaceInput {
     @deprecated(
       reason: "Use newGroupId field instead, which accepts a TRN (Tharsis Resource Name)"
     )
+}
+
+# Workspace label types
+type WorkspaceLabel {
+  key: String!
+  value: String!
+}
+
+input WorkspaceLabelInput {
+  key: String!
+  value: String!
+}
+
+input WorkspaceLabelsFilter {
+  labels: [WorkspaceLabelInput!]!
 }

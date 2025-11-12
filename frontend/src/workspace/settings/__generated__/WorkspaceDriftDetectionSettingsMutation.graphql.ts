@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6d4cb44090c088a2d10ec65f3c6e7d18>>
+ * @generated SignedSource<<5e1c0270520890ab86fa5bbc1664777f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type UpdateWorkspaceInput = {
   description?: string | null | undefined;
   driftDetectionEnabled?: NamespaceDriftDetectionEnabledInput | null | undefined;
   id?: string | null | undefined;
+  labels?: ReadonlyArray<WorkspaceLabelInput> | null | undefined;
   maxJobDuration?: number | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
   preventDestroyPlan?: boolean | null | undefined;
@@ -26,6 +27,10 @@ export type UpdateWorkspaceInput = {
 export type NamespaceDriftDetectionEnabledInput = {
   enabled?: boolean | null | undefined;
   inherit: boolean;
+};
+export type WorkspaceLabelInput = {
+  key: string;
+  value: string;
 };
 export type ResourceMetadataInput = {
   version: string;

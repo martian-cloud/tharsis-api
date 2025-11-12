@@ -7,6 +7,7 @@ import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import { Link as LinkRouter } from 'react-router-dom';
 import Timestamp from '../common/Timestamp';
+import LabelList from './labels/LabelList';
 import { WorkspaceSearchListItemFragment_workspace$key } from './__generated__/WorkspaceSearchListItemFragment_workspace.graphql';
 
 interface Props {
@@ -25,6 +26,10 @@ function WorkspaceSearchListItem(props: Props) {
             name
             description
             fullPath
+            labels {
+                key
+                value
+            }
         }
     `, props.workspaceKey);
 
@@ -71,6 +76,15 @@ function WorkspaceSearchListItem(props: Props) {
                             {data.fullPath}
                         </Link>
                         <Typography variant="body2" color="textSecondary">{data.description}</Typography>
+                        {data.labels && data.labels.length > 0 && (
+                            <Box sx={{ mt: 0.5 }}>
+                                <LabelList
+                                    labels={[...data.labels]}
+                                    size="xs"
+                                    maxVisible={3}
+                                />
+                            </Box>
+                        )}
                     </Box>
                     <Stack direction="row" spacing={1}>
                         <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt} />

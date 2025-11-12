@@ -277,6 +277,18 @@ func (r *ActivityEventPayloadResolver) ToActivityEventMoveManagedIdentityPayload
 	return res, ok
 }
 
+// ToActivityEventCreateWorkspacePayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventCreateWorkspacePayload() (*ActivityEventCreateWorkspacePayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventCreateWorkspacePayloadResolver)
+	return res, ok
+}
+
+// ToActivityEventUpdateWorkspacePayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventUpdateWorkspacePayload() (*ActivityEventUpdateWorkspacePayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventUpdateWorkspacePayloadResolver)
+	return res, ok
+}
+
 // ActivityEventResolver resolves an activity event resource
 type ActivityEventResolver struct {
 	activityEvent *models.ActivityEvent
@@ -403,6 +415,7 @@ func (r *ActivityEventResolver) Target(ctx context.Context) (*NodeResolver, erro
 			return nil, err
 		}
 		return &NodeResolver{result: &WorkspaceResolver{workspace: workspace}}, nil
+
 	case models.TargetTerraformProvider:
 		tfProvider, err := loadTerraformProvider(ctx, r.activityEvent.TargetID)
 		if err != nil {
@@ -551,6 +564,20 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 				return nil, err
 			}
 			return &ActivityEventPayloadResolver{result: &ActivityEventMoveManagedIdentityPayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionCreate) &&
+			(r.activityEvent.TargetType == models.TargetWorkspace):
+			var payload models.ActivityEventCreateWorkspacePayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventCreateWorkspacePayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionUpdate) &&
+			(r.activityEvent.TargetType == models.TargetWorkspace):
+			var payload models.ActivityEventUpdateWorkspacePayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventUpdateWorkspacePayloadResolver{payload: &payload}}, nil
 		default:
 			return nil, fmt.Errorf("payload supplied without a supported target type and action")
 
@@ -650,6 +677,61 @@ type ActivityEventMoveManagedIdentityPayloadResolver struct {
 // PreviousGroupPath resolver
 func (r *ActivityEventMoveManagedIdentityPayloadResolver) PreviousGroupPath() string {
 	return r.payload.PreviousGroupPath
+}
+
+// LabelChangePayloadResolver resolves label changes
+type LabelChangePayloadResolver struct {
+	payload *models.LabelChangePayload
+}
+
+// Added resolver
+func (r *LabelChangePayloadResolver) Added() (*[]*WorkspaceLabelResolver, error) {
+	var resolvers []*WorkspaceLabelResolver
+	for key, value := range r.payload.Added {
+		resolvers = append(resolvers, &WorkspaceLabelResolver{key: key, value: value})
+	}
+	return &resolvers, nil
+}
+
+// Updated resolver
+func (r *LabelChangePayloadResolver) Updated() (*[]*WorkspaceLabelResolver, error) {
+	var resolvers []*WorkspaceLabelResolver
+	for key, value := range r.payload.Updated {
+		resolvers = append(resolvers, &WorkspaceLabelResolver{key: key, value: value})
+	}
+	return &resolvers, nil
+}
+
+// Removed resolver
+func (r *LabelChangePayloadResolver) Removed() (*[]string, error) {
+	return &r.payload.Removed, nil
+}
+
+// ActivityEventCreateWorkspacePayloadResolver resolves workspace creation payload
+type ActivityEventCreateWorkspacePayloadResolver struct {
+	payload *models.ActivityEventCreateWorkspacePayload
+}
+
+// Labels resolver
+func (r *ActivityEventCreateWorkspacePayloadResolver) Labels() (*[]*WorkspaceLabelResolver, error) {
+	var resolvers []*WorkspaceLabelResolver
+	for key, value := range r.payload.Labels {
+		resolvers = append(resolvers, &WorkspaceLabelResolver{key: key, value: value})
+	}
+	return &resolvers, nil
+}
+
+// ActivityEventUpdateWorkspacePayloadResolver resolves workspace update payload
+type ActivityEventUpdateWorkspacePayloadResolver struct {
+	payload *models.ActivityEventUpdateWorkspacePayload
+}
+
+// LabelChanges resolver
+func (r *ActivityEventUpdateWorkspacePayloadResolver) LabelChanges() *LabelChangePayloadResolver {
+	if r.payload.LabelChanges == nil {
+		return nil
+	}
+	return &LabelChangePayloadResolver{payload: r.payload.LabelChanges}
 }
 
 func activityEventsQuery(ctx context.Context, args *ActivityEventConnectionQueryArgs) (*ActivityEventConnectionResolver, error) {

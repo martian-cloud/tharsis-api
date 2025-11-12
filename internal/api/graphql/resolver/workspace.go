@@ -27,9 +27,37 @@ import (
 // WorkspaceConnectionQueryArgs are used to query a workspace connection
 type WorkspaceConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	GroupPath *string // DEPRECATED: use GroupID instead with a TRN
-	GroupID   *string
-	Search    *string
+	GroupPath   *string // DEPRECATED: use GroupID instead with a TRN
+	GroupID     *string
+	Search      *string
+	LabelFilter *WorkspaceLabelsFilter
+}
+
+// WorkspaceLabelsFilter represents label filtering criteria
+type WorkspaceLabelsFilter struct {
+	Labels []WorkspaceLabelInput
+}
+
+// WorkspaceLabelResolver resolves a workspace label resource (JSONB-based)
+type WorkspaceLabelResolver struct {
+	key   string // For JSONB-based labels
+	value string // For JSONB-based labels
+}
+
+// Key resolver
+func (r *WorkspaceLabelResolver) Key() string {
+	return r.key
+}
+
+// Value resolver
+func (r *WorkspaceLabelResolver) Value() string {
+	return r.value
+}
+
+// WorkspaceLabelInput represents a label key-value pair
+type WorkspaceLabelInput struct {
+	Key   string
+	Value string
 }
 
 // WorkspaceQueryArgs are used to query a single workspace
@@ -210,6 +238,25 @@ func (r *WorkspaceResolver) AssignedManagedIdentities(ctx context.Context) ([]*M
 	for _, identity := range identities {
 		identityCopy := identity
 		resolvers = append(resolvers, &ManagedIdentityResolver{managedIdentity: &identityCopy})
+	}
+
+	return resolvers, nil
+}
+
+// Labels resolver - converts JSONB labels to GraphQL label array
+func (r *WorkspaceResolver) Labels(ctx context.Context) ([]*WorkspaceLabelResolver, error) {
+	if len(r.workspace.Labels) == 0 {
+		return []*WorkspaceLabelResolver{}, nil
+	}
+
+	resolvers := make([]*WorkspaceLabelResolver, 0, len(r.workspace.Labels))
+	for key, value := range r.workspace.Labels {
+		// Create a simple label structure for JSONB approach
+		label := &WorkspaceLabelResolver{
+			key:   key,
+			value: value,
+		}
+		resolvers = append(resolvers, label)
 	}
 
 	return resolvers, nil
@@ -476,6 +523,18 @@ func workspacesQuery(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*
 		input.GroupID = &groupID
 	}
 
+	// Handle label filtering
+	if args.LabelFilter != nil && len(args.LabelFilter.Labels) > 0 {
+		labelFilters := make([]db.WorkspaceLabelFilter, len(args.LabelFilter.Labels))
+		for i, label := range args.LabelFilter.Labels {
+			labelFilters[i] = db.WorkspaceLabelFilter{
+				Key:   label.Key,
+				Value: label.Value,
+			}
+		}
+		input.LabelFilters = labelFilters
+	}
+
 	if args.Sort != nil {
 		sort := db.WorkspaceSortableField(*args.Sort)
 		input.Sort = &sort
@@ -518,6 +577,7 @@ type CreateWorkspaceInput struct {
 	GroupPath             *string // DEPRECATED: use GroupID instead with a TRN
 	Description           string
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	Labels                *[]WorkspaceLabelInput
 }
 
 // UpdateWorkspaceInput contains the input for updating a workspace
@@ -534,6 +594,7 @@ type UpdateWorkspaceInput struct {
 	ID                    *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	Labels                *[]WorkspaceLabelInput
 }
 
 // DeleteWorkspaceInput contains the input for deleting a workspace
@@ -615,6 +676,15 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		MaxJobDuration:     input.MaxJobDuration,
 		TerraformVersion:   terraformVersion,
 		PreventDestroyPlan: preventDestroyPlan,
+	}
+
+	// Handle labels input
+	if input.Labels != nil && len(*input.Labels) > 0 {
+		labels := make(map[string]string, len(*input.Labels))
+		for _, label := range *input.Labels {
+			labels[label.Key] = label.Value
+		}
+		wsCreateOptions.Labels = labels
 	}
 
 	if input.RunnerTags != nil {
@@ -714,6 +784,15 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 		if input.DriftDetectionEnabled.Inherit {
 			ws.EnableDriftDetection = nil
 		}
+	}
+
+	// Handle labels input
+	if input.Labels != nil {
+		labels := make(map[string]string, len(*input.Labels))
+		for _, label := range *input.Labels {
+			labels[label.Key] = label.Value
+		}
+		ws.Labels = labels
 	}
 
 	ws, err = wsService.UpdateWorkspace(ctx, ws)

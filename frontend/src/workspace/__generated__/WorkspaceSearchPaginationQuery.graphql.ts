@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f8994a6d0ccb0247cbe7e657ebf2734b>>
+ * @generated SignedSource<<d3e02496b7aad96bef51becc414f0857>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,10 +10,18 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type WorkspaceLabelsFilter = {
+  labels: ReadonlyArray<WorkspaceLabelInput>;
+};
+export type WorkspaceLabelInput = {
+  key: string;
+  value: string;
+};
 export type WorkspaceSearchPaginationQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
+  labelFilter?: WorkspaceLabelsFilter | null | undefined;
   last?: number | null | undefined;
   search?: string | null | undefined;
 };
@@ -45,6 +53,11 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
+    "name": "labelFilter"
+  },
+  {
+    "defaultValue": null,
+    "kind": "LocalArgument",
     "name": "last"
   },
   {
@@ -68,6 +81,11 @@ v1 = [
     "kind": "Variable",
     "name": "first",
     "variableName": "first"
+  },
+  {
+    "kind": "Variable",
+    "name": "labelFilter",
+    "variableName": "labelFilter"
   },
   {
     "kind": "Variable",
@@ -187,6 +205,31 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "concreteType": "WorkspaceLabel",
+                    "kind": "LinkedField",
+                    "name": "labels",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "key",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "value",
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "kind": "ScalarField",
                     "name": "__typename",
                     "storageKey": null
@@ -251,6 +294,7 @@ return {
         "args": (v1/*: any*/),
         "filters": [
           "search",
+          "labelFilter",
           "sort"
         ],
         "handle": "connection",
@@ -261,16 +305,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "06ad34961b9240cbce85c62937ddf512",
+    "cacheID": "b41cdeb29a780cfad13b3ecb7097fba4",
     "id": null,
     "metadata": {},
     "name": "WorkspaceSearchPaginationQuery",
     "operationKind": "query",
-    "text": "query WorkspaceSearchPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $search: String\n) {\n  ...WorkspaceSearchFragment_workspaces\n}\n\nfragment WorkspaceSearchFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, search: $search, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceSearchListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceSearchListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n}\n"
+    "text": "query WorkspaceSearchPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $labelFilter: WorkspaceLabelsFilter\n  $last: Int\n  $search: String\n) {\n  ...WorkspaceSearchFragment_workspaces\n}\n\nfragment WorkspaceSearchFragment_workspaces on Query {\n  workspaces(after: $after, before: $before, first: $first, last: $last, search: $search, labelFilter: $labelFilter, sort: FULL_PATH_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...WorkspaceSearchListItemFragment_workspace\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment WorkspaceSearchListItemFragment_workspace on Workspace {\n  metadata {\n    updatedAt\n  }\n  id\n  name\n  description\n  fullPath\n  labels {\n    key\n    value\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f40a8ea7b58144c83ea3075f4ef57778";
+(node as any).hash = "bf05799adad70e9e1988659394b40352";
 
 export default node;

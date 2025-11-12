@@ -18,6 +18,7 @@ import WorkspaceDetailsCurrentJob from './WorkspaceDetailsCurrentJob';
 import WorkspaceDetailsEmpty from './WorkspaceDetailsEmpty';
 import { WorkspaceDetailsIndexFragment_workspace$key } from './__generated__/WorkspaceDetailsIndexFragment_workspace.graphql';
 import { WorkspaceDetailsIndex_DestroyWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_DestroyWorkspaceMutation.graphql';
+import LabelList from './labels/LabelList';
 import RunStatusChip from './runs/RunStatusChip';
 import StateVersionDependencies from './state/StateVersionDependencies';
 import StateVersionFile from './state/StateVersionFile';
@@ -89,6 +90,10 @@ function WorkspaceDetailsIndex(props: Props) {
         description
         fullPath
         preventDestroyPlan
+        labels {
+            key
+            value
+        }
         metadata {
             trn
         }
@@ -226,6 +231,15 @@ function WorkspaceDetailsIndex(props: Props) {
                     <Stack>
                         <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>
                         <Typography color="textSecondary" variant="subtitle2">{data.description}</Typography>
+                        {data.labels && data.labels.length > 0 && (
+                            <Box sx={{ mt: 1 }}>
+                                <LabelList
+                                    labels={[...data.labels]}
+                                    size="small"
+                                    maxVisible={6}
+                                />
+                            </Box>
+                        )}
                     </Stack>
                 </Box>
                 <Stack direction="row" spacing={1}>

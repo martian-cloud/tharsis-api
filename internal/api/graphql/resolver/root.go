@@ -29,7 +29,8 @@ func (r RootResolver) UserPreferences() (*UserPreferencesResolver, error) {
 // SetUserNotificationPreference sets the notification preference for the authenticated subject
 func (r RootResolver) SetUserNotificationPreference(ctx context.Context, args *struct {
 	Input *SetUserNotificationPreferenceInput
-}) (*UserNotificationPreferenceMutationPayloadResolver, error) {
+},
+) (*UserNotificationPreferenceMutationPayloadResolver, error) {
 	response, err := setUserNotificationPreferenceMutation(ctx, args.Input)
 	if err != nil {
 		return handleUserNotificationPreferenceMutationProblem(err, args.Input.ClientMutationID)
@@ -121,7 +122,8 @@ func (r RootResolver) UnlockWorkspace(ctx context.Context, args *struct{ Input *
 
 // MigrateWorkspace migrates an existing workspace
 func (r RootResolver) MigrateWorkspace(ctx context.Context,
-	args *struct{ Input *MigrateWorkspaceInput }) (*WorkspaceMutationPayloadResolver, error) {
+	args *struct{ Input *MigrateWorkspaceInput },
+) (*WorkspaceMutationPayloadResolver, error) {
 	response, err := migrateWorkspaceMutation(ctx, args.Input)
 	if err != nil {
 		return handleWorkspaceMutationProblem(err, args.Input.ClientMutationID)
@@ -132,7 +134,8 @@ func (r RootResolver) MigrateWorkspace(ctx context.Context,
 
 // DestroyWorkspace creates a destroy run for an existing workspace
 func (r RootResolver) DestroyWorkspace(ctx context.Context,
-	args *struct{ Input *DestroyWorkspaceInput }) (*RunMutationPayloadResolver, error) {
+	args *struct{ Input *DestroyWorkspaceInput },
+) (*RunMutationPayloadResolver, error) {
 	response, err := destroyWorkspaceMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunMutationProblem(err, args.Input.ClientMutationID)
@@ -143,7 +146,8 @@ func (r RootResolver) DestroyWorkspace(ctx context.Context,
 
 // AssessWorkspace creates an assessment run for an existing workspace
 func (r RootResolver) AssessWorkspace(ctx context.Context,
-	args *struct{ Input *AssessWorkspaceInput }) (*RunMutationPayloadResolver, error) {
+	args *struct{ Input *AssessWorkspaceInput },
+) (*RunMutationPayloadResolver, error) {
 	response, err := assessWorkspaceMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunMutationProblem(err, args.Input.ClientMutationID)
@@ -208,7 +212,8 @@ func (r RootResolver) DeleteGroup(ctx context.Context, args *struct{ Input *Dele
 
 // MigrateGroup migrates an existing group
 func (r RootResolver) MigrateGroup(ctx context.Context,
-	args *struct{ Input *MigrateGroupInput }) (*GroupMutationPayloadResolver, error) {
+	args *struct{ Input *MigrateGroupInput },
+) (*GroupMutationPayloadResolver, error) {
 	response, err := migrateGroupMutation(ctx, args.Input)
 	if err != nil {
 		return handleGroupMutationProblem(err, args.Input.ClientMutationID)
@@ -286,7 +291,8 @@ func (r RootResolver) UpdateApply(ctx context.Context, args *struct{ Input *Upda
 // SetVariablesIncludedInTFConfig sets the variables that are included in the Terraform config.
 func (r RootResolver) SetVariablesIncludedInTFConfig(ctx context.Context, args *struct {
 	Input *SetVariablesIncludedInTFConfigInput
-}) (*RunMutationPayloadResolver, error) {
+},
+) (*RunMutationPayloadResolver, error) {
 	response, err := setVariablesIncludedInTFConfigMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunMutationProblem(err, args.Input.ClientMutationID)
@@ -554,7 +560,8 @@ func (r RootResolver) Jobs(ctx context.Context, args *JobConnectionQueryArgs) (*
 // JobEvents subscribes to job events
 func (r RootResolver) JobEvents(ctx context.Context, args *struct {
 	Input *JobEventSubscriptionInput
-}) (<-chan *JobEventResolver, error) {
+},
+) (<-chan *JobEventResolver, error) {
 	return r.jobEventsSubscription(ctx, args.Input)
 }
 
@@ -562,7 +569,8 @@ func (r RootResolver) JobEvents(ctx context.Context, args *struct {
 func (r RootResolver) JobLogStreamEvents(ctx context.Context,
 	args *struct {
 		Input *JobLogStreamSubscriptionInput
-	}) (<-chan *JobLogStreamEventResolver, error) {
+	},
+) (<-chan *JobLogStreamEventResolver, error) {
 	return r.jobLogStreamEventsSubscription(ctx, args.Input)
 }
 
@@ -1268,7 +1276,8 @@ func (r RootResolver) DeleteRunner(ctx context.Context, args *struct{ Input *Del
 // AssignServiceAccountToRunner assigns a service account to a runner
 func (r RootResolver) AssignServiceAccountToRunner(ctx context.Context, args *struct {
 	Input *AssignServiceAccountToRunnerInput
-}) (*RunnerMutationPayloadResolver, error) {
+},
+) (*RunnerMutationPayloadResolver, error) {
 	response, err := assignServiceAccountToRunnerMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
@@ -1279,7 +1288,8 @@ func (r RootResolver) AssignServiceAccountToRunner(ctx context.Context, args *st
 // UnassignServiceAccountFromRunner unassigns a service account from a runner
 func (r RootResolver) UnassignServiceAccountFromRunner(ctx context.Context, args *struct {
 	Input *AssignServiceAccountToRunnerInput
-}) (*RunnerMutationPayloadResolver, error) {
+},
+) (*RunnerMutationPayloadResolver, error) {
 	response, err := unassignServiceAccountFromRunnerMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunnerMutationProblem(err, args.Input.ClientMutationID)
@@ -1292,21 +1302,24 @@ func (r RootResolver) UnassignServiceAccountFromRunner(ctx context.Context, args
 // RunnerSessionEvents subscribes to runner session events
 func (r RootResolver) RunnerSessionEvents(ctx context.Context, args *struct {
 	Input *RunnerSessionEventSubscriptionInput
-}) (<-chan *RunnerSessionEventResolver, error) {
+},
+) (<-chan *RunnerSessionEventResolver, error) {
 	return r.runnerSessionEventsSubscription(ctx, args.Input)
 }
 
 // RunnerSessionErrorLogEvents subscribes to runner session error log events
 func (r RootResolver) RunnerSessionErrorLogEvents(ctx context.Context, args *struct {
 	Input *RunnerSessionErrorLogSubscriptionInput
-}) (<-chan *RunnerSessionErrorLogEventResolver, error) {
+},
+) (<-chan *RunnerSessionErrorLogEventResolver, error) {
 	return r.runnerSessionErrorLogSubscription(ctx, args.Input)
 }
 
 // CreateRunnerSession creates a new runner session.
 func (r RootResolver) CreateRunnerSession(ctx context.Context, args *struct {
 	Input *CreateRunnerSessionInput
-}) (*CreateRunnerSessionMutationPayloadResolver, error) {
+},
+) (*CreateRunnerSessionMutationPayloadResolver, error) {
 	response, err := createRunnerSessionMutation(ctx, args.Input)
 	if err != nil {
 		return handleCreateRunnerSessionMutationProblem(err, args.Input.ClientMutationID)
@@ -1317,7 +1330,8 @@ func (r RootResolver) CreateRunnerSession(ctx context.Context, args *struct {
 // RunnerSessionHeartbeat sends a runner session heartbeat to the runner session.
 func (r RootResolver) RunnerSessionHeartbeat(ctx context.Context, args *struct {
 	Input *RunnerSessionHeartbeatInput
-}) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
+},
+) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
 	response, err := runnerSessionHeartbeatMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunnerSessionHeartbeatErrorMutationProblem(err, args.Input.ClientMutationID)
@@ -1328,7 +1342,8 @@ func (r RootResolver) RunnerSessionHeartbeat(ctx context.Context, args *struct {
 // CreateRunnerSessionError sends a runner session error to the runner session.
 func (r RootResolver) CreateRunnerSessionError(ctx context.Context, args *struct {
 	Input *CreateRunnerSessionErrorInput
-}) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
+},
+) (*RunnerSessionHeartbeatErrorMutationPayloadResolver, error) {
 	response, err := createRunnerSessionErrorMutation(ctx, args.Input)
 	if err != nil {
 		return handleRunnerSessionHeartbeatErrorMutationProblem(err, args.Input.ClientMutationID)
@@ -1345,7 +1360,8 @@ func (r RootResolver) ResourceLimits(ctx context.Context) ([]*ResourceLimitResol
 
 // UpdateResourceLimit creates or updates a resource limit
 func (r RootResolver) UpdateResourceLimit(ctx context.Context,
-	args *struct{ Input *UpdateResourceLimitInput }) (*ResourceLimitMutationPayloadResolver, error) {
+	args *struct{ Input *UpdateResourceLimitInput },
+) (*ResourceLimitMutationPayloadResolver, error) {
 	response, err := updateResourceLimitMutation(ctx, args.Input)
 	if err != nil {
 		return handleResourceLimitMutationProblem(err, args.Input.ClientMutationID)
@@ -1363,7 +1379,8 @@ func (r RootResolver) TerraformProviderVersionMirror(ctx context.Context, args *
 // CreateTerraformProviderVersionMirror creates a TerraformProviderVersionMirror.
 func (r RootResolver) CreateTerraformProviderVersionMirror(ctx context.Context, args *struct {
 	Input *CreateTerraformProviderVersionMirrorInput
-}) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
+},
+) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
 	response, err := createTerraformProviderVersionMirrorMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderVersionMirrorMutationProblem(err, args.Input.ClientMutationID)
@@ -1374,7 +1391,8 @@ func (r RootResolver) CreateTerraformProviderVersionMirror(ctx context.Context, 
 // DeleteTerraformProviderVersionMirror deletes a TerraformProviderVersionMirror.
 func (r RootResolver) DeleteTerraformProviderVersionMirror(ctx context.Context, args *struct {
 	Input *DeleteTerraformProviderVersionMirrorInput
-}) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
+},
+) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
 	response, err := deleteTerraformProviderVersionMirrorMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderVersionMirrorMutationProblem(err, args.Input.ClientMutationID)
@@ -1387,7 +1405,8 @@ func (r RootResolver) DeleteTerraformProviderVersionMirror(ctx context.Context, 
 // DeleteTerraformProviderPlatformMirror deletes a TerraformProviderPlatformMirror.
 func (r RootResolver) DeleteTerraformProviderPlatformMirror(ctx context.Context, args *struct {
 	Input *DeleteTerraformProviderPlatformMirrorInput
-}) (*TerraformProviderPlatformMirrorMutationPayloadResolver, error) {
+},
+) (*TerraformProviderPlatformMirrorMutationPayloadResolver, error) {
 	response, err := deleteTerraformProviderPlatformMirrorMutation(ctx, args.Input)
 	if err != nil {
 		return handleTerraformProviderPlatformMirrorMutationProblem(err, args.Input.ClientMutationID)
@@ -1404,7 +1423,8 @@ func (r RootResolver) MaintenanceMode(ctx context.Context) (*MaintenanceModeReso
 
 // EnableMaintenanceMode enables maintenance mode
 func (r RootResolver) EnableMaintenanceMode(ctx context.Context,
-	args *struct{ Input *EnableMaintenanceModeInput }) (*MaintenanceModeMutationPayloadResolver, error) {
+	args *struct{ Input *EnableMaintenanceModeInput },
+) (*MaintenanceModeMutationPayloadResolver, error) {
 	response, err := enableMaintenanceModeMutation(ctx, args.Input)
 	if err != nil {
 		return handleMaintenanceModeMutationProblem(err, args.Input.ClientMutationID)
@@ -1414,7 +1434,8 @@ func (r RootResolver) EnableMaintenanceMode(ctx context.Context,
 
 // DisableMaintenanceMode disables maintenance mode
 func (r RootResolver) DisableMaintenanceMode(ctx context.Context,
-	args *struct{ Input *DisableMaintenanceModeInput }) (*MaintenanceModeMutationPayloadResolver, error) {
+	args *struct{ Input *DisableMaintenanceModeInput },
+) (*MaintenanceModeMutationPayloadResolver, error) {
 	response, err := disableMaintenanceModeMutation(ctx, args.Input)
 	if err != nil {
 		return handleMaintenanceModeMutationProblem(err, args.Input.ClientMutationID)
@@ -1431,7 +1452,8 @@ func (r RootResolver) Announcements(ctx context.Context, args *AnnouncementConne
 
 // CreateAnnouncement creates a new announcement
 func (r RootResolver) CreateAnnouncement(ctx context.Context,
-	args *struct{ Input *CreateAnnouncementInput }) (*AnnouncementMutationPayloadResolver, error) {
+	args *struct{ Input *CreateAnnouncementInput },
+) (*AnnouncementMutationPayloadResolver, error) {
 	response, err := createAnnouncementMutation(ctx, args.Input)
 	if err != nil {
 		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
@@ -1441,7 +1463,8 @@ func (r RootResolver) CreateAnnouncement(ctx context.Context,
 
 // UpdateAnnouncement updates an existing announcement
 func (r RootResolver) UpdateAnnouncement(ctx context.Context,
-	args *struct{ Input *UpdateAnnouncementInput }) (*AnnouncementMutationPayloadResolver, error) {
+	args *struct{ Input *UpdateAnnouncementInput },
+) (*AnnouncementMutationPayloadResolver, error) {
 	response, err := updateAnnouncementMutation(ctx, args.Input)
 	if err != nil {
 		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
@@ -1451,7 +1474,8 @@ func (r RootResolver) UpdateAnnouncement(ctx context.Context,
 
 // DeleteAnnouncement deletes an existing announcement
 func (r RootResolver) DeleteAnnouncement(ctx context.Context,
-	args *struct{ Input *DeleteAnnouncementInput }) (*AnnouncementMutationPayloadResolver, error) {
+	args *struct{ Input *DeleteAnnouncementInput },
+) (*AnnouncementMutationPayloadResolver, error) {
 	response, err := deleteAnnouncementMutation(ctx, args.Input)
 	if err != nil {
 		return handleAnnouncementMutationProblem(err, args.Input.ClientMutationID)
@@ -1526,8 +1550,8 @@ func (r RootResolver) DeleteFederatedRegistry(ctx context.Context,
 func (r RootResolver) CreateFederatedRegistryTokens(ctx context.Context,
 	args *struct {
 		Input *CreateFederatedRegistryTokensInput
-	}) (*FederatedRegistryTokensMutationPayloadResolver, error) {
-
+	},
+) (*FederatedRegistryTokensMutationPayloadResolver, error) {
 	response, err := createFederatedRegistryTokensMutation(ctx, args.Input)
 	if err != nil {
 		return handleCreateFederatedRegistryTokensMutationProblem(err, args.Input.ClientMutationID)
