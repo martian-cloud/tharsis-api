@@ -3,8 +3,8 @@ import MembersIcon from '@mui/icons-material/PeopleOutline';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
 import { Avatar, Box, List, ListItem, ListItemAvatar, ListItemIcon, ListItemText, ListItemButton, Typography, useMediaQuery, useTheme } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import teal from '@mui/material/colors/teal';
+import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 import { AccountLockOutline as ManagedIdentityIcon, LanConnect as ServiceAccountIcon, KeyVariant as KeyIcon, SourceMerge as VCSProviderIcon, RobotOutline as RunnersIcon, ServerNetwork as FederatedRegistryIcon, CubeOutline as TerraformModuleIcon } from 'mdi-material-ui';
 
@@ -32,7 +32,6 @@ const LIST_ITEMS = [
 
 function GroupDetailsDrawer(props: Props) {
     const { route, groupName, groupPath } = props;
-    const navigate = useNavigate();
     const theme = useTheme();
     const fullSize = useMediaQuery(theme.breakpoints.up('md'));
 
@@ -48,7 +47,8 @@ function GroupDetailsDrawer(props: Props) {
                         <Typography variant="subtitle2" color="textSecondary">Group</Typography>
                     </ListItem>}
                     <ListItemButton
-                        onClick={() => navigate(`/groups/${groupPath}`)}
+                        component={Link}
+                        to={`/groups/${groupPath}`}
                     >
                         <ListItemAvatar>
                             <Avatar sx={{ width: 24, height: 24, bgcolor: teal[200] }} variant="rounded">{groupName[0].toUpperCase()}</Avatar>
@@ -59,7 +59,8 @@ function GroupDetailsDrawer(props: Props) {
                         <ListItemButton
                             key={item.route}
                             selected={route === item.route}
-                            onClick={() => navigate(`/groups/${groupPath}/-/${item.route}`)}
+                            component={Link}
+                            to={`/groups/${groupPath}/-/${item.route}`}
                         >
                             <ListItemIcon>{item.icon}</ListItemIcon>
                             <ListItemText primary={item.label} />

@@ -1,20 +1,19 @@
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, useTheme } from "@mui/material";
+import { Link, useLocation } from 'react-router-dom';
 import { AnnouncementIcon, RunnerIcon, SettingsIcon, UserIcon } from "../common/Icons";
 import Drawer from '../common/Drawer';
-import { useLocation, useNavigate } from 'react-router-dom';
 
 const LIST_ITEMS = [
     { route: 'users', label: 'Users', icon: <UserIcon /> },
     { route: 'runners', label: 'Runner Agents', icon: <RunnerIcon /> },
     { route: 'announcements', label: 'Announcements', icon: <AnnouncementIcon /> },
-    { route: 'system_settings', label: 'System Settings', icon: <SettingsIcon /> },
+    { route: 'system_settings', label: 'System Settings', icon: <SettingsIcon /> }
 ]
 
 const DRAWER_WIDTH = 240;
 
 function AdminAreaDetailsDrawer() {
     const theme = useTheme();
-    const navigate = useNavigate();
     const location = useLocation();
     const route = location.pathname as string;
 
@@ -30,7 +29,8 @@ function AdminAreaDetailsDrawer() {
                         <ListItemButton
                             key={item.route}
                             selected={route.includes(item.route)}
-                            onClick={() => navigate(`/admin/${item.route}`)}
+                            component={Link}
+                            to={`/admin/${item.route}`}
                         >
                             <ListItemIcon>{item.icon}</ListItemIcon>
                             <ListItemText>{item.label}</ListItemText>
@@ -42,4 +42,4 @@ function AdminAreaDetailsDrawer() {
     );
 }
 
-export default AdminAreaDetailsDrawer
+export default AdminAreaDetailsDrawer;

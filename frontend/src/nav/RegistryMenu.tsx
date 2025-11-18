@@ -2,11 +2,10 @@
 import DropdownIcon from '@mui/icons-material/ArrowDropDown';
 import { Button, Menu, MenuItem } from '@mui/material';
 import Box from '@mui/material/Box';
+import { Link } from 'react-router-dom';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 function RegistryMenu() {
-    const navigate = useNavigate();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
 
     function onMenuOpen(event: React.MouseEvent<HTMLButtonElement>) {
@@ -15,11 +14,6 @@ function RegistryMenu() {
 
     function onMenuClose() {
         setMenuAnchorEl(null);
-    }
-
-    function onNavigate(path: string) {
-        onMenuClose();
-        navigate(path);
     }
 
     return (
@@ -32,8 +26,8 @@ function RegistryMenu() {
                 open={Boolean(menuAnchorEl)}
                 onClose={onMenuClose}
             >
-                <MenuItem onClick={() => onNavigate('/module-registry')}>Modules</MenuItem>
-                <MenuItem onClick={() => onNavigate('/provider-registry')}>Providers</MenuItem>
+                <MenuItem component={Link} to="/module-registry" onClick={onMenuClose}>Modules</MenuItem>
+                <MenuItem component={Link} to="/provider-registry" onClick={onMenuClose}>Providers</MenuItem>
             </Menu>
         </Box>
     );

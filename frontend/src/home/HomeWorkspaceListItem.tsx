@@ -1,9 +1,9 @@
-import { Avatar, Link, ListItemButton, ListItemText, Tooltip } from '@mui/material';
+import { Avatar, ListItemButton, ListItemText, Tooltip, Typography } from '@mui/material';
 import teal from '@mui/material/colors/teal';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { HomeWorkspaceListItemFragment_workspace$key } from "./__generated__/HomeWorkspaceListItemFragment_workspace.graphql";
 
 interface Props {
@@ -12,7 +12,6 @@ interface Props {
 }
 
 function HomeWorkspaceListItem({ fragmentRef, last }: Props) {
-    const navigate = useNavigate();
 
     const data = useFragment(graphql`
         fragment HomeWorkspaceListItemFragment_workspace on Workspace
@@ -33,7 +32,8 @@ function HomeWorkspaceListItem({ fragmentRef, last }: Props) {
     return (
         <ListItemButton
             dense
-            onClick={() => navigate(`/groups/${data.fullPath}`)}
+            component={Link}
+            to={`/groups/${data.fullPath}`}
             divider={!last}
         >
             <Avatar
@@ -49,17 +49,21 @@ function HomeWorkspaceListItem({ fragmentRef, last }: Props) {
                 sx={{ overflow: "hidden" }}
                 primary={
                     <Tooltip title={data.fullPath}>
-                        <Link
-                            underline="hover"
+                        <Typography
                             fontWeight={500}
                             variant="body2"
                             color="textPrimary"
                             sx={{
-                                wordWrap: 'break-word'
+                                wordWrap: 'break-word',
+                                textDecoration: 'underline',
+                                textDecorationColor: 'transparent',
+                                '&:hover': {
+                                    textDecorationColor: 'currentColor'
+                                }
                             }}
                         >
                             {formattedWorkspacePath}
-                        </Link>
+                        </Typography>
                     </Tooltip>
                 }
             />

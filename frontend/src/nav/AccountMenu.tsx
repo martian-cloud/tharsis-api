@@ -1,14 +1,14 @@
 import { Launch } from '@mui/icons-material';
-import { Link, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
+import { List, ListItem, ListItemButton, ListItemText } from '@mui/material';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
+import { Link } from 'react-router-dom';
 import React, { useContext, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
-import { useNavigate } from 'react-router-dom';
 import AuthServiceContext from '../auth/AuthServiceContext';
 import AuthenticationService from '../auth/AuthenticationService';
 import Gravatar from '../common/Gravatar';
@@ -23,7 +23,6 @@ interface Props {
 }
 
 function AccountMenu({ fragmentRef }: Props) {
-    const navigate = useNavigate();
     const authService = useContext<AuthenticationService>(AuthServiceContext);
     const [showAboutDialog, setShowAboutDialog] = useState(false);
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -51,24 +50,9 @@ function AccountMenu({ fragmentRef }: Props) {
         setMenuAnchorEl(null);
     }
 
-    function onShowGraphiql() {
-        onMenuClose();
-        navigate('graphiql');
-    }
-
-    function onShowAdminArea() {
-        onMenuClose();
-        navigate('admin');
-    }
-
     function onShowAboutDialog() {
         onMenuClose();
         setShowAboutDialog(true);
-    }
-
-    function onShowPreferences() {
-        onMenuClose();
-        navigate('preferences');
     }
 
     return (
@@ -94,21 +78,19 @@ function AccountMenu({ fragmentRef }: Props) {
                     </Box>
                     <Divider />
                     <List dense>
-                        <ListItemButton onClick={onShowPreferences}>
+                        <ListItemButton component={Link} to="/preferences" onClick={onMenuClose}>
                             <ListItemText primary="Preferences" />
                         </ListItemButton>
-                        {user.admin && <ListItemButton>
-                            <ListItemText onClick={onShowAdminArea}>
-                                Admin Area
-                            </ListItemText>
+                        {user.admin && <ListItemButton component={Link} to="/admin" onClick={onMenuClose}>
+                            <ListItemText primary="Admin Area" />
                         </ListItemButton>}
-                        <ListItemButton onClick={onShowGraphiql}>
+                        <ListItemButton component={Link} to="/graphiql" onClick={onMenuClose}>
                             <ListItemText primary="GraphQL Editor" />
                         </ListItemButton>
                         <ListItem secondaryAction={
-                            <IconButton LinkComponent={Link}
+                            <IconButton component={Link}
                                 edge='end'
-                                href={config.docsUrl}
+                                to={config.docsUrl}
                                 target='_blank'
                                 rel='noopener noreferrer'
                                 disableRipple
@@ -118,15 +100,15 @@ function AccountMenu({ fragmentRef }: Props) {
                         }
                             disablePadding
                         >
-                            <ListItemButton LinkComponent={Link} href={config.docsUrl} target='_blank' rel='noopener noreferrer' dense>
+                            <ListItemButton component={Link} to={config.docsUrl} target='_blank' rel='noopener noreferrer' dense>
                                 <ListItemText primary="Documentation" />
                             </ListItemButton>
                         </ListItem>
                         {apiConfig.tharsisSupportUrl !== '' && <ListItem
                             secondaryAction={
-                                <IconButton LinkComponent={Link}
+                                <IconButton component={Link}
                                     edge='end'
-                                    href={apiConfig.tharsisSupportUrl}
+                                    to={apiConfig.tharsisSupportUrl}
                                     target='_blank'
                                     rel='noopener noreferrer'
                                     disableRipple
@@ -136,7 +118,7 @@ function AccountMenu({ fragmentRef }: Props) {
                             }
                             disablePadding
                         >
-                            <ListItemButton LinkComponent={Link} href={apiConfig.tharsisSupportUrl} target='_blank' rel='noopener noreferrer' dense>
+                            <ListItemButton component={Link} to={apiConfig.tharsisSupportUrl} target='_blank' rel='noopener noreferrer' dense>
                                 <ListItemText primary="Support" />
                             </ListItemButton>
                         </ListItem>}

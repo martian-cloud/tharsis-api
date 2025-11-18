@@ -1,8 +1,8 @@
-import { Avatar, Link, ListItemButton, ListItemText } from '@mui/material';
+import { Avatar, ListItemButton, ListItemText, Typography } from '@mui/material';
 import teal from '@mui/material/colors/teal';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { HomeTeamListItemFragment_team$key } from "./__generated__/HomeTeamListItemFragment_team.graphql";
 
 interface Props {
@@ -11,7 +11,6 @@ interface Props {
 }
 
 function HomeTeamListItem({ fragmentRef, last }: Props) {
-    const navigate = useNavigate();
 
     const data = useFragment(graphql`
         fragment HomeTeamListItemFragment_team on Team
@@ -23,7 +22,8 @@ function HomeTeamListItem({ fragmentRef, last }: Props) {
     return (
         <ListItemButton
             dense
-            onClick={() => navigate(`/teams/${data.name}`)}
+            component={Link}
+            to={`/teams/${data.name}`}
             divider={!last}
         >
             <Avatar
@@ -36,12 +36,20 @@ function HomeTeamListItem({ fragmentRef, last }: Props) {
                 variant="rounded">{data.name[0].toUpperCase()}
             </Avatar>
             <ListItemText
-                primary={<Link
-                    underline="hover"
+                primary={<Typography
                     fontWeight={500}
                     variant="body2"
                     color="textPrimary"
-                >{data.name}</Link>} />
+                    sx={{
+                        textDecoration: 'underline',
+                        textDecorationColor: 'transparent',
+                        '&:hover': {
+                            textDecorationColor: 'currentColor'
+                        }
+                    }}
+                >
+                    {data.name}
+                </Typography>} />
         </ListItemButton>
     );
 }
