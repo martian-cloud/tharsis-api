@@ -16,8 +16,8 @@ import MembersIcon from '@mui/icons-material/PeopleOutline';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
-import { useNavigate } from 'react-router-dom';
 import teal from '@mui/material/colors/teal';
+import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 import { AccountLockOutline as ManagedIdentityIcon, RocketLaunchOutline as RunIcon } from 'mdi-material-ui';
 
@@ -41,7 +41,6 @@ const LIST_ITEMS = [
 
 function WorkspaceDetailsDrawer(props: Props) {
     const { route, workspaceName, workspacePath } = props;
-    const navigate = useNavigate();
     const theme = useTheme();
     const fullSize = useMediaQuery(theme.breakpoints.up('md'));
 
@@ -57,7 +56,8 @@ function WorkspaceDetailsDrawer(props: Props) {
                         <Typography variant="subtitle2" color="textSecondary">Workspace</Typography>
                     </ListItem>}
                     <ListItemButton
-                        onClick={() => navigate(`/groups/${workspacePath}`)}
+                        component={Link}
+                        to={`/groups/${workspacePath}`}
                     >
                         <ListItemAvatar>
                             <Avatar sx={{ width: 24, height: 24, bgcolor: teal[200] }} variant="rounded">{workspaceName[0].toUpperCase()}</Avatar>
@@ -68,7 +68,8 @@ function WorkspaceDetailsDrawer(props: Props) {
                         <ListItemButton
                             key={item.route}
                             selected={route === item.route}
-                            onClick={() => navigate(`/groups/${workspacePath}/-/${item.route}`)}>
+                            component={Link}
+                            to={`/groups/${workspacePath}/-/${item.route}`}>
                             <ListItemIcon sx={{ mt: 0.5, mb: 0.5 }}>
                                 {item.icon}
                             </ListItemIcon>
