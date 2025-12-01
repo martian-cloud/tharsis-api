@@ -1,6 +1,6 @@
 module gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api
 
-go 1.24.0
+go 1.24.9
 
 require (
 	github.com/Masterminds/semver/v3 v3.2.1
