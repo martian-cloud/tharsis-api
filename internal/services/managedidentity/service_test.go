@@ -2804,7 +2804,6 @@ func TestCreateCredentials(t *testing.T) {
 		},
 		WorkspaceID: "some-workspace-id",
 	}
-
 	type testCase struct {
 		caller                    auth.Caller
 		input                     *models.ManagedIdentity
@@ -2858,7 +2857,6 @@ func TestCreateCredentials(t *testing.T) {
 
 			if test.existingManagedIdentities != nil {
 				mockManagedIdentities.On("GetManagedIdentitiesForWorkspace", mock.Anything, sampleJob.WorkspaceID).Return(test.existingManagedIdentities, nil)
-
 				mockJobService.On("GetJobByID", mock.Anything, sampleJob.Metadata.ID).Return(sampleJob, nil)
 			}
 

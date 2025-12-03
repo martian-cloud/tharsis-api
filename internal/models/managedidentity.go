@@ -19,9 +19,10 @@ type ManagedIdentityType string
 
 // Managed Identity Types
 const (
-	ManagedIdentityAzureFederated   ManagedIdentityType = "azure_federated"
-	ManagedIdentityAWSFederated     ManagedIdentityType = "aws_federated"
-	ManagedIdentityTharsisFederated ManagedIdentityType = "tharsis_federated"
+	ManagedIdentityAzureFederated      ManagedIdentityType = "azure_federated"
+	ManagedIdentityAWSFederated        ManagedIdentityType = "aws_federated"
+	ManagedIdentityTharsisFederated    ManagedIdentityType = "tharsis_federated"
+	ManagedIdentityKubernetesFederated ManagedIdentityType = "kubernetes_federated"
 )
 
 // ManagedIdentityAccessRuleType represents the supported managed identity rule types

@@ -35,6 +35,39 @@ interface Props {
 const ISSUER = config.apiUrl;
 const HOSTNAME = new URL(ISSUER).hostname;
 
+// Template for Terraform HCL to configure managed identity access
+const buildTerraformHCLTemplate = (apiUrl: string, managedIdentityId: string, audience: string) => {
+    return `resource "kubernetes_cluster_role_binding_v1" "tharsis_managed_identity" {
+  metadata {
+    name = "tharsis-managed-identity-${managedIdentityId}"
+  }
+  
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "cluster-admin"  # Adjust permissions as needed
+  }
+  
+  subject {
+    kind      = "User"
+    name      = "${apiUrl}#${managedIdentityId}"
+    api_group = "rbac.authorization.k8s.io"
+  }
+}
+
+# Configure OIDC identity provider
+resource "aws_eks_identity_provider_config" "tharsis" {
+  cluster_name = "your-cluster-name"
+  
+  oidc {
+    identity_provider_config_name = "tharsis"
+    issuer_url                   = "${apiUrl}"
+    client_id                    = "${audience}"
+  }
+}`;
+
+};
+
 const FieldLabel = styled(
     Typography
 )(() => ({}));
@@ -396,6 +429,17 @@ function ManagedIdentityDetails(props: Props) {
                                     </TableBody>
                                 </Table>
                             </Paper>
+                        </Box>}
+                        {data.managedIdentity.type === 'kubernetes_federated' && <Box>
+                            <FieldLabel>Client ID</FieldLabel>
+                            <FieldValue>{payload.audience}</FieldValue>
+                            <FieldLabel>Subject Name</FieldLabel>
+                            <FieldValue>{`${ISSUER}#${data.managedIdentity.id}`}</FieldValue>
+                            <FieldLabel marginTop={2}>Terraform Configuration</FieldLabel>
+                            <Typography color="textSecondary">
+                                Use the Terraform configuration below to configure your EKS cluster OIDC identity provider and allow this managed identity access.
+                            </Typography>
+                            <SyntaxHighlighter wrapLongLines customStyle={{ fontSize: 14 }} language="hcl" style={prismTheme} children={buildTerraformHCLTemplate(config.apiUrl, data.managedIdentity.id, payload.audience)} />
                         </Box>}
                     </Box>}
                     {tab === 'rules' && <Box>
