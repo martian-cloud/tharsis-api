@@ -42,7 +42,7 @@ function ManagedIdentityListItem({ fragmentRef, inherited }: Props) {
                     borderBottomRightRadius: 4
                 }
             }}>
-            <Box minWidth={70}>
+            <Box minWidth={90}>
                 <ManagedIdentityTypeChip mr={1} type={data.type} />
             </Box>
             <ListItemText

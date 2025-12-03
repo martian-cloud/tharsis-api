@@ -71,7 +71,7 @@ require (
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
 	gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity v0.4.0
-	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.50.0
+	gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-sdk-go v0.52.0
 	go.opentelemetry.io/contrib/propagators/aws v1.26.0
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0

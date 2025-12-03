@@ -13,6 +13,7 @@ import EditManagedIdentityRuleDialog from './rules/EditManagedIdentityRuleDialog
 import ManagedIdentityRulesList from './rules/ManagedIdentityRulesList';
 import NewManagedIdentityRuleDialog from './rules/NewManagedIdentityRuleDialog';
 
+
 export interface FormData {
     type: string
     name: string
@@ -32,6 +33,7 @@ interface Props {
 const ManagedIdentityTypes = [
     { name: 'aws_federated', title: 'AWS', description: 'AWS managed identity for assuming an IAM role using OIDC Federation' },
     { name: 'azure_federated', title: 'Azure', description: 'Azure managed identity for assuming an Azure Service Principal using OIDC Federation' },
+    { name: 'kubernetes_federated', title: 'Kubernetes', description: 'Kubernetes managed identity for assuming a kubernetes role using OIDC Federation' },
     { name: 'tharsis_federated', title: 'Tharsis', description: 'Tharsis managed identity for assuming a Tharsis Service Account using OIDC Federation' }
 ];
 
@@ -39,20 +41,38 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
     const [ruleToEdit, setRuleToEdit] = useState<any>(null);
     const [showCreateNewRuleDialog, setShowCreateNewRuleDialog] = useState(false);
 
+
     const onTypeChange = (type: string) => {
         if (!editMode) {
+            let payload;
+            switch (type) {
+                case 'aws_federated':
+                    payload = { role: '' };
+                    break;
+                case 'azure_federated':
+                    payload = { clientId: '', tenantId: '' };
+                    break;
+                case 'kubernetes_federated':
+                    payload = { audience: 'kubernetes' };
+                    break;
+                default:
+                    payload = { clientId: '', tenantId: '' };
+            }
+            
             onChange({
                 ...data,
                 type,
-                payload: type === 'aws_federated' ? { role: '' } : { clientId: '', tenantId: '' }
+                payload
             });
         }
     };
 
     const onPayloadFieldChange = (field: string, val: string | boolean) => {
+        const newPayload = { ...data.payload, [field]: val };
+        
         onChange({
             ...data,
-            payload: { ...data.payload, [field]: val }
+            payload: newPayload
         });
     };
 
@@ -96,6 +116,7 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
             {error && <Alert sx={{ marginTop: 2 }} severity={error.severity}>
                 {error.message}
             </Alert>}
+
             <Box marginTop={4} marginBottom={4}>
                 <Typography variant="subtitle1" gutterBottom>Select Type</Typography>
                 <Divider light />
@@ -172,6 +193,23 @@ function ManagedIdentityForm({ groupPath, data, onChange, editMode, error }: Pro
                         value={data.payload.tenantId}
                         onChange={event => onPayloadFieldChange('tenantId', event.target.value)}
                     />
+                </Box>}
+                {data.type === 'kubernetes_federated' && <Box marginTop={2}>
+                    <TextField
+                        autoComplete="off"
+                        size="small"
+                        fullWidth
+                        label="Audience"
+                        value={data.payload.audience}
+                        onChange={event => onPayloadFieldChange('audience', event.target.value)}
+                        required
+
+                    />
+                    <Typography color="textSecondary" variant="caption" mt={1} display="block">
+                        Specify the audience for this Kubernetes managed identity. This determines which EKS clusters 
+                        can accept tokens from this managed identity. The audience should match the client_id configured 
+                        in your EKS OIDC identity provider. If not provided, the default value is <strong>"kubernetes"</strong>.
+                    </Typography>
                 </Box>}
                 {data.type === 'tharsis_federated' && <Box marginTop={2}>
                     <Box marginBottom={2}>

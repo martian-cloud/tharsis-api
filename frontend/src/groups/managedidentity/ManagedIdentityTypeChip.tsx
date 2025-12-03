@@ -12,6 +12,7 @@ function ManagedIdentityTypeChip({ type, mr }: Props) {
             {type === 'aws_federated' && <Chip sx={{ color: '#FF9900', borderColor: '#FF9900', marginRight: mr }} variant="outlined" label={'aws'} size="small" />}
             {type === 'azure_federated' && <Chip sx={{ color: '#00a2ed', borderColor: '#00a2ed', marginRight: mr }} variant="outlined" label={'azure'} size="small" />}
             {type === 'tharsis_federated' && <Chip sx={{ color: '#4db6ac', borderColor: '#4db6ac', marginRight: mr }} variant="outlined" label={'tharsis'} size="small" />}
+            {type === 'kubernetes_federated' && <Chip sx={{ color: '#326ce5', borderColor: '#326ce5', marginRight: mr }} variant="outlined" label={'kubernetes'} size="small" />}
         </React.Fragment>
     )
 }
