@@ -3,10 +3,10 @@ package resolver
 import (
 	"context"
 	"fmt"
-
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/universalsearch"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
@@ -23,6 +23,7 @@ type State struct {
 	Config         *config.Config
 	Logger         logger.Logger
 	ServiceCatalog *services.Catalog
+	SearchManager  universalsearch.Manager
 }
 
 // Attach is used to attach the resolver state to the context
@@ -46,6 +47,11 @@ func (k key) String() string {
 
 func getServiceCatalog(ctx context.Context) *services.Catalog {
 	return extract(ctx).ServiceCatalog
+}
+
+// getUniversalSearchManager extracts the universal search manager from the resolver context
+func getUniversalSearchManager(ctx context.Context) universalsearch.Manager {
+	return extract(ctx).SearchManager
 }
 
 // nolint

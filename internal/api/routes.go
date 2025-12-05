@@ -23,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/ui"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/universalsearch"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
@@ -44,6 +45,7 @@ func BuildRouter(
 	authenticator auth.Authenticator,
 	openIDConfigFetcher auth.OpenIDConfigFetcher,
 	serviceCatalog *services.Catalog,
+	searchManager universalsearch.Manager,
 	userSessionManager auth.UserSessionManager,
 	signingKeyManager auth.SigningKeyManager,
 ) (chi.Router, error) {
@@ -51,6 +53,7 @@ func BuildRouter(
 		Config:         cfg,
 		Logger:         logger,
 		ServiceCatalog: serviceCatalog,
+		SearchManager:  searchManager,
 	}
 
 	// The connection timeout will use the same timeout as the session refresh token to ensure that a graphql subscription

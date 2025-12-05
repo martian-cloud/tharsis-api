@@ -229,6 +229,18 @@ func unwrapTharsisError(err error) (*TharsisError, bool) {
 			return tErr, true
 		}
 
-		err = errors.Unwrap(err)
+		if uw, ok := err.(interface{ Unwrap() error }); ok {
+			err = uw.Unwrap()
+		} else if uw, ok := err.(interface{ Unwrap() []error }); ok {
+			// If multiple errors are wrapped, just take the first one
+			errs := uw.Unwrap()
+			if len(errs) > 0 {
+				err = errs[0]
+			} else {
+				err = nil
+			}
+		} else {
+			err = nil
+		}
 	}
 }

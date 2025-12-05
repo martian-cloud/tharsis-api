@@ -26,7 +26,7 @@ const graphQLFetcher = (authService: AuthenticationService) => {
     const json = await response.json();
     // Throw error here so it'll be caught by error boundary
     if (json.errors && json.errors.length) {
-        throw new GraphQLError(`GraphQL query failed: ${json.errors.map((e: any) => e.message).join('; ')}`, json.errors.map((e: any) => e.extensions.code))
+        throw new GraphQLError(`GraphQL query failed: ${json.errors.map((e: any) => e.message).join('; ')}`, json.errors.map((e: any) => e.extensions?.code || 'UNKNOWN'))
     }
     return json;
   }

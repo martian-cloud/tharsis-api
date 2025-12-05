@@ -1884,6 +1884,7 @@ type Query {
   roles(after: String, before: String, first: Int, last: Int, search: String, sort: RoleSort): RoleConnection!
   run(id: String!): Run @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   runs(after: String, before: String, first: Int, last: Int, sort: RunSort, workspaceAssessment: Boolean, workspaceId: String, workspacePath: String): RunConnection!
+  search(query: String!): SearchResponse!
   serviceAccount(id: String!): ServiceAccount @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   sharedRunners(after: String, before: String, first: Int, last: Int, sort: ServiceAccountSort): RunnerConnection!
   team(name: String!): Team @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
@@ -2218,6 +2219,10 @@ input SaveJobLogsInput {
 type SaveJobLogsPayload {
   clientMutationId: String
   problems: [Problem!]!
+}
+
+type SearchResponse {
+  results: [Node!]!
 }
 
 type ServiceAccount implements Node {
