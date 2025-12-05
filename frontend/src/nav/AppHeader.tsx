@@ -4,7 +4,7 @@ import { Box, Button, Stack } from '@mui/material';
 import { styled } from "@mui/material/styles";
 import Toolbar from '@mui/material/Toolbar';
 import { useEffect, useRef } from 'react';
-import AccountMenu from './AccountMenu';
+import AccountMenu from '../nav/AccountMenu';
 import Link from '../routes/Link';
 import { Link as RouterLink } from 'react-router-dom';
 import RegistryMenu from './RegistryMenu';
@@ -12,6 +12,7 @@ import { useFragment } from 'react-relay/hooks';
 import { AppHeaderFragment$key } from './__generated__/AppHeaderFragment.graphql';
 import AnnouncementBanner from '../common/AnnouncementBanner';
 import { useAppHeaderHeight } from '../contexts/AppHeaderHeightProvider';
+import UniversalSearch from './UniversalSearch';
 
 const StyledAppBar = styled(AppBar)<AppBarProps>(({ theme }) => ({
     boxShadow: 'none',
@@ -75,7 +76,10 @@ function AppHeader(props: Props) {
                         <Box marginRight={4}>
                             <Link underline="none" color="primary" variant="h5" sx={{ fontWeight: "bold" }} to="/">Tharsis</Link>
                         </Box>
-                        <Box display="flex" flex="1" justifyContent="flex-end" alignItems="center">
+                        <Box display="flex" flex="1" alignItems="center" justifyContent="center">
+                            <UniversalSearch />
+                        </Box>
+                        <Box display="flex" justifyContent="flex-end" alignItems="center">
                             <Stack direction="row" spacing={1} alignItems="center" marginRight={3}>
                                 <Button
                                     color="inherit"

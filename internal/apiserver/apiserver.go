@@ -59,6 +59,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/version"
 	workspacesvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/universalsearch"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -267,7 +268,8 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		WorkspaceService:                 workspaceService,
 	}
 	serviceCatalog.Init()
-
+	// Initialize universal search service
+	universalSearchManager := universalsearch.NewManager(serviceCatalog, logger)
 	// Start workspace assessment scheduler
 	workspace.NewAssessmentScheduler(
 		dbClient,
@@ -286,7 +288,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		}
 	}
 
-	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, userSessionManager, signingKeyManager)
+	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, universalSearchManager, userSessionManager, signingKeyManager)
 	if err != nil {
 		return nil, err
 	}
