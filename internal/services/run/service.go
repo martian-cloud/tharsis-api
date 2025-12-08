@@ -129,35 +129,43 @@ func (c CreateRunInput) Validate() error {
 
 	// Check that there is at least one of configuration version and module source.
 	if (c.ConfigurationVersionID == nil) && (c.ModuleSource == nil) {
-		return fmt.Errorf("must supply either configuration version ID or module source")
+		return errors.New("must supply either configuration version ID or module source", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Check that there is no more than one of configuration version and module source.
 	if (c.ConfigurationVersionID != nil) && (c.ModuleSource != nil) {
-		return fmt.Errorf("must supply configuration version ID or module source but not both")
+		return errors.New("must supply configuration version ID or module source but not both", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Check that there is no more than one of configuration version and module version.
 	if (c.ConfigurationVersionID != nil) && (c.ModuleVersion != nil) {
-		return fmt.Errorf("must supply configuration version ID or module version but not both")
+		return errors.New("must supply configuration version ID or module version but not both", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Make sure module version is not specified without module source.
 	if (c.ModuleSource == nil) && (c.ModuleVersion != nil) {
-		return fmt.Errorf("module version is not allowed without module source")
+		return errors.New("module version is not allowed without module source", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	// If a module version is specified, make sure it's a valid semver.
+	// If a module version is specified, validate it.
 	if c.ModuleVersion != nil {
+		if *c.ModuleVersion == "" {
+			return errors.New("module version cannot be empty; please specify a valid semantic version", errors.WithErrorCode(errors.EInvalid))
+		}
+		if *c.ModuleVersion == "latest" {
+			return errors.New("'latest' is not a valid module version; please specify a valid semantic version", errors.WithErrorCode(errors.EInvalid))
+		}
+
+		// Make sure it's a valid semver.
 		_, err := semver.StrictNewVersion(*c.ModuleVersion)
 		if err != nil {
-			return fmt.Errorf("module version is not a valid semver string: %v", err)
+			return errors.New("module version is not a valid semver string", errors.WithErrorCode(errors.EInvalid))
 		}
 	}
 
 	// Don't allow refresh_only in combination with other options that would conflict.
 	if c.RefreshOnly && c.IsDestroy {
-		return fmt.Errorf("refresh_only is not allowed with destroy")
+		return errors.New("refresh_only is not allowed with destroy", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	return nil
