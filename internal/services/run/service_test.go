@@ -4062,3 +4062,51 @@ func TestUpdatePlan(t *testing.T) {
 		})
 	}
 }
+func TestCreateRunInputValidate(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           CreateRunInput
+		expectError     string
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "empty module version",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String(""),
+			},
+			expectError:     "module version cannot be empty; please specify a valid semantic version",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "latest module version",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String("latest"),
+			},
+			expectError:     "'latest' is not a valid module version; please specify a valid semantic version",
+			expectErrorCode: errors.EInvalid,
+		},
+		{
+			name: "valid module version",
+			input: CreateRunInput{
+				ModuleSource:  ptr.String("test-source"),
+				ModuleVersion: ptr.String("1.0.0"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.input.Validate()
+
+			if test.expectError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectError)
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
