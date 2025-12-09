@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 )
 
 type responseWriter struct {
@@ -31,7 +32,7 @@ var totalRequests = promauto.NewCounterVec(
 		Name: "http_requests_total",
 		Help: "Number of get requests.",
 	},
-	[]string{"path"},
+	[]string{"path", "caller_type"},
 )
 
 var responseStatus = promauto.NewCounterVec(
@@ -48,6 +49,32 @@ func PrometheusMiddleware(next http.Handler) http.Handler {
 		rw := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		next.ServeHTTP(rw, r)
 
+		ctx := r.Context()
+
+		var callerType string
+
+		caller := auth.GetCaller(ctx)
+		if caller != nil {
+			switch caller.(type) {
+			case *auth.UserCaller:
+				callerType = "user"
+			case *auth.ServiceAccountCaller:
+				callerType = "service_account"
+			case *auth.JobCaller:
+				callerType = "job"
+			case *auth.SCIMCaller:
+				callerType = "scim"
+			case *auth.FederatedRegistryCaller:
+				callerType = "federated_registry"
+			case *auth.VCSWorkspaceLinkCaller:
+				callerType = "vcs_workspace_link"
+			default:
+				callerType = "unknown"
+			}
+		} else {
+			callerType = "anonymous"
+		}
+
 		statusCode := rw.Status()
 
 		routePattern := chi.RouteContext(r.Context()).RoutePattern()
@@ -58,6 +85,6 @@ func PrometheusMiddleware(next http.Handler) http.Handler {
 		sanitizedPath := strings.ToValidUTF8(routePattern, "<INVALID_UTF_SEQ>")
 
 		responseStatus.WithLabelValues(strconv.Itoa(statusCode)).Inc()
-		totalRequests.WithLabelValues(sanitizedPath).Inc()
+		totalRequests.WithLabelValues(sanitizedPath, callerType).Inc()
 	})
 }

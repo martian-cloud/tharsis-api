@@ -401,7 +401,9 @@ func (s *service) SubscribeToJobs(ctx context.Context, options *SubscribeToJobsI
 
 			job, err := s.dbClient.Jobs.GetJobByID(ctx, event.ID)
 			if err != nil {
-				s.logger.WithContextFields(ctx).Errorf("error querying for job in subscription goroutine: %v", err)
+				if !errors.IsContextCanceledError(err) && !errors.IsDeadlineExceededError(err) {
+					s.logger.WithContextFields(ctx).Errorf("error querying for job in subscription goroutine: %v", err)
+				}
 				continue
 			}
 			if job == nil {

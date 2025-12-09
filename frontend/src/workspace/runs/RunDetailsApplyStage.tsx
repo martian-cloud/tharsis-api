@@ -11,22 +11,22 @@ import React, { useState } from 'react';
 import Lottie from 'react-lottie-player';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import Gravatar from '../../common/Gravatar';
-import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
+import Timestamp from '../../common/Timestamp';
 import { MutationError } from '../../common/error';
 import RocketLottieFileJson from '../../lotties/rocket-in-space-lottie.json';
 import Link from '../../routes/Link';
 import ForceCancelRunAlert from './ForceCancelRunAlert';
 import JobLogs from './JobLogs';
+import NoRunnerAlert from './NoRunnerAlert';
 import RunDetailsErrorSummary from './RunDetailsErrorSummary';
 import RunDetailsPlanSummary from './RunDetailsPlanSummary';
+import RunJobDialog from './RunJobDialog';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunVariables from './RunVariables';
-import RunJobDialog from './RunJobDialog';
-import { RunJobDialog_currentJob$key } from './__generated__/RunJobDialog_currentJob.graphql';
 import { RunDetailsApplyStageApplyRunMutation } from './__generated__/RunDetailsApplyStageApplyRunMutation.graphql';
 import { RunDetailsApplyStageFragment_apply$key } from './__generated__/RunDetailsApplyStageFragment_apply.graphql';
-import NoRunnerAlert from './NoRunnerAlert';
+import { RunJobDialog_currentJob$key } from './__generated__/RunJobDialog_currentJob.graphql';
 
 interface Props {
     fragmentRef: RunDetailsApplyStageFragment_apply$key
@@ -148,21 +148,13 @@ function RunDetailsApplyStage(props: Props) {
                         justifyContent: { xs: 'flex-start', md: 'space-between' },
                         gap: { xs: 1 },
                     }}>
-                    <Box display="flex" alignItems="center">
-                        <Typography sx={{ paddingRight: '4px' }}>Apply triggered</Typography>
+                    <Typography component="div">
+                        Apply triggered{' '}
                         <Timestamp component="span" timestamp={data.apply.metadata.createdAt} />
-                        <Typography sx={{ paddingLeft: '4px', paddingRight: '8px' }}>by</Typography>
-                        <Gravatar width={20} height={20} email={data.apply.triggeredBy} />
-                        <Typography
-                            sx={{
-                                paddingLeft: '8px',
-                                [theme.breakpoints.down('lg')]: {
-                                    display: 'none'
-                                }
-                            }}>
-                            {data.apply.triggeredBy}
-                        </Typography>
-                    </Box>
+                        {' '}by{' '}
+                        <Gravatar sx={{ display: 'inline-block', verticalAlign: 'middle' }} width={20} height={20} email={data.apply.triggeredBy} />
+                        {' '}{data.apply.triggeredBy}
+                    </Typography>
                     <TRNButton trn={data.apply.metadata.trn} />
                 </Box>}
                 <Paper variant="outlined" sx={{ marginBottom: 2, p: 2 }} >
@@ -226,7 +218,7 @@ function RunDetailsApplyStage(props: Props) {
                     </Box>
                 </Box>}
                 {(data.apply && data.apply.currentJob && data.apply.status !== 'pending') && <Paper variant="outlined" sx={{ padding: 2, marginBottom: 2 }}>
-                <Typography variant="body2" component="div">This apply has
+                    <Typography variant="body2" component="div">This apply has
                         <MuiLink
                             component="button"
                             color="secondary"
@@ -235,9 +227,9 @@ function RunDetailsApplyStage(props: Props) {
                             variant="body2"
                             sx={{ marginLeft: '4px', fontWeight: 600 }}
                         >1 job
-                    </MuiLink>
-                </Typography>
-            </Paper>}
+                        </MuiLink>
+                    </Typography>
+                </Paper>}
                 {data.apply.currentJob && data.apply.status !== 'pending' && <Box>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <Tabs value={tab} onChange={onTabChange}>

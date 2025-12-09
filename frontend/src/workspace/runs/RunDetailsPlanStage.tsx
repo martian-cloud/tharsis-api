@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { CircularProgress, Divider, Link as MuiLink, Paper, Tooltip, Typography, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
@@ -8,28 +7,28 @@ import { grey } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import humanizeDuration from 'humanize-duration';
 import moment from 'moment';
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import Lottie from 'react-lottie-player';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Gravatar from '../../common/Gravatar';
-import Timestamp from '../../common/Timestamp';
 import TRNButton from '../../common/TRNButton';
+import Timestamp from '../../common/Timestamp';
 import { MutationError } from '../../common/error';
 import RocketLottieFileJson from '../../lotties/rocket-in-space-lottie.json';
 import Link from '../../routes/Link';
 import ForceCancelRunAlert from './ForceCancelRunAlert';
 import JobLogs from './JobLogs';
+import NoRunnerAlert from './NoRunnerAlert';
 import RunDetailsErrorSummary from './RunDetailsErrorSummary';
 import RunDetailsPlanSummary from './RunDetailsPlanSummary';
+import RunJobDialog from './RunJobDialog';
 import RunStageStatusTypes from './RunStageStatusTypes';
 import RunVariables from './RunVariables';
-import RunJobDialog from './RunJobDialog';
-import { RunJobDialog_currentJob$key } from './__generated__/RunJobDialog_currentJob.graphql';
 import { RunDetailsPlanStageApplyRunMutation } from './__generated__/RunDetailsPlanStageApplyRunMutation.graphql';
 import { RunDetailsPlanStageFragment_plan$key } from './__generated__/RunDetailsPlanStageFragment_plan.graphql';
+import { RunJobDialog_currentJob$key } from './__generated__/RunJobDialog_currentJob.graphql';
 import RunDetailsPlanDiffViewer, { MaxDiffSize } from './plandiff/RunDetailsPlanDiffViewer';
-import NoRunnerAlert from './NoRunnerAlert';
 
 interface Props {
     fragmentRef: RunDetailsPlanStageFragment_plan$key
@@ -161,21 +160,13 @@ function RunDetailsPlanStage(props: Props) {
                     justifyContent: { xs: 'flex-start', md: 'space-between' },
                     gap: { xs: 1 },
                 }}>
-                <Box display="flex" alignItems="center">
-                    <Typography sx={{ paddingRight: '4px' }}>Plan triggered</Typography>
+                <Typography component="div">
+                    Plan triggered{' '}
                     <Timestamp component="span" timestamp={data.plan.metadata.createdAt} />
-                    <Typography sx={{ paddingLeft: '4px', paddingRight: '8px' }}>by</Typography>
-                    <Gravatar width={20} height={20} email={data.createdBy} />
-                    <Typography
-                        sx={{
-                            paddingLeft: '8px',
-                            [theme.breakpoints.down('lg')]: {
-                                display: 'none'
-                            }
-                        }}>
-                        {data.createdBy}
-                    </Typography>
-                </Box>
+                    {' '}by{' '}
+                    <Gravatar sx={{ display: 'inline-block', verticalAlign: 'middle' }} width={20} height={20} email={data.createdBy} />
+                    {' '}{data.createdBy}
+                </Typography>
                 <TRNButton trn={data.plan.metadata.trn} />
             </Box>}
             {data.plan.status !== 'pending' && <Paper variant="outlined" sx={{ marginBottom: 2, p: 2 }} >

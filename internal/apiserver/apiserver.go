@@ -78,7 +78,7 @@ type APIServer struct {
 
 // New creates a new APIServer instance
 func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersion string, buildTimestamp string) (*APIServer, error) {
-	openIDConfigFetcher := auth.NewOpenIDConfigFetcher()
+	openIDConfigFetcher := auth.NewOpenIDConfigFetcher(logger)
 
 	tlsConfig, err := loadTLSConfig(cfg, logger)
 	if err != nil {

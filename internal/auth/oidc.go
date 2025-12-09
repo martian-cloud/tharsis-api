@@ -19,6 +19,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 const (
@@ -45,6 +46,26 @@ type OpenIDConfigFetcher interface {
 	GetOpenIDConfig(ctx context.Context, issuer string) (*OIDCConfiguration, error)
 }
 
+type leveledLoggerAdapter struct {
+	logger logger.Logger
+}
+
+func (l *leveledLoggerAdapter) Error(msg string, keysAndValues ...interface{}) {
+	l.logger.With(keysAndValues...).Error(msg)
+}
+
+func (l *leveledLoggerAdapter) Info(msg string, keysAndValues ...interface{}) {
+	l.logger.With(keysAndValues...).Info(msg)
+}
+
+func (l *leveledLoggerAdapter) Debug(msg string, keysAndValues ...interface{}) {
+	l.logger.With(keysAndValues...).Debug(msg)
+}
+
+func (l *leveledLoggerAdapter) Warn(msg string, keysAndValues ...interface{}) {
+	l.logger.With(keysAndValues...).Info(msg)
+}
+
 // OpenIDConfigFetcher implements functions to fetch
 // OpenID configuration from an issuer.
 type openIDConfigFetcher struct {
@@ -52,10 +73,12 @@ type openIDConfigFetcher struct {
 }
 
 // NewOpenIDConfigFetcher returns a new NewOpenIDConfigFetcher
-func NewOpenIDConfigFetcher() OpenIDConfigFetcher {
+func NewOpenIDConfigFetcher(logger logger.Logger) OpenIDConfigFetcher {
 	// Retryablehttp client defaults to 4 retries.
 	client := retryablehttp.NewClient()
 	client.RetryWaitMin = retryWaitMinimum
+	client.Logger = &leveledLoggerAdapter{logger: logger}
+
 	return &openIDConfigFetcher{client: client}
 }
 

@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS index_state_versions_on_run_id;
+DROP INDEX IF EXISTS index_state_versions_on_workspace_id;
+DROP INDEX IF EXISTS index_state_version_outputs_on_state_version_id;

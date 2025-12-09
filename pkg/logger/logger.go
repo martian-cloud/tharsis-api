@@ -3,6 +3,7 @@ package logger
 
 import (
 	"context"
+	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -59,8 +60,16 @@ type logger struct {
 
 // New creates a new logger using the default configuration.
 func New() Logger {
-	l, _ := zap.NewProduction()
-	return NewWithZap(l)
+	var level zap.AtomicLevel
+
+	if err := level.UnmarshalText([]byte(os.Getenv("LOG_LEVEL"))); err != nil {
+		level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	}
+
+	config := zap.NewProductionConfig()
+	config.Level = level
+	logger, _ := config.Build()
+	return NewWithZap(logger)
 }
 
 // NewWithZap creates a new logger using the pre-configured zap logger.

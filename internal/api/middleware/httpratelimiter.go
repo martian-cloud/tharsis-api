@@ -6,6 +6,7 @@ import (
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
@@ -18,6 +19,10 @@ const (
 	headerRetryAfter    = "Retry-After"
 )
 
+var (
+	httpRateLimitTokens = metric.NewHistogram("http_rate_limit_tokens", "Amount of tokens used.", 1, 2, 8)
+)
+
 // HTTPRateLimiterMiddleware creates a handler for HTTP rate limiting.
 func HTTPRateLimiterMiddleware(
 	logger logger.Logger,
@@ -27,7 +32,7 @@ func HTTPRateLimiterMiddleware(
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			// Use the subject string set by the ResolveSubject middleware.
+			// Use the subject string set by the subject middleware.
 			subject := auth.GetSubject(ctx)
 			if subject == nil {
 				logger.WithContextFields(ctx).Errorf("No subject string in context")
@@ -43,6 +48,12 @@ func HTTPRateLimiterMiddleware(
 				respWriter.RespondWithError(r.Context(), w, errors.Wrap(err, "Failed to check HTTP rate limit"))
 				return
 			}
+
+			usedTokens := tokenLimit - remaining
+
+			httpRateLimitTokens.Observe(float64(usedTokens))
+
+			logger.With("subject", subject, "tokens_used", usedTokens).Debug("http request")
 
 			// Tell the requester the current rate limit status.
 			w.Header().Add(headerRateLimit, strconv.Itoa(int(tokenLimit)))
