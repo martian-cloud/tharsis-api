@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"sync"
 
-	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/metric"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
@@ -64,7 +65,14 @@ type events struct {
 	dbClient *Client
 }
 
-var dbEventCount = metric.NewCounter("db_event_count", "Amount of database events.")
+var dbEventCount = promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "db_event_count",
+		Help: "Amount of database events.",
+	},
+	[]string{"table", "action"},
+)
+
 
 // NewEvents returns an instance of the Events interface
 func NewEvents(dbClient *Client) Events {
@@ -123,7 +131,7 @@ func (e *events) Listen(ctx context.Context) (<-chan Event, <-chan error) {
 				continue
 			}
 
-			dbEventCount.Inc()
+			dbEventCount.WithLabelValues(event.Table, event.Action).Inc()
 			select {
 			case ch <- event:
 			case <-ctx.Done():

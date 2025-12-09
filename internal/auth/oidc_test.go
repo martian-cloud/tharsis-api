@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
 func TestGetOpenIDConfig(t *testing.T) {
@@ -78,7 +79,8 @@ func TestGetOpenIDConfig(t *testing.T) {
 
 			issuer = s.URL
 
-			resp, err := NewOpenIDConfigFetcher().GetOpenIDConfig(ctx, issuer)
+			logger, _ := logger.NewForTest()
+			resp, err := NewOpenIDConfigFetcher(logger).GetOpenIDConfig(ctx, issuer)
 			if err != nil {
 				assert.True(t, test.expectErr)
 				return

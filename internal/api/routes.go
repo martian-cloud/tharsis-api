@@ -83,9 +83,9 @@ func BuildRouter(
 		}),
 		middleware.NewRequestIDMiddleware(),
 		middleware.NewUserAgentMiddleware(),
-		middleware.PrometheusMiddleware,
 		middleware.NewAuthenticationMiddleware(authenticator, respWriter, userSessionManager),
 		middleware.NewSubjectMiddleware(logger, respWriter),
+		middleware.PrometheusMiddleware,
 		middleware.HTTPRateLimiterMiddleware(
 			logger,
 			respWriter,
