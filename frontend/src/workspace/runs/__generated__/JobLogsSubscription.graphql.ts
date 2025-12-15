@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3e029dd7420e492e28cd5258aaca03c8>>
+ * @generated SignedSource<<8d4ae647ee7509a73a08aadd894fdef6>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,6 +18,11 @@ export type JobLogsSubscription$variables = {
 };
 export type JobLogsSubscription$data = {
   readonly jobLogStreamEvents: {
+    readonly completed: boolean;
+    readonly data: {
+      readonly logs: string;
+      readonly offset: number;
+    } | null | undefined;
     readonly size: number;
   };
 };
@@ -55,6 +60,38 @@ v1 = [
         "kind": "ScalarField",
         "name": "size",
         "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "completed",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "JobLogStreamEventData",
+        "kind": "LinkedField",
+        "name": "data",
+        "plural": false,
+        "selections": [
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "offset",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "logs",
+            "storageKey": null
+          }
+        ],
+        "storageKey": null
       }
     ],
     "storageKey": null
@@ -78,16 +115,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "eb1d30d6cb57a80d14cac615936c9d2d",
+    "cacheID": "5c53020c1b1272c7f93bf58ada9bc3d9",
     "id": null,
     "metadata": {},
     "name": "JobLogsSubscription",
     "operationKind": "subscription",
-    "text": "subscription JobLogsSubscription(\n  $input: JobLogStreamSubscriptionInput!\n) {\n  jobLogStreamEvents(input: $input) {\n    size\n  }\n}\n"
+    "text": "subscription JobLogsSubscription(\n  $input: JobLogStreamSubscriptionInput!\n) {\n  jobLogStreamEvents(input: $input) {\n    size\n    completed\n    data {\n      offset\n      logs\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "8dec75d5dcbc78eb86dd059a15ac0582";
+(node as any).hash = "30862c6d8ed3d6f81775d6fa28488862";
 
 export default node;

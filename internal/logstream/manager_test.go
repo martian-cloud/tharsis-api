@@ -124,58 +124,98 @@ func TestReadLogs(t *testing.T) {
 func TestSubscribe(t *testing.T) {
 	streamID := "stream1"
 
-	// Test cases
 	tests := []struct {
-		name           string
-		lastSeenSize   *int
-		sendEventData  []*db.LogStreamEventData
-		expectedEvents []LogEvent
+		name               string
+		lastSeenLogSize    *int
+		logStreamSize      int
+		logStreamExists    bool
+		expectErrorMessage string
+		expectedEvents     []struct {
+			size   int
+			offset int
+			logs   string
+		}
+		dbEvents []db.LogStreamEventData
 	}{
 		{
-			name: "stream 2 events with last seen size not set",
-			sendEventData: []*db.LogStreamEventData{
-				{Size: 5, Completed: false},
-				{Size: 10, Completed: true},
+			name:            "successful subscription with no last seen size",
+			logStreamExists: true,
+			logStreamSize:   10,
+			dbEvents: []db.LogStreamEventData{
+				{Size: 13, Completed: false},
 			},
-			expectedEvents: []LogEvent{
-				{Size: 5, Completed: false},
-				{Size: 10, Completed: true},
+			expectedEvents: []struct {
+				size   int
+				offset int
+				logs   string
+			}{
+				{size: 13, offset: 10, logs: "new"},
 			},
 		},
 		{
-			name: "last seen does not equal the current stream size",
-			sendEventData: []*db.LogStreamEventData{
-				{Size: 5, Completed: false},
-				{Size: 10, Completed: true},
+			name:            "successful subscription with last seen size",
+			lastSeenLogSize: ptr.Int(5),
+			logStreamExists: true,
+			logStreamSize:   15,
+			expectedEvents: []struct {
+				size   int
+				offset int
+				logs   string
+			}{
+				{size: 10, offset: 5, logs: "chunk"},
+				{size: 15, offset: 10, logs: "data2"},
 			},
-			expectedEvents: []LogEvent{
-				{Size: 2, Completed: false},
-				{Size: 5, Completed: false},
-				{Size: 10, Completed: true},
-			},
-			lastSeenSize: ptr.Int(3),
+		},
+		{
+			name:               "log stream not found",
+			logStreamExists:    false,
+			expectErrorMessage: "log stream not found with ID",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			mockStore := NewMockStore(t)
 			mockLogStreams := db.NewMockLogStreams(t)
-			mockEvents := db.NewMockEvents(t)
+			mockStore := NewMockStore(t)
 
-			mockEventChannel := make(chan db.Event, 1)
-			var roEventChan <-chan db.Event = mockEventChannel
-			mockEvents.On("Listen", mock.Anything).Return(roEventChan, make(<-chan error)).Maybe()
+			var mockEvents *db.MockEvents
+			var eventChan chan db.Event
+			var errorChan chan error
 
-			mockLogStreams.On("GetLogStreamByID", mock.Anything, streamID).Return(&models.LogStream{
-				Metadata: models.ResourceMetadata{
-					ID: streamID,
-				},
-				Size: 2,
-			}, nil).Once()
+			if len(test.dbEvents) > 0 {
+				mockEvents = db.NewMockEvents(t)
+				eventChan = make(chan db.Event, 10)
+				errorChan = make(chan error, 1)
+				mockEvents.On("Listen", mock.Anything).Return((<-chan db.Event)(eventChan), (<-chan error)(errorChan))
+			}
+
+			var logStream *models.LogStream
+			if test.logStreamExists {
+				logStream = &models.LogStream{
+					Metadata: models.ResourceMetadata{
+						ID: streamID,
+					},
+					Size:      test.logStreamSize,
+					Completed: false,
+				}
+			}
+
+			mockLogStreams.On("GetLogStreamByID", mock.Anything, streamID).Return(logStream, nil)
+
+			if test.logStreamExists && len(test.expectedEvents) > 0 {
+				for _, event := range test.expectedEvents {
+					offset := event.offset
+					mockStore.On("ReadLogs", mock.Anything, streamID, offset, mock.AnythingOfType("int")).Return([]byte(event.logs), nil).Once()
+				}
+			}
+
+			// Mock for db events
+			if len(test.dbEvents) > 0 {
+				mockStore.On("ReadLogs", mock.Anything, streamID, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return([]byte("new"), nil).Maybe()
+			}
 
 			dbClient := &db.Client{
 				LogStreams: mockLogStreams,
@@ -183,48 +223,57 @@ func TestSubscribe(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-
-			eventManager := events.NewEventManager(dbClient, logger)
-			eventManager.Start(ctx)
+			var eventManager *events.EventManager
+			if mockEvents != nil {
+				eventManager = events.NewEventManager(dbClient, logger)
+				eventManager.Start(ctx)
+			} else {
+				eventManager = events.NewEventManager(nil, logger)
+			}
 
 			manager := New(mockStore, dbClient, eventManager, logger)
 
-			eventChannel, err := manager.Subscribe(ctx, &SubscriptionOptions{
+			options := &SubscriptionOptions{
 				LogStreamID:     streamID,
-				LastSeenLogSize: test.lastSeenSize,
-			})
-			if err != nil {
-				t.Fatal(err)
+				LastSeenLogSize: test.lastSeenLogSize,
 			}
 
-			receivedEvents := []*LogEvent{}
+			channel, err := manager.Subscribe(ctx, options)
 
-			go func() {
-				for _, d := range test.sendEventData {
-					encoded, err := json.Marshal(d)
-					require.Nil(t, err)
+			if test.expectErrorMessage != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectErrorMessage)
+				assert.Nil(t, channel)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, channel)
 
-					mockEventChannel <- db.Event{
-						Table:  "log_streams",
-						Action: string(events.UpdateAction),
-						ID:     streamID,
-						Data:   encoded,
+				// Send db events after subscription is established
+				go func() {
+					time.Sleep(10 * time.Millisecond) // Allow subscription to be established
+					for _, dbEvent := range test.dbEvents {
+						eventData, _ := json.Marshal(dbEvent)
+						eventChan <- db.Event{
+							Table:  "log_streams",
+							Action: "UPDATE",
+							ID:     streamID,
+							Data:   eventData,
+						}
+					}
+				}()
+
+				// Verify we can receive expected events
+				for i, expectedEvent := range test.expectedEvents {
+					select {
+					case event := <-channel:
+						assert.Equal(t, expectedEvent.size, event.Size)
+						require.NotNil(t, event.Data)
+						assert.Equal(t, expectedEvent.offset, event.Data.Offset)
+						assert.Equal(t, expectedEvent.logs, event.Data.Logs)
+					case <-time.After(100 * time.Millisecond):
+						t.Fatalf("expected to receive event %d", i+1)
 					}
 				}
-			}()
-
-			for e := range eventChannel {
-				eCopy := e
-				receivedEvents = append(receivedEvents, eCopy)
-
-				if len(receivedEvents) == len(test.expectedEvents) {
-					break
-				}
-			}
-
-			require.Equal(t, len(test.expectedEvents), len(receivedEvents))
-			for i, e := range test.expectedEvents {
-				assert.Equal(t, e, *receivedEvents[i])
 			}
 		})
 	}

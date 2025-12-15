@@ -3,16 +3,20 @@ import { Box, darken, LinearProgress, Paper, ToggleButton, Tooltip, Typography, 
 import graphql from 'babel-plugin-relay/macro';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
-import { useFragment, useRelayEnvironment, useSubscription } from 'react-relay/hooks';
-import { fetchQuery, GraphQLSubscriptionConfig, RecordSourceProxy } from 'relay-runtime';
+import { useFragment, useSubscription } from 'react-relay/hooks';
+import { GraphQLSubscriptionConfig, RecordSourceProxy } from 'relay-runtime';
 import LogViewer from './LogViewer';
 import { JobLogsFragment_logs$key } from './__generated__/JobLogsFragment_logs.graphql';
-import { JobLogsQuery } from './__generated__/JobLogsQuery.graphql';
 import { JobLogsSubscription, JobLogsSubscription$data } from './__generated__/JobLogsSubscription.graphql';
 
 const subscription = graphql`subscription JobLogsSubscription($input: JobLogStreamSubscriptionInput!) {
     jobLogStreamEvents(input: $input) {
       size
+      completed
+      data {
+        offset
+        logs
+      }
     }
   }`;
 
@@ -25,8 +29,6 @@ const bytes = (str: string) => {
     const size = new Blob([str]).size;
     return size;
 }
-
-const LOG_CHUNK_SIZE_BYTES = 1024 * 1024;
 
 function JobLogs(props: Props) {
     const theme = useTheme();
@@ -45,10 +47,7 @@ function JobLogs(props: Props) {
     const [logs, setLogs] = useState(data.logs);
     const [currentLogSize, setCurrentLogSize] = useState(bytes(data.logs));
     const [actualLogSize, setActualLogSize] = useState(data.logSize);
-    const [lastLogEventSize, setLastLogEventSize] = useState(data.logSize);
-    const [loading, setLoading] = useState<boolean>(false);
     const [autoScroll, setAutoScroll] = useState(props.enableAutoScrollByDefault);
-    const environment = useRelayEnvironment();
 
     const config = useMemo<GraphQLSubscriptionConfig<JobLogsSubscription>>(() => ({
         variables: { input: { jobId: data.id, lastSeenLogSize: data.logSize } },
@@ -57,49 +56,17 @@ function JobLogs(props: Props) {
         onError: () => console.warn("Subscription error"),
         updater: (store: RecordSourceProxy, payload: JobLogsSubscription$data | null | undefined) => {
             if (payload) {
-                setLastLogEventSize(payload.jobLogStreamEvents.size);
+                setCurrentLogSize(payload.jobLogStreamEvents.size);
+                setActualLogSize(payload.jobLogStreamEvents.size);
+                if (payload.jobLogStreamEvents.data && payload.jobLogStreamEvents.data.logs) {
+                    setLogs(prevLogs => {
+                        return bytes(prevLogs) < payload.jobLogStreamEvents.size ? prevLogs + payload.jobLogStreamEvents.data?.logs : prevLogs;
+                    });
+                }
             }
         }
     }), [data.id]);
     useSubscription<JobLogsSubscription>(config);
-
-    useEffect(() => {
-        if (lastLogEventSize > actualLogSize) {
-            setActualLogSize(lastLogEventSize);
-        }
-    }, [lastLogEventSize, actualLogSize]);
-
-    useEffect(() => {
-        if (loading || currentLogSize >= actualLogSize) {
-            return;
-        }
-
-        setLoading(true);
-
-        fetchQuery<JobLogsQuery>(
-            environment,
-            graphql`
-              query JobLogsQuery($id: String!, $startOffset: Int!, $limit: Int!) {
-                job(id: $id) {
-                  id
-                  logLastUpdatedAt
-                  logSize
-                  logs(startOffset:$startOffset, limit:$limit)
-                }
-              }
-            `,
-            { id: data.id, startOffset: currentLogSize, limit: LOG_CHUNK_SIZE_BYTES },
-            { fetchPolicy: 'network-only' }
-        ).toPromise().then(async response => {
-            setLoading(false);
-            const job = response?.job;
-            if (job) {
-                setLogs(logs + job.logs);
-                setActualLogSize(job.logSize);
-                setCurrentLogSize(prev => prev + bytes(job.logs));
-            }
-        });
-    }, [data, actualLogSize, currentLogSize, logs, loading, environment]);
 
     useEffect(() => {
         if (autoScroll) {

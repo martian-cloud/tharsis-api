@@ -32,7 +32,7 @@ var totalRequests = promauto.NewCounterVec(
 		Name: "http_requests_total",
 		Help: "Number of get requests.",
 	},
-	[]string{"path", "caller_type"},
+	[]string{"path", "caller_type", "user_agent"},
 )
 
 var responseStatus = promauto.NewCounterVec(
@@ -75,6 +75,13 @@ func PrometheusMiddleware(next http.Handler) http.Handler {
 			callerType = "anonymous"
 		}
 
+		var userAgent string
+		if value := r.Context().Value(contextKeyUserAgent); value != nil {
+			userAgent, _ = value.(string)
+		} else {
+			userAgent = "unknown"
+		}
+
 		statusCode := rw.Status()
 
 		routePattern := chi.RouteContext(r.Context()).RoutePattern()
@@ -85,6 +92,6 @@ func PrometheusMiddleware(next http.Handler) http.Handler {
 		sanitizedPath := strings.ToValidUTF8(routePattern, "<INVALID_UTF_SEQ>")
 
 		responseStatus.WithLabelValues(strconv.Itoa(statusCode)).Inc()
-		totalRequests.WithLabelValues(sanitizedPath, callerType).Inc()
+		totalRequests.WithLabelValues(sanitizedPath, callerType, userAgent).Inc()
 	})
 }

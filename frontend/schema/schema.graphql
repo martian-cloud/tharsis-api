@@ -1301,7 +1301,13 @@ type JobEvent {
 
 type JobLogStreamEvent {
   completed: Boolean!
+  data: JobLogStreamEventData
   size: Int!
+}
+
+type JobLogStreamEventData {
+  logs: String!
+  offset: Int!
 }
 
 input JobLogStreamSubscriptionInput {
