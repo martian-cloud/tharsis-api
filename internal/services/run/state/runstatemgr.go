@@ -126,6 +126,21 @@ func (r *runStateManager) UpdateJob(ctx context.Context, job *models.Job) (*mode
 		}
 	}()
 
+	if job.Status == models.JobFinished {
+		// Update log stream to completed if job is finished
+		logStream, err := r.dbClient.LogStreams.GetLogStreamByJobID(txContext, job.Metadata.ID)
+		if err != nil {
+			return nil, err
+		}
+		if logStream != nil {
+			logStream.Completed = true
+			_, err = r.dbClient.LogStreams.UpdateLogStream(txContext, logStream)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	oldJob, err := r.dbClient.Jobs.GetJobByID(txContext, job.Metadata.ID)
 	if err != nil {
 		return nil, err

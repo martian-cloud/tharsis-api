@@ -78,9 +78,15 @@ input JobLogStreamSubscriptionInput {
   lastSeenLogSize: Int
 }
 
+type JobLogStreamEventData {
+  offset: Int!
+  logs: String!
+}
+
 type JobLogStreamEvent {
   completed: Boolean!
   size: Int!
+  data: JobLogStreamEventData
 }
 
 type JobCancellationEvent {

@@ -14,16 +14,26 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
+const (
+	logEventChunkSizeBytes = 1024 * 1024 // 1MB
+)
+
 // SubscriptionOptions includes options for setting up a log event subscription
 type SubscriptionOptions struct {
 	LastSeenLogSize *int
 	LogStreamID     string
 }
 
+type LogEventData struct {
+	Offset int
+	Logs   string
+}
+
 // LogEvent represents a log stream event
 type LogEvent struct {
 	Size      int
 	Completed bool
+	Data      *LogEventData
 }
 
 // Manager interface encapsulates the logic for saving and retrieving logs
@@ -111,25 +121,30 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 		Type: events.LogStreamSubscription,
 		ID:   logStream.Metadata.ID,
 		Actions: []events.SubscriptionAction{
+			events.CreateAction,
 			events.UpdateAction,
 		},
 	}
 	subscriber := s.eventManager.Subscribe([]events.Subscription{subscription})
 
 	outgoing := make(chan *LogEvent)
+	var completed bool
+
 	go func() {
+		var currentSize int
+
 		// Defer close of outgoing channel
 		defer close(outgoing)
 		defer s.eventManager.Unsubscribe(subscriber)
 
 		if options.LastSeenLogSize != nil {
-			if logStream.Size != *options.LastSeenLogSize {
-				select {
-				case <-ctx.Done():
-					return
-				case outgoing <- &LogEvent{Size: logStream.Size}:
-				}
+			// Send all logs that were missed since last seen size
+			currentSize, completed = s.sendLogstreamEvent(ctx, logStream.Metadata.ID, *options.LastSeenLogSize, logStream.Size, logStream.Completed, outgoing)
+			if completed {
+				return
 			}
+		} else {
+			currentSize = logStream.Size
 		}
 
 		// Wait for log stream updates
@@ -148,18 +163,43 @@ func (s *stream) Subscribe(ctx context.Context, options *SubscriptionOptions) (<
 				return
 			}
 
-			select {
-			case <-ctx.Done():
-				return
-			case outgoing <- &LogEvent{Size: logStreamEventData.Size, Completed: logStreamEventData.Completed}:
-			}
-
-			// Return from loop if log stream has been completed because there are no more logs to process
-			if logStream.Completed {
+			currentSize, completed = s.sendLogstreamEvent(ctx, logStream.Metadata.ID, currentSize, logStreamEventData.Size, logStreamEventData.Completed, outgoing)
+			if completed {
 				return
 			}
 		}
 	}()
 
 	return outgoing, nil
+}
+
+func (s *stream) sendLogstreamEvent(ctx context.Context, logStreamID string, lastSeenLogSize int, actualLogSize int, completed bool, outgoing chan *LogEvent) (int, bool) {
+	for lastSeenLogSize < actualLogSize {
+		offset := lastSeenLogSize
+		// Read logs in chunks
+		logs, err := s.store.ReadLogs(ctx, logStreamID, lastSeenLogSize, logEventChunkSizeBytes)
+		if err != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to read logs for log stream %s: %v", logStreamID, err)
+			return 0, true
+		}
+
+		lastSeenLogSize += len(logs)
+
+		select {
+		case <-ctx.Done():
+			return 0, true
+		case outgoing <- &LogEvent{Size: lastSeenLogSize, Data: &LogEventData{Offset: offset, Logs: string(logs)}}:
+		}
+	}
+
+	// Return from loop if log stream has been completed because there are no more logs to process
+	if completed {
+		select {
+		case <-ctx.Done():
+			return 0, true
+		case outgoing <- &LogEvent{Size: lastSeenLogSize, Completed: completed}:
+		}
+	}
+
+	return lastSeenLogSize, completed
 }

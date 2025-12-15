@@ -302,6 +302,18 @@ func (r *JobResolver) RunnerAvailabilityStatus(ctx context.Context) (*job.Runner
 
 /* Job Subscriptions */
 
+type JobLogStreamEventDataResolver struct {
+	eventData *logstream.LogEventData
+}
+
+func (j *JobLogStreamEventDataResolver) Offset() int32 {
+	return int32(j.eventData.Offset)
+}
+
+func (j *JobLogStreamEventDataResolver) Logs() string {
+	return j.eventData.Logs
+}
+
 // JobLogStreamEventResolver resolves a job log stream event
 type JobLogStreamEventResolver struct {
 	event *logstream.LogEvent
@@ -315,6 +327,14 @@ func (j *JobLogStreamEventResolver) Completed() bool {
 // Size resolver
 func (j *JobLogStreamEventResolver) Size() int32 {
 	return int32(j.event.Size)
+}
+
+// Data resolver
+func (j *JobLogStreamEventResolver) Data() *JobLogStreamEventDataResolver {
+	if j.event.Data == nil {
+		return nil
+	}
+	return &JobLogStreamEventDataResolver{eventData: j.event.Data}
 }
 
 // DEPRECATED: use node query instead
