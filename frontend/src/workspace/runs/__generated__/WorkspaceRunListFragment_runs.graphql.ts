@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7d8c8793b4bbf96a507ea7ef6a18ad58>>
+ * @generated SignedSource<<988e26854404cfbc32a761591b6b483b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,24 +10,24 @@
 
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type RunListFragment_runs$data = {
+export type WorkspaceRunListFragment_runs$data = {
   readonly runs: {
     readonly edges: ReadonlyArray<{
       readonly node: {
         readonly id: string;
-        readonly " $fragmentSpreads": FragmentRefs<"RunListItemFragment_run">;
       } | null | undefined;
     } | null | undefined> | null | undefined;
     readonly totalCount: number;
+    readonly " $fragmentSpreads": FragmentRefs<"RunListFragment_runConnection">;
   };
-  readonly " $fragmentType": "RunListFragment_runs";
+  readonly " $fragmentType": "WorkspaceRunListFragment_runs";
 };
-export type RunListFragment_runs$key = {
-  readonly " $data"?: RunListFragment_runs$data;
-  readonly " $fragmentSpreads": FragmentRefs<"RunListFragment_runs">;
+export type WorkspaceRunListFragment_runs$key = {
+  readonly " $data"?: WorkspaceRunListFragment_runs$data;
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceRunListFragment_runs">;
 };
 
-import RunListPaginationQuery_graphql from './RunListPaginationQuery.graphql';
+import WorkspaceRunListPaginationQuery_graphql from './WorkspaceRunListPaginationQuery.graphql';
 
 const node: ReaderFragment = (function(){
 var v0 = [
@@ -83,10 +83,10 @@ return {
         "path": (v0/*: any*/)
       },
       "fragmentPathInResult": [],
-      "operation": RunListPaginationQuery_graphql
+      "operation": WorkspaceRunListPaginationQuery_graphql
     }
   },
-  "name": "RunListFragment_runs",
+  "name": "WorkspaceRunListFragment_runs",
   "selections": [
     {
       "alias": "runs",
@@ -109,7 +109,7 @@ return {
       ],
       "concreteType": "RunConnection",
       "kind": "LinkedField",
-      "name": "__RunList_runs_connection",
+      "name": "__WorkspaceRunList_runs_connection",
       "plural": false,
       "selections": [
         {
@@ -143,11 +143,6 @@ return {
                   "storageKey": null
                 },
                 {
-                  "args": null,
-                  "kind": "FragmentSpread",
-                  "name": "RunListItemFragment_run"
-                },
-                {
                   "alias": null,
                   "args": null,
                   "kind": "ScalarField",
@@ -166,6 +161,11 @@ return {
             }
           ],
           "storageKey": null
+        },
+        {
+          "args": null,
+          "kind": "FragmentSpread",
+          "name": "RunListFragment_runConnection"
         },
         {
           "alias": null,
@@ -215,6 +215,6 @@ return {
 };
 })();
 
-(node as any).hash = "fc2e409ecd0d355ae76a6149d827c3c6";
+(node as any).hash = "403a1d01ccfdb3d6a2b818d4d2505dea";
 
 export default node;

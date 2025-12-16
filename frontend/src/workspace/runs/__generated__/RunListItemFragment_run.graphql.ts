@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4c29317a224225dffca3199c144a7f11>>
+ * @generated SignedSource<<3a8a2de2cd651f70d864338c8d4bf02d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -29,6 +29,9 @@ export type RunListItemFragment_run$data = {
     readonly status: PlanStatus;
   };
   readonly status: RunStatus;
+  readonly workspace: {
+    readonly fullPath: string;
+  };
   readonly " $fragmentType": "RunListItemFragment_run";
 };
 export type RunListItemFragment_run$key = {
@@ -110,6 +113,24 @@ return {
     {
       "alias": null,
       "args": null,
+      "concreteType": "Workspace",
+      "kind": "LinkedField",
+      "name": "workspace",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "fullPath",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "Plan",
       "kind": "LinkedField",
       "name": "plan",
@@ -133,6 +154,6 @@ return {
 };
 })();
 
-(node as any).hash = "b2deb13eebdc7f7c2ca8a9156943319b";
+(node as any).hash = "e1612b9fbac3dc1149945bd711fe3306";
 
 export default node;

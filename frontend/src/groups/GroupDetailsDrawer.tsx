@@ -6,7 +6,7 @@ import { Avatar, Box, List, ListItem, ListItemAvatar, ListItemIcon, ListItemText
 import teal from '@mui/material/colors/teal';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
-import { AccountLockOutline as ManagedIdentityIcon, LanConnect as ServiceAccountIcon, KeyVariant as KeyIcon, SourceMerge as VCSProviderIcon, RobotOutline as RunnersIcon, ServerNetwork as FederatedRegistryIcon, CubeOutline as TerraformModuleIcon } from 'mdi-material-ui';
+import { AccountLockOutline as ManagedIdentityIcon, LanConnect as ServiceAccountIcon, KeyVariant as KeyIcon, SourceMerge as VCSProviderIcon, RobotOutline as RunnersIcon, ServerNetwork as FederatedRegistryIcon, CubeOutline as TerraformModuleIcon, RocketLaunchOutline as RunIcon } from 'mdi-material-ui';
 
 interface Props {
   groupPath: string
@@ -18,6 +18,7 @@ const DRAWER_WIDTH = 240;
 
 const LIST_ITEMS = [
   { route: 'activity', label: 'Activity', icon: <ActivityIcon /> },
+  { route: 'runs', label: 'Runs', icon: <RunIcon /> },
   { route: 'variables', label: 'Variables', icon: <VariablesIcon /> },
   { route: 'managed_identities', label: 'Managed Identities', icon: <ManagedIdentityIcon /> },
   { route: 'runners', label: 'Runner Agents', icon: <RunnersIcon /> },

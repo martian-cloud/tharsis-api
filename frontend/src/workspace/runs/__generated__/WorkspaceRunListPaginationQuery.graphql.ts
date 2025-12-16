@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e66af6e371ed72c8291c39712fabfe8a>>
+ * @generated SignedSource<<30c04c8eb69af14be9d1dfc2fe59c99c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type RunListPaginationQuery$variables = {
+export type WorkspaceRunListPaginationQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
@@ -18,12 +18,12 @@ export type RunListPaginationQuery$variables = {
   workspaceAssessment?: boolean | null | undefined;
   workspaceId?: string | null | undefined;
 };
-export type RunListPaginationQuery$data = {
-  readonly " $fragmentSpreads": FragmentRefs<"RunListFragment_runs">;
+export type WorkspaceRunListPaginationQuery$data = {
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceRunListFragment_runs">;
 };
-export type RunListPaginationQuery = {
-  response: RunListPaginationQuery$data;
-  variables: RunListPaginationQuery$variables;
+export type WorkspaceRunListPaginationQuery = {
+  response: WorkspaceRunListPaginationQuery$data;
+  variables: WorkspaceRunListPaginationQuery$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -119,12 +119,12 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "RunListPaginationQuery",
+    "name": "WorkspaceRunListPaginationQuery",
     "selections": [
       {
         "args": null,
         "kind": "FragmentSpread",
-        "name": "RunListFragment_runs"
+        "name": "WorkspaceRunListFragment_runs"
       }
     ],
     "type": "Query",
@@ -134,7 +134,7 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "RunListPaginationQuery",
+    "name": "WorkspaceRunListPaginationQuery",
     "selections": [
       {
         "alias": null,
@@ -168,6 +168,13 @@ return {
                 "plural": false,
                 "selections": [
                   (v2/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
                   {
                     "alias": null,
                     "args": null,
@@ -218,6 +225,25 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "concreteType": "Workspace",
+                    "kind": "LinkedField",
+                    "name": "workspace",
+                    "plural": false,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "fullPath",
+                        "storageKey": null
+                      },
+                      (v2/*: any*/)
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "Plan",
                     "kind": "LinkedField",
                     "name": "plan",
@@ -233,13 +259,6 @@ return {
                     "name": "apply",
                     "plural": false,
                     "selections": (v4/*: any*/),
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "__typename",
                     "storageKey": null
                   }
                 ],
@@ -306,23 +325,23 @@ return {
           "workspaceAssessment"
         ],
         "handle": "connection",
-        "key": "RunList_runs",
+        "key": "WorkspaceRunList_runs",
         "kind": "LinkedHandle",
         "name": "runs"
       }
     ]
   },
   "params": {
-    "cacheID": "60fb9a0b6851cdbd8a7f7c01b9c5bcdc",
+    "cacheID": "b3f40a90e2df78054fdccb34fbd8b7ee",
     "id": null,
     "metadata": {},
-    "name": "RunListPaginationQuery",
+    "name": "WorkspaceRunListPaginationQuery",
     "operationKind": "query",
-    "text": "query RunListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $workspaceAssessment: Boolean\n  $workspaceId: String\n) {\n  ...RunListFragment_runs\n}\n\nfragment RunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    totalCount\n    edges {\n      node {\n        id\n        ...RunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n"
+    "text": "query WorkspaceRunListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $workspaceAssessment: Boolean\n  $workspaceId: String\n) {\n  ...WorkspaceRunListFragment_runs\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  totalCount\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n\nfragment WorkspaceRunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    totalCount\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunListFragment_runConnection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "fc2e409ecd0d355ae76a6149d827c3c6";
+(node as any).hash = "403a1d01ccfdb3d6a2b818d4d2505dea";
 
 export default node;

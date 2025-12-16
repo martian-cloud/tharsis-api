@@ -164,7 +164,15 @@ type Group implements Node, Namespace {
     last: Int
     sort: FederatedRegistrySort
   ): FederatedRegistryConnection!
-}
+  runs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: RunSort
+    workspaceAssessment: Boolean
+    includeNestedRuns: Boolean
+  ): RunConnection!}
 
 input CreateGroupInput {
   clientMutationId: String

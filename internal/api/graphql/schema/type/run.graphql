@@ -88,6 +88,7 @@ input RunSubscriptionInput {
     )
   workspaceId: String
   runId: String
+  ancestorGroupId: String
 }
 
 type RunMutationPayload {

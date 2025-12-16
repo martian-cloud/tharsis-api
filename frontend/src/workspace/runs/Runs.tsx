@@ -8,7 +8,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { Route, Routes } from 'react-router-dom';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import RunDetails from './RunDetails';
-import RunList from './RunList';
+import WorkspaceRunList from './WorkspaceRunList';
 import CreateRun from './create/CreateRun';
 import { RunsFragment_runs$key } from './__generated__/RunsFragment_runs.graphql';
 import { RunsIndexFragment_runs$key } from './__generated__/RunsIndexFragment_runs.graphql';
@@ -124,9 +124,8 @@ function RunsIndex({ fragmentRef }: RunsIndexProps) {
             >
                 <CircularProgress />
             </Box>}>
-                <RunList
+                <WorkspaceRunList
                     workspaceId={data.id}
-                    workspacePath={data.fullPath}
                     includeAssessmentRuns={showAssessmentRuns}
                 />
             </Suspense>

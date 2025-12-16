@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -92,4 +93,12 @@ func (r *Run) IsComplete() bool {
 	default:
 		return false
 	}
+}
+
+// GetGroupPath returns the group path
+func (r *Run) GetGroupPath() string {
+	path := strings.Split(r.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	pathSegments := strings.Split(path, "/")
+	groupPath := strings.Join(pathSegments[:len(pathSegments)-2], "/")
+	return groupPath
 }

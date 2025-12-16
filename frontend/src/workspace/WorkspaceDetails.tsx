@@ -10,7 +10,7 @@ import NamespaceMemberships from '../namespace/members/NamespaceMemberships';
 import Variables from '../namespace/variables/Variables';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import AssignedManagedIdentityList from './managedidentity/AssignedManagedIdentityList';
-import { GetConnections } from './runs/RunList';
+import { GetConnections } from './runs/WorkspaceRunList';
 import Runs from './runs/Runs';
 import StateVersions from './state/StateVersions';
 import WorkspaceDetailsDrawer from './WorkspaceDetailsDrawer';

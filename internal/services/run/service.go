@@ -25,6 +25,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/module"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
+	namespaceutils "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
@@ -71,8 +72,9 @@ type Event struct {
 
 // EventSubscriptionOptions provides options for subscribing to run events
 type EventSubscriptionOptions struct {
-	WorkspaceID *string
-	RunID       *string // RunID is optional
+	WorkspaceID     *string
+	RunID           *string // RunID is optional
+	AncestorGroupID *string
 }
 
 // SetVariablesIncludedInTFConfigInput is the input for setting variables
@@ -92,6 +94,8 @@ type GetRunsInput struct {
 	Workspace *models.Workspace
 	// Group filters the runs by the specified group
 	Group *models.Group
+	// IncludeNestedRuns indicates whether to include runs from nested namespaces
+	IncludeNestedRuns *bool
 	// WorkspaceAssessment can be used to filter for only assessment runs or to exclude assessment runs
 	WorkspaceAssessment *bool
 }
@@ -351,6 +355,20 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 		}
 	}
 
+	// Pre-fetch target group if group filtering is enabled
+	var ancestorGroupPath string
+	if options.AncestorGroupID != nil {
+		targetGroup, err := s.dbClient.Groups.GetGroupByID(ctx, *options.AncestorGroupID)
+		if err != nil {
+			tracing.RecordError(span, err, "failed to query target group")
+			return nil, err
+		}
+		if targetGroup == nil {
+			return nil, errors.New("target group not found", errors.WithErrorCode(errors.ENotFound))
+		}
+		ancestorGroupPath = targetGroup.FullPath
+	}
+
 	subscription := events.Subscription{
 		Type: events.RunSubscription,
 		Actions: []events.SubscriptionAction{
@@ -391,7 +409,6 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				// Not the workspace we're looking for.
 				continue
 			}
-
 			runsResult, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
 				PaginationOptions: &pagination.Options{
 					First: ptr.Int32(1),
@@ -415,6 +432,22 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				continue
 			}
 
+			// Group filtering: check if run's workspace belongs to the specified group using TRN
+			if options.AncestorGroupID != nil {
+				run := runsResult.Runs[0]
+
+				var isInGroup bool
+				isInGroup, err = s.isRunInTargetGroup(ctx, &run, ancestorGroupPath)
+				if err != nil {
+					s.logger.WithContextFields(ctx).Errorf("Error checking run group membership for run %s: %v", run.Metadata.ID, err)
+					continue
+				}
+
+				if !isInGroup {
+					continue
+				}
+			}
+
 			select {
 			case <-ctx.Done():
 				return
@@ -424,6 +457,14 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 	}()
 
 	return outgoing, nil
+}
+
+// isRunInTargetGroup checks if a run's workspace belongs to the specified group or its descendants
+func (s *service) isRunInTargetGroup(ctx context.Context, run *models.Run, ancestorGroupPath string) (bool, error) {
+	workspaceGroupPath := run.GetGroupPath()
+
+	// Check if workspace's group matches or is descendant of target group
+	return workspaceGroupPath == ancestorGroupPath || namespaceutils.IsDescendantOfPath(workspaceGroupPath, ancestorGroupPath), nil
 }
 
 func (s *service) CreateAssessmentRunForWorkspace(ctx context.Context, options *CreateAssessmentRunForWorkspaceInput) (*models.Run, error) {
@@ -1606,6 +1647,10 @@ func (s *service) GetRuns(ctx context.Context, input *GetRunsInput) (*db.RunsRes
 			filter.UserMemberID = &userCaller.User.Metadata.ID
 		}
 	}
+	if input.IncludeNestedRuns != nil && *input.IncludeNestedRuns && input.Group == nil {
+		return nil, errors.New("IncludeNestedRuns can only be used with Group filter", errors.WithErrorCode(errors.EInvalid))
+	}
+	filter.IncludeNestedRuns = input.IncludeNestedRuns
 
 	result, err := s.dbClient.Runs.GetRuns(ctx, &db.GetRunsInput{
 		Sort:              input.Sort,
