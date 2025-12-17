@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<91380db6d29efb1e0bec231a9d23763e>>
+ * @generated SignedSource<<f5ad471996f13ab278d30dd888159139>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
-export type RunListQuery$variables = {
+export type WorkspaceRunListQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
@@ -18,12 +18,12 @@ export type RunListQuery$variables = {
   workspaceAssessment?: boolean | null | undefined;
   workspaceId?: string | null | undefined;
 };
-export type RunListQuery$data = {
-  readonly " $fragmentSpreads": FragmentRefs<"RunListFragment_runs">;
+export type WorkspaceRunListQuery$data = {
+  readonly " $fragmentSpreads": FragmentRefs<"WorkspaceRunListFragment_runs">;
 };
-export type RunListQuery = {
-  response: RunListQuery$data;
-  variables: RunListQuery$variables;
+export type WorkspaceRunListQuery = {
+  response: WorkspaceRunListQuery$data;
+  variables: WorkspaceRunListQuery$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -124,12 +124,12 @@ return {
     ],
     "kind": "Fragment",
     "metadata": null,
-    "name": "RunListQuery",
+    "name": "WorkspaceRunListQuery",
     "selections": [
       {
         "args": null,
         "kind": "FragmentSpread",
-        "name": "RunListFragment_runs"
+        "name": "WorkspaceRunListFragment_runs"
       }
     ],
     "type": "Query",
@@ -146,7 +146,7 @@ return {
       (v4/*: any*/)
     ],
     "kind": "Operation",
-    "name": "RunListQuery",
+    "name": "WorkspaceRunListQuery",
     "selections": [
       {
         "alias": null,
@@ -180,6 +180,13 @@ return {
                 "plural": false,
                 "selections": [
                   (v7/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "__typename",
+                    "storageKey": null
+                  },
                   {
                     "alias": null,
                     "args": null,
@@ -230,6 +237,25 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "concreteType": "Workspace",
+                    "kind": "LinkedField",
+                    "name": "workspace",
+                    "plural": false,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "fullPath",
+                        "storageKey": null
+                      },
+                      (v7/*: any*/)
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "Plan",
                     "kind": "LinkedField",
                     "name": "plan",
@@ -245,13 +271,6 @@ return {
                     "name": "apply",
                     "plural": false,
                     "selections": (v9/*: any*/),
-                    "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "__typename",
                     "storageKey": null
                   }
                 ],
@@ -318,23 +337,23 @@ return {
           "workspaceAssessment"
         ],
         "handle": "connection",
-        "key": "RunList_runs",
+        "key": "WorkspaceRunList_runs",
         "kind": "LinkedHandle",
         "name": "runs"
       }
     ]
   },
   "params": {
-    "cacheID": "4ea7c59e757664d78966e309d937301f",
+    "cacheID": "4016c04f9aff55b00867d9e976287fb4",
     "id": null,
     "metadata": {},
-    "name": "RunListQuery",
+    "name": "WorkspaceRunListQuery",
     "operationKind": "query",
-    "text": "query RunListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $workspaceId: String\n  $workspaceAssessment: Boolean\n) {\n  ...RunListFragment_runs\n}\n\nfragment RunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    totalCount\n    edges {\n      node {\n        id\n        ...RunListItemFragment_run\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n"
+    "text": "query WorkspaceRunListQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $workspaceId: String\n  $workspaceAssessment: Boolean\n) {\n  ...WorkspaceRunListFragment_runs\n}\n\nfragment RunListFragment_runConnection on RunConnection {\n  totalCount\n  edges {\n    node {\n      id\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n\nfragment WorkspaceRunListFragment_runs on Query {\n  runs(after: $after, before: $before, first: $first, last: $last, workspaceId: $workspaceId, sort: CREATED_AT_DESC, workspaceAssessment: $workspaceAssessment) {\n    totalCount\n    edges {\n      node {\n        id\n        __typename\n      }\n      cursor\n    }\n    ...RunListFragment_runConnection\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0da1b8ee64369aa7a194e72b310755d9";
+(node as any).hash = "f6ac57e32da131d0044d4d8f0712c2dd";
 
 export default node;

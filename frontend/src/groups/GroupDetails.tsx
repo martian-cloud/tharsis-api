@@ -35,7 +35,7 @@ import GPGKeys from './keys/GPGKeys';
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import GroupNotificationPreference from '../notifications/GroupNotificationPreference';
 import TerraformModules from './terraformmodule/TerraformModules';
-
+import GroupRuns from './GroupRuns';
 const TABS = ['workspaces', 'subgroups'];
 
 interface Props {
@@ -92,6 +92,7 @@ function GroupDetails(props: Props) {
             ...GroupDetailsIndexFragment_group
             ...ManagedIdentitiesFragment_group
             ...GroupRunnersFragment_group
+            ...GroupRunsFragment_group
             ...ServiceAccountsFragment_group
             ...TerraformModulesFragment_group
             ...VCSProvidersFragment_group
@@ -126,6 +127,7 @@ function GroupDetails(props: Props) {
                         <Routes>
                             <Route path={`${groupPath}/*`} element={<GroupDetailsIndex route={route} fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/activity/*`} element={<NamespaceActivity fragmentRef={data} />} />
+                            <Route path={`${groupPath}/-/runs/*`} element={<GroupRuns fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/managed_identities/*`} element={<ManagedIdentities fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/runners/*`} element={<GroupRunners fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/service_accounts/*`} element={<ServiceAccounts fragmentRef={data} />} />

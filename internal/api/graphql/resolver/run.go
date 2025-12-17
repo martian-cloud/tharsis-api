@@ -27,6 +27,7 @@ type RunConnectionQueryArgs struct {
 	WorkspacePath       *string // DEPRECATED: use WorkspaceID with a TRN instead
 	WorkspaceID         *string
 	WorkspaceAssessment *bool
+	IncludeNestedRuns   *bool
 }
 
 // RunQueryArgs are used to query a single run
@@ -444,6 +445,10 @@ func runsQuery(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectio
 		input.Workspace = workspace
 	}
 
+	if args.IncludeNestedRuns != nil {
+		input.IncludeNestedRuns = args.IncludeNestedRuns
+	}
+
 	if args.Sort != nil {
 		sort := db.RunSortableField(*args.Sort)
 		input.Sort = &sort
@@ -692,9 +697,10 @@ func (r *RunEventResolver) Run() *RunResolver {
 
 // RunSubscriptionInput is the input for subscribing to run events
 type RunSubscriptionInput struct {
-	RunID         *string
-	WorkspaceID   *string
-	WorkspacePath *string // DEPRECATED: use workspaceID instead with a TRN
+	RunID           *string
+	WorkspaceID     *string
+	WorkspacePath   *string // DEPRECATED: use workspaceID instead with a TRN
+	AncestorGroupID *string
 }
 
 func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input *RunSubscriptionInput) (<-chan *RunEventResolver, error) {
@@ -730,7 +736,14 @@ func (r RootResolver) workspaceRunEventsSubscription(ctx context.Context, input 
 
 		subscriptionInput.RunID = &runID
 	}
+	if input.AncestorGroupID != nil {
+		ancestorGroupID, err := serviceCatalog.FetchModelID(ctx, *input.AncestorGroupID)
+		if err != nil {
+			return nil, err
+		}
 
+		subscriptionInput.AncestorGroupID = &ancestorGroupID
+	}
 	events, err := serviceCatalog.RunService.SubscribeToRunEvents(ctx, subscriptionInput)
 	if err != nil {
 		return nil, err

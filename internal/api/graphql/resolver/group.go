@@ -16,6 +16,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
@@ -217,6 +218,27 @@ func (r *GroupResolver) Workspaces(ctx context.Context, args *ConnectionQueryArg
 	}
 
 	return NewWorkspaceConnectionResolver(ctx, &input)
+}
+
+// Runs resolver
+func (r *GroupResolver) Runs(ctx context.Context, args *RunConnectionQueryArgs) (*RunConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := run.GetRunsInput{
+		PaginationOptions:   &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		Group:               r.group,
+		WorkspaceAssessment: args.WorkspaceAssessment,
+		IncludeNestedRuns:   args.IncludeNestedRuns,
+	}
+
+	if args.Sort != nil {
+		sort := db.RunSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewRunConnectionResolver(ctx, &input)
 }
 
 // Memberships resolver

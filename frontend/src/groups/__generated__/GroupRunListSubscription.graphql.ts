@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5f0c3a776f968580f61ed23169e50f91>>
+ * @generated SignedSource<<a3f89141b7b165c1811afa8a783df7f8>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,21 +16,22 @@ export type RunSubscriptionInput = {
   workspaceId?: string | null | undefined;
   workspacePath?: string | null | undefined;
 };
-export type HomeRunListSubscription$variables = {
+export type GroupRunListSubscription$variables = {
   input: RunSubscriptionInput;
 };
-export type HomeRunListSubscription$data = {
+export type GroupRunListSubscription$data = {
   readonly workspaceRunEvents: {
     readonly action: string;
     readonly run: {
+      readonly assessment: boolean;
       readonly id: string;
-      readonly " $fragmentSpreads": FragmentRefs<"HomeRunListItemFragment_run">;
+      readonly " $fragmentSpreads": FragmentRefs<"RunListItemFragment_run">;
     };
   };
 };
-export type HomeRunListSubscription = {
-  response: HomeRunListSubscription$data;
-  variables: HomeRunListSubscription$variables;
+export type GroupRunListSubscription = {
+  response: GroupRunListSubscription$data;
+  variables: GroupRunListSubscription$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -62,14 +63,22 @@ v3 = {
   "name": "id",
   "storageKey": null
 },
-v4 = [
-  {
-    "alias": null,
-    "args": null,
-    "kind": "ScalarField",
-    "name": "status",
-    "storageKey": null
-  },
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "assessment",
+  "storageKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "status",
+  "storageKey": null
+},
+v6 = [
+  (v5/*: any*/),
   (v3/*: any*/)
 ];
 return {
@@ -77,7 +86,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "HomeRunListSubscription",
+    "name": "GroupRunListSubscription",
     "selections": [
       {
         "alias": null,
@@ -97,10 +106,11 @@ return {
             "plural": false,
             "selections": [
               (v3/*: any*/),
+              (v4/*: any*/),
               {
                 "args": null,
                 "kind": "FragmentSpread",
-                "name": "HomeRunListItemFragment_run"
+                "name": "RunListItemFragment_run"
               }
             ],
             "storageKey": null
@@ -116,7 +126,7 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "HomeRunListSubscription",
+    "name": "GroupRunListSubscription",
     "selections": [
       {
         "alias": null,
@@ -136,13 +146,7 @@ return {
             "plural": false,
             "selections": [
               (v3/*: any*/),
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "createdBy",
-                "storageKey": null
-              },
+              (v4/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -157,6 +161,13 @@ return {
                     "kind": "ScalarField",
                     "name": "createdAt",
                     "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "trn",
+                    "storageKey": null
                   }
                 ],
                 "storageKey": null
@@ -164,21 +175,16 @@ return {
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "Plan",
-                "kind": "LinkedField",
-                "name": "plan",
-                "plural": false,
-                "selections": (v4/*: any*/),
+                "kind": "ScalarField",
+                "name": "createdBy",
                 "storageKey": null
               },
+              (v5/*: any*/),
               {
                 "alias": null,
                 "args": null,
-                "concreteType": "Apply",
-                "kind": "LinkedField",
-                "name": "apply",
-                "plural": false,
-                "selections": (v4/*: any*/),
+                "kind": "ScalarField",
+                "name": "isDestroy",
                 "storageKey": null
               },
               {
@@ -199,6 +205,26 @@ return {
                   (v3/*: any*/)
                 ],
                 "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "Plan",
+                "kind": "LinkedField",
+                "name": "plan",
+                "plural": false,
+                "selections": (v6/*: any*/),
+                "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "concreteType": "Apply",
+                "kind": "LinkedField",
+                "name": "apply",
+                "plural": false,
+                "selections": (v6/*: any*/),
+                "storageKey": null
               }
             ],
             "storageKey": null
@@ -209,16 +235,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "a7f22c598a8bbc927e90516ccc3f7e0a",
+    "cacheID": "5aa3af085553d893d1b4c545eb28cb63",
     "id": null,
     "metadata": {},
-    "name": "HomeRunListSubscription",
+    "name": "GroupRunListSubscription",
     "operationKind": "subscription",
-    "text": "subscription HomeRunListSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      ...HomeRunListItemFragment_run\n    }\n  }\n}\n\nfragment HomeRunListItemFragment_run on Run {\n  id\n  createdBy\n  metadata {\n    createdAt\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n  workspace {\n    fullPath\n    id\n  }\n}\n"
+    "text": "subscription GroupRunListSubscription(\n  $input: RunSubscriptionInput!\n) {\n  workspaceRunEvents(input: $input) {\n    action\n    run {\n      id\n      assessment\n      ...RunListItemFragment_run\n    }\n  }\n}\n\nfragment RunListItemFragment_run on Run {\n  metadata {\n    createdAt\n    trn\n  }\n  id\n  createdBy\n  status\n  isDestroy\n  assessment\n  workspace {\n    fullPath\n    id\n  }\n  plan {\n    status\n    id\n  }\n  apply {\n    status\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "99506e643a552642c2b1c813c03d36e0";
+(node as any).hash = "c1b820be0fe2d1b61dcee91c18342e68";
 
 export default node;

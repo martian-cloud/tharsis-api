@@ -71,6 +71,7 @@ type RunFilter struct {
 	UserMemberID        *string
 	RunIDs              []string
 	WorkspaceAssessment *bool
+	IncludeNestedRuns   *bool
 }
 
 // GetRunsInput is the input for listing runs
@@ -245,7 +246,13 @@ func (r *runs) GetRuns(ctx context.Context, input *GetRunsInput) (*RunsResult, e
 		}
 
 		if input.Filter.GroupID != nil {
-			ex = ex.Append(goqu.I("workspaces.group_id").Eq(*input.Filter.GroupID))
+			includeNested := input.Filter.IncludeNestedRuns != nil && *input.Filter.IncludeNestedRuns
+			if includeNested {
+				ex = ex.Append(goqu.I("namespaces.path").Like(goqu.Any(
+					dialect.From("namespaces").Select(goqu.L("path || '/%'")).Where(goqu.Ex{"group_id": *input.Filter.GroupID}))))
+			} else {
+				ex = ex.Append(goqu.I("workspaces.group_id").Eq(*input.Filter.GroupID))
+			}
 		}
 
 		if input.Filter.UserMemberID != nil {

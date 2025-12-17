@@ -133,13 +133,13 @@ function GroupList(props: Props) {
                 No subgroups matching search <strong>{search}</strong>
             </Typography>}
             <InfiniteScroll
-                dataLength={data.groups.edges?.length ?? 0}
+                dataLength={data.groups?.edges?.length ?? 0}
                 next={() => loadNext(100)}
                 hasMore={hasNext}
                 loader={<ListSkeleton rowCount={3} />}
             >
                 <List sx={isRefreshing ? { opacity: 0.5 } : null} disablePadding>
-                    {data.groups.edges?.map((edge: any, index: number) => <GroupListItem key={edge.node.id} groupKey={edge.node} last={index === edgeCount} />)}
+                    {data.groups?.edges?.map((edge: any, index: number) => <GroupListItem key={edge.node.id} groupKey={edge.node} last={index === edgeCount} />)}
                 </List>
             </InfiniteScroll>
         </Box>

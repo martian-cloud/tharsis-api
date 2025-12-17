@@ -1208,6 +1208,7 @@ type Group implements Namespace & Node {
   parent: Group
   runnerTags: NamespaceRunnerTags!
   runners(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: RunnerSort): RunnerConnection!
+  runs(after: String, before: String, first: Int, includeNestedRuns: Boolean, last: Int, sort: RunSort, workspaceAssessment: Boolean): RunConnection!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ServiceAccountSort): ServiceAccountConnection!
   terraformModules(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
   terraformProviderMirrors(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
@@ -2060,6 +2061,7 @@ enum RunStatus {
 }
 
 input RunSubscriptionInput {
+  ancestorGroupId: String
   runId: String
   workspaceId: String
   workspacePath: String
