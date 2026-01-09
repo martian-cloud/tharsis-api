@@ -14,7 +14,7 @@ const (
 type contextKey string
 
 var (
-	contextKeyUserAgent  = contextKey("user agent")
+	contextKeyUserAgent = contextKey("user agent")
 )
 
 func (c contextKey) String() string {

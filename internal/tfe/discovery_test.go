@@ -17,25 +17,25 @@ import (
 
 func TestBuildTFEServiceDiscoveryHandler(t *testing.T) {
 	tests := []struct {
-		name                    string
-		tfeBasePath             string
-		cfg                     *config.Config
-		mockSetup               func(*auth.MockOpenIDConfigFetcher)
-		expectErrorMessage      string
-		expectLoginClient       string
-		expectLoginAuthz        string
-		expectLoginToken        string
-		expectModulesV1         string
-		expectProvidersV1       string
-		expectStateV2           string
-		expectTfeV2             string
+		name               string
+		tfeBasePath        string
+		cfg                *config.Config
+		mockSetup          func(*auth.MockOpenIDConfigFetcher)
+		expectErrorMessage string
+		expectLoginClient  string
+		expectLoginAuthz   string
+		expectLoginToken   string
+		expectModulesV1    string
+		expectProvidersV1  string
+		expectStateV2      string
+		expectTfeV2        string
 	}{
 		{
 			name:        "successful handler with oauth providers",
 			tfeBasePath: "/tfe",
 			cfg: &config.Config{
-				TharsisAPIURL:      "https://api.example.com",
-				CLILoginOIDCScopes: "openid profile",
+				TharsisAPIURL:        "https://api.example.com",
+				CLILoginOIDCScopes:   "openid profile",
 				CLILoginOIDCClientID: "test-client-id",
 				OauthProviders: []config.IdpConfig{
 					{
@@ -51,13 +51,13 @@ func TestBuildTFEServiceDiscoveryHandler(t *testing.T) {
 				}
 				mockFetcher.On("GetOpenIDConfig", mock.Anything, "https://issuer.example.com").Return(oidcConfig, nil)
 			},
-			expectLoginClient:   "test-client-id",
-			expectLoginAuthz:    "https://issuer.example.com/auth",
-			expectLoginToken:    "https://issuer.example.com/token",
-			expectModulesV1:     "https://api.example.com/v1/module-registry/modules/",
-			expectProvidersV1:   "https://api.example.com/v1/provider-registry/providers/",
-			expectStateV2:       "https://api.example.com/tfe/v2/",
-			expectTfeV2:         "https://api.example.com/tfe/v2/",
+			expectLoginClient: "test-client-id",
+			expectLoginAuthz:  "https://issuer.example.com/auth",
+			expectLoginToken:  "https://issuer.example.com/token",
+			expectModulesV1:   "https://api.example.com/v1/module-registry/modules/",
+			expectProvidersV1: "https://api.example.com/v1/provider-registry/providers/",
+			expectStateV2:     "https://api.example.com/tfe/v2/",
+			expectTfeV2:       "https://api.example.com/tfe/v2/",
 		},
 		{
 			name:        "successful handler with first oauth provider when no client ID specified",

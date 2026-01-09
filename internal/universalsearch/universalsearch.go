@@ -18,15 +18,18 @@ const (
 	defaultSearchLimit = int32(20)
 )
 
+// SearchResult represents a single search result with its data and type.
 type SearchResult struct {
 	Data models.Model
 	Type types.ModelType
 }
 
+// SearchRequest represents a search query request.
 type SearchRequest struct {
 	Query string
 }
 
+// SearchResponse contains the results of a search operation.
 type SearchResponse struct {
 	Results []*SearchResult
 }
@@ -46,6 +49,7 @@ type manager struct {
 	logger     logger.Logger
 }
 
+// NewManager creates a new universal search manager.
 func NewManager(catalog *services.Catalog, logger logger.Logger) Manager {
 	return newManager(catalog, logger, map[types.ModelType]searchFunc{
 		types.GroupModelType:             groupSearcher(catalog.GroupService),

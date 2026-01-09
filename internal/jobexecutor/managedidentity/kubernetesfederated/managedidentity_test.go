@@ -18,10 +18,7 @@ func TestAuthenticate(t *testing.T) {
 	clientID := "client1"
 	authenticator, _ := New()
 	defer func(authenticator *Authenticator, ctx context.Context) {
-		err := authenticator.Close(ctx)
-		if err != nil {
-
-		}
+		_ = authenticator.Close(ctx)
 	}(authenticator, ctx)
 
 	dataBuffer, err := json.Marshal(&kubernetesfederated.Data{Audience: clientID})

@@ -73,7 +73,6 @@ var dbEventCount = promauto.NewCounterVec(
 	[]string{"table", "action"},
 )
 
-
 // NewEvents returns an instance of the Events interface
 func NewEvents(dbClient *Client) Events {
 	return &events{dbClient: dbClient}

@@ -244,7 +244,7 @@ func (r *WorkspaceResolver) AssignedManagedIdentities(ctx context.Context) ([]*M
 }
 
 // Labels resolver - converts JSONB labels to GraphQL label array
-func (r *WorkspaceResolver) Labels(ctx context.Context) ([]*WorkspaceLabelResolver, error) {
+func (r *WorkspaceResolver) Labels() ([]*WorkspaceLabelResolver, error) {
 	if len(r.workspace.Labels) == 0 {
 		return []*WorkspaceLabelResolver{}, nil
 	}

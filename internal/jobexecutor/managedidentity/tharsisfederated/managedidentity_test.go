@@ -362,7 +362,7 @@ func verifyServiceAccountTokenFileEventuallyContains(t *testing.T, workspaceDir 
 		return token == string(contents)
 	}
 
-	assert.Eventually(t, verify, refreshTokenEarlyDuration * 3, 500*time.Millisecond)
+	assert.Eventually(t, verify, refreshTokenEarlyDuration*3, 500*time.Millisecond)
 }
 
 func readFile(t *testing.T, path string) string {

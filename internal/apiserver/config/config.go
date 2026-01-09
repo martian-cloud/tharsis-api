@@ -64,6 +64,13 @@ type FederatedRegistryTrustPolicy struct {
 	GroupGlobPatterns []string `yaml:"group_glob_patterns" json:"group_glob_patterns"` // list of groups with potential wildcard in path for access to private modules and providers
 }
 
+// MCPServerConfig contains the config fields for MCP.
+type MCPServerConfig struct {
+	EnabledToolsets string `yaml:"enabled_toolsets" env:"ENABLED_TOOLSETS"`
+	EnabledTools    string `yaml:"enabled_tools" env:"ENABLED_TOOLS"`
+	ReadOnly        bool   `yaml:"read_only" env:"READ_ONLY"`
+}
+
 // Config represents an application configuration.
 type Config struct {
 	// Plugin Data
@@ -83,6 +90,8 @@ type Config struct {
 	DisableSensitiveVariableFeature bool `yaml:"disable_sensitive_variable_feature" env:"DISABLE_SENSITIVE_VARIABLE_FEATURE"`
 
 	EmailFooter string `yaml:"email_footer" env:"EMAIL_FOOTER"`
+
+	MCPServerConfig MCPServerConfig `yaml:"mcp_server_config"`
 
 	// The external facing URL for the Tharsis API
 	TharsisAPIURL string `yaml:"tharsis_api_url" env:"API_URL"`
@@ -104,9 +113,9 @@ type Config struct {
 	JWTIssuerURL string `yaml:"JWT_ISSUER_URL" env:"JWT_ISSUER_URL"`
 
 	// the url for connecting to the database. required.
-	DBHost     string `yaml:"db_host" env:"DB_HOST"`
-	DBName     string `yaml:"db_name" env:"DB_NAME"`
-	DBSSLMode  string `yaml:"db_ssl_mode" env:"DB_SSL_MODE"`
+	DBHost     string `yaml:"db_host" env:"DB_HOST" sensitive:"true"`
+	DBName     string `yaml:"db_name" env:"DB_NAME" sensitive:"true"`
+	DBSSLMode  string `yaml:"db_ssl_mode" env:"DB_SSL_MODE" sensitive:"true"`
 	DBUsername string `yaml:"db_username" env:"DB_USERNAME,secret" sensitive:"true"`
 	DBPassword string `yaml:"db_password" env:"DB_PASSWORD,secret" sensitive:"true"`
 
@@ -121,11 +130,11 @@ type Config struct {
 	AdminUserEmail string `yaml:"admin_user_email" env:"ADMIN_USER_EMAIL" sensitive:"true"`
 
 	// AdminUserPassword is optional and will set the password for the user specified in the AdminUserEmail config field
-	AdminUserPassword string `yaml:"admin_user_password" env:"ADMIN_USER_PASSWORD"`
+	AdminUserPassword string `yaml:"admin_user_password" env:"ADMIN_USER_PASSWORD" sensitive:"true"`
 
 	// Otel
-	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE"`
-	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST"`
+	OtelTraceType          string `yaml:"otel_trace_type" env:"OTEL_TRACE_TYPE" sensitive:"true"`
+	OtelTraceCollectorHost string `yaml:"otel_trace_host" env:"OTEL_TRACE_HOST" sensitive:"true"`
 
 	// TerraformCLIVersionConstraint is a comma-separated list of constraints used to limit the returned Terraform CLI versions.
 	TerraformCLIVersionConstraint string `yaml:"terraform_cli_version_constraint" env:"TERRAFORM_CLI_VERSION_CONSTRAINT"`
@@ -156,11 +165,11 @@ type Config struct {
 	// HTTP rate limit value
 	HTTPRateLimit int `yaml:"http_rate_limit" env:"HTTP_RATE_LIMIT"`
 
-	OtelTraceCollectorPort int  `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT"`
-	OtelTraceEnabled       bool `yaml:"otel_trace_enabled" env:"OTEL_TRACE_ENABLED"`
+	OtelTraceCollectorPort int  `yaml:"otel_trace_port" env:"OTEL_TRACE_PORT" sensitive:"true"`
+	OtelTraceEnabled       bool `yaml:"otel_trace_enabled" env:"OTEL_TRACE_ENABLED" sensitive:"true"`
 
 	// Whether to auto migrate the database
-	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED"`
+	DBAutoMigrateEnabled bool `yaml:"db_auto_migrate_enabled" env:"DB_AUTO_MIGRATE_ENABLED" sensitive:"true"`
 
 	// WorkspaceAssessmentIntervalHours is the min duration for running workspace assessments
 	WorkspaceAssessmentIntervalHours int `yaml:"workspace_assessment_interval_hours" env:"WORKSPACE_ASSESSMENT_INTERVAL_HOURS"`
@@ -326,6 +335,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load Email Client plugin data
 	for k, v := range loadPluginData("THARSIS_EMAIL_CLIENT_PLUGIN_DATA_") {
 		c.EmailClientPluginData[k] = v
+	}
+
+	// Load MCP Server config from env vars
+	if err := env.New("THARSIS_MCP_", logger.Infof).Load(&c.MCPServerConfig); err != nil {
+		return nil, fmt.Errorf("failed to load MCP server config: %w", err)
 	}
 
 	// Default JWTIssuerURL to TharsisURL

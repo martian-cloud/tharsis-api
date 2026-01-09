@@ -1,3 +1,4 @@
+// Package universalsearch provides universal search functionality across different resource types.
 package universalsearch
 
 import (

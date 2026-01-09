@@ -80,7 +80,7 @@ type TerraformModuleFilter struct {
 	UserID             *string
 	ServiceAccountID   *string
 	TerraformModuleIDs []string
-	NamespacePaths    []string
+	NamespacePaths     []string
 }
 
 // GetModulesInput is the input for listing terraform modules

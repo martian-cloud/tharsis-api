@@ -288,7 +288,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		}
 	}
 
-	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, universalSearchManager, userSessionManager, signingKeyManager)
+	router, err := api.BuildRouter(ctx, cfg, logger, respWriter, pluginCatalog, authenticator, openIDConfigFetcher, serviceCatalog, universalSearchManager, userSessionManager, signingKeyManager, apiVersion)
 	if err != nil {
 		return nil, err
 	}
