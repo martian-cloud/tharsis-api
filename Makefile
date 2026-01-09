@@ -34,7 +34,7 @@ lint: ## run linting on Go and UI code
 	@echo "Linting Go code..."
 	@revive -set_exit_status $(PACKAGES)
 	@echo "Checking Go formatting..."
-	@UNFORMATTED=$$(gofmt -l . 2>/dev/null | grep -v vendor | grep -v testdata); \
+	@UNFORMATTED=$$(gofmt -l . 2>/dev/null | grep -v vendor | grep -v testdata | grep -v '/pkg/mod/'); \
 	if [ -n "$$UNFORMATTED" ]; then \
 		echo "Files not formatted:"; \
 		echo "$$UNFORMATTED"; \

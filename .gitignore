@@ -28,6 +28,9 @@ testdata/postgres/*
 .test-results
 .xunit-results.xml
 
+# Go module cache (CI uses GOPATH=.go)
+.go/
+
 # Tharsis Api specific
 apiserver
 job
