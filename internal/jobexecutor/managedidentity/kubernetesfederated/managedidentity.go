@@ -1,4 +1,4 @@
-// Package kubernetes package
+// Package kubernetesfederated provides Kubernetes federated managed identity authentication.
 package kubernetesfederated
 
 import (

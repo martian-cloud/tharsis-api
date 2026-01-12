@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
@@ -319,6 +320,31 @@ func (r *ConfigResolver) SecretManagerPluginData() []*PluginDataEntryResolver {
 // EmailClientPluginData resolver
 func (r *ConfigResolver) EmailClientPluginData() []*PluginDataEntryResolver {
 	return mapToPluginDataEntries(r.cfg.EmailClientPluginData)
+}
+
+// MCPServerConfig resolver
+func (r *ConfigResolver) MCPServerConfig() *MCPServerConfigResolver {
+	return &MCPServerConfigResolver{cfg: &r.cfg.MCPServerConfig}
+}
+
+// MCPServerConfigResolver resolves MCP server config
+type MCPServerConfigResolver struct {
+	cfg *config.MCPServerConfig
+}
+
+// EnabledToolsets resolver
+func (r *MCPServerConfigResolver) EnabledToolsets() []string {
+	return strings.Split(r.cfg.EnabledToolsets, ",")
+}
+
+// EnabledTools resolver
+func (r *MCPServerConfigResolver) EnabledTools() []string {
+	return strings.Split(r.cfg.EnabledTools, ",")
+}
+
+// ReadOnly resolver
+func (r *MCPServerConfigResolver) ReadOnly() bool {
+	return r.cfg.ReadOnly
 }
 
 // IssuerURL resolver

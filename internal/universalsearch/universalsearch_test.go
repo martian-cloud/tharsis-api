@@ -52,14 +52,14 @@ func TestSearchManager_Search_WithDirectSearchers(t *testing.T) {
 	searchers := make(map[types.ModelType]searchFunc)
 
 	// Create direct searcher functions - CHANGED: Using []*SearchResult
-	groupSearcher := func(ctx context.Context, query string, limit int32) ([]*SearchResult, error) {
+	groupSearcher := func(_ context.Context, _ string, _ int32) ([]*SearchResult, error) {
 		return []*SearchResult{
 			{Data: &models.Group{Metadata: models.ResourceMetadata{ID: "group1"}}, Type: types.GroupModelType},
 			{Data: &models.Group{Metadata: models.ResourceMetadata{ID: "group2"}}, Type: types.GroupModelType},
 		}, nil
 	}
 
-	workspaceSearcher := func(ctx context.Context, query string, limit int32) ([]*SearchResult, error) {
+	workspaceSearcher := func(_ context.Context, _ string, _ int32) ([]*SearchResult, error) {
 		return []*SearchResult{
 			{Data: &models.Workspace{Metadata: models.ResourceMetadata{ID: "workspace1"}}, Type: types.WorkspaceModelType},
 		}, nil

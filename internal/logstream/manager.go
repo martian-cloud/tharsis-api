@@ -24,6 +24,7 @@ type SubscriptionOptions struct {
 	LogStreamID     string
 }
 
+// LogEventData contains the data for a log event.
 type LogEventData struct {
 	Offset int
 	Logs   string

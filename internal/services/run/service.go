@@ -437,7 +437,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 				run := runsResult.Runs[0]
 
 				var isInGroup bool
-				isInGroup, err = s.isRunInTargetGroup(ctx, &run, ancestorGroupPath)
+				isInGroup, err = s.isRunInTargetGroup(&run, ancestorGroupPath)
 				if err != nil {
 					s.logger.WithContextFields(ctx).Errorf("Error checking run group membership for run %s: %v", run.Metadata.ID, err)
 					continue
@@ -460,7 +460,7 @@ func (s *service) SubscribeToRunEvents(ctx context.Context, options *EventSubscr
 }
 
 // isRunInTargetGroup checks if a run's workspace belongs to the specified group or its descendants
-func (s *service) isRunInTargetGroup(ctx context.Context, run *models.Run, ancestorGroupPath string) (bool, error) {
+func (s *service) isRunInTargetGroup(run *models.Run, ancestorGroupPath string) (bool, error) {
 	workspaceGroupPath := run.GetGroupPath()
 
 	// Check if workspace's group matches or is descendant of target group

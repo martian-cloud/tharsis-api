@@ -5,12 +5,6 @@ type Config {
   tharsisSupportUrl: String!
   tlsEnabled: Boolean!
   jwtIssuerUrl: String!
-  dbHost: String!
-  dbName: String!
-  dbSslMode: String!
-  dbPort: Int!
-  dbMaxConnections: Int!
-  dbAutoMigrateEnabled: Boolean!
   cliLoginOIDCClientID: String
   cliLoginOIDCScopes: String
   oidcInternalIdentityProviderClientID: String!
@@ -19,10 +13,6 @@ type Config {
   asyncTaskTimeout: Int!
   vcsRepositorySizeLimit: Int!
   httpRateLimit: Int!
-  otelTraceEnabled: Boolean!
-  otelTraceType: String
-  otelTraceCollectorHost: String
-  otelTraceCollectorPort: Int!
   serviceDiscoveryHost: String!
   terraformCliVersionConstraint: String!
   workspaceAssessmentIntervalHours: Int!
@@ -45,14 +35,31 @@ type Config {
   internalRunners: [RunnerConfig!]!
 
   # Sensitive fields - always returned but masked for non-admin users
+  otelTraceEnabled: Boolean!
+  otelTraceType: String
+  otelTraceCollectorHost: String
+  otelTraceCollectorPort: Int!
+  dbHost: String!
+  dbName: String!
+  dbSslMode: String!
+  dbPort: Int!
+  dbMaxConnections: Int!
+  dbAutoMigrateEnabled: Boolean!
   tlsCertFile: String!
   tlsKeyFile: String!
   adminUserEmail: String!
-  objectStorePluginData: [PluginDataEntry!]!
-  rateLimitStorePluginData: [PluginDataEntry!]!
-  jwsProviderPluginData: [PluginDataEntry!]!
-  secretManagerPluginData: [PluginDataEntry!]!
-  emailClientPluginData: [PluginDataEntry!]!
+  objectStorePluginData: [KeyValueEntry!]!
+  rateLimitStorePluginData: [KeyValueEntry!]!
+  jwsProviderPluginData: [KeyValueEntry!]!
+  secretManagerPluginData: [KeyValueEntry!]!
+  emailClientPluginData: [KeyValueEntry!]!
+  mcpServerConfig: MCPServerConfig!
+}
+
+type MCPServerConfig {
+  enabledToolsets: [String!]!
+  enabledTools: [String!]!
+  readOnly: Boolean!
 }
 
 type IdpConfig {
@@ -65,7 +72,7 @@ type IdpConfig {
 type RunnerConfig {
   name: String!
   jobDispatcherType: String!
-  jobDispatcherData: [PluginDataEntry!]!
+  jobDispatcherData: [KeyValueEntry!]!
 }
 
 type FederatedRegistryTrustPolicy {
@@ -75,7 +82,7 @@ type FederatedRegistryTrustPolicy {
   groupGlobPatterns: [String!]!
 }
 
-type PluginDataEntry {
+type KeyValueEntry {
   key: String!
   value: String!
 }

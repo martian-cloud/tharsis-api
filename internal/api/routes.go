@@ -19,6 +19,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
+	tharsishttp "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/http"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/mcp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tfe"
@@ -48,6 +50,7 @@ func BuildRouter(
 	searchManager universalsearch.Manager,
 	userSessionManager auth.UserSessionManager,
 	signingKeyManager auth.SigningKeyManager,
+	apiVersion string,
 ) (chi.Router, error) {
 	resolverState := resolver.State{
 		Config:         cfg,
@@ -139,6 +142,23 @@ func BuildRouter(
 	router.Group(func(r chi.Router) {
 		r.Use(csrfMiddleware)
 		r.Handle("/graphql", graphqlHandler)
+	})
+
+	// MCP SSE handler
+	mcpHandler, err := mcp.NewSSEHandler(&mcp.ServerOptions{
+		ServicesCatalog: serviceCatalog,
+		Version:         apiVersion,
+		Config:          &cfg.MCPServerConfig,
+		HTTPClient:      tharsishttp.NewHTTPClient(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize MCP handler: %v", err)
+	}
+
+	router.Group(func(r chi.Router) {
+		r.Use(csrfMiddleware)
+		r.Use(requireAuthenticatedCallerMiddleware)
+		r.Handle("/mcp", mcpHandler)
 	})
 
 	/* TFE API Router */

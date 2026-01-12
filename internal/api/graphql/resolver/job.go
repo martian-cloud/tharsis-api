@@ -302,14 +302,17 @@ func (r *JobResolver) RunnerAvailabilityStatus(ctx context.Context) (*job.Runner
 
 /* Job Subscriptions */
 
+// JobLogStreamEventDataResolver resolves job log stream event data.
 type JobLogStreamEventDataResolver struct {
 	eventData *logstream.LogEventData
 }
 
+// Offset returns the log offset.
 func (j *JobLogStreamEventDataResolver) Offset() int32 {
 	return int32(j.eventData.Offset)
 }
 
+// Logs returns the log content.
 func (j *JobLogStreamEventDataResolver) Logs() string {
 	return j.eventData.Logs
 }
