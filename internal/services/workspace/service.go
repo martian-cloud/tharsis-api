@@ -97,6 +97,8 @@ type GetWorkspacesInput struct {
 	WorkspacePath *string
 	// LabelFilters filters workspaces by labels
 	LabelFilters []db.WorkspaceLabelFilter
+	// Favorites filters to only return user's favorite workspaces
+	Favorites *bool
 }
 
 // GetStateVersionsInput is the input for querying a list of state versions
@@ -337,6 +339,15 @@ func (s *service) GetWorkspaces(ctx context.Context, input *GetWorkspacesInput) 
 			WorkspacePath:             input.WorkspacePath,
 			LabelFilters:              input.LabelFilters,
 		},
+	}
+
+	// Handle favorites filter
+	if input.Favorites != nil && *input.Favorites {
+		userCaller, ok := caller.(*auth.UserCaller)
+		if !ok {
+			return nil, errors.New("only users can filter by favorites", errors.WithErrorCode(errors.EInvalid))
+		}
+		dbInput.Filter.FavoriteUserID = &userCaller.User.Metadata.ID
 	}
 
 	if input.GroupID != nil {

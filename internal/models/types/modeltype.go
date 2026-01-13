@@ -66,6 +66,7 @@ var (
 	WorkspaceModelType                       = ModelType{name: "workspace", gidCode: "W"}
 	WorkspaceVCSProviderLinkModelType        = ModelType{name: "workspace_vcs_provider_link", gidCode: "WPL"}
 	FederatedRegistryModelType               = ModelType{name: "federated_registry", gidCode: "FR"}
+	NamespaceFavoriteModelType               = ModelType{name: "namespace_favorite", gidCode: "NF"}
 )
 
 // ResourcePathFromTRN returns the resource path from a TRN.

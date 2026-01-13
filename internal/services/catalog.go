@@ -381,6 +381,16 @@ func (c *Catalog) Init() {
 		},
 	)
 
+	// Namespace Favorite
+	c.addModelFetchers(types.NamespaceFavoriteModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.UserService.GetNamespaceFavoriteByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.UserService.GetNamespaceFavoriteByTRN(ctx, value)
+		},
+	)
+
 	// Variable Service
 	c.addModelFetchers(types.VariableModelType,
 		func(ctx context.Context, value string) (models.Model, error) {

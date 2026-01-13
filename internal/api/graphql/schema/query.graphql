@@ -31,6 +31,7 @@ type Query {
       )
     search: String
     sort: GroupSort
+    favorites: Boolean
   ): GroupConnection!
   workspace(fullPath: String!): Workspace
     @deprecated(
@@ -49,6 +50,7 @@ type Query {
     search: String
     sort: WorkspaceSort
     labelFilter: WorkspaceLabelsFilter
+    favorites: Boolean
   ): WorkspaceConnection!
   terraformProviders(
     after: String

@@ -33,6 +33,8 @@ type GetGroupsInput struct {
 	RootOnly bool
 	// GroupPath is the path of the group to be used for filtering
 	GroupPath *string
+	// Favorites filters to only return user's favorite groups
+	Favorites *bool
 }
 
 // DeleteGroupInput is the input for deleting a group
@@ -148,6 +150,15 @@ func (s *service) GetGroups(ctx context.Context, input *GetGroupsInput) (*db.Gro
 		Filter: &db.GroupFilter{
 			Search: input.Search,
 		},
+	}
+
+	// Handle favorites filter
+	if input.Favorites != nil && *input.Favorites {
+		userCaller, ok := caller.(*auth.UserCaller)
+		if !ok {
+			return nil, errors.New("only users can filter by favorites", errors.WithErrorCode(errors.EInvalid))
+		}
+		dbInput.Filter.FavoriteUserID = &userCaller.User.Metadata.ID
 	}
 
 	if input.GroupPath != nil {

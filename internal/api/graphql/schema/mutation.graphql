@@ -240,4 +240,6 @@ type Mutation {
   deleteAnnouncement(
     input: DeleteAnnouncementInput!
   ): DeleteAnnouncementPayload!
+  favoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
+  unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
 }

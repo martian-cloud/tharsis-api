@@ -1,0 +1,33 @@
+type NamespaceFavoriteConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [NamespaceFavoriteEdge]
+}
+
+type NamespaceFavoriteEdge {
+  cursor: String!
+  node: NamespaceFavorite!
+}
+
+type NamespaceFavorite implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  namespace: Namespace!
+}
+
+type NamespaceFavoriteMutationPayload {
+  clientMutationId: String
+  namespaceFavorite: NamespaceFavorite
+  problems: [Problem!]!
+}
+
+type NamespaceUnfavoriteMutationPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+}
+
+input NamespaceFavoriteInput {
+  clientMutationId: String
+  namespacePath: String!
+  namespaceType: NamespaceType!
+}

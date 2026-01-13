@@ -31,6 +31,7 @@ type WorkspaceConnectionQueryArgs struct {
 	GroupID     *string
 	Search      *string
 	LabelFilter *WorkspaceLabelsFilter
+	Favorites   *bool
 }
 
 // WorkspaceLabelsFilter represents label filtering criteria
@@ -538,6 +539,10 @@ func workspacesQuery(ctx context.Context, args *WorkspaceConnectionQueryArgs) (*
 	if args.Sort != nil {
 		sort := db.WorkspaceSortableField(*args.Sort)
 		input.Sort = &sort
+	}
+
+	if args.Favorites != nil && *args.Favorites {
+		input.Favorites = args.Favorites
 	}
 
 	return NewWorkspaceConnectionResolver(ctx, &input)

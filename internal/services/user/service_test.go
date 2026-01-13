@@ -1615,3 +1615,715 @@ func TestService_SetUserPassword(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNamespaceFavorites(t *testing.T) {
+	userID := "user-id-1"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *GetNamespaceFavoritesInput
+		mockResult      *db.NamespaceFavoritesResult
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully get namespace favorites for user",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			input: &GetNamespaceFavoritesInput{},
+			mockResult: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						UserID: userID,
+					},
+				},
+			},
+		},
+		{
+			name: "get namespace favorites with namespace filter",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			input: &GetNamespaceFavoritesInput{
+				NamespacePath: ptr.String("test-namespace"),
+			},
+			mockResult: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						UserID: userID,
+					},
+				},
+			},
+		},
+		{
+			name:            "non-user caller cannot get namespace favorites",
+			caller:          &auth.ServiceAccountCaller{},
+			input:           &GetNamespaceFavoritesInput{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "unauthenticated caller cannot get namespace favorites",
+			caller:          nil,
+			input:           &GetNamespaceFavoritesInput{},
+			expectError:     true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
+
+			if tc.caller != nil {
+				if _, ok := tc.caller.(*auth.UserCaller); ok {
+					mockNamespaceFavorites.On("GetNamespaceFavorites", mock.Anything, mock.MatchedBy(func(input *db.GetNamespaceFavoritesInput) bool {
+						return input.Filter != nil && len(input.Filter.UserIDs) > 0
+					})).Return(tc.mockResult, nil).Maybe()
+				}
+			}
+
+			dbClient := &db.Client{
+				NamespaceFavorites: mockNamespaceFavorites,
+			}
+
+			if tc.caller != nil {
+				ctx = auth.WithCaller(ctx, tc.caller)
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			result, err := testService.GetNamespaceFavorites(ctx, tc.input)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, len(tc.mockResult.NamespaceFavorites), len(result.NamespaceFavorites))
+		})
+	}
+}
+
+func TestCreateNamespaceFavorite(t *testing.T) {
+	userID := "user-id-1"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *CreateNamespaceFavoriteInput
+		mockGroup       *models.Group
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully create favorite for group",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
+
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &CreateNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			mockGroup: &models.Group{
+				Metadata: models.ResourceMetadata{ID: "group-id"},
+				FullPath: "test-namespace",
+			},
+		},
+		{
+			name: "successfully create favorite for workspace",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewWorkspacePermission}, mock.Anything).Return(nil)
+
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &CreateNamespaceFavoriteInput{
+				NamespacePath: "test-group/test-workspace",
+				NamespaceType: namespace.TypeWorkspace,
+			},
+		},
+		{
+			name: "non-user caller cannot create favorite",
+			caller: &auth.ServiceAccountCaller{
+				ServiceAccountID: "sa-id",
+			},
+			input: &CreateNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "unauthenticated caller cannot create favorite",
+			caller:          nil,
+			input:           &CreateNamespaceFavoriteInput{NamespacePath: "test-namespace", NamespaceType: namespace.TypeGroup},
+			expectError:     true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name: "returns existing favorite on conflict",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &CreateNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			mockGroup: &models.Group{
+				Metadata: models.ResourceMetadata{ID: "group-id"},
+				FullPath: "test-namespace",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockGroups := db.NewMockGroups(t)
+			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
+
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			if !tc.expectError {
+				if tc.input.NamespaceType == namespace.TypeGroup {
+					mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(tc.input.NamespacePath)).Return(tc.mockGroup, nil)
+				} else if tc.input.NamespaceType == namespace.TypeWorkspace {
+					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, types.WorkspaceModelType.BuildTRN(tc.input.NamespacePath)).Return(&models.Workspace{
+						Metadata: models.ResourceMetadata{ID: "workspace-id"},
+						FullPath: tc.input.NamespacePath,
+					}, nil)
+				}
+				if tc.name == "returns existing favorite on conflict" {
+					mockNamespaceFavorites.On("CreateNamespaceFavorite", mock.Anything, mock.MatchedBy(func(fav *models.NamespaceFavorite) bool {
+						return fav.UserID == userID
+					})).Return(nil, errors.New("conflict", errors.WithErrorCode(errors.EConflict)))
+					mockNamespaceFavorites.On("GetNamespaceFavorites", mock.Anything, mock.MatchedBy(func(input *db.GetNamespaceFavoritesInput) bool {
+						return input.Filter != nil && len(input.Filter.UserIDs) > 0
+					})).Return(&db.NamespaceFavoritesResult{
+						NamespaceFavorites: []models.NamespaceFavorite{
+							{
+								Metadata: models.ResourceMetadata{ID: "existing-favorite-id"},
+								UserID:   userID,
+							},
+						},
+					}, nil)
+				} else {
+					mockNamespaceFavorites.On("CreateNamespaceFavorite", mock.Anything, mock.MatchedBy(func(fav *models.NamespaceFavorite) bool {
+						return fav.UserID == userID
+					})).Return(&models.NamespaceFavorite{
+						UserID: userID,
+					}, nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				Groups:             mockGroups,
+				Workspaces:         mockWorkspaces,
+				NamespaceFavorites: mockNamespaceFavorites,
+			}
+
+			if tc.caller != nil {
+				ctx = auth.WithCaller(ctx, tc.caller)
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			result, err := testService.CreateNamespaceFavorite(ctx, tc.input)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, userID, result.UserID)
+
+		})
+	}
+}
+
+func TestDeleteNamespaceFavorite(t *testing.T) {
+	userID := "user-id-1"
+	favoriteID := "favorite-id-1"
+
+	type testCase struct {
+		name            string
+		caller          auth.Caller
+		input           *DeleteNamespaceFavoriteInput
+		mockFavorites   *db.NamespaceFavoritesResult
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}
+
+	testCases := []testCase{
+		{
+			name: "successfully delete group favorite",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
+
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &DeleteNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			mockFavorites: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						Metadata: models.ResourceMetadata{
+							ID:      favoriteID,
+							Version: 1,
+						},
+						UserID: userID,
+					},
+				},
+			},
+		},
+		{
+			name: "successfully delete workspace favorite",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewWorkspacePermission}, mock.Anything).Return(nil)
+
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &DeleteNamespaceFavoriteInput{
+				NamespacePath: "test-group/test-workspace",
+				NamespaceType: namespace.TypeWorkspace,
+			},
+			mockFavorites: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						Metadata: models.ResourceMetadata{
+							ID:      favoriteID,
+							Version: 1,
+						},
+						UserID: userID,
+					},
+				},
+			},
+		},
+		{
+			name: "non-user caller cannot delete favorite",
+			caller: &auth.ServiceAccountCaller{
+				ServiceAccountID: "sa-id",
+			},
+			input: &DeleteNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "unauthenticated caller cannot delete favorite",
+			caller:          nil,
+			input:           &DeleteNamespaceFavoriteInput{NamespacePath: "test-namespace", NamespaceType: namespace.TypeGroup},
+			expectError:     true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name: "favorite not found returns success",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, []models.Permission{models.ViewGroupPermission}, mock.Anything).Return(nil)
+
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &DeleteNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			mockFavorites: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{},
+			},
+		},
+		{
+			name: "user without permission cannot delete favorite",
+			caller: func() auth.Caller {
+				mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+				mockAuthorizer := auth.NewMockAuthorizer(t)
+
+				mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+				mockAuthorizer.On("RequireAccess", mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+
+				return auth.NewUserCaller(&models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				}, mockAuthorizer, nil, mockMaintenanceMonitor, nil)
+			}(),
+			input: &DeleteNamespaceFavoriteInput{
+				NamespacePath: "test-namespace",
+				NamespaceType: namespace.TypeGroup,
+			},
+			mockFavorites: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						Metadata: models.ResourceMetadata{
+							ID:      favoriteID,
+							Version: 1,
+						},
+						UserID: userID,
+					},
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
+			mockGroups := db.NewMockGroups(t)
+			mockWorkspaces := db.NewMockWorkspaces(t)
+
+			if tc.mockFavorites != nil {
+				if tc.expectErrorCode != errors.EForbidden {
+					mockNamespaceFavorites.On("GetNamespaceFavorites", mock.Anything, mock.MatchedBy(func(input *db.GetNamespaceFavoritesInput) bool {
+						return input.Filter != nil && len(input.Filter.UserIDs) > 0
+					})).Return(tc.mockFavorites, nil)
+				}
+
+				if !tc.expectError && len(tc.mockFavorites.NamespaceFavorites) > 0 {
+					mockNamespaceFavorites.On("DeleteNamespaceFavorite", mock.Anything, mock.MatchedBy(func(fav *models.NamespaceFavorite) bool {
+						return fav.Metadata.ID == tc.mockFavorites.NamespaceFavorites[0].Metadata.ID
+					})).Return(nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				NamespaceFavorites: mockNamespaceFavorites,
+				Groups:             mockGroups,
+				Workspaces:         mockWorkspaces,
+			}
+
+			if tc.caller != nil {
+				ctx = auth.WithCaller(ctx, tc.caller)
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			err := testService.DeleteNamespaceFavorite(ctx, tc.input)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGetNamespaceFavoriteByID(t *testing.T) {
+	favoriteID := "favorite-id"
+	userID := "user-id"
+	otherUserID := "other-user-id"
+
+	testCases := []struct {
+		name            string
+		favoriteID      string
+		caller          auth.Caller
+		mockFavorite    *models.NamespaceFavorite
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name:       "successfully get namespace favorite by ID",
+			favoriteID: favoriteID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			mockFavorite: &models.NamespaceFavorite{
+				Metadata: models.ResourceMetadata{ID: favoriteID},
+				UserID:   userID,
+			},
+		},
+		{
+			name:       "user cannot access another user's favorite",
+			favoriteID: favoriteID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: otherUserID},
+				},
+			},
+			mockFavorite: &models.NamespaceFavorite{
+				Metadata: models.ResourceMetadata{ID: favoriteID},
+				UserID:   userID,
+			},
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:       "admin cannot access other user's favorite",
+			favoriteID: favoriteID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: "admin-user-id"},
+					Admin:    true,
+				},
+			},
+			mockFavorite: &models.NamespaceFavorite{
+				Metadata: models.ResourceMetadata{ID: favoriteID},
+				UserID:   userID,
+			},
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:       "namespace favorite not found",
+			favoriteID: favoriteID,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			mockFavorite:    nil,
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "service account cannot access favorites",
+			favoriteID:      favoriteID,
+			caller:          &auth.ServiceAccountCaller{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "unauthenticated caller",
+			favoriteID:      favoriteID,
+			caller:          nil,
+			expectError:     true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
+
+			if tc.caller != nil {
+				ctx = auth.WithCaller(ctx, tc.caller)
+				if _, ok := tc.caller.(*auth.UserCaller); ok {
+					mockNamespaceFavorites.On("GetNamespaceFavoriteByID", mock.Anything, tc.favoriteID).Return(tc.mockFavorite, nil)
+				}
+			}
+
+			dbClient := &db.Client{
+				NamespaceFavorites: mockNamespaceFavorites,
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			result, err := testService.GetNamespaceFavoriteByID(ctx, tc.favoriteID)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tc.mockFavorite.Metadata.ID, result.Metadata.ID)
+			assert.Equal(t, tc.mockFavorite.UserID, result.UserID)
+
+		})
+	}
+}
+
+func TestGetNamespaceFavoriteByTRN(t *testing.T) {
+	favoriteID := "favorite-id"
+	userID := "user-id"
+	otherUserID := "other-user-id"
+	resourcePath := "testresource"
+	favoriteTRN := "trn:namespace_favorite:" + resourcePath
+
+	testCases := []struct {
+		name            string
+		trn             string
+		caller          auth.Caller
+		mockFavorite    *models.NamespaceFavorite
+		expectError     bool
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "successfully get namespace favorite by TRN",
+			trn:  favoriteTRN,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			mockFavorite: &models.NamespaceFavorite{
+				Metadata: models.ResourceMetadata{ID: favoriteID, TRN: favoriteTRN},
+				UserID:   userID,
+			},
+		},
+		{
+			name: "user cannot access another user's favorite",
+			trn:  favoriteTRN,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: otherUserID},
+				},
+			},
+			mockFavorite: &models.NamespaceFavorite{
+				Metadata: models.ResourceMetadata{ID: favoriteID, TRN: favoriteTRN},
+				UserID:   userID,
+			},
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name: "admin cannot access other user's favorite by TRN",
+			trn:  favoriteTRN,
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: "admin-user-id"},
+					Admin:    true,
+				},
+			},
+			mockFavorite: &models.NamespaceFavorite{
+				Metadata: models.ResourceMetadata{ID: favoriteID, TRN: favoriteTRN},
+				UserID:   userID,
+			},
+			expectError:     true,
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "service account cannot access favorites",
+			trn:             favoriteTRN,
+			caller:          &auth.ServiceAccountCaller{},
+			expectError:     true,
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:            "unauthenticated caller",
+			trn:             favoriteTRN,
+			caller:          nil,
+			expectError:     true,
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name: "invalid TRN format",
+			trn:  "invalid-trn",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			expectError:     true,
+			expectErrorCode: errors.EInvalid,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
+
+			if tc.caller != nil {
+				ctx = auth.WithCaller(ctx, tc.caller)
+				if _, ok := tc.caller.(*auth.UserCaller); ok {
+					if !tc.expectError {
+						mockNamespaceFavorites.On("GetNamespaceFavoriteByTRN", mock.Anything, tc.trn).Return(tc.mockFavorite, nil)
+					} else if tc.expectErrorCode == errors.EInvalid {
+						mockNamespaceFavorites.On("GetNamespaceFavoriteByTRN", mock.Anything, tc.trn).Return(nil, errors.New("invalid TRN", errors.WithErrorCode(errors.EInvalid)))
+					} else if tc.expectErrorCode == errors.ENotFound && tc.mockFavorite != nil {
+						mockNamespaceFavorites.On("GetNamespaceFavoriteByTRN", mock.Anything, tc.trn).Return(tc.mockFavorite, nil)
+					}
+				}
+			}
+
+			dbClient := &db.Client{
+				NamespaceFavorites: mockNamespaceFavorites,
+			}
+
+			logger, _ := logger.NewForTest()
+			testService := NewService(logger, dbClient, nil)
+
+			result, err := testService.GetNamespaceFavoriteByTRN(ctx, tc.trn)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tc.mockFavorite.Metadata.ID, result.Metadata.ID)
+			assert.Equal(t, tc.mockFavorite.UserID, result.UserID)
+
+		})
+	}
+}

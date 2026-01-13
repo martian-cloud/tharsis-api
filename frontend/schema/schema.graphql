@@ -1575,6 +1575,7 @@ type Mutation {
   destroyWorkspace(input: DestroyWorkspaceInput!): DestroyWorkspacePayload!
   disableMaintenanceMode(input: DisableMaintenanceModeInput!): DisableMaintenanceModePayload!
   enableMaintenanceMode(input: EnableMaintenanceModeInput!): EnableMaintenanceModePayload!
+  favoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
   lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
   migrateGroup(input: MigrateGroupInput!): MigrateGroupPayload!
   migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
@@ -1591,6 +1592,7 @@ type Mutation {
   setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload!
   unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   unassignServiceAccountFromRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
+  unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
   updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
@@ -1642,6 +1644,35 @@ input NamespaceDriftDetectionEnabledInput {
   inherit: Boolean!
 }
 
+type NamespaceFavorite implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  namespace: Namespace!
+}
+
+type NamespaceFavoriteConnection {
+  edges: [NamespaceFavoriteEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type NamespaceFavoriteEdge {
+  cursor: String!
+  node: NamespaceFavorite!
+}
+
+input NamespaceFavoriteInput {
+  clientMutationId: String
+  namespacePath: String!
+  namespaceType: NamespaceType!
+}
+
+type NamespaceFavoriteMutationPayload {
+  clientMutationId: String
+  namespaceFavorite: NamespaceFavorite
+  problems: [Problem!]!
+}
+
 type NamespaceMembership implements Node {
   id: ID!
   member: Member
@@ -1683,6 +1714,11 @@ type NamespaceRunnerTags {
 input NamespaceRunnerTagsInput {
   inherit: Boolean!
   tags: [String!]
+}
+
+enum NamespaceType {
+  GROUP
+  WORKSPACE
 }
 
 type NamespaceVariable implements Node {
@@ -1877,7 +1913,7 @@ type Query {
   config: Config!
   configurationVersion(id: String!): ConfigurationVersion @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   group(fullPath: String!): Group @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
-  groups(after: String, before: String, first: Int, last: Int, parentId: String, parentPath: String, search: String, sort: GroupSort): GroupConnection!
+  groups(after: String, before: String, favorites: Boolean, first: Int, last: Int, parentId: String, parentPath: String, search: String, sort: GroupSort): GroupConnection!
   job(id: String!): Job @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   jobs(after: String, before: String, first: Int, jobStatus: JobStatus, jobType: JobType, last: Int, sort: JobSort, workspaceId: String, workspacePath: String): JobConnection!
   maintenanceMode: MaintenanceMode
@@ -1908,7 +1944,7 @@ type Query {
   users(after: String, before: String, first: Int, last: Int, search: String, sort: UserSort): UserConnection!
   version: Version!
   workspace(fullPath: String!): Workspace @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
-  workspaces(after: String, before: String, first: Int, groupId: String, groupPath: String, labelFilter: WorkspaceLabelsFilter, last: Int, search: String, sort: WorkspaceSort): WorkspaceConnection!
+  workspaces(after: String, before: String, favorites: Boolean, first: Int, groupId: String, groupPath: String, labelFilter: WorkspaceLabelsFilter, last: Int, search: String, sort: WorkspaceSort): WorkspaceConnection!
 }
 
 input RemoveUserFromTeamInput {
@@ -3048,6 +3084,7 @@ type User implements Node {
   email: String!
   id: ID!
   metadata: ResourceMetadata!
+  namespaceFavorites(after: String, before: String, first: Int, last: Int, namespacePath: String): NamespaceFavoriteConnection!
   namespaceMemberships(after: String, before: String, first: Int, last: Int): NamespaceMembershipConnection!
   scimExternalId: String
   teams(after: String, before: String, first: Int, last: Int, sort: TeamSort): TeamConnection!
