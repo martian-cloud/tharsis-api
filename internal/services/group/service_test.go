@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -414,10 +415,11 @@ func TestGetGroups(t *testing.T) {
 
 	// Because this test focuses only on the filters passed to the DB layer, don't worry about end-to-end errors and such.
 	type testCase struct {
-		svcInput   *GetGroupsInput
-		dbInput    *db.GetGroupsInput
-		name       string
-		callerType string // "admin", "user", "service-account"
+		svcInput        *GetGroupsInput
+		dbInput         *db.GetGroupsInput
+		name            string
+		callerType      string // "admin", "user", "service-account"
+		expectErrorCode errors.CodeType
 	}
 
 	// Test cases
@@ -780,6 +782,27 @@ func TestGetGroups(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "user caller with favorites filter",
+			callerType: "user",
+			svcInput: &GetGroupsInput{
+				Favorites: ptr.Bool(true),
+			},
+			dbInput: &db.GetGroupsInput{
+				Filter: &db.GroupFilter{
+					UserMemberID:   &userMemberID,
+					FavoriteUserID: &userMemberID,
+				},
+			},
+		},
+		{
+			name:       "negative: service account cannot filter by favorites",
+			callerType: "service-account",
+			svcInput: &GetGroupsInput{
+				Favorites: ptr.Bool(true),
+			},
+			expectErrorCode: errors.EInvalid,
+		},
 	}
 
 	for _, test := range testCases {
@@ -864,13 +887,16 @@ func TestGetGroups(t *testing.T) {
 
 			// Call the service function.
 			actualOutput, actualError := service.GetGroups(auth.WithCaller(ctx, testCaller), test.svcInput)
-			if actualError != nil {
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(actualError))
+			} else if actualError != nil {
 				t.Fatal(actualError)
+			} else {
+				assert.Equal(t, &db.GroupsResult{
+					Groups: []models.Group{},
+				}, actualOutput)
 			}
 
-			assert.Equal(t, &db.GroupsResult{
-				Groups: []models.Group{},
-			}, actualOutput)
 		})
 	}
 }

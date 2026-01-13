@@ -27,6 +27,7 @@ import StateVersionOutputs from './state/StateVersionOutputs';
 import StateVersionResources from './state/StateVersionResources';
 import WorkspaceDetailsDriftDetection from './WorkspaceDetailsDriftDetection';
 import WorkspaceNotificationPreference from '../notifications/WorkspaceNotificationPreference';
+import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
 
 const DRIFT_ALERT_DESCRIPTION = "This workspace has drifted from its configuration; this can happen if the resources were modified outside of Tharsis, or if the infrastructure was changed directly through the cloud provider console."
 
@@ -243,6 +244,10 @@ function WorkspaceDetailsIndex(props: Props) {
                     </Stack>
                 </Box>
                 <Stack direction="row" spacing={1}>
+                    <NamespaceFavoriteButton 
+                        namespacePath={data.fullPath}
+                        namespaceType="WORKSPACE"
+                    />
                     <WorkspaceNotificationPreference fragmentRef={data} />
                     <TRNButton trn={data.metadata.trn} size="small" />
                     {(data.currentStateVersion && data.currentStateVersion.run) && (

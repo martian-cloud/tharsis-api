@@ -37,6 +37,7 @@ type GroupConnectionQueryArgs struct {
 	ParentPath *string // DEPRECATED: use ParentID instead with a TRN
 	ParentID   *string
 	Search     *string
+	Favorites  *bool
 }
 
 // GroupQueryArgs are used to query a single group
@@ -555,6 +556,10 @@ func groupsQuery(ctx context.Context, args *GroupConnectionQueryArgs) (*GroupCon
 	if args.Sort != nil {
 		sort := db.GroupSortableField(*args.Sort)
 		input.Sort = &sort
+	}
+
+	if args.Favorites != nil && *args.Favorites {
+		input.Favorites = args.Favorites
 	}
 
 	return NewGroupConnectionResolver(ctx, &input)

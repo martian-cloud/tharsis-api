@@ -78,6 +78,7 @@ type WorkspaceFilter struct {
 	HasStateVersion                *bool
 	WorkspacePath                  *string
 	LabelFilters                   []WorkspaceLabelFilter
+	FavoriteUserID                 *string
 }
 
 // WorkspaceLabelFilter represents a label filter for workspace queries
@@ -217,6 +218,13 @@ func (w *workspaces) GetWorkspaces(ctx context.Context, input *GetWorkspacesInpu
 	query := dialect.From(goqu.T("workspaces")).
 		Select(w.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"workspaces.id": goqu.I("namespaces.workspace_id")}))
+
+	if input.Filter != nil && input.Filter.FavoriteUserID != nil {
+		query = query.InnerJoin(goqu.T("namespace_favorites"), goqu.On(goqu.And(
+			goqu.Ex{"namespace_favorites.workspace_id": goqu.I("workspaces.id")},
+			goqu.Ex{"namespace_favorites.user_id": *input.Filter.FavoriteUserID},
+		)))
+	}
 
 	// Since managed identities is a many to many relationship only join them when we are looking for exactly one.
 	// Otherwise duplicates will result.

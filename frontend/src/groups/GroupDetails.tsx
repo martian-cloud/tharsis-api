@@ -36,6 +36,8 @@ import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import GroupNotificationPreference from '../notifications/GroupNotificationPreference';
 import TerraformModules from './terraformmodule/TerraformModules';
 import GroupRuns from './GroupRuns';
+import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
+
 const TABS = ['workspaces', 'subgroups'];
 
 interface Props {
@@ -260,6 +262,10 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     </Box>
                     <Box>
                         <Stack direction="row" spacing={1}>
+                            <NamespaceFavoriteButton
+                                namespacePath={data.fullPath}
+                                namespaceType="GROUP"
+                            />
                             <GroupNotificationPreference fragmentRef={data} />
                             <TRNButton trn={data.metadata.trn} size="small" />
                             <Button size="small" variant="outlined" color="info" onClick={() => (navigate(`/workspaces/-/new?parent=${data.fullPath}`))}>New Workspace</Button>

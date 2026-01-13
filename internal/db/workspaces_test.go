@@ -433,6 +433,18 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 		createdWorkspaces = append(createdWorkspaces, *created)
 	}
 
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-workspaces",
+		Email:    "test-user-workspaces@test.com",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.NamespaceFavorites.CreateNamespaceFavorite(ctx, &models.NamespaceFavorite{
+		UserID:      user.Metadata.ID,
+		WorkspaceID: &createdWorkspaces[0].Metadata.ID,
+	})
+	require.NoError(t, err)
+
 	type testCase struct {
 		name            string
 		expectErrorCode errors.CodeType
@@ -508,6 +520,15 @@ func TestWorkspaces_GetWorkspaces(t *testing.T) {
 				},
 			},
 			expectCount: len(createdWorkspaces),
+		},
+		{
+			name: "filter by favorite user",
+			input: &GetWorkspacesInput{
+				Filter: &WorkspaceFilter{
+					FavoriteUserID: &user.Metadata.ID,
+				},
+			},
+			expectCount: 1,
 		},
 	}
 

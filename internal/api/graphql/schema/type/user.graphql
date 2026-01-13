@@ -82,6 +82,13 @@ type User implements Node {
     last: Int
     sort: UserSessionSort
   ): UserSessionConnection!
+  namespaceFavorites(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    namespacePath: String
+  ): NamespaceFavoriteConnection!
 }
 
 input UpdateUserAdminStatusInput {

@@ -124,6 +124,7 @@ type Client struct {
 	SchemaMigrations                 SchemaMigrations
 	NotificationPreferences          NotificationPreferences
 	FederatedRegistries              FederatedRegistries
+	NamespaceFavorites               NamespaceFavorites
 }
 
 // NewClient creates a new Client
@@ -231,6 +232,7 @@ func NewClient(
 	dbClient.SchemaMigrations = NewSchemaMigrations(dbClient)
 	dbClient.NotificationPreferences = NewNotificationPreferences(dbClient)
 	dbClient.FederatedRegistries = NewFederatedRegistries(dbClient)
+	dbClient.NamespaceFavorites = NewNamespaceFavorites(dbClient)
 
 	return dbClient, nil
 }

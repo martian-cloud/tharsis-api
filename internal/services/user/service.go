@@ -111,6 +111,25 @@ type GetNotificationPreferenceInput struct {
 	NamespacePath *string
 }
 
+// GetNamespaceFavoritesInput is the input for listing namespace favorites
+type GetNamespaceFavoritesInput struct {
+	Sort              *db.NamespaceFavoriteSortableField
+	PaginationOptions *pagination.Options
+	NamespacePath     *string
+}
+
+// CreateNamespaceFavoriteInput is the input for creating a namespace favorite
+type CreateNamespaceFavoriteInput struct {
+	NamespacePath string
+	NamespaceType namespace.Type
+}
+
+// DeleteNamespaceFavoriteInput is the input for deleting a namespace favorite
+type DeleteNamespaceFavoriteInput struct {
+	NamespacePath string
+	NamespaceType namespace.Type
+}
+
 // Service implements all user related functionality
 type Service interface {
 	GetUserByID(ctx context.Context, userID string) (*models.User, error)
@@ -127,6 +146,11 @@ type Service interface {
 	SetUserPassword(ctx context.Context, input *SetUserPasswordInput) (*models.User, error)
 	SetNotificationPreference(ctx context.Context, input *SetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error)
 	GetNotificationPreference(ctx context.Context, input *GetNotificationPreferenceInput) (*namespace.NotificationPreferenceSetting, error)
+	GetNamespaceFavoriteByID(ctx context.Context, id string) (*models.NamespaceFavorite, error)
+	GetNamespaceFavoriteByTRN(ctx context.Context, trn string) (*models.NamespaceFavorite, error)
+	GetNamespaceFavorites(ctx context.Context, input *GetNamespaceFavoritesInput) (*db.NamespaceFavoritesResult, error)
+	CreateNamespaceFavorite(ctx context.Context, input *CreateNamespaceFavoriteInput) (*models.NamespaceFavorite, error)
+	DeleteNamespaceFavorite(ctx context.Context, input *DeleteNamespaceFavoriteInput) error
 }
 
 type service struct {
@@ -718,4 +742,232 @@ func (s *service) SetUserPassword(ctx context.Context, input *SetUserPasswordInp
 	)
 
 	return updatedUser, nil
+}
+
+// NamespaceFavorite service methods
+func (s *service) GetNamespaceFavoriteByID(ctx context.Context, id string) (*models.NamespaceFavorite, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceFavoriteByID")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can access namespace favorites", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	favorite, err := s.dbClient.NamespaceFavorites.GetNamespaceFavoriteByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get namespace favorite", errors.WithSpan(span))
+	}
+
+	if favorite == nil || favorite.UserID != userCaller.User.Metadata.ID {
+		return nil, errors.New("namespace favorite with ID %s not found", id, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	return favorite, nil
+}
+
+func (s *service) GetNamespaceFavoriteByTRN(ctx context.Context, trn string) (*models.NamespaceFavorite, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceFavoriteByTRN")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can access namespace favorites", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	favorite, err := s.dbClient.NamespaceFavorites.GetNamespaceFavoriteByTRN(ctx, trn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get namespace favorite", errors.WithSpan(span))
+	}
+
+	if favorite == nil || favorite.UserID != userCaller.User.Metadata.ID {
+		return nil, errors.New("namespace favorite with TRN %s not found", trn, errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	return favorite, nil
+}
+
+func (s *service) GetNamespaceFavorites(ctx context.Context, input *GetNamespaceFavoritesInput) (*db.NamespaceFavoritesResult, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetNamespaceFavorites")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can get namespace favorites", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	return s.dbClient.NamespaceFavorites.GetNamespaceFavorites(ctx, &db.GetNamespaceFavoritesInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter: &db.NamespaceFavoriteFilter{
+			UserIDs:       []string{userCaller.User.Metadata.ID},
+			NamespacePath: input.NamespacePath,
+		},
+	})
+}
+
+func (s *service) CreateNamespaceFavorite(ctx context.Context, input *CreateNamespaceFavoriteInput) (*models.NamespaceFavorite, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateNamespaceFavorite")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return nil, errors.New("only users can create namespace favorites", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if input.NamespacePath == "" {
+		return nil, errors.New("namespace path cannot be empty", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	namespacePath := input.NamespacePath
+	var groupID *string
+	var workspaceID *string
+
+	switch input.NamespaceType {
+	case namespace.TypeGroup:
+		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
+			return nil, err
+		}
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get group", errors.WithSpan(span))
+		}
+		if group == nil {
+			return nil, errors.New("namespace path does not correspond to a group", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+		}
+		groupID = &group.Metadata.ID
+	case namespace.TypeWorkspace:
+		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
+			return nil, err
+		}
+		workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(namespacePath))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get workspace", errors.WithSpan(span))
+		}
+		if workspace == nil {
+			return nil, errors.New("namespace path does not correspond to a workspace", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+		}
+		workspaceID = &workspace.Metadata.ID
+	default:
+		return nil, errors.New("invalid namespace type", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	favorite := &models.NamespaceFavorite{
+		UserID:      userCaller.User.Metadata.ID,
+		GroupID:     groupID,
+		WorkspaceID: workspaceID,
+	}
+
+	if err = favorite.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid namespace favorite", errors.WithSpan(span))
+	}
+
+	createdFavorite, err := s.dbClient.NamespaceFavorites.CreateNamespaceFavorite(ctx, favorite)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.EConflict {
+			existingFavorites, getErr := s.dbClient.NamespaceFavorites.GetNamespaceFavorites(ctx, &db.GetNamespaceFavoritesInput{
+				Filter: &db.NamespaceFavoriteFilter{
+					UserIDs:       []string{userCaller.User.Metadata.ID},
+					NamespacePath: &namespacePath,
+				},
+			})
+			if getErr != nil {
+				return nil, errors.Wrap(getErr, "failed to get existing namespace favorite", errors.WithSpan(span))
+			}
+			if len(existingFavorites.NamespaceFavorites) > 0 {
+				return &existingFavorites.NamespaceFavorites[0], nil
+			}
+		}
+		return nil, errors.Wrap(err, "failed to create namespace favorite", errors.WithSpan(span))
+	}
+
+	return createdFavorite, nil
+}
+
+func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteNamespaceFavoriteInput) error {
+	ctx, span := tracer.Start(ctx, "svc.DeleteNamespaceFavorite")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		return errors.Wrap(err, "caller not authenticated", errors.WithSpan(span))
+	}
+
+	userCaller, ok := caller.(*auth.UserCaller)
+	if !ok {
+		return errors.New("only users can delete namespace favorites", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+	}
+
+	if input.NamespacePath == "" {
+		return errors.New("namespace path cannot be empty", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	namespacePath := input.NamespacePath
+
+	switch input.NamespaceType {
+	case namespace.TypeGroup:
+		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
+			return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		}
+	case namespace.TypeWorkspace:
+		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
+			return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+		}
+	default:
+		return errors.New("invalid namespace type", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	favorites, err := s.dbClient.NamespaceFavorites.GetNamespaceFavorites(ctx, &db.GetNamespaceFavoritesInput{
+		Filter: &db.NamespaceFavoriteFilter{
+			UserIDs:       []string{userCaller.User.Metadata.ID},
+			NamespacePath: &input.NamespacePath,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to get namespace favorites", errors.WithSpan(span))
+	}
+
+	if len(favorites.NamespaceFavorites) == 0 {
+		return nil
+	}
+
+	favorite := favorites.NamespaceFavorites[0]
+	if err = s.dbClient.NamespaceFavorites.DeleteNamespaceFavorite(ctx, &favorite); err != nil {
+		if errors.ErrorCode(err) == errors.EOptimisticLock {
+			existingFavorites, getErr := s.dbClient.NamespaceFavorites.GetNamespaceFavorites(ctx, &db.GetNamespaceFavoritesInput{
+				Filter: &db.NamespaceFavoriteFilter{
+					UserIDs:       []string{userCaller.User.Metadata.ID},
+					NamespacePath: &input.NamespacePath,
+				},
+			})
+			if getErr != nil {
+				return errors.Wrap(getErr, "failed to get namespace favorites", errors.WithSpan(span))
+			}
+			if len(existingFavorites.NamespaceFavorites) == 0 {
+				return nil
+			}
+		}
+		return errors.Wrap(err, "failed to delete namespace favorite", errors.WithSpan(span))
+	}
+	return nil
 }

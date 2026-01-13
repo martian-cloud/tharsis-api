@@ -51,6 +51,7 @@ type GroupFilter struct {
 	NamespaceIDs           []string
 	RootOnly               bool
 	GroupPaths             []string
+	FavoriteUserID         *string
 }
 
 // GroupSortableField represents the fields that a group can be sorted by
@@ -195,12 +196,21 @@ func (g *groups) GetGroups(ctx context.Context, input *GetGroupsInput) (*GroupsR
 		if len(input.Filter.GroupPaths) > 0 {
 			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.GroupPaths))
 		}
+
 	}
 
 	query := dialect.From(goqu.T("groups")).
 		Select(g.getSelectFields()...).
-		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")})).
-		Where(ex)
+		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"groups.id": goqu.I("namespaces.group_id")}))
+
+	if input.Filter != nil && input.Filter.FavoriteUserID != nil {
+		query = query.InnerJoin(goqu.T("namespace_favorites"), goqu.On(goqu.And(
+			goqu.Ex{"namespace_favorites.group_id": goqu.I("groups.id")},
+			goqu.Ex{"namespace_favorites.user_id": *input.Filter.FavoriteUserID},
+		)))
+	}
+
+	query = query.Where(ex)
 
 	sortDirection := pagination.AscSort
 

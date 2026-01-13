@@ -212,6 +212,18 @@ func (r *NodeResolver) ToUserSession() (*UserSessionResolver, bool) {
 	}
 }
 
+// ToNamespaceFavorite resolver
+func (r *NodeResolver) ToNamespaceFavorite() (*NamespaceFavoriteResolver, bool) {
+	switch res := r.result.(type) {
+	case *NamespaceFavoriteResolver:
+		return res, true
+	case *models.NamespaceFavorite:
+		return &NamespaceFavoriteResolver{namespaceFavorite: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToNamespaceVariable resolver
 func (r *NodeResolver) ToNamespaceVariable() (*NamespaceVariableResolver, bool) {
 	switch res := r.result.(type) {

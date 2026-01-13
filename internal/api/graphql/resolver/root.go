@@ -1483,6 +1483,26 @@ func (r RootResolver) DeleteAnnouncement(ctx context.Context,
 	return response, nil
 }
 
+/* NamespaceFavorite Mutations */
+
+// FavoriteNamespace favorites a namespace
+func (r RootResolver) FavoriteNamespace(ctx context.Context, args *struct{ Input *NamespaceFavoriteInput }) (*NamespaceFavoriteMutationPayloadResolver, error) {
+	response, err := favoriteNamespaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleNamespaceFavoriteMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// UnfavoriteNamespace unfavorites a namespace
+func (r RootResolver) UnfavoriteNamespace(ctx context.Context, args *struct{ Input *NamespaceFavoriteInput }) (*NamespaceUnfavoriteMutationPayloadResolver, error) {
+	response, err := unfavoriteNamespaceMutation(ctx, args.Input)
+	if err != nil {
+		return handleNamespaceUnfavoriteMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
 // Version returns the version of the API and its components
 func (r RootResolver) Version(ctx context.Context) (*VersionResolver, error) {
 	return versionQuery(ctx)

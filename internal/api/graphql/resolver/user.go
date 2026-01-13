@@ -234,6 +234,25 @@ func (r *UserResolver) UserSessions(ctx context.Context,
 	return NewUserSessionConnectionResolver(ctx, &input)
 }
 
+// NamespaceFavorites resolver
+func (r *UserResolver) NamespaceFavorites(ctx context.Context, args *NamespaceFavoritesConnectionQueryArgs) (*NamespaceFavoriteConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := user.GetNamespaceFavoritesInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		NamespacePath:     args.NamespacePath,
+	}
+
+	if args.Sort != nil {
+		sort := db.NamespaceFavoriteSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewNamespaceFavoriteConnectionResolver(ctx, &input)
+}
+
 func usersQuery(ctx context.Context, args *UserConnectionQueryArgs) (*UserConnectionResolver, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err

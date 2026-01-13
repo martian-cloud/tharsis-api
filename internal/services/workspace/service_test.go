@@ -1173,6 +1173,26 @@ func TestGetWorkspaces(t *testing.T) {
 			authError:       errors.New("auth failed", errors.WithErrorCode(errors.EUnauthorized)),
 			expectErrorCode: errors.EUnauthorized,
 		},
+		{
+			name: "positive: user can filter by favorites",
+			input: &GetWorkspacesInput{
+				Favorites: ptr.Bool(true),
+			},
+			userID:               ptr.String("user-1"),
+			accessPolicyAllowAll: false,
+			expectResult: []models.Workspace{
+				sampleWorkspace,
+			},
+		},
+		{
+			name: "negative: service account cannot filter by favorites",
+			input: &GetWorkspacesInput{
+				Favorites: ptr.Bool(true),
+			},
+			serviceAccountID:     ptr.String("sa-1"),
+			accessPolicyAllowAll: false,
+			expectErrorCode:      errors.EInvalid,
+		},
 	}
 
 	for _, test := range testCases {
@@ -1184,7 +1204,20 @@ func TestGetWorkspaces(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 
 			if !test.failAuthorization {
-				ctx = auth.WithCaller(ctx, mockCaller)
+				if test.input.Favorites != nil && *test.input.Favorites && test.userID != nil {
+					mockAuthorizer := auth.NewMockAuthorizer(t)
+					mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+					mockAuthorizer.On("GetRootNamespaces", mock.Anything).Return([]models.MembershipNamespace{}, nil).Maybe()
+					ctx = auth.WithCaller(ctx, auth.NewUserCaller(
+						&models.User{Metadata: models.ResourceMetadata{ID: *test.userID}},
+						mockAuthorizer,
+						&db.Client{Workspaces: mockWorkspaces},
+						mockMaintenanceMonitor,
+						nil,
+					))
+				} else {
+					ctx = auth.WithCaller(ctx, mockCaller)
+				}
 			}
 
 			input := db.GetWorkspacesInput{
@@ -1195,6 +1228,11 @@ func TestGetWorkspaces(t *testing.T) {
 					AssignedManagedIdentityID: test.input.AssignedManagedIdentityID,
 					LabelFilters:              test.input.LabelFilters,
 				},
+			}
+
+			// Handle favorites filter
+			if test.input.Favorites != nil && *test.input.Favorites && test.userID != nil {
+				input.Filter.FavoriteUserID = test.userID
 			}
 
 			if test.input.GroupID != nil {

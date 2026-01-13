@@ -276,6 +276,17 @@ func TestGroups_GetGroups(t *testing.T) {
 		require.NoError(t, err)
 		createdGroups = append(createdGroups, *created)
 	}
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user-groups",
+		Email:    "test-user-groups@test.com",
+	})
+	require.NoError(t, err)
+
+	_, err = testClient.client.NamespaceFavorites.CreateNamespaceFavorite(ctx, &models.NamespaceFavorite{
+		UserID:  user.Metadata.ID,
+		GroupID: &createdGroups[0].Metadata.ID,
+	})
+	require.NoError(t, err)
 
 	type testCase struct {
 		name            string
@@ -289,6 +300,15 @@ func TestGroups_GetGroups(t *testing.T) {
 			name:        "get all groups",
 			input:       &GetGroupsInput{},
 			expectCount: len(createdGroups),
+		},
+		{
+			name: "get groups with favorite filter",
+			input: &GetGroupsInput{
+				Filter: &GroupFilter{
+					FavoriteUserID: &user.Metadata.ID,
+				},
+			},
+			expectCount: 1,
 		},
 	}
 
