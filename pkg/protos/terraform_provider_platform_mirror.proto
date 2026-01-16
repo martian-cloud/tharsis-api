@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_provider_platform_mirror;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// TerraformProviderPlatformMirrorSortableField defines enums for sorting platform mirrors.
+enum TerraformProviderPlatformMirrorSortableField {
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+}
+
+// GetTerraformProviderPlatformMirrorByIDRequest is the input for retrieving a platform mirror by ID.
+message GetTerraformProviderPlatformMirrorByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformProviderPlatformMirrorsRequest is the input for retrieving a paginated list of platform mirrors.
+message GetTerraformProviderPlatformMirrorsRequest {
+  optional pagination.PaginationOptions                 pagination_options = 1;
+  optional TerraformProviderPlatformMirrorSortableField sort               = 2;
+  string                                                version_mirror_id  = 3;
+  optional string                                       os                 = 4;
+  optional string                                       architecture       = 5;
+}
+
+// DeleteTerraformProviderPlatformMirrorRequest is the input for deleting a platform mirror.
+message DeleteTerraformProviderPlatformMirrorRequest {
+  string id = 1;
+}
+
+// TerraformProviderPlatformMirror represents a mirrored provider platform.
+message TerraformProviderPlatformMirror {
+  metadata.ResourceMetadata metadata          = 1;
+  string                    os                = 2;
+  string                    architecture      = 3;
+  string                    version_mirror_id = 4;
+}
+
+// GetTerraformProviderPlatformMirrorsResponse is the response for GetTerraformProviderPlatformMirrors.
+message GetTerraformProviderPlatformMirrorsResponse {
+  pagination.PageInfo                      page_info        = 1;
+  repeated TerraformProviderPlatformMirror platform_mirrors = 2;
+}

@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.state_version;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// StateVersions implements all functionality related to Tharsis State Versions.
+service StateVersions {
+  // GetStateVersionByID returns a StateVersion by an ID.
+  rpc GetStateVersionByID(GetStateVersionByIDRequest) returns (StateVersion);
+  // GetStateVersions returns a paginated list of StateVersions for a workspace.
+  rpc GetStateVersions(GetStateVersionsRequest) returns (GetStateVersionsResponse);
+  // CreateStateVersion creates a new StateVersion.
+  rpc CreateStateVersion(CreateStateVersionRequest) returns (StateVersion);
+}
+
+// StateVersionSortableField defines enums that allow sorting a paginated list of StateVersions.
+enum StateVersionSortableField {
+  UPDATED_AT_ASC  = 0;
+  UPDATED_AT_DESC = 1;
+}
+
+// GetStateVersionByIDRequest is the input for retrieving a StateVersion by its ID.
+message GetStateVersionByIDRequest {
+  string id = 1;
+}
+
+// GetStateVersionsRequest is the input for retrieving a paginated list of StateVersions.
+message GetStateVersionsRequest {
+  string                                workspace_id       = 1;
+  optional pagination.PaginationOptions pagination_options = 2;
+  optional StateVersionSortableField    sort               = 3;
+}
+
+// CreateStateVersionRequest is the input for creating a new StateVersion.
+message CreateStateVersionRequest {
+  optional string run_id = 1;
+  string          state  = 2;
+}
+
+// StateVersion represents a specific version of the terraform state.
+message StateVersion {
+  metadata.ResourceMetadata metadata     = 1;
+  string                    workspace_id = 2;
+  optional string           run_id       = 3;
+  string                    created_by   = 4;
+}
+
+// GetStateVersionsResponse is the paginated list of StateVersions.
+message GetStateVersionsResponse {
+  repeated StateVersion state_versions = 1;
+  pagination.PageInfo   page_info      = 2;
+}

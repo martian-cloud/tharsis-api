@@ -131,7 +131,7 @@ type Service interface {
 	LockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
 	UnlockWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error)
 	GetCurrentStateVersion(ctx context.Context, workspaceID string) (*models.StateVersion, error)
-	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data *string) (*models.StateVersion, error)
+	CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error)
 	GetStateVersionByID(ctx context.Context, stateVersionID string) (*models.StateVersion, error)
 	GetStateVersionByTRN(ctx context.Context, trn string) (*models.StateVersion, error)
 	GetStateVersions(ctx context.Context, input *GetStateVersionsInput) (*db.StateVersionsResult, error)
@@ -1093,7 +1093,7 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 	return response, nil
 }
 
-func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data *string) (*models.StateVersion, error) {
+func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateStateVersion")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
@@ -1111,7 +1111,7 @@ func (s *service) CreateStateVersion(ctx context.Context, stateVersion *models.S
 	}
 
 	// We need to decode the base64 encoded string
-	decoded, err := base64.StdEncoding.DecodeString(*data)
+	decoded, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to decoded base64-encoded state version")
 		return nil, err

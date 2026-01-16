@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.runner_session;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/timestamp.proto";
+
+// RunnerSessionSortableField defines enums for sorting runner sessions.
+enum RunnerSessionSortableField {
+  CREATED_AT_ASC      = 0;
+  CREATED_AT_DESC     = 1;
+  LAST_CONTACTED_ASC  = 2;
+  LAST_CONTACTED_DESC = 3;
+}
+
+// CreateRunnerSessionRequest is the input for creating a runner session.
+message CreateRunnerSessionRequest {
+  string runner_path = 1;
+}
+
+// GetRunnerSessionsRequest is the input for getting runner sessions.
+message GetRunnerSessionsRequest {
+  string                                runner_id          = 1;
+  optional pagination.PaginationOptions pagination_options = 2;
+  optional RunnerSessionSortableField   sort               = 3;
+}
+
+// GetRunnerSessionByIDRequest is the input for getting a runner session by ID.
+message GetRunnerSessionByIDRequest {
+  string id = 1;
+}
+
+// SendRunnerSessionHeartbeatRequest is the input for accepting a heartbeat.
+message SendRunnerSessionHeartbeatRequest {
+  string session_id = 1;
+}
+
+// CreateRunnerSessionErrorRequest is the input for creating a session error.
+message CreateRunnerSessionErrorRequest {
+  string runner_session_id = 1;
+  string message           = 2;
+}
+
+// SubscribeToRunnerSessionsRequest is the input for subscribing to runner sessions.
+message SubscribeToRunnerSessionsRequest {
+  optional string group_id    = 1;
+  optional string runner_id   = 2;
+  optional string runner_type = 3;
+}
+
+// SubscribeToRunnerSessionErrorLogRequest is the input for subscribing to runner session error logs.
+message SubscribeToRunnerSessionErrorLogRequest {
+  string         runner_session_id  = 1;
+  optional int32 last_seen_log_size = 2;
+}
+
+// RunnerSession represents a runner session.
+message RunnerSession {
+  metadata.ResourceMetadata metadata          = 1;
+  string                    runner_id         = 2;
+  bool                      internal          = 3;
+  google.protobuf.Timestamp last_contacted_at = 4;
+  int32                     error_count       = 5;
+}
+
+// GetRunnerSessionsResponse is the paginated list of runner sessions.
+message GetRunnerSessionsResponse {
+  repeated RunnerSession runner_sessions = 1;
+  pagination.PageInfo    page_info       = 2;
+}
+
+// RunnerSessionEvent represents a runner session event.
+message RunnerSessionEvent {
+  string        action         = 1;
+  RunnerSession runner_session = 2;
+}
+
+// RunnerSessionErrorLogEventData contains the log data.
+message RunnerSessionErrorLogEventData {
+  int32  offset = 1;
+  string logs   = 2;
+}
+
+// RunnerSessionErrorLogEvent represents a runner session error log event.
+message RunnerSessionErrorLogEvent {
+  bool                                    completed = 1;
+  int32                                   size      = 2;
+  optional RunnerSessionErrorLogEventData data      = 3;
+}

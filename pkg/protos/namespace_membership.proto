@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.namespace_membership;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// NamespaceMemberships implements all functionality related to a Tharsis NamespaceMembership.
+service NamespaceMemberships {
+  // GetNamespaceMembershipByID returns a NamespaceMembership by an ID.
+  rpc GetNamespaceMembershipByID(GetNamespaceMembershipByIDRequest) returns (NamespaceMembership);
+  // GetNamespaceMembershipsForNamespace returns memberships for a namespace.
+  rpc GetNamespaceMembershipsForNamespace(GetNamespaceMembershipsForNamespaceRequest) returns (GetNamespaceMembershipsForNamespaceResponse);
+  // GetNamespaceMembershipsForSubject returns a paginated list of memberships for a subject.
+  rpc GetNamespaceMembershipsForSubject(GetNamespaceMembershipsForSubjectRequest) returns (GetNamespaceMembershipsForSubjectResponse);
+  // CreateNamespaceMembership creates a new NamespaceMembership.
+  rpc CreateNamespaceMembership(CreateNamespaceMembershipRequest) returns (NamespaceMembership);
+  // UpdateNamespaceMembership returns the updated NamespaceMembership.
+  rpc UpdateNamespaceMembership(UpdateNamespaceMembershipRequest) returns (NamespaceMembership);
+  // DeleteNamespaceMembership deletes a NamespaceMembership.
+  rpc DeleteNamespaceMembership(DeleteNamespaceMembershipRequest) returns (google.protobuf.Empty);
+}
+
+// NamespaceMembershipSortableField defines enums that allow sorting a paginated list.
+enum NamespaceMembershipSortableField {
+  UPDATED_AT_ASC      = 0;
+  UPDATED_AT_DESC     = 1;
+  NAMESPACE_PATH_ASC  = 2;
+  NAMESPACE_PATH_DESC = 3;
+}
+
+// GetNamespaceMembershipByIDRequest is the input for retrieving a NamespaceMembership by its ID.
+message GetNamespaceMembershipByIDRequest {
+  string id = 1;
+}
+
+// GetNamespaceMembershipsForNamespaceRequest is the input for retrieving memberships for a namespace.
+message GetNamespaceMembershipsForNamespaceRequest {
+  string namespace_path = 1;
+}
+
+// GetNamespaceMembershipsForNamespaceResponse is the response for retrieving memberships for a namespace.
+message GetNamespaceMembershipsForNamespaceResponse {
+  repeated NamespaceMembership namespace_memberships = 1;
+}
+
+// GetNamespaceMembershipsForSubjectRequest is the input for retrieving memberships for a subject.
+message GetNamespaceMembershipsForSubjectRequest {
+  optional pagination.PaginationOptions     pagination_options = 1;
+  optional NamespaceMembershipSortableField sort               = 2;
+  optional string                           user_id            = 3;
+  optional string                           service_account_id = 4;
+}
+
+// GetNamespaceMembershipsForSubjectResponse is the paginated list of NamespaceMemberships.
+message GetNamespaceMembershipsForSubjectResponse {
+  repeated NamespaceMembership namespace_memberships = 1;
+  pagination.PageInfo          page_info             = 2;
+}
+
+// CreateNamespaceMembershipRequest is the input for creating a new NamespaceMembership.
+message CreateNamespaceMembershipRequest {
+  string          namespace_path     = 1;
+  string          role_id            = 2;
+  optional string user_id            = 3;
+  optional string service_account_id = 4;
+  optional string team_id            = 5;
+}
+
+// UpdateNamespaceMembershipRequest is the input for updating a NamespaceMembership.
+message UpdateNamespaceMembershipRequest {
+  string         id      = 1;
+  string         role_id = 2;
+  optional int64 version = 3;
+}
+
+// DeleteNamespaceMembershipRequest is the input for deleting a NamespaceMembership.
+message DeleteNamespaceMembershipRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// MembershipNamespace represents the namespace for a membership.
+message MembershipNamespace {
+  string          id           = 1;
+  string          path         = 2;
+  optional string group_id     = 3;
+  optional string workspace_id = 4;
+}
+
+// NamespaceMembership defines a namespace membership within Tharsis.
+message NamespaceMembership {
+  metadata.ResourceMetadata metadata           = 1;
+  string                    role_id            = 2;
+  MembershipNamespace       namespace          = 3;
+  optional string           user_id            = 4;
+  optional string           service_account_id = 5;
+  optional string           team_id            = 6;
+}

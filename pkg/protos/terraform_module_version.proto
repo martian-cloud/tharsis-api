@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_module_version;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/timestamp.proto";
+
+// TerraformModuleVersionSortableField defines enums for sorting module versions.
+enum TerraformModuleVersionSortableField {
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+}
+
+// GetTerraformModuleVersionByIDRequest is the input for retrieving a TerraformModuleVersion by its ID.
+message GetTerraformModuleVersionByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformModuleVersionsRequest is the input for retrieving a paginated list of TerraformModuleVersions.
+message GetTerraformModuleVersionsRequest {
+  optional pagination.PaginationOptions        pagination_options = 1;
+  optional TerraformModuleVersionSortableField sort               = 2;
+  string                                       module_id          = 3;
+  optional string                              search             = 4;
+  optional bool                                latest             = 5;
+  optional string                              semantic_version   = 6;
+}
+
+// CreateTerraformModuleVersionRequest is the input for creating a new TerraformModuleVersion.
+message CreateTerraformModuleVersionRequest {
+  string module_id = 1;
+  string version   = 2;
+  string sha_sum   = 3;
+}
+
+// DeleteTerraformModuleVersionRequest is the input for deleting a TerraformModuleVersion.
+message DeleteTerraformModuleVersionRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// TerraformModuleVersion represents a version of a Terraform module.
+message TerraformModuleVersion {
+  metadata.ResourceMetadata          metadata                 = 1;
+  string                             created_by               = 2;
+  string                             diagnostics              = 3;
+  string                             error                    = 4;
+  bool                               latest                   = 5;
+  string                             module_id                = 6;
+  string                             semantic_version         = 7;
+  string                             sha_sum                  = 8;
+  string                             status                   = 9;
+  repeated string                    submodules               = 10;
+  optional google.protobuf.Timestamp upload_started_timestamp = 11;
+}
+
+// GetTerraformModuleVersionsResponse is the paginated list of TerraformModuleVersions.
+message GetTerraformModuleVersionsResponse {
+  repeated TerraformModuleVersion versions  = 1;
+  pagination.PageInfo             page_info = 2;
+}

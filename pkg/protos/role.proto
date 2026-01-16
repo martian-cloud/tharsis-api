@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.role;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// Roles implements all functionality related to a Tharsis Role.
+service Roles {
+  // GetRoleByID returns a Role by an ID.
+  rpc GetRoleByID(GetRoleByIDRequest) returns (Role);
+  // GetRoles returns a paginated list of Roles.
+  rpc GetRoles(GetRolesRequest) returns (GetRolesResponse);
+  // GetAvailablePermissions returns the list of available permissions.
+  rpc GetAvailablePermissions(google.protobuf.Empty) returns (GetAvailablePermissionsResponse);
+  // CreateRole creates a new Role.
+  rpc CreateRole(CreateRoleRequest) returns (Role);
+  // UpdateRole returns the updated Role.
+  rpc UpdateRole(UpdateRoleRequest) returns (Role);
+  // DeleteRole deletes a Role.
+  rpc DeleteRole(DeleteRoleRequest) returns (google.protobuf.Empty);
+}
+
+// RoleSortableField defines enums that allow sorting a paginated list of Roles.
+enum RoleSortableField {
+  NAME_ASC        = 0;
+  NAME_DESC       = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+}
+
+// GetRoleByIDRequest is the input for retrieving a Role by its ID.
+message GetRoleByIDRequest {
+  string id = 1;
+}
+
+// GetRolesRequest is the input for retrieving a paginated list of Roles.
+message GetRolesRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional RoleSortableField            sort               = 2;
+  optional string                       search             = 3;
+}
+
+// GetAvailablePermissionsResponse is the response for retrieving available permissions.
+message GetAvailablePermissionsResponse {
+  repeated string permissions = 1;
+}
+
+// CreateRoleRequest is the input for creating a new Role.
+message CreateRoleRequest {
+  string          name        = 1;
+  string          description = 2;
+  repeated string permissions = 3;
+}
+
+// UpdateRoleRequest is the input for updating a Role.
+message UpdateRoleRequest {
+  string          id          = 1;
+  optional string description = 2;
+  optional int64  version     = 3;
+  repeated string permissions = 4;
+}
+
+// DeleteRoleRequest is the input for deleting a Role.
+message DeleteRoleRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// Role defines a role within Tharsis.
+message Role {
+  metadata.ResourceMetadata metadata    = 1;
+  string                    name        = 2;
+  string                    description = 3;
+  string                    created_by  = 4;
+  repeated string           permissions = 5;
+}
+
+// GetRolesResponse is the paginated list of Roles.
+message GetRolesResponse {
+  repeated Role       roles     = 1;
+  pagination.PageInfo page_info = 2;
+}

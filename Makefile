@@ -1,3 +1,4 @@
+PROTOC_VERSION=25.6
 GO_VERSION = 1.24
 MODULE = $(shell go list -m)
 VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo "1.0.0")
@@ -54,6 +55,25 @@ fmt: ## run "go fmt" on all Go packages
 .PHONY: generate
 generate: ## run go generate
 	go generate -v ./...
+
+.PHONY: protos
+protos: ## generate code from a .proto file with protoc cli.
+	@echo "Verify correct protoc version installed"
+	@if [ $(shell which protoc | wc -l) = 0 ] || [ "$(shell protoc --version | awk '{print $$2}')" != $(PROTOC_VERSION) ]; then \
+  		echo "Required protoc version is not installed. $(shell protoc --version | awk '{print $$2}') detected, $(PROTOC_VERSION) required."; \
+  		echo "You can install the correct version from https://github.com/protocolbuffers/protobuf/releases/tag/v$(PROTOC_VERSION) or consider using nix."; \
+		echo "See installation instructions https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os"; \
+  		exit 1; \
+	fi
+
+	@go install tool
+
+	@echo "Generating code from protos"
+	protoc --go_out=pkg/protos/gen --go_opt=paths=source_relative \
+		--go-grpc_out=pkg/protos/gen --go-grpc_opt=paths=source_relative \
+		--proto_path=pkg/protos pkg/protos/*.proto
+
+	@echo "Protos successfully generated"
 
 # Test targets
 .PHONY: test

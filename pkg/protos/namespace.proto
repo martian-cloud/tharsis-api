@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.namespace;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+// NamespaceRunnerTagsInput is the input for setting runner tags on a namespace.
+message NamespaceRunnerTagsInput {
+  bool            inherit = 1;
+  repeated string tags    = 2;
+}
+
+// NamespaceDriftDetectionEnabledInput is the input for setting drift detection on a namespace.
+message NamespaceDriftDetectionEnabledInput {
+  oneof value {
+    bool inherit = 1;
+    bool enabled = 2;
+  }
+}

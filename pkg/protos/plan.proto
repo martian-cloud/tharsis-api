@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.plan;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// PlanStatus defines the status of a Plan.
+enum PlanStatus {
+  CANCELED = 0;
+  QUEUED   = 1;
+  ERRORED  = 2;
+  FINISHED = 3;
+  PENDING  = 4;
+  RUNNING  = 5;
+}
+
+// GetPlanByIDRequest is the input for retrieving a Plan by its ID.
+message GetPlanByIDRequest {
+  string id = 1;
+}
+
+// UpdatePlanRequest is the input for updating a Plan.
+message UpdatePlanRequest {
+  string          id            = 1;
+  optional int64  version       = 2;
+  PlanStatus      status        = 3;
+  bool            has_changes   = 4;
+  optional string error_message = 5;
+}
+
+// GetLatestJobForPlanRequest is the input for getting the latest job for a plan.
+message GetLatestJobForPlanRequest {
+  string plan_id = 1;
+}
+
+// Plan represents a Terraform plan.
+message Plan {
+  metadata.ResourceMetadata metadata      = 1;
+  string                    status        = 2;
+  optional string           error_message = 3;
+  bool                      has_changes   = 4;
+}

@@ -280,7 +280,7 @@ func (c *workspaceController) CreateStateVersion(w http.ResponseWriter, r *http.
 
 	options := models.StateVersion{WorkspaceID: workspaceID}
 
-	sv, err := c.workspaceService.CreateStateVersion(r.Context(), &options, req.State)
+	sv, err := c.workspaceService.CreateStateVersion(r.Context(), &options, *req.State)
 	if err != nil {
 		c.respWriter.RespondWithError(r.Context(), w, err)
 		return

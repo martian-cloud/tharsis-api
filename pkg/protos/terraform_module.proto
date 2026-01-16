@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_module;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+import "terraform_module_version.proto";
+import "terraform_module_attestation.proto";
+
+// TerraformModules implements all functionality related to a Tharsis TerraformModule.
+service TerraformModules {
+  // GetTerraformModuleByID returns a TerraformModule by an ID.
+  rpc GetTerraformModuleByID(GetTerraformModuleByIDRequest) returns (TerraformModule);
+  // GetTerraformModules returns a paginated list of TerraformModules.
+  rpc GetTerraformModules(GetTerraformModulesRequest) returns (GetTerraformModulesResponse);
+  // CreateTerraformModule creates a new TerraformModule.
+  rpc CreateTerraformModule(CreateTerraformModuleRequest) returns (TerraformModule);
+  // UpdateTerraformModule returns the updated TerraformModule.
+  rpc UpdateTerraformModule(UpdateTerraformModuleRequest) returns (TerraformModule);
+  // DeleteTerraformModule deletes a TerraformModule.
+  rpc DeleteTerraformModule(DeleteTerraformModuleRequest) returns (google.protobuf.Empty);
+  // GetTerraformModuleVersionByID returns a TerraformModuleVersion by an ID.
+  rpc GetTerraformModuleVersionByID(terraform_module_version.GetTerraformModuleVersionByIDRequest) returns (terraform_module_version.TerraformModuleVersion);
+  // GetTerraformModuleVersions returns a paginated list of TerraformModuleVersions.
+  rpc GetTerraformModuleVersions(terraform_module_version.GetTerraformModuleVersionsRequest) returns (terraform_module_version.GetTerraformModuleVersionsResponse);
+  // CreateTerraformModuleVersion creates a new TerraformModuleVersion.
+  rpc CreateTerraformModuleVersion(terraform_module_version.CreateTerraformModuleVersionRequest) returns (terraform_module_version.TerraformModuleVersion);
+  // DeleteTerraformModuleVersion deletes a TerraformModuleVersion.
+  rpc DeleteTerraformModuleVersion(terraform_module_version.DeleteTerraformModuleVersionRequest) returns (google.protobuf.Empty);
+  // GetTerraformModuleAttestationByID returns a TerraformModuleAttestation by an ID.
+  rpc GetTerraformModuleAttestationByID(terraform_module_attestation.GetTerraformModuleAttestationByIDRequest) returns (terraform_module_attestation.TerraformModuleAttestation);
+  // GetTerraformModuleAttestations returns a paginated list of TerraformModuleAttestations.
+  rpc GetTerraformModuleAttestations(terraform_module_attestation.GetTerraformModuleAttestationsRequest) returns (terraform_module_attestation.GetTerraformModuleAttestationsResponse);
+  // CreateTerraformModuleAttestation creates a new TerraformModuleAttestation.
+  rpc CreateTerraformModuleAttestation(terraform_module_attestation.CreateTerraformModuleAttestationRequest) returns (terraform_module_attestation.TerraformModuleAttestation);
+  // UpdateTerraformModuleAttestation updates a TerraformModuleAttestation.
+  rpc UpdateTerraformModuleAttestation(terraform_module_attestation.UpdateTerraformModuleAttestationRequest) returns (terraform_module_attestation.TerraformModuleAttestation);
+  // DeleteTerraformModuleAttestation deletes a TerraformModuleAttestation.
+  rpc DeleteTerraformModuleAttestation(terraform_module_attestation.DeleteTerraformModuleAttestationRequest) returns (google.protobuf.Empty);
+}
+
+// TerraformModuleSortableField defines enums that allow sorting a paginated list of TerraformModules.
+enum TerraformModuleSortableField {
+  NAME_ASC         = 0;
+  NAME_DESC        = 1;
+  UPDATED_AT_ASC   = 2;
+  UPDATED_AT_DESC  = 3;
+  GROUP_LEVEL_ASC  = 4;
+  GROUP_LEVEL_DESC = 5;
+}
+
+// GetTerraformModuleByIDRequest is the input for retrieving a TerraformModule by its ID.
+message GetTerraformModuleByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformModulesRequest is the input for retrieving a paginated list of TerraformModules.
+message GetTerraformModulesRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional TerraformModuleSortableField sort               = 2;
+  optional string                       search             = 3;
+  optional string                       group_id           = 4;
+  bool                                  include_inherited  = 5;
+}
+
+// CreateTerraformModuleRequest is the input for creating a new TerraformModule.
+message CreateTerraformModuleRequest {
+  string name           = 1;
+  string system         = 2;
+  string group_id       = 3;
+  string repository_url = 4;
+  bool   private        = 5;
+}
+
+// UpdateTerraformModuleRequest is the input for updating a TerraformModule.
+message UpdateTerraformModuleRequest {
+  string          id             = 1;
+  optional string repository_url = 2;
+  optional bool   private        = 3;
+  optional int64  version        = 4;
+}
+
+// DeleteTerraformModuleRequest is the input for deleting a TerraformModule.
+message DeleteTerraformModuleRequest {
+  string id = 1;
+}
+
+// TerraformModule defines a Terraform module within Tharsis.
+message TerraformModule {
+  metadata.ResourceMetadata metadata       = 1;
+  string                    name           = 2;
+  string                    system         = 3;
+  string                    group_id       = 4;
+  string                    repository_url = 5;
+  bool                      private        = 6;
+  string                    created_by     = 7;
+}
+
+// GetTerraformModulesResponse is the paginated list of TerraformModules.
+message GetTerraformModulesResponse {
+  repeated TerraformModule modules   = 1;
+  pagination.PageInfo      page_info = 2;
+}

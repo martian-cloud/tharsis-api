@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.pagination;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+// PaginationOptions are used for paginating.
+message PaginationOptions {
+  optional string before = 1;
+  optional string after  = 2;
+  optional int32  first  = 3;
+  optional int32  last   = 4;
+}
+
+// PageInfo message.
+message PageInfo {
+  optional string end_cursor        = 1;
+  optional string start_cursor      = 2;
+  bool            has_next_page     = 3;
+  bool            has_previous_page = 4;
+  int32           total_count       = 5;
+}

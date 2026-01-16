@@ -627,13 +627,11 @@ func TestGetTeamMembers(t *testing.T) {
 			mockCaller := auth.NewMockCaller(t)
 			mockTeamMembers := db.NewMockTeamMembers(t)
 
-			dbInput := &db.GetTeamMembersInput{
-				Filter: &db.TeamMemberFilter{
-					TeamIDs: []string{teamID},
-				},
+			input := &GetTeamMembersInput{
+				TeamID: &teamID,
 			}
 
-			mockTeamMembers.On("GetTeamMembers", mock.Anything, dbInput).
+			mockTeamMembers.On("GetTeamMembers", mock.Anything, mock.Anything).
 				Return(&db.TeamMembersResult{
 					TeamMembers: []models.TeamMember{test.expectMember},
 				}, nil)
@@ -644,7 +642,7 @@ func TestGetTeamMembers(t *testing.T) {
 
 			service := NewService(nil, dbClient, nil)
 
-			result, err := service.GetTeamMembers(auth.WithCaller(ctx, mockCaller), dbInput)
+			result, err := service.GetTeamMembers(auth.WithCaller(ctx, mockCaller), input)
 
 			if err != nil {
 				t.Fatal(err)

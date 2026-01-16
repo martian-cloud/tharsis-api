@@ -5,14 +5,19 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	_ "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity" // Placeholder to ensure private packages are being downloaded
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/grpc"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/asynctask"
@@ -71,6 +76,7 @@ type APIServer struct {
 	taskManager   asynctask.Manager
 	dbClient      *db.Client
 	srv           *http.Server
+	grpcServer    *grpc.Server
 	traceShutdown func(context.Context) error
 	tlsConfig     *tls.Config
 	shutdownOnce  sync.Once
@@ -331,13 +337,44 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		go runner.Start(auth.WithCaller(ctx, &auth.SystemCaller{}))
 	}
 
+	// Create a listener for gRPC.
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", cfg.GRPCServerPort))
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on port %v for gRPC server: %v", cfg.GRPCServerPort, err)
+	}
+
+	var grpcListener net.Listener
+	if cfg.TLSEnabled {
+		grpcListener = tls.NewListener(listener, tlsConfig)
+	} else {
+		grpcListener = listener
+	}
+
+	grpcServer := grpc.NewServer(&grpc.ServerOptions{
+		Listener:        grpcListener,
+		Logger:          logger,
+		Authenticator:   authenticator,
+		APIServerConfig: cfg,
+		ServiceCatalog:  serviceCatalog,
+		OAuthProviders:  cfg.OauthProviders,
+		RateLimitStore:  pluginCatalog.HTTPRateLimitStore,
+	})
+
+	rootHandler := buildRootHandler(router, grpcServer)
+	if !cfg.TLSEnabled {
+		// The default go server only supports http2 when TLS is enabled; therefore, when TLS
+		// is disabled we'll use the h2c package to handle http2 connections
+		rootHandler = h2c.NewHandler(rootHandler, &http2.Server{})
+	}
+
 	return &APIServer{
 		logger:      logger,
 		dbClient:    dbClient,
 		taskManager: taskManager,
+		grpcServer:  grpcServer,
 		srv: &http.Server{
 			Addr:              fmt.Sprintf(":%v", cfg.ServerPort),
-			Handler:           router,
+			Handler:           rootHandler,
 			ReadHeaderTimeout: time.Minute,
 			TLSConfig:         tlsConfig,
 		},
@@ -373,6 +410,15 @@ func (api *APIServer) Start() {
 		}
 	}()
 
+	// Start gRPC server on its own port.
+	go func() {
+		if err := api.grpcServer.Start(); err != nil {
+			api.logger.Errorf("gRPC server failed to start: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Start main server
 	var err error
 	if api.tlsConfig != nil {
 		api.logger.Infof("HTTPS server listening on %s", api.srv.Addr)
@@ -399,6 +445,9 @@ func (api *APIServer) Shutdown(ctx context.Context) {
 
 		api.logger.Info("HTTP server shutdown successfully")
 
+		// Shutdown gRPC server.
+		api.grpcServer.Shutdown()
+
 		// Shutdown trace provider.
 		if err := api.traceShutdown(ctx); err != nil {
 			api.logger.Errorf("Shutdown trace provider failed: %w", err)
@@ -414,11 +463,26 @@ func (api *APIServer) Shutdown(ctx context.Context) {
 	})
 }
 
+func buildRootHandler(httpHandler http.Handler, grpcHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if grpc.IsGRPCRequest(r) {
+			grpcHandler.ServeHTTP(w, r)
+		} else {
+			httpHandler.ServeHTTP(w, r)
+		}
+	})
+}
+
 func configureDefaultAdminUser(ctx context.Context, email string, password string, dbClient *db.Client, logger logger.Logger) error {
+	if email == "" {
+		return nil
+	}
+
 	user, err := dbClient.Users.GetUserByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
+
 	if user == nil {
 		user = &models.User{
 			Username: auth.ParseUsername(email),
@@ -426,7 +490,6 @@ func configureDefaultAdminUser(ctx context.Context, email string, password strin
 			Admin:    true,
 			Active:   true,
 		}
-
 		if password != "" {
 			if err = user.SetPassword(password); err != nil {
 				return err
@@ -436,28 +499,27 @@ func configureDefaultAdminUser(ctx context.Context, email string, password strin
 		if _, err = dbClient.Users.CreateUser(ctx, user); err != nil {
 			return fmt.Errorf("failed to create admin user: %v", err)
 		}
+
 		logger.Infof("User with email %s created.", email)
-	} else {
-		updateUser := false
+		return nil
+	}
 
-		if !user.Admin {
-			user.Admin = true
-			updateUser = true
-		}
+	needsUpdate := !user.Admin || (password != "" && !user.VerifyPassword(password))
+	if !needsUpdate {
+		return nil
+	}
 
-		if password != "" && !user.VerifyPassword(password) {
-			if err = user.SetPassword(password); err != nil {
-				return err
-			}
-			updateUser = true
-		}
-
-		if updateUser {
-			if _, err = dbClient.Users.UpdateUser(ctx, user); err != nil {
-				return fmt.Errorf("failed to set user to admin: %v", err)
-			}
-			logger.Infof("User with email %s has been granted admin privileges.", email)
+	user.Admin = true
+	if password != "" {
+		if err = user.SetPassword(password); err != nil {
+			return err
 		}
 	}
+
+	if _, err = dbClient.Users.UpdateUser(ctx, user); err != nil {
+		return fmt.Errorf("failed to set user to admin: %v", err)
+	}
+
+	logger.Infof("User with email %s has been granted admin privileges.", email)
 	return nil
 }

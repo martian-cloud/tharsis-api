@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_provider_version;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// TerraformProviderVersionSortableField defines enums for sorting provider versions.
+enum TerraformProviderVersionSortableField {
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+  VERSION_ASC     = 4;
+  VERSION_DESC    = 5;
+}
+
+// GetTerraformProviderVersionByIDRequest is the input for retrieving a TerraformProviderVersion by its ID.
+message GetTerraformProviderVersionByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformProviderVersionsRequest is the input for retrieving a paginated list of TerraformProviderVersions.
+message GetTerraformProviderVersionsRequest {
+  optional pagination.PaginationOptions          pagination_options    = 1;
+  optional TerraformProviderVersionSortableField sort                  = 2;
+  string                                         provider_id           = 3;
+  optional string                                semantic_version      = 4;
+  optional bool                                  latest                = 5;
+  optional bool                                  sha_sums_uploaded     = 6;
+  optional bool                                  sha_sums_sig_uploaded = 7;
+}
+
+// CreateTerraformProviderVersionRequest is the input for creating a new TerraformProviderVersion.
+message CreateTerraformProviderVersionRequest {
+  string          provider_id = 1;
+  string          version     = 2;
+  repeated string protocols   = 3;
+}
+
+// DeleteTerraformProviderVersionRequest is the input for deleting a TerraformProviderVersion.
+message DeleteTerraformProviderVersionRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// TerraformProviderVersion represents a version of a Terraform provider.
+message TerraformProviderVersion {
+  metadata.ResourceMetadata metadata              = 1;
+  string                    created_by            = 2;
+  optional string           gpg_ascii_armor       = 3;
+  optional uint64           gpg_key_id            = 4;
+  bool                      latest                = 5;
+  repeated string           protocols             = 6;
+  string                    provider_id           = 7;
+  bool                      readme_uploaded       = 8;
+  string                    semantic_version      = 9;
+  bool                      sha_sums_sig_uploaded = 10;
+  bool                      sha_sums_uploaded     = 11;
+}
+
+// GetTerraformProviderVersionsResponse is the paginated list of TerraformProviderVersions.
+message GetTerraformProviderVersionsResponse {
+  repeated TerraformProviderVersion versions  = 1;
+  pagination.PageInfo               page_info = 2;
+}

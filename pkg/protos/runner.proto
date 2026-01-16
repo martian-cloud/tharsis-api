@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.runner;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+import "runner_session.proto";
+
+// Runners implements all functionality related to a Tharsis Runner.
+service Runners {
+  // GetRunnerByID returns a Runner by an ID.
+  rpc GetRunnerByID(GetRunnerByIDRequest) returns (Runner);
+  // GetRunners returns a paginated list of Runners.
+  rpc GetRunners(GetRunnersRequest) returns (GetRunnersResponse);
+  // CreateRunner creates a new Runner.
+  rpc CreateRunner(CreateRunnerRequest) returns (Runner);
+  // UpdateRunner returns the updated Runner.
+  rpc UpdateRunner(UpdateRunnerRequest) returns (Runner);
+  // DeleteRunner deletes a Runner.
+  rpc DeleteRunner(DeleteRunnerRequest) returns (google.protobuf.Empty);
+  // AssignServiceAccountToRunner assigns a service account to a runner.
+  rpc AssignServiceAccountToRunner(AssignServiceAccountToRunnerRequest) returns (google.protobuf.Empty);
+  // UnassignServiceAccountFromRunner unassigns a service account from a runner.
+  rpc UnassignServiceAccountFromRunner(UnassignServiceAccountFromRunnerRequest) returns (google.protobuf.Empty);
+  // CreateRunnerSession creates a new runner session.
+  rpc CreateRunnerSession(runner_session.CreateRunnerSessionRequest) returns (runner_session.RunnerSession);
+  // GetRunnerSessions returns a paginated list of runner sessions.
+  rpc GetRunnerSessions(runner_session.GetRunnerSessionsRequest) returns (runner_session.GetRunnerSessionsResponse);
+  // GetRunnerSessionByID returns a runner session by ID.
+  rpc GetRunnerSessionByID(runner_session.GetRunnerSessionByIDRequest) returns (runner_session.RunnerSession);
+  // SendRunnerSessionHeartbeat accepts a heartbeat from a runner session.
+  rpc SendRunnerSessionHeartbeat(runner_session.SendRunnerSessionHeartbeatRequest) returns (google.protobuf.Empty);
+  // CreateRunnerSessionError creates an error for a runner session.
+  rpc CreateRunnerSessionError(runner_session.CreateRunnerSessionErrorRequest) returns (google.protobuf.Empty);
+  // SubscribeToRunnerSessions subscribes to runner session events.
+  rpc SubscribeToRunnerSessions(runner_session.SubscribeToRunnerSessionsRequest) returns (stream runner_session.RunnerSessionEvent);
+  // SubscribeToRunnerSessionErrorLog subscribes to runner session error log events.
+  rpc SubscribeToRunnerSessionErrorLog(runner_session.SubscribeToRunnerSessionErrorLogRequest) returns (stream runner_session.RunnerSessionErrorLogEvent);
+}
+
+// RunnerSortableField defines enums that allow sorting a paginated list of Runners.
+enum RunnerSortableField {
+  UPDATED_AT_ASC   = 0;
+  UPDATED_AT_DESC  = 1;
+  GROUP_LEVEL_ASC  = 2;
+  GROUP_LEVEL_DESC = 3;
+}
+
+// RunnerType defines the type of runner.
+enum RunnerType {
+  GROUP  = 0;
+  SHARED = 1;
+}
+
+// GetRunnerByIDRequest is the input for retrieving a Runner by its ID.
+message GetRunnerByIDRequest {
+  string id = 1;
+}
+
+// GetRunnersRequest is the input for retrieving a paginated list of Runners.
+message GetRunnersRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional RunnerSortableField          sort               = 2;
+  optional string                       namespace_path     = 3;
+  optional RunnerType                   runner_type        = 4;
+  bool                                  include_inherited  = 5;
+}
+
+// CreateRunnerRequest is the input for creating a new Runner.
+message CreateRunnerRequest {
+  string          name              = 1;
+  string          description       = 2;
+  string          group_id          = 3;
+  optional bool   disabled          = 4;
+  bool            run_untagged_jobs = 5;
+  repeated string tags              = 6;
+}
+
+// UpdateRunnerRequest is the input for updating a Runner.
+message UpdateRunnerRequest {
+  string          id                = 1;
+  optional string description       = 2;
+  optional int64  version           = 3;
+  optional bool   disabled          = 4;
+  optional bool   run_untagged_jobs = 5;
+  repeated string tags              = 6;
+}
+
+// DeleteRunnerRequest is the input for deleting a Runner.
+message DeleteRunnerRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// AssignServiceAccountToRunnerRequest is the input for assigning a service account.
+message AssignServiceAccountToRunnerRequest {
+  string runner_id          = 1;
+  string service_account_id = 2;
+}
+
+// UnassignServiceAccountFromRunnerRequest is the input for unassigning a service account.
+message UnassignServiceAccountFromRunnerRequest {
+  string runner_id          = 1;
+  string service_account_id = 2;
+}
+
+// Runner defines a runner within Tharsis.
+message Runner {
+  metadata.ResourceMetadata metadata          = 1;
+  string                    name              = 2;
+  string                    description       = 3;
+  optional string           group_id          = 4;
+  string                    type              = 5;
+  string                    created_by        = 6;
+  bool                      disabled          = 7;
+  bool                      run_untagged_jobs = 8;
+  repeated string           tags              = 9;
+}
+
+// GetRunnersResponse is the paginated list of Runners.
+message GetRunnersResponse {
+  repeated Runner     runners   = 1;
+  pagination.PageInfo page_info = 2;
+}

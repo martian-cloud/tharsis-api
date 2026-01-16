@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.auth_settings;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "google/protobuf/empty.proto";
+
+// AuthSettings implements functionality related to Tharsis authentication settings.
+service AuthSettings {
+  // GetAuthSettings returns the authentication settings for Tharsis.
+  rpc GetAuthSettings(google.protobuf.Empty) returns (GetAuthSettingsResponse);
+}
+
+// UserAuthType defines the authentication type.
+enum UserAuthType {
+  BASIC = 0;
+  OIDC  = 1;
+}
+
+// OIDCAuthSettings contains OIDC authentication settings.
+message OIDCAuthSettings {
+  string issuer_url = 1;
+  string client_id  = 2;
+}
+
+// GetAuthSettingsResponse is the response for the GetAuthSettings RPC.
+message GetAuthSettingsResponse {
+  UserAuthType     auth_type          = 1;
+  OIDCAuthSettings oidc_auth_settings = 2;
+}
