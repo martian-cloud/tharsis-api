@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.group;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "namespace.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// Groups implements all functionality related to a Tharsis Group.
+service Groups {
+  // GetGroupByID returns a Group by an ID.
+  rpc GetGroupByID(GetGroupByIDRequest) returns (Group);
+  // GetGroups returns a paginated list of Groups.
+  rpc GetGroups(GetGroupsRequest) returns (GetGroupsResponse);
+  // CreateGroup creates a new Group.
+  rpc CreateGroup(CreateGroupRequest) returns (Group);
+  // UpdateGroup returns the updated Group.
+  rpc UpdateGroup(UpdateGroupRequest) returns (Group);
+  // DeleteGroup deletes a Group.
+  rpc DeleteGroup(DeleteGroupRequest) returns (google.protobuf.Empty);
+  // MigrateGroup migrates a Group to a new parent.
+  rpc MigrateGroup(MigrateGroupRequest) returns (Group);
+}
+
+// GroupSortableField defines enums that allow sorting a paginated list of
+// Groups.
+enum GroupSortableField {
+  FULL_PATH_ASC    = 0;
+  FULL_PATH_DESC   = 1;
+  GROUP_LEVEL_ASC  = 2;
+  GROUP_LEVEL_DESC = 3;
+  UPDATED_AT_ASC   = 4;
+  UPDATED_AT_DESC  = 5;
+}
+
+// GetGroupByIDRequest is the input for retrieving a Group by its ID.
+message GetGroupByIDRequest {
+  string id = 1;
+}
+
+// GetGroupsRequest is the input for retrieving a paginated list of Groups.
+message GetGroupsRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional GroupSortableField           sort               = 2;
+  optional string                       search             = 3;
+  optional string                       parent_id          = 4;
+}
+
+// CreateGroupRequest is the input for creating a new Group.
+message CreateGroupRequest {
+  string                                                 name                    = 1;
+  string                                                 description             = 2;
+  optional string                                        parent_id               = 3;
+  repeated string                                        runner_tags             = 4;
+  optional namespace.NamespaceDriftDetectionEnabledInput drift_detection_enabled = 5;
+}
+
+// UpdateGroupRequest is the input for updating a Group.
+message UpdateGroupRequest {
+  string                                                 id                      = 1;
+  optional string                                        description             = 2;
+  optional int64                                         version                 = 3;
+  repeated string                                        runner_tags             = 4;
+  optional namespace.NamespaceDriftDetectionEnabledInput drift_detection_enabled = 5;
+}
+
+// DeleteGroupRequest is the input for deleting a Group.
+message DeleteGroupRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+  optional bool  force   = 3;
+}
+
+// MigrateGroupRequest is the input for migrating a Group.
+message MigrateGroupRequest {
+  string          group_id      = 1;
+  optional string new_parent_id = 2;
+}
+
+// Group defines a container that houses resources within Tharsis.
+message Group {
+  metadata.ResourceMetadata metadata    = 1;
+  string                    name        = 2;
+  string                    description = 3;
+  string                    full_path   = 4;
+  string                    created_by  = 5;
+  string                    parent_id   = 6;
+}
+
+// GetGroupsResponse is the paginated list of Groups.
+message GetGroupsResponse {
+  repeated Group      groups    = 1;
+  pagination.PageInfo page_info = 2;
+}

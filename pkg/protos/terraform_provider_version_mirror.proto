@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_provider_version_mirror;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// TerraformProviderVersionMirrorSortableField defines enums for sorting version mirrors.
+enum TerraformProviderVersionMirrorSortableField {
+  CREATED_AT_ASC        = 0;
+  CREATED_AT_DESC       = 1;
+  SEMANTIC_VERSION_ASC  = 2;
+  SEMANTIC_VERSION_DESC = 3;
+}
+
+// GetTerraformProviderVersionMirrorByIDRequest is the input for retrieving a version mirror by ID.
+message GetTerraformProviderVersionMirrorByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformProviderVersionMirrorsRequest is the input for retrieving a paginated list of version mirrors.
+message GetTerraformProviderVersionMirrorsRequest {
+  optional pagination.PaginationOptions                pagination_options = 1;
+  optional TerraformProviderVersionMirrorSortableField sort               = 2;
+  bool                                                 include_inherited  = 3;
+  string                                               namespace_path     = 4;
+}
+
+// CreateTerraformProviderVersionMirrorRequest is the input for creating a version mirror.
+message CreateTerraformProviderVersionMirrorRequest {
+  string group_id           = 1;
+  string type               = 2;
+  string registry_namespace = 3;
+  string registry_hostname  = 4;
+  string semantic_version   = 5;
+}
+
+// DeleteTerraformProviderVersionMirrorRequest is the input for deleting a version mirror.
+message DeleteTerraformProviderVersionMirrorRequest {
+  string id    = 1;
+  bool   force = 2;
+}
+
+// TerraformProviderVersionMirror represents a mirrored provider version.
+message TerraformProviderVersionMirror {
+  metadata.ResourceMetadata metadata           = 1;
+  string                    created_by         = 2;
+  string                    type               = 3;
+  string                    semantic_version   = 4;
+  string                    registry_namespace = 5;
+  string                    registry_hostname  = 6;
+  map<string, string>       digests            = 7;
+  string                    group_id           = 8;
+}
+
+// GetTerraformProviderVersionMirrorsResponse is the response for GetTerraformProviderVersionMirrors.
+message GetTerraformProviderVersionMirrorsResponse {
+  pagination.PageInfo                     page_info       = 1;
+  repeated TerraformProviderVersionMirror version_mirrors = 2;
+}

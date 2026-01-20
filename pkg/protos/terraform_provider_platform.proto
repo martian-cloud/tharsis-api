@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_provider_platform;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// TerraformProviderPlatformSortableField defines enums for sorting provider platforms.
+enum TerraformProviderPlatformSortableField {
+  UPDATED_AT_ASC  = 0;
+  UPDATED_AT_DESC = 1;
+}
+
+// GetTerraformProviderPlatformByIDRequest is the input for retrieving a TerraformProviderPlatform by its ID.
+message GetTerraformProviderPlatformByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformProviderPlatformsRequest is the input for retrieving a paginated list of TerraformProviderPlatforms.
+message GetTerraformProviderPlatformsRequest {
+  optional pagination.PaginationOptions           pagination_options  = 1;
+  optional TerraformProviderPlatformSortableField sort                = 2;
+  optional string                                 provider_version_id = 3;
+  optional string                                 provider_id         = 4;
+  optional bool                                   binary_uploaded     = 5;
+  optional string                                 operating_system    = 6;
+  optional string                                 architecture        = 7;
+}
+
+// CreateTerraformProviderPlatformRequest is the input for creating a new TerraformProviderPlatform.
+message CreateTerraformProviderPlatformRequest {
+  string provider_version_id = 1;
+  string os                  = 2;
+  string arch                = 3;
+  string sha_sum             = 4;
+  string filename            = 5;
+}
+
+// DeleteTerraformProviderPlatformRequest is the input for deleting a TerraformProviderPlatform.
+message DeleteTerraformProviderPlatformRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// TerraformProviderPlatform represents a platform for a Terraform provider version.
+message TerraformProviderPlatform {
+  metadata.ResourceMetadata metadata            = 1;
+  string                    architecture        = 2;
+  bool                      binary_uploaded     = 3;
+  string                    created_by          = 4;
+  string                    filename            = 5;
+  string                    operating_system    = 6;
+  string                    provider_version_id = 7;
+  string                    sha_sum             = 8;
+}
+
+// GetTerraformProviderPlatformsResponse is the paginated list of TerraformProviderPlatforms.
+message GetTerraformProviderPlatformsResponse {
+  repeated TerraformProviderPlatform platforms = 1;
+  pagination.PageInfo                page_info = 2;
+}

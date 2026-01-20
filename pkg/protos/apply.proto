@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.apply;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// ApplyStatus defines the status of an Apply.
+enum ApplyStatus {
+  CANCELED = 0;
+  CREATED  = 1;
+  ERRORED  = 2;
+  FINISHED = 3;
+  PENDING  = 4;
+  QUEUED   = 5;
+  RUNNING  = 6;
+}
+
+// GetApplyByIDRequest is the input for retrieving an Apply by its ID.
+message GetApplyByIDRequest {
+  string id = 1;
+}
+
+// UpdateApplyRequest is the input for updating an Apply.
+message UpdateApplyRequest {
+  string          id            = 1;
+  optional int64  version       = 2;
+  ApplyStatus     status        = 3;
+  optional string error_message = 4;
+}
+
+// GetLatestJobForApplyRequest is the input for getting the latest job for an apply.
+message GetLatestJobForApplyRequest {
+  string apply_id = 1;
+}
+
+// Apply represents a Terraform apply.
+message Apply {
+  metadata.ResourceMetadata metadata      = 1;
+  string                    status        = 2;
+  string                    triggered_by  = 3;
+  optional string           error_message = 4;
+}

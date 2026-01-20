@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.team;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+import "team_member.proto";
+
+// Teams implements all functionality related to a Tharsis Team.
+service Teams {
+  // GetTeamByID returns a Team by an ID.
+  rpc GetTeamByID(GetTeamByIDRequest) returns (Team);
+  // GetTeams returns a paginated list of Teams.
+  rpc GetTeams(GetTeamsRequest) returns (GetTeamsResponse);
+  // CreateTeam creates a new Team.
+  rpc CreateTeam(CreateTeamRequest) returns (Team);
+  // UpdateTeam returns the updated Team.
+  rpc UpdateTeam(UpdateTeamRequest) returns (Team);
+  // DeleteTeam deletes a Team.
+  rpc DeleteTeam(DeleteTeamRequest) returns (google.protobuf.Empty);
+  // GetTeamMember returns a team member.
+  rpc GetTeamMember(team_member.GetTeamMemberRequest) returns (team_member.TeamMember);
+  // GetTeamMembers returns a paginated list of team members.
+  rpc GetTeamMembers(team_member.GetTeamMembersRequest) returns (team_member.GetTeamMembersResponse);
+  // AddUserToTeam adds a user to a team.
+  rpc AddUserToTeam(team_member.AddUserToTeamRequest) returns (team_member.TeamMember);
+  // UpdateTeamMember updates a team member.
+  rpc UpdateTeamMember(team_member.UpdateTeamMemberRequest) returns (team_member.TeamMember);
+  // RemoveUserFromTeam removes a user from a team.
+  rpc RemoveUserFromTeam(team_member.RemoveUserFromTeamRequest) returns (google.protobuf.Empty);
+}
+
+// TeamSortableField defines enums that allow sorting a paginated list of Teams.
+enum TeamSortableField {
+  NAME_ASC        = 0;
+  NAME_DESC       = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+}
+
+// GetTeamByIDRequest is the input for retrieving a Team by its ID.
+message GetTeamByIDRequest {
+  string id = 1;
+}
+
+// GetTeamsRequest is the input for retrieving a paginated list of Teams.
+message GetTeamsRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional TeamSortableField            sort               = 2;
+  optional string                       team_name_prefix   = 3;
+  optional string                       user_id            = 4;
+}
+
+// CreateTeamRequest is the input for creating a new Team.
+message CreateTeamRequest {
+  string name        = 1;
+  string description = 2;
+}
+
+// UpdateTeamRequest is the input for updating a Team.
+message UpdateTeamRequest {
+  string          id          = 1;
+  optional string description = 2;
+  optional int64  version     = 3;
+}
+
+// DeleteTeamRequest is the input for deleting a Team.
+message DeleteTeamRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// Team defines a team within Tharsis.
+message Team {
+  metadata.ResourceMetadata metadata         = 1;
+  string                    name             = 2;
+  string                    description      = 3;
+  string                    scim_external_id = 4;
+}
+
+// GetTeamsResponse is the paginated list of Teams.
+message GetTeamsResponse {
+  repeated Team       teams     = 1;
+  pagination.PageInfo page_info = 2;
+}

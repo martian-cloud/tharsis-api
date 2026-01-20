@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_provider_mirror;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "google/protobuf/empty.proto";
+import "terraform_provider_version_mirror.proto";
+import "terraform_provider_platform_mirror.proto";
+
+// TerraformProviderMirrors implements all functionality related to Terraform provider mirrors.
+service TerraformProviderMirrors {
+  // GetTerraformProviderVersionMirrorByID returns a version mirror by ID.
+  rpc GetTerraformProviderVersionMirrorByID(terraform_provider_version_mirror.GetTerraformProviderVersionMirrorByIDRequest) returns (terraform_provider_version_mirror.TerraformProviderVersionMirror);
+  // GetTerraformProviderVersionMirrors returns a paginated list of version mirrors.
+  rpc GetTerraformProviderVersionMirrors(terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsRequest) returns (terraform_provider_version_mirror.GetTerraformProviderVersionMirrorsResponse);
+  // CreateTerraformProviderVersionMirror creates a new version mirror.
+  rpc CreateTerraformProviderVersionMirror(terraform_provider_version_mirror.CreateTerraformProviderVersionMirrorRequest) returns (terraform_provider_version_mirror.TerraformProviderVersionMirror);
+  // DeleteTerraformProviderVersionMirror deletes a version mirror.
+  rpc DeleteTerraformProviderVersionMirror(terraform_provider_version_mirror.DeleteTerraformProviderVersionMirrorRequest) returns (google.protobuf.Empty);
+  // GetTerraformProviderPlatformMirrorByID returns a platform mirror by ID.
+  rpc GetTerraformProviderPlatformMirrorByID(terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorByIDRequest) returns (terraform_provider_platform_mirror.TerraformProviderPlatformMirror);
+  // GetTerraformProviderPlatformMirrors returns a paginated list of platform mirrors.
+  rpc GetTerraformProviderPlatformMirrors(terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsRequest) returns (terraform_provider_platform_mirror.GetTerraformProviderPlatformMirrorsResponse);
+  // DeleteTerraformProviderPlatformMirror deletes a platform mirror.
+  rpc DeleteTerraformProviderPlatformMirror(terraform_provider_platform_mirror.DeleteTerraformProviderPlatformMirrorRequest) returns (google.protobuf.Empty);
+}

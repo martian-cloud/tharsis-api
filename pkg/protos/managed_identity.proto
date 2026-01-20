@@ -1,0 +1,247 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.managed_identity;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+import "job.proto";
+
+// ManagedIdentities implements all functionality related to a Tharsis ManagedIdentity.
+service ManagedIdentities {
+  // GetManagedIdentityByID returns a ManagedIdentity by an ID.
+  rpc GetManagedIdentityByID(GetManagedIdentityByIDRequest) returns (ManagedIdentity);
+  // GetManagedIdentities returns a paginated list of ManagedIdentities.
+  rpc GetManagedIdentities(GetManagedIdentitiesRequest) returns (GetManagedIdentitiesResponse);
+  // CreateManagedIdentity creates a new ManagedIdentity.
+  rpc CreateManagedIdentity(CreateManagedIdentityRequest) returns (ManagedIdentity);
+  // UpdateManagedIdentity returns the updated ManagedIdentity.
+  rpc UpdateManagedIdentity(UpdateManagedIdentityRequest) returns (ManagedIdentity);
+  // DeleteManagedIdentity deletes a ManagedIdentity.
+  rpc DeleteManagedIdentity(DeleteManagedIdentityRequest) returns (google.protobuf.Empty);
+  // CreateManagedIdentityCredentials creates credentials for a ManagedIdentity.
+  rpc CreateManagedIdentityCredentials(CreateManagedIdentityCredentialsRequest) returns (CreateManagedIdentityCredentialsResponse);
+  // AssignManagedIdentityToWorkspace assigns a ManagedIdentity to a Workspace.
+  rpc AssignManagedIdentityToWorkspace(AssignManagedIdentityToWorkspaceRequest) returns (google.protobuf.Empty);
+  // GetManagedIdentitiesForWorkspace returns ManagedIdentities for a Workspace.
+  rpc GetManagedIdentitiesForWorkspace(GetManagedIdentitiesForWorkspaceRequest) returns (GetManagedIdentitiesResponse);
+  // RemoveManagedIdentityFromWorkspace removes a ManagedIdentity from a Workspace.
+  rpc RemoveManagedIdentityFromWorkspace(RemoveManagedIdentityFromWorkspaceRequest) returns (google.protobuf.Empty);
+  // GetManagedIdentityAccessRules returns access rules for a ManagedIdentity.
+  rpc GetManagedIdentityAccessRules(GetManagedIdentityAccessRulesRequest) returns (GetManagedIdentityAccessRulesResponse);
+  // GetManagedIdentityAccessRuleByID returns an access rule by ID.
+  rpc GetManagedIdentityAccessRuleByID(GetManagedIdentityAccessRuleByIDRequest) returns (ManagedIdentityAccessRule);
+  // CreateManagedIdentityAccessRule creates a new access rule.
+  rpc CreateManagedIdentityAccessRule(CreateManagedIdentityAccessRuleRequest) returns (ManagedIdentityAccessRule);
+  // UpdateManagedIdentityAccessRule updates an access rule.
+  rpc UpdateManagedIdentityAccessRule(UpdateManagedIdentityAccessRuleRequest) returns (ManagedIdentityAccessRule);
+  // DeleteManagedIdentityAccessRule deletes an access rule.
+  rpc DeleteManagedIdentityAccessRule(DeleteManagedIdentityAccessRuleRequest) returns (google.protobuf.Empty);
+  // CreateManagedIdentityAlias creates an alias for a ManagedIdentity.
+  rpc CreateManagedIdentityAlias(CreateManagedIdentityAliasRequest) returns (ManagedIdentity);
+  // DeleteManagedIdentityAlias deletes a ManagedIdentity alias.
+  rpc DeleteManagedIdentityAlias(DeleteManagedIdentityAliasRequest) returns (google.protobuf.Empty);
+  // MoveManagedIdentity moves a ManagedIdentity to a new group.
+  rpc MoveManagedIdentity(MoveManagedIdentityRequest) returns (ManagedIdentity);
+}
+
+// ManagedIdentityType defines the type of managed identity.
+enum ManagedIdentityType {
+  AZURE_FEDERATED      = 0;
+  AWS_FEDERATED        = 1;
+  THARSIS_FEDERATED    = 2;
+  KUBERNETES_FEDERATED = 3;
+}
+
+// ManagedIdentityAccessRuleType defines the type of access rule.
+enum ManagedIdentityAccessRuleType {
+  ELIGIBLE_PRINCIPALS = 0;
+  MODULE_ATTESTATION  = 1;
+}
+
+// ManagedIdentitySortableField defines enums that allow sorting a paginated list of ManagedIdentities.
+enum ManagedIdentitySortableField {
+  CREATED_AT_ASC   = 0;
+  CREATED_AT_DESC  = 1;
+  UPDATED_AT_ASC   = 2;
+  UPDATED_AT_DESC  = 3;
+  GROUP_LEVEL_ASC  = 4;
+  GROUP_LEVEL_DESC = 5;
+}
+
+// GetManagedIdentityByIDRequest is the input for retrieving a ManagedIdentity by its ID.
+message GetManagedIdentityByIDRequest {
+  string id = 1;
+}
+
+// GetManagedIdentitiesRequest is the input for retrieving a paginated list of ManagedIdentities.
+message GetManagedIdentitiesRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional ManagedIdentitySortableField sort               = 2;
+  optional string                       search             = 3;
+  string                                namespace_path     = 4;
+  optional string                       alias_source_id    = 5;
+  bool                                  include_inherited  = 6;
+}
+
+// CreateManagedIdentityRequest is the input for creating a new ManagedIdentity.
+message CreateManagedIdentityRequest {
+  ManagedIdentityType                     type         = 1;
+  string                                  name         = 2;
+  string                                  description  = 3;
+  string                                  group_id     = 4;
+  string                                  data         = 5;
+  repeated ManagedIdentityAccessRuleInput access_rules = 6;
+}
+
+// UpdateManagedIdentityRequest is the input for updating a ManagedIdentity.
+message UpdateManagedIdentityRequest {
+  string          id          = 1;
+  optional string description = 2;
+  optional string data        = 3;
+}
+
+// DeleteManagedIdentityRequest is the input for deleting a ManagedIdentity.
+message DeleteManagedIdentityRequest {
+  string        id    = 1;
+  optional bool force = 2;
+}
+
+// CreateManagedIdentityCredentialsRequest is the input for creating credentials.
+message CreateManagedIdentityCredentialsRequest {
+  string managed_identity_id = 1;
+}
+
+// AssignManagedIdentityToWorkspaceRequest is the input for assigning to workspace.
+message AssignManagedIdentityToWorkspaceRequest {
+  string managed_identity_id = 1;
+  string workspace_id        = 2;
+}
+
+// GetManagedIdentitiesForWorkspaceRequest is the input for getting workspace identities.
+message GetManagedIdentitiesForWorkspaceRequest {
+  string workspace_id = 1;
+}
+
+// RemoveManagedIdentityFromWorkspaceRequest is the input for removing from workspace.
+message RemoveManagedIdentityFromWorkspaceRequest {
+  string managed_identity_id = 1;
+  string workspace_id        = 2;
+}
+
+// GetManagedIdentityAccessRulesRequest is the input for getting access rules.
+message GetManagedIdentityAccessRulesRequest {
+  string managed_identity_id = 1;
+}
+
+// GetManagedIdentityAccessRuleByIDRequest is the input for getting an access rule by ID.
+message GetManagedIdentityAccessRuleByIDRequest {
+  string id = 1;
+}
+
+// CreateManagedIdentityAccessRuleRequest is the input for creating an access rule.
+message CreateManagedIdentityAccessRuleRequest {
+  ManagedIdentityAccessRuleType                             type                        = 1;
+  job.JobType                                               run_stage                   = 2;
+  string                                                    managed_identity_id         = 3;
+  repeated string                                           allowed_users               = 4;
+  repeated string                                           allowed_service_accounts    = 5;
+  repeated string                                           allowed_teams               = 6;
+  bool                                                      verify_state_lineage        = 7;
+  repeated ManagedIdentityAccessRuleModuleAttestationPolicy module_attestation_policies = 8;
+}
+
+// UpdateManagedIdentityAccessRuleRequest is the input for updating an access rule.
+message UpdateManagedIdentityAccessRuleRequest {
+  string                                                    id                          = 1;
+  job.JobType                                               run_stage                   = 2;
+  repeated string                                           allowed_users               = 3;
+  repeated string                                           allowed_service_accounts    = 4;
+  repeated string                                           allowed_teams               = 5;
+  optional bool                                             verify_state_lineage        = 6;
+  repeated ManagedIdentityAccessRuleModuleAttestationPolicy module_attestation_policies = 7;
+}
+
+// DeleteManagedIdentityAccessRuleRequest is the input for deleting an access rule.
+message DeleteManagedIdentityAccessRuleRequest {
+  string id = 1;
+}
+
+// CreateManagedIdentityAliasRequest is the input for creating an alias.
+message CreateManagedIdentityAliasRequest {
+  string name            = 1;
+  string alias_source_id = 2;
+  string group_id        = 3;
+}
+
+// DeleteManagedIdentityAliasRequest is the input for deleting an alias.
+message DeleteManagedIdentityAliasRequest {
+  string        id    = 1;
+  optional bool force = 2;
+}
+
+// MoveManagedIdentityRequest is the input for moving a managed identity.
+message MoveManagedIdentityRequest {
+  string managed_identity_id = 1;
+  string new_group_id        = 2;
+}
+
+// ManagedIdentityAccessRuleInput is the input for access rules.
+message ManagedIdentityAccessRuleInput {
+  ManagedIdentityAccessRuleType                             type                        = 1;
+  job.JobType                                               run_stage                   = 2;
+  repeated string                                           allowed_users               = 3;
+  repeated string                                           allowed_service_accounts    = 4;
+  repeated string                                           allowed_teams               = 5;
+  bool                                                      verify_state_lineage        = 6;
+  repeated ManagedIdentityAccessRuleModuleAttestationPolicy module_attestation_policies = 7;
+}
+
+// ManagedIdentityAccessRuleModuleAttestationPolicy is used to verify module attestations.
+message ManagedIdentityAccessRuleModuleAttestationPolicy {
+  optional string predicate_type = 1;
+  string          public_key     = 2;
+}
+
+// ManagedIdentity defines a managed identity within Tharsis.
+message ManagedIdentity {
+  metadata.ResourceMetadata metadata        = 1;
+  string                    name            = 2;
+  string                    description     = 3;
+  string                    group_id        = 4;
+  string                    type            = 5;
+  string                    data            = 6;
+  string                    created_by      = 7;
+  optional string           alias_source_id = 8;
+}
+
+// ManagedIdentityAccessRule defines an access rule for a managed identity.
+message ManagedIdentityAccessRule {
+  metadata.ResourceMetadata                                 metadata                    = 1;
+  string                                                    type                        = 2;
+  string                                                    run_stage                   = 3;
+  string                                                    managed_identity_id         = 4;
+  repeated string                                           allowed_users               = 5;
+  repeated string                                           allowed_service_accounts    = 6;
+  repeated string                                           allowed_teams               = 7;
+  bool                                                      verify_state_lineage        = 8;
+  repeated ManagedIdentityAccessRuleModuleAttestationPolicy module_attestation_policies = 9;
+}
+
+// GetManagedIdentitiesResponse is the paginated list of ManagedIdentities.
+message GetManagedIdentitiesResponse {
+  repeated ManagedIdentity managed_identities = 1;
+  pagination.PageInfo      page_info          = 2;
+}
+
+// CreateManagedIdentityCredentialsResponse contains the credentials data.
+message CreateManagedIdentityCredentialsResponse {
+  string data = 1;
+}
+
+// GetManagedIdentityAccessRulesResponse is the response for getting access rules.
+message GetManagedIdentityAccessRulesResponse {
+  repeated ManagedIdentityAccessRule access_rules = 1;
+}

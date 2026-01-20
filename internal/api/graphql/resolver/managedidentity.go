@@ -1051,7 +1051,7 @@ func updateManagedIdentityMutation(ctx context.Context, input *UpdateManagedIden
 
 	managedIdentity, err := serviceCatalog.ManagedIdentityService.UpdateManagedIdentity(ctx, &managedidentity.UpdateManagedIdentityInput{
 		ID:          id,
-		Description: input.Description,
+		Description: &input.Description,
 		Data:        []byte(input.Data),
 	})
 	if err != nil {

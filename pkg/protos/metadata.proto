@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.metadata;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "google/protobuf/timestamp.proto";
+
+// ResourceMetadata is the metadata message embedded in every resource.
+message ResourceMetadata {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  int64                     version    = 3;
+  string                    id         = 4;
+  string                    trn        = 5;
+}

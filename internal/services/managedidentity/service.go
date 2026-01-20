@@ -63,7 +63,7 @@ type CreateManagedIdentityInput struct {
 // UpdateManagedIdentityInput contains the fields for updating a managed identity
 type UpdateManagedIdentityInput struct {
 	ID          string
-	Description string
+	Description *string
 	Data        []byte
 }
 
@@ -1024,7 +1024,9 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 		return nil, err
 	}
 
-	managedIdentity.Description = input.Description
+	if input.Description != nil {
+		managedIdentity.Description = *input.Description
+	}
 
 	// Validate model
 	if vErr := managedIdentity.Validate(); vErr != nil {
@@ -1032,9 +1034,11 @@ func (s *service) UpdateManagedIdentity(ctx context.Context, input *UpdateManage
 		return nil, vErr
 	}
 
-	if sErr := delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); sErr != nil {
-		tracing.RecordError(span, sErr, "failed to set managed identity date")
-		return nil, errors.Wrap(sErr, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
+	if len(input.Data) > 0 {
+		if sErr := delegate.SetManagedIdentityData(ctx, managedIdentity, input.Data); sErr != nil {
+			tracing.RecordError(span, sErr, "failed to set managed identity date")
+			return nil, errors.Wrap(sErr, "failed to set managed identity data", errors.WithErrorCode(errors.EInvalid))
+		}
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Updated a managed identity.",

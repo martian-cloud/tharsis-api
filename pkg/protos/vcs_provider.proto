@@ -1,0 +1,196 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.vcs_provider;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// VCSProviders implements all functionality related to a Tharsis VCS Provider.
+service VCSProviders {
+  // GetVCSProviderByID returns a VCS Provider by an ID.
+  rpc GetVCSProviderByID(GetVCSProviderByIDRequest) returns (VCSProvider);
+  // GetVCSProviders returns a paginated list of VCS Providers.
+  rpc GetVCSProviders(GetVCSProvidersRequest) returns (GetVCSProvidersResponse);
+  // CreateVCSProvider creates a new VCS Provider.
+  rpc CreateVCSProvider(CreateVCSProviderRequest) returns (CreateVCSProviderResponse);
+  // UpdateVCSProvider returns the updated VCS Provider.
+  rpc UpdateVCSProvider(UpdateVCSProviderRequest) returns (VCSProvider);
+  // DeleteVCSProvider deletes a VCS Provider.
+  rpc DeleteVCSProvider(DeleteVCSProviderRequest) returns (google.protobuf.Empty);
+  // ResetVCSProviderOAuthToken resets the OAuth token for a VCS Provider.
+  rpc ResetVCSProviderOAuthToken(ResetVCSProviderOAuthTokenRequest) returns (ResetVCSProviderOAuthTokenResponse);
+  // GetWorkspaceVCSProviderLinkByID returns a WorkspaceVCSProviderLink by an ID.
+  rpc GetWorkspaceVCSProviderLinkByID(GetWorkspaceVCSProviderLinkByIDRequest) returns (WorkspaceVCSProviderLink);
+  // CreateWorkspaceVCSProviderLink creates a new WorkspaceVCSProviderLink.
+  rpc CreateWorkspaceVCSProviderLink(CreateWorkspaceVCSProviderLinkRequest) returns (CreateWorkspaceVCSProviderLinkResponse);
+  // UpdateWorkspaceVCSProviderLink updates a WorkspaceVCSProviderLink.
+  rpc UpdateWorkspaceVCSProviderLink(UpdateWorkspaceVCSProviderLinkRequest) returns (WorkspaceVCSProviderLink);
+  // DeleteWorkspaceVCSProviderLink deletes a WorkspaceVCSProviderLink.
+  rpc DeleteWorkspaceVCSProviderLink(DeleteWorkspaceVCSProviderLinkRequest) returns (google.protobuf.Empty);
+  // CreateVCSRun creates a run from a VCS event.
+  rpc CreateVCSRun(CreateVCSRunRequest) returns (google.protobuf.Empty);
+}
+
+// VCSProviderType defines the type of VCS provider.
+enum VCSProviderType {
+  GITLAB = 0;
+  GITHUB = 1;
+}
+
+// VCSProviderSortableField defines enums that allow sorting a paginated list of
+// VCS Providers.
+enum VCSProviderSortableField {
+  CREATED_AT_ASC   = 0;
+  CREATED_AT_DESC  = 1;
+  UPDATED_AT_ASC   = 2;
+  UPDATED_AT_DESC  = 3;
+  GROUP_LEVEL_ASC  = 4;
+  GROUP_LEVEL_DESC = 5;
+}
+
+// GetVCSProviderByIDRequest is the input for retrieving a VCS Provider by its ID.
+message GetVCSProviderByIDRequest {
+  string id = 1;
+}
+
+// GetVCSProvidersRequest is the input for retrieving a paginated list of VCS Providers.
+message GetVCSProvidersRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional VCSProviderSortableField     sort               = 2;
+  optional string                       search             = 3;
+  string                                namespace_path     = 4;
+  bool                                  include_inherited  = 5;
+}
+
+// CreateVCSProviderRequest is the input for creating a new VCS Provider.
+message CreateVCSProviderRequest {
+  string          name                 = 1;
+  string          description          = 2;
+  string          group_id             = 3;
+  VCSProviderType type                 = 4;
+  optional string url                  = 5;
+  string          oauth_client_id      = 6;
+  string          oauth_client_secret  = 7;
+  bool            auto_create_webhooks = 8;
+}
+
+// UpdateVCSProviderRequest is the input for updating a VCS Provider.
+message UpdateVCSProviderRequest {
+  string          id                  = 1;
+  optional string description         = 2;
+  optional string oauth_client_id     = 3;
+  optional string oauth_client_secret = 4;
+  optional int64  version             = 5;
+}
+
+// DeleteVCSProviderRequest is the input for deleting a VCS Provider.
+message DeleteVCSProviderRequest {
+  string         id      = 1;
+  optional bool  force   = 2;
+  optional int64 version = 3;
+}
+
+// ResetVCSProviderOAuthTokenRequest is the input for resetting a VCS Provider OAuth token.
+message ResetVCSProviderOAuthTokenRequest {
+  string provider_id = 1;
+}
+
+// GetWorkspaceVCSProviderLinkByIDRequest is the input for retrieving a WorkspaceVCSProviderLink by ID.
+message GetWorkspaceVCSProviderLinkByIDRequest {
+  string id = 1;
+}
+
+// CreateWorkspaceVCSProviderLinkRequest is the input for creating a WorkspaceVCSProviderLink.
+message CreateWorkspaceVCSProviderLinkRequest {
+  string          workspace_id          = 1;
+  string          provider_id           = 2;
+  string          repository_path       = 3;
+  optional string module_directory      = 4;
+  optional string branch                = 5;
+  optional string tag_regex             = 6;
+  repeated string glob_patterns         = 7;
+  bool            auto_speculative_plan = 8;
+  bool            webhook_disabled      = 9;
+}
+
+// UpdateWorkspaceVCSProviderLinkRequest is the input for updating a WorkspaceVCSProviderLink.
+message UpdateWorkspaceVCSProviderLinkRequest {
+  string          id                    = 1;
+  optional string module_directory      = 2;
+  optional string branch                = 3;
+  optional string tag_regex             = 4;
+  repeated string glob_patterns         = 5;
+  optional bool   auto_speculative_plan = 6;
+  optional bool   webhook_disabled      = 7;
+  optional int64  version               = 8;
+}
+
+// DeleteWorkspaceVCSProviderLinkRequest is the input for deleting a WorkspaceVCSProviderLink.
+message DeleteWorkspaceVCSProviderLinkRequest {
+  string         id      = 1;
+  optional bool  force   = 2;
+  optional int64 version = 3;
+}
+
+// CreateVCSRunRequest is the input for creating a VCS run.
+message CreateVCSRunRequest {
+  string          workspace_id   = 1;
+  optional string reference_name = 2;
+  bool            is_destroy     = 3;
+}
+
+// VCSProvider defines a version control system provider within Tharsis.
+message VCSProvider {
+  metadata.ResourceMetadata metadata             = 1;
+  string                    name                 = 2;
+  string                    description          = 3;
+  string                    group_id             = 4;
+  string                    type                 = 5;
+  string                    url                  = 6;
+  string                    created_by           = 7;
+  bool                      auto_create_webhooks = 8;
+}
+
+// WorkspaceVCSProviderLink defines a link between a workspace and a VCS provider.
+message WorkspaceVCSProviderLink {
+  metadata.ResourceMetadata metadata              = 1;
+  string                    created_by            = 2;
+  string                    workspace_id          = 3;
+  string                    vcs_provider_id       = 4;
+  string                    repository_path       = 5;
+  string                    webhook_id            = 6;
+  optional string           module_directory      = 7;
+  string                    branch                = 8;
+  optional string           tag_regex             = 9;
+  repeated string           glob_patterns         = 10;
+  bool                      auto_speculative_plan = 11;
+  bool                      webhook_disabled      = 12;
+}
+
+// GetVCSProvidersResponse is the paginated list of VCS Providers.
+message GetVCSProvidersResponse {
+  repeated VCSProvider vcs_providers = 1;
+  pagination.PageInfo  page_info     = 2;
+}
+
+// CreateVCSProviderResponse is the response for creating a VCS Provider.
+message CreateVCSProviderResponse {
+  VCSProvider vcs_provider            = 1;
+  string      oauth_authorization_url = 2;
+}
+
+// ResetVCSProviderOAuthTokenResponse is the response for resetting a VCS Provider OAuth token.
+message ResetVCSProviderOAuthTokenResponse {
+  VCSProvider vcs_provider            = 1;
+  string      oauth_authorization_url = 2;
+}
+
+// CreateWorkspaceVCSProviderLinkResponse is the response for creating a WorkspaceVCSProviderLink.
+message CreateWorkspaceVCSProviderLinkResponse {
+  WorkspaceVCSProviderLink vcs_provider_link = 1;
+  string                   webhook_token     = 2;
+  optional string          webhook_url       = 3;
+}

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.resource_limit;
+
+import "metadata.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+// ResourceLimits service handles resource limit operations.
+service ResourceLimits {
+  // GetResourceLimits returns a list of ResourceLimits.
+  rpc GetResourceLimits(google.protobuf.Empty) returns (GetResourceLimitsResponse) {};
+  // UpdateResourceLimit updates and returns the ResourceLimit.
+  rpc UpdateResourceLimit(UpdateResourceLimitRequest) returns (ResourceLimit) {};
+}
+
+// UpdateResourceLimitRequest is the request for updating a ResourceLimit.
+message UpdateResourceLimitRequest {
+  optional int64 version = 1;
+  string         name    = 2;
+  int32          value   = 3;
+}
+
+// ResourceLimit represents a resource limit.
+message ResourceLimit {
+  metadata.ResourceMetadata metadata = 1;
+  string                    name     = 2;
+  int32                     value    = 3;
+}
+
+// GetResourceLimitsResponse is the response for GetResourceLimits.
+message GetResourceLimitsResponse {
+  repeated ResourceLimit resource_limits = 1;
+}

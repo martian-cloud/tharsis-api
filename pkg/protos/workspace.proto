@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.workspace;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "namespace.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// Workspaces implements all functionality related to a Tharsis Workspace.
+service Workspaces {
+  // GetWorkspaceByID returns a Workspace by an ID.
+  rpc GetWorkspaceByID(GetWorkspaceByIDRequest) returns (Workspace);
+  // GetWorkspaces returns a paginated list of Workspaces.
+  rpc GetWorkspaces(GetWorkspacesRequest) returns (GetWorkspacesResponse);
+  // CreateWorkspace creates a new Workspace.
+  rpc CreateWorkspace(CreateWorkspaceRequest) returns (Workspace);
+  // UpdateWorkspace returns the updated Workspace.
+  rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (Workspace);
+  // DeleteWorkspace deletes a Workspace.
+  rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (google.protobuf.Empty);
+  // LockWorkspace locks a Workspace.
+  rpc LockWorkspace(LockWorkspaceRequest) returns (Workspace);
+  // UnlockWorkspace unlocks a Workspace.
+  rpc UnlockWorkspace(UnlockWorkspaceRequest) returns (Workspace);
+  // MigrateWorkspace moves a Workspace to a different group.
+  rpc MigrateWorkspace(MigrateWorkspaceRequest) returns (Workspace);
+  // SubscribeToWorkspaceEvents subscribes to workspace events.
+  rpc SubscribeToWorkspaceEvents(SubscribeToWorkspaceEventsRequest) returns (stream WorkspaceEvent);
+}
+
+// WorkspaceSortableField defines enums that allow sorting a paginated list of Workspaces.
+enum WorkspaceSortableField {
+  FULL_PATH_ASC   = 0;
+  FULL_PATH_DESC  = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+}
+
+// GetWorkspaceByIDRequest is the input for retrieving a Workspace by its ID.
+message GetWorkspaceByIDRequest {
+  string id = 1;
+}
+
+// GetWorkspacesRequest is the input for retrieving a paginated list of Workspaces.
+message GetWorkspacesRequest {
+  optional pagination.PaginationOptions pagination_options           = 1;
+  optional WorkspaceSortableField       sort                         = 2;
+  optional string                       search                       = 3;
+  optional string                       group_id                     = 4;
+  optional string                       assigned_managed_identity_id = 5;
+  optional string                       workspace_path               = 6;
+  map<string, string>                   label_filters                = 7;
+}
+
+// CreateWorkspaceRequest is the input for creating a new Workspace.
+message CreateWorkspaceRequest {
+  string                                                 name                    = 1;
+  string                                                 description             = 2;
+  string                                                 group_id                = 3;
+  string                                                 terraform_version       = 4;
+  optional int32                                         max_job_duration        = 5;
+  bool                                                   prevent_destroy_plan    = 6;
+  optional namespace.NamespaceRunnerTagsInput            runner_tags             = 7;
+  optional namespace.NamespaceDriftDetectionEnabledInput drift_detection_enabled = 8;
+  map<string, string>                                    labels                  = 9;
+}
+
+// UpdateWorkspaceRequest is the input for updating a Workspace.
+message UpdateWorkspaceRequest {
+  string                                                 id                      = 1;
+  optional string                                        description             = 2;
+  optional int64                                         version                 = 3;
+  optional string                                        terraform_version       = 4;
+  optional int32                                         max_job_duration        = 5;
+  optional bool                                          prevent_destroy_plan    = 6;
+  optional namespace.NamespaceRunnerTagsInput            runner_tags             = 7;
+  optional namespace.NamespaceDriftDetectionEnabledInput drift_detection_enabled = 8;
+  map<string, string>                                    labels                  = 9;
+}
+
+// DeleteWorkspaceRequest is the input for deleting a Workspace.
+message DeleteWorkspaceRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+  optional bool  force   = 3;
+}
+
+// LockWorkspaceRequest is the input for locking a Workspace.
+message LockWorkspaceRequest {
+  string workspace_id = 1;
+}
+
+// UnlockWorkspaceRequest is the input for unlocking a Workspace.
+message UnlockWorkspaceRequest {
+  string workspace_id = 1;
+}
+
+// MigrateWorkspaceRequest is the input for migrating a Workspace.
+message MigrateWorkspaceRequest {
+  string workspace_id = 1;
+  string new_group_id = 2;
+}
+
+// SubscribeToWorkspaceEventsRequest is the input for subscribing to workspace events.
+message SubscribeToWorkspaceEventsRequest {
+  string workspace_id = 1;
+}
+
+// Workspace defines a container for Terraform state and configuration.
+message Workspace {
+  metadata.ResourceMetadata metadata                 = 1;
+  string                    name                     = 2;
+  string                    description              = 3;
+  string                    group_id                 = 4;
+  string                    full_path                = 5;
+  string                    created_by               = 6;
+  bool                      locked                   = 7;
+  bool                      dirty_state              = 8;
+  string                    current_job_id           = 9;
+  string                    current_state_version_id = 10;
+  map<string, string>       labels                   = 11;
+}
+
+// GetWorkspacesResponse is the paginated list of Workspaces.
+message GetWorkspacesResponse {
+  repeated Workspace  workspaces = 1;
+  pagination.PageInfo page_info  = 2;
+}
+
+// WorkspaceEvent represents a workspace event.
+message WorkspaceEvent {
+  string    action    = 1;
+  Workspace workspace = 2;
+}

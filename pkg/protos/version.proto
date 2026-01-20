@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.versions;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Version implements functionality related to Tharsis version.
+service Version {
+  // GetVersion returns the version information for Tharsis.
+  rpc GetVersion(google.protobuf.Empty) returns (GetVersionResponse);
+}
+
+// GetVersionResponse is the response for the GetVersion RPC.
+message GetVersionResponse {
+  string                    version              = 1;
+  string                    db_migration_version = 2;
+  bool                      db_migration_dirty   = 3;
+  google.protobuf.Timestamp build_timestamp      = 4;
+}

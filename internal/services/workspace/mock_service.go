@@ -51,7 +51,7 @@ func (_m *MockService) CreateConfigurationVersion(ctx context.Context, options *
 }
 
 // CreateStateVersion provides a mock function with given fields: ctx, stateVersion, data
-func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data *string) (*models.StateVersion, error) {
+func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *models.StateVersion, data string) (*models.StateVersion, error) {
 	ret := _m.Called(ctx, stateVersion, data)
 
 	if len(ret) == 0 {
@@ -60,10 +60,10 @@ func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *mod
 
 	var r0 *models.StateVersion
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, *string) (*models.StateVersion, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, string) (*models.StateVersion, error)); ok {
 		return rf(ctx, stateVersion, data)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, *string) *models.StateVersion); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *models.StateVersion, string) *models.StateVersion); ok {
 		r0 = rf(ctx, stateVersion, data)
 	} else {
 		if ret.Get(0) != nil {
@@ -71,7 +71,7 @@ func (_m *MockService) CreateStateVersion(ctx context.Context, stateVersion *mod
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion, *string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *models.StateVersion, string) error); ok {
 		r1 = rf(ctx, stateVersion, data)
 	} else {
 		r1 = ret.Error(1)

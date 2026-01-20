@@ -1817,7 +1817,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			name: "positive: successfully update a managed identity",
 			input: &UpdateManagedIdentityInput{
 				ID:          "some-managed-identity-id",
-				Description: "This is an updated description",
+				Description: ptr.String("This is an updated description"),
 				Data:        []byte("this is new data"),
 			},
 			existingManagedIdentity: sampleManagedIdentity,
@@ -1837,7 +1837,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			name: "negative: set managed identity data fails validation",
 			input: &UpdateManagedIdentityInput{
 				ID:          "some-managed-identity-id",
-				Description: "This is an updated description",
+				Description: ptr.String("This is an updated description"),
 				Data:        []byte("this is new data"),
 			},
 			setManagedIdentityDataError: errors.New("host invalid", errors.WithErrorCode(errors.EInvalid)),
@@ -1849,7 +1849,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			name: "negative: updated description is too long",
 			input: &UpdateManagedIdentityInput{
 				ID:          "some-managed-identity-id",
-				Description: strings.Repeat("really long description", 20),
+				Description: ptr.String(strings.Repeat("really long description", 20)),
 				Data:        []byte("this is new data"),
 			},
 			expectErrorCode:         errors.EInvalid,
@@ -1860,7 +1860,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			name: "negative: managed identity being updated doesn't exist",
 			input: &UpdateManagedIdentityInput{
 				ID:          "non-existent-id",
-				Description: "This is an updated description",
+				Description: ptr.String("This is an updated description"),
 				Data:        []byte("this is new data"),
 			},
 			expectErrorCode: errors.ENotFound,
@@ -1870,7 +1870,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			name: "negative: attempting to update a managed identity alias",
 			input: &UpdateManagedIdentityInput{
 				ID:          "some-managed-identity-id",
-				Description: "This is an updated description",
+				Description: ptr.String("This is an updated description"),
 				Data:        []byte("this is new data"),
 			},
 			existingManagedIdentity: &models.ManagedIdentity{
@@ -1883,7 +1883,7 @@ func TestUpdateManagedIdentity(t *testing.T) {
 			name: "negative: subject does not have access to group",
 			input: &UpdateManagedIdentityInput{
 				ID:          "some-managed-identity-id",
-				Description: "This is an updated description",
+				Description: ptr.String("This is an updated description"),
 				Data:        []byte("this is new data"),
 			},
 			existingManagedIdentity: sampleManagedIdentity,

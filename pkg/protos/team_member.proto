@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.team_member;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// TeamMemberSortableField defines enums for sorting team members.
+enum TeamMemberSortableField {
+  USERNAME_ASC  = 0;
+  USERNAME_DESC = 1;
+}
+
+// GetTeamMemberRequest is the input for getting a team member.
+message GetTeamMemberRequest {
+  string username  = 1;
+  string team_name = 2;
+}
+
+// GetTeamMembersRequest is the input for getting team members.
+message GetTeamMembersRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional TeamMemberSortableField      sort               = 2;
+  optional string                       user_id            = 3;
+  optional string                       team_id            = 4;
+}
+
+// AddUserToTeamRequest is the input for adding a user to a team.
+message AddUserToTeamRequest {
+  string username      = 1;
+  string team_name     = 2;
+  bool   is_maintainer = 3;
+}
+
+// UpdateTeamMemberRequest is the input for updating a team member.
+message UpdateTeamMemberRequest {
+  string         username      = 1;
+  string         team_name     = 2;
+  bool           is_maintainer = 3;
+  optional int64 version       = 4;
+}
+
+// RemoveUserFromTeamRequest is the input for removing a user from a team.
+message RemoveUserFromTeamRequest {
+  string username  = 1;
+  string team_name = 2;
+}
+
+// TeamMember represents a team member.
+message TeamMember {
+  metadata.ResourceMetadata metadata      = 1;
+  string                    user_id       = 2;
+  string                    team_id       = 3;
+  bool                      is_maintainer = 4;
+}
+
+// GetTeamMembersResponse is the paginated list of team members.
+message GetTeamMembersResponse {
+  repeated TeamMember team_members = 1;
+  pagination.PageInfo page_info    = 2;
+}

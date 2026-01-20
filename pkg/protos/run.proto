@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.run;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "job.proto";
+import "plan.proto";
+import "apply.proto";
+import "google/protobuf/timestamp.proto";
+
+// Runs implements all functionality related to a Tharsis Run.
+service Runs {
+  // GetRunByID returns a Run by an ID.
+  rpc GetRunByID(GetRunByIDRequest) returns (Run);
+  // GetRuns returns a paginated list of Runs.
+  rpc GetRuns(GetRunsRequest) returns (GetRunsResponse);
+  // CreateRun creates a new Run.
+  rpc CreateRun(CreateRunRequest) returns (Run);
+  // ApplyRun applies a Run.
+  rpc ApplyRun(ApplyRunRequest) returns (Run);
+  // CancelRun cancels a Run.
+  rpc CancelRun(CancelRunRequest) returns (Run);
+  // GetRunVariables returns variables for a Run.
+  rpc GetRunVariables(GetRunVariablesRequest) returns (GetRunVariablesResponse);
+  // GetPlanByID returns a Plan by an ID.
+  rpc GetPlanByID(plan.GetPlanByIDRequest) returns (plan.Plan);
+  // GetApplyByID returns an Apply by an ID.
+  rpc GetApplyByID(apply.GetApplyByIDRequest) returns (apply.Apply);
+  // UpdatePlan updates a Plan.
+  rpc UpdatePlan(plan.UpdatePlanRequest) returns (plan.Plan);
+  // UpdateApply updates an Apply.
+  rpc UpdateApply(apply.UpdateApplyRequest) returns (apply.Apply);
+  // GetLatestJobForPlan returns the latest job for a Plan.
+  rpc GetLatestJobForPlan(plan.GetLatestJobForPlanRequest) returns (job.Job);
+  // GetLatestJobForApply returns the latest job for an Apply.
+  rpc GetLatestJobForApply(apply.GetLatestJobForApplyRequest) returns (job.Job);
+  // SubscribeToRunEvents subscribes to run events.
+  rpc SubscribeToRunEvents(SubscribeToRunEventsRequest) returns (stream RunEvent);
+}
+
+// RunSortableField defines enums that allow sorting a paginated list of Runs.
+enum RunSortableField {
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+}
+
+// GetRunByIDRequest is the input for retrieving a Run by its ID.
+message GetRunByIDRequest {
+  string id = 1;
+}
+
+// GetRunsRequest is the input for retrieving a paginated list of Runs.
+message GetRunsRequest {
+  optional pagination.PaginationOptions pagination_options  = 1;
+  optional RunSortableField             sort                = 2;
+  optional string                       workspace_id        = 3;
+  optional string                       group_id            = 4;
+  optional bool                         include_nested_runs = 5;
+}
+
+// CreateRunRequest is the input for creating a new Run.
+message CreateRunRequest {
+  string                    workspace_id             = 1;
+  optional string           configuration_version_id = 2;
+  bool                      is_destroy               = 3;
+  optional string           terraform_version        = 4;
+  optional bool             speculative              = 5;
+  repeated string           target_addresses         = 6;
+  bool                      refresh                  = 7;
+  bool                      refresh_only             = 8;
+  repeated RunVariableInput variables                = 9;
+  optional string           module_source            = 10;
+  optional string           module_version           = 11;
+}
+
+// ApplyRunRequest is the input for applying a Run.
+message ApplyRunRequest {
+  string run_id = 1;
+}
+
+// CancelRunRequest is the input for canceling a Run.
+message CancelRunRequest {
+  string        id    = 1;
+  optional bool force = 2;
+}
+
+// GetRunVariablesRequest is the input for getting run variables.
+message GetRunVariablesRequest {
+  string id                       = 1;
+  bool   include_sensitive_values = 2;
+}
+
+// SubscribeToRunEventsRequest is the input for subscribing to run events.
+message SubscribeToRunEventsRequest {
+  optional string workspace_id      = 1;
+  optional string run_id            = 2;
+  optional string ancestor_group_id = 3;
+}
+
+// RunVariableInput is the input for a run variable.
+message RunVariableInput {
+  string          category = 1;
+  string          key      = 2;
+  optional string value    = 3;
+}
+
+// Run represents a Terraform plan/apply operation.
+message Run {
+  metadata.ResourceMetadata          metadata                  = 1;
+  string                             apply_id                  = 2;
+  optional string                    configuration_version_id  = 3;
+  string                             created_by                = 4;
+  bool                               force_canceled            = 5;
+  optional google.protobuf.Timestamp force_cancel_available_at = 6;
+  optional string                    force_canceled_by         = 7;
+  bool                               has_changes               = 8;
+  bool                               is_destroy                = 9;
+  optional string                    module_digest             = 10;
+  optional string                    module_source             = 11;
+  optional string                    module_version            = 12;
+  string                             plan_id                   = 13;
+  bool                               refresh                   = 14;
+  bool                               refresh_only              = 15;
+  string                             status                    = 16;
+  repeated string                    target_addresses          = 17;
+  string                             terraform_version         = 18;
+  string                             workspace_id              = 19;
+}
+
+// RunVariable represents a variable used in a run.
+message RunVariable {
+  optional string namespace_path        = 1;
+  string          category              = 2;
+  string          key                   = 3;
+  optional string value                 = 4;
+  bool            sensitive             = 5;
+  optional string version_id            = 6;
+  bool            included_in_tf_config = 7;
+}
+
+// RunEvent represents a run event for subscriptions.
+message RunEvent {
+  string action = 1;
+  Run    run    = 2;
+}
+
+// GetRunsResponse is the paginated list of Runs.
+message GetRunsResponse {
+  repeated Run        runs      = 1;
+  pagination.PageInfo page_info = 2;
+}
+
+// GetRunVariablesResponse is the response for getting run variables.
+message GetRunVariablesResponse {
+  repeated RunVariable variables = 1;
+}

@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.job;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// Jobs implements all functionality related to Tharsis Jobs.
+service Jobs {
+  // SubscribeToJobLogStream subscribes to job log stream events.
+  rpc SubscribeToJobLogStream(SubscribeToJobLogStreamRequest) returns (stream JobLogStreamEvent);
+  // SubscribeToJobEvents subscribes to job events.
+  rpc SubscribeToJobEvents(SubscribeToJobEventsRequest) returns (stream JobEvent);
+  // SubscribeToJobCancellationEvent subscribes to job cancellation events.
+  rpc SubscribeToJobCancellationEvent(SubscribeToJobCancellationEventRequest) returns (stream JobCancellationEvent);
+}
+
+// JobType defines the type of job.
+enum JobType {
+  PLAN  = 0;
+  APPLY = 1;
+}
+
+// SubscribeToJobLogStreamRequest is the input for subscribing to job log stream events.
+message SubscribeToJobLogStreamRequest {
+  string         job_id             = 1;
+  optional int32 last_seen_log_size = 2;
+}
+
+// SubscribeToJobEventsRequest is the input for subscribing to job events.
+message SubscribeToJobEventsRequest {
+  optional string runner_id    = 1;
+  optional string workspace_id = 2;
+}
+
+// SubscribeToJobCancellationEventRequest is the input for subscribing to job cancellation events.
+message SubscribeToJobCancellationEventRequest {
+  string job_id = 1;
+}
+
+// Job represents a Terraform job.
+message Job {
+  metadata.ResourceMetadata metadata         = 1;
+  string                    workspace_id     = 2;
+  string                    run_id           = 3;
+  string                    type             = 4;
+  string                    status           = 5;
+  int32                     max_job_duration = 6;
+}
+
+// JobLogStreamEventData contains the log data.
+message JobLogStreamEventData {
+  int32  offset = 1;
+  string logs   = 2;
+}
+
+// JobLogStreamEvent represents a job log stream event.
+message JobLogStreamEvent {
+  bool                           completed = 1;
+  int32                          size      = 2;
+  optional JobLogStreamEventData data      = 3;
+}
+
+// JobEvent represents a job event.
+message JobEvent {
+  string action = 1;
+  Job    job    = 2;
+}
+
+// JobCancellationEvent represents a job cancellation event.
+message JobCancellationEvent {
+  Job job = 1;
+}

@@ -1521,7 +1521,7 @@ func TestCreateStateVersion(t *testing.T) {
 			}
 
 			testDataString := string(test.data)
-			result, err := service.CreateStateVersion(ctx, test.toCreate, &testDataString)
+			result, err := service.CreateStateVersion(ctx, test.toCreate, testDataString)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))

@@ -444,8 +444,7 @@ type TeamMemberConnectionResolver struct {
 func NewTeamMemberConnectionResolver(ctx context.Context,
 	input *team.GetTeamMembersInput,
 ) (*TeamMemberConnectionResolver, error) {
-	result, err := getServiceCatalog(ctx).TeamService.GetTeamMembers(ctx,
-		&db.GetTeamMembersInput{Filter: &db.TeamMemberFilter{TeamIDs: []string{*input.TeamID}}})
+	result, err := getServiceCatalog(ctx).TeamService.GetTeamMembers(ctx, input)
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,7 @@ import (
 
 const (
 	defaultServerPort                                 = "8000"
+	defaultGRPCServerPort                             = "50051"
 	envOidcProviderConfigPrefix                       = "THARSIS_OAUTH_PROVIDERS_"
 	envRunnerConfigPrefix                             = "THARSIS_INTERNAL_RUNNERS_"
 	envFederatedRegistryTrustPolicyName               = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
@@ -109,6 +110,12 @@ type Config struct {
 
 	// the server port. Defaults to 8000
 	ServerPort string `yaml:"server_port" env:"SERVER_PORT"`
+
+	// GRPCServerPort is the GRPC server port. Defaults to 50051
+	GRPCServerPort string `yaml:"grpc_server_port" env:"GRPC_SERVER_PORT"`
+
+	// ExternalGRPCPort is the external GRPC port when using a reverse proxy. Defaults to the GRPC port
+	ExternalGRPCPort string `yaml:"external_grpc_server_port" env:"EXTERNAL_GRPC_PORT"`
 
 	JWTIssuerURL string `yaml:"JWT_ISSUER_URL" env:"JWT_ISSUER_URL"`
 
@@ -203,6 +210,8 @@ type Config struct {
 func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.ServerPort, is.Port),
+		validation.Field(&c.GRPCServerPort, is.Port),
+		validation.Field(&c.ExternalGRPCPort, is.Port),
 		validation.Field(&c.ObjectStorePluginType, validation.Required),
 		validation.Field(&c.TharsisAPIURL, validation.Required),
 		validation.Field(&c.TharsisUIURL, validation.Required),
@@ -215,6 +224,7 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// default config
 	c := Config{
 		ServerPort:                                 defaultServerPort,
+		GRPCServerPort:                             defaultGRPCServerPort,
 		MaxGraphQLComplexity:                       defaultMaxGraphQLComplexity,
 		RateLimitStorePluginType:                   defaultRateLimitStorePluginType,
 		ModuleRegistryMaxUploadSize:                defaultModuleRegistryMaxUploadSize,
@@ -262,6 +272,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 			return nil, fmt.Errorf("invalid URL used for THARSIS_API_URL: %v", err)
 		}
 		c.ServiceDiscoveryHost = apiURL.Host
+	}
+
+	// Set external GRPC port if it's not defined
+	if c.ExternalGRPCPort == "" {
+		c.ExternalGRPCPort = c.GRPCServerPort
 	}
 
 	// Load OAUTH IDP config from environment is available

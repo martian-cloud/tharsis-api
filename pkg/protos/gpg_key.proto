@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.gpg_key;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// GPGKeys implements all functionality related to a Tharsis GPG Key.
+service GPGKeys {
+  // GetGPGKeyByID returns a GPG Key by an ID.
+  rpc GetGPGKeyByID(GetGPGKeyByIDRequest) returns (GPGKey);
+  // GetGPGKeys returns a paginated list of GPG Keys.
+  rpc GetGPGKeys(GetGPGKeysRequest) returns (GetGPGKeysResponse);
+  // CreateGPGKey creates a new GPG Key.
+  rpc CreateGPGKey(CreateGPGKeyRequest) returns (GPGKey);
+  // DeleteGPGKey deletes a GPG Key.
+  rpc DeleteGPGKey(DeleteGPGKeyRequest) returns (google.protobuf.Empty);
+}
+
+// GPGKeySortableField defines enums that allow sorting a paginated list of
+// GPG Keys.
+enum GPGKeySortableField {
+  UPDATED_AT_ASC   = 0;
+  UPDATED_AT_DESC  = 1;
+  GROUP_LEVEL_ASC  = 2;
+  GROUP_LEVEL_DESC = 3;
+}
+
+// GetGPGKeyByIDRequest is the input for retrieving a GPG Key by its ID.
+message GetGPGKeyByIDRequest {
+  string id = 1;
+}
+
+// GetGPGKeysRequest is the input for retrieving a paginated list of GPG Keys.
+message GetGPGKeysRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional GPGKeySortableField          sort               = 2;
+  string                                namespace_path     = 3;
+  bool                                  include_inherited  = 4;
+}
+
+// CreateGPGKeyRequest is the input for creating a new GPG Key.
+message CreateGPGKeyRequest {
+  string group_id    = 1;
+  string ascii_armor = 2;
+}
+
+// DeleteGPGKeyRequest is the input for deleting a GPG Key.
+message DeleteGPGKeyRequest {
+  string id = 1;
+}
+
+// GPGKey defines a GPG key resource within Tharsis.
+message GPGKey {
+  metadata.ResourceMetadata metadata    = 1;
+  string                    group_id    = 2;
+  string                    ascii_armor = 3;
+  string                    gpg_key_id  = 4;
+  string                    fingerprint = 5;
+  string                    created_by  = 6;
+}
+
+// GetGPGKeysResponse is the paginated list of GPG Keys.
+message GetGPGKeysResponse {
+  repeated GPGKey     gpg_keys  = 1;
+  pagination.PageInfo page_info = 2;
+}

@@ -310,7 +310,7 @@ func createStateVersionMutation(ctx context.Context, input *CreateStateVersionIn
 		RunID:       &run.Metadata.ID,
 	}
 
-	stateVersion, err := serviceCatalog.WorkspaceService.CreateStateVersion(ctx, &stateVersionCreateOptions, &input.State)
+	stateVersion, err := serviceCatalog.WorkspaceService.CreateStateVersion(ctx, &stateVersionCreateOptions, input.State)
 	if err != nil {
 		return nil, err
 	}

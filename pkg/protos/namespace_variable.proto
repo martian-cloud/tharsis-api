@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.namespace_variable;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// NamespaceVariables implements all functionality related to a Tharsis NamespaceVariable.
+service NamespaceVariables {
+  // GetNamespaceVariableByID returns a NamespaceVariable by an ID.
+  rpc GetNamespaceVariableByID(GetNamespaceVariableByIDRequest) returns (NamespaceVariable);
+  // GetNamespaceVariables returns a list of NamespaceVariables for a namespace.
+  rpc GetNamespaceVariables(GetNamespaceVariablesRequest) returns (GetNamespaceVariablesResponse);
+  // CreateNamespaceVariable creates a new NamespaceVariable.
+  rpc CreateNamespaceVariable(CreateNamespaceVariableRequest) returns (NamespaceVariable);
+  // UpdateNamespaceVariable returns the updated NamespaceVariable.
+  rpc UpdateNamespaceVariable(UpdateNamespaceVariableRequest) returns (NamespaceVariable);
+  // DeleteNamespaceVariable deletes a NamespaceVariable.
+  rpc DeleteNamespaceVariable(DeleteNamespaceVariableRequest) returns (google.protobuf.Empty);
+  // SetNamespaceVariables sets multiple variables for a namespace.
+  rpc SetNamespaceVariables(SetNamespaceVariablesRequest) returns (google.protobuf.Empty);
+  // GetNamespaceVariableVersionByID returns a NamespaceVariableVersion by an ID.
+  rpc GetNamespaceVariableVersionByID(GetNamespaceVariableVersionByIDRequest) returns (NamespaceVariableVersion);
+  // GetNamespaceVariableVersions returns a list of NamespaceVariableVersions.
+  rpc GetNamespaceVariableVersions(GetNamespaceVariableVersionsRequest) returns (GetNamespaceVariableVersionsResponse);
+}
+
+// VariableCategory specifies if the variable is a terraform or environment variable.
+enum VariableCategory {
+  TERRAFORM   = 0;
+  ENVIRONMENT = 1;
+}
+
+// NamespaceVariableVersionSortableField represents fields that a list of variable versions can be sorted by.
+enum NamespaceVariableVersionSortableField {
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+}
+
+// GetNamespaceVariableByIDRequest is the input for retrieving a NamespaceVariable by its ID.
+message GetNamespaceVariableByIDRequest {
+  string id = 1;
+}
+
+// GetNamespaceVariablesRequest is the input for retrieving NamespaceVariables for a namespace.
+message GetNamespaceVariablesRequest {
+  string namespace_path = 1;
+}
+
+// CreateNamespaceVariableRequest is the input for creating a new NamespaceVariable.
+message CreateNamespaceVariableRequest {
+  VariableCategory category       = 1;
+  string           key            = 2;
+  string           namespace_path = 3;
+  bool             sensitive      = 4;
+  string           value          = 5;
+}
+
+// UpdateNamespaceVariableRequest is the input for updating a NamespaceVariable.
+message UpdateNamespaceVariableRequest {
+  string id    = 1;
+  string key   = 2;
+  string value = 4;
+}
+
+// DeleteNamespaceVariableRequest is the input for deleting a NamespaceVariable.
+message DeleteNamespaceVariableRequest {
+  string         id      = 1;
+  optional int64 version = 2;
+}
+
+// SetNamespaceVariablesRequest is the input for setting multiple variables.
+message SetNamespaceVariablesRequest {
+  VariableCategory                            category       = 1;
+  string                                      namespace_path = 2;
+  repeated SetNamespaceVariablesInputVariable variables      = 3;
+}
+
+// GetNamespaceVariableVersionByIDRequest is the input for retrieving a NamespaceVariableVersion by its ID.
+message GetNamespaceVariableVersionByIDRequest {
+  string id                      = 1;
+  bool   include_sensitive_value = 2;
+}
+
+// GetNamespaceVariableVersionsRequest is the input for retrieving NamespaceVariableVersions.
+message GetNamespaceVariableVersionsRequest {
+  string                                variable_id        = 1;
+  NamespaceVariableVersionSortableField sort               = 2;
+  pagination.PaginationOptions          pagination_options = 3;
+}
+
+// SetNamespaceVariablesInputVariable is an input namespace_variable for setting namespace variables.
+message SetNamespaceVariablesInputVariable {
+  string key       = 1;
+  bool   sensitive = 2;
+  string value     = 3;
+}
+
+// NamespaceVariable defines a configuration namespace_variable within Tharsis.
+message NamespaceVariable {
+  metadata.ResourceMetadata metadata          = 1;
+  string                    category          = 2;
+  string                    key               = 3;
+  string                    namespace_path    = 4;
+  bool                      sensitive         = 5;
+  optional string           value             = 6;
+  string                    latest_version_id = 7;
+}
+
+// NamespaceVariableVersion represents a version of a namespace_variable.
+message NamespaceVariableVersion {
+  metadata.ResourceMetadata metadata              = 1;
+  string                    key                   = 2;
+  optional string           value                 = 3;
+  string                    namespace_variable_id = 4;
+}
+
+// GetNamespaceVariablesResponse is the list of NamespaceVariables.
+message GetNamespaceVariablesResponse {
+  repeated NamespaceVariable variables = 1;
+}
+
+// GetNamespaceVariableVersionsResponse is the list of NamespaceVariableVersions.
+message GetNamespaceVariableVersionsResponse {
+  pagination.PageInfo               page_info                   = 1;
+  repeated NamespaceVariableVersion namespace_variable_versions = 2;
+}

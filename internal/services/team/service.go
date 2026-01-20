@@ -88,7 +88,7 @@ type Service interface {
 	UpdateTeam(ctx context.Context, input *UpdateTeamInput) (*models.Team, error)
 	DeleteTeam(ctx context.Context, input *DeleteTeamInput) error
 	GetTeamMember(ctx context.Context, username, teamName string) (*models.TeamMember, error)
-	GetTeamMembers(ctx context.Context, input *db.GetTeamMembersInput) (*db.TeamMembersResult, error)
+	GetTeamMembers(ctx context.Context, input *GetTeamMembersInput) (*db.TeamMembersResult, error)
 	AddUserToTeam(ctx context.Context, input *AddUserToTeamInput) (*models.TeamMember, error)
 	UpdateTeamMember(ctx context.Context, input *UpdateTeamMemberInput) (*models.TeamMember, error)
 	RemoveUserFromTeam(ctx context.Context, input *RemoveUserFromTeamInput) error
@@ -417,7 +417,7 @@ func (s *service) GetTeamMember(ctx context.Context, username, teamName string) 
 	return teamMember, nil
 }
 
-func (s *service) GetTeamMembers(ctx context.Context, input *db.GetTeamMembersInput) (*db.TeamMembersResult, error) {
+func (s *service) GetTeamMembers(ctx context.Context, input *GetTeamMembersInput) (*db.TeamMembersResult, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetTeamMembers")
 	defer span.End()
 
@@ -426,8 +426,22 @@ func (s *service) GetTeamMembers(ctx context.Context, input *db.GetTeamMembersIn
 		return nil, err
 	}
 
+	dbInput := &db.GetTeamMembersInput{
+		Sort:              input.Sort,
+		PaginationOptions: input.PaginationOptions,
+		Filter:            &db.TeamMemberFilter{},
+	}
+
+	if input.UserID != nil {
+		dbInput.Filter.UserID = input.UserID
+	}
+
+	if input.TeamID != nil {
+		dbInput.Filter.TeamIDs = []string{*input.TeamID}
+	}
+
 	// Do the query.
-	results, err := s.dbClient.TeamMembers.GetTeamMembers(ctx, input)
+	results, err := s.dbClient.TeamMembers.GetTeamMembers(ctx, dbInput)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get team members")
 		return nil, err

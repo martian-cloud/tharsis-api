@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_provider;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+import "terraform_provider_version.proto";
+import "terraform_provider_platform.proto";
+
+// TerraformProviders implements all functionality related to a Tharsis Terraform Provider.
+service TerraformProviders {
+  // GetTerraformProviderByID returns a Terraform Provider by an ID.
+  rpc GetTerraformProviderByID(GetTerraformProviderByIDRequest) returns (TerraformProvider);
+  // GetTerraformProviders returns a paginated list of Terraform Providers.
+  rpc GetTerraformProviders(GetTerraformProvidersRequest) returns (GetTerraformProvidersResponse);
+  // CreateTerraformProvider creates a new Terraform Provider.
+  rpc CreateTerraformProvider(CreateTerraformProviderRequest) returns (TerraformProvider);
+  // UpdateTerraformProvider returns the updated Terraform Provider.
+  rpc UpdateTerraformProvider(UpdateTerraformProviderRequest) returns (TerraformProvider);
+  // DeleteTerraformProvider deletes a Terraform Provider.
+  rpc DeleteTerraformProvider(DeleteTerraformProviderRequest) returns (google.protobuf.Empty);
+  // GetTerraformProviderVersionByID returns a TerraformProviderVersion by an ID.
+  rpc GetTerraformProviderVersionByID(terraform_provider_version.GetTerraformProviderVersionByIDRequest) returns (terraform_provider_version.TerraformProviderVersion);
+  // GetTerraformProviderVersions returns a paginated list of TerraformProviderVersions.
+  rpc GetTerraformProviderVersions(terraform_provider_version.GetTerraformProviderVersionsRequest) returns (terraform_provider_version.GetTerraformProviderVersionsResponse);
+  // CreateTerraformProviderVersion creates a new TerraformProviderVersion.
+  rpc CreateTerraformProviderVersion(terraform_provider_version.CreateTerraformProviderVersionRequest) returns (terraform_provider_version.TerraformProviderVersion);
+  // DeleteTerraformProviderVersion deletes a TerraformProviderVersion.
+  rpc DeleteTerraformProviderVersion(terraform_provider_version.DeleteTerraformProviderVersionRequest) returns (google.protobuf.Empty);
+  // GetTerraformProviderPlatformByID returns a TerraformProviderPlatform by an ID.
+  rpc GetTerraformProviderPlatformByID(terraform_provider_platform.GetTerraformProviderPlatformByIDRequest) returns (terraform_provider_platform.TerraformProviderPlatform);
+  // GetTerraformProviderPlatforms returns a paginated list of TerraformProviderPlatforms.
+  rpc GetTerraformProviderPlatforms(terraform_provider_platform.GetTerraformProviderPlatformsRequest) returns (terraform_provider_platform.GetTerraformProviderPlatformsResponse);
+  // CreateTerraformProviderPlatform creates a new TerraformProviderPlatform.
+  rpc CreateTerraformProviderPlatform(terraform_provider_platform.CreateTerraformProviderPlatformRequest) returns (terraform_provider_platform.TerraformProviderPlatform);
+  // DeleteTerraformProviderPlatform deletes a TerraformProviderPlatform.
+  rpc DeleteTerraformProviderPlatform(terraform_provider_platform.DeleteTerraformProviderPlatformRequest) returns (google.protobuf.Empty);
+}
+
+// TerraformProviderSortableField defines enums that allow sorting a paginated list of Terraform Providers.
+enum TerraformProviderSortableField {
+  NAME_ASC        = 0;
+  NAME_DESC       = 1;
+  UPDATED_AT_ASC  = 2;
+  UPDATED_AT_DESC = 3;
+}
+
+// GetTerraformProviderByIDRequest is the input for retrieving a Terraform Provider by its ID.
+message GetTerraformProviderByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformProvidersRequest is the input for retrieving a paginated list of Terraform Providers.
+message GetTerraformProvidersRequest {
+  optional pagination.PaginationOptions   pagination_options = 1;
+  optional TerraformProviderSortableField sort               = 2;
+  optional string                         search             = 3;
+  optional string                         group_id           = 4;
+}
+
+// CreateTerraformProviderRequest is the input for creating a new Terraform Provider.
+message CreateTerraformProviderRequest {
+  string name           = 1;
+  string group_id       = 2;
+  string repository_url = 3;
+  bool   private        = 4;
+}
+
+// UpdateTerraformProviderRequest is the input for updating a Terraform Provider.
+message UpdateTerraformProviderRequest {
+  string          id             = 1;
+  optional string repository_url = 2;
+  optional bool   private        = 3;
+  optional int64  version        = 4;
+}
+
+// DeleteTerraformProviderRequest is the input for deleting a Terraform Provider.
+message DeleteTerraformProviderRequest {
+  string id = 1;
+}
+
+// TerraformProvider defines a Terraform Provider within Tharsis.
+message TerraformProvider {
+  metadata.ResourceMetadata metadata       = 1;
+  string                    created_by     = 2;
+  string                    group_id       = 3;
+  string                    name           = 4;
+  bool                      private        = 5;
+  string                    repository_url = 6;
+}
+
+// GetTerraformProvidersResponse is the paginated list of Terraform Providers.
+message GetTerraformProvidersResponse {
+  repeated TerraformProvider providers = 1;
+  pagination.PageInfo        page_info = 2;
+}

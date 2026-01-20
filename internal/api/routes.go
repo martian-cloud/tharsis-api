@@ -72,6 +72,16 @@ func BuildRouter(
 		return nil, fmt.Errorf("failed to build TFE discovery document handler %v", err)
 	}
 
+	discoveryController, err := controllers.NewServiceDiscoveryController(
+		logger,
+		respWriter,
+		cfg.TharsisAPIURL,
+		cfg.ExternalGRPCPort,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build service discovery controller %v", err)
+	}
+
 	allowedOrigins := strings.Split(cfg.CorsAllowedOrigins, ",")
 	for i, part := range allowedOrigins {
 		allowedOrigins[i] = strings.TrimSpace(part)
@@ -134,6 +144,8 @@ func BuildRouter(
 	}
 
 	AddRoutes(router, oidcController)
+
+	AddRoutes(router, discoveryController)
 
 	if tfeHandler != nil {
 		router.Method("GET", "/.well-known/terraform.json", tfeHandler)

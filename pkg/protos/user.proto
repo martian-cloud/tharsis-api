@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.user;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+import "google/protobuf/empty.proto";
+
+// Users implements all functionality related to a Tharsis User.
+service Users {
+  // GetUserByID returns a User by an ID.
+  rpc GetUserByID(GetUserByIDRequest) returns (User);
+  // GetUsers returns a paginated list of Users.
+  rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
+  // CreateUser creates a new User.
+  rpc CreateUser(CreateUserRequest) returns (User);
+  // DeleteUser deletes a User.
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+}
+
+// UserSortableField defines enums that allow sorting a paginated list of Users.
+enum UserSortableField {
+  UPDATED_AT_ASC  = 0;
+  UPDATED_AT_DESC = 1;
+}
+
+// GetUserByIDRequest is the input for retrieving a User by its ID.
+message GetUserByIDRequest {
+  string id = 1;
+}
+
+// GetUsersRequest is the input for retrieving a paginated list of Users.
+message GetUsersRequest {
+  optional pagination.PaginationOptions pagination_options = 1;
+  optional UserSortableField            sort               = 2;
+  optional string                       search             = 3;
+}
+
+// CreateUserRequest is the input for creating a new User.
+message CreateUserRequest {
+  string          username = 1;
+  string          email    = 2;
+  optional string password = 3;
+  bool            admin    = 4;
+}
+
+// DeleteUserRequest is the input for deleting a User.
+message DeleteUserRequest {
+  string id = 1;
+}
+
+// User defines a user within Tharsis.
+message User {
+  metadata.ResourceMetadata metadata         = 1;
+  string                    username         = 2;
+  string                    email            = 3;
+  bool                      admin            = 4;
+  bool                      active           = 5;
+  string                    scim_external_id = 6;
+}
+
+// GetUsersResponse is the paginated list of Users.
+message GetUsersResponse {
+  repeated User       users     = 1;
+  pagination.PageInfo page_info = 2;
+}

@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.terraform_module_attestation;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+import "pagination.proto";
+
+// TerraformModuleAttestationSortableField defines enums for sorting module attestations.
+enum TerraformModuleAttestationSortableField {
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+  PREDICATE_ASC   = 2;
+  PREDICATE_DESC  = 3;
+}
+
+// GetTerraformModuleAttestationByIDRequest is the input for retrieving a TerraformModuleAttestation by its ID.
+message GetTerraformModuleAttestationByIDRequest {
+  string id = 1;
+}
+
+// GetTerraformModuleAttestationsRequest is the input for retrieving a paginated list of TerraformModuleAttestations.
+message GetTerraformModuleAttestationsRequest {
+  optional pagination.PaginationOptions            pagination_options = 1;
+  optional TerraformModuleAttestationSortableField sort               = 2;
+  string                                           module_id          = 3;
+  optional string                                  digest             = 4;
+}
+
+// CreateTerraformModuleAttestationRequest is the input for creating a new TerraformModuleAttestation.
+message CreateTerraformModuleAttestationRequest {
+  string module_id        = 1;
+  string description      = 2;
+  string attestation_data = 3;
+}
+
+// UpdateTerraformModuleAttestationRequest is the input for updating a TerraformModuleAttestation.
+message UpdateTerraformModuleAttestationRequest {
+  string          id          = 1;
+  optional string description = 2;
+}
+
+// DeleteTerraformModuleAttestationRequest is the input for deleting a TerraformModuleAttestation.
+message DeleteTerraformModuleAttestationRequest {
+  string id = 1;
+}
+
+// TerraformModuleAttestation represents an attestation for a Terraform module.
+message TerraformModuleAttestation {
+  metadata.ResourceMetadata metadata       = 1;
+  string                    created_by     = 2;
+  string                    data           = 3;
+  string                    data_sha_sum   = 4;
+  string                    description    = 5;
+  repeated string           digests        = 6;
+  string                    module_id      = 7;
+  string                    predicate_type = 8;
+  string                    schema_type    = 9;
+}
+
+// GetTerraformModuleAttestationsResponse is the paginated list of TerraformModuleAttestations.
+message GetTerraformModuleAttestationsResponse {
+  repeated TerraformModuleAttestation attestations = 1;
+  pagination.PageInfo                 page_info    = 2;
+}

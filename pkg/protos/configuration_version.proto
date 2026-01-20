@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.configuration_version;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// ConfigurationVersions implements all functionality related to Tharsis Configuration Versions.
+service ConfigurationVersions {
+  // GetConfigurationVersionByID returns a ConfigurationVersion by an ID.
+  rpc GetConfigurationVersionByID(GetConfigurationVersionByIDRequest) returns (ConfigurationVersion);
+  // CreateConfigurationVersion creates a new ConfigurationVersion.
+  rpc CreateConfigurationVersion(CreateConfigurationVersionRequest) returns (ConfigurationVersion);
+}
+
+// GetConfigurationVersionByIDRequest is the input for retrieving a ConfigurationVersion by its ID.
+message GetConfigurationVersionByIDRequest {
+  string id = 1;
+}
+
+// CreateConfigurationVersionRequest is the input for creating a new ConfigurationVersion.
+message CreateConfigurationVersionRequest {
+  string workspace_id = 1;
+  bool   speculative  = 2;
+}
+
+// ConfigurationVersion represents a terraform configuration that can be used by a single Run.
+message ConfigurationVersion {
+  metadata.ResourceMetadata metadata     = 1;
+  string                    status       = 2;
+  bool                      speculative  = 3;
+  string                    workspace_id = 4;
+  string                    created_by   = 5;
+  optional string           vcs_event_id = 6;
+}
