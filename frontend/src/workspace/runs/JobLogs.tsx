@@ -50,7 +50,7 @@ function JobLogs(props: Props) {
     const [autoScroll, setAutoScroll] = useState(props.enableAutoScrollByDefault);
 
     const config = useMemo<GraphQLSubscriptionConfig<JobLogsSubscription>>(() => ({
-        variables: { input: { jobId: data.id, lastSeenLogSize: data.logSize } },
+        variables: { input: { jobId: data.id, lastSeenLogSize: bytes(data.logs) } },
         subscription,
         onCompleted: () => console.log("Subscription completed"),
         onError: () => console.warn("Subscription error"),
