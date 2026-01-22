@@ -20,6 +20,36 @@ func (u UserSortableField) getValue() string {
 	return string(u)
 }
 
+func TestGetUserByExternalID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a test user
+	createdUser, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-external-user",
+		Email:    "test-external@example.com",
+		Active:   true,
+	})
+	require.Nil(t, err)
+
+	// Link external ID
+	issuer := "https://test-idp.com"
+	externalID := "external-123"
+	err = testClient.client.Users.LinkUserWithExternalID(ctx, issuer, externalID, createdUser.Metadata.ID)
+	require.Nil(t, err)
+
+	// Test positive case
+	gotUser, err := testClient.client.Users.GetUserByExternalID(ctx, issuer, externalID)
+	require.Nil(t, err)
+	require.NotNil(t, gotUser)
+	assert.Equal(t, createdUser.Metadata.ID, gotUser.Metadata.ID)
+
+	// Test negative case
+	gotUser, err = testClient.client.Users.GetUserByExternalID(ctx, issuer, "non-existent")
+	require.Nil(t, err)
+	assert.Nil(t, gotUser)
+}
 func TestUsers_CreateUser(t *testing.T) {
 	ctx := context.Background()
 	testClient := newTestClient(ctx, t)
@@ -408,4 +438,31 @@ func TestUsers_GetUserByTRN(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUsers_LinkUserWithExternalID(t *testing.T) {
+	ctx := context.Background()
+	testClient := newTestClient(ctx, t)
+	defer testClient.close(ctx)
+
+	// Create a user first
+	user, err := testClient.client.Users.CreateUser(ctx, &models.User{
+		Username: "test-user",
+		Email:    "test@example.com",
+		Active:   true,
+	})
+	require.Nil(t, err)
+
+	// Test successful linking
+	err = testClient.client.Users.LinkUserWithExternalID(ctx, "https://example.com", "ext-123", user.Metadata.ID)
+	assert.Nil(t, err)
+
+	// Verify link was created
+	linkedUser, err := testClient.client.Users.GetUserByExternalID(ctx, "https://example.com", "ext-123")
+	assert.Nil(t, err)
+	assert.Equal(t, user.Metadata.ID, linkedUser.Metadata.ID)
+
+	// Test duplicate external ID returns conflict error
+	err = testClient.client.Users.LinkUserWithExternalID(ctx, "https://example.com", "ext-123", user.Metadata.ID)
+	assert.Equal(t, errors.EConflict, errors.ErrorCode(err))
 }

@@ -1,5 +1,10 @@
-type SCIMTokenPayload {
+type CreateSCIMTokenPayload {
   clientMutationId: String
   token: String
   problems: [Problem!]!
+}
+
+input CreateSCIMTokenInput {
+  clientMutationId: String
+  idpIssuerURL: String!
 }

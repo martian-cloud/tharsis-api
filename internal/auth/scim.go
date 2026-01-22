@@ -13,17 +13,31 @@ import (
 // SCIMCaller represents a SCIM subject.
 type SCIMCaller struct {
 	dbClient           *db.Client
+	idpIssuerURL       string
 	maintenanceMonitor maintenance.Monitor
 }
 
 // NewSCIMCaller returns a new SCIM caller.
-func NewSCIMCaller(dbClient *db.Client, maintenanceMonitor maintenance.Monitor) *SCIMCaller {
-	return &SCIMCaller{dbClient, maintenanceMonitor}
+func NewSCIMCaller(
+	dbClient *db.Client,
+	maintenanceMonitor maintenance.Monitor,
+	idpIssuerURL string,
+) *SCIMCaller {
+	return &SCIMCaller{
+		dbClient:           dbClient,
+		maintenanceMonitor: maintenanceMonitor,
+		idpIssuerURL:       idpIssuerURL,
+	}
 }
 
 // GetSubject returns the subject identifier for this caller.
 func (s *SCIMCaller) GetSubject() string {
 	return "scim"
+}
+
+// GetIDPIssuerURL returns the IDP issuer URL
+func (s *SCIMCaller) GetIDPIssuerURL() string {
+	return s.idpIssuerURL
 }
 
 // IsAdmin returns true if the caller is an admin.

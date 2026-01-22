@@ -154,7 +154,7 @@ type Mutation {
   createTerraformCLIDownloadURL(
     input: CreateTerraformCLIDownloadURLInput!
   ): TerraformCLIMutationPayload!
-  createSCIMToken: SCIMTokenPayload!
+  createSCIMToken(input: CreateSCIMTokenInput!): CreateSCIMTokenPayload!
   createVCSProvider(input: CreateVCSProviderInput!): CreateVCSProviderPayload!
   updateVCSProvider(input: UpdateVCSProviderInput!): UpdateVCSProviderPayload!
   deleteVCSProvider(input: DeleteVCSProviderInput!): DeleteVCSProviderPayload!

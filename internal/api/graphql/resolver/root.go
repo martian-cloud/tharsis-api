@@ -1057,10 +1057,12 @@ func (r RootResolver) CreateTerraformCLIDownloadURL(ctx context.Context, args *s
 /* SCIM queries and mutations */
 
 // CreateSCIMToken generates a token specifically for provisioning SCIM resources.
-func (r RootResolver) CreateSCIMToken(ctx context.Context) (*SCIMTokenPayload, error) {
-	response, err := createSCIMTokenMutation(ctx)
+func (r RootResolver) CreateSCIMToken(ctx context.Context, args *struct {
+	Input *CreateSCIMTokenInput
+}) (*CreateSCIMTokenPayload, error) {
+	response, err := createSCIMTokenMutation(ctx, args.Input)
 	if err != nil {
-		return handleSCIMMutationProblem(err, nil)
+		return handleSCIMMutationProblem(err, args.Input.ClientMutationID)
 	}
 
 	return response, nil

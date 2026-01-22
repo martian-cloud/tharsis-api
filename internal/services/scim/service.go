@@ -4,10 +4,12 @@ package scim
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -16,6 +18,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // OP is the type of SCIM update operation.
@@ -87,7 +90,7 @@ type DeleteSCIMResourceInput struct {
 
 // Service encapsulates the logic for interacting with the SCIM service.
 type Service interface {
-	CreateSCIMToken(ctx context.Context) ([]byte, error)
+	CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]byte, error)
 	GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput) ([]models.User, error)
 	CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput) (*models.User, error)
 	UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error)
@@ -102,6 +105,7 @@ type service struct {
 	logger            logger.Logger
 	dbClient          *db.Client
 	signingKeyManager auth.SigningKeyManager
+	oauthProviders    []config.IdpConfig
 }
 
 // NewService creates an instance of Service
@@ -109,17 +113,19 @@ func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
 	signingKeyManager auth.SigningKeyManager,
+	oauthProviders []config.IdpConfig,
 ) Service {
 	return &service{
 		logger,
 		dbClient,
 		signingKeyManager,
+		oauthProviders,
 	}
 }
 
-func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
+func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]byte, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateSCIMToken")
-	// TODO: Consider setting trace/span attributes for the input.
+	span.SetAttributes(attribute.String("idpIssuerURL", idpIssuerURL))
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
@@ -141,6 +147,22 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 		return nil, errors.New(
 			"Only system admins can create SCIM tokens",
 			errors.WithErrorCode(errors.EForbidden))
+	}
+
+	if _, err := url.Parse(idpIssuerURL); err != nil {
+		return nil, errors.Wrap(err, "failed to parse idpIssuerURL", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
+	}
+
+	// Validate that the idpIssuerURL matches a configured identity provider
+	validIssuer := false
+	for _, idp := range s.oauthProviders {
+		if idp.IssuerURL == idpIssuerURL {
+			validIssuer = true
+			break
+		}
+	}
+	if !validIssuer {
+		return nil, errors.New("identity provider issuer url does not match any configured identity provider", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 	}
 
 	// Transaction is used to avoid invalidating previous token if new one fails creation.
@@ -178,10 +200,12 @@ func (s *service) CreateSCIMToken(ctx context.Context) ([]byte, error) {
 	// Generate a token with a UUID claim.
 	jwtID := uuid.New().String()
 	scimToken, err := s.signingKeyManager.GenerateToken(txContext, &auth.TokenInput{
-		Subject: "scim",
-		JwtID:   jwtID,
+		Subject:  "scim",
+		Audience: "tharsis",
+		JwtID:    jwtID,
 		Claims: map[string]string{
-			"type": auth.SCIMTokenType,
+			"type":                     auth.SCIMTokenType,
+			auth.IDPIssuerURLClaimName: idpIssuerURL,
 		},
 	})
 	if err != nil {
@@ -272,14 +296,69 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 		return nil, err
 	}
 
-	input.Email = strings.ToLower(input.Email)
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return nil, errors.New("only a scim caller may create scim users", errors.WithErrorCode(errors.EInternal))
+	}
 
-	// Check if user with the email already exists.
-	existingUser, err := s.dbClient.Users.GetUserByEmail(ctx, input.Email)
+	existingUser, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, input.SCIMExternalID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get user by scim external id")
+		return nil, err
+	}
+
+	// If user found by SCIM external ID, return proper SCIM error
+	if existingUser != nil {
+		return nil, errors.New(
+			fmt.Sprintf("user with external id %s already exists", input.SCIMExternalID),
+			errors.WithErrorCode(errors.EConflict))
+	}
+
+	// Check if external identity already exists for this IDP and external ID
+	existingUser, err = s.dbClient.Users.GetUserByExternalID(ctx, scimCaller.GetIDPIssuerURL(), input.SCIMExternalID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get user by external id")
+		return nil, err
+	}
+
+	// If external identity exists but SCIMExternalID is not set, update it
+	if existingUser != nil {
+		if existingUser.SCIMExternalID != input.SCIMExternalID {
+			existingUser.SCIMExternalID = input.SCIMExternalID
+			existingUser.Active = input.Active
+			existingUser.Email = strings.ToLower(input.Email)
+
+			updatedUser, err := s.dbClient.Users.UpdateUser(ctx, existingUser)
+			if err != nil {
+				tracing.RecordError(span, err, "failed to update user with SCIM external ID")
+				return nil, err
+			}
+			return updatedUser, nil
+		}
+		// SCIMExternalID already set, return conflict
+		return nil, errors.New(
+			fmt.Sprintf("user with external id %s already exists", input.SCIMExternalID),
+			errors.WithErrorCode(errors.EConflict))
+	}
+
+	// If no user found by external ID, try to find by email to adopt existing user
+	existingUser, err = s.dbClient.Users.GetUserByEmail(ctx, strings.ToLower(input.Email))
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get user by email")
 		return nil, err
 	}
+
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to begin DB transaction")
+		return nil, err
+	}
+
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for CreateSCIMUser: %v", txErr)
+		}
+	}()
 
 	var createdUser *models.User
 
@@ -287,10 +366,23 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 	if existingUser != nil {
 		existingUser.Active = input.Active
 		existingUser.SCIMExternalID = input.SCIMExternalID
+		existingUser.Email = strings.ToLower(input.Email)
+		// Don't update username - it should never change
 
-		createdUser, err = s.dbClient.Users.UpdateUser(ctx, existingUser)
+		createdUser, err = s.dbClient.Users.UpdateUser(txContext, existingUser)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to update user")
+			return nil, err
+		}
+
+		// Create external identity record
+		err = s.dbClient.Users.LinkUserWithExternalID(txContext, scimCaller.GetIDPIssuerURL(), input.SCIMExternalID, createdUser.Metadata.ID)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.EConflict {
+				tracing.RecordError(span, err, "external identity already exists")
+				return nil, errors.New("external identity already exists for this user", errors.WithErrorCode(errors.EConflict))
+			}
+			tracing.RecordError(span, err, "failed to create external identity")
 			return nil, err
 		}
 	}
@@ -299,16 +391,28 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 	if existingUser == nil {
 		newUser := &models.User{
 			Username:       auth.ParseUsername(input.Email),
-			Email:          input.Email,
+			Email:          strings.ToLower(input.Email),
 			SCIMExternalID: input.SCIMExternalID,
 			Active:         input.Active,
 		}
 
-		createdUser, err = s.dbClient.Users.CreateUser(ctx, newUser)
+		createdUser, err = s.dbClient.Users.CreateUser(txContext, newUser)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to create user")
 			return nil, err
 		}
+
+		// Create external identity record for new user
+		err = s.dbClient.Users.LinkUserWithExternalID(txContext, scimCaller.GetIDPIssuerURL(), input.SCIMExternalID, createdUser.Metadata.ID)
+		if err != nil {
+			tracing.RecordError(span, err, "failed to create external identity for new user")
+			return nil, err
+		}
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		tracing.RecordError(span, err, "failed to commit DB transaction")
+		return nil, err
 	}
 
 	return createdUser, nil
@@ -316,31 +420,78 @@ func (s *service) CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput
 
 func (s *service) UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error) {
 	ctx, span := tracer.Start(ctx, "svc.UpdateSCIMUser")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	caller, err := auth.AuthorizeCaller(ctx)
 	if err != nil {
-		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
 	err = caller.RequirePermission(ctx, models.UpdateUserPermission, auth.WithUserID(input.ID))
 	if err != nil {
-		tracing.RecordError(span, err, "permission check failed")
 		return nil, err
 	}
 
-	updatedUser, err := s.processSCIMUserOperations(ctx, input.Operations, input.ID)
-	if err != nil {
-		tracing.RecordError(span, err, "failed to process SCIM user operations")
-		return nil, err
+	scimCaller, ok := caller.(*auth.SCIMCaller)
+	if !ok {
+		return nil, errors.New("only a scim caller can update a SCIM user", errors.WithErrorCode(errors.EForbidden))
 	}
 
-	updatedUser, err = s.dbClient.Users.UpdateUser(ctx, updatedUser)
+	// Get the current user
+	user, err := s.dbClient.Users.GetUserByID(ctx, input.ID)
 	if err != nil {
-		tracing.RecordError(span, err, "failed to update user")
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get user by ID", errors.WithSpan(span))
+	}
+
+	if user == nil {
+		return nil, errors.New(
+			"SCIM user not found",
+			errors.WithErrorCode(errors.ENotFound))
+	}
+
+	// Store original external ID for comparison
+	originalExternalID := user.SCIMExternalID
+
+	// Process the operations to update user fields
+	updatedUser, err := s.processSCIMUserOperations(input.Operations, user)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to process SCIM user operations", errors.WithSpan(span))
+	}
+
+	// Start transaction for all DB operations
+	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin transaction", errors.WithSpan(span))
+	}
+	defer func() {
+		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback transaction for UpdateSCIMUser: %v", txErr)
+		}
+	}()
+
+	// Handle external ID linking/unlinking if changed
+	if originalExternalID != updatedUser.SCIMExternalID {
+		// Unlink old external ID if it exists
+		if originalExternalID != "" {
+			if err := s.dbClient.Users.UnlinkUserExternalID(txContext, scimCaller.GetIDPIssuerURL(), originalExternalID); err != nil {
+				return nil, errors.Wrap(err, "failed to unlink user external id", errors.WithSpan(span))
+			}
+		}
+
+		// Link new external ID
+		if err := s.dbClient.Users.LinkUserWithExternalID(txContext, scimCaller.GetIDPIssuerURL(), updatedUser.SCIMExternalID, updatedUser.Metadata.ID); err != nil {
+			return nil, errors.Wrap(err, "failed to link user with external id", errors.WithSpan(span))
+		}
+	}
+
+	// Update the user
+	updatedUser, err = s.dbClient.Users.UpdateUser(txContext, updatedUser)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update user", errors.WithSpan(span))
+	}
+
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return nil, errors.Wrap(err, "failed to commit transaction", errors.WithSpan(span))
 	}
 
 	return updatedUser, nil
@@ -536,18 +687,7 @@ func (s *service) DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResource
 // processSCIMUserOperations processes the SCIM PATCH operations,
 // and updates the user fields appropriately. Returns an error
 // if operation is not supported.
-func (s *service) processSCIMUserOperations(ctx context.Context, operations []Operation, userID string) (*models.User, error) {
-	user, err := s.dbClient.Users.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	if user == nil {
-		return nil, errors.New(
-			"Failed to get a SCIM user for processing update operations",
-			errors.WithErrorCode(errors.EInternal))
-	}
-
+func (s *service) processSCIMUserOperations(operations []Operation, user *models.User) (*models.User, error) {
 	// Process the update operations.
 	for _, operation := range operations {
 		// Currently, only replacing an existing attribute is supported.
@@ -564,6 +704,7 @@ func (s *service) processSCIMUserOperations(ctx context.Context, operations []Op
 				return nil, fmt.Errorf("unexpected value for user emails field: expected string, got %T", operation.Value)
 			}
 			user.Email = strings.ToLower(email)
+			// Don't update username - it should never change
 		case "externalId":
 			externalID, ok := operation.Value.(string)
 			if !ok {

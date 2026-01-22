@@ -36,6 +36,11 @@ const (
 	FederatedRegistryTokenType string = "federated_registry"
 )
 
+// SCIM token claim names.
+const (
+	IDPIssuerURLClaimName = "idp_issuer_url"
+)
+
 // Authenticator is used to authenticate JWT tokens
 type Authenticator interface {
 	// Authenticate verifies the token and returns a Caller
@@ -173,11 +178,10 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 			dbClient:    t.dbClient,
 		}, nil
 	case SCIMTokenType:
-		scimCaller, sErr := t.verifySCIMTokenClaim(ctx, output.Token)
-		if sErr != nil {
+		if sErr := t.verifySCIMTokenClaim(ctx, output.Token); sErr != nil {
 			return nil, sErr
 		}
-		return scimCaller, nil
+		return NewSCIMCaller(t.dbClient, t.maintenanceMonitor, output.PrivateClaims[IDPIssuerURLClaimName]), nil
 	case VCSWorkspaceLinkTokenType:
 		vcsCaller, sErr := t.verifyVCSToken(ctx, output)
 		if sErr != nil {
@@ -190,18 +194,18 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 }
 
 // verifySCIMToken verifies the JwtID field is known.
-func (t *tharsisIDPTokenAuthenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Token) (*SCIMCaller, error) {
+func (t *tharsisIDPTokenAuthenticator) verifySCIMTokenClaim(ctx context.Context, token jwt.Token) error {
 	// Get the token claim to verify it is known.
 	tokenClaim, err := t.dbClient.SCIMTokens.GetTokenByNonce(ctx, token.JwtID())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if tokenClaim == nil {
-		return nil, errors.New("scim token has an invalid jti claim", errors.WithErrorCode(errors.EUnauthorized))
+		return errors.New("scim token has an invalid jti claim", errors.WithErrorCode(errors.EUnauthorized))
 	}
 
-	return NewSCIMCaller(t.dbClient, t.maintenanceMonitor), nil
+	return nil
 }
 
 // verifyVCSToken verifies a VCS token is known.

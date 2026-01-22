@@ -260,6 +260,24 @@ func (_m *MockUsers) LinkUserWithExternalID(ctx context.Context, issuer string, 
 	return r0
 }
 
+// UnlinkUserExternalID provides a mock function with given fields: ctx, issuer, externalID
+func (_m *MockUsers) UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error {
+	ret := _m.Called(ctx, issuer, externalID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UnlinkUserExternalID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, issuer, externalID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateUser provides a mock function with given fields: ctx, user
 func (_m *MockUsers) UpdateUser(ctx context.Context, user *models.User) (*models.User, error) {
 	ret := _m.Called(ctx, user)

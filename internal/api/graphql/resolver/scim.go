@@ -2,29 +2,35 @@ package resolver
 
 import "context"
 
-// SCIMTokenPayload is the response payload for a SCIM token mutation.
-type SCIMTokenPayload struct {
+// CreateSCIMTokenInput contains the input for creating a SCIM token
+type CreateSCIMTokenInput struct {
+	ClientMutationID *string
+	IdpIssuerURL     string
+}
+
+// CreateSCIMTokenPayload is the response payload for a SCIM token mutation.
+type CreateSCIMTokenPayload struct {
 	ClientMutationID *string
 	Token            *string
 	Problems         []Problem
 }
 
-func handleSCIMMutationProblem(e error, clientMutationID *string) (*SCIMTokenPayload, error) {
+func handleSCIMMutationProblem(e error, clientMutationID *string) (*CreateSCIMTokenPayload, error) {
 	problem, err := buildProblem(e)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SCIMTokenPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}, nil
+	return &CreateSCIMTokenPayload{ClientMutationID: clientMutationID, Problems: []Problem{*problem}}, nil
 }
 
-func createSCIMTokenMutation(ctx context.Context) (*SCIMTokenPayload, error) {
-	tokenBytes, err := getServiceCatalog(ctx).SCIMService.CreateSCIMToken(ctx)
+func createSCIMTokenMutation(ctx context.Context, input *CreateSCIMTokenInput) (*CreateSCIMTokenPayload, error) {
+	tokenBytes, err := getServiceCatalog(ctx).SCIMService.CreateSCIMToken(ctx, input.IdpIssuerURL)
 	if err != nil {
 		return nil, err
 	}
 
 	stringToken := string(tokenBytes)
 
-	return &SCIMTokenPayload{Token: &stringToken}, nil
+	return &CreateSCIMTokenPayload{ClientMutationID: input.ClientMutationID, Token: &stringToken}, nil
 }
