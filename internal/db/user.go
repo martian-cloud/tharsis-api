@@ -24,6 +24,7 @@ type Users interface {
 	GetUserBySCIMExternalID(ctx context.Context, scimExternalID string) (*models.User, error)
 	GetUserByExternalID(ctx context.Context, issuer string, externalID string) (*models.User, error)
 	LinkUserWithExternalID(ctx context.Context, issuer string, externalID string, userID string) error
+	UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
 	GetUserByTRN(ctx context.Context, trn string) (*models.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
@@ -201,6 +202,30 @@ func (u *users) LinkUserWithExternalID(ctx context.Context, issuer string, exter
 				return errors.New("user with external id %s already exists for issuer %s", externalID, issuer, errors.WithErrorCode(errors.EConflict))
 			}
 		}
+		tracing.RecordError(span, err, "failed to execute query")
+		return err
+	}
+
+	return nil
+}
+
+func (u *users) UnlinkUserExternalID(ctx context.Context, issuer string, externalID string) error {
+	ctx, span := tracer.Start(ctx, "db.UnlinkUserExternalID")
+	defer span.End()
+
+	sql, args, err := dialect.Delete("user_external_identities").
+		Prepared(true).
+		Where(goqu.Ex{
+			"issuer":      issuer,
+			"external_id": externalID,
+		}).ToSQL()
+	if err != nil {
+		tracing.RecordError(span, err, "failed to generate SQL")
+		return err
+	}
+
+	_, err = u.dbClient.getConnection(ctx).Exec(ctx, sql, args...)
+	if err != nil {
 		tracing.RecordError(span, err, "failed to execute query")
 		return err
 	}

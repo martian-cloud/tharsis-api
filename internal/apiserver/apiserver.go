@@ -212,7 +212,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore, activityService)
 		moduleRegistryService      = moduleregistry.NewService(logger, dbClient, limits, moduleRegistryStore, activityService, taskManager)
 		gpgKeyService              = gpgkey.NewService(logger, dbClient, limits, activityService)
-		scimService                = scim.NewService(logger, dbClient, signingKeyManager)
+		scimService                = scim.NewService(logger, dbClient, signingKeyManager, cfg.OauthProviders)
 		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, activityService, signingKeyManager)
 		moduleResolver             = registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, signingKeyManager)
 		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleResolver, runStateManager, limits, pluginCatalog.SecretManager)

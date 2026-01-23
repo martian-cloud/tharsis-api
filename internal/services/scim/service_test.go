@@ -6,9 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -37,6 +39,7 @@ func TestCreateSCIMToken(t *testing.T) {
 		name            string
 		expectErrorCode errors.CodeType
 		existingTokens  []models.SCIMToken
+		idpIssuerURL    string
 	}{
 		{
 			name: "positive: caller is admin; expect signed token.",
@@ -50,6 +53,7 @@ func TestCreateSCIMToken(t *testing.T) {
 				},
 			},
 			existingTokens: []models.SCIMToken{existingToken},
+			idpIssuerURL:   "https://example.com/scim",
 		},
 		{
 			name: "negative: caller is not admin; expect error EForbidden.",
@@ -64,6 +68,22 @@ func TestCreateSCIMToken(t *testing.T) {
 			},
 			existingTokens:  []models.SCIMToken{existingToken},
 			expectErrorCode: errors.EForbidden,
+			idpIssuerURL:    "https://example.com/scim",
+		},
+		{
+			name: "negative: invalid IDP issuer URL",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{
+						ID: resourceUUID,
+					},
+					Email: "admin@example.com",
+					Admin: true,
+				},
+			},
+			existingTokens:  []models.SCIMToken{},
+			expectErrorCode: errors.EInvalid,
+			idpIssuerURL:    "https://invalid-idp.com",
 		},
 	}
 
@@ -79,7 +99,9 @@ func TestCreateSCIMToken(t *testing.T) {
 			mockTransactions.Test(t)
 
 			mockScimTokens.On("GetTokens", ctx).Return(test.existingTokens, nil)
-			mockScimTokens.On("DeleteToken", ctx, &test.existingTokens[0]).Return(nil)
+			if len(test.existingTokens) > 0 {
+				mockScimTokens.On("DeleteToken", ctx, &test.existingTokens[0]).Return(nil)
+			}
 			mockScimTokens.On("CreateToken", ctx, mock.Anything).Return(nil, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
@@ -97,9 +119,10 @@ func TestCreateSCIMToken(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
-			service := NewService(logger, dbClient, mockSigningKeyManager)
+			cfg := &config.Config{OauthProviders: []config.IdpConfig{{IssuerURL: "https://example.com/scim"}}}
+			service := NewService(logger, dbClient, mockSigningKeyManager, cfg.OauthProviders)
 
-			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, test.caller))
+			token, err := service.CreateSCIMToken(auth.WithCaller(ctx, test.caller), test.idpIssuerURL)
 			if test.expectErrorCode != "" {
 				// Negative case.
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -177,7 +200,7 @@ func TestGetSCIMUsers(t *testing.T) {
 				Users: &mockUsers,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
 
 			users, err := service.GetSCIMUsers(ctx, test.input)
 			if test.expectedError != "" {
@@ -203,10 +226,11 @@ func TestCreateSCIMUser(t *testing.T) {
 
 	// testCases should never return an error since CreateSCIMUser is idempotent.
 	testCases := []struct {
-		input            *CreateSCIMUserInput
-		existingSCIMUser *models.User
-		returnedSCIMUser *models.User
-		name             string
+		input                  *CreateSCIMUserInput
+		existingSCIMUser       *models.User
+		existingExternalIDUser *models.User
+		returnedSCIMUser       *models.User
+		name                   string
 	}{
 		{
 			name: "positive: user already exists in the system without a scimExternalID; expect updated user.",
@@ -216,6 +240,21 @@ func TestCreateSCIMUser(t *testing.T) {
 				Active:         true,
 			},
 			existingSCIMUser: &models.User{
+				Username: "input-user",
+				Email:    "input-user@example.com",
+				Admin:    false,
+				Active:   true,
+			},
+			returnedSCIMUser: sampleUser,
+		},
+		{
+			name: "positive: user exists with external ID but no SCIMExternalID; expect updated user.",
+			input: &CreateSCIMUserInput{
+				Email:          "input-user@example.com",
+				SCIMExternalID: externalID,
+				Active:         true,
+			},
+			existingExternalIDUser: &models.User{
 				Username: "input-user",
 				Email:    "input-user@example.com",
 				Admin:    false,
@@ -240,24 +279,35 @@ func TestCreateSCIMUser(t *testing.T) {
 			defer cancel()
 
 			mockUsers := db.MockUsers{}
-			mockCaller := auth.MockCaller{}
-
 			mockUsers.Test(t)
-			mockCaller.Test(t)
 
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateUserPermission).Return(nil)
+			mockTransactions := db.MockTransactions{}
+			mockTransactions.Test(t)
 
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
+
+			mockUsers.On("GetUserBySCIMExternalID", mock.Anything, externalID).Return(nil, nil)
+			mockUsers.On("GetUserByExternalID", mock.Anything, "https://example.com/scim", externalID).Return(test.existingExternalIDUser, nil)
 			mockUsers.On("GetUserByEmail", mock.Anything, test.input.Email).Return(test.existingSCIMUser, nil)
-			mockUsers.On("UpdateUser", mock.Anything, test.existingSCIMUser).Return(test.returnedSCIMUser, nil)
+			mockUsers.On("UpdateUser", mock.Anything, mock.Anything).Return(test.returnedSCIMUser, nil)
 			mockUsers.On("CreateUser", mock.Anything, sampleUser).Return(test.returnedSCIMUser, nil)
+			mockUsers.On("LinkUserWithExternalID", mock.Anything, "https://example.com/scim", externalID, mock.AnythingOfType("string")).Return(nil)
+
+			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+			mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 
 			dbClient := &db.Client{
-				Users: &mockUsers,
+				Users:        &mockUsers,
+				Transactions: &mockTransactions,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			scimCaller := auth.NewSCIMCaller(dbClient, mockMaintenanceMonitor, "https://example.com/scim")
 
-			user, err := service.CreateSCIMUser(auth.WithCaller(ctx, &mockCaller), test.input)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+
+			user, err := service.CreateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
 			if err != nil {
 				t.Fatal(err)
 			} else {
@@ -307,12 +357,41 @@ func TestUpdateSCIMUser(t *testing.T) {
 			// We expect no error from this.
 		},
 		{
-			name: "negative: invalid Metadata ID; expect error EInternal",
+			name: "positive: valid 'replace' operation on email; expect email and username to be updated.",
+			input: &UpdateResourceInput{
+				ID: resourceUUID,
+				Operations: []Operation{
+					{
+						OP:    replaceOPType,
+						Path:  "emails[type eq \"work\"].value",
+						Value: "new.user@example.com",
+					},
+				},
+			},
+			existingUser: &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: resourceUUID,
+				},
+				Username:       "input-user",
+				Email:          "input-user@example.com",
+				SCIMExternalID: externalID,
+			},
+			expectedSCIMUser: &models.User{
+				Metadata: models.ResourceMetadata{
+					ID: resourceUUID,
+				},
+				Username:       "input-user", // Username should NOT change
+				Email:          "new.user@example.com",
+				SCIMExternalID: externalID,
+			},
+		},
+		{
+			name: "negative: invalid Metadata ID; expect error ENotFound",
 			input: &UpdateResourceInput{
 				ID:         "bogus-id",
 				Operations: []Operation{}, // Operation won't matter for this.
 			},
-			expectedErrorCode: errors.EInternal,
+			expectedErrorCode: errors.ENotFound,
 		},
 		{
 			name: "negative: invalid operation OP; expect error EInvalid.",
@@ -356,10 +435,8 @@ func TestUpdateSCIMUser(t *testing.T) {
 			mockTransactions := db.MockTransactions{}
 			mockTransactions.Test(t)
 
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockCaller.On("RequirePermission", mock.Anything, models.UpdateUserPermission, mock.Anything).Return(nil)
+			mockMaintenanceMonitor := maintenance.NewMockMonitor(t)
+			mockMaintenanceMonitor.On("InMaintenanceMode", mock.Anything).Return(false, nil)
 
 			mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 			mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
@@ -367,17 +444,21 @@ func TestUpdateSCIMUser(t *testing.T) {
 
 			// This function just updates the user in the db layer.
 			// Actual fields are updated via a private func.
-			mockUsers.On("UpdateUser", mock.Anything, test.expectedSCIMUser).Return(test.expectedSCIMUser, nil)
-			mockUsers.On("GetUserByID", mock.Anything, test.input.ID).Return(test.existingUser, nil)
+			mockUsers.On("UnlinkUserExternalID", mock.Anything, "https://example.com/scim", mock.AnythingOfType("string")).Return(nil).Maybe()
+			mockUsers.On("LinkUserWithExternalID", mock.Anything, "https://example.com/scim", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
+			mockUsers.On("UpdateUser", mock.Anything, test.expectedSCIMUser).Return(test.expectedSCIMUser, nil).Maybe()
+			mockUsers.On("GetUserByID", mock.Anything, test.input.ID).Return(test.existingUser, nil).Maybe()
 
 			dbClient := &db.Client{
 				Users:        &mockUsers,
 				Transactions: &mockTransactions,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			scimCaller := auth.NewSCIMCaller(dbClient, mockMaintenanceMonitor, "https://example.com/scim")
 
-			user, err := service.UpdateSCIMUser(auth.WithCaller(ctx, &mockCaller), test.input)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
+
+			user, err := service.UpdateSCIMUser(auth.WithCaller(ctx, scimCaller), test.input)
 			if test.expectedErrorCode != "" {
 				// Negative cases.
 				assert.Equal(t, test.expectedErrorCode, errors.ErrorCode(err))
@@ -448,7 +529,7 @@ func TestDeleteSCIMUser(t *testing.T) {
 				Users: &mockUsers,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
 
 			err := service.DeleteSCIMUser(ctx, test.input)
 			if test.expectedErrorCode != "" {
@@ -526,7 +607,7 @@ func TestGetSCIMGroups(t *testing.T) {
 				Teams: &mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
 
 			groups, err := service.GetSCIMGroups(ctx, test.input)
 			if test.expectedError != "" {
@@ -595,7 +676,7 @@ func TestCreateSCIMGroup(t *testing.T) {
 				Teams: &mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
 
 			group, err := service.CreateSCIMGroup(auth.WithCaller(ctx, &mockCaller), test.input)
 			if err != nil {
@@ -832,7 +913,7 @@ func TestUpdateSCIMGroup(t *testing.T) {
 				Transactions: &mockTransactions,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
 
 			input := &UpdateResourceInput{
 				ID:         test.inputID,
@@ -908,7 +989,7 @@ func TestDeleteSCIMGroup(t *testing.T) {
 				Teams: &mockTeams,
 			}
 
-			service := NewService(nil, dbClient, nil)
+			service := NewService(nil, dbClient, nil, []config.IdpConfig{})
 
 			err := service.DeleteSCIMGroup(ctx, test.input)
 			if test.expectedErrorCode != "" {
