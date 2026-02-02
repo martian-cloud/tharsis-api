@@ -19,6 +19,7 @@ type NamespaceFavoriteResolver struct {
 type NamespaceFavoritesConnectionQueryArgs struct {
 	ConnectionQueryArgs
 	NamespacePath *string
+	Search        *string
 }
 
 // ID resolver

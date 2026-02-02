@@ -116,6 +116,7 @@ type GetNamespaceFavoritesInput struct {
 	Sort              *db.NamespaceFavoriteSortableField
 	PaginationOptions *pagination.Options
 	NamespacePath     *string
+	Search            *string
 }
 
 // CreateNamespaceFavoriteInput is the input for creating a namespace favorite
@@ -817,6 +818,7 @@ func (s *service) GetNamespaceFavorites(ctx context.Context, input *GetNamespace
 		Filter: &db.NamespaceFavoriteFilter{
 			UserIDs:       []string{userCaller.User.Metadata.ID},
 			NamespacePath: input.NamespacePath,
+			Search:        input.Search,
 		},
 	})
 }
@@ -927,11 +929,25 @@ func (s *service) DeleteNamespaceFavorite(ctx context.Context, input *DeleteName
 	switch input.NamespaceType {
 	case namespace.TypeGroup:
 		if err := userCaller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(namespacePath)); err != nil {
-			return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+			return err
+		}
+		group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(namespacePath))
+		if err != nil {
+			return errors.Wrap(err, "failed to get group", errors.WithSpan(span))
+		}
+		if group == nil {
+			return errors.New("namespace path does not correspond to a group", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 	case namespace.TypeWorkspace:
 		if err := userCaller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(namespacePath)); err != nil {
-			return errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+			return err
+		}
+		workspace, err := s.dbClient.Workspaces.GetWorkspaceByTRN(ctx, types.WorkspaceModelType.BuildTRN(namespacePath))
+		if err != nil {
+			return errors.Wrap(err, "failed to get workspace", errors.WithSpan(span))
+		}
+		if workspace == nil {
+			return errors.New("namespace path does not correspond to a workspace", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 		}
 	default:
 		return errors.New("invalid namespace type", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))

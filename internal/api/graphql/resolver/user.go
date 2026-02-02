@@ -243,6 +243,7 @@ func (r *UserResolver) NamespaceFavorites(ctx context.Context, args *NamespaceFa
 	input := user.GetNamespaceFavoritesInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		NamespacePath:     args.NamespacePath,
+		Search:            args.Search,
 	}
 
 	if args.Sort != nil {
