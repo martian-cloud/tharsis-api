@@ -60,7 +60,9 @@
     "@babel/helpers": "^7.26.10",
     "@babel/runtime": "^7.26.10",
     "@ardatan/relay-compiler": "npm:relay-compiler@^18.2.0",
-    "qs": "^6.14.1"
+    "qs": "^6.14.1",
+    "diff": "^8.0.3",
+    "lodash": "^4.17.23"
   },
   "scripts": {
     "start": "vite",

@@ -60,6 +60,7 @@ type NamespaceFavoriteFilter struct {
 	NamespaceFavoriteIDs []string
 	UserIDs              []string
 	NamespacePath        *string
+	Search               *string
 }
 
 // GetNamespaceFavoritesInput is the input for listing namespace favorites
@@ -160,6 +161,9 @@ func (f *namespaceFavorites) GetNamespaceFavorites(ctx context.Context, input *G
 		}
 		if input.Filter.NamespacePath != nil {
 			ex = ex.Append(goqu.I("namespaces.path").Eq(*input.Filter.NamespacePath))
+		}
+		if input.Filter.Search != nil {
+			ex = ex.Append(goqu.I("namespaces.path").ILike("%" + *input.Filter.Search + "%"))
 		}
 	}
 

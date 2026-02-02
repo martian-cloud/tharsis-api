@@ -292,28 +292,31 @@ type Config {
   dbPort: Int!
   dbSslMode: String!
   disableSensitiveVariableFeature: Boolean!
-  emailClientPluginData: [PluginDataEntry!]!
+  emailClientPluginData: [KeyValueEntry!]!
   emailClientPluginType: String!
   emailFooter: String
   federatedRegistryTrustPolicies: [FederatedRegistryTrustPolicy!]!
   httpRateLimit: Int!
   internalRunners: [RunnerConfig!]!
-  jwsProviderPluginData: [PluginDataEntry!]!
+  jwsProviderPluginData: [KeyValueEntry!]!
   jwsProviderPluginType: String!
   jwtIssuerUrl: String!
   maxGraphQlComplexity: Int!
+  mcpServerConfig: MCPServerConfig!
   moduleRegistryMaxUploadSize: Int!
   oauthProviders: [IdpConfig!]!
-  objectStorePluginData: [PluginDataEntry!]!
+  objectStorePluginData: [KeyValueEntry!]!
   objectStorePluginType: String!
   oidcInternalIdentityProviderClientID: String!
   otelTraceCollectorHost: String
   otelTraceCollectorPort: Int!
+
+  """Sensitive fields - always returned but masked for non-admin users"""
   otelTraceEnabled: Boolean!
   otelTraceType: String
-  rateLimitStorePluginData: [PluginDataEntry!]!
+  rateLimitStorePluginData: [KeyValueEntry!]!
   rateLimitStorePluginType: String!
-  secretManagerPluginData: [PluginDataEntry!]!
+  secretManagerPluginData: [KeyValueEntry!]!
   secretManagerPluginType: String!
   serverPort: String!
   serviceDiscoveryHost: String!
@@ -321,8 +324,6 @@ type Config {
   tharsisApiUrl: String!
   tharsisSupportUrl: String!
   tharsisUiUrl: String!
-
-  """Sensitive fields - always returned but masked for non-admin users"""
   tlsCertFile: String!
   tlsEnabled: Boolean!
   tlsKeyFile: String!
@@ -564,6 +565,17 @@ type CreateRunnerSessionPayload {
   clientMutationId: String
   problems: [Problem!]!
   runnerSession: RunnerSession
+}
+
+input CreateSCIMTokenInput {
+  clientMutationId: String
+  idpIssuerURL: String!
+}
+
+type CreateSCIMTokenPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  token: String
 }
 
 input CreateServiceAccountInput {
@@ -1347,6 +1359,11 @@ enum JobType {
   plan
 }
 
+type KeyValueEntry {
+  key: String!
+  value: String!
+}
+
 type LabelChangePayload {
   added: [WorkspaceLabel!]
   removed: [String!]
@@ -1363,6 +1380,12 @@ type LockWorkspacePayload {
   clientMutationId: String
   problems: [Problem!]!
   workspace: Workspace
+}
+
+type MCPServerConfig {
+  enabledTools: [String!]!
+  enabledToolsets: [String!]!
+  readOnly: Boolean!
 }
 
 type MaintenanceMode {
@@ -1530,7 +1553,7 @@ type Mutation {
   createRunner(input: CreateRunnerInput!): CreateRunnerPayload!
   createRunnerSession(input: CreateRunnerSessionInput!): CreateRunnerSessionPayload!
   createRunnerSessionError(input: CreateRunnerSessionErrorInput!): CreateRunnerSessionErrorPayload!
-  createSCIMToken: SCIMTokenPayload!
+  createSCIMToken(input: CreateSCIMTokenInput!): CreateSCIMTokenPayload!
   createServiceAccount(input: CreateServiceAccountInput!): CreateServiceAccountPayload!
   createStateVersion(input: CreateStateVersionInput!): CreateStateVersionPayload!
   createTeam(input: CreateTeamInput): CreateTeamPayload!
@@ -1592,7 +1615,7 @@ type Mutation {
   setVariablesIncludedInTFConfig(input: SetVariablesIncludedInTFConfigInput!): SetVariablesIncludedInTFConfigPayload!
   unassignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   unassignServiceAccountFromRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
-  unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
+  unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   updateAnnouncement(input: UpdateAnnouncementInput!): UpdateAnnouncementPayload!
   updateApply(input: UpdateApplyInput!): UpdateApplyPayload!
@@ -1719,6 +1742,11 @@ input NamespaceRunnerTagsInput {
 enum NamespaceType {
   GROUP
   WORKSPACE
+}
+
+type NamespaceUnfavoriteMutationPayload {
+  clientMutationId: String
+  problems: [Problem!]!
 }
 
 type NamespaceVariable implements Node {
@@ -1882,11 +1910,6 @@ type PlanSummary {
   resourceDestructions: Int!
   resourceDrift: Int!
   resourceImports: Int!
-}
-
-type PluginDataEntry {
-  key: String!
-  value: String!
 }
 
 type Problem {
@@ -2152,7 +2175,7 @@ enum RunnerAvailabilityStatus {
 }
 
 type RunnerConfig {
-  jobDispatcherData: [PluginDataEntry!]!
+  jobDispatcherData: [KeyValueEntry!]!
   jobDispatcherType: String!
   name: String!
 }
@@ -2245,12 +2268,6 @@ enum RunnerSort {
 enum RunnerType {
   group
   shared
-}
-
-type SCIMTokenPayload {
-  clientMutationId: String
-  problems: [Problem!]!
-  token: String
 }
 
 input SaveJobLogsInput {
@@ -3084,7 +3101,7 @@ type User implements Node {
   email: String!
   id: ID!
   metadata: ResourceMetadata!
-  namespaceFavorites(after: String, before: String, first: Int, last: Int, namespacePath: String): NamespaceFavoriteConnection!
+  namespaceFavorites(after: String, before: String, first: Int, last: Int, namespacePath: String, search: String): NamespaceFavoriteConnection!
   namespaceMemberships(after: String, before: String, first: Int, last: Int): NamespaceMembershipConnection!
   scimExternalId: String
   teams(after: String, before: String, first: Int, last: Int, sort: TeamSort): TeamConnection!

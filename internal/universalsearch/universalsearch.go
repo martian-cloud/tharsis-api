@@ -37,6 +37,16 @@ type SearchResponse struct {
 // searchFunc defines the search function type
 type searchFunc func(ctx context.Context, query string, limit int32) ([]*SearchResult, error)
 
+// resourceTypeOrder defines the display order of resource types in search results
+var resourceTypeOrder = []types.ModelType{
+	types.NamespaceFavoriteModelType,
+	types.GroupModelType,
+	types.WorkspaceModelType,
+	types.TeamModelType,
+	types.TerraformModuleModelType,
+	types.TerraformProviderModelType,
+}
+
 // Manager defines the main universal search interface
 type Manager interface {
 	Search(ctx context.Context, request SearchRequest) (*SearchResponse, error)
@@ -52,6 +62,7 @@ type manager struct {
 // NewManager creates a new universal search manager.
 func NewManager(catalog *services.Catalog, logger logger.Logger) Manager {
 	return newManager(catalog, logger, map[types.ModelType]searchFunc{
+		types.NamespaceFavoriteModelType: favoriteSearcher(catalog.UserService),
 		types.GroupModelType:             groupSearcher(catalog.GroupService),
 		types.WorkspaceModelType:         workspaceSearcher(catalog.WorkspaceService),
 		types.TeamModelType:              teamSearcher(catalog.TeamService),
@@ -82,8 +93,17 @@ func (s *manager) Search(ctx context.Context, request SearchRequest) (*SearchRes
 	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
 	defer cancel()
 
+	// For empty query, only display favorites
 	if request.Query == "" {
-		return &SearchResponse{Results: []*SearchResult{}}, nil
+		favoriteSearcher, ok := s.searchers[types.NamespaceFavoriteModelType]
+		if !ok {
+			return &SearchResponse{Results: []*SearchResult{}}, nil
+		}
+		favorites, err := favoriteSearcher(ctx, request.Query, defaultSearchLimit)
+		if err != nil {
+			return nil, err
+		}
+		return &SearchResponse{Results: favorites}, nil
 	}
 
 	var wg sync.WaitGroup
@@ -117,8 +137,8 @@ func (s *manager) Search(ctx context.Context, request SearchRequest) (*SearchRes
 	optimalSlots := s.calculateOptimalSlots(resultsByType)
 	var allResults []*SearchResult
 
-	// Single pass allocation using optimal slots
-	for _, modelType := range s.modelTypes {
+	// Add results in defined order
+	for _, modelType := range resourceTypeOrder {
 		results, ok := resultsByType[modelType]
 		if !ok || len(results) == 0 {
 			continue

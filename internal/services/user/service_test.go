@@ -1664,6 +1664,24 @@ func TestGetNamespaceFavorites(t *testing.T) {
 			},
 		},
 		{
+			name: "get namespace favorites with search filter",
+			caller: &auth.UserCaller{
+				User: &models.User{
+					Metadata: models.ResourceMetadata{ID: userID},
+				},
+			},
+			input: &GetNamespaceFavoritesInput{
+				Search: ptr.String("test-search"),
+			},
+			mockResult: &db.NamespaceFavoritesResult{
+				NamespaceFavorites: []models.NamespaceFavorite{
+					{
+						UserID: userID,
+					},
+				},
+			},
+		},
+		{
 			name:            "non-user caller cannot get namespace favorites",
 			caller:          &auth.ServiceAccountCaller{},
 			input:           &GetNamespaceFavoritesInput{},
@@ -2036,6 +2054,19 @@ func TestDeleteNamespaceFavorite(t *testing.T) {
 			mockNamespaceFavorites := db.NewMockNamespaceFavorites(t)
 			mockGroups := db.NewMockGroups(t)
 			mockWorkspaces := db.NewMockWorkspaces(t)
+			if tc.input != nil && tc.expectErrorCode != errors.EForbidden && tc.expectErrorCode != errors.EUnauthorized {
+				if tc.input.NamespaceType == namespace.TypeGroup {
+					mockGroups.On("GetGroupByTRN", mock.Anything, types.GroupModelType.BuildTRN(tc.input.NamespacePath)).Return(&models.Group{
+						Metadata: models.ResourceMetadata{ID: "group-id"},
+						FullPath: tc.input.NamespacePath,
+					}, nil)
+				} else if tc.input.NamespaceType == namespace.TypeWorkspace {
+					mockWorkspaces.On("GetWorkspaceByTRN", mock.Anything, types.WorkspaceModelType.BuildTRN(tc.input.NamespacePath)).Return(&models.Workspace{
+						Metadata: models.ResourceMetadata{ID: "workspace-id"},
+						FullPath: tc.input.NamespacePath,
+					}, nil)
+				}
+			}
 
 			if tc.mockFavorites != nil {
 				if tc.expectErrorCode != errors.EForbidden {

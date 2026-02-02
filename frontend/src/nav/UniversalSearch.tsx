@@ -26,6 +26,18 @@ const searchQuery = graphql`
         search(query: $query) {
             results {
                 __typename
+                ... on NamespaceFavorite {
+                    id
+                    namespace {
+                        __typename
+                        ... on Group {
+                            fullPath
+                        }
+                        ... on Workspace {
+                            fullPath
+                        }
+                    }
+                }
                 ... on Group {
                     id
                     name
@@ -96,7 +108,16 @@ type TerraformProviderResult = {
     registryNamespace: string;
 };
 
-type SearchResult = GroupResult | WorkspaceResult | TeamResult | TerraformModuleResult | TerraformProviderResult;
+type NamespaceFavoriteResult = {
+    __typename: 'NamespaceFavorite';
+    id: string;
+    namespace: {
+        __typename: 'Group' | 'Workspace';
+        fullPath: string;
+    };
+};
+
+type SearchResult = GroupResult | WorkspaceResult | TeamResult | TerraformModuleResult | TerraformProviderResult | NamespaceFavoriteResult;
 
 type AutocompleteOption = {
     category: string;
@@ -108,6 +129,10 @@ type AutocompleteOption = {
 
 // Icon generators
 const ICON_GENERATORS = {
+    NamespaceFavorite: (result: NamespaceFavoriteResult): React.ReactNode => {
+        const type = result.namespace.__typename;
+        return type === 'Group' ? <GroupIcon color="disabled" /> : <WorkspaceIcon color="disabled" />;
+    },
     Group: (): React.ReactNode => <GroupIcon color="disabled" />,
     Workspace: (): React.ReactNode => <WorkspaceIcon color="disabled" />,
     Team: (result: TeamResult): React.ReactNode => <Avatar
@@ -120,6 +145,7 @@ const ICON_GENERATORS = {
 
 // Label generators
 const LABEL_GENERATORS = {
+    NamespaceFavorite: (result: NamespaceFavoriteResult): string => result.namespace.fullPath,
     Group: (result: GroupResult): string => result.fullPath,
     Workspace: (result: WorkspaceResult): string => result.fullPath,
     Team: (result: TeamResult): string => result.name,
@@ -128,6 +154,7 @@ const LABEL_GENERATORS = {
 } as const;
 
 const PATH_GENERATORS = {
+    NamespaceFavorite: (result: NamespaceFavoriteResult): string => `/groups/${result.namespace.fullPath}`,
     Group: (result: GroupResult): string => `/groups/${result.fullPath}`,
     Workspace: (result: WorkspaceResult): string => `/groups/${result.fullPath}`,
     TerraformModule: (result: TerraformModuleResult): string => `/module-registry/${result.registryNamespace}/${result.name}/${result.system}`,
@@ -136,12 +163,27 @@ const PATH_GENERATORS = {
 } as const;
 
 const CATEGORIES = {
+    NamespaceFavorite: 'Favorites',
     Group: 'Groups',
     Workspace: 'Workspaces',
     Team: 'Teams',
     TerraformModule: 'Terraform Modules',
     TerraformProvider: 'Terraform Providers',
 } as const;
+
+const mapResultsToOptions = (results: readonly any[]): AutocompleteOption[] => {
+    return results.map((res) => {
+        res = res as SearchResult;
+        const type = res.__typename as keyof typeof CATEGORIES;
+        return {
+            category: CATEGORIES[type],
+            id: res.id,
+            label: LABEL_GENERATORS[type](res as any),
+            path: PATH_GENERATORS[type](res as any),
+            icon: ICON_GENERATORS[type](res as any),
+        }
+    });
+};
 
 function UniversalSearch() {
     const theme = useTheme();
@@ -175,6 +217,22 @@ function UniversalSearch() {
         [environment],
     );
 
+    const search = () => {
+        let active = true;
+
+        setLoading(true);
+        fetch({ input: inputValue }, (response: UniversalSearchQuery$data['search']) => {
+            if (active) {
+                setOptions(mapResultsToOptions(response.results));
+                setLoading(false);
+            }
+        });
+
+        return () => {
+            active = false;
+        };
+    };
+
     useEffect(() => {
         return () => {
             // Cancel request when component unmounts
@@ -182,40 +240,23 @@ function UniversalSearch() {
         }
     }, [fetch]);
 
+    const handleFocus = () => {
+        const callback = search();
+        fetch.flush();
+
+        return callback;
+    };
+
+    const handleBlur = () => {
+        setOptions(null);
+    };
+
     useEffect(() => {
-        let active = true;
-
-        if (inputValue === '') {
-            setOptions(null);
-            setLoading(false);
-        } else {
-            setLoading(true);
-
-            fetch({ input: inputValue }, (response: UniversalSearchQuery$data['search']) => {
-                if (active) {
-                    setOptions(response.results.map((res) => {
-                        res = res as SearchResult;
-
-                        const type = res.__typename;
-                        const labelGenerator = LABEL_GENERATORS[type];
-                        const iconGenerator = ICON_GENERATORS[type];
-                        const pathGenerator = PATH_GENERATORS[type];
-                        return {
-                            category: CATEGORIES[type],
-                            id: res.id,
-                            label: labelGenerator(res as any),
-                            path: pathGenerator(res as any),
-                            icon: iconGenerator(res as any),
-                        }
-                    }));
-                    setLoading(false);
-                }
-            });
+        if (options === null) {
+            return;
         }
 
-        return () => {
-            active = false;
-        };
+        return search();
     }, [fetch, inputValue]);
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -254,7 +295,7 @@ function UniversalSearch() {
                 options={options || []}
                 loading={loading}
                 getOptionLabel={(option: AutocompleteOption) => option.label}
-                open={options !== null}
+                open={options !== null && (inputValue.length > 0 || options.length > 0)}
                 value={selectedItem}
                 blurOnSelect
                 clearOnBlur
@@ -273,6 +314,8 @@ function UniversalSearch() {
                     <TextField
                         {...params}
                         placeholder="Search"
+                        onFocus={handleFocus}
+                        onBlur={handleBlur}
                         InputProps={{
                             ...params.InputProps,
                             endAdornment: (

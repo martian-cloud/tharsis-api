@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<83dcdf5f81f630855e788f12a0363d4c>>
+ * @generated SignedSource<<fd645538d5f259adda23829eda1e50e0>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,6 +19,20 @@ export type UniversalSearchQuery$data = {
       readonly fullPath: string;
       readonly id: string;
       readonly name: string;
+    } | {
+      readonly __typename: "NamespaceFavorite";
+      readonly id: string;
+      readonly namespace: {
+        readonly __typename: "Group";
+        readonly fullPath: string;
+      } | {
+        readonly __typename: "Workspace";
+        readonly fullPath: string;
+      } | {
+        // This will never be '%other', but we need some
+        // value in case none of the concrete values match.
+        readonly __typename: "%other";
+      };
     } | {
       readonly __typename: "Team";
       readonly id: string;
@@ -86,45 +100,60 @@ v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "name",
-  "storageKey": null
-},
-v5 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
   "name": "fullPath",
   "storageKey": null
 },
-v6 = [
-  (v3/*: any*/),
-  (v4/*: any*/),
-  (v5/*: any*/)
+v5 = [
+  (v4/*: any*/)
 ],
+v6 = {
+  "kind": "InlineFragment",
+  "selections": (v5/*: any*/),
+  "type": "Group",
+  "abstractKey": null
+},
 v7 = {
+  "kind": "InlineFragment",
+  "selections": (v5/*: any*/),
+  "type": "Workspace",
+  "abstractKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "name",
+  "storageKey": null
+},
+v9 = [
+  (v3/*: any*/),
+  (v8/*: any*/),
+  (v4/*: any*/)
+],
+v10 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "system",
   "storageKey": null
 },
-v8 = {
+v11 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "groupPath",
   "storageKey": null
 },
-v9 = {
+v12 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "registryNamespace",
   "storageKey": null
 },
-v10 = [
-  (v4/*: any*/),
-  (v5/*: any*/)
+v13 = [
+  (v8/*: any*/),
+  (v4/*: any*/)
 ];
 return {
   "fragment": {
@@ -152,13 +181,35 @@ return {
               (v2/*: any*/),
               {
                 "kind": "InlineFragment",
-                "selections": (v6/*: any*/),
+                "selections": [
+                  (v3/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": null,
+                    "kind": "LinkedField",
+                    "name": "namespace",
+                    "plural": false,
+                    "selections": [
+                      (v2/*: any*/),
+                      (v6/*: any*/),
+                      (v7/*: any*/)
+                    ],
+                    "storageKey": null
+                  }
+                ],
+                "type": "NamespaceFavorite",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v9/*: any*/),
                 "type": "Group",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v6/*: any*/),
+                "selections": (v9/*: any*/),
                 "type": "Workspace",
                 "abstractKey": null
               },
@@ -166,10 +217,10 @@ return {
                 "kind": "InlineFragment",
                 "selections": [
                   (v3/*: any*/),
-                  (v4/*: any*/),
-                  (v7/*: any*/),
                   (v8/*: any*/),
-                  (v9/*: any*/)
+                  (v10/*: any*/),
+                  (v11/*: any*/),
+                  (v12/*: any*/)
                 ],
                 "type": "TerraformModule",
                 "abstractKey": null
@@ -178,9 +229,9 @@ return {
                 "kind": "InlineFragment",
                 "selections": [
                   (v3/*: any*/),
-                  (v4/*: any*/),
                   (v8/*: any*/),
-                  (v9/*: any*/)
+                  (v11/*: any*/),
+                  (v12/*: any*/)
                 ],
                 "type": "TerraformProvider",
                 "abstractKey": null
@@ -189,7 +240,7 @@ return {
                 "kind": "InlineFragment",
                 "selections": [
                   (v3/*: any*/),
-                  (v4/*: any*/)
+                  (v8/*: any*/)
                 ],
                 "type": "Team",
                 "abstractKey": null
@@ -230,23 +281,45 @@ return {
               (v3/*: any*/),
               {
                 "kind": "InlineFragment",
-                "selections": (v10/*: any*/),
+                "selections": [
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": null,
+                    "kind": "LinkedField",
+                    "name": "namespace",
+                    "plural": false,
+                    "selections": [
+                      (v2/*: any*/),
+                      (v6/*: any*/),
+                      (v7/*: any*/),
+                      (v3/*: any*/)
+                    ],
+                    "storageKey": null
+                  }
+                ],
+                "type": "NamespaceFavorite",
+                "abstractKey": null
+              },
+              {
+                "kind": "InlineFragment",
+                "selections": (v13/*: any*/),
                 "type": "Group",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
-                "selections": (v10/*: any*/),
+                "selections": (v13/*: any*/),
                 "type": "Workspace",
                 "abstractKey": null
               },
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v4/*: any*/),
-                  (v7/*: any*/),
                   (v8/*: any*/),
-                  (v9/*: any*/)
+                  (v10/*: any*/),
+                  (v11/*: any*/),
+                  (v12/*: any*/)
                 ],
                 "type": "TerraformModule",
                 "abstractKey": null
@@ -254,9 +327,9 @@ return {
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v4/*: any*/),
                   (v8/*: any*/),
-                  (v9/*: any*/)
+                  (v11/*: any*/),
+                  (v12/*: any*/)
                 ],
                 "type": "TerraformProvider",
                 "abstractKey": null
@@ -264,7 +337,7 @@ return {
               {
                 "kind": "InlineFragment",
                 "selections": [
-                  (v4/*: any*/)
+                  (v8/*: any*/)
                 ],
                 "type": "Team",
                 "abstractKey": null
@@ -278,16 +351,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "ce130488e4af2241fe68608434531712",
+    "cacheID": "d10d1561b7c22d1ea9b6ec79e7c4e196",
     "id": null,
     "metadata": {},
     "name": "UniversalSearchQuery",
     "operationKind": "query",
-    "text": "query UniversalSearchQuery(\n  $query: String!\n) {\n  search(query: $query) {\n    results {\n      __typename\n      ... on Group {\n        id\n        name\n        fullPath\n      }\n      ... on Workspace {\n        id\n        name\n        fullPath\n      }\n      ... on TerraformModule {\n        id\n        name\n        system\n        groupPath\n        registryNamespace\n      }\n      ... on TerraformProvider {\n        id\n        name\n        groupPath\n        registryNamespace\n      }\n      ... on Team {\n        id\n        name\n      }\n      id\n    }\n  }\n}\n"
+    "text": "query UniversalSearchQuery(\n  $query: String!\n) {\n  search(query: $query) {\n    results {\n      __typename\n      ... on NamespaceFavorite {\n        id\n        namespace {\n          __typename\n          ... on Group {\n            fullPath\n          }\n          ... on Workspace {\n            fullPath\n          }\n          id\n        }\n      }\n      ... on Group {\n        id\n        name\n        fullPath\n      }\n      ... on Workspace {\n        id\n        name\n        fullPath\n      }\n      ... on TerraformModule {\n        id\n        name\n        system\n        groupPath\n        registryNamespace\n      }\n      ... on TerraformProvider {\n        id\n        name\n        groupPath\n        registryNamespace\n      }\n      ... on Team {\n        id\n        name\n      }\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "918f70f0f088ed79abd7cb8b5922fe29";
+(node as any).hash = "049e07616ba35a2a591c7dfbf62b27a0";
 
 export default node;

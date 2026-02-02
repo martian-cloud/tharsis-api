@@ -9,6 +9,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/moduleregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providerregistry"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/team"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/user"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
@@ -109,6 +110,26 @@ func providerSearcher(service providerregistry.Service) searchFunc {
 		results := make([]*SearchResult, len(result.Providers))
 		for i, p := range result.Providers {
 			results[i] = &SearchResult{Data: &p, Type: p.GetModelType()}
+		}
+		return results, nil
+	}
+}
+
+func favoriteSearcher(service user.Service) searchFunc {
+	return func(ctx context.Context, query string, limit int32) ([]*SearchResult, error) {
+		sortBy := db.NamespaceFavoriteSortableFieldCreatedAtDesc
+		result, err := service.GetNamespaceFavorites(ctx, &user.GetNamespaceFavoritesInput{
+			Search:            &query,
+			PaginationOptions: &pagination.Options{First: &limit},
+			Sort:              &sortBy,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]*SearchResult, len(result.NamespaceFavorites))
+		for i, f := range result.NamespaceFavorites {
+			results[i] = &SearchResult{Data: &f, Type: f.GetModelType()}
 		}
 		return results, nil
 	}

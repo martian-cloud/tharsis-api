@@ -237,6 +237,22 @@ func TestGetNamespaceFavorites(t *testing.T) {
 			},
 			expectResultCount: 1,
 		},
+		{
+			name: "search favorites by partial path match",
+			filter: &NamespaceFavoriteFilter{
+				UserIDs: []string{user1.Metadata.ID},
+				Search:  func() *string { s := "group-1"; return &s }(),
+			},
+			expectResultCount: 1,
+		},
+		{
+			name: "search favorites returns no results for non-matching query",
+			filter: &NamespaceFavoriteFilter{
+				UserIDs: []string{user1.Metadata.ID},
+				Search:  func() *string { s := "nonexistent"; return &s }(),
+			},
+			expectResultCount: 0,
+		},
 	}
 
 	for _, test := range testCases {

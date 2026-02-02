@@ -11,21 +11,31 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-// Test 1: Empty query returns empty results
+// Test 1: Empty query returns only favorites
 func TestSearchManager_Search_EmptyQuery(t *testing.T) {
 	logger, _ := logger.NewForTest()
-	searchManager := newManager(&services.Catalog{}, logger, make(map[types.ModelType]searchFunc))
+
+	// Create a mock favorite searcher that returns favorites
+	searchers := make(map[types.ModelType]searchFunc)
+	searchers[types.NamespaceFavoriteModelType] = func(_ context.Context, _ string, _ int32) ([]*SearchResult, error) {
+		return []*SearchResult{
+			{Data: &models.NamespaceFavorite{Metadata: models.ResourceMetadata{ID: "fav1"}}, Type: types.NamespaceFavoriteModelType},
+		}, nil
+	}
+
+	searchManager := newManager(&services.Catalog{}, logger, searchers)
 
 	request := SearchRequest{
-		Query: "", // ← Testing this edge case
+		Query: "", // Empty query should return favorites only
 	}
 
 	response, err := searchManager.Search(context.Background(), request)
 
-	// Verify empty query behavior
+	// Verify empty query returns favorites
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.Empty(t, response.Results)
+	assert.Len(t, response.Results, 1)
+	assert.Equal(t, types.NamespaceFavoriteModelType, response.Results[0].Type)
 }
 
 // Test 2: No searchers used (empty resource types filter)
