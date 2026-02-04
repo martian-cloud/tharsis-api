@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
@@ -15,13 +16,14 @@ import (
 type JobCaller struct {
 	dbClient    *db.Client
 	JobID       string
+	JobTRN      string
 	WorkspaceID string
 	RunID       string
 }
 
 // GetSubject returns the subject identifier for this caller
 func (j *JobCaller) GetSubject() string {
-	return j.JobID
+	return j.JobTRN
 }
 
 // IsAdmin returns true if the caller is an admin
@@ -308,14 +310,83 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 
 	// a workspace must belong under at least one group, so it is safe to assume
 	// the first index is the root regardless of levels.
-	rootNamespace := strings.Split(workspace.FullPath, "/")[0] + "/"
+	rootNamespace := strings.Split(workspace.FullPath, "/")[0]
 
 	for _, namespacePath := range namespacePaths {
 		// TODO Advanced controls will need to eventually be added.
 		// Currently, a job will have access to anything under the same root namespace
-		if !strings.HasPrefix(namespacePath, rootNamespace) {
+		if namespacePath != rootNamespace && !strings.HasPrefix(namespacePath, rootNamespace+"/") {
 			return j.UnauthorizedError(ctx, false)
 		}
+	}
+
+	return nil
+}
+
+// requireProviderMirrorAccess allows creating provider mirrors if the workspace has provider mirror enabled.
+func (j *JobCaller) requireProviderMirrorAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
+	if checks.groupID == nil && len(checks.namespacePaths) == 0 {
+		return errMissingConstraints
+	}
+
+	job, err := j.dbClient.Jobs.GetJobByID(ctx, j.JobID)
+	if err != nil {
+		return err
+	}
+
+	if job == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	// Check if provider mirror is enabled from job properties
+	propValue, ok := job.Properties[models.JobPropertyProviderMirrorEnabled]
+	if !ok {
+		return j.UnauthorizedError(ctx, true)
+	}
+
+	enabled, err := strconv.ParseBool(propValue)
+	if err != nil {
+		return terrors.Wrap(err, "invalid value for job property %s", models.JobPropertyProviderMirrorEnabled)
+	}
+
+	if !enabled {
+		return j.UnauthorizedError(ctx, true)
+	}
+
+	workspace, err := j.dbClient.Workspaces.GetWorkspaceByID(ctx, j.WorkspaceID)
+	if err != nil {
+		return err
+	}
+
+	if workspace == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	rootGroupPath := workspace.GetRootGroupPath()
+
+	// Check namespace paths if provided
+	if len(checks.namespacePaths) > 0 {
+		for _, ns := range checks.namespacePaths {
+			if ns != rootGroupPath {
+				return j.UnauthorizedError(ctx, false)
+			}
+		}
+
+		return nil
+	}
+
+	if checks.groupID == nil {
+		return j.UnauthorizedError(ctx, false)
+	}
+
+	// Fall back to groupID
+	group, err := j.dbClient.Groups.GetGroupByID(ctx, *checks.groupID)
+	if err != nil {
+		return err
+	}
+
+	if group == nil || group.FullPath != rootGroupPath {
+		return j.UnauthorizedError(ctx, false)
 	}
 
 	return nil
@@ -324,20 +395,21 @@ func (j *JobCaller) requireRootNamespaceAccess(ctx context.Context, namespacePat
 // getPermissionHandler returns a permissionTypeHandler for a given permission.
 func (j *JobCaller) getPermissionHandler(perm models.Permission) (permissionTypeHandler, bool) {
 	handlerMap := map[models.Permission]permissionTypeHandler{
-		models.ViewWorkspacePermission:                j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewConfigurationVersionPermission:     j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewStateVersionPermission:             j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewManagedIdentityPermission:          j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewVariablePermission:                 j.requireAccessToWorkspacesInGroupHierarchy,
-		models.ViewStateVersionDataPermission:         j.requireAccessToJobWorkspace,
-		models.CreateStateVersionPermission:           j.requireAccessToJobWorkspace,
-		models.ViewVariableValuePermission:            j.requireAccessToJobWorkspace,
-		models.ViewRunPermission:                      j.requireRunAccess, // View is automatically granted if action != View.
-		models.ViewJobPermission:                      j.requireJobAccess, // View is automatically granted if action != View.
-		models.UpdateJobPermission:                    j.requireJobAccess,
-		models.CreateFederatedRegistryTokenPermission: j.requireJobAccess,
-		models.UpdatePlanPermission:                   j.requirePlanWriteAccess,
-		models.UpdateApplyPermission:                  j.requireApplyWriteAccess,
+		models.ViewWorkspacePermission:                 j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewConfigurationVersionPermission:      j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewStateVersionPermission:              j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewManagedIdentityPermission:           j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewVariablePermission:                  j.requireAccessToWorkspacesInGroupHierarchy,
+		models.ViewStateVersionDataPermission:          j.requireAccessToJobWorkspace,
+		models.CreateStateVersionPermission:            j.requireAccessToJobWorkspace,
+		models.ViewVariableValuePermission:             j.requireAccessToJobWorkspace,
+		models.ViewRunPermission:                       j.requireRunAccess, // View is automatically granted if action != View.
+		models.ViewJobPermission:                       j.requireJobAccess, // View is automatically granted if action != View.
+		models.UpdateJobPermission:                     j.requireJobAccess,
+		models.IssueFederatedRegistryTokenPermission:   j.requireJobAccess,
+		models.UpdatePlanPermission:                    j.requirePlanWriteAccess,
+		models.UpdateApplyPermission:                   j.requireApplyWriteAccess,
+		models.CreateTerraformProviderMirrorPermission: j.requireProviderMirrorAccess,
 	}
 
 	handlerFunc, ok := handlerMap[perm]

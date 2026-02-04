@@ -204,6 +204,7 @@ type CreateGroupRequest struct {
 	ParentId              *string                              `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3,oneof" json:"parent_id,omitempty"`
 	RunnerTags            []string                             `protobuf:"bytes,4,rep,name=runner_tags,json=runnerTags,proto3" json:"runner_tags,omitempty"`
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput `protobuf:"bytes,5,opt,name=drift_detection_enabled,json=driftDetectionEnabled,proto3,oneof" json:"drift_detection_enabled,omitempty"`
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput `protobuf:"bytes,6,opt,name=provider_mirror_enabled,json=providerMirrorEnabled,proto3,oneof" json:"provider_mirror_enabled,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -273,6 +274,13 @@ func (x *CreateGroupRequest) GetDriftDetectionEnabled() *NamespaceDriftDetection
 	return nil
 }
 
+func (x *CreateGroupRequest) GetProviderMirrorEnabled() *NamespaceProviderMirrorEnabledInput {
+	if x != nil {
+		return x.ProviderMirrorEnabled
+	}
+	return nil
+}
+
 // UpdateGroupRequest is the input for updating a Group.
 type UpdateGroupRequest struct {
 	state                 protoimpl.MessageState               `protogen:"open.v1"`
@@ -281,6 +289,7 @@ type UpdateGroupRequest struct {
 	Version               *int64                               `protobuf:"varint,3,opt,name=version,proto3,oneof" json:"version,omitempty"`
 	RunnerTags            []string                             `protobuf:"bytes,4,rep,name=runner_tags,json=runnerTags,proto3" json:"runner_tags,omitempty"`
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput `protobuf:"bytes,5,opt,name=drift_detection_enabled,json=driftDetectionEnabled,proto3,oneof" json:"drift_detection_enabled,omitempty"`
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput `protobuf:"bytes,6,opt,name=provider_mirror_enabled,json=providerMirrorEnabled,proto3,oneof" json:"provider_mirror_enabled,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -346,6 +355,13 @@ func (x *UpdateGroupRequest) GetRunnerTags() []string {
 func (x *UpdateGroupRequest) GetDriftDetectionEnabled() *NamespaceDriftDetectionEnabledInput {
 	if x != nil {
 		return x.DriftDetectionEnabled
+	}
+	return nil
+}
+
+func (x *UpdateGroupRequest) GetProviderMirrorEnabled() *NamespaceProviderMirrorEnabledInput {
+	if x != nil {
+		return x.ProviderMirrorEnabled
 	}
 	return nil
 }
@@ -618,28 +634,32 @@ const file_group_proto_rawDesc = "" +
 	"\x05_sortB\t\n" +
 	"\a_searchB\f\n" +
 	"\n" +
-	"_parent_id\"\xbe\x02\n" +
+	"_parent_id\"\xe1\x03\n" +
 	"\x12CreateGroupRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12 \n" +
 	"\tparent_id\x18\x03 \x01(\tH\x00R\bparentId\x88\x01\x01\x12\x1f\n" +
 	"\vrunner_tags\x18\x04 \x03(\tR\n" +
 	"runnerTags\x12\x84\x01\n" +
-	"\x17drift_detection_enabled\x18\x05 \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInputH\x01R\x15driftDetectionEnabled\x88\x01\x01B\f\n" +
+	"\x17drift_detection_enabled\x18\x05 \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInputH\x01R\x15driftDetectionEnabled\x88\x01\x01\x12\x84\x01\n" +
+	"\x17provider_mirror_enabled\x18\x06 \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInputH\x02R\x15providerMirrorEnabled\x88\x01\x01B\f\n" +
 	"\n" +
 	"_parent_idB\x1a\n" +
-	"\x18_drift_detection_enabled\"\xca\x02\n" +
+	"\x18_drift_detection_enabledB\x1a\n" +
+	"\x18_provider_mirror_enabled\"\xed\x03\n" +
 	"\x12UpdateGroupRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x03 \x01(\x03H\x01R\aversion\x88\x01\x01\x12\x1f\n" +
 	"\vrunner_tags\x18\x04 \x03(\tR\n" +
 	"runnerTags\x12\x84\x01\n" +
-	"\x17drift_detection_enabled\x18\x05 \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInputH\x02R\x15driftDetectionEnabled\x88\x01\x01B\x0e\n" +
+	"\x17drift_detection_enabled\x18\x05 \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInputH\x02R\x15driftDetectionEnabled\x88\x01\x01\x12\x84\x01\n" +
+	"\x17provider_mirror_enabled\x18\x06 \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInputH\x03R\x15providerMirrorEnabled\x88\x01\x01B\x0e\n" +
 	"\f_descriptionB\n" +
 	"\n" +
 	"\b_versionB\x1a\n" +
-	"\x18_drift_detection_enabled\"t\n" +
+	"\x18_drift_detection_enabledB\x1a\n" +
+	"\x18_provider_mirror_enabled\"t\n" +
 	"\x12DeleteGroupRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01\x12\x19\n" +
@@ -703,35 +723,38 @@ var file_group_proto_goTypes = []any{
 	(*GetGroupsResponse)(nil),                   // 8: martiancloud.tharsis.api.group.GetGroupsResponse
 	(*PaginationOptions)(nil),                   // 9: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*NamespaceDriftDetectionEnabledInput)(nil), // 10: martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
-	(*ResourceMetadata)(nil),                    // 11: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                            // 12: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                       // 13: google.protobuf.Empty
+	(*NamespaceProviderMirrorEnabledInput)(nil), // 11: martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
+	(*ResourceMetadata)(nil),                    // 12: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),                            // 13: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                       // 14: google.protobuf.Empty
 }
 var file_group_proto_depIdxs = []int32{
 	9,  // 0: martiancloud.tharsis.api.group.GetGroupsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.group.GetGroupsRequest.sort:type_name -> martiancloud.tharsis.api.group.GroupSortableField
 	10, // 2: martiancloud.tharsis.api.group.CreateGroupRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
-	10, // 3: martiancloud.tharsis.api.group.UpdateGroupRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
-	11, // 4: martiancloud.tharsis.api.group.Group.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	7,  // 5: martiancloud.tharsis.api.group.GetGroupsResponse.groups:type_name -> martiancloud.tharsis.api.group.Group
-	12, // 6: martiancloud.tharsis.api.group.GetGroupsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1,  // 7: martiancloud.tharsis.api.group.Groups.GetGroupByID:input_type -> martiancloud.tharsis.api.group.GetGroupByIDRequest
-	2,  // 8: martiancloud.tharsis.api.group.Groups.GetGroups:input_type -> martiancloud.tharsis.api.group.GetGroupsRequest
-	3,  // 9: martiancloud.tharsis.api.group.Groups.CreateGroup:input_type -> martiancloud.tharsis.api.group.CreateGroupRequest
-	4,  // 10: martiancloud.tharsis.api.group.Groups.UpdateGroup:input_type -> martiancloud.tharsis.api.group.UpdateGroupRequest
-	5,  // 11: martiancloud.tharsis.api.group.Groups.DeleteGroup:input_type -> martiancloud.tharsis.api.group.DeleteGroupRequest
-	6,  // 12: martiancloud.tharsis.api.group.Groups.MigrateGroup:input_type -> martiancloud.tharsis.api.group.MigrateGroupRequest
-	7,  // 13: martiancloud.tharsis.api.group.Groups.GetGroupByID:output_type -> martiancloud.tharsis.api.group.Group
-	8,  // 14: martiancloud.tharsis.api.group.Groups.GetGroups:output_type -> martiancloud.tharsis.api.group.GetGroupsResponse
-	7,  // 15: martiancloud.tharsis.api.group.Groups.CreateGroup:output_type -> martiancloud.tharsis.api.group.Group
-	7,  // 16: martiancloud.tharsis.api.group.Groups.UpdateGroup:output_type -> martiancloud.tharsis.api.group.Group
-	13, // 17: martiancloud.tharsis.api.group.Groups.DeleteGroup:output_type -> google.protobuf.Empty
-	7,  // 18: martiancloud.tharsis.api.group.Groups.MigrateGroup:output_type -> martiancloud.tharsis.api.group.Group
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 3: martiancloud.tharsis.api.group.CreateGroupRequest.provider_mirror_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
+	10, // 4: martiancloud.tharsis.api.group.UpdateGroupRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
+	11, // 5: martiancloud.tharsis.api.group.UpdateGroupRequest.provider_mirror_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
+	12, // 6: martiancloud.tharsis.api.group.Group.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	7,  // 7: martiancloud.tharsis.api.group.GetGroupsResponse.groups:type_name -> martiancloud.tharsis.api.group.Group
+	13, // 8: martiancloud.tharsis.api.group.GetGroupsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	1,  // 9: martiancloud.tharsis.api.group.Groups.GetGroupByID:input_type -> martiancloud.tharsis.api.group.GetGroupByIDRequest
+	2,  // 10: martiancloud.tharsis.api.group.Groups.GetGroups:input_type -> martiancloud.tharsis.api.group.GetGroupsRequest
+	3,  // 11: martiancloud.tharsis.api.group.Groups.CreateGroup:input_type -> martiancloud.tharsis.api.group.CreateGroupRequest
+	4,  // 12: martiancloud.tharsis.api.group.Groups.UpdateGroup:input_type -> martiancloud.tharsis.api.group.UpdateGroupRequest
+	5,  // 13: martiancloud.tharsis.api.group.Groups.DeleteGroup:input_type -> martiancloud.tharsis.api.group.DeleteGroupRequest
+	6,  // 14: martiancloud.tharsis.api.group.Groups.MigrateGroup:input_type -> martiancloud.tharsis.api.group.MigrateGroupRequest
+	7,  // 15: martiancloud.tharsis.api.group.Groups.GetGroupByID:output_type -> martiancloud.tharsis.api.group.Group
+	8,  // 16: martiancloud.tharsis.api.group.Groups.GetGroups:output_type -> martiancloud.tharsis.api.group.GetGroupsResponse
+	7,  // 17: martiancloud.tharsis.api.group.Groups.CreateGroup:output_type -> martiancloud.tharsis.api.group.Group
+	7,  // 18: martiancloud.tharsis.api.group.Groups.UpdateGroup:output_type -> martiancloud.tharsis.api.group.Group
+	14, // 19: martiancloud.tharsis.api.group.Groups.DeleteGroup:output_type -> google.protobuf.Empty
+	7,  // 20: martiancloud.tharsis.api.group.Groups.MigrateGroup:output_type -> martiancloud.tharsis.api.group.Group
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_group_proto_init() }

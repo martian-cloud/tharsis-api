@@ -50,8 +50,17 @@ interface Namespace {
     targetTypes: [ActivityEventTargetType!]
     sort: ActivityEventSort
   ): ActivityEventConnection!
+  terraformProviderMirrors(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: TerraformProviderVersionMirrorSort
+    search: String
+  ): TerraformProviderVersionMirrorConnection!
   runnerTags: NamespaceRunnerTags!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
+  providerMirrorEnabled: NamespaceProviderMirrorEnabled!
 }
 
 input NamespaceRunnerTagsInput {
@@ -74,4 +83,15 @@ type NamespaceDriftDetectionEnabled {
   inherited: Boolean!
   namespacePath: String!
   value: Boolean!
+}
+
+type NamespaceProviderMirrorEnabled {
+  inherited: Boolean!
+  namespacePath: String!
+  value: Boolean!
+}
+
+input NamespaceProviderMirrorEnabledInput {
+  inherit: Boolean!
+  enabled: Boolean
 }

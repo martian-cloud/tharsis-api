@@ -20,4 +20,5 @@ type Namespace interface {
 	ExpandPath() []string
 	GetRunnerTags() []string
 	DriftDetectionEnabled() *bool
+	ProviderMirrorEnabled() *bool
 }

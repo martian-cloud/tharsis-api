@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<807e2c8d0e47f4ad08e5e73bf37c2741>>
+ * @generated SignedSource<<f0149315b9f1f2342d9a02922ba0557a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,6 +18,7 @@ export type UpdateGroupInput = {
   groupPath?: string | null | undefined;
   id?: string | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
+  providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
 };
 export type NamespaceDriftDetectionEnabledInput = {
@@ -26,6 +27,10 @@ export type NamespaceDriftDetectionEnabledInput = {
 };
 export type ResourceMetadataInput = {
   version: string;
+};
+export type NamespaceProviderMirrorEnabledInput = {
+  enabled?: boolean | null | undefined;
+  inherit: boolean;
 };
 export type NamespaceRunnerTagsInput = {
   inherit: boolean;

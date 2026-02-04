@@ -1,14 +1,13 @@
 import { TabContext, TabList } from '@mui/lab';
 import MuiTabPanel, { TabPanelProps } from '@mui/lab/TabPanel';
-import { LoadingButton } from '@mui/lab';
-import { Avatar, Button, CircularProgress, Stack, styled, Typography } from '@mui/material';
-import { Box, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
+import { Avatar, Box, Button, CircularProgress, Stack, styled, Typography } from '@mui/material';
 import teal from '@mui/material/colors/teal';
 import { TabProps } from '@mui/material/Tab';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useEffect, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { LinkProps, Route, Routes } from 'react-router-dom';
+import ConfirmationDialog from '../common/ConfirmationDialog';
 import { GroupIcon, WorkspaceIcon } from '../common/Icons';
 import TRNButton from '../common/TRNButton';
 import Variables from '../namespace/variables/Variables';
@@ -32,6 +31,7 @@ import ServiceAccounts from './serviceaccount/ServiceAccounts';
 import VCSProviders from './vcsprovider/VCSProviders';
 import FederatedRegistries from './federatedregistry/FederatedRegistries';
 import GPGKeys from './keys/GPGKeys';
+import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import GroupNotificationPreference from '../notifications/GroupNotificationPreference';
 import TerraformModules from './terraformmodule/TerraformModules';
@@ -43,34 +43,6 @@ const TABS = ['workspaces', 'subgroups'];
 interface Props {
     fragmentRef: GroupDetailsFragment_group$key
     route: string
-}
-
-interface ConfirmationDialogProps {
-    groupName: string
-    deleteInProgress: boolean;
-    keepMounted: boolean;
-    open: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { groupName, deleteInProgress, onClose, open, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={open}
-            {...other}
-        >
-            <DialogTitle>Delete Group</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete group <strong>{groupName}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>Cancel</Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>Delete</LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
 }
 
 const Tab = styled(TabLink)<TabProps | LinkProps>(() => ({
@@ -102,6 +74,7 @@ function GroupDetails(props: Props) {
             ...VariablesFragment_variables
             ...NamespaceMembershipsFragment_memberships
             ...GPGKeysFragment_group
+            ...ProviderMirrorsFragment_namespace
             ...NamespaceActivityFragment_activity
             ...GroupSettingsFragment_group
         }
@@ -136,6 +109,7 @@ function GroupDetails(props: Props) {
                             <Route path={`${groupPath}/-/terraform_modules/*`} element={<TerraformModules fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/vcs_providers/*`} element={<VCSProviders fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/federated_registries/*`} element={<FederatedRegistries fragmentRef={data} />} />
+                            <Route path={`${groupPath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/variables/*`} element={<Variables fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/members/*`} element={<NamespaceMemberships fragmentRef={data} />} />
                             <Route path={`${groupPath}/-/keys/*`} element={<GPGKeys fragmentRef={data} />} />
@@ -294,7 +268,7 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     </Box>
                     <TabPanel value="workspaces">
                         {data.workspaces.totalCount > 0 && <Suspense fallback={<ListSkeleton rowCount={10} />}>
-                            <WorkspaceList fragmentRef={data}/>
+                            <WorkspaceList fragmentRef={data} />
                         </Suspense>}
                         {data.workspaces.totalCount === 0 && <Box padding={4} display="flex" justifyContent="center" alignItems="center">
                             <Typography color="textSecondary">No workspaces in this group</Typography>
@@ -310,13 +284,17 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     </TabPanel>
                 </TabContext>}
             </React.Fragment>}
-            <DeleteConfirmationDialog
-                groupName={data.name}
-                keepMounted
-                deleteInProgress={commitInFlight}
-                open={showDeleteConfirmationDialog}
-                onClose={onDeleteConfirmationDialogClosed}
-            />
+            {showDeleteConfirmationDialog && (
+                <ConfirmationDialog
+                    title="Delete Group"
+                    confirmLabel="Delete"
+                    confirmInProgress={commitInFlight}
+                    onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                    onClose={() => onDeleteConfirmationDialogClosed()}
+                >
+                    Are you sure you want to delete group <strong>{data.name}</strong>?
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

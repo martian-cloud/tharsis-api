@@ -110,7 +110,7 @@ type GroupsResult struct {
 	Groups   []models.Group
 }
 
-var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags", "drift_detection_enabled")
+var groupFieldList = append(metadataFieldList, "name", "description", "parent_id", "created_by", "runner_tags", "drift_detection_enabled", "provider_mirror_enabled")
 
 type groups struct {
 	dbClient *Client
@@ -310,6 +310,7 @@ func (g *groups) CreateGroup(ctx context.Context, group *models.Group) (*models.
 			"created_by":              group.CreatedBy,
 			"runner_tags":             runnerTags,
 			"drift_detection_enabled": group.EnableDriftDetection,
+			"provider_mirror_enabled": group.EnableProviderMirror,
 		}).
 		Returning(groupFieldList...).ToSQL()
 	if err != nil {
@@ -393,6 +394,7 @@ func (g *groups) UpdateGroup(ctx context.Context, group *models.Group) (*models.
 						"description":             nullableString(group.Description),
 						"runner_tags":             runnerTags,
 						"drift_detection_enabled": group.EnableDriftDetection,
+						"provider_mirror_enabled": group.EnableProviderMirror,
 					},
 				).Where(goqu.Ex{"id": group.Metadata.ID, "version": group.Metadata.Version}).
 				Returning("*"),
@@ -932,6 +934,7 @@ func scanGroup(row scanner, withFullPath bool) (*models.Group, error) {
 		&group.CreatedBy,
 		&group.RunnerTags,
 		&group.EnableDriftDetection,
+		&group.EnableProviderMirror,
 	}
 
 	if withFullPath {

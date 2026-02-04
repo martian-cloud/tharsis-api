@@ -2267,3 +2267,58 @@ func TestGetWorkspaceAssessmentsByWorkspaceIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestGetProviderMirrorEnabledSetting(t *testing.T) {
+	workspace := models.Workspace{
+		FullPath: "group1/workspace1",
+	}
+
+	tests := []struct {
+		name          string
+		expectSetting *namespace.ProviderMirrorEnabledSetting
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get setting",
+			expectSetting: &namespace.ProviderMirrorEnabledSetting{
+				Value: true,
+			},
+		},
+		{
+			name:          "unauthorized",
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewWorkspacePermission, mock.Anything).Return(test.authError)
+
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, &workspace).Return(test.expectSetting, nil).Maybe()
+
+			svc := service{
+				logger:                    testLogger,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
+			}
+
+			setting, err := svc.GetProviderMirrorEnabledSetting(auth.WithCaller(ctx, mockCaller), &workspace)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}

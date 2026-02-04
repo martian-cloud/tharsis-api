@@ -1,13 +1,9 @@
 package providermirror
 
 import (
-	"bytes"
 	context "context"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	io "io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
 )
 
 const (
@@ -291,7 +288,7 @@ func TestGetProviderVersionMirrorByID(t *testing.T) {
 				TerraformProviderVersionMirrors: mockVersionMirrors,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := &service{dbClient: dbClient}
 
 			actualMirror, err := service.GetProviderVersionMirrorByID(auth.WithCaller(ctx, mockCaller), versionMirrorID)
 
@@ -451,7 +448,7 @@ func TestGetProviderVersionMirrorsByIDs(t *testing.T) {
 				TerraformProviderVersionMirrors: mockVersionMirrors,
 			}
 
-			service := NewService(nil, &dbClient, nil, nil, nil, nil)
+			service := &service{dbClient: &dbClient}
 
 			modules, err := service.GetProviderVersionMirrorsByIDs(auth.WithCaller(ctx, mockCaller), []string{versionMirrorID})
 
@@ -491,8 +488,7 @@ func TestGetProviderVersionMirrors(t *testing.T) {
 		{
 			name: "successfully return a list of provider version mirrors",
 			input: &GetProviderVersionMirrorsInput{
-				NamespacePath:    namespace,
-				IncludeInherited: true,
+				NamespacePath: namespace,
 			},
 			expectMirror: &models.TerraformProviderVersionMirror{
 				Metadata:          models.ResourceMetadata{ID: versionMirrorID},
@@ -512,8 +508,7 @@ func TestGetProviderVersionMirrors(t *testing.T) {
 		{
 			name: "no version mirrors found",
 			input: &GetProviderVersionMirrorsInput{
-				NamespacePath:    namespace,
-				IncludeInherited: true,
+				NamespacePath: namespace,
 			},
 		},
 	}
@@ -548,7 +543,7 @@ func TestGetProviderVersionMirrors(t *testing.T) {
 				TerraformProviderVersionMirrors: mockVersionMirrors,
 			}
 
-			service := NewService(nil, &dbClient, nil, nil, nil, nil)
+			service := &service{dbClient: &dbClient}
 
 			result, err := service.GetProviderVersionMirrors(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -587,7 +582,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		SemanticVersion:   semanticVersion,
 		GroupID:           groupID,
 		CreatedBy:         mockSubject,
-		Digests: map[string][]byte{
+		Digests: provider.Checksums{
 			"terraform-provider-aws_5.2.0_freebsd_amd64.zip": parseChecksumString(t, "0e48449e9f29b64663e7ff641a3ba1da434608460c33a20bdb45efeb1e067d4a"),
 			"terraform-provider-aws_5.2.0_windows_386.zip":   parseChecksumString(t, "0ec657a1e586087368cc3051ccb8bdf67e8763e50eece76b8dc4695f8d349ebb"),
 			"terraform-provider-aws_5.2.0_openbsd_amd64.zip": parseChecksumString(t, "1cff541e792477c4dc8b8405a6f76a56d1292e23d6fc367993efed2b3988c208"),
@@ -610,8 +605,9 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		group                 *models.Group
 		expectCreated         *models.TerraformProviderVersionMirror
 		input                 *CreateProviderVersionMirrorInput
-		listVersionsResp      *listVersionsResponse
-		packageQueryResp      *packageQueryResponse
+		listVersions          []provider.VersionInfo
+		packageInfo           *provider.PackageInfo
+		checksums             provider.Checksums
 		authError             error
 		name                  string
 		expectErrorCode       errors.CodeType
@@ -627,103 +623,22 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryNamespace,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupID:           namespace,
+				GroupPath:         namespace,
 			},
-			listVersionsResp: &listVersionsResponse{
-				Versions: []struct {
-					Version   string `json:"version"`
-					Platforms []struct {
-						OS   string `json:"os"`
-						Arch string `json:"arch"`
-					} `json:"platforms"`
-				}{
-					{
-						Version: semanticVersion,
-						Platforms: []struct {
-							OS   string `json:"os"`
-							Arch string `json:"arch"`
-						}{
-							{
-								OS:   "windows",
-								Arch: "amd64",
-							},
-						},
+			listVersions: []provider.VersionInfo{
+				{
+					Version: semanticVersion,
+					Platforms: []provider.Platform{
+						{OS: "windows", Arch: "amd64"},
 					},
 				},
 			},
-			packageQueryResp: &packageQueryResponse{
+			packageInfo: &provider.PackageInfo{
 				SHASumsURL:          "https://registry.terraform.io/v1/providers/checksums",
 				SHASumsSignatureURL: "https://registry.terraform.io/v1/providers/signatures",
-				SigningKeys: struct {
-					GPGPublicKeys []struct {
-						ASCIIArmor string "json:\"ascii_armor\""
-					} "json:\"gpg_public_keys\""
-				}{
-					GPGPublicKeys: []struct {
-						ASCIIArmor string "json:\"ascii_armor\""
-					}{
-						{
-							ASCIIArmor: hashicorpGPGKey,
-						},
-					},
-				},
+				GPGASCIIArmors:      []string{hashicorpGPGKey},
 			},
-			group: &models.Group{
-				Metadata: models.ResourceMetadata{ID: groupID},
-				FullPath: namespace,
-			},
-			expectCreated:         sampleCreatedMirror,
-			limit:                 5,
-			injectMirrorsPerGroup: 5,
-		},
-		{
-			name: "limit for number of terraform provider version mirrors per group was exceeded",
-			input: &CreateProviderVersionMirrorInput{
-				RegistryHostname:  registryHostname,
-				RegistryNamespace: registryNamespace,
-				Type:              providerType,
-				SemanticVersion:   semanticVersion,
-				GroupID:           namespace,
-			},
-			listVersionsResp: &listVersionsResponse{
-				Versions: []struct {
-					Version   string `json:"version"`
-					Platforms []struct {
-						OS   string `json:"os"`
-						Arch string `json:"arch"`
-					} `json:"platforms"`
-				}{
-					{
-						Version: semanticVersion,
-						Platforms: []struct {
-							OS   string `json:"os"`
-							Arch string `json:"arch"`
-						}{
-							{
-								OS:   "windows",
-								Arch: "amd64",
-							},
-						},
-					},
-				},
-			},
-			packageQueryResp: &packageQueryResponse{
-				SHASumsURL:          "https://registry.terraform.io/v1/providers/checksums",
-				SHASumsSignatureURL: "https://registry.terraform.io/v1/providers/signatures",
-				SigningKeys: struct {
-					GPGPublicKeys []struct {
-						ASCIIArmor string "json:\"ascii_armor\""
-					} "json:\"gpg_public_keys\""
-				}{
-					GPGPublicKeys: []struct {
-						ASCIIArmor string "json:\"ascii_armor\""
-					}{
-						{
-							ASCIIArmor: hashicorpGPGKey,
-						},
-					},
-				},
-			},
+			checksums: sampleCreatedMirror.Digests,
 			group: &models.Group{
 				Metadata: models.ResourceMetadata{ID: groupID},
 				FullPath: namespace,
@@ -736,14 +651,14 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 		{
 			name: "group not found",
 			input: &CreateProviderVersionMirrorInput{
-				GroupID: namespace,
+				GroupPath: namespace,
 			},
 			expectErrorCode: errors.ENotFound,
 		},
 		{
 			name: "group is not a root",
 			input: &CreateProviderVersionMirrorInput{
-				GroupID: namespace,
+				GroupPath: namespace,
 			},
 			group: &models.Group{
 				ParentID: "not-root",
@@ -757,7 +672,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryHostname,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupID:           namespace,
+				GroupPath:         namespace,
 			},
 			group: &models.Group{
 				FullPath: namespace,
@@ -771,7 +686,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				RegistryNamespace: registryHostname,
 				Type:              providerType,
 				SemanticVersion:   "not-semantic",
-				GroupID:           namespace,
+				GroupPath:         namespace,
 			},
 			group: &models.Group{
 				FullPath: namespace,
@@ -782,33 +697,26 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 			name: "unsupported provider version",
 			input: &CreateProviderVersionMirrorInput{
 				RegistryHostname:  registryHostname,
-				RegistryNamespace: registryHostname,
+				RegistryNamespace: registryNamespace,
 				Type:              providerType,
 				SemanticVersion:   semanticVersion,
-				GroupID:           namespace,
+				GroupPath:         namespace,
 			},
 			group: &models.Group{
 				FullPath: namespace,
 			},
-			listVersionsResp: &listVersionsResponse{
-				Versions: []struct {
-					Version   string `json:"version"`
-					Platforms []struct {
-						OS   string `json:"os"`
-						Arch string `json:"arch"`
-					} `json:"platforms"`
-				}{
-					{
-						Version: "0.1.0", // Different from above.
-					},
-				},
+			listVersions: []provider.VersionInfo{
+				{Version: "0.1.0"}, // Different from above.
 			},
 			expectErrorCode: errors.EInvalid,
 		},
 		{
 			name: "subject does not have permissions to create version mirror",
 			input: &CreateProviderVersionMirrorInput{
-				GroupID: namespace,
+				GroupPath: namespace,
+			},
+			group: &models.Group{
+				FullPath: namespace,
 			},
 			authError:       errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
 			expectErrorCode: errors.EForbidden,
@@ -830,7 +738,7 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 			mockCaller.On("RequirePermission", mock.Anything, models.CreateTerraformProviderMirrorPermission, mock.Anything).Return(test.authError)
 
 			if test.authError == nil {
-				mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(test.group, nil)
+				mockGroups.On("GetGroupByTRN", mock.Anything, mock.Anything).Return(test.group, nil)
 			}
 
 			if test.expectCreated != nil {
@@ -869,51 +777,23 @@ func TestCreateProviderVersionMirror(t *testing.T) {
 				TerraformProviderVersionMirrors: mockVersionMirrors,
 			}
 
-			httpClient := newTestHTTPClient(func(r *http.Request) *http.Response {
-				require.NotNil(t, r.URL)
-
-				urlString := r.URL.String()
-
-				var (
-					payloadBuf []byte
-					err        error
-				)
-
-				// Decide what type of payload we're returning based on the endpoint.
-				// We're loosely deciding this but should be good for testing.
-				switch {
-				case strings.HasSuffix(urlString, "/versions"):
-					payloadBuf, err = json.Marshal(test.listVersionsResp)
-					require.Nil(t, err)
-				case strings.Contains(urlString, "/download"):
-					payloadBuf, err = json.Marshal(test.packageQueryResp)
-					require.Nil(t, err)
-				case strings.HasSuffix(urlString, "/checksums"):
-					payloadBuf, err = base64.StdEncoding.DecodeString(awsProviderChecksumsData)
-					require.Nil(t, err)
-				case strings.HasSuffix(urlString, "/signatures"):
-					payloadBuf, err = base64.StdEncoding.DecodeString(awsProviderChecksumsSignature)
-					require.Nil(t, err)
-				default:
-					// Helps ensure nothing is being bypassed.
-					require.Fail(t, "request to http client is made but no endpoint was called")
-				}
-
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(bytes.NewReader(payloadBuf)),
-					Header:     make(http.Header),
-				}
-			})
+			mockResolver := provider.NewMockRegistryProtocol(t)
+			if test.listVersions != nil {
+				mockResolver.On("ListVersions", mock.Anything, mock.Anything, mock.Anything).Return(test.listVersions, nil)
+			}
+			if test.packageInfo != nil {
+				mockResolver.On("GetPackageInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.packageInfo, nil)
+			}
+			if test.checksums != nil {
+				mockResolver.On("GetChecksums", mock.Anything, mock.Anything, mock.Anything).Return(test.checksums, nil)
+			}
 
 			logger, _ := logger.NewForTest()
 
-			// Initialize the struct directly since disco field isn't available on constructor.
 			service := &service{
 				logger:          logger,
 				dbClient:        dbClient,
-				httpClient:      httpClient,
-				discovery:       &fakeServiceDiscoverer{},
+				registryClient:  mockResolver,
 				limitChecker:    limits.NewLimitChecker(dbClient),
 				activityService: mockActivityEvents,
 			}
@@ -1023,7 +903,12 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 
 				mockGroups.On("GetGroupByID", mock.Anything, groupID).Return(sampleGroup, nil)
 
-				providerName := fmt.Sprintf("%s/%s/%s", test.input.VersionMirror.RegistryHostname, test.input.VersionMirror.RegistryNamespace, test.input.VersionMirror.Type)
+				provider := &provider.Provider{
+					Hostname:  test.input.VersionMirror.RegistryHostname,
+					Namespace: test.input.VersionMirror.RegistryNamespace,
+					Type:      test.input.VersionMirror.Type,
+				}
+				providerName := fmt.Sprintf("%s/%s", provider, test.input.VersionMirror.SemanticVersion)
 				mockActivityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
 					NamespacePath: &namespace,
 					Action:        models.ActionDeleteChildResource,
@@ -1045,7 +930,7 @@ func TestDeleteProviderVersionMirror(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, mockActivityEvents, nil)
+			service := &service{logger: logger, dbClient: dbClient, activityService: mockActivityEvents}
 
 			err := service.DeleteProviderVersionMirror(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1121,7 +1006,7 @@ func TestGetProviderPlatformMirrorByID(t *testing.T) {
 				TerraformProviderPlatformMirrors: mockPlatformMirrors,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := &service{dbClient: dbClient}
 
 			actualMirror, err := service.GetProviderPlatformMirrorByID(auth.WithCaller(ctx, mockCaller), platformMirrorID)
 
@@ -1305,7 +1190,7 @@ func TestGetProviderPlatformMirrors(t *testing.T) {
 				TerraformProviderPlatformMirrors: mockPlatformMirrors,
 			}
 
-			service := NewService(nil, &dbClient, nil, nil, nil, nil)
+			service := &service{dbClient: &dbClient}
 
 			result, err := service.GetProviderPlatformMirrors(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1384,7 +1269,7 @@ func TestDeleteProviderPlatformMirror(t *testing.T) {
 			}
 
 			logger, _ := logger.NewForTest()
-			service := NewService(logger, dbClient, nil, nil, nil, nil)
+			service := &service{logger: logger, dbClient: dbClient}
 
 			err := service.DeleteProviderPlatformMirror(auth.WithCaller(ctx, mockCaller), &DeleteProviderPlatformMirrorInput{samplePlatformMirror})
 
@@ -1429,8 +1314,8 @@ func TestUploadInstallationPackage(t *testing.T) {
 				Type:            "null",
 				SemanticVersion: "0.1.0",
 				GroupID:         groupID,
-				Digests: map[string][]byte{
-					getProviderPackageName(
+				Digests: provider.Checksums{
+					provider.GetPackageName(
 						"null",
 						"0.1.0",
 						"windows",
@@ -1495,8 +1380,8 @@ func TestUploadInstallationPackage(t *testing.T) {
 				Type:            "null",
 				SemanticVersion: "0.1.0",
 				GroupID:         groupID,
-				Digests: map[string][]byte{
-					getProviderPackageName(
+				Digests: provider.Checksums{
+					provider.GetPackageName(
 						"null",
 						"0.1.0",
 						"windows",
@@ -1532,9 +1417,6 @@ func TestUploadInstallationPackage(t *testing.T) {
 					if test.platformAlreadyMirrored {
 						// Simply increase the totalCount to verify the logic works.
 						result.PageInfo.TotalCount = 1
-					} else {
-						mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-						mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 					}
 
 					mockPlatformMirrors.On("GetPlatformMirrors", mock.Anything, &db.GetProviderPlatformMirrorsInput{
@@ -1551,15 +1433,25 @@ func TestUploadInstallationPackage(t *testing.T) {
 			}
 
 			if test.expectErrorCode == "" {
+				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
+				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
+
 				toCreate := &models.TerraformProviderPlatformMirror{
 					VersionMirrorID: versionMirrorID,
 					OS:              test.input.OS,
 					Architecture:    test.input.Architecture,
 				}
 
-				mockPlatformMirrors.On("CreatePlatformMirror", mock.Anything, toCreate).Return(nil, nil)
+				createdPlatformMirror := &models.TerraformProviderPlatformMirror{
+					Metadata:        models.ResourceMetadata{ID: "platform-mirror-id"},
+					VersionMirrorID: versionMirrorID,
+					OS:              test.input.OS,
+					Architecture:    test.input.Architecture,
+				}
 
-				mockStore.On("UploadProviderPlatformPackage", mock.Anything, parseChecksumString(t, validPackageChecksum), mock.Anything).Return(nil)
+				mockPlatformMirrors.On("CreatePlatformMirror", mock.Anything, toCreate).Return(createdPlatformMirror, nil)
+
+				mockStore.On("UploadProviderPlatformPackage", mock.Anything, "platform-mirror-id", mock.Anything).Return(nil)
 
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)
 			}
@@ -1570,7 +1462,7 @@ func TestUploadInstallationPackage(t *testing.T) {
 				TerraformProviderPlatformMirrors: mockPlatformMirrors,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, mockStore)
+			service := &service{dbClient: dbClient, mirrorStore: mockStore}
 
 			err := service.UploadInstallationPackage(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1680,7 +1572,7 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 					result.PageInfo.TotalCount = 1
 				}
 
-				sort := db.TerraformProviderVersionMirrorSortableFieldSemanticVersionAsc
+				sort := db.TerraformProviderVersionMirrorSortableFieldCreatedAtAsc
 				mockVersionMirrors.On("GetVersionMirrors", mock.Anything, &db.GetProviderVersionMirrorsInput{
 					Sort: &sort,
 					Filter: &db.TerraformProviderVersionMirrorFilter{
@@ -1688,6 +1580,7 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 						RegistryHostname:  &test.input.RegistryHostname,
 						RegistryNamespace: &test.input.RegistryNamespace,
 						Type:              &test.input.Type,
+						HasPackages:       ptr.Bool(true),
 					},
 				}).Return(result, nil).Maybe()
 			}
@@ -1697,7 +1590,7 @@ func TestGetAvailableProviderVersions(t *testing.T) {
 				TerraformProviderVersionMirrors: mockVersionMirrors,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, nil)
+			service := &service{dbClient: dbClient}
 
 			availableVersions, err := service.GetAvailableProviderVersions(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1752,8 +1645,8 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 				RegistryNamespace: "hashicorp",
 				Type:              "aws",
 				SemanticVersion:   "0.1.0",
-				Digests: map[string][]byte{
-					getProviderPackageName(
+				Digests: provider.Checksums{
+					provider.GetPackageName(
 						"aws",
 						"0.1.0",
 						"windows",
@@ -1762,6 +1655,7 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 				},
 			},
 			expectPlatformMirror: &models.TerraformProviderPlatformMirror{
+				Metadata:     models.ResourceMetadata{ID: "platform-mirror-id"},
 				OS:           "windows",
 				Architecture: "amd64",
 			},
@@ -1859,6 +1753,7 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 						RegistryNamespace: &test.input.RegistryNamespace,
 						Type:              &test.input.Type,
 						SemanticVersion:   &test.input.SemanticVersion,
+						HasPackages:       ptr.Bool(true),
 					},
 				}).Return(versionsResult, nil).Maybe()
 
@@ -1889,7 +1784,7 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 				TerraformProviderPlatformMirrors: mockPlatformMirrors,
 			}
 
-			service := NewService(nil, dbClient, nil, nil, nil, mockStore)
+			service := &service{dbClient: dbClient, mirrorStore: mockStore}
 
 			availablePackages, err := service.GetAvailableInstallationPackages(auth.WithCaller(ctx, mockCaller), test.input)
 
@@ -1916,294 +1811,6 @@ func TestGetAvailableInstallationPackages(t *testing.T) {
 				// Expecting a presigned URL and a hash.
 				assert.Len(t, m, 2)
 			}
-		})
-	}
-}
-
-func TestListAvailableProviderVersions(t *testing.T) {
-	type testCase struct {
-		payloadToReturn *listVersionsResponse
-		name            string
-		expectError     string
-		statusToReturn  int
-	}
-
-	testCases := []testCase{
-		{
-			name: "successfully list available provider versions",
-			payloadToReturn: &listVersionsResponse{
-				Versions: []struct {
-					Version   string `json:"version"`
-					Platforms []struct {
-						OS   string `json:"os"`
-						Arch string `json:"arch"`
-					} `json:"platforms"`
-				}{
-					{
-						Version: "0.1.0",
-					},
-				},
-			},
-			statusToReturn: http.StatusOK,
-		},
-		{
-			name: "query for available provider versions returns warnings",
-			payloadToReturn: &listVersionsResponse{
-				Warnings: []string{
-					"this is a warning",
-				},
-			},
-			statusToReturn: http.StatusOK,
-			expectError:    "provider versions endpoint returned warnings: this is a warning",
-		},
-		{
-			name:            "query returns no provider versions",
-			payloadToReturn: &listVersionsResponse{},
-			statusToReturn:  http.StatusOK,
-			expectError:     "no versions found for provider registry.terraform.io/hashicorp/aws",
-		},
-		{
-			name:           "query returns a not OK status",
-			statusToReturn: http.StatusBadRequest,
-			expectError:    "unexpected status code: 400",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			httpClient := newTestHTTPClient(func(_ *http.Request) *http.Response {
-				payload, err := json.Marshal(test.payloadToReturn)
-				require.Nil(t, err)
-
-				return &http.Response{
-					StatusCode: test.statusToReturn,
-					Body:       io.NopCloser(bytes.NewReader(payload)),
-					Header:     make(http.Header),
-				}
-			})
-
-			serviceURL, err := url.Parse("http://test/v1/providers/")
-			require.Nil(t, err)
-
-			provider, err := parseProvider("registry.terraform.io", "hashicorp", "aws")
-			require.Nil(t, err)
-
-			// Instantiate struct directly for testing private func.
-			service := &service{httpClient: httpClient}
-
-			resp, err := service.listAvailableProviderVersions(ctx, serviceURL, provider)
-
-			if test.expectError != "" {
-				assert.Equal(t, test.expectError, err.Error())
-				return
-			}
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.payloadToReturn, resp)
-		})
-	}
-}
-
-func TestFindProviderPackage(t *testing.T) {
-	type testCase struct {
-		payloadToReturn *packageQueryResponse
-		name            string
-		expectError     string
-		statusToReturn  int
-	}
-
-	testCases := []testCase{
-		{
-			name: "successfully find provider package",
-			payloadToReturn: &packageQueryResponse{
-				SHASumsURL:          "http://test/shasums",
-				SHASumsSignatureURL: "http://test/signatures",
-				SigningKeys: struct {
-					GPGPublicKeys []struct {
-						ASCIIArmor string "json:\"ascii_armor\""
-					} "json:\"gpg_public_keys\""
-				}{
-					GPGPublicKeys: []struct {
-						ASCIIArmor string "json:\"ascii_armor\""
-					}{
-						{ASCIIArmor: hashicorpGPGKey},
-					},
-				},
-			},
-			statusToReturn: http.StatusOK,
-		},
-		{
-			name:           "query returns a not OK status",
-			statusToReturn: http.StatusBadRequest,
-			expectError:    "unexpected status code: 400",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			httpClient := newTestHTTPClient(func(_ *http.Request) *http.Response {
-				payload, err := json.Marshal(test.payloadToReturn)
-				require.Nil(t, err)
-
-				return &http.Response{
-					StatusCode: test.statusToReturn,
-					Body:       io.NopCloser(bytes.NewReader(payload)),
-					Header:     make(http.Header),
-				}
-			})
-
-			serviceURL, err := url.Parse("http://test/v1/providers/")
-			require.Nil(t, err)
-
-			provider, err := parseProvider("registry.terraform.io", "hashicorp", "aws")
-			require.Nil(t, err)
-
-			// Instantiate struct directly for testing private func.
-			service := &service{httpClient: httpClient}
-
-			resp, err := service.findProviderPackage(ctx, serviceURL, provider, "0.1.0", "windows_amd64")
-
-			if test.expectError != "" {
-				assert.Equal(t, test.expectError, err.Error())
-				return
-			}
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.payloadToReturn, resp)
-		})
-	}
-}
-
-func TestGetChecksums(t *testing.T) {
-	// Some bad data that's encoded in base64 just for testing.
-	sampleBadData := "YmFkIGRhdGE=" // Literally "bad data".
-
-	type testCase struct {
-		payloadToStatusCode       map[string]int
-		checksumPayloadToReturn   string
-		signaturesPayloadToReturn string
-		name                      string
-		expectError               string
-		gpgKeys                   []string
-		expectChecksums           int
-	}
-
-	testCases := []testCase{
-		{
-			name:                      "successfully return checksums",
-			checksumPayloadToReturn:   awsProviderChecksumsData,
-			signaturesPayloadToReturn: awsProviderChecksumsSignature,
-			gpgKeys:                   []string{hashicorpGPGKey},
-			payloadToStatusCode: map[string]int{
-				"checksums":  http.StatusOK,
-				"signatures": http.StatusOK,
-			},
-			expectChecksums: 15, // Our sample checksum data has 15 rows.
-		},
-		{
-			name:                    "checksums endpoint returned not ok status",
-			checksumPayloadToReturn: sampleBadData,
-			payloadToStatusCode: map[string]int{
-				"checksums": http.StatusBadRequest,
-			},
-			gpgKeys:     []string{hashicorpGPGKey},
-			expectError: "unexpected status returned from checksums download: 400",
-		},
-		{
-			name:                      "signatures endpoint returned not ok status",
-			checksumPayloadToReturn:   awsProviderChecksumsData,
-			signaturesPayloadToReturn: sampleBadData,
-			payloadToStatusCode: map[string]int{
-				"checksums":  http.StatusOK,
-				"signatures": http.StatusBadRequest,
-			},
-			gpgKeys:     []string{hashicorpGPGKey},
-			expectError: "unexpected status returned from checksums signature download: 400",
-		},
-		{
-			name:                      "checksum data has a signature mismatch",
-			checksumPayloadToReturn:   sampleBadData,
-			signaturesPayloadToReturn: awsProviderChecksumsSignature,
-			payloadToStatusCode: map[string]int{
-				"checksums":  http.StatusOK,
-				"signatures": http.StatusOK,
-			},
-			gpgKeys:     []string{hashicorpGPGKey},
-			expectError: "failed to verify checksum signature: no matching key found for signature or signature mismatch",
-		},
-		{
-			name:                      "no gpg keys available",
-			checksumPayloadToReturn:   awsProviderChecksumsData,
-			signaturesPayloadToReturn: awsProviderChecksumsSignature,
-			payloadToStatusCode: map[string]int{
-				"checksums":  http.StatusOK,
-				"signatures": http.StatusOK,
-			},
-			expectError: "failed to verify checksum signature: no matching key found for signature or signature mismatch",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			httpClient := newTestHTTPClient(func(r *http.Request) *http.Response {
-				require.NotNil(t, r.URL)
-				endpoint := r.URL.String()
-
-				var (
-					payload string
-					status  int
-				)
-
-				// Decide the type of payload and status we're returning.
-				switch {
-				case strings.HasSuffix(endpoint, "/checksums"):
-					payload = test.checksumPayloadToReturn
-					status = test.payloadToStatusCode["checksums"]
-				case strings.HasSuffix(endpoint, "/signatures"):
-					payload = test.signaturesPayloadToReturn
-					status = test.payloadToStatusCode["signatures"]
-				}
-
-				payloadBytes, err := base64.StdEncoding.DecodeString(payload)
-				require.Nil(t, err)
-
-				return &http.Response{
-					StatusCode: status,
-					Body:       io.NopCloser(bytes.NewReader(payloadBytes)),
-					Header:     make(http.Header),
-				}
-			})
-
-			// Instantiate struct directly for testing private func.
-			service := &service{httpClient: httpClient}
-
-			checksums, err := service.getChecksums(ctx, "http://test/checksums", "http://test/signatures", test.gpgKeys)
-
-			if test.expectError != "" {
-				assert.Equal(t, test.expectError, err.Error())
-				return
-			}
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Len(t, checksums, test.expectChecksums)
 		})
 	}
 }

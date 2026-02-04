@@ -100,7 +100,7 @@ type jobs struct {
 
 var jobFieldList = append(metadataFieldList, "status", "type", "workspace_id", "run_id",
 	"cancel_requested", "cancel_requested_at",
-	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "tags")
+	"runner_id", "runner_path", "queued_at", "pending_at", "running_at", "finished_at", "max_job_duration", "tags", "properties")
 
 // NewJobs returns an instance of the Jobs interface
 func NewJobs(dbClient *Client) Jobs {
@@ -337,6 +337,11 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 		return nil, err
 	}
 
+	properties, err := json.Marshal(job.Properties)
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := currentTime()
 
 	sql, args, err := dialect.From("jobs").
@@ -362,6 +367,7 @@ func (j *jobs) CreateJob(ctx context.Context, job *models.Job) (*models.Job, err
 					"runner_id":           job.RunnerID,
 					"runner_path":         job.RunnerPath,
 					"tags":                tags,
+					"properties":          properties,
 				}).Returning("*"),
 		).Select(j.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"jobs.workspace_id": goqu.I("namespaces.workspace_id")})).
@@ -484,6 +490,7 @@ func scanJob(row scanner) (*models.Job, error) {
 		&finishedAt,
 		&job.MaxJobDuration,
 		&job.Tags,
+		&job.Properties,
 		&workspacePath,
 	}
 

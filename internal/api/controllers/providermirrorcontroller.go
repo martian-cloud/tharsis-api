@@ -22,6 +22,12 @@ type AvailableInstallationPackagesResponse struct {
 	Archives map[string]any `json:"archives"`
 }
 
+// InstallationPackageResponse represents the response for GetInstallationPackage.
+type InstallationPackageResponse struct {
+	URL    string   `json:"url"`
+	Hashes []string `json:"hashes"`
+}
+
 type providerMirrorController struct {
 	logger                logger.Logger
 	respWriter            response.Writer
@@ -51,6 +57,7 @@ func (c *providerMirrorController) RegisterRoutes(router chi.Router) {
 
 	router.Get("/provider-mirror/providers/{groupName}/{hostname}/{namespace}/{type}/index.json", c.GetAvailableProviderVersions)
 	router.Get("/provider-mirror/providers/{groupName}/{hostname}/{namespace}/{type}/{version:.+\\.json}", c.GetAvailableInstallationPackages)
+	router.Get("/provider-mirror/providers/{groupName}/{hostname}/{namespace}/{type}/{version}/{os}/{arch}", c.GetInstallationPackage)
 
 	router.Put("/provider-mirror/providers/{versionMirrorId}/{os}/{architecture}/upload", c.UploadInstallationPackage)
 }
@@ -88,6 +95,26 @@ func (c *providerMirrorController) GetAvailableInstallationPackages(w http.Respo
 	}
 
 	c.respWriter.RespondWithJSON(r.Context(), w, &AvailableInstallationPackagesResponse{Archives: packages}, http.StatusOK)
+}
+
+func (c *providerMirrorController) GetInstallationPackage(w http.ResponseWriter, r *http.Request) {
+	input := &providermirror.GetInstallationPackageInput{
+		GroupPath:         chi.URLParam(r, "groupName"),
+		RegistryHostname:  chi.URLParam(r, "hostname"),
+		RegistryNamespace: chi.URLParam(r, "namespace"),
+		Type:              chi.URLParam(r, "type"),
+		SemanticVersion:   chi.URLParam(r, "version"),
+		OS:                chi.URLParam(r, "os"),
+		Arch:              chi.URLParam(r, "arch"),
+	}
+
+	pkg, err := c.providerMirrorService.GetInstallationPackage(r.Context(), input)
+	if err != nil {
+		c.respWriter.RespondWithError(r.Context(), w, err)
+		return
+	}
+
+	c.respWriter.RespondWithJSON(r.Context(), w, &InstallationPackageResponse{URL: pkg.URL, Hashes: pkg.Hashes}, http.StatusOK)
 }
 
 func (c *providerMirrorController) UploadInstallationPackage(w http.ResponseWriter, r *http.Request) {

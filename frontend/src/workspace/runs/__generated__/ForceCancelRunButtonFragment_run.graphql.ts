@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5fa2c87975c3c41ba2f05847bd476787>>
+ * @generated SignedSource<<c280689a5258203af23b170fdf211910>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,9 @@ import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type ForceCancelRunButtonFragment_run$data = {
   readonly id: string;
-  readonly " $fragmentSpreads": FragmentRefs<"ForceCancelRunButtonDialogFragment_run">;
+  readonly workspace: {
+    readonly fullPath: string;
+  };
   readonly " $fragmentType": "ForceCancelRunButtonFragment_run";
 };
 export type ForceCancelRunButtonFragment_run$key = {
@@ -34,15 +36,28 @@ const node: ReaderFragment = {
       "storageKey": null
     },
     {
+      "alias": null,
       "args": null,
-      "kind": "FragmentSpread",
-      "name": "ForceCancelRunButtonDialogFragment_run"
+      "concreteType": "Workspace",
+      "kind": "LinkedField",
+      "name": "workspace",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "fullPath",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
     }
   ],
   "type": "Run",
   "abstractKey": null
 };
 
-(node as any).hash = "ba4e608975407198b8ec72a2af736772";
+(node as any).hash = "3849b9bd49adf07bea4d993d4e259f21";
 
 export default node;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<22b0b18e995ee2436dea3c5eef051db6>>
+ * @generated SignedSource<<d1a7a2ca51f720637e15c30c526205fd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,6 +20,7 @@ export type CreateWorkspaceInput = {
   maxJobDuration?: number | null | undefined;
   name: string;
   preventDestroyPlan?: boolean | null | undefined;
+  providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
   terraformVersion?: string | null | undefined;
 };
@@ -30,6 +31,10 @@ export type NamespaceDriftDetectionEnabledInput = {
 export type WorkspaceLabelInput = {
   key: string;
   value: string;
+};
+export type NamespaceProviderMirrorEnabledInput = {
+  enabled?: boolean | null | undefined;
+  inherit: boolean;
 };
 export type NamespaceRunnerTagsInput = {
   inherit: boolean;

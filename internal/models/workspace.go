@@ -35,6 +35,7 @@ type Workspace struct {
 	PreventDestroyPlan    bool
 	RunnerTags            []string
 	EnableDriftDetection  *bool
+	EnableProviderMirror  *bool
 	Labels                map[string]string
 }
 
@@ -109,24 +110,25 @@ func (w *Workspace) DriftDetectionEnabled() *bool {
 	return w.EnableDriftDetection
 }
 
+// ProviderMirrorEnabled returns the provider mirror enabled setting
+func (w *Workspace) ProviderMirrorEnabled() *bool {
+	return w.EnableProviderMirror
+}
+
 // GetGroupPath returns the group path
 func (w *Workspace) GetGroupPath() string {
 	return w.FullPath[:strings.LastIndex(w.FullPath, "/")]
 }
 
+// GetRootGroupPath returns the root group path
+func (w *Workspace) GetRootGroupPath() string {
+	return strings.Split(w.FullPath, "/")[0]
+}
+
 // ExpandPath returns the expanded path list for the workspace. The expanded path
 // list includes the full path for the workspace in addition to all parent paths
 func (w *Workspace) ExpandPath() []string {
-	pathParts := strings.Split(w.FullPath, "/")
-
-	paths := []string{}
-	for len(pathParts) > 0 {
-		paths = append(paths, strings.Join(pathParts, "/"))
-		// Remove last element
-		pathParts = pathParts[:len(pathParts)-1]
-	}
-
-	return paths
+	return utils.ExpandPath(w.FullPath)
 }
 
 // IsDescendantOfGroup returns true if the workspace is a descendant of the specified ancestor group path.

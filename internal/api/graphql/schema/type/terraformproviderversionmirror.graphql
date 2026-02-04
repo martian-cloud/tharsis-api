@@ -1,6 +1,8 @@
 enum TerraformProviderVersionMirrorSort {
   CREATED_AT_ASC
   CREATED_AT_DESC
+  TYPE_ASC
+  TYPE_DESC
 }
 
 type TerraformProviderVersionMirrorConnection {
@@ -36,19 +38,18 @@ type TerraformProviderVersionMirror implements Node {
   registryHostname: String!
   platformMirrors: [TerraformProviderPlatformMirror!]!
   createdBy: String!
+  groupPath: String!
+  providerAddress: String!
 }
 
 input CreateTerraformProviderVersionMirrorInput {
   clientMutationId: String
-  groupPath: String
-    @deprecated(
-      reason: "Use groupId field instead, which accepts a TRN (Tharsis Resource Name)"
-    )
-  groupId: String
+  groupPath: String!
   type: String!
   registryNamespace: String!
   registryHostname: String!
   semanticVersion: String!
+  registryToken: String
 }
 
 input DeleteTerraformProviderVersionMirrorInput {

@@ -200,6 +200,21 @@ func (r *JobResolver) Tags() []string {
 	return r.job.Tags
 }
 
+// Properties resolver
+func (r *JobResolver) Properties() []*JobPropertiesResolver {
+	entries := make([]*JobPropertiesResolver, 0, len(r.job.Properties))
+	for k, v := range r.job.Properties {
+		entries = append(entries, &JobPropertiesResolver{Key: k, Value: v})
+	}
+	return entries
+}
+
+// JobPropertiesResolver resolves a job's properties field
+type JobPropertiesResolver struct {
+	Key   string
+	Value string
+}
+
 // Runner resolver
 func (r *JobResolver) Runner(ctx context.Context) (*RunnerResolver, error) {
 	if r.job.RunnerID == nil {

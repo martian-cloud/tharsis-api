@@ -1,10 +1,10 @@
-import { LoadingButton } from '@mui/lab';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Typography } from '@mui/material';
+import { Box, Button, Paper, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useState } from 'react';
 import { useFragment, useMutation } from 'react-relay';
 import { RecordSourceProxy } from 'relay-runtime';
+import ConfirmationDialog from '../../../common/ConfirmationDialog';
 import { MutationError } from '../../../common/error';
 import EditManagedIdentityRuleDialog from './EditManagedIdentityRuleDialog';
 import ManagedIdentityRulesList from './ManagedIdentityRulesList';
@@ -13,33 +13,6 @@ import { ManagedIdentityRulesCreateRuleMutation, ManagedIdentityRulesCreateRuleM
 import { ManagedIdentityRulesDeleteMutation, ManagedIdentityRulesDeleteMutation$data } from './__generated__/ManagedIdentityRulesDeleteMutation.graphql';
 import { ManagedIdentityRulesFragment_managedIdentity$key } from './__generated__/ManagedIdentityRulesFragment_managedIdentity.graphql';
 import { ManagedIdentityRulesUpdateRuleMutation } from './__generated__/ManagedIdentityRulesUpdateRuleMutation.graphql';
-
-interface ConfirmationDialogProps {
-    deleteInProgress: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { deleteInProgress, onClose, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            open
-            {...other}
-        >
-            <DialogTitle>Delete Rule</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete this access rule?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>Delete</LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
-}
 
 interface Props {
     fragmentRef: ManagedIdentityRulesFragment_managedIdentity$key;
@@ -228,7 +201,7 @@ function ManagedIdentityRules(props: Props) {
                     allowedServiceAccounts: rule.allowedServiceAccounts.map((sa: any) => (sa.resourcePath)) || [],
                     allowedUsers: rule.allowedUsers.map((user: any) => (user.username)) || [],
                     allowedTeams: rule.allowedTeams.map((team: any) => (team.name)) || [],
-                    moduleAttestationPolicies: rule.moduleAttestationPolicies.map((att: any) => ({...att, predicateType: att.predicateType === '' ? undefined : att.predicateType}))
+                    moduleAttestationPolicies: rule.moduleAttestationPolicies.map((att: any) => ({ ...att, predicateType: att.predicateType === '' ? undefined : att.predicateType }))
                 }
             },
             onCompleted: data => {
@@ -283,7 +256,7 @@ function ManagedIdentityRules(props: Props) {
                     allowedServiceAccounts: rule.allowedServiceAccounts.map((sa: any) => (sa.resourcePath)) || [],
                     allowedUsers: rule.allowedUsers.map((user: any) => (user.username)) || [],
                     allowedTeams: rule.allowedTeams.map((team: any) => (team.name)) || [],
-                    moduleAttestationPolicies: rule.moduleAttestationPolicies.map((att: any) => ({...att, predicateType: att.predicateType === '' ? undefined : att.predicateType}))
+                    moduleAttestationPolicies: rule.moduleAttestationPolicies.map((att: any) => ({ ...att, predicateType: att.predicateType === '' ? undefined : att.predicateType }))
                 },
             },
             onCompleted: data => {
@@ -347,10 +320,17 @@ function ManagedIdentityRules(props: Props) {
                     setError(undefined);
                 }}
             />}
-            {ruleToDelete && <DeleteConfirmationDialog
-                deleteInProgress={commitDeleteRuleInFlight}
-                onClose={onDeleteConfirmationDialogClosed}
-            />}
+            {ruleToDelete && (
+                <ConfirmationDialog
+                    title="Delete Rule"
+                    confirmLabel="Delete"
+                    confirmInProgress={commitDeleteRuleInFlight}
+                    onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                    onClose={() => onDeleteConfirmationDialogClosed()}
+                >
+                    Are you sure you want to delete this access rule?
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

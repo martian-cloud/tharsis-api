@@ -66,6 +66,7 @@ message CreateWorkspaceRequest {
   optional namespace.NamespaceRunnerTagsInput            runner_tags             = 7;
   optional namespace.NamespaceDriftDetectionEnabledInput drift_detection_enabled = 8;
   map<string, string>                                    labels                  = 9;
+  optional namespace.NamespaceProviderMirrorEnabledInput provider_mirror_enabled = 10;
 }
 
 // UpdateWorkspaceRequest is the input for updating a Workspace.
@@ -79,6 +80,7 @@ message UpdateWorkspaceRequest {
   optional namespace.NamespaceRunnerTagsInput            runner_tags             = 7;
   optional namespace.NamespaceDriftDetectionEnabledInput drift_detection_enabled = 8;
   map<string, string>                                    labels                  = 9;
+  optional namespace.NamespaceProviderMirrorEnabledInput provider_mirror_enabled = 10;
 }
 
 // DeleteWorkspaceRequest is the input for deleting a Workspace.

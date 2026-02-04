@@ -103,6 +103,36 @@ func (_m *MockInheritedSettingResolver) GetNotificationPreferences(ctx context.C
 	return r0, r1
 }
 
+// GetProviderMirrorEnabled provides a mock function with given fields: ctx, namespace
+func (_m *MockInheritedSettingResolver) GetProviderMirrorEnabled(ctx context.Context, namespace Namespace) (*ProviderMirrorEnabledSetting, error) {
+	ret := _m.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderMirrorEnabled")
+	}
+
+	var r0 *ProviderMirrorEnabledSetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, Namespace) (*ProviderMirrorEnabledSetting, error)); ok {
+		return rf(ctx, namespace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, Namespace) *ProviderMirrorEnabledSetting); ok {
+		r0 = rf(ctx, namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ProviderMirrorEnabledSetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, Namespace) error); ok {
+		r1 = rf(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunnerTags provides a mock function with given fields: ctx, namespace
 func (_m *MockInheritedSettingResolver) GetRunnerTags(ctx context.Context, namespace Namespace) (*RunnerTagsSetting, error) {
 	ret := _m.Called(ctx, namespace)

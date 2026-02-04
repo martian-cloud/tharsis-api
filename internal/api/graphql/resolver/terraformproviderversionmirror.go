@@ -11,6 +11,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
 )
 
 /* TerraformProviderVersionMirror Query Resolvers */
@@ -18,7 +19,7 @@ import (
 // TerraformProviderVersionMirrorConnectionQueryArgs are used to query for a provider version mirror connection.
 type TerraformProviderVersionMirrorConnectionQueryArgs struct {
 	ConnectionQueryArgs
-	IncludeInherited *bool
+	Search *string
 }
 
 // TerraformProviderVersionMirrorQueryArgs is used to query for a single provider version mirror.
@@ -144,6 +145,22 @@ func (r *TerraformProviderVersionMirrorResolver) CreatedBy() string {
 	return r.versionMirror.CreatedBy
 }
 
+// GroupPath resolver
+func (r *TerraformProviderVersionMirrorResolver) GroupPath() string {
+	return r.versionMirror.GetGroupPath()
+}
+
+// ProviderAddress resolver
+func (r *TerraformProviderVersionMirrorResolver) ProviderAddress() string {
+	provider := &provider.Provider{
+		Hostname:  r.versionMirror.RegistryHostname,
+		Namespace: r.versionMirror.RegistryNamespace,
+		Type:      r.versionMirror.Type,
+	}
+
+	return provider.String()
+}
+
 // Version resolver
 func (r *TerraformProviderVersionMirrorResolver) Version() string {
 	return r.versionMirror.SemanticVersion
@@ -232,12 +249,12 @@ func (r *TerraformProviderVersionMirrorMutationPayloadResolver) VersionMirror() 
 // CreateTerraformProviderVersionMirrorInput is the input for creating a TerraformProviderVersionMirror.
 type CreateTerraformProviderVersionMirrorInput struct {
 	ClientMutationID  *string
-	GroupPath         *string // Deprecated: use GroupID instead with a TRN
-	GroupID           *string
+	GroupPath         string
 	Type              string
 	RegistryNamespace string
 	RegistryHostname  string
 	SemanticVersion   string
+	RegistryToken     *string
 }
 
 // DeleteTerraformProviderVersionMirrorInput is the input for deleting a TerraformProviderVersionMirror.
@@ -258,17 +275,15 @@ func handleTerraformProviderVersionMirrorMutationProblem(e error, clientMutation
 }
 
 func createTerraformProviderVersionMirrorMutation(ctx context.Context, input *CreateTerraformProviderVersionMirrorInput) (*TerraformProviderVersionMirrorMutationPayloadResolver, error) {
-	groupID, err := toModelID(ctx, input.GroupPath, input.GroupID, types.GroupModelType)
-	if err != nil {
-		return nil, err
-	}
+	serviceCatalog := getServiceCatalog(ctx)
 
-	createdMirror, err := getServiceCatalog(ctx).TerraformProviderMirrorService.CreateProviderVersionMirror(ctx, &providermirror.CreateProviderVersionMirrorInput{
+	createdMirror, err := serviceCatalog.TerraformProviderMirrorService.CreateProviderVersionMirror(ctx, &providermirror.CreateProviderVersionMirrorInput{
 		Type:              input.Type,
 		RegistryNamespace: input.RegistryNamespace,
 		RegistryHostname:  input.RegistryHostname,
-		GroupID:           groupID,
+		GroupPath:         input.GroupPath,
 		SemanticVersion:   input.SemanticVersion,
+		RegistryToken:     input.RegistryToken,
 	})
 	if err != nil {
 		return nil, err

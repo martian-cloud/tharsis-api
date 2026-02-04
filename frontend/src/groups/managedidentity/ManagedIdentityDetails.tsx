@@ -1,6 +1,5 @@
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import { LoadingButton } from '@mui/lab';
-import { ButtonGroup, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Menu, MenuItem, Paper, Stack, styled, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { ButtonGroup, Chip, Menu, MenuItem, Paper, Stack, styled, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Tab from '@mui/material/Tab';
@@ -14,6 +13,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import config from '../../common/config';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import { ManagedIdentityDetailsDeleteAliasMutation } from './__generated__/ManagedIdentityDetailsDeleteAliasMutation.graphql';
@@ -98,35 +98,8 @@ function buildPolicy(role: string, sub: string): string {
 }`;
 }
 
-interface ConfirmationDialogProps {
-    isAlias: boolean;
-    managedIdentityName: string;
-    deleteInProgress: boolean;
-    keepMounted: boolean;
-    open: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { isAlias, managedIdentityName, deleteInProgress, onClose, open, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={open}
-            {...other}
-        >
-            <DialogTitle>Delete {isAlias ? 'Alias' : 'Managed Identity'}</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete the {isAlias ? 'alias' : 'managed identity'} <strong>{managedIdentityName}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>Delete</LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
+interface Props {
+    fragmentRef: ManagedIdentityDetailsFragment_group$key
 }
 
 function ManagedIdentityDetails(props: Props) {
@@ -457,14 +430,17 @@ function ManagedIdentityDetails(props: Props) {
                         />
                     </Box>}
                 </Box>
-                <DeleteConfirmationDialog
-                    isAlias={data.managedIdentity.isAlias}
-                    managedIdentityName={data.managedIdentity.name}
-                    keepMounted
-                    deleteInProgress={data.managedIdentity.isAlias ? commitDeleteAliasInFlight : commitDeleteInFlight}
-                    open={showDeleteConfirmationDialog}
-                    onClose={data.managedIdentity.isAlias ? onDeleteAliasConfirmationDialogClosed : onDeleteConfirmationDialogClosed}
-                />
+                {showDeleteConfirmationDialog && data.managedIdentity && (
+                    <ConfirmationDialog
+                        title={`Delete ${data.managedIdentity.isAlias ? 'Alias' : 'Managed Identity'}`}
+                        confirmLabel="Delete"
+                        confirmInProgress={data.managedIdentity.isAlias ? commitDeleteAliasInFlight : commitDeleteInFlight}
+                        onConfirm={() => data.managedIdentity?.isAlias ? onDeleteAliasConfirmationDialogClosed(true) : onDeleteConfirmationDialogClosed(true)}
+                        onClose={() => data.managedIdentity?.isAlias ? onDeleteAliasConfirmationDialogClosed() : onDeleteConfirmationDialogClosed()}
+                    >
+                        Are you sure you want to delete the {data.managedIdentity.isAlias ? 'alias' : 'managed identity'} <strong>{data.managedIdentity.name}</strong>?
+                    </ConfirmationDialog>
+                )}
                 {showMoveManagedIdentityDialog && <MoveManagedIdentityDialog onClose={() => setShowMoveManagedIdentityDialog(false)} fragmentRef={data.managedIdentity} groupId={group.id} />}
             </Box>
         );

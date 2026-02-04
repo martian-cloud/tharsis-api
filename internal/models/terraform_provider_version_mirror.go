@@ -1,6 +1,8 @@
 package models
 
 import (
+	"strings"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 )
@@ -42,12 +44,21 @@ func (t *TerraformProviderVersionMirror) ResolveMetadata(key string) (*string, e
 		switch key {
 		case "semantic_version":
 			return &t.SemanticVersion, nil
+		case "type":
+			return &t.Type, nil
 		default:
 			return nil, err
 		}
 	}
 
 	return val, nil
+}
+
+// GetGroupPath returns the group path from the TRN
+func (t *TerraformProviderVersionMirror) GetGroupPath() string {
+	// TRN format: trn:terraform_provider_version_mirror:group/hostname/namespace/type/version
+	resourcePath := strings.Split(t.Metadata.TRN[len(types.TRNPrefix):], ":")[1]
+	return strings.Split(resourcePath, "/")[0]
 }
 
 // Validate performs validation on the model.

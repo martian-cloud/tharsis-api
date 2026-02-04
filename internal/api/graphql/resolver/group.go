@@ -416,6 +416,11 @@ func (r *GroupResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.D
 	return getServiceCatalog(ctx).GroupService.GetDriftDetectionEnabledSetting(ctx, r.group)
 }
 
+// ProviderMirrorEnabled resolver
+func (r *GroupResolver) ProviderMirrorEnabled(ctx context.Context) (*namespace.ProviderMirrorEnabledSetting, error) {
+	return getServiceCatalog(ctx).GroupService.GetProviderMirrorEnabledSetting(ctx, r.group)
+}
+
 // CreatedBy resolver
 func (r *GroupResolver) CreatedBy() string {
 	return r.group.CreatedBy
@@ -475,15 +480,12 @@ func (r *GroupResolver) TerraformProviderMirrors(
 	input := &providermirror.GetProviderVersionMirrorsInput{
 		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
 		NamespacePath:     r.group.FullPath,
+		Search:            args.Search,
 	}
 
 	if args.Sort != nil {
 		sort := db.TerraformProviderVersionMirrorSortableField(*args.Sort)
 		input.Sort = &sort
-	}
-
-	if args.IncludeInherited != nil && *args.IncludeInherited {
-		input.IncludeInherited = true
 	}
 
 	return NewTerraformProviderVersionMirrorConnectionResolver(ctx, input)
@@ -595,6 +597,7 @@ type CreateGroupInput struct {
 	ParentID              *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
 	Description           string
 }
 
@@ -607,6 +610,7 @@ type UpdateGroupInput struct {
 	ID                    *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
 }
 
 // DeleteGroupInput contains the input for deleting a group
@@ -659,6 +663,16 @@ func createGroupMutation(ctx context.Context, input *CreateGroupInput) (*GroupMu
 
 		if input.DriftDetectionEnabled.Enabled != nil {
 			groupCreateOptions.EnableDriftDetection = input.DriftDetectionEnabled.Enabled
+		}
+	}
+
+	if input.ProviderMirrorEnabled != nil {
+		if err := input.ProviderMirrorEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.ProviderMirrorEnabled.Enabled != nil {
+			groupCreateOptions.EnableProviderMirror = input.ProviderMirrorEnabled.Enabled
 		}
 	}
 
@@ -745,6 +759,20 @@ func updateGroupMutation(ctx context.Context, input *UpdateGroupInput) (*GroupMu
 
 		if input.DriftDetectionEnabled.Inherit {
 			group.EnableDriftDetection = nil
+		}
+	}
+
+	if input.ProviderMirrorEnabled != nil {
+		if err = input.ProviderMirrorEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.ProviderMirrorEnabled.Enabled != nil {
+			group.EnableProviderMirror = input.ProviderMirrorEnabled.Enabled
+		}
+
+		if input.ProviderMirrorEnabled.Inherit {
+			group.EnableProviderMirror = nil
 		}
 	}
 

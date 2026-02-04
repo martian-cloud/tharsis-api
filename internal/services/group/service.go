@@ -65,6 +65,8 @@ type Service interface {
 	GetRunnerTagsSetting(ctx context.Context, group *models.Group) (*namespace.RunnerTagsSetting, error)
 	// GetDriftDetectionEnabledSetting returns the (inherited or direct) drift detection enabled setting for a group.
 	GetDriftDetectionEnabledSetting(ctx context.Context, group *models.Group) (*namespace.DriftDetectionEnabledSetting, error)
+	// GetProviderMirrorEnabledSetting returns the (inherited or direct) provider mirror enabled setting for a group.
+	GetProviderMirrorEnabledSetting(ctx context.Context, group *models.Group) (*namespace.ProviderMirrorEnabledSetting, error)
 }
 
 type service struct {
@@ -773,6 +775,26 @@ func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, group *mo
 	}
 
 	return s.inheritedSettingsResolver.GetDriftDetectionEnabled(ctx, group)
+}
+
+// GetProviderMirrorEnabledSetting returns the (inherited or direct) setting for a group.
+func (s *service) GetProviderMirrorEnabledSetting(ctx context.Context, group *models.Group) (*namespace.ProviderMirrorEnabledSetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderMirrorEnabledSetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewGroupPermission, auth.WithNamespacePath(group.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.inheritedSettingsResolver.GetProviderMirrorEnabled(ctx, group)
 }
 
 // checkParentSubgroupLimit checks whether the parent subgroup limit has just been violated.

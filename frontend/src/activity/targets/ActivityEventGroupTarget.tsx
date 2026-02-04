@@ -25,6 +25,7 @@ const RESOURCE_TYPES = {
     GPG_KEY: 'GPG key',
     TERRAFORM_MODULE: 'Terraform module',
     TERRAFORM_PROVIDER: 'Terraform provider',
+    TERRAFORM_PROVIDER_VERSION_MIRROR: 'Provider mirror',
     VARIABLE: 'Variable',
     VCS_PROVIDER: 'VCS Provider',
     MODULE: 'Module',

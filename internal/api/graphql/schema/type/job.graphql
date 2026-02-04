@@ -71,6 +71,7 @@ type Job implements Node {
   runnerPath: String
   tags: [String!]!
   runnerAvailabilityStatus: RunnerAvailabilityStatus!
+  properties: [KeyValueEntry!]!
 }
 
 input JobLogStreamSubscriptionInput {

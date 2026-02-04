@@ -4,52 +4,72 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
-	filename               = "cli-configuration.tfrc"
-	permissions            = os.FileMode(0o600)
+	cliConfigFilename      = "cli-configuration.tfrc"
+	cliConfigPermissions   = os.FileMode(0o600)
 	tfCliConfigFileEnvName = "TF_CLI_CONFIG_FILE"
 
-	cliConfigurationFormat = `credentials_helper "%s" {}`
+	credentialHelperBlockFmt = "credentials_helper %q {}\n"
+
+	// network_mirror proxies providers through Tharsis for caching.
+	// direct allows Tharsis-hosted providers to bypass the mirror (no caching needed).
+	providerInstallationBlockFmt = `provider_installation {
+  network_mirror {
+    url = %q
+    exclude = [%s]
+  }
+  direct {
+    include = [%s]
+  }
+}
+`
 )
 
-func (t *terraformWorkspace) setupCliConfiguration(credentialHelperName string) error {
-	tempDir, err := t.createTempDir()
-	if err != nil {
-		return err
-	}
-
-	cliConfigurationPath, err := writeCliConfigurationFile(credentialHelperName, *tempDir)
-	if err != nil {
-		return err
-	}
-
-	t.fullEnv[tfCliConfigFileEnvName] = *cliConfigurationPath
-
-	return nil
+type providerMirrorConfig struct {
+	url          string
+	excludeHosts []string
 }
 
-func (t *terraformWorkspace) createTempDir() (*string, error) {
+type cliConfig struct {
+	credentialHelperName *string
+	providerMirror       *providerMirrorConfig
+}
+
+func (c cliConfig) String() string {
+	var sb strings.Builder
+
+	if c.credentialHelperName != nil {
+		fmt.Fprintf(&sb, credentialHelperBlockFmt, *c.credentialHelperName)
+	}
+
+	if c.providerMirror != nil {
+		patterns := make([]string, len(c.providerMirror.excludeHosts))
+		for i, host := range c.providerMirror.excludeHosts {
+			patterns[i] = fmt.Sprintf("%q", host+"/*/*")
+		}
+		// Same patterns used for mirror exclude and direct include
+		patternStr := strings.Join(patterns, ", ")
+		fmt.Fprintf(&sb, providerInstallationBlockFmt, c.providerMirror.url, patternStr, patternStr)
+	}
+
+	return sb.String()
+}
+
+func (t *terraformWorkspace) setupCliConfiguration(cfg cliConfig) error {
 	tempDir, err := os.MkdirTemp("", "cli-configuration-*")
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	t.deletePathWhenJobCompletes(tempDir)
 
-	return &tempDir, nil
-}
-
-func writeCliConfigurationFile(credHelperName string, tempDir string) (*string, error) {
-	cliConfigurationPath := filepath.Join(tempDir, filename)
-
-	contents := fmt.Sprintf(cliConfigurationFormat, credHelperName)
-
-	err := os.WriteFile(cliConfigurationPath, []byte(contents), permissions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write terraform cli configuration file %v", err)
+	configPath := filepath.Join(tempDir, cliConfigFilename)
+	if err := os.WriteFile(configPath, []byte(cfg.String()), cliConfigPermissions); err != nil {
+		return fmt.Errorf("failed to write terraform cli configuration file: %w", err)
 	}
 
-	return &cliConfigurationPath, nil
+	t.fullEnv[tfCliConfigFileEnvName] = configPath
+	return nil
 }

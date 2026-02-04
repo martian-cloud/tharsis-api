@@ -43,6 +43,11 @@ type Client interface {
 	CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, token string) (string, *time.Duration, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, runID string, variableKeys []string) error
 	CreateFederatedRegistryTokens(ctx context.Context, input *types.CreateFederatedRegistryTokensInput) ([]types.FederatedRegistryToken, error)
+	CreateProviderVersionMirror(ctx context.Context, input *types.CreateTerraformProviderVersionMirrorInput) (*types.TerraformProviderVersionMirror, error)
+	GetProviderPlatformMirror(ctx context.Context, input *types.GetTerraformProviderPlatformMirrorInput) (*types.TerraformProviderPlatformMirror, error)
+	UploadProviderPlatformPackageToMirror(ctx context.Context, input *types.UploadProviderPlatformPackageToMirrorInput) error
+	GetProviderPlatformPackageDownloadURL(ctx context.Context, input *types.GetProviderPlatformPackageDownloadURLInput) (*types.ProviderPlatformPackageInfo, error)
+	GetAvailableProviderVersions(ctx context.Context, input *types.GetAvailableProviderVersionsInput) (map[string]struct{}, error)
 }
 
 var _ Client = (*client)(nil)
@@ -334,4 +339,33 @@ func (c *client) CreateFederatedRegistryTokens(ctx context.Context,
 	}
 
 	return tokens, nil
+}
+
+// CreateProviderVersionMirror creates a new provider version mirror.
+func (c *client) CreateProviderVersionMirror(ctx context.Context, input *types.CreateTerraformProviderVersionMirrorInput) (*types.TerraformProviderVersionMirror, error) {
+	return c.tharsisClient.TerraformProviderVersionMirror.CreateProviderVersionMirror(ctx, input)
+}
+
+// GetProviderPlatformMirror returns a platform mirror by ID or TRN. Returns nil, nil if not found.
+func (c *client) GetProviderPlatformMirror(ctx context.Context, input *types.GetTerraformProviderPlatformMirrorInput) (*types.TerraformProviderPlatformMirror, error) {
+	result, err := c.tharsisClient.TerraformProviderPlatformMirror.GetProviderPlatformMirror(ctx, input)
+	if err != nil && tharsis.IsNotFoundError(err) {
+		return nil, nil
+	}
+	return result, err
+}
+
+// UploadProviderPlatformPackageToMirror uploads a provider platform package to the mirror.
+func (c *client) UploadProviderPlatformPackageToMirror(ctx context.Context, input *types.UploadProviderPlatformPackageToMirrorInput) error {
+	return c.tharsisClient.TerraformProviderPlatformMirror.UploadProviderPlatformPackageToMirror(ctx, input)
+}
+
+// GetProviderPlatformPackageDownloadURL returns the download URL for a provider platform package.
+func (c *client) GetProviderPlatformPackageDownloadURL(ctx context.Context, input *types.GetProviderPlatformPackageDownloadURLInput) (*types.ProviderPlatformPackageInfo, error) {
+	return c.tharsisClient.TerraformProviderPlatformMirror.GetProviderPlatformPackageDownloadURL(ctx, input)
+}
+
+// GetAvailableProviderVersions returns all cached versions for a provider via REST API.
+func (c *client) GetAvailableProviderVersions(ctx context.Context, input *types.GetAvailableProviderVersionsInput) (map[string]struct{}, error) {
+	return c.tharsisClient.TerraformProviderVersionMirror.GetAvailableProviderVersions(ctx, input)
 }

@@ -8,6 +8,7 @@ import { ConnectionHandler, ConnectionInterface, GraphQLSubscriptionConfig, Reco
 import NamespaceActivity from '../namespace/activity/NamespaceActivity';
 import NamespaceMemberships from '../namespace/members/NamespaceMemberships';
 import Variables from '../namespace/variables/Variables';
+import ProviderMirrors from '../namespace/providermirror/ProviderMirrors';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import AssignedManagedIdentityList from './managedidentity/AssignedManagedIdentityList';
 import { GetConnections } from './runs/WorkspaceRunList';
@@ -66,6 +67,7 @@ function WorkspaceDetails(props: Props) {
       ...NamespaceMembershipsFragment_memberships
       ...WorkspaceSettingsFragment_workspace
       ...NamespaceActivityFragment_activity
+      ...ProviderMirrorsFragment_namespace
     }
 `, fragmentRef);
 
@@ -151,6 +153,7 @@ function WorkspaceDetails(props: Props) {
               <Route path={`${workspacePath}/-/managed_identities/*`} element={<AssignedManagedIdentityList fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/variables/*`} element={<Variables fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/members/*`} element={<NamespaceMemberships fragmentRef={data} />} />
+              <Route path={`${workspacePath}/-/provider_mirror/*`} element={<ProviderMirrors fragmentRef={data} />} />
               <Route path={`${workspacePath}/-/settings/*`} element={<WorkspaceSettings fragmentRef={data} />} />
             </Routes>
           </Box>

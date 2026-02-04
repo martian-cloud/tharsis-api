@@ -4,31 +4,39 @@ import React from "react";
 
 interface Props {
     title: string;
-    message: React.ReactNode;
-    confirmButtonLabel: string;
-    opInProgress: boolean;
+    children: React.ReactNode;
+    confirmLabel: string;
+    confirmDisabled?: boolean;
+    confirmColor?: 'error' | 'primary';
+    confirmInProgress: boolean;
     onConfirm: () => void;
     onClose: () => void;
+    maxWidth?: 'xs' | 'sm' | 'md';
 }
 
-function ConfirmationDialog({ title, message, confirmButtonLabel, opInProgress, onClose, onConfirm, ...other }: Props) {
+function ConfirmationDialog({ title, children, confirmLabel, confirmDisabled, confirmColor = 'error', confirmInProgress, onClose, onConfirm, maxWidth = 'xs', ...other }: Props) {
     return (
         <Dialog
-            maxWidth="xs"
+            maxWidth={maxWidth}
             open
             keepMounted={false}
             {...other}
         >
             <DialogTitle>{title}</DialogTitle>
             <DialogContent dividers>
-                {message}
+                {children}
             </DialogContent>
             <DialogActions>
                 <Button color="inherit" onClick={onClose}>
-                    No
+                    Cancel
                 </Button>
-                <LoadingButton loading={opInProgress} onClick={onConfirm}>
-                    {confirmButtonLabel}
+                <LoadingButton
+                    color={confirmColor}
+                    loading={confirmInProgress}
+                    disabled={confirmDisabled}
+                    onClick={onConfirm}
+                >
+                    {confirmLabel}
                 </LoadingButton>
             </DialogActions>
         </Dialog>

@@ -4,6 +4,7 @@ import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/ico
 import { LoadingButton } from '@mui/lab';
 import { Avatar, Alert, Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, Divider, Menu, MenuItem, Link, Paper, Stack, styled, Typography } from '@mui/material'
 import teal from '@mui/material/colors/teal';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import TRNButton from '../../common/TRNButton';
 import { MutationError } from '../../common/error';
@@ -42,34 +43,8 @@ interface DialogProps {
     open: boolean
     onClose: (confirm?: boolean) => void
     keepMounted: boolean
-    deleteInProgress?: boolean
     resetInProgress?: boolean
-    vcsProviderPath?: string | undefined
     error?: MutationError
-}
-
-function DeleteConfirmationDialog(props: DialogProps) {
-    const { vcsProviderPath, deleteInProgress, onClose, open, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={open}
-            {...other}
-        >
-            <DialogTitle>Delete VCS Provider</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete VCS provider <strong>{vcsProviderPath}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>
-                    Delete
-                </LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
 }
 
 function ResetOAuthDialog(props: DialogProps) {
@@ -352,13 +327,17 @@ function VCSProviderDetails(props: Props) {
                         </Box>
                     </Box>
                 </Paper >
-                <DeleteConfirmationDialog
-                    vcsProviderPath={vcsProvider.resourcePath}
-                    keepMounted
-                    deleteInProgress={commitInFlight}
-                    open={showDeleteConfirmationDialog}
-                    onClose={onDeleteConfirmationDialogClosed}
-                />
+                {showDeleteConfirmationDialog && (
+                    <ConfirmationDialog
+                        title="Delete VCS Provider"
+                        confirmLabel="Delete"
+                        confirmInProgress={commitInFlight}
+                        onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                        onClose={() => onDeleteConfirmationDialogClosed()}
+                    >
+                        Are you sure you want to delete VCS provider <strong>{vcsProvider.resourcePath}</strong>?
+                    </ConfirmationDialog>
+                )}
                 <ResetOAuthDialog
                     open={showResetOAuthDialog}
                     keepMounted

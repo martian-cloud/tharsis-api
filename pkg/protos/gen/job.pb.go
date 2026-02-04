@@ -228,6 +228,7 @@ type Job struct {
 	Type           string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
 	Status         string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
 	MaxJobDuration int32                  `protobuf:"varint,6,opt,name=max_job_duration,json=maxJobDuration,proto3" json:"max_job_duration,omitempty"`
+	Properties     map[string]string      `protobuf:"bytes,7,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -302,6 +303,13 @@ func (x *Job) GetMaxJobDuration() int32 {
 		return x.MaxJobDuration
 	}
 	return 0
+}
+
+func (x *Job) GetProperties() map[string]string {
+	if x != nil {
+		return x.Properties
+	}
+	return nil
 }
 
 // JobLogStreamEventData contains the log data.
@@ -532,14 +540,20 @@ const file_job_proto_rawDesc = "" +
 	"_runner_idB\x0f\n" +
 	"\r_workspace_id\"?\n" +
 	"&SubscribeToJobCancellationEventRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\xe6\x01\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\xf8\x02\n" +
 	"\x03Job\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x15\n" +
 	"\x06run_id\x18\x03 \x01(\tR\x05runId\x12\x12\n" +
 	"\x04type\x18\x04 \x01(\tR\x04type\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12(\n" +
-	"\x10max_job_duration\x18\x06 \x01(\x05R\x0emaxJobDuration\"C\n" +
+	"\x10max_job_duration\x18\x06 \x01(\x05R\x0emaxJobDuration\x12Q\n" +
+	"\n" +
+	"properties\x18\a \x03(\v21.martiancloud.tharsis.api.job.Job.PropertiesEntryR\n" +
+	"properties\x1a=\n" +
+	"\x0fPropertiesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"C\n" +
 	"\x15JobLogStreamEventData\x12\x16\n" +
 	"\x06offset\x18\x01 \x01(\x05R\x06offset\x12\x12\n" +
 	"\x04logs\x18\x02 \x01(\tR\x04logs\"\x9c\x01\n" +
@@ -574,7 +588,7 @@ func file_job_proto_rawDescGZIP() []byte {
 }
 
 var file_job_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_job_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_job_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_job_proto_goTypes = []any{
 	(JobType)(0),                                   // 0: martiancloud.tharsis.api.job.JobType
 	(*SubscribeToJobLogStreamRequest)(nil),         // 1: martiancloud.tharsis.api.job.SubscribeToJobLogStreamRequest
@@ -585,24 +599,26 @@ var file_job_proto_goTypes = []any{
 	(*JobLogStreamEvent)(nil),     // 6: martiancloud.tharsis.api.job.JobLogStreamEvent
 	(*JobEvent)(nil),              // 7: martiancloud.tharsis.api.job.JobEvent
 	(*JobCancellationEvent)(nil),  // 8: martiancloud.tharsis.api.job.JobCancellationEvent
-	(*ResourceMetadata)(nil),      // 9: martiancloud.tharsis.api.metadata.ResourceMetadata
+	nil,                           // 9: martiancloud.tharsis.api.job.Job.PropertiesEntry
+	(*ResourceMetadata)(nil),      // 10: martiancloud.tharsis.api.metadata.ResourceMetadata
 }
 var file_job_proto_depIdxs = []int32{
-	9, // 0: martiancloud.tharsis.api.job.Job.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	5, // 1: martiancloud.tharsis.api.job.JobLogStreamEvent.data:type_name -> martiancloud.tharsis.api.job.JobLogStreamEventData
-	4, // 2: martiancloud.tharsis.api.job.JobEvent.job:type_name -> martiancloud.tharsis.api.job.Job
-	4, // 3: martiancloud.tharsis.api.job.JobCancellationEvent.job:type_name -> martiancloud.tharsis.api.job.Job
-	1, // 4: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:input_type -> martiancloud.tharsis.api.job.SubscribeToJobLogStreamRequest
-	2, // 5: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:input_type -> martiancloud.tharsis.api.job.SubscribeToJobEventsRequest
-	3, // 6: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:input_type -> martiancloud.tharsis.api.job.SubscribeToJobCancellationEventRequest
-	6, // 7: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:output_type -> martiancloud.tharsis.api.job.JobLogStreamEvent
-	7, // 8: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:output_type -> martiancloud.tharsis.api.job.JobEvent
-	8, // 9: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:output_type -> martiancloud.tharsis.api.job.JobCancellationEvent
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	10, // 0: martiancloud.tharsis.api.job.Job.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	9,  // 1: martiancloud.tharsis.api.job.Job.properties:type_name -> martiancloud.tharsis.api.job.Job.PropertiesEntry
+	5,  // 2: martiancloud.tharsis.api.job.JobLogStreamEvent.data:type_name -> martiancloud.tharsis.api.job.JobLogStreamEventData
+	4,  // 3: martiancloud.tharsis.api.job.JobEvent.job:type_name -> martiancloud.tharsis.api.job.Job
+	4,  // 4: martiancloud.tharsis.api.job.JobCancellationEvent.job:type_name -> martiancloud.tharsis.api.job.Job
+	1,  // 5: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:input_type -> martiancloud.tharsis.api.job.SubscribeToJobLogStreamRequest
+	2,  // 6: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:input_type -> martiancloud.tharsis.api.job.SubscribeToJobEventsRequest
+	3,  // 7: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:input_type -> martiancloud.tharsis.api.job.SubscribeToJobCancellationEventRequest
+	6,  // 8: martiancloud.tharsis.api.job.Jobs.SubscribeToJobLogStream:output_type -> martiancloud.tharsis.api.job.JobLogStreamEvent
+	7,  // 9: martiancloud.tharsis.api.job.Jobs.SubscribeToJobEvents:output_type -> martiancloud.tharsis.api.job.JobEvent
+	8,  // 10: martiancloud.tharsis.api.job.Jobs.SubscribeToJobCancellationEvent:output_type -> martiancloud.tharsis.api.job.JobCancellationEvent
+	8,  // [8:11] is the sub-list for method output_type
+	5,  // [5:8] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_job_proto_init() }
@@ -620,7 +636,7 @@ func file_job_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_job_proto_rawDesc), len(file_job_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

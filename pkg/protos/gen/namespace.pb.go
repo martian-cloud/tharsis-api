@@ -157,6 +157,89 @@ func (*NamespaceDriftDetectionEnabledInput_Inherit) isNamespaceDriftDetectionEna
 
 func (*NamespaceDriftDetectionEnabledInput_Enabled) isNamespaceDriftDetectionEnabledInput_Value() {}
 
+// NamespaceProviderMirrorEnabledInput is the input for setting provider mirror on a namespace.
+type NamespaceProviderMirrorEnabledInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Value:
+	//
+	//	*NamespaceProviderMirrorEnabledInput_Inherit
+	//	*NamespaceProviderMirrorEnabledInput_Enabled
+	Value         isNamespaceProviderMirrorEnabledInput_Value `protobuf_oneof:"value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespaceProviderMirrorEnabledInput) Reset() {
+	*x = NamespaceProviderMirrorEnabledInput{}
+	mi := &file_namespace_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespaceProviderMirrorEnabledInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespaceProviderMirrorEnabledInput) ProtoMessage() {}
+
+func (x *NamespaceProviderMirrorEnabledInput) ProtoReflect() protoreflect.Message {
+	mi := &file_namespace_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespaceProviderMirrorEnabledInput.ProtoReflect.Descriptor instead.
+func (*NamespaceProviderMirrorEnabledInput) Descriptor() ([]byte, []int) {
+	return file_namespace_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *NamespaceProviderMirrorEnabledInput) GetValue() isNamespaceProviderMirrorEnabledInput_Value {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *NamespaceProviderMirrorEnabledInput) GetInherit() bool {
+	if x != nil {
+		if x, ok := x.Value.(*NamespaceProviderMirrorEnabledInput_Inherit); ok {
+			return x.Inherit
+		}
+	}
+	return false
+}
+
+func (x *NamespaceProviderMirrorEnabledInput) GetEnabled() bool {
+	if x != nil {
+		if x, ok := x.Value.(*NamespaceProviderMirrorEnabledInput_Enabled); ok {
+			return x.Enabled
+		}
+	}
+	return false
+}
+
+type isNamespaceProviderMirrorEnabledInput_Value interface {
+	isNamespaceProviderMirrorEnabledInput_Value()
+}
+
+type NamespaceProviderMirrorEnabledInput_Inherit struct {
+	Inherit bool `protobuf:"varint,1,opt,name=inherit,proto3,oneof"`
+}
+
+type NamespaceProviderMirrorEnabledInput_Enabled struct {
+	Enabled bool `protobuf:"varint,2,opt,name=enabled,proto3,oneof"`
+}
+
+func (*NamespaceProviderMirrorEnabledInput_Inherit) isNamespaceProviderMirrorEnabledInput_Value() {}
+
+func (*NamespaceProviderMirrorEnabledInput_Enabled) isNamespaceProviderMirrorEnabledInput_Value() {}
+
 var File_namespace_proto protoreflect.FileDescriptor
 
 const file_namespace_proto_rawDesc = "" +
@@ -166,6 +249,10 @@ const file_namespace_proto_rawDesc = "" +
 	"\ainherit\x18\x01 \x01(\bR\ainherit\x12\x12\n" +
 	"\x04tags\x18\x02 \x03(\tR\x04tags\"f\n" +
 	"#NamespaceDriftDetectionEnabledInput\x12\x1a\n" +
+	"\ainherit\x18\x01 \x01(\bH\x00R\ainherit\x12\x1a\n" +
+	"\aenabled\x18\x02 \x01(\bH\x00R\aenabledB\a\n" +
+	"\x05value\"f\n" +
+	"#NamespaceProviderMirrorEnabledInput\x12\x1a\n" +
 	"\ainherit\x18\x01 \x01(\bH\x00R\ainherit\x12\x1a\n" +
 	"\aenabled\x18\x02 \x01(\bH\x00R\aenabledB\a\n" +
 	"\x05valueBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
@@ -182,10 +269,11 @@ func file_namespace_proto_rawDescGZIP() []byte {
 	return file_namespace_proto_rawDescData
 }
 
-var file_namespace_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_namespace_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_namespace_proto_goTypes = []any{
 	(*NamespaceRunnerTagsInput)(nil),            // 0: martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInput
 	(*NamespaceDriftDetectionEnabledInput)(nil), // 1: martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
+	(*NamespaceProviderMirrorEnabledInput)(nil), // 2: martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
 }
 var file_namespace_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -204,13 +292,17 @@ func file_namespace_proto_init() {
 		(*NamespaceDriftDetectionEnabledInput_Inherit)(nil),
 		(*NamespaceDriftDetectionEnabledInput_Enabled)(nil),
 	}
+	file_namespace_proto_msgTypes[2].OneofWrappers = []any{
+		(*NamespaceProviderMirrorEnabledInput_Inherit)(nil),
+		(*NamespaceProviderMirrorEnabledInput_Enabled)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_namespace_proto_rawDesc), len(file_namespace_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

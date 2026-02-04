@@ -412,6 +412,7 @@ input CreateGroupInput {
   name: String!
   parentId: String
   parentPath: String
+  providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
 }
 
@@ -712,6 +713,7 @@ input CreateTerraformProviderVersionMirrorInput {
   groupPath: String
   registryHostname: String!
   registryNamespace: String!
+  registryToken: String
   semanticVersion: String!
   type: String!
 }
@@ -784,6 +786,7 @@ input CreateWorkspaceInput {
   maxJobDuration: Int
   name: String!
   preventDestroyPlan: Boolean
+  providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
   terraformVersion: String
 }
@@ -1218,12 +1221,13 @@ type Group implements Namespace & Node {
   metadata: ResourceMetadata!
   name: String!
   parent: Group
+  providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!
   runners(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: RunnerSort): RunnerConnection!
   runs(after: String, before: String, first: Int, includeNestedRuns: Boolean, last: Int, sort: RunSort, workspaceAssessment: Boolean): RunConnection!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ServiceAccountSort): ServiceAccountConnection!
   terraformModules(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
-  terraformProviderMirrors(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
+  terraformProviderMirrors(after: String, before: String, first: Int, last: Int, search: String, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
   terraformProviders(after: String, before: String, first: Int, last: Int, search: String): TerraformProviderConnection!
   variables: [NamespaceVariable!]!
   vcsProviders(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: VCSProviderSort): VCSProviderConnection!
@@ -1277,6 +1281,7 @@ type Job implements Node {
   logs(limit: Int!, startOffset: Int!): String!
   maxJobDuration: Int!
   metadata: ResourceMetadata!
+  properties: [KeyValueEntry!]!
   run: Run!
   runner: Runner
   runnerAvailabilityStatus: RunnerAvailabilityStatus!
@@ -1651,8 +1656,10 @@ interface Namespace {
   memberships: [NamespaceMembership!]!
   metadata: ResourceMetadata!
   name: String!
+  providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String): ServiceAccountConnection!
+  terraformProviderMirrors(after: String, before: String, first: Int, last: Int, search: String, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
   variables: [NamespaceVariable!]!
 }
 
@@ -1726,6 +1733,17 @@ type NamespaceMembershipMutationPayload {
 enum NamespaceMembershipSort {
   UPDATED_AT_ASC
   UPDATED_AT_DESC
+}
+
+type NamespaceProviderMirrorEnabled {
+  inherited: Boolean!
+  namespacePath: String!
+  value: Boolean!
+}
+
+input NamespaceProviderMirrorEnabledInput {
+  enabled: Boolean
+  inherit: Boolean!
 }
 
 type NamespaceRunnerTags {
@@ -2739,9 +2757,11 @@ type TerraformProviderVersionEdge {
 type TerraformProviderVersionMirror implements Node {
   createdBy: String!
   group: Group!
+  groupPath: String!
   id: ID!
   metadata: ResourceMetadata!
   platformMirrors: [TerraformProviderPlatformMirror!]!
+  providerAddress: String!
   registryHostname: String!
   registryNamespace: String!
   type: String!
@@ -2762,6 +2782,8 @@ type TerraformProviderVersionMirrorEdge {
 enum TerraformProviderVersionMirrorSort {
   CREATED_AT_ASC
   CREATED_AT_DESC
+  TYPE_ASC
+  TYPE_DESC
 }
 
 enum TerraformProviderVersionSort {
@@ -2838,6 +2860,7 @@ input UpdateGroupInput {
   groupPath: String
   id: String
   metadata: ResourceMetadataInput
+  providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
 }
 
@@ -3065,6 +3088,7 @@ input UpdateWorkspaceInput {
   maxJobDuration: Int
   metadata: ResourceMetadataInput
   preventDestroyPlan: Boolean
+  providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
   runnerTags: NamespaceRunnerTagsInput
   terraformVersion: String
   workspacePath: String
@@ -3306,9 +3330,11 @@ type Workspace implements Namespace & Node {
   metadata: ResourceMetadata!
   name: String!
   preventDestroyPlan: Boolean!
+  providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   runnerTags: NamespaceRunnerTags!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String): ServiceAccountConnection!
   stateVersions(after: String, before: String, first: Int, last: Int, sort: StateVersionSort): StateVersionConnection!
+  terraformProviderMirrors(after: String, before: String, first: Int, last: Int, search: String, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
   terraformVersion: String!
   variables: [NamespaceVariable!]!
   vcsEvents(after: String, before: String, first: Int, last: Int, sort: VCSEventSort): VCSEventConnection!

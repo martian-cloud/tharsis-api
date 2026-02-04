@@ -1,11 +1,11 @@
-import LoadingButton from '@mui/lab/LoadingButton';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, List, Paper, Typography, useTheme } from '@mui/material';
+import { Box, Button, List, Paper, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useState } from 'react';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { ConnectionHandler, useFragment, useLazyLoadQuery, useMutation, usePaginationFragment } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import ListSkeleton from '../../skeletons/ListSkeleton';
 import GPGKeyListItem from './GPGKeyListItem';
@@ -27,37 +27,6 @@ const query = graphql`
         }
     }
 `;
-
-interface ConfirmationDialogProps {
-    gpgKeyId: string
-    deleteInProgress: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { gpgKeyId, deleteInProgress, onClose, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            keepMounted={false}
-            open={true}
-            {...other}
-        >
-            <DialogTitle>Delete GPG Key</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete GPG key <strong>{gpgKeyId}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>
-                    Delete
-                </LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
-}
 
 interface Props {
     fragmentRef: GPGKeyListFragment_group$key
@@ -224,7 +193,17 @@ function GPGKeyList(props: Props) {
                     <Button component={RouterLink} variant="outlined" to="new">New GPG Key</Button>
                 </Box>
             </Box>}
-            {gpgKeyToDelete && <DeleteConfirmationDialog gpgKeyId={gpgKeyToDelete.gpgKeyId} deleteInProgress={commitInFlight} onClose={onDeleteConfirmationDialogClosed} />}
+            {gpgKeyToDelete && (
+                <ConfirmationDialog
+                    title="Delete GPG Key"
+                    confirmLabel="Delete"
+                    confirmInProgress={commitInFlight}
+                    onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                    onClose={() => onDeleteConfirmationDialogClosed()}
+                >
+                    Are you sure you want to delete GPG key <strong>{gpgKeyToDelete.gpgKeyId}</strong>?
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

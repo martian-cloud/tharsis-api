@@ -19,7 +19,7 @@ import VariablesIcon from '@mui/icons-material/WindowOutlined';
 import teal from '@mui/material/colors/teal';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
-import { AccountLockOutline as ManagedIdentityIcon, RocketLaunchOutline as RunIcon } from 'mdi-material-ui';
+import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, RocketLaunchOutline as RunIcon } from 'mdi-material-ui';
 
 interface Props {
     workspacePath: string
@@ -35,6 +35,7 @@ const LIST_ITEMS = [
     { route: 'variables', label: 'Variables', icon: <VariablesIcon /> },
     { route: 'state_versions', label: 'State Versions', icon: <StateIcon /> },
     { route: 'managed_identities', label: 'Assigned Managed Identities', icon: <ManagedIdentityIcon /> },
+    { route: 'provider_mirror', label: 'Provider Mirror', icon: <ProviderMirrorIcon /> },
     { route: 'members', label: 'Members', icon: <MembersIcon /> },
     { route: 'settings', label: 'Settings', icon: <SettingsIcon /> }
 ];

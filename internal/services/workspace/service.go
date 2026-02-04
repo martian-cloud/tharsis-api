@@ -154,6 +154,7 @@ type Service interface {
 	MigrateWorkspace(ctx context.Context, workspaceID string, newGroupID string) (*models.Workspace, error)
 	GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error)
 	GetDriftDetectionEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.DriftDetectionEnabledSetting, error)
+	GetProviderMirrorEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error)
 }
 
 type handleCallerFunc func(
@@ -1895,6 +1896,26 @@ func (s *service) GetDriftDetectionEnabledSetting(ctx context.Context, workspace
 	}
 
 	return s.inheritedSettingsResolver.GetDriftDetectionEnabled(ctx, workspace)
+}
+
+// GetProviderMirrorEnabledSetting returns the (inherited or direct) provider mirror setting for a workspace.
+func (s *service) GetProviderMirrorEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetProviderMirrorEnabledSetting")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, models.ViewWorkspacePermission, auth.WithNamespacePath(workspace.FullPath))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	return s.inheritedSettingsResolver.GetProviderMirrorEnabled(ctx, workspace)
 }
 
 func (s *service) getWorkspaceByID(ctx context.Context, id string) (*models.Workspace, error) {

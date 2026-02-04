@@ -35,6 +35,14 @@ func (_m *MockLogger) Infof(format string, a ...interface{}) {
 	_m.Called(_ca...)
 }
 
+// Printf provides a mock function with given fields: format, a
+func (_m *MockLogger) Printf(format string, a ...interface{}) {
+	var _ca []interface{}
+	_ca = append(_ca, format)
+	_ca = append(_ca, a...)
+	_m.Called(_ca...)
+}
+
 // Start provides a mock function with no fields
 func (_m *MockLogger) Start() {
 	_m.Called()

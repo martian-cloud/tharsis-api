@@ -133,6 +133,19 @@ func (r *NamespaceResolver) ActivityEvents(ctx context.Context,
 	return nil, r.invalidNamespaceType()
 }
 
+// TerraformProviderMirrors resolver
+func (r *NamespaceResolver) TerraformProviderMirrors(ctx context.Context,
+	args *TerraformProviderVersionMirrorConnectionQueryArgs,
+) (*TerraformProviderVersionMirrorConnectionResolver, error) {
+	switch v := r.result.(type) {
+	case *GroupResolver:
+		return v.TerraformProviderMirrors(ctx, args)
+	case *WorkspaceResolver:
+		return v.TerraformProviderMirrors(ctx, args)
+	}
+	return nil, r.invalidNamespaceType()
+}
+
 // ToGroup resolves the group namespace type
 func (r *NamespaceResolver) ToGroup() (*GroupResolver, bool) {
 	res, ok := r.result.(*GroupResolver)
@@ -217,6 +230,20 @@ func (r *NamespaceDriftDetectionEnabledInput) Validate() error {
 	return nil
 }
 
+// NamespaceProviderMirrorEnabledInput represents the settings for enabling provider mirror
+type NamespaceProviderMirrorEnabledInput struct {
+	Enabled *bool
+	Inherit bool
+}
+
+// Validate returns an error if the input is not valid.
+func (r *NamespaceProviderMirrorEnabledInput) Validate() error {
+	if r != nil && r.Enabled != nil && r.Inherit {
+		return errors.New("cannot specify both enabled and inherit", errors.WithErrorCode(errors.EInvalid))
+	}
+	return nil
+}
+
 // DriftDetectionEnabled resolver
 func (r *NamespaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
 	switch v := r.result.(type) {
@@ -224,6 +251,17 @@ func (r *NamespaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespa
 		return v.DriftDetectionEnabled(ctx)
 	case *WorkspaceResolver:
 		return v.DriftDetectionEnabled(ctx)
+	}
+	return nil, r.invalidNamespaceType()
+}
+
+// ProviderMirrorEnabled resolver
+func (r *NamespaceResolver) ProviderMirrorEnabled(ctx context.Context) (*namespace.ProviderMirrorEnabledSetting, error) {
+	switch v := r.result.(type) {
+	case *GroupResolver:
+		return v.ProviderMirrorEnabled(ctx)
+	case *WorkspaceResolver:
+		return v.ProviderMirrorEnabled(ctx)
 	}
 	return nil, r.invalidNamespaceType()
 }

@@ -32,18 +32,18 @@ type TerraformProviderVersionMirrorSortableField string
 
 // TerraformProviderVersionMirrorSortableField constants
 const (
-	TerraformProviderVersionMirrorSortableFieldCreatedAtAsc        TerraformProviderVersionMirrorSortableField = "CREATED_AT_ASC"
-	TerraformProviderVersionMirrorSortableFieldCreatedAtDesc       TerraformProviderVersionMirrorSortableField = "CREATED_AT_DESC"
-	TerraformProviderVersionMirrorSortableFieldSemanticVersionAsc  TerraformProviderVersionMirrorSortableField = "SEMANTIC_VERSION_ASC"
-	TerraformProviderVersionMirrorSortableFieldSemanticVersionDesc TerraformProviderVersionMirrorSortableField = "SEMANTIC_VERSION_DESC"
+	TerraformProviderVersionMirrorSortableFieldCreatedAtAsc  TerraformProviderVersionMirrorSortableField = "CREATED_AT_ASC"
+	TerraformProviderVersionMirrorSortableFieldCreatedAtDesc TerraformProviderVersionMirrorSortableField = "CREATED_AT_DESC"
+	TerraformProviderVersionMirrorSortableFieldTypeAsc       TerraformProviderVersionMirrorSortableField = "TYPE_ASC"
+	TerraformProviderVersionMirrorSortableFieldTypeDesc      TerraformProviderVersionMirrorSortableField = "TYPE_DESC"
 )
 
 func (ts TerraformProviderVersionMirrorSortableField) getFieldDescriptor() *pagination.FieldDescriptor {
 	switch ts {
 	case TerraformProviderVersionMirrorSortableFieldCreatedAtAsc, TerraformProviderVersionMirrorSortableFieldCreatedAtDesc:
 		return &pagination.FieldDescriptor{Key: "created_at", Table: "terraform_provider_version_mirrors", Col: "created_at"}
-	case TerraformProviderVersionMirrorSortableFieldSemanticVersionAsc, TerraformProviderVersionMirrorSortableFieldSemanticVersionDesc:
-		return &pagination.FieldDescriptor{Key: "semantic_version", Table: "terraform_provider_version_mirrors", Col: "semantic_version"}
+	case TerraformProviderVersionMirrorSortableFieldTypeAsc, TerraformProviderVersionMirrorSortableFieldTypeDesc:
+		return &pagination.FieldDescriptor{Key: "type", Table: "terraform_provider_version_mirrors", Col: "type"}
 	default:
 		return nil
 	}
@@ -58,6 +58,7 @@ func (ts TerraformProviderVersionMirrorSortableField) getSortDirection() paginat
 
 // TerraformProviderVersionMirrorFilter represents fields a TerraformProviderVersionMirror can be filtered by.
 type TerraformProviderVersionMirrorFilter struct {
+	Search            *string
 	RegistryHostname  *string
 	RegistryNamespace *string
 	Type              *string
@@ -65,6 +66,7 @@ type TerraformProviderVersionMirrorFilter struct {
 	GroupID           *string
 	VersionMirrorIDs  []string
 	NamespacePaths    []string
+	HasPackages       *bool
 }
 
 // GetProviderVersionMirrorsInput is the input for listing TerraformProviderVersionMirrors.
@@ -147,6 +149,10 @@ func (t *terraformProviderVersionMirrors) GetVersionMirrors(ctx context.Context,
 	ex := goqu.And()
 
 	if input.Filter != nil {
+		if input.Filter.Search != nil && *input.Filter.Search != "" {
+			searchExp := goqu.L("CONCAT(terraform_provider_version_mirrors.registry_hostname, '/', terraform_provider_version_mirrors.registry_namespace, '/', terraform_provider_version_mirrors.type)")
+			ex = ex.Append(searchExp.ILike("%" + *input.Filter.Search + "%"))
+		}
 		if len(input.Filter.NamespacePaths) > 0 {
 			ex = ex.Append(goqu.I("namespaces.path").In(input.Filter.NamespacePaths))
 		}
@@ -168,6 +174,18 @@ func (t *terraformProviderVersionMirrors) GetVersionMirrors(ctx context.Context,
 		if input.Filter.GroupID != nil {
 			// GroupID is mainly for convenience as it avoids querying for a group prior to calling this function.
 			ex = ex.Append(goqu.I("terraform_provider_version_mirrors.group_id").Eq(*input.Filter.GroupID))
+		}
+		if input.Filter.HasPackages != nil {
+			// Use subquery to check if platform mirrors exist
+			subquery := dialect.From("terraform_provider_platform_mirrors").
+				Select(goqu.L("1")).
+				Where(goqu.I("terraform_provider_platform_mirrors.version_mirror_id").Eq(goqu.I("terraform_provider_version_mirrors.id"))).
+				Limit(1)
+			if *input.Filter.HasPackages {
+				ex = ex.Append(goqu.L("EXISTS ?", subquery))
+			} else {
+				ex = ex.Append(goqu.L("NOT EXISTS ?", subquery))
+			}
 		}
 	}
 

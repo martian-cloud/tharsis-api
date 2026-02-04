@@ -122,6 +122,7 @@ var workspaceFieldList = append(
 	"prevent_destroy_plan",
 	"runner_tags",
 	"drift_detection_enabled",
+	"provider_mirror_enabled",
 	"labels",
 )
 
@@ -342,6 +343,7 @@ func (w *workspaces) UpdateWorkspace(ctx context.Context, workspace *models.Work
 						"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 						"runner_tags":              runnerTags,
 						"drift_detection_enabled":  workspace.EnableDriftDetection,
+						"provider_mirror_enabled":  workspace.EnableProviderMirror,
 						"labels":                   labelsJSON,
 					},
 				).Where(goqu.Ex{"id": workspace.Metadata.ID, "version": workspace.Metadata.Version}).
@@ -428,6 +430,7 @@ func (w *workspaces) CreateWorkspace(ctx context.Context, workspace *models.Work
 			"prevent_destroy_plan":     workspace.PreventDestroyPlan,
 			"runner_tags":              runnerTags,
 			"drift_detection_enabled":  workspace.EnableDriftDetection,
+			"provider_mirror_enabled":  workspace.EnableProviderMirror,
 			"labels":                   labelsJSON,
 		}).
 		Returning(workspaceFieldList...).ToSQL()
@@ -804,6 +807,7 @@ func scanWorkspace(row scanner, withFullPath bool) (*models.Workspace, error) {
 		&ws.PreventDestroyPlan,
 		&ws.RunnerTags,
 		&ws.EnableDriftDetection,
+		&ws.EnableProviderMirror,
 		&labelsJSON,
 	}
 

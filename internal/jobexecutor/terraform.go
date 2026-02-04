@@ -2,6 +2,7 @@ package jobexecutor
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/hashicorp/go-slug"
@@ -47,6 +49,9 @@ terraform {
 	// Env variable name prefix used by Terraform for tokens. Format is TF_TOKEN_<host>
 	tfTokenVarPrefix = "TF_TOKEN_"
 
+	// Job property key for provider mirror enabled setting
+	jobPropertyProviderMirrorEnabled = "providerMirrorEnabled"
+
 	// Terraform variable suffix for write-only version variables that are automatically injected
 	writeOnlyVariableSuffix = "_wo_version"
 
@@ -76,6 +81,7 @@ type terraformWorkspace struct {
 	jobCfg            *JobConfig
 	workspace         *types.Workspace
 	run               *types.Run
+	job               *types.Job
 	jobLogger         joblogger.Logger
 	managedIdentities *managedIdentities
 	fullEnv           map[string]string
@@ -93,6 +99,7 @@ func newTerraformWorkspace(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
+	job *types.Job,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
 ) (*terraformWorkspace, error) {
@@ -119,6 +126,7 @@ func newTerraformWorkspace(
 		workspaceDir:      workspaceDir,
 		workspace:         workspace,
 		run:               run,
+		job:               job,
 		jobLogger:         jobLogger,
 		client:            client,
 		managedIdentities: managedIdentities,
@@ -180,7 +188,6 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	// Handle a possible configuration version.  Configuration version and module
 	// source are mutually exclusive, so downloading to workspaceDir is okay.
 	if t.run.ConfigurationVersionID != nil {
-
 		t.jobLogger.Infof("Downloading configuration version %s", *t.run.ConfigurationVersionID)
 
 		if err = t.downloadConfigurationVersion(ctx); err != nil {
@@ -291,12 +298,73 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize tfexec: %v", err)
 	}
-	// Enable ansi colors
 	tf.SetColor(true)
 
-	err = t.setupCredentialHelper(managedIdentitiesResponse.HostCredentialFileMapping)
+	// Check if provider mirror is enabled from job properties
+	var mirrorURL *string
+	if propValue, ok := t.job.Properties[jobPropertyProviderMirrorEnabled]; ok {
+		enabled, pErr := strconv.ParseBool(propValue)
+		if pErr != nil {
+			return nil, fmt.Errorf("invalid value for job property %s: %v", jobPropertyProviderMirrorEnabled, pErr)
+		}
+
+		if enabled {
+			// Build hostname -> token map from TF_TOKEN_* env vars (includes federated registry tokens)
+			registryTokens := map[string]string{}
+			for k, v := range t.fullEnv {
+				if encoded, ok := strings.CutPrefix(k, tfTokenVarPrefix); ok {
+					hostname := strings.ReplaceAll(encoded, "__", "-")
+					hostname = strings.ReplaceAll(hostname, "_", ".")
+					registryTokens[hostname] = v
+				}
+			}
+
+			proxy, pErr := newProviderMirrorProxy(
+				t.cancellableCtx, // Use cancellable context so async caching can be manually cancelled
+				t.client,
+				t.workspace.Metadata.ID,
+				t.jobLogger,
+				registryTokens,
+				time.Duration(t.workspace.MaxJobDuration)*time.Minute,
+			)
+			if pErr != nil {
+				return nil, fmt.Errorf("failed to create provider mirror proxy: %v", pErr)
+			}
+			proxy.start()
+			defer proxy.shutdown()
+
+			t.jobLogger.Infof("Provider mirror enabled, external registry providers will be cached automatically")
+			mirrorURL = ptr.String(proxy.url())
+
+			// Write CA cert for Terraform to trust the local proxy
+			caCertPath, cErr := t.writeCACert(proxy.caCert())
+			if cErr != nil {
+				return nil, fmt.Errorf("failed to write CA cert: %v", cErr)
+			}
+			t.fullEnv["SSL_CERT_FILE"] = caCertPath
+		}
+	}
+
+	credHelperName, err := t.setupCredentialHelper(managedIdentitiesResponse.HostCredentialFileMapping)
 	if err != nil {
 		return nil, err
+	}
+
+	var providerMirror *providerMirrorConfig
+	if mirrorURL != nil {
+		providerMirror = &providerMirrorConfig{
+			url:          *mirrorURL,
+			excludeHosts: t.jobCfg.DiscoveryProtocolHosts,
+		}
+	}
+
+	if credHelperName != nil || providerMirror != nil {
+		if err = t.setupCliConfiguration(cliConfig{
+			credentialHelperName: credHelperName,
+			providerMirror:       providerMirror,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = t.mapSupportedTerraformEnvConfiguration(tf); err != nil {
@@ -365,7 +433,7 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 	return tf, nil
 }
 
-func (t *terraformWorkspace) setupCredentialHelper(hostCredentialFileMapping map[string]string) error {
+func (t *terraformWorkspace) setupCredentialHelper(hostCredentialFileMapping map[string]string) (*string, error) {
 	isWindows := runtime.GOOS == "windows"
 	hasHosts := len(hostCredentialFileMapping) > 0
 
@@ -374,27 +442,16 @@ func (t *terraformWorkspace) setupCredentialHelper(hostCredentialFileMapping map
 	}
 
 	if isWindows || !hasHosts {
-		return nil
+		return nil, nil
 	}
 
 	hosts := make([]string, 0, len(hostCredentialFileMapping))
 	for host := range hostCredentialFileMapping {
 		hosts = append(hosts, host)
 	}
-
 	t.jobLogger.Infof("The following managed identity hosts each have a credential file: %v", strings.Join(hosts, ", "))
 
-	credHelperName, err := t.credentialHelper.install(hostCredentialFileMapping)
-	if err != nil {
-		return err
-	}
-
-	err = t.setupCliConfiguration(*credHelperName)
-	if err != nil {
-		return fmt.Errorf("failed to setup cli configuration: %v", err)
-	}
-
-	return nil
+	return t.credentialHelper.install(hostCredentialFileMapping)
 }
 
 // mapSupportedTerraformEnvConfiguration
@@ -546,6 +603,25 @@ func (t *terraformWorkspace) setDiscoveryProtocolHostTfTokenEnvVars(hostCredenti
 
 func (t *terraformWorkspace) deletePathWhenJobCompletes(path string) {
 	t.pathsToRemove = append(t.pathsToRemove, path)
+}
+
+func (t *terraformWorkspace) writeCACert(certDER []byte) (string, error) {
+	certPEM := "-----BEGIN CERTIFICATE-----\n" +
+		base64.StdEncoding.EncodeToString(certDER) +
+		"\n-----END CERTIFICATE-----\n"
+
+	f, err := os.CreateTemp("", "ca-cert-*.pem")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(certPEM); err != nil {
+		return "", err
+	}
+
+	t.deletePathWhenJobCompletes(f.Name())
+	return f.Name(), nil
 }
 
 func (t *terraformWorkspace) createVarsFile() (string, []string, error) {

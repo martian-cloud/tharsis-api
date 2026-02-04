@@ -1,7 +1,6 @@
 import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
-import { LoadingButton } from '@mui/lab';
-import { Avatar, ButtonGroup, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Link, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Avatar, ButtonGroup, Chip, Collapse, Link, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import teal from '@mui/material/colors/teal';
@@ -13,6 +12,7 @@ import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { useNavigate, useParams } from 'react-router-dom';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import { GetConnections } from './ServiceAccountList';
@@ -24,38 +24,6 @@ const CARD_PADDING = 3;
 
 interface Props {
     fragmentRef: ServiceAccountDetailsFragment_group$key
-}
-
-interface ConfirmationDialogProps {
-    serviceAccountPath: string
-    deleteInProgress: boolean;
-    keepMounted: boolean;
-    open: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { serviceAccountPath, deleteInProgress, onClose, open, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={open}
-            {...other}
-        >
-            <DialogTitle>Delete Service Account</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete service account <strong>{serviceAccountPath}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>
-                    Delete
-                </LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
 }
 
 function ServiceAccountDetails(props: Props) {
@@ -285,13 +253,17 @@ function ServiceAccountDetails(props: Props) {
                         </Box>
                     </Box>
                 </Paper >
-                <DeleteConfirmationDialog
-                    serviceAccountPath={data.serviceAccount.resourcePath}
-                    keepMounted
-                    deleteInProgress={commitInFlight}
-                    open={showDeleteConfirmationDialog}
-                    onClose={onDeleteConfirmationDialogClosed}
-                />
+                {showDeleteConfirmationDialog && (
+                    <ConfirmationDialog
+                        title="Delete Service Account"
+                        confirmLabel="Delete"
+                        confirmInProgress={commitInFlight}
+                        onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                        onClose={() => onDeleteConfirmationDialogClosed()}
+                    >
+                        Are you sure you want to delete service account <strong>{data.serviceAccount.resourcePath}</strong>?
+                    </ConfirmationDialog>
+                )}
             </Box >
         );
     } else {

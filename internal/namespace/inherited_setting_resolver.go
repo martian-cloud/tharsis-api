@@ -29,6 +29,13 @@ type DriftDetectionEnabledSetting struct {
 	Value         bool
 }
 
+// ProviderMirrorEnabledSetting contains the inherited setting for enabling provider mirror
+type ProviderMirrorEnabledSetting struct {
+	Inherited     bool
+	NamespacePath string
+	Value         bool
+}
+
 // NotificationPreferenceSetting contains the inherited setting for user notification preferences
 type NotificationPreferenceSetting struct {
 	Inherited     bool
@@ -41,6 +48,7 @@ type NotificationPreferenceSetting struct {
 type InheritedSettingResolver interface {
 	GetRunnerTags(ctx context.Context, namespace Namespace) (*RunnerTagsSetting, error)
 	GetDriftDetectionEnabled(ctx context.Context, namespace Namespace) (*DriftDetectionEnabledSetting, error)
+	GetProviderMirrorEnabled(ctx context.Context, namespace Namespace) (*ProviderMirrorEnabledSetting, error)
 	GetNotificationPreference(ctx context.Context, userID string, namespacePath *string) (*NotificationPreferenceSetting, error)
 	GetNotificationPreferences(ctx context.Context, userIDs []string, namespacePath *string) (map[string]*NotificationPreferenceSetting, error)
 }
@@ -197,6 +205,30 @@ func (r *inheritedSettingsResolver) GetDriftDetectionEnabled(ctx context.Context
 	}
 
 	return &DriftDetectionEnabledSetting{
+		Inherited:     response.inherited,
+		NamespacePath: response.namespacePath,
+		Value:         value,
+	}, nil
+}
+
+func (r *inheritedSettingsResolver) GetProviderMirrorEnabled(ctx context.Context, namespace Namespace) (*ProviderMirrorEnabledSetting, error) {
+	response, err := r.getInheritedSetting(ctx, namespace, func(namespace Namespace) (any, bool) {
+		enabled := namespace.ProviderMirrorEnabled()
+		if enabled == nil {
+			return false, false
+		}
+		return *enabled, true
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	value := false
+	if response.value != nil {
+		value = response.value.(bool)
+	}
+
+	return &ProviderMirrorEnabledSetting{
 		Inherited:     response.inherited,
 		NamespacePath: response.namespacePath,
 		Value:         value,

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5e1c0270520890ab86fa5bbc1664777f>>
+ * @generated SignedSource<<754bf1a3fec34006d237dd8897cefdb9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,6 +20,7 @@ export type UpdateWorkspaceInput = {
   maxJobDuration?: number | null | undefined;
   metadata?: ResourceMetadataInput | null | undefined;
   preventDestroyPlan?: boolean | null | undefined;
+  providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
   terraformVersion?: string | null | undefined;
   workspacePath?: string | null | undefined;
@@ -34,6 +35,10 @@ export type WorkspaceLabelInput = {
 };
 export type ResourceMetadataInput = {
   version: string;
+};
+export type NamespaceProviderMirrorEnabledInput = {
+  enabled?: boolean | null | undefined;
+  inherit: boolean;
 };
 export type NamespaceRunnerTagsInput = {
   inherit: boolean;

@@ -1,13 +1,13 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import StateIcon from '@mui/icons-material/InsertDriveFileOutlined';
-import { LoadingButton } from "@mui/lab";
-import { Alert, AlertTitle, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
+import { Alert, AlertTitle, Avatar, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
 import teal from '@mui/material/colors/teal';
 import graphql from 'babel-plugin-relay/macro';
 import { CubeOutline as ModuleIcon } from 'mdi-material-ui';
 import React, { useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import ConfirmationDialog from '../common/ConfirmationDialog';
 import Timestamp from '../common/Timestamp';
 import TabContent from '../common/TabContent';
 import TRNButton from '../common/TRNButton';
@@ -33,43 +33,6 @@ const DRIFT_ALERT_DESCRIPTION = "This workspace has drifted from its configurati
 
 interface Props {
     fragmentRef: WorkspaceDetailsIndexFragment_workspace$key
-}
-
-interface ConfirmationDialogProps {
-    open: boolean
-    onClose: (confirm?: boolean) => void
-    deleteInProgress: boolean | undefined
-}
-
-function DestroyRunConfirmationDialog({ deleteInProgress, onClose, open }: ConfirmationDialogProps) {
-
-    return (
-        <Dialog
-            keepMounted
-            maxWidth="sm"
-            open={open}
-        >
-            <DialogTitle>Destroy Workspace</DialogTitle>
-            <DialogContent >
-                <Alert sx={{ mb: 2 }} severity="warning">
-                    <AlertTitle>Warning</AlertTitle>
-                    Initiating a destroy workspace run will <strong><ins>permanently</ins></strong> destroy all resources managed by this workspace.
-                    This operation will use the same module or configuration version that created the current workspace state. Any variables used in
-                    the most recent successful apply operation will automatically be included. The created plan will have to be applied manually.
-                </Alert>
-            </DialogContent>
-            <DialogActions>
-                <Button
-                    color="inherit"
-                    onClick={() => onClose()}>Cancel</Button>
-                <LoadingButton
-                    color="error"
-                    variant="outlined"
-                    loading={deleteInProgress}
-                    onClick={() => onClose(true)}>Destroy</LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
 }
 
 function WorkspaceDetailsIndex(props: Props) {
@@ -244,7 +207,7 @@ function WorkspaceDetailsIndex(props: Props) {
                     </Stack>
                 </Box>
                 <Stack direction="row" spacing={1}>
-                    <NamespaceFavoriteButton 
+                    <NamespaceFavoriteButton
                         namespacePath={data.fullPath}
                         namespaceType="WORKSPACE"
                     />
@@ -383,11 +346,23 @@ function WorkspaceDetailsIndex(props: Props) {
                     <StateVersionFile fragmentRef={data.currentStateVersion} />
                 </TabContent>}
             </React.Fragment>}
-            <DestroyRunConfirmationDialog
-                open={showDestroyRunConfirmationDialog}
-                deleteInProgress={destroyWorkspaceIsInFlight}
-                onClose={onDestroyConfirmationDialogClosed}
-            />
+            {showDestroyRunConfirmationDialog && (
+                <ConfirmationDialog
+                    title="Destroy Workspace"
+                    maxWidth="sm"
+                    confirmLabel="Destroy"
+                    confirmInProgress={destroyWorkspaceIsInFlight ?? false}
+                    onConfirm={() => onDestroyConfirmationDialogClosed(true)}
+                    onClose={() => onDestroyConfirmationDialogClosed()}
+                >
+                    <Alert severity="warning">
+                        <AlertTitle>Warning</AlertTitle>
+                        Initiating a destroy workspace run will <strong><ins>permanently</ins></strong> destroy all resources managed by this workspace.
+                        This operation will use the same module or configuration version that created the current workspace state. Any variables used in
+                        the most recent successful apply operation will automatically be included. The created plan will have to be applied manually.
+                    </Alert>
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

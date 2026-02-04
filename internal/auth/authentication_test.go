@@ -208,7 +208,13 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 			name:        "job token type",
 			tokenString: "test-token",
 			setupMocks: func(mockIDP *MockSigningKeyManager, _ *db.Client) {
+				token := jwt.New()
+				jobTRN := "trn:job:group/workspace/" + gid.ToGlobalID(types.JobModelType, jobID)
+				err := token.Set(jwt.SubjectKey, jobTRN)
+				require.NoError(t, err)
+
 				mockIDP.On("VerifyToken", mock.Anything, "test-token").Return(&VerifyTokenOutput{
+					Token: token,
 					PrivateClaims: map[string]string{
 						"type":         JobTokenType,
 						"job_id":       gid.ToGlobalID(types.JobModelType, jobID),
@@ -219,6 +225,7 @@ func TestTharsisIDPTokenAuthenticator_Authenticate(t *testing.T) {
 			},
 			expectCaller: &JobCaller{
 				JobID:       jobID,
+				JobTRN:      "trn:job:group/workspace/" + gid.ToGlobalID(types.JobModelType, jobID),
 				RunID:       runID,
 				WorkspaceID: workspaceID,
 			},

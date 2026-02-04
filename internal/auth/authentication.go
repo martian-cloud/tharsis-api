@@ -173,6 +173,7 @@ func (t *tharsisIDPTokenAuthenticator) Authenticate(ctx context.Context, tokenSt
 	case JobTokenType:
 		return &JobCaller{
 			JobID:       gid.FromGlobalID(output.PrivateClaims["job_id"]),
+			JobTRN:      output.PrivateClaims["job_trn"],
 			RunID:       gid.FromGlobalID(output.PrivateClaims["run_id"]),
 			WorkspaceID: gid.FromGlobalID(output.PrivateClaims["workspace_id"]),
 			dbClient:    t.dbClient,

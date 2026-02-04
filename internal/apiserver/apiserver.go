@@ -68,6 +68,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
 )
 
 // APIServer represents an instance of a server
@@ -150,6 +151,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	userAuth := auth.NewUserAuth(ctx, cfg.OauthProviders, logger, dbClient, maintenanceMonitor, openIDConfigFetcher)
 	federatedRegistryAuth := auth.NewFederatedRegistryAuth(ctx, cfg.FederatedRegistryTrustPolicies, logger, openIDConfigFetcher, dbClient)
+
+	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
+
 	authenticator := auth.NewAuthenticator(userAuth, federatedRegistryAuth, signingKeyManager, dbClient, maintenanceMonitor, cfg.JWTIssuerURL)
 	userSessionManager, err := auth.NewUserSessionManager(
 		dbClient,
@@ -186,7 +190,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	}
 
 	limits := limits.NewLimitChecker(dbClient)
-	inheritedSettingsResolver := namespace.NewInheritedSettingResolver(dbClient)
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
 	federatedRegistryClient := registry.NewFederatedRegistryClient(signingKeyManager)
 
@@ -215,11 +218,12 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		scimService                = scim.NewService(logger, dbClient, signingKeyManager, cfg.OauthProviders)
 		federatedRegistryService   = federatedregistry.NewService(logger, dbClient, limits, activityService, signingKeyManager)
 		moduleResolver             = registry.NewModuleResolver(dbClient, httpClient, federatedRegistryClient, logger, cfg.TharsisAPIURL, signingKeyManager)
-		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleResolver, runStateManager, limits, pluginCatalog.SecretManager)
+		providerRegistryClient     = provider.NewRegistryClient(httpClient)
+		runService                 = run.NewService(logger, dbClient, artifactStore, eventManager, jobService, cliService, activityService, moduleResolver, runStateManager, limits, pluginCatalog.SecretManager, inheritedSettingsResolver)
 		runnerService              = runner.NewService(logger, dbClient, limits, activityService, logStreamManager, eventManager)
 		roleService                = role.NewService(logger, dbClient, activityService)
 		resourceLimitService       = resourcelimit.NewService(logger, dbClient)
-		providerMirrorService      = providermirror.NewService(logger, dbClient, httpClient, limits, activityService, mirrorStore)
+		providerMirrorService      = providermirror.NewService(logger, dbClient, providerRegistryClient, limits, activityService, mirrorStore)
 		maintenanceModeService     = maint.NewService(logger, dbClient)
 	)
 
