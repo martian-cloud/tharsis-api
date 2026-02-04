@@ -225,6 +225,7 @@ type CreateWorkspaceRequest struct {
 	RunnerTags            *NamespaceRunnerTagsInput            `protobuf:"bytes,7,opt,name=runner_tags,json=runnerTags,proto3,oneof" json:"runner_tags,omitempty"`
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput `protobuf:"bytes,8,opt,name=drift_detection_enabled,json=driftDetectionEnabled,proto3,oneof" json:"drift_detection_enabled,omitempty"`
 	Labels                map[string]string                    `protobuf:"bytes,9,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput `protobuf:"bytes,10,opt,name=provider_mirror_enabled,json=providerMirrorEnabled,proto3,oneof" json:"provider_mirror_enabled,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -322,6 +323,13 @@ func (x *CreateWorkspaceRequest) GetLabels() map[string]string {
 	return nil
 }
 
+func (x *CreateWorkspaceRequest) GetProviderMirrorEnabled() *NamespaceProviderMirrorEnabledInput {
+	if x != nil {
+		return x.ProviderMirrorEnabled
+	}
+	return nil
+}
+
 // UpdateWorkspaceRequest is the input for updating a Workspace.
 type UpdateWorkspaceRequest struct {
 	state                 protoimpl.MessageState               `protogen:"open.v1"`
@@ -334,6 +342,7 @@ type UpdateWorkspaceRequest struct {
 	RunnerTags            *NamespaceRunnerTagsInput            `protobuf:"bytes,7,opt,name=runner_tags,json=runnerTags,proto3,oneof" json:"runner_tags,omitempty"`
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput `protobuf:"bytes,8,opt,name=drift_detection_enabled,json=driftDetectionEnabled,proto3,oneof" json:"drift_detection_enabled,omitempty"`
 	Labels                map[string]string                    `protobuf:"bytes,9,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput `protobuf:"bytes,10,opt,name=provider_mirror_enabled,json=providerMirrorEnabled,proto3,oneof" json:"provider_mirror_enabled,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -427,6 +436,13 @@ func (x *UpdateWorkspaceRequest) GetDriftDetectionEnabled() *NamespaceDriftDetec
 func (x *UpdateWorkspaceRequest) GetLabels() map[string]string {
 	if x != nil {
 		return x.Labels
+	}
+	return nil
+}
+
+func (x *UpdateWorkspaceRequest) GetProviderMirrorEnabled() *NamespaceProviderMirrorEnabledInput {
+	if x != nil {
+		return x.ProviderMirrorEnabled
 	}
 	return nil
 }
@@ -934,7 +950,7 @@ const file_workspace_proto_rawDesc = "" +
 	"\a_searchB\v\n" +
 	"\t_group_idB\x1f\n" +
 	"\x1d_assigned_managed_identity_idB\x11\n" +
-	"\x0f_workspace_path\"\xbe\x05\n" +
+	"\x0f_workspace_path\"\xe1\x06\n" +
 	"\x16CreateWorkspaceRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x19\n" +
@@ -945,13 +961,16 @@ const file_workspace_proto_rawDesc = "" +
 	"\vrunner_tags\x18\a \x01(\v2<.martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInputH\x01R\n" +
 	"runnerTags\x88\x01\x01\x12\x84\x01\n" +
 	"\x17drift_detection_enabled\x18\b \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInputH\x02R\x15driftDetectionEnabled\x88\x01\x01\x12^\n" +
-	"\x06labels\x18\t \x03(\v2F.martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\t \x03(\v2F.martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.LabelsEntryR\x06labels\x12\x84\x01\n" +
+	"\x17provider_mirror_enabled\x18\n" +
+	" \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInputH\x03R\x15providerMirrorEnabled\x88\x01\x01\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x13\n" +
 	"\x11_max_job_durationB\x0e\n" +
 	"\f_runner_tagsB\x1a\n" +
-	"\x18_drift_detection_enabled\"\x98\x06\n" +
+	"\x18_drift_detection_enabledB\x1a\n" +
+	"\x18_provider_mirror_enabled\"\xbb\a\n" +
 	"\x16UpdateWorkspaceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x1d\n" +
@@ -962,7 +981,9 @@ const file_workspace_proto_rawDesc = "" +
 	"\vrunner_tags\x18\a \x01(\v2<.martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInputH\x05R\n" +
 	"runnerTags\x88\x01\x01\x12\x84\x01\n" +
 	"\x17drift_detection_enabled\x18\b \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInputH\x06R\x15driftDetectionEnabled\x88\x01\x01\x12^\n" +
-	"\x06labels\x18\t \x03(\v2F.martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\t \x03(\v2F.martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.LabelsEntryR\x06labels\x12\x84\x01\n" +
+	"\x17provider_mirror_enabled\x18\n" +
+	" \x01(\v2G.martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInputH\aR\x15providerMirrorEnabled\x88\x01\x01\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
@@ -973,7 +994,8 @@ const file_workspace_proto_rawDesc = "" +
 	"\x11_max_job_durationB\x17\n" +
 	"\x15_prevent_destroy_planB\x0e\n" +
 	"\f_runner_tagsB\x1a\n" +
-	"\x18_drift_detection_enabled\"x\n" +
+	"\x18_drift_detection_enabledB\x1a\n" +
+	"\x18_provider_mirror_enabled\"x\n" +
 	"\x16DeleteWorkspaceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01\x12\x19\n" +
@@ -1069,9 +1091,10 @@ var file_workspace_proto_goTypes = []any{
 	(*PaginationOptions)(nil),                   // 17: martiancloud.tharsis.api.pagination.PaginationOptions
 	(*NamespaceRunnerTagsInput)(nil),            // 18: martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInput
 	(*NamespaceDriftDetectionEnabledInput)(nil), // 19: martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
-	(*ResourceMetadata)(nil),                    // 20: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                            // 21: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                       // 22: google.protobuf.Empty
+	(*NamespaceProviderMirrorEnabledInput)(nil), // 20: martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
+	(*ResourceMetadata)(nil),                    // 21: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),                            // 22: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                       // 23: google.protobuf.Empty
 }
 var file_workspace_proto_depIdxs = []int32{
 	17, // 0: martiancloud.tharsis.api.workspace.GetWorkspacesRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
@@ -1080,37 +1103,39 @@ var file_workspace_proto_depIdxs = []int32{
 	18, // 3: martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.runner_tags:type_name -> martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInput
 	19, // 4: martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
 	14, // 5: martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.labels:type_name -> martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.LabelsEntry
-	18, // 6: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.runner_tags:type_name -> martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInput
-	19, // 7: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
-	15, // 8: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.labels:type_name -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.LabelsEntry
-	20, // 9: martiancloud.tharsis.api.workspace.Workspace.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	16, // 10: martiancloud.tharsis.api.workspace.Workspace.labels:type_name -> martiancloud.tharsis.api.workspace.Workspace.LabelsEntry
-	10, // 11: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.workspaces:type_name -> martiancloud.tharsis.api.workspace.Workspace
-	21, // 12: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	10, // 13: martiancloud.tharsis.api.workspace.WorkspaceEvent.workspace:type_name -> martiancloud.tharsis.api.workspace.Workspace
-	1,  // 14: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:input_type -> martiancloud.tharsis.api.workspace.GetWorkspaceByIDRequest
-	2,  // 15: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:input_type -> martiancloud.tharsis.api.workspace.GetWorkspacesRequest
-	3,  // 16: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:input_type -> martiancloud.tharsis.api.workspace.CreateWorkspaceRequest
-	4,  // 17: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:input_type -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest
-	5,  // 18: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:input_type -> martiancloud.tharsis.api.workspace.DeleteWorkspaceRequest
-	6,  // 19: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:input_type -> martiancloud.tharsis.api.workspace.LockWorkspaceRequest
-	7,  // 20: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:input_type -> martiancloud.tharsis.api.workspace.UnlockWorkspaceRequest
-	8,  // 21: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:input_type -> martiancloud.tharsis.api.workspace.MigrateWorkspaceRequest
-	9,  // 22: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:input_type -> martiancloud.tharsis.api.workspace.SubscribeToWorkspaceEventsRequest
-	10, // 23: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	11, // 24: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:output_type -> martiancloud.tharsis.api.workspace.GetWorkspacesResponse
-	10, // 25: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	10, // 26: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	22, // 27: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:output_type -> google.protobuf.Empty
-	10, // 28: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	10, // 29: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	10, // 30: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
-	12, // 31: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:output_type -> martiancloud.tharsis.api.workspace.WorkspaceEvent
-	23, // [23:32] is the sub-list for method output_type
-	14, // [14:23] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	20, // 6: martiancloud.tharsis.api.workspace.CreateWorkspaceRequest.provider_mirror_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
+	18, // 7: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.runner_tags:type_name -> martiancloud.tharsis.api.namespace.NamespaceRunnerTagsInput
+	19, // 8: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.drift_detection_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceDriftDetectionEnabledInput
+	15, // 9: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.labels:type_name -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.LabelsEntry
+	20, // 10: martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest.provider_mirror_enabled:type_name -> martiancloud.tharsis.api.namespace.NamespaceProviderMirrorEnabledInput
+	21, // 11: martiancloud.tharsis.api.workspace.Workspace.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	16, // 12: martiancloud.tharsis.api.workspace.Workspace.labels:type_name -> martiancloud.tharsis.api.workspace.Workspace.LabelsEntry
+	10, // 13: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.workspaces:type_name -> martiancloud.tharsis.api.workspace.Workspace
+	22, // 14: martiancloud.tharsis.api.workspace.GetWorkspacesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	10, // 15: martiancloud.tharsis.api.workspace.WorkspaceEvent.workspace:type_name -> martiancloud.tharsis.api.workspace.Workspace
+	1,  // 16: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:input_type -> martiancloud.tharsis.api.workspace.GetWorkspaceByIDRequest
+	2,  // 17: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:input_type -> martiancloud.tharsis.api.workspace.GetWorkspacesRequest
+	3,  // 18: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:input_type -> martiancloud.tharsis.api.workspace.CreateWorkspaceRequest
+	4,  // 19: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:input_type -> martiancloud.tharsis.api.workspace.UpdateWorkspaceRequest
+	5,  // 20: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:input_type -> martiancloud.tharsis.api.workspace.DeleteWorkspaceRequest
+	6,  // 21: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:input_type -> martiancloud.tharsis.api.workspace.LockWorkspaceRequest
+	7,  // 22: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:input_type -> martiancloud.tharsis.api.workspace.UnlockWorkspaceRequest
+	8,  // 23: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:input_type -> martiancloud.tharsis.api.workspace.MigrateWorkspaceRequest
+	9,  // 24: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:input_type -> martiancloud.tharsis.api.workspace.SubscribeToWorkspaceEventsRequest
+	10, // 25: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaceByID:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	11, // 26: martiancloud.tharsis.api.workspace.Workspaces.GetWorkspaces:output_type -> martiancloud.tharsis.api.workspace.GetWorkspacesResponse
+	10, // 27: martiancloud.tharsis.api.workspace.Workspaces.CreateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	10, // 28: martiancloud.tharsis.api.workspace.Workspaces.UpdateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	23, // 29: martiancloud.tharsis.api.workspace.Workspaces.DeleteWorkspace:output_type -> google.protobuf.Empty
+	10, // 30: martiancloud.tharsis.api.workspace.Workspaces.LockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	10, // 31: martiancloud.tharsis.api.workspace.Workspaces.UnlockWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	10, // 32: martiancloud.tharsis.api.workspace.Workspaces.MigrateWorkspace:output_type -> martiancloud.tharsis.api.workspace.Workspace
+	12, // 33: martiancloud.tharsis.api.workspace.Workspaces.SubscribeToWorkspaceEvents:output_type -> martiancloud.tharsis.api.workspace.WorkspaceEvent
+	25, // [25:34] is the sub-list for method output_type
+	16, // [16:25] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_workspace_proto_init() }

@@ -9,10 +9,10 @@ import "pagination.proto";
 
 // TerraformProviderVersionMirrorSortableField defines enums for sorting version mirrors.
 enum TerraformProviderVersionMirrorSortableField {
-  CREATED_AT_ASC        = 0;
-  CREATED_AT_DESC       = 1;
-  SEMANTIC_VERSION_ASC  = 2;
-  SEMANTIC_VERSION_DESC = 3;
+  CREATED_AT_ASC  = 0;
+  CREATED_AT_DESC = 1;
+  TYPE_ASC        = 2;
+  TYPE_DESC       = 3;
 }
 
 // GetTerraformProviderVersionMirrorByIDRequest is the input for retrieving a version mirror by ID.
@@ -24,17 +24,17 @@ message GetTerraformProviderVersionMirrorByIDRequest {
 message GetTerraformProviderVersionMirrorsRequest {
   optional pagination.PaginationOptions                pagination_options = 1;
   optional TerraformProviderVersionMirrorSortableField sort               = 2;
-  bool                                                 include_inherited  = 3;
-  string                                               namespace_path     = 4;
+  string                                               namespace_path     = 3;
 }
 
 // CreateTerraformProviderVersionMirrorRequest is the input for creating a version mirror.
 message CreateTerraformProviderVersionMirrorRequest {
-  string group_id           = 1;
-  string type               = 2;
-  string registry_namespace = 3;
-  string registry_hostname  = 4;
-  string semantic_version   = 5;
+  string          group_path         = 1;
+  string          type               = 2;
+  string          registry_namespace = 3;
+  string          registry_hostname  = 4;
+  string          semantic_version   = 5;
+  optional string registry_token     = 6;
 }
 
 // DeleteTerraformProviderVersionMirrorRequest is the input for deleting a version mirror.

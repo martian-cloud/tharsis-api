@@ -3,36 +3,27 @@
 package providermirror
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
-	"path"
-	"strings"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/apparentlymart/go-versions/versions"
 	"github.com/aws/smithy-go/ptr"
-	tfaddr "github.com/hashicorp/terraform-registry-address"
-	svchost "github.com/hashicorp/terraform-svchost"
-	"github.com/hashicorp/terraform-svchost/disco"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace/utils"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/tracing"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
 )
 
 const (
@@ -47,8 +38,8 @@ type GetProviderVersionMirrorsInput struct {
 	PaginationOptions *pagination.Options
 	// NamespacePath is the namespace to return provider version mirrors for.
 	NamespacePath string
-	// IncludeInherited includes inherited provider version mirrors in the result.
-	IncludeInherited bool
+	// Search filters by hostname/namespace/type.
+	Search *string
 }
 
 // GetProviderVersionMirrorByAddressInput is the input for GetProviderVersionMirrorByAddress.
@@ -66,7 +57,8 @@ type CreateProviderVersionMirrorInput struct {
 	RegistryNamespace string
 	RegistryHostname  string
 	SemanticVersion   string
-	GroupID           string
+	GroupPath         string
+	RegistryToken     *string
 }
 
 // DeleteProviderVersionMirrorInput is the input for DeleteTerraformProviderVersionMirror.
@@ -119,32 +111,21 @@ type GetAvailableInstallationPackagesInput struct {
 	GroupPath         string
 }
 
-// listVersionsResponse is the response returned from the Terraform Registry API
-// when querying for supported versions for a provider.
-// https://developer.hashicorp.com/terraform/internals/provider-registry-protocol#list-available-versions
-type listVersionsResponse struct {
-	Versions []struct {
-		Version   string `json:"version"`
-		Platforms []struct {
-			OS   string `json:"os"`
-			Arch string `json:"arch"`
-		} `json:"platforms"`
-	} `json:"versions"`
-	Warnings []string `json:"warnings"`
+// GetInstallationPackageInput represents the input for GetInstallationPackage.
+type GetInstallationPackageInput struct {
+	Type              string
+	RegistryNamespace string
+	RegistryHostname  string
+	SemanticVersion   string
+	GroupPath         string
+	OS                string
+	Arch              string
 }
 
-// packageQueryResponse is the response returned when querying for a particular
-// installation package. It is used to find the SHA256SUMS, SHA256SUMS.sig files
-// and the associated key files needed to verify their authenticity.
-// https://developer.hashicorp.com/terraform/internals/provider-registry-protocol#find-a-provider-package
-type packageQueryResponse struct {
-	SHASumsURL          string `json:"shasums_url"`
-	SHASumsSignatureURL string `json:"shasums_signature_url"`
-	SigningKeys         struct {
-		GPGPublicKeys []struct {
-			ASCIIArmor string `json:"ascii_armor"`
-		} `json:"gpg_public_keys"`
-	} `json:"signing_keys"`
+// InstallationPackage represents a single platform's installation package info.
+type InstallationPackage struct {
+	URL    string
+	Hashes []string
 }
 
 // Service implements all the Terraform provider mirror functionality.
@@ -162,18 +143,13 @@ type Service interface {
 	UploadInstallationPackage(ctx context.Context, input *UploadInstallationPackageInput) error
 	GetAvailableProviderVersions(ctx context.Context, input *GetAvailableProviderVersionsInput) (map[string]struct{}, error)
 	GetAvailableInstallationPackages(ctx context.Context, input *GetAvailableInstallationPackagesInput) (map[string]any, error)
-}
-
-// serviceDiscoverer is an interface meant to facilitate in easier testing using the disco package.
-type serviceDiscoverer interface {
-	DiscoverServiceURL(hostname svchost.Hostname, serviceID string) (*url.URL, error)
+	GetInstallationPackage(ctx context.Context, input *GetInstallationPackageInput) (*InstallationPackage, error)
 }
 
 type service struct {
 	logger          logger.Logger
 	dbClient        *db.Client
-	httpClient      *http.Client
-	discovery       serviceDiscoverer
+	registryClient  provider.RegistryProtocol
 	limitChecker    limits.LimitChecker
 	activityService activityevent.Service
 	mirrorStore     TerraformProviderMirrorStore
@@ -183,7 +159,7 @@ type service struct {
 func NewService(
 	logger logger.Logger,
 	dbClient *db.Client,
-	httpClient *http.Client,
+	registryClient provider.RegistryProtocol,
 	limitChecker limits.LimitChecker,
 	activityService activityevent.Service,
 	mirrorStore TerraformProviderMirrorStore,
@@ -191,11 +167,10 @@ func NewService(
 	return &service{
 		logger:          logger,
 		dbClient:        dbClient,
-		httpClient:      httpClient,
+		registryClient:  registryClient,
 		limitChecker:    limitChecker,
 		activityService: activityService,
 		mirrorStore:     mirrorStore,
-		discovery:       disco.New(),
 	}
 }
 
@@ -304,22 +279,11 @@ func (s *service) GetProviderVersionMirrors(ctx context.Context, input *GetProvi
 	dbInput := &db.GetProviderVersionMirrorsInput{
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
-		Filter:            &db.TerraformProviderVersionMirrorFilter{},
-	}
-
-	if input.IncludeInherited {
-		pathParts := strings.Split(input.NamespacePath, "/")
-
-		paths := []string{}
-		for len(pathParts) > 0 {
-			paths = append(paths, strings.Join(pathParts, "/"))
-			// Remove last element
-			pathParts = pathParts[:len(pathParts)-1]
-		}
-
-		dbInput.Filter.NamespacePaths = paths
-	} else {
-		dbInput.Filter.NamespacePaths = []string{input.NamespacePath}
+		Filter: &db.TerraformProviderVersionMirrorFilter{
+			Search: input.Search,
+			// Version mirrors are always associated with a root group, so they must be inherited.
+			NamespacePaths: utils.ExpandPath(input.NamespacePath),
+		},
 	}
 
 	result, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrors(ctx, dbInput)
@@ -341,13 +305,13 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, err
 	}
 
-	err = caller.RequirePermission(ctx, models.CreateTerraformProviderMirrorPermission, auth.WithGroupID(input.GroupID))
+	err = caller.RequirePermission(ctx, models.CreateTerraformProviderMirrorPermission, auth.WithNamespacePath(input.GroupPath))
 	if err != nil {
 		tracing.RecordError(span, err, "caller permission check failed")
 		return nil, err
 	}
 
-	group, err := s.dbClient.Groups.GetGroupByID(ctx, input.GroupID)
+	group, err := s.dbClient.Groups.GetGroupByTRN(ctx, types.GroupModelType.BuildTRN(input.GroupPath))
 	if err != nil {
 		tracing.RecordError(span, err, "group not found")
 		return nil, err
@@ -355,7 +319,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	if group == nil {
 		tracing.RecordError(span, nil, "group not found")
-		return nil, errors.New("group with id %s not found", input.GroupID, errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.New("group %s not found", input.GroupPath, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	if group.ParentID != "" {
@@ -363,10 +327,10 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, errors.New("terraform provider version mirrors can only be created in a top-level group", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	provider, err := parseProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
+	prov, err := provider.NewProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to parse provider")
-		return nil, err
+		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	wantVersion, err := versions.ParseVersion(input.SemanticVersion)
@@ -375,39 +339,38 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 		return nil, errors.Wrap(err, "invalid provider version", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	// Discover the provider registry host and get the service URL.
-	serviceURL, err := s.discovery.DiscoverServiceURL(provider.Hostname, "providers.v1")
-	if err != nil {
-		tracing.RecordError(span, err, "failed to discover provider registry's service URL")
-		return nil, fmt.Errorf("failed to discover provider registry's service URL: %w", err)
+	// Build request options with token if available.
+	var reqOpts []provider.RequestOption
+	if input.RegistryToken != nil {
+		reqOpts = append(reqOpts, provider.WithToken(*input.RegistryToken))
 	}
 
 	// We will attempt to list all the supported versions for this provider, so we can find the
 	// platforms it supports. It isn't possible to know this otherwise.
-	availableVersions, err := s.listAvailableProviderVersions(ctx, serviceURL, provider)
+	availableVersions, err := s.registryClient.ListVersions(ctx, prov, reqOpts...)
 	if err != nil {
-		tracing.RecordError(span, err, "Failed to list available provider versions")
-		return nil, errors.Wrap(err, "Failed to list available provider versions", errors.WithErrorCode(errors.ENotFound))
+		tracing.RecordError(span, err, "failed to list available provider versions")
+		return nil, errors.Wrap(err, "failed to list available provider versions", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Find a platform the provider supports. We only need one for our purposes.
-	supportedPlatform, err := findSupportedPlatform(wantVersion, availableVersions)
+	supportedPlatform, err := provider.GetPlatformForVersion(wantVersion.String(), availableVersions)
 	if err != nil {
-		tracing.RecordError(span, err, "Unsupported provider version")
-		return nil, errors.Wrap(err, "Unsupported version %s for provider %s", wantVersion, provider, errors.WithErrorCode(errors.EInvalid))
+		tracing.RecordError(span, err, "unsupported provider version")
+		return nil, errors.Wrap(err, "unsupported version %s for provider %s", wantVersion, prov, errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Now, find the sha sums, signature URLs and the associated GPG key(s) by arbitrarily using
 	// one of the supported platforms. The sha sums and signature URLs should be independent of
 	// of the platform being queried for.
-	packageResp, err := s.findProviderPackage(ctx, serviceURL, provider, wantVersion.String(), supportedPlatform)
+	packageInfo, err := s.registryClient.GetPackageInfo(ctx, prov, wantVersion.String(), supportedPlatform.OS, supportedPlatform.Arch, reqOpts...)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to find provider package")
-		return nil, errors.Wrap(err, "Could not find package at provider registry API", errors.WithErrorCode(errors.ENotFound))
+		return nil, errors.Wrap(err, "could not find package at provider registry API", errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Retrieve and verify the checksums from the response.
-	digests, err := s.getChecksums(ctx, packageResp.SHASumsURL, packageResp.SHASumsSignatureURL, getGPGKeys(packageResp))
+	digests, err := s.registryClient.GetChecksums(ctx, packageInfo)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to get checksums")
 		return nil, fmt.Errorf("failed to get checksums: %w", err)
@@ -427,9 +390,9 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 
 	toCreate := &models.TerraformProviderVersionMirror{
 		CreatedBy:         caller.GetSubject(),
-		Type:              provider.Type,
-		RegistryNamespace: provider.Namespace,
-		RegistryHostname:  provider.Hostname.String(),
+		Type:              prov.Type,
+		RegistryNamespace: prov.Namespace,
+		RegistryHostname:  prov.Hostname,
 		SemanticVersion:   wantVersion.String(),
 		Digests:           digests,
 		GroupID:           group.Metadata.ID,
@@ -480,7 +443,7 @@ func (s *service) CreateProviderVersionMirror(ctx context.Context, input *Create
 	}
 
 	s.logger.WithContextFields(ctx).Infow("Created a terraform provider version mirror.",
-		"groupPath", input.GroupID,
+		"groupPath", input.GroupPath,
 		"versionMirrorID", created.Metadata.ID,
 	)
 
@@ -561,7 +524,13 @@ func (s *service) DeleteProviderVersionMirror(ctx context.Context, input *Delete
 		return fmt.Errorf("failed to get group associated with version mirror: %w", err)
 	}
 
-	providerName := fmt.Sprintf("%s/%s/%s", input.VersionMirror.RegistryHostname, input.VersionMirror.RegistryNamespace, input.VersionMirror.Type)
+	provider := &provider.Provider{
+		Hostname:  input.VersionMirror.RegistryHostname,
+		Namespace: input.VersionMirror.RegistryNamespace,
+		Type:      input.VersionMirror.Type,
+	}
+
+	providerName := fmt.Sprintf("%s/%s", provider, input.VersionMirror.SemanticVersion)
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
 			NamespacePath: &group.FullPath,
@@ -780,6 +749,47 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		return errors.New("provider platform package is already mirrored", errors.WithErrorCode(errors.EConflict))
 	}
 
+	digestKey := provider.GetPackageName(versionMirror.Type, versionMirror.SemanticVersion, input.OS, input.Architecture)
+
+	// No point in continuing if we don't have a checksum for the package.
+	expectDigest, ok := versionMirror.Digests[digestKey]
+	if !ok {
+		tracing.RecordError(span, nil, "no checksum available for provider package %s", digestKey)
+		return errors.New("no checksum available for provider package %s", digestKey)
+	}
+
+	checksum := sha256.New()
+	teeReader := io.TeeReader(
+		io.LimitReader(input.Data, providerPlatformPackageMaxSizeLimit),
+		checksum,
+	)
+
+	packageFile, err := os.CreateTemp("", "terraform-provider-package-*.zip")
+	if err != nil {
+		tracing.RecordError(span, err, "failed to create temporary package file")
+		return err
+	}
+	defer os.Remove(packageFile.Name())
+	defer packageFile.Close()
+
+	if _, err = io.Copy(packageFile, teeReader); err != nil {
+		tracing.RecordError(span, err, "failed to save uploaded provider package file to disk")
+		return fmt.Errorf("failed to save uploaded provider package file to disk: %w", err)
+	}
+
+	calculatedSum := checksum.Sum(nil)
+	if !bytes.Equal(expectDigest, calculatedSum) {
+		tracing.RecordError(span, nil, "checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest)
+		return errors.New("checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest, errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// Seek back to beginning for upload
+	if _, err = packageFile.Seek(0, io.SeekStart); err != nil {
+		tracing.RecordError(span, err, "failed to seek package file")
+		return fmt.Errorf("failed to seek package file: %w", err)
+	}
+
+	// Start transaction for DB operations and upload
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -792,67 +802,18 @@ func (s *service) UploadInstallationPackage(ctx context.Context, input *UploadIn
 		}
 	}()
 
-	digestKey := getProviderPackageName(versionMirror.Type, versionMirror.SemanticVersion, input.OS, input.Architecture)
-
-	// No point in continuing if we don't have a checksum for the package.
-	expectDigest, ok := versionMirror.Digests[digestKey]
-	if !ok {
-		tracing.RecordError(span, nil, "no checksum available for provider package %s", digestKey)
-		return fmt.Errorf("no checksum available for provider package %s", digestKey)
-	}
-
-	// This platform package hasn't been uploaded to the mirror yet, so we must upload it and
-	// calculate the checksum for it afterwards.
-	checksum := sha256.New()
-	teeReader := io.TeeReader(
-		// Wrap the package download in a limit reader so, we don't read indefinitely.
-		io.LimitReader(input.Data, providerPlatformPackageMaxSizeLimit),
-		checksum,
-	)
-
-	// Create a temp file we can download the package to. Needed to compute checksum prior to upload.
-	f, err := os.CreateTemp("", "terraform-provider-package-*.zip")
-	if err != nil {
-		tracing.RecordError(span, err, "failed to create temporary package file")
-		return err
-	}
-	defer os.Remove(f.Name())
-
-	// Save the package to disk.
-	if _, err = io.Copy(f, teeReader); err != nil {
-		tracing.RecordError(span, err, "failed to save uploaded provider package file to disk")
-		return fmt.Errorf("failed to save uploaded provider package file to disk: %w", err)
-	}
-
-	// Must calculate afterwards to avoid downloading the package into memory.
-	calculatedSum := checksum.Sum(nil)
-
-	if !bytes.Equal(expectDigest, calculatedSum) {
-		tracing.RecordError(span, nil, "checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest)
-		return errors.New("checksum of the uploaded provider platform package %x does not match the expected checksum %x", calculatedSum, expectDigest, errors.WithErrorCode(errors.EInvalid))
-	}
-
-	toCreate := &models.TerraformProviderPlatformMirror{
+	// Create DB records first before uploading
+	platformMirror, err := s.dbClient.TerraformProviderPlatformMirrors.CreatePlatformMirror(txContext, &models.TerraformProviderPlatformMirror{
 		VersionMirrorID: versionMirror.Metadata.ID,
 		OS:              input.OS,
 		Architecture:    input.Architecture,
-	}
-
-	// Create the provider platform mirror before attempting an upload, incase the upload completes
-	// and this fails to create. This allows us to rollback the transaction.
-	if _, err = s.dbClient.TerraformProviderPlatformMirrors.CreatePlatformMirror(txContext, toCreate); err != nil {
-		tracing.RecordError(span, err, "failed to create provider platform mirror")
-		return fmt.Errorf("failed to create provider platform mirror: %w", err)
-	}
-
-	packageFile, err := os.Open(f.Name()) // nosemgrep: gosec.G304-1
+	})
 	if err != nil {
-		tracing.RecordError(span, err, "failed to open provider package file from disk")
-		return fmt.Errorf("failed to open provider package file from disk: %w", err)
+		tracing.RecordError(span, err, "failed to create provider platform mirror")
+		return errors.Wrap(err, "failed to create provider platform mirror")
 	}
-	defer packageFile.Close()
 
-	if err = s.mirrorStore.UploadProviderPlatformPackage(txContext, expectDigest, packageFile); err != nil {
+	if err = s.mirrorStore.UploadProviderPlatformPackage(txContext, platformMirror.Metadata.ID, packageFile); err != nil {
 		tracing.RecordError(span, err, "failed to upload provider platform package to object store")
 		return fmt.Errorf("failed to upload provider platform package to object store: %w", err)
 	}
@@ -888,21 +849,22 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 		return nil, err
 	}
 
-	provider, err := parseProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
+	prov, err := provider.NewProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to parse provider")
-		return nil, err
+		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	// Let the DB sort by semantic version ascending.
-	sort := db.TerraformProviderVersionMirrorSortableFieldSemanticVersionAsc
+	// Only return versions with packages.
+	sort := db.TerraformProviderVersionMirrorSortableFieldCreatedAtAsc
 	result, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrors(ctx, &db.GetProviderVersionMirrorsInput{
 		Sort: &sort,
 		Filter: &db.TerraformProviderVersionMirrorFilter{
 			GroupID:           &group.Metadata.ID,
-			RegistryHostname:  ptr.String(provider.Hostname.String()),
-			RegistryNamespace: &provider.Namespace,
-			Type:              &provider.Type,
+			RegistryHostname:  &prov.Hostname,
+			RegistryNamespace: &prov.Namespace,
+			Type:              &prov.Type,
+			HasPackages:       ptr.Bool(true),
 		},
 	})
 	if err != nil {
@@ -912,8 +874,8 @@ func (s *service) GetAvailableProviderVersions(ctx context.Context, input *GetAv
 
 	// Per Terraform docs, must return a ENotFound when we have no mirrored provider versions.
 	if result.PageInfo.TotalCount == 0 {
-		tracing.RecordError(span, nil, "no versions are currently mirrored for Terraform provider %s", provider)
-		return nil, errors.New("no versions are currently mirrored for Terraform provider %s", provider, errors.WithErrorCode(errors.ENotFound))
+		tracing.RecordError(span, nil, "no versions are currently mirrored for Terraform provider %s", prov)
+		return nil, errors.New("no versions are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Must convert to a map here as needed by Terraform CLI.
@@ -947,10 +909,10 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		return nil, err
 	}
 
-	provider, err := parseProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
+	prov, err := provider.NewProvider(input.RegistryHostname, input.RegistryNamespace, input.Type)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to parse provider")
-		return nil, err
+		return nil, errors.Wrap(err, "invalid provider", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// Find the version mirror first.
@@ -960,10 +922,11 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 		},
 		Filter: &db.TerraformProviderVersionMirrorFilter{
 			GroupID:           &group.Metadata.ID,
-			RegistryHostname:  &input.RegistryHostname,
-			RegistryNamespace: &input.RegistryNamespace,
-			Type:              &input.Type,
+			RegistryHostname:  &prov.Hostname,
+			RegistryNamespace: &prov.Namespace,
+			Type:              &prov.Type,
 			SemanticVersion:   &input.SemanticVersion,
+			HasPackages:       ptr.Bool(true),
 		},
 	})
 	if err != nil {
@@ -972,8 +935,8 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 	}
 
 	if versionsResult.PageInfo.TotalCount == 0 {
-		tracing.RecordError(span, nil, "version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, provider)
-		return nil, errors.New("version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, provider, errors.WithErrorCode(errors.ENotFound))
+		tracing.RecordError(span, nil, "version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov)
+		return nil, errors.New("version %s is currently not mirrored for Terraform provider %s", input.SemanticVersion, prov, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	versionMirror := versionsResult.VersionMirrors[0]
@@ -989,8 +952,8 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 	}
 
 	if result.PageInfo.TotalCount == 0 {
-		tracing.RecordError(span, nil, "no installation packages are currently mirrored for Terraform provider %s", provider)
-		return nil, errors.New("no installation packages are currently mirrored for Terraform provider %s", provider, errors.WithErrorCode(errors.ENotFound))
+		tracing.RecordError(span, nil, "no installation packages are currently mirrored for Terraform provider %s", prov)
+		return nil, errors.New("no installation packages are currently mirrored for Terraform provider %s", prov, errors.WithErrorCode(errors.ENotFound))
 	}
 
 	// Build the list of supported packages.
@@ -1003,183 +966,71 @@ func (s *service) GetAvailableInstallationPackages(ctx context.Context, input *G
 	return supportedPackages, nil
 }
 
-// listAvailableProviderVersions lists the available provider versions and platforms
-// they support by contacting the Terraform Registry API the provider is associated with.
-func (s *service) listAvailableProviderVersions(
-	ctx context.Context,
-	serviceURL *url.URL,
-	provider *tfaddr.Provider,
-) (*listVersionsResponse, error) {
-	result, err := url.Parse(path.Join(provider.Namespace, provider.Type, "versions"))
+func (s *service) GetInstallationPackage(ctx context.Context, input *GetInstallationPackageInput) (*InstallationPackage, error) {
+	ctx, span := tracer.Start(ctx, "svc.GetInstallationPackage")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	group, err := s.getGroupByFullPath(ctx, input.GroupPath)
 	if err != nil {
 		return nil, err
 	}
 
-	endpoint := serviceURL.ResolveReference(result)
-
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	err = caller.RequireAccessToInheritableResource(ctx, types.TerraformProviderMirrorModelType, auth.WithGroupID(group.Metadata.ID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate http request: %w", err)
+		tracing.RecordError(span, err, "caller permission check failed")
+		return nil, err
 	}
 
-	r.Header.Add("Accept", "application/json")
-
-	resp, err := s.httpClient.Do(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// Decode the payload to get the available provider versions.
-	var decodedBody listVersionsResponse
-	if err = json.NewDecoder(resp.Body).Decode(&decodedBody); err != nil {
-		return nil, fmt.Errorf("failed to decode response body: %w", err)
-	}
-
-	// Make sure no warnings were returned.
-	if len(decodedBody.Warnings) > 0 {
-		return nil, fmt.Errorf("provider versions endpoint returned warnings: %s", strings.Join(decodedBody.Warnings, "; "))
-	}
-
-	if len(decodedBody.Versions) == 0 {
-		return nil, fmt.Errorf("no versions found for provider %s", provider)
-	}
-
-	return &decodedBody, nil
-}
-
-// findProviderPackage attempts to locate the provider package at the provider's registry.
-// It visits the endpoint for the target provider and parses the JSON response, which should
-// give us access to the SHA256SUMS, SHA256SUMS.sig and GPG key used to sign the checksums file.
-func (s *service) findProviderPackage(
-	ctx context.Context,
-	serviceURL *url.URL,
-	provider *tfaddr.Provider,
-	version,
-	platform string,
-) (*packageQueryResponse, error) {
-	// Separate OS and arch.
-	parts := strings.Split(platform, "_")
-
-	// Build the URL to the provider's download endpoint which will give us access to the
-	// SHASUMS, SHASUMS.sig and GPG key used to sign the checksums file. These are generally
-	// hosted in a different location than the provider's registry.
-	path := path.Join(
-		provider.Namespace,
-		provider.Type,
-		version,
-		"download",
-		parts[0],
-		parts[1],
+	// Build TRN for version mirror lookup.
+	versionTRN := types.TerraformProviderVersionMirrorModelType.BuildTRN(
+		input.GroupPath, input.RegistryHostname, input.RegistryNamespace, input.Type, input.SemanticVersion,
 	)
 
-	result, err := url.Parse(path)
+	versionMirror, err := s.dbClient.TerraformProviderVersionMirrors.GetVersionMirrorByTRN(ctx, versionTRN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build package download URL: %w", err)
+		tracing.RecordError(span, err, "failed to get version mirror")
+		return nil, err
+	}
+	if versionMirror == nil {
+		return nil, errors.New("version %s is not mirrored for provider %s/%s/%s", input.SemanticVersion, input.RegistryHostname, input.RegistryNamespace, input.Type, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	endpoint := serviceURL.ResolveReference(result)
-
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build package download HTTP request: %w", err)
-	}
-
-	// We only want JSON.
-	r.Header.Set("Accept", "application/json")
-
-	response, err := s.httpClient.Do(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get package download URL: %w", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
-	}
-
-	var foundResp packageQueryResponse
-	if err := json.NewDecoder(response.Body).Decode(&foundResp); err != nil {
-		return nil, fmt.Errorf("failed to decode download package response body: %w", err)
-	}
-
-	return &foundResp, nil
-}
-
-func (s *service) getChecksums(
-	ctx context.Context,
-	shaSumsURL,
-	shaSumsSignatureURL string,
-	gpgKeys []string,
-) (map[string][]byte, error) {
-	// Parse the URL from the response.
-	endpoint, err := url.Parse(shaSumsURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse checksums URL: %w", err)
-	}
-
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build download checksums request: %w", err)
-	}
-
-	checksumResp, err := s.httpClient.Do(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download checksums file: %w", err)
-	}
-	defer checksumResp.Body.Close()
-
-	if checksumResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status returned from checksums download: %d", checksumResp.StatusCode)
-	}
-
-	endpoint, err = url.Parse(shaSumsSignatureURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse checksums signature URL: %w", err)
-	}
-
-	r, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build download signatures request: %w", err)
-	}
-
-	signatureResp, err := s.httpClient.Do(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download checksums signature file: %w", err)
-	}
-	defer signatureResp.Body.Close()
-
-	if signatureResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status returned from checksums signature download: %d", signatureResp.StatusCode)
-	}
-
-	var (
-		checksumReader io.Reader    // For building checksum map.
-		buffer         bytes.Buffer // For validating checksum signature.
+	// Build TRN for platform mirror lookup.
+	platformTRN := types.TerraformProviderPlatformMirrorModelType.BuildTRN(
+		input.GroupPath, input.RegistryHostname, input.RegistryNamespace, input.Type, input.SemanticVersion, input.OS, input.Arch,
 	)
-	sigReader := io.TeeReader(checksumResp.Body, &buffer)
-	checksumReader = &buffer
 
-	// Verify the signature.
-	if err = verifySumsSignature(sigReader, signatureResp.Body, gpgKeys); err != nil {
-		return nil, fmt.Errorf("failed to verify checksum signature: %w", err)
-	}
-
-	checksumMap, err := toChecksumMap(checksumReader)
+	platformMirror, err := s.dbClient.TerraformProviderPlatformMirrors.GetPlatformMirrorByTRN(ctx, platformTRN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse checksums: %w", err)
+		tracing.RecordError(span, err, "failed to get platform mirror")
+		return nil, err
+	}
+	if platformMirror == nil {
+		return nil, errors.New("platform %s_%s is not mirrored", input.OS, input.Arch, errors.WithErrorCode(errors.ENotFound))
 	}
 
-	// Sanity check to make sure we actually have checksums.
-	if len(checksumMap) == 0 {
-		return nil, fmt.Errorf("no checksums found after parsing response")
+	digestKey := provider.GetPackageName(versionMirror.Type, versionMirror.SemanticVersion, platformMirror.OS, platformMirror.Architecture)
+	hash, ok := provider.Checksums(versionMirror.Digests).GetZipHash(digestKey)
+	if !ok {
+		return nil, fmt.Errorf("digest not found for provider package: %s", digestKey)
 	}
 
-	return checksumMap, nil
+	presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, platformMirror.Metadata.ID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get presigned URL")
+		return nil, err
+	}
+
+	return &InstallationPackage{
+		URL:    presignedURL,
+		Hashes: []string{hash},
+	}, nil
 }
 
 // buildSupportedPackages builds a map of supported Terraform packages for each
@@ -1192,16 +1043,16 @@ func (s *service) buildSupportedPackages(
 	supportedPackages := make(map[string]any, len(platformMirrors))
 
 	for _, mirror := range platformMirrors {
-		digestKey := getProviderPackageName(versionMirror.Type, versionMirror.SemanticVersion, mirror.OS, mirror.Architecture)
+		digestKey := provider.GetPackageName(versionMirror.Type, versionMirror.SemanticVersion, mirror.OS, mirror.Architecture)
 
-		digest, ok := versionMirror.Digests[digestKey]
+		hash, ok := provider.Checksums(versionMirror.Digests).GetZipHash(digestKey)
 		if !ok {
 			// Shouldn't happen.
 			return nil, fmt.Errorf("failed to get digest for provider package: %s", digestKey)
 		}
 
 		// Get the presignedURL for downloading this provider package.
-		presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, digest)
+		presignedURL, err := s.mirrorStore.GetProviderPlatformPackagePresignedURL(ctx, mirror.Metadata.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get provider platform package presigned URL: %w", err)
 		}
@@ -1210,12 +1061,8 @@ func (s *service) buildSupportedPackages(
 		key := fmt.Sprintf("%s_%s", mirror.OS, mirror.Architecture)
 
 		supportedPackages[key] = map[string]any{
-			"url": presignedURL,
-			"hashes": []string{
-				// Hash format complies with Terraform's zip hash format:
-				// https://github.com/hashicorp/terraform/blob/d49e991c3c33c10b26c120465466d41f96e073de/internal/getproviders/hash.go#L330
-				fmt.Sprintf("zh:%x", digest),
-			},
+			"url":    presignedURL,
+			"hashes": []string{hash},
 		}
 	}
 
@@ -1259,130 +1106,4 @@ func (s *service) getGroupByFullPath(ctx context.Context, path string) (*models.
 	}
 
 	return group, nil
-}
-
-// verifySumsSignature attempts to validate the signature on the checksum file.
-func verifySumsSignature(checksums, signature io.Reader, gpgKeys []string) error {
-	// Iterate through the keys and attempt to verify the signature. We only need a single key to match.
-	// Per Terraform docs, at least one of the supplied keys must be used to sign the checksums.
-	var matchFound bool
-	for _, key := range gpgKeys {
-		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(key))
-		if err != nil {
-			return err
-		}
-
-		if _, err := openpgp.CheckDetachedSignature(entityList, checksums, signature, nil); err == nil {
-			matchFound = true
-			break
-		}
-	}
-
-	if !matchFound {
-		return fmt.Errorf("no matching key found for signature or signature mismatch")
-	}
-
-	return nil
-}
-
-// toChecksumMap returns a map of binary name --> SHA256SUM.
-func toChecksumMap(reader io.Reader) (map[string][]byte, error) {
-	checksumMap := make(map[string][]byte)
-	scanner := bufio.NewScanner(reader)
-
-	// Line by line process the checksum file.
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// There should be exactly two parts for every line.
-		parts := strings.Fields(line)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("unexpected checksum line format: %s", line)
-		}
-
-		// Verify checksum only has hex values.
-		hexBytes, err := hex.DecodeString(parts[0])
-		if err != nil {
-			return nil, err
-		}
-
-		// Check if it's the right length.
-		if len(hexBytes) != sha256.Size {
-			return nil, fmt.Errorf("unexpected checksum size. Expected %d, got %d", sha256.Size, len(hexBytes))
-		}
-
-		checksumMap[parts[1]] = hexBytes
-	}
-
-	return checksumMap, nil
-}
-
-// parseProvider parses a provider from the input. It validates
-// all components to make sure they comply with Terraform's standards.
-func parseProvider(hostname, namespace, providerType string) (*tfaddr.Provider, error) {
-	// Must parse individual parts first to avoid any panics from NewProvider.
-	ns, err := tfaddr.ParseProviderPart(namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid registry namespace", errors.WithErrorCode(errors.EInvalid))
-	}
-
-	pType, err := tfaddr.ParseProviderPart(providerType)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid provider type", errors.WithErrorCode(errors.EInvalid))
-	}
-
-	convertedHostname, err := svchost.ForComparison(hostname)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid registry hostname", errors.WithErrorCode(errors.EInvalid))
-	}
-
-	provider := tfaddr.NewProvider(convertedHostname, ns, pType)
-
-	return &provider, nil
-}
-
-// findSupportedPlatform finds the target provider version and returns a platform it supports.
-func findSupportedPlatform(targetVersion versions.Version, versionsResp *listVersionsResponse) (string, error) {
-	platform := ""
-
-	for _, version := range versionsResp.Versions {
-		v, err := versions.ParseVersion(version.Version)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse provider version: %w", err)
-		}
-
-		if v.Same(targetVersion) {
-			for _, p := range version.Platforms {
-				// We will short-circuit here and just return the first platform we see
-				// since that's all we really need.
-				platform = fmt.Sprintf("%s_%s", p.OS, p.Arch)
-				break
-			}
-
-			break
-		}
-	}
-
-	// If this is empty then version is likely not supported by the provider.
-	if platform == "" {
-		return "", fmt.Errorf("no supported platforms found or provider version not supported")
-	}
-
-	return platform, nil
-}
-
-// getGPGKeys returns a slice of GPG keys from the packageQueryResponse.
-func getGPGKeys(packageResp *packageQueryResponse) []string {
-	gpgKeys := []string{}
-	for _, key := range packageResp.SigningKeys.GPGPublicKeys {
-		gpgKeys = append(gpgKeys, key.ASCIIArmor)
-	}
-
-	return gpgKeys
-}
-
-// Should conform to the following format as used by Terraform:
-// terraform-provider-<provider_type>_<version>_<os>_<arch>.zip
-func getProviderPackageName(providerType, version, os, arch string) string {
-	return fmt.Sprintf("terraform-provider-%s_%s_%s_%s.zip", providerType, version, os, arch)
 }

@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/managedidentity"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/providermirror"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/run"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/serviceaccount"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/vcs"
@@ -471,6 +472,29 @@ func (r *WorkspaceResolver) VCSEvents(ctx context.Context, args *VCSEventConnect
 	return NewVCSEventConnectionResolver(ctx, &input)
 }
 
+// TerraformProviderMirrors resolver
+func (r *WorkspaceResolver) TerraformProviderMirrors(
+	ctx context.Context,
+	args *TerraformProviderVersionMirrorConnectionQueryArgs,
+) (*TerraformProviderVersionMirrorConnectionResolver, error) {
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	input := &providermirror.GetProviderVersionMirrorsInput{
+		PaginationOptions: &pagination.Options{First: args.First, Last: args.Last, After: args.After, Before: args.Before},
+		NamespacePath:     r.workspace.FullPath,
+		Search:            args.Search,
+	}
+
+	if args.Sort != nil {
+		sort := db.TerraformProviderVersionMirrorSortableField(*args.Sort)
+		input.Sort = &sort
+	}
+
+	return NewTerraformProviderVersionMirrorConnectionResolver(ctx, input)
+}
+
 // RunnerTags resolver
 func (r *WorkspaceResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTagsSetting, error) {
 	return getServiceCatalog(ctx).WorkspaceService.GetRunnerTagsSetting(ctx, r.workspace)
@@ -479,6 +503,11 @@ func (r *WorkspaceResolver) RunnerTags(ctx context.Context) (*namespace.RunnerTa
 // DriftDetectionEnabled resolver
 func (r *WorkspaceResolver) DriftDetectionEnabled(ctx context.Context) (*namespace.DriftDetectionEnabledSetting, error) {
 	return getServiceCatalog(ctx).WorkspaceService.GetDriftDetectionEnabledSetting(ctx, r.workspace)
+}
+
+// ProviderMirrorEnabled resolver
+func (r *WorkspaceResolver) ProviderMirrorEnabled(ctx context.Context) (*namespace.ProviderMirrorEnabledSetting, error) {
+	return getServiceCatalog(ctx).WorkspaceService.GetProviderMirrorEnabledSetting(ctx, r.workspace)
 }
 
 // DEPRECATED: use node query instead
@@ -582,6 +611,7 @@ type CreateWorkspaceInput struct {
 	GroupPath             *string // DEPRECATED: use GroupID instead with a TRN
 	Description           string
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
 	Labels                *[]WorkspaceLabelInput
 }
 
@@ -599,6 +629,7 @@ type UpdateWorkspaceInput struct {
 	ID                    *string
 	RunnerTags            *NamespaceRunnerTagsInput
 	DriftDetectionEnabled *NamespaceDriftDetectionEnabledInput
+	ProviderMirrorEnabled *NamespaceProviderMirrorEnabledInput
 	Labels                *[]WorkspaceLabelInput
 }
 
@@ -712,6 +743,16 @@ func createWorkspaceMutation(ctx context.Context, input *CreateWorkspaceInput) (
 		}
 	}
 
+	if input.ProviderMirrorEnabled != nil {
+		if err = input.ProviderMirrorEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.ProviderMirrorEnabled.Enabled != nil {
+			wsCreateOptions.EnableProviderMirror = input.ProviderMirrorEnabled.Enabled
+		}
+	}
+
 	createdWorkspace, err := getServiceCatalog(ctx).WorkspaceService.CreateWorkspace(ctx, &wsCreateOptions)
 	if err != nil {
 		return nil, err
@@ -788,6 +829,20 @@ func updateWorkspaceMutation(ctx context.Context, input *UpdateWorkspaceInput) (
 
 		if input.DriftDetectionEnabled.Inherit {
 			ws.EnableDriftDetection = nil
+		}
+	}
+
+	if input.ProviderMirrorEnabled != nil {
+		if err = input.ProviderMirrorEnabled.Validate(); err != nil {
+			return nil, err
+		}
+
+		if input.ProviderMirrorEnabled.Enabled != nil {
+			ws.EnableProviderMirror = input.ProviderMirrorEnabled.Enabled
+		}
+
+		if input.ProviderMirrorEnabled.Inherit {
+			ws.EnableProviderMirror = nil
 		}
 	}
 

@@ -14,9 +14,9 @@ type MockTerraformProviderMirrorStore struct {
 	mock.Mock
 }
 
-// GetProviderPlatformPackagePresignedURL provides a mock function with given fields: ctx, checksum
-func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedURL(ctx context.Context, checksum []byte) (string, error) {
-	ret := _m.Called(ctx, checksum)
+// GetProviderPlatformPackagePresignedURL provides a mock function with given fields: ctx, platformMirrorID
+func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedURL(ctx context.Context, platformMirrorID string) (string, error) {
+	ret := _m.Called(ctx, platformMirrorID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetProviderPlatformPackagePresignedURL")
@@ -24,17 +24,17 @@ func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedU
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) (string, error)); ok {
-		return rf(ctx, checksum)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, platformMirrorID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) string); ok {
-		r0 = rf(ctx, checksum)
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, platformMirrorID)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte) error); ok {
-		r1 = rf(ctx, checksum)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, platformMirrorID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -42,17 +42,17 @@ func (_m *MockTerraformProviderMirrorStore) GetProviderPlatformPackagePresignedU
 	return r0, r1
 }
 
-// UploadProviderPlatformPackage provides a mock function with given fields: ctx, checksum, body
-func (_m *MockTerraformProviderMirrorStore) UploadProviderPlatformPackage(ctx context.Context, checksum []byte, body io.Reader) error {
-	ret := _m.Called(ctx, checksum, body)
+// UploadProviderPlatformPackage provides a mock function with given fields: ctx, platformMirrorID, body
+func (_m *MockTerraformProviderMirrorStore) UploadProviderPlatformPackage(ctx context.Context, platformMirrorID string, body io.Reader) error {
+	ret := _m.Called(ctx, platformMirrorID, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UploadProviderPlatformPackage")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, io.Reader) error); ok {
-		r0 = rf(ctx, checksum, body)
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) error); ok {
+		r0 = rf(ctx, platformMirrorID, body)
 	} else {
 		r0 = ret.Error(0)
 	}

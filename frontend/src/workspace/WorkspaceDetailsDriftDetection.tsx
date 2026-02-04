@@ -228,12 +228,14 @@ function WorkspaceDetailsDriftDetection({ fragmentRef }: Props) {
             {showConfirmationDialog && (
                 <ConfirmationDialog
                     title="Run Drift Detection"
-                    message="Are you sure you want to create a drift detection run?"
-                    confirmButtonLabel="Confirm"
-                    opInProgress={isInFlight}
+                    confirmLabel="Confirm"
+                    confirmColor="primary"
+                    confirmInProgress={isInFlight}
                     onConfirm={() => onRunDriftDetectionDialogClosed(true)}
                     onClose={() => onRunDriftDetectionDialogClosed()}
-                />
+                >
+                    Are you sure you want to create a drift detection run?
+                </ConfirmationDialog>
             )}
         </Box>
     );

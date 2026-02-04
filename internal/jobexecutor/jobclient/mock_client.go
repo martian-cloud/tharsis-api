@@ -98,6 +98,36 @@ func (_m *MockClient) CreateManagedIdentityCredentials(ctx context.Context, mana
 	return r0, r1
 }
 
+// CreateProviderVersionMirror provides a mock function with given fields: ctx, input
+func (_m *MockClient) CreateProviderVersionMirror(ctx context.Context, input *types.CreateTerraformProviderVersionMirrorInput) (*types.TerraformProviderVersionMirror, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateProviderVersionMirror")
+	}
+
+	var r0 *types.TerraformProviderVersionMirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateTerraformProviderVersionMirrorInput) (*types.TerraformProviderVersionMirror, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateTerraformProviderVersionMirrorInput) *types.TerraformProviderVersionMirror); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.TerraformProviderVersionMirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.CreateTerraformProviderVersionMirrorInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateServiceAccountToken provides a mock function with given fields: ctx, serviceAccountPath, token
 func (_m *MockClient) CreateServiceAccountToken(ctx context.Context, serviceAccountPath string, token string) (string, *time.Duration, error) {
 	ret := _m.Called(ctx, serviceAccountPath, token)
@@ -277,6 +307,36 @@ func (_m *MockClient) GetAssignedManagedIdentities(ctx context.Context, workspac
 	return r0, r1
 }
 
+// GetAvailableProviderVersions provides a mock function with given fields: ctx, input
+func (_m *MockClient) GetAvailableProviderVersions(ctx context.Context, input *types.GetAvailableProviderVersionsInput) (map[string]struct{}, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAvailableProviderVersions")
+	}
+
+	var r0 map[string]struct{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetAvailableProviderVersionsInput) (map[string]struct{}, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetAvailableProviderVersionsInput) map[string]struct{}); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]struct{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetAvailableProviderVersionsInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetConfigurationVersion provides a mock function with given fields: ctx, id
 func (_m *MockClient) GetConfigurationVersion(ctx context.Context, id string) (*types.ConfigurationVersion, error) {
 	ret := _m.Called(ctx, id)
@@ -330,6 +390,66 @@ func (_m *MockClient) GetJob(ctx context.Context, id string) (*types.Job, error)
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetProviderPlatformMirror provides a mock function with given fields: ctx, input
+func (_m *MockClient) GetProviderPlatformMirror(ctx context.Context, input *types.GetTerraformProviderPlatformMirrorInput) (*types.TerraformProviderPlatformMirror, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderPlatformMirror")
+	}
+
+	var r0 *types.TerraformProviderPlatformMirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetTerraformProviderPlatformMirrorInput) (*types.TerraformProviderPlatformMirror, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetTerraformProviderPlatformMirrorInput) *types.TerraformProviderPlatformMirror); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.TerraformProviderPlatformMirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetTerraformProviderPlatformMirrorInput) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetProviderPlatformPackageDownloadURL provides a mock function with given fields: ctx, input
+func (_m *MockClient) GetProviderPlatformPackageDownloadURL(ctx context.Context, input *types.GetProviderPlatformPackageDownloadURLInput) (*types.ProviderPlatformPackageInfo, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderPlatformPackageDownloadURL")
+	}
+
+	var r0 *types.ProviderPlatformPackageInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetProviderPlatformPackageDownloadURLInput) (*types.ProviderPlatformPackageInfo, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetProviderPlatformPackageDownloadURLInput) *types.ProviderPlatformPackageInfo); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ProviderPlatformPackageInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetProviderPlatformPackageDownloadURLInput) error); ok {
+		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -582,6 +702,24 @@ func (_m *MockClient) UploadPlanData(ctx context.Context, plan *types.Plan, tfPl
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *types.Plan, *tfjson.Plan, *tfjson.ProviderSchemas) error); ok {
 		r0 = rf(ctx, plan, tfPlan, tfProviderScheams)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadProviderPlatformPackageToMirror provides a mock function with given fields: ctx, input
+func (_m *MockClient) UploadProviderPlatformPackageToMirror(ctx context.Context, input *types.UploadProviderPlatformPackageToMirrorInput) error {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadProviderPlatformPackageToMirror")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UploadProviderPlatformPackageToMirrorInput) error); ok {
+		r0 = rf(ctx, input)
 	} else {
 		r0 = ret.Error(0)
 	}

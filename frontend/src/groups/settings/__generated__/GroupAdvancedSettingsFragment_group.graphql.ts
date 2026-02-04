@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6018e1b002455dff880140e0697b8782>>
+ * @generated SignedSource<<440c08c25773b0e27e822ae00eb615d9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,7 +13,7 @@ import { FragmentRefs } from "relay-runtime";
 export type GroupAdvancedSettingsFragment_group$data = {
   readonly fullPath: string;
   readonly name: string;
-  readonly " $fragmentSpreads": FragmentRefs<"GroupAdvancedSettingsDeleteDialogFragment_group" | "MigrateGroupDialogFragment_group">;
+  readonly " $fragmentSpreads": FragmentRefs<"MigrateGroupDialogFragment_group">;
   readonly " $fragmentType": "GroupAdvancedSettingsFragment_group";
 };
 export type GroupAdvancedSettingsFragment_group$key = {
@@ -44,11 +44,6 @@ const node: ReaderFragment = {
     {
       "args": null,
       "kind": "FragmentSpread",
-      "name": "GroupAdvancedSettingsDeleteDialogFragment_group"
-    },
-    {
-      "args": null,
-      "kind": "FragmentSpread",
       "name": "MigrateGroupDialogFragment_group"
     }
   ],
@@ -56,6 +51,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "2e4a8d3f6d8e02810195b4fadbe3f5fe";
+(node as any).hash = "d0e6b91b371ba16edf08bf2c8ceec601";
 
 export default node;

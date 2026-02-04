@@ -117,8 +117,7 @@ function RunDetails(props: Props) {
                         <Alert severity="warning" variant="outlined" sx={{ marginBottom: 2 }}>
                             <AlertTitle>Workspace is currently locked</AlertTitle>
                             A lock prevents new runs from starting. If the workspace was manually locked,
-                            it can be unlocked within the <strong>State Settings</strong> section on the
-                            <Link to={`/groups/${queryData?.run?.workspace.fullPath}/-/settings`}>Settings</Link> page.
+                            it can be unlocked within the <strong>State Settings</strong> section on the <Link to={`/groups/${queryData?.run?.workspace.fullPath}/-/settings`}>Settings</Link> page.
                         </Alert>}
                     {error && <Alert sx={{ marginBottom: 2 }} severity={error.severity}>
                         {error.message}

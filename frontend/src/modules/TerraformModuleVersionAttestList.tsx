@@ -3,10 +3,10 @@ import graphql from 'babel-plugin-relay/macro'
 import { ConnectionHandler, useMutation, usePaginationFragment } from "react-relay/hooks";
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from "@mui/material";
 import ListSkeleton from '../skeletons/ListSkeleton';
-import { LoadingButton } from '@mui/lab';
 import { useSnackbar } from 'notistack';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { a11yDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import ConfirmationDialog from '../common/ConfirmationDialog';
 import TerraformModuleVersionAttestListItem from './TerraformModuleVersionAttestListItem';
 import { TerraformModuleVersionAttestListFragment_attestations$key } from './__generated__/TerraformModuleVersionAttestListFragment_attestations.graphql';
 import { TerraformModuleVersionAttestListDeleteMutation } from './__generated__/TerraformModuleVersionAttestListDeleteMutation.graphql';
@@ -22,12 +22,6 @@ interface Props {
 interface DataDialogProps {
     onCloseDataDialog: () => void
     encodedData: string | null
-}
-
-interface DeleteDialogProps {
-    deleteInProgress: boolean;
-    onCloseDeleteDialog: (confirm?: boolean) => void
-    attestId: string | null
 }
 
 function GetConnections(id: string): [string] {
@@ -62,33 +56,7 @@ function DataDialog({ onCloseDataDialog, encodedData }: DataDialogProps) {
             </DialogActions>
         </Dialog>
         :
-    null
-}
-
-function DeleteConfirmationDialog({ deleteInProgress, onCloseDeleteDialog, attestId }: DeleteDialogProps) {
-
-    return attestId ?
-        <Dialog
-            maxWidth="sm"
-            keepMounted
-            open={!!attestId}
-        >
-            <DialogTitle>Delete Attestation</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete attestation {attestId.substring(0, 8)}...?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onCloseDeleteDialog()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error"
-                    loading={deleteInProgress}
-                    onClick={() => onCloseDeleteDialog(true)}
-                >Delete</LoadingButton>
-            </DialogActions>
-        </Dialog>
-        :
-    null
+        null
 }
 
 function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
@@ -143,7 +111,7 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
                 },
                 onCompleted: data => {
                     if (data.deleteTerraformModuleAttestation.problems.length) {
-                        enqueueSnackbar(data.deleteTerraformModuleAttestation.problems.map(problem => problem.message).join('; '),  { variant: 'warning' });
+                        enqueueSnackbar(data.deleteTerraformModuleAttestation.problems.map(problem => problem.message).join('; '), { variant: 'warning' });
                     }
                     setAttestToDelete(null)
                 },
@@ -214,16 +182,22 @@ function TerraformModuleVersionAttestList({ fragmentRef }: Props) {
             <DataDialog
                 encodedData={attestationDataToDisplay}
                 onCloseDataDialog={() => setAttestationDataToDisplay(null)} />
-            <DeleteConfirmationDialog
-                deleteInProgress={commitInFlight}
-                onCloseDeleteDialog={onCloseDeleteAttestConfirmation}
-                attestId={attestToDelete}
-            />
+            {attestToDelete && (
+                <ConfirmationDialog
+                    title="Delete Attestation"
+                    confirmLabel="Delete"
+                    confirmInProgress={commitInFlight}
+                    onConfirm={() => onCloseDeleteAttestConfirmation(true)}
+                    onClose={() => onCloseDeleteAttestConfirmation()}
+                >
+                    Are you sure you want to delete attestation {attestToDelete.substring(0, 8)}...?
+                </ConfirmationDialog>
+            )}
         </Box>
         :
         <Box padding={2} display="flex" justifyContent="center" alignItems="center">
-			<Typography color="textSecondary">No attestations for this version</Typography>
-		</Box>
+            <Typography color="textSecondary">No attestations for this version</Typography>
+        </Box>
 }
 
 export default TerraformModuleVersionAttestList

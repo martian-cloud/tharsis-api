@@ -9,8 +9,8 @@ import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
 import { useFragment, useMutation } from "react-relay/hooks";
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceMembershipListItem from './NamespaceMembershipListItem';
-import NamespaceMembershipDeleteConfirmationDialog from './NamespaceMembershipDeleteConfirmationDialog';
 import { NamespaceMembershipListDeleteNamespaceMembershipMutation } from './__generated__/NamespaceMembershipListDeleteNamespaceMembershipMutation.graphql';
 import { NamespaceMembershipListFragment_memberships$key } from './__generated__/NamespaceMembershipListFragment_memberships.graphql';
 
@@ -203,11 +203,17 @@ function NamespaceMembershipList(props: Props) {
       }}>
         No members matching search <strong>{search}</strong>
       </Typography>}
-      {membershipToDelete && <NamespaceMembershipDeleteConfirmationDialog
-        membership={membershipToDelete}
-        deleteInProgress={deleteInFlight}
-        onClose={onDelete}
-      />}
+      {membershipToDelete && (
+        <ConfirmationDialog
+          title="Remove Member"
+          confirmLabel="Remove"
+          confirmInProgress={deleteInFlight}
+          onConfirm={() => onDelete(true)}
+          onClose={() => onDelete()}
+        >
+          Are you sure you want to remove the member <strong>{getMemberName(membershipToDelete)}</strong>?
+        </ConfirmationDialog>
+      )}
     </Box>
   );
 }

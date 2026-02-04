@@ -116,6 +116,7 @@ type Group implements Node, Namespace {
   ): RunnerConnection!
   runnerTags: NamespaceRunnerTags!
   driftDetectionEnabled: NamespaceDriftDetectionEnabled!
+  providerMirrorEnabled: NamespaceProviderMirrorEnabled!
   memberships: [NamespaceMembership!]!
   variables: [NamespaceVariable!]!
   activityEvents(
@@ -154,8 +155,8 @@ type Group implements Node, Namespace {
     before: String
     first: Int
     last: Int
-    includeInherited: Boolean
     sort: TerraformProviderVersionMirrorSort
+    search: String
   ): TerraformProviderVersionMirrorConnection!
   federatedRegistries(
     after: String
@@ -172,7 +173,8 @@ type Group implements Node, Namespace {
     sort: RunSort
     workspaceAssessment: Boolean
     includeNestedRuns: Boolean
-  ): RunConnection!}
+  ): RunConnection!
+}
 
 input CreateGroupInput {
   clientMutationId: String
@@ -185,6 +187,7 @@ input CreateGroupInput {
   description: String!
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
+  providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
 }
 
 input UpdateGroupInput {
@@ -198,6 +201,7 @@ input UpdateGroupInput {
   metadata: ResourceMetadataInput
   runnerTags: NamespaceRunnerTagsInput
   driftDetectionEnabled: NamespaceDriftDetectionEnabledInput
+  providerMirrorEnabled: NamespaceProviderMirrorEnabledInput
 }
 
 input DeleteGroupInput {

@@ -24,11 +24,13 @@ type Logger interface {
 	// Close flushes the logger
 	Close()
 	// Infof writes an info log to the job's log output
-	Infof(format string, a ...interface{})
+	Infof(format string, a ...any)
 	// Errorf writes an error log to the job's log output
-	Errorf(format string, a ...interface{})
+	Errorf(format string, a ...any)
 	// Warningf writes a warning log to the job's log output
-	Warningf(format string, a ...interface{})
+	Warningf(format string, a ...any)
+	// Printf writes a plain log to the job's log output
+	Printf(format string, a ...any)
 	// Write will append the data to the log buffer
 	Write(data []byte) (n int, err error)
 	// Start starts the logger
@@ -75,18 +77,23 @@ func (j *jobLogger) Close() {
 }
 
 // Infof writes an info log to the job's log output
-func (j *jobLogger) Infof(format string, a ...interface{}) {
-	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldCyan)+"\n", a...)))
+func (j *jobLogger) Infof(format string, a ...any) {
+	j.Write(fmt.Appendf(nil, ansi.Colorize(format, ansi.BoldCyan)+"\n", a...))
 }
 
 // Errorf writes an error log to the job's log output
-func (j *jobLogger) Errorf(format string, a ...interface{}) {
-	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldRed)+"\n", a...)))
+func (j *jobLogger) Errorf(format string, a ...any) {
+	j.Write(fmt.Appendf(nil, ansi.Colorize(format, ansi.BoldRed)+"\n", a...))
 }
 
 // Warningf writes a warning log to the job's log output
-func (j *jobLogger) Warningf(format string, a ...interface{}) {
-	j.Write([]byte(fmt.Sprintf(ansi.Colorize(format, ansi.BoldYellow)+"\n", a...)))
+func (j *jobLogger) Warningf(format string, a ...any) {
+	j.Write(fmt.Appendf(nil, ansi.Colorize(format, ansi.BoldYellow)+"\n", a...))
+}
+
+// Printf writes a plain log to the job's log output
+func (j *jobLogger) Printf(format string, a ...any) {
+	j.Write(fmt.Appendf(nil, format+"\n", a...))
 }
 
 // Write will append the data to the log buffer

@@ -6,29 +6,30 @@ import { Avatar, Box, List, ListItem, ListItemAvatar, ListItemIcon, ListItemText
 import teal from '@mui/material/colors/teal';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
-import { AccountLockOutline as ManagedIdentityIcon, LanConnect as ServiceAccountIcon, KeyVariant as KeyIcon, SourceMerge as VCSProviderIcon, RobotOutline as RunnersIcon, ServerNetwork as FederatedRegistryIcon, CubeOutline as TerraformModuleIcon, RocketLaunchOutline as RunIcon } from 'mdi-material-ui';
+import { AccountLockOutline as ManagedIdentityIcon, LanConnect as ServiceAccountIcon, KeyVariant as KeyIcon, SourceMerge as VCSProviderIcon, RobotOutline as RunnersIcon, ServerNetwork as FederatedRegistryIcon, CubeOutline as TerraformModuleIcon, RocketLaunchOutline as RunIcon, ContentDuplicate as ProviderMirrorIcon } from 'mdi-material-ui';
 
 interface Props {
-  groupPath: string
-  groupName: string
-  route: string
+    groupPath: string
+    groupName: string
+    route: string
 }
 
 const DRAWER_WIDTH = 240;
 
 const LIST_ITEMS = [
-  { route: 'activity', label: 'Activity', icon: <ActivityIcon /> },
-  { route: 'runs', label: 'Runs', icon: <RunIcon /> },
-  { route: 'variables', label: 'Variables', icon: <VariablesIcon /> },
-  { route: 'managed_identities', label: 'Managed Identities', icon: <ManagedIdentityIcon /> },
-  { route: 'runners', label: 'Runner Agents', icon: <RunnersIcon /> },
-  { route: 'service_accounts', label: 'Service Accounts', icon: <ServiceAccountIcon /> },
-  { route: 'terraform_modules', label: 'Terraform Modules', icon: <TerraformModuleIcon /> },
-  { route: 'vcs_providers', label: 'VCS Providers', icon: <VCSProviderIcon /> },
-  { route: 'federated_registries', label: 'Federated Registries', icon: <FederatedRegistryIcon /> },
-  { route: 'members', label: 'Members', icon: <MembersIcon /> },
-  { route: 'keys', label: 'GPG Keys', icon: <KeyIcon /> },
-  { route: 'settings', label: 'Settings', icon: <SettingsIcon /> }
+    { route: 'activity', label: 'Activity', icon: <ActivityIcon /> },
+    { route: 'runs', label: 'Runs', icon: <RunIcon /> },
+    { route: 'variables', label: 'Variables', icon: <VariablesIcon /> },
+    { route: 'managed_identities', label: 'Managed Identities', icon: <ManagedIdentityIcon /> },
+    { route: 'runners', label: 'Runner Agents', icon: <RunnersIcon /> },
+    { route: 'service_accounts', label: 'Service Accounts', icon: <ServiceAccountIcon /> },
+    { route: 'terraform_modules', label: 'Terraform Modules', icon: <TerraformModuleIcon /> },
+    { route: 'vcs_providers', label: 'VCS Providers', icon: <VCSProviderIcon /> },
+    { route: 'federated_registries', label: 'Federated Registries', icon: <FederatedRegistryIcon /> },
+    { route: 'provider_mirror', label: 'Provider Mirror', icon: <ProviderMirrorIcon /> },
+    { route: 'keys', label: 'GPG Keys', icon: <KeyIcon /> },
+    { route: 'members', label: 'Members', icon: <MembersIcon /> },
+    { route: 'settings', label: 'Settings', icon: <SettingsIcon /> }
 ];
 
 function GroupDetailsDrawer(props: Props) {

@@ -14,8 +14,8 @@ import (
 )
 
 func TestJobCaller_GetSubject(t *testing.T) {
-	caller := JobCaller{JobID: "job1"}
-	assert.Equal(t, "job1", caller.GetSubject())
+	caller := JobCaller{JobTRN: "trn:job:group/workspace/job-id"}
+	assert.Equal(t, "trn:job:group/workspace/job-id", caller.GetSubject())
 }
 
 func TestJobCaller_IsAdmin(t *testing.T) {
@@ -66,6 +66,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 		job             *models.Job
 		name            string
 		workspace       *models.Workspace
+		group           *models.Group
 		perms           models.Permission
 		constraints     []func(*constraints)
 	}{
@@ -223,6 +224,64 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			constraints:     []func(*constraints){WithNamespacePath("a")},
 			expectErrorCode: errors.EForbidden,
 		},
+		{
+			name:        "create provider mirror when enabled and group in hierarchy",
+			perms:       models.CreateTerraformProviderMirrorPermission,
+			constraints: []func(*constraints){WithNamespacePath("a")},
+			job: &models.Job{
+				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Properties: map[string]string{"providerMirrorEnabled": "true"},
+			},
+		},
+		{
+			name:        "create provider mirror with groupID when enabled",
+			perms:       models.CreateTerraformProviderMirrorPermission,
+			constraints: []func(*constraints){WithGroupID("group-ID")},
+			job: &models.Job{
+				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Properties: map[string]string{"providerMirrorEnabled": "true"},
+			},
+		},
+		{
+			name:        "create provider mirror access denied because not enabled",
+			perms:       models.CreateTerraformProviderMirrorPermission,
+			constraints: []func(*constraints){WithNamespacePath("a")},
+			job: &models.Job{
+				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Properties: map[string]string{"providerMirrorEnabled": "false"},
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:        "create provider mirror access denied because property missing",
+			perms:       models.CreateTerraformProviderMirrorPermission,
+			constraints: []func(*constraints){WithNamespacePath("a")},
+			job: &models.Job{
+				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Properties: map[string]string{},
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name:        "create provider mirror access denied because group not in hierarchy",
+			perms:       models.CreateTerraformProviderMirrorPermission,
+			constraints: []func(*constraints){WithNamespacePath("b")},
+			job: &models.Job{
+				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Properties: map[string]string{"providerMirrorEnabled": "true"},
+			},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:        "create provider mirror access denied with groupID not in hierarchy",
+			perms:       models.CreateTerraformProviderMirrorPermission,
+			constraints: []func(*constraints){WithGroupID("other-group-ID")},
+			job: &models.Job{
+				Metadata:   models.ResourceMetadata{ID: caller.JobID},
+				Properties: map[string]string{"providerMirrorEnabled": "true"},
+			},
+			expectErrorCode: errors.ENotFound,
+		},
 	}
 
 	for _, test := range testCases {
@@ -242,6 +301,8 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			mockRuns.On("GetRunByID", mock.Anything, caller.RunID).Return(test.run, nil).Maybe()
 
 			mockJobs.On("GetLatestJobByType", mock.Anything, caller.RunID, stage).Return(test.job, nil).Maybe()
+			mockJobs.On("GetJobByID", mock.Anything, caller.JobID).Return(test.job, nil).Maybe()
+
 			if constraints.workspaceID != nil {
 				mockWorkspaces.On("GetWorkspaceByID", mock.Anything, *constraints.workspaceID).Return(test.workspace, nil).Maybe()
 			}
@@ -249,6 +310,7 @@ func TestJobCaller_RequirePermissions(t *testing.T) {
 			mockWorkspaces.On("GetWorkspaceByID", mock.Anything, caller.WorkspaceID).Return(jobWorkspace, nil).Maybe()
 
 			mockGroups.On("GetGroupByID", mock.Anything, "group-ID").Return(jobGroup, nil).Maybe()
+			mockGroups.On("GetGroupByID", mock.Anything, "other-group-ID").Return(&models.Group{FullPath: "b"}, nil).Maybe()
 
 			caller.dbClient = &db.Client{
 				Runs:       mockRuns,

@@ -32,11 +32,12 @@ func NewApplyHandler(
 	workspaceDir string,
 	workspace *types.Workspace,
 	run *types.Run,
+	job *types.Job,
 	logger logger.Logger,
 	jobLogger joblogger.Logger,
 	client jobclient.Client,
 ) (*ApplyHandler, error) {
-	terraformWorkspace, err := newTerraformWorkspace(cancellableCtx, jobCfg, workspaceDir, workspace, run, jobLogger, client)
+	terraformWorkspace, err := newTerraformWorkspace(cancellableCtx, jobCfg, workspaceDir, workspace, run, job, jobLogger, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize terraform workspace: %w", err)
 	}

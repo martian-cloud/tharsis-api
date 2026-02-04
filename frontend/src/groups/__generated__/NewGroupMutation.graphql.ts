@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c7ef4dc34a14fdb1e5f9e011bb3e74c6>>
+ * @generated SignedSource<<ec652e742eaf8625d1fc7c5f8dbc7ee1>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,9 +18,14 @@ export type CreateGroupInput = {
   name: string;
   parentId?: string | null | undefined;
   parentPath?: string | null | undefined;
+  providerMirrorEnabled?: NamespaceProviderMirrorEnabledInput | null | undefined;
   runnerTags?: NamespaceRunnerTagsInput | null | undefined;
 };
 export type NamespaceDriftDetectionEnabledInput = {
+  enabled?: boolean | null | undefined;
+  inherit: boolean;
+};
+export type NamespaceProviderMirrorEnabledInput = {
   enabled?: boolean | null | undefined;
   inherit: boolean;
 };

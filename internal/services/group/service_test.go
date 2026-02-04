@@ -1361,3 +1361,55 @@ func TestGetDriftDetectionEnabledSetting(t *testing.T) {
 		})
 	}
 }
+
+func TestGetProviderMirrorEnabledSetting(t *testing.T) {
+	group := models.Group{
+		FullPath: "group1",
+	}
+
+	tests := []struct {
+		name          string
+		expectSetting *namespace.ProviderMirrorEnabledSetting
+		authError     error
+		expectErrCode errors.CodeType
+	}{
+		{
+			name: "get setting",
+			expectSetting: &namespace.ProviderMirrorEnabledSetting{
+				Value: true,
+			},
+		},
+		{
+			name:          "unauthorized",
+			authError:     errors.New("Unauthorized", errors.WithErrorCode(errors.EForbidden)),
+			expectErrCode: errors.EForbidden,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			mockCaller := auth.NewMockCaller(t)
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			testLogger, _ := logger.NewForTest()
+
+			mockCaller.On("RequirePermission", mock.Anything, models.ViewGroupPermission, mock.Anything).Return(test.authError)
+
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, &group).Return(test.expectSetting, nil).Maybe()
+
+			service := NewService(testLogger, nil, nil, nil, nil, mockInheritedSettingsResolver)
+
+			setting, err := service.GetProviderMirrorEnabledSetting(auth.WithCaller(ctx, mockCaller), &group)
+
+			if test.expectErrCode != "" {
+				assert.Equal(t, test.expectErrCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectSetting, setting)
+		})
+	}
+}

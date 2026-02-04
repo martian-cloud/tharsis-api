@@ -1,7 +1,6 @@
 import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
-import { LoadingButton } from '@mui/lab';
-import { Alert, Box, Button, ButtonGroup, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Link, Menu, MenuItem, Stack, Tab, Tabs, Typography, useTheme } from "@mui/material";
+import { Alert, Box, Button, ButtonGroup, Chip, Collapse, Link, Menu, MenuItem, Stack, Tab, Tabs, Typography, useTheme } from "@mui/material";
 import { green } from "@mui/material/colors";
 import graphql from 'babel-plugin-relay/macro';
 import moment from 'moment';
@@ -10,6 +9,7 @@ import { useMemo, useState } from "react";
 import { useFragment, useMutation, useSubscription } from 'react-relay/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ConnectionHandler, ConnectionInterface, GraphQLSubscriptionConfig, RecordSourceProxy } from "relay-runtime";
+import ConfirmationDialog from '../common/ConfirmationDialog';
 import { RunnerIcon } from "../common/Icons";
 import TabContent from "../common/TabContent";
 import TRNButton from "../common/TRNButton";
@@ -30,39 +30,6 @@ const runnerSessionEventsSubscription = graphql`subscription RunnerDetailsSessio
       }
     }
   }`;
-
-interface ConfirmationDialogProps {
-    runnerName: string
-    deleteInProgress: boolean;
-    keepMounted: boolean;
-    open: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { runnerName, deleteInProgress, onClose, open, ...other } = props;
-
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={open}
-            {...other}
-        >
-            <DialogTitle>Delete Runner</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete runner <strong>{runnerName}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>
-                    Delete
-                </LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
-}
 
 interface Props {
     fragmentRef: RunnerDetailsFragment_runner$key
@@ -336,13 +303,17 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                 {tab === 'jobs' && <RunnerJobList />}
                 {tab === 'assignedServiceAccounts' && runner.type === 'group' && <AssignedServiceAccountList fragmentRef={runner} />}
             </TabContent>
-            <DeleteConfirmationDialog
-                runnerName={runner.name}
-                keepMounted
-                deleteInProgress={commitInFlight}
-                open={showDeleteConfirmationDialog}
-                onClose={onDeleteConfirmationDialogClosed}
-            />
+            {showDeleteConfirmationDialog && (
+                <ConfirmationDialog
+                    title="Delete Runner"
+                    confirmLabel="Delete"
+                    confirmInProgress={commitInFlight}
+                    onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                    onClose={() => onDeleteConfirmationDialogClosed()}
+                >
+                    Are you sure you want to delete runner <strong>{runner.name}</strong>?
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

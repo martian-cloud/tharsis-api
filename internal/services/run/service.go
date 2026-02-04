@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -247,19 +248,20 @@ type Service interface {
 }
 
 type service struct {
-	logger          logger.Logger
-	dbClient        *db.Client
-	artifactStore   workspace.ArtifactStore
-	eventManager    *events.EventManager
-	jobService      job.Service
-	cliService      cli.Service
-	runStateManager state.RunStateManager
-	activityService activityevent.Service
-	moduleResolver  registry.ModuleResolver
-	ruleEnforcer    rules.RuleEnforcer
-	limitChecker    limits.LimitChecker
-	planParser      plan.Parser
-	secretManager   secret.Manager
+	logger                    logger.Logger
+	dbClient                  *db.Client
+	artifactStore             workspace.ArtifactStore
+	eventManager              *events.EventManager
+	jobService                job.Service
+	cliService                cli.Service
+	runStateManager           state.RunStateManager
+	activityService           activityevent.Service
+	moduleResolver            registry.ModuleResolver
+	ruleEnforcer              rules.RuleEnforcer
+	limitChecker              limits.LimitChecker
+	planParser                plan.Parser
+	secretManager             secret.Manager
+	inheritedSettingsResolver namespace.InheritedSettingResolver
 }
 
 // NewService creates an instance of Service
@@ -275,6 +277,7 @@ func NewService(
 	runStateManager state.RunStateManager,
 	limitChecker limits.LimitChecker,
 	secretManager secret.Manager,
+	inheritedSettingsResolver namespace.InheritedSettingResolver,
 ) Service {
 	return newService(
 		logger,
@@ -290,6 +293,7 @@ func NewService(
 		limitChecker,
 		plan.NewParser(),
 		secretManager,
+		inheritedSettingsResolver,
 	)
 }
 
@@ -307,6 +311,7 @@ func newService(
 	limitChecker limits.LimitChecker,
 	planParser plan.Parser,
 	secretManager secret.Manager,
+	inheritedSettingsResolver namespace.InheritedSettingResolver,
 ) Service {
 	return &service{
 		logger,
@@ -322,6 +327,7 @@ func newService(
 		limitChecker,
 		planParser,
 		secretManager,
+		inheritedSettingsResolver,
 	}
 }
 
@@ -906,7 +912,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
-			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for claimJob: %v", txErr)
+			s.logger.WithContextFields(ctx).Errorf("failed to rollback tx for createRun: %v", txErr)
 		}
 	}()
 
@@ -1034,6 +1040,13 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 		return nil, errors.Wrap(err, "failed to get runner tags for workspace")
 	}
 
+	// Get provider mirror enabled setting for job properties
+	providerMirrorSetting, err := s.inheritedSettingsResolver.GetProviderMirrorEnabled(txContext, ws)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider mirror enabled setting")
+		return nil, errors.Wrap(err, "failed to get provider mirror enabled setting")
+	}
+
 	// Create job for initial plan
 	job := models.Job{
 		Status:          models.JobQueued,
@@ -1046,6 +1059,9 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 		},
 		MaxJobDuration: *ws.MaxJobDuration,
 		Tags:           runnerTags,
+		Properties: map[string]string{
+			models.JobPropertyProviderMirrorEnabled: strconv.FormatBool(providerMirrorSetting.Value),
+		},
 	}
 
 	// Create Job
@@ -1220,6 +1236,13 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		return nil, errors.Wrap(err, "failed to get runner tags for workspace")
 	}
 
+	// Get provider mirror enabled setting for job properties
+	providerMirrorSetting, err := s.inheritedSettingsResolver.GetProviderMirrorEnabled(txContext, ws)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get provider mirror enabled setting")
+		return nil, errors.Wrap(err, "failed to get provider mirror enabled setting")
+	}
+
 	// Create job for apply
 	job := models.Job{
 		Status:          models.JobQueued,
@@ -1232,6 +1255,9 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		},
 		MaxJobDuration: *ws.MaxJobDuration,
 		Tags:           runnerTags,
+		Properties: map[string]string{
+			models.JobPropertyProviderMirrorEnabled: strconv.FormatBool(providerMirrorSetting.Value),
+		},
 	}
 
 	// Create Job

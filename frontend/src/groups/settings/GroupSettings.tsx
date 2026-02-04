@@ -8,6 +8,7 @@ import GroupRunnerSettings from './GroupRunnerSettings';
 import GroupAdvancedSettings from './GroupAdvancedSettings';
 import { GroupSettingsFragment_group$key } from './__generated__/GroupSettingsFragment_group.graphql'
 import GroupDriftDetectionSettings from './GroupDriftDetectionSettings';
+import GroupProviderMirrorSettings from './GroupProviderMirrorSettings';
 
 interface Props {
     fragmentRef: GroupSettingsFragment_group$key
@@ -30,6 +31,7 @@ function GroupSettings(props: Props) {
             ...GroupAdvancedSettingsFragment_group
             ...GroupRunnerSettingsFragment_group
             ...GroupDriftDetectionSettingsFragment_group
+            ...GroupProviderMirrorSettingsFragment_group
         }
     `, props.fragmentRef
     )
@@ -48,6 +50,8 @@ function GroupSettings(props: Props) {
             <GroupRunnerSettings fragmentRef={data}/>
             <StyledDivider />
             <GroupDriftDetectionSettings fragmentRef={data} />
+            <StyledDivider />
+            <GroupProviderMirrorSettings fragmentRef={data} />
             <StyledDivider />
             <GroupAdvancedSettings fragmentRef={data} />
         </Box>

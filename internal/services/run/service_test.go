@@ -23,6 +23,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plan/action"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
@@ -922,17 +923,21 @@ func TestCreateRunWithSensitiveVariables(t *testing.T) {
 	mockModuleResolver := registry.NewMockModuleResolver(t)
 	ruleEnforcer := rules.NewMockRuleEnforcer(t)
 
+	mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+	mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil)
+
 	logger, _ := logger.NewForTest()
 
 	testService := service{
-		logger:          logger,
-		dbClient:        dbClient.Client,
-		artifactStore:   &mockArtifactStore,
-		activityService: &mockActivityEvents,
-		moduleResolver:  mockModuleResolver,
-		limitChecker:    limits.NewLimitChecker(dbClient.Client),
-		secretManager:   mockSecretManager,
-		ruleEnforcer:    ruleEnforcer,
+		logger:                    logger,
+		dbClient:                  dbClient.Client,
+		artifactStore:             &mockArtifactStore,
+		activityService:           &mockActivityEvents,
+		moduleResolver:            mockModuleResolver,
+		limitChecker:              limits.NewLimitChecker(dbClient.Client),
+		secretManager:             mockSecretManager,
+		ruleEnforcer:              ruleEnforcer,
+		inheritedSettingsResolver: mockInheritedSettingsResolver,
 	}
 
 	_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
@@ -1122,17 +1127,21 @@ func TestCreateRunWithManagedIdentityAccessRules(t *testing.T) {
 				ruleEnforcer.On("EnforceRules", mock.Anything, &miCopy, mock.Anything).Return(test.enforceRulesResponse)
 			}
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			logger, _ := logger.NewForTest()
 
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   &mockArtifactStore,
-				activityService: &mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
-				secretManager:   mockSecretManager,
-				ruleEnforcer:    ruleEnforcer,
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             &mockArtifactStore,
+				activityService:           &mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				secretManager:             mockSecretManager,
+				ruleEnforcer:              ruleEnforcer,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), &CreateRunInput{
@@ -1374,15 +1383,19 @@ func TestCreateRunWithPreventDestroy(t *testing.T) {
 
 			mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			logger, _ := logger.NewForTest()
 
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   &mockArtifactStore,
-				activityService: &mockActivityEvents,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
-				secretManager:   mockSecretManager,
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             &mockArtifactStore,
+				activityService:           &mockActivityEvents,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				secretManager:             mockSecretManager,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.runInput)
@@ -1707,16 +1720,20 @@ func TestCreateRunWithSpeculativeOption(t *testing.T) {
 
 			mockSecretManager := secret.NewMockManager(t)
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			logger, _ := logger.NewForTest()
 
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   &mockArtifactStore,
-				activityService: &mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
-				secretManager:   mockSecretManager,
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             &mockArtifactStore,
+				activityService:           &mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				secretManager:             mockSecretManager,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
@@ -1897,16 +1914,20 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 
 			mockSecretManager := secret.NewMockManager(t)
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			logger, _ := logger.NewForTest()
 
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   &mockArtifactStore,
-				activityService: &mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
-				secretManager:   mockSecretManager,
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             &mockArtifactStore,
+				activityService:           &mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				secretManager:             mockSecretManager,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.input)
@@ -2161,16 +2182,21 @@ func TestCreateRunWithJobTags(t *testing.T) {
 				Return(nil, registry.ErrRemoteModuleSource).Maybe()
 
 			mockSecretManager := secret.NewMockManager(t)
+
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			logger, _ := logger.NewForTest()
 
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   &mockArtifactStore,
-				activityService: &mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
-				secretManager:   mockSecretManager,
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             &mockArtifactStore,
+				activityService:           &mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				secretManager:             mockSecretManager,
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			_, err := testService.CreateRun(auth.WithCaller(ctx, mockCaller), test.createRunInputs)
@@ -2310,15 +2336,19 @@ func TestApplyRunWithManagedIdentityAccessRules(t *testing.T) {
 
 			logger, _ := logger.NewForTest()
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				activityService: &mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
-				secretManager:   mockSecretManager,
-				ruleEnforcer:    ruleEnforcer,
-				runStateManager: state.NewRunStateManager(dbClient.Client, logger),
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				activityService:           &mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				secretManager:             mockSecretManager,
+				ruleEnforcer:              ruleEnforcer,
+				runStateManager:           state.NewRunStateManager(dbClient.Client, logger),
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			_, err := testService.ApplyRun(ctx, run.Metadata.ID, nil)
@@ -2541,15 +2571,19 @@ func TestCreateDestroyRunForWorkspace(t *testing.T) {
 					Return(nil, registry.ErrRemoteModuleSource).Maybe()
 			}
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			// Create test fixture
 			logger, _ := logger.NewForTest()
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   mockArtifactStore,
-				activityService: mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             mockArtifactStore,
+				activityService:           mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			// Invoke test method
@@ -3789,15 +3823,19 @@ func TestCreateWorkspaceAssessmentRunForWorkspace(t *testing.T) {
 					Return(nil, registry.ErrRemoteModuleSource).Maybe()
 			}
 
+			mockInheritedSettingsResolver := namespace.NewMockInheritedSettingResolver(t)
+			mockInheritedSettingsResolver.On("GetProviderMirrorEnabled", mock.Anything, mock.Anything).Return(&namespace.ProviderMirrorEnabledSetting{Value: false}, nil).Maybe()
+
 			// Create test fixture
 			logger, _ := logger.NewForTest()
 			testService := service{
-				logger:          logger,
-				dbClient:        dbClient.Client,
-				artifactStore:   mockArtifactStore,
-				activityService: mockActivityEvents,
-				moduleResolver:  mockModuleResolver,
-				limitChecker:    limits.NewLimitChecker(dbClient.Client),
+				logger:                    logger,
+				dbClient:                  dbClient.Client,
+				artifactStore:             mockArtifactStore,
+				activityService:           mockActivityEvents,
+				moduleResolver:            mockModuleResolver,
+				limitChecker:              limits.NewLimitChecker(dbClient.Client),
+				inheritedSettingsResolver: mockInheritedSettingsResolver,
 			}
 
 			// Invoke test method

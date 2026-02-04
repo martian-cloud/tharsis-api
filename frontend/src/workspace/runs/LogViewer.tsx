@@ -22,7 +22,7 @@ function buildLogTextStyle(entry: Anser.AnserJsonEntry) {
     return {
         backgroundColor: entry.bg ? `rgb(${entry.bg})` : undefined,
         color: entry.fg ? `rgb(${entry.fg})` : undefined,
-        fontWeight: entry.decoration === 'bold' ? 500 : undefined
+        fontWeight: entry.decoration === 'bold' ? 700 : undefined
     };
 }
 
@@ -97,7 +97,31 @@ function LogViewer({ logs, sx, hideLineNumbers }: Props) {
 
     const logLines = useMemo(() => {
         const lines = logs.split(/\r?\n/);
-        return (lines.length === 1 && lines[0] === '') ? [] : lines;
+        if (lines.length === 1 && lines[0] === '') {
+            return [];
+        }
+
+        // ANSI codes don't carry across newlines after splitting, so we track the active
+        // styles and prepend them to subsequent lines until a reset code is encountered.
+        // This ensures multi-line colored output (e.g., Terraform's green success messages)
+        // maintains consistent styling across line breaks.
+        const esc = '\u001b';
+        const ansiCodeRegex = new RegExp(`${esc}\\[[0-9;]*m`, 'g');
+        const isResetCode = (code: string) => code === `${esc}[0m` || code === `${esc}[0;m`;
+
+        let activeCodes: string[] = [];
+        return lines.map(line => {
+            const result = activeCodes.join('') + line;
+            const codes = line.match(ansiCodeRegex) || [];
+            for (const code of codes) {
+                if (isResetCode(code)) {
+                    activeCodes = [];
+                } else {
+                    activeCodes.push(code);
+                }
+            }
+            return result;
+        });
     }, [logs]);
 
     return (

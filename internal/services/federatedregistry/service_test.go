@@ -1050,7 +1050,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 		{
 			name: "authorization fails",
 			setupMocks: func(mockCaller *auth.MockCaller, _ *db.MockJobs, _ *db.MockWorkspaces, _ *db.MockFederatedRegistries, _ *auth.MockSigningKeyManager) {
-				mockCaller.On("RequirePermission", mock.Anything, models.CreateFederatedRegistryTokenPermission, mock.Anything).
+				mockCaller.On("RequirePermission", mock.Anything, models.IssueFederatedRegistryTokenPermission, mock.Anything).
 					Return(errors.New("caller lacks permission", errors.WithErrorCode(errors.EForbidden)))
 			},
 			expectErrorCode: errors.EForbidden,
@@ -1058,7 +1058,7 @@ func TestCreateFederatedRegistryTokensForJob(t *testing.T) {
 		{
 			name: "successful token creation",
 			setupMocks: func(mockCaller *auth.MockCaller, mockJobs *db.MockJobs, mockWorkspaces *db.MockWorkspaces, mockFederatedRegistries *db.MockFederatedRegistries, mockIDP *auth.MockSigningKeyManager) {
-				mockCaller.On("RequirePermission", mock.Anything, models.CreateFederatedRegistryTokenPermission, mock.Anything).
+				mockCaller.On("RequirePermission", mock.Anything, models.IssueFederatedRegistryTokenPermission, mock.Anything).
 					Return(nil)
 				mockJobs.On("GetJobByID", mock.Anything, jobID).Return(&models.Job{
 					WorkspaceID: workspaceID,

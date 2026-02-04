@@ -99,7 +99,7 @@ func (s *service) CreateFederatedRegistryTokensForJob(ctx context.Context, jobID
 		return nil, errors.Wrap(err, "caller authorization failed", errors.WithSpan(span))
 	}
 
-	if err = caller.RequirePermission(ctx, models.CreateFederatedRegistryTokenPermission, auth.WithJobID(jobID)); err != nil {
+	if err = caller.RequirePermission(ctx, models.IssueFederatedRegistryTokenPermission, auth.WithJobID(jobID)); err != nil {
 		return nil, errors.Wrap(err, "caller lacks permission to create federated registry tokens", errors.WithSpan(span))
 	}
 

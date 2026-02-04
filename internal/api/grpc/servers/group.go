@@ -117,6 +117,13 @@ func (s *GroupServer) CreateGroup(ctx context.Context, req *pb.CreateGroupReques
 		}
 	}
 
+	if req.ProviderMirrorEnabled != nil {
+		if !req.ProviderMirrorEnabled.GetInherit() {
+			enabled := req.ProviderMirrorEnabled.GetEnabled()
+			toCreate.EnableProviderMirror = &enabled
+		}
+	}
+
 	if req.ParentId != nil {
 		parentID, err := s.serviceCatalog.FetchModelID(ctx, *req.ParentId)
 		if err != nil {
@@ -162,6 +169,13 @@ func (s *GroupServer) UpdateGroup(ctx context.Context, req *pb.UpdateGroupReques
 		if !req.DriftDetectionEnabled.GetInherit() {
 			enabled := req.DriftDetectionEnabled.GetEnabled()
 			gotGroup.EnableDriftDetection = &enabled
+		}
+	}
+
+	if req.ProviderMirrorEnabled != nil {
+		if !req.ProviderMirrorEnabled.GetInherit() {
+			enabled := req.ProviderMirrorEnabled.GetEnabled()
+			gotGroup.EnableProviderMirror = &enabled
 		}
 	}
 

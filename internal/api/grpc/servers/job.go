@@ -147,5 +147,6 @@ func toPBJob(j *models.Job) *pb.Job {
 		Type:           string(j.Type),
 		Status:         string(j.Status),
 		MaxJobDuration: j.MaxJobDuration,
+		Properties:     j.Properties,
 	}
 }

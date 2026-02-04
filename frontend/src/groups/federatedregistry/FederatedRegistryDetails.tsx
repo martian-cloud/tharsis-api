@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Link, Menu, MenuItem, Paper, Stack, styled, Typography } from '@mui/material';
+import { Box, Button, ButtonGroup, Collapse, Divider, Link, Menu, MenuItem, Paper, Stack, styled, Typography } from '@mui/material';
 import { ArrowDropUp, ArrowDropDown } from '@mui/icons-material';
 import { FederatedRegistryIcon } from '../../common/Icons';
-import { LoadingButton } from '@mui/lab';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useFragment, useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import { useNavigate, useParams } from 'react-router-dom';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import TRNButton from '../../common/TRNButton';
 import Timestamp from '../../common/Timestamp';
@@ -30,38 +30,6 @@ const FieldValue = styled(
         marginBottom: 0
     }
 }));
-
-interface ConfirmationDialogProps {
-    hostname: string;
-    deleteInProgress: boolean;
-    open: boolean;
-    onClose: (confirm?: boolean) => void;
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { hostname, deleteInProgress, onClose, open, ...other } = props;
-    return (
-        <Dialog
-            keepMounted={false}
-            maxWidth="xs"
-            open={open}
-            {...other}
-        >
-            <DialogTitle>Delete Federated Registry</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete federated registry <strong>{hostname}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>
-                    Delete
-                </LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
-}
 
 interface Props {
     fragmentRef: FederatedRegistryDetailsFragment_group$key;
@@ -249,12 +217,17 @@ function FederatedRegistryDetails({ fragmentRef }: Props) {
                         </Collapse>
                     </Box>
                 </Paper>
-                <DeleteConfirmationDialog
-                    hostname={federatedRegistry.hostname || ''}
-                    deleteInProgress={commitInFlight}
-                    open={showDeleteConfirmationDialog}
-                    onClose={onDeleteConfirmationDialogClosed}
-                />
+                {showDeleteConfirmationDialog && (
+                    <ConfirmationDialog
+                        title="Delete Federated Registry"
+                        confirmLabel="Delete"
+                        confirmInProgress={commitInFlight}
+                        onConfirm={() => onDeleteConfirmationDialogClosed(true)}
+                        onClose={() => onDeleteConfirmationDialogClosed()}
+                    >
+                        Are you sure you want to delete federated registry <strong>{federatedRegistry.hostname}</strong>?
+                    </ConfirmationDialog>
+                )}
             </Box>
         );
     }

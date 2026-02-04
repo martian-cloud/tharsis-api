@@ -1,5 +1,4 @@
-import { LoadingButton } from '@mui/lab';
-import { Dialog, DialogActions, DialogContent, DialogTitle, useTheme } from '@mui/material';
+import { useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
@@ -14,41 +13,13 @@ import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { Route, Routes } from 'react-router-dom';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
 import EditVariableDialog from './EditVariableDialog';
 import VariableList from './VariableList';
 import { VariablesDeleteVariableMutation } from './__generated__/VariablesDeleteVariableMutation.graphql';
 import { VariablesFragment_variables$key } from './__generated__/VariablesFragment_variables.graphql';
 import VariableHistoryDialog from './VariableHistoryDialog';
-
-interface ConfirmationDialogProps {
-    variable: any
-    deleteInProgress: boolean;
-    keepMounted: boolean;
-    onClose: (confirm?: boolean) => void
-}
-
-function DeleteConfirmationDialog(props: ConfirmationDialogProps) {
-    const { variable, deleteInProgress, onClose, ...other } = props;
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={!!variable}
-            {...other}
-        >
-            <DialogTitle>Delete Variable</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete the variable <strong>{variable?.key}</strong>?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton color="error" loading={deleteInProgress} onClick={() => onClose(true)}>Delete</LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
-}
 
 interface Props {
     fragmentRef: VariablesFragment_variables$key
@@ -245,12 +216,17 @@ function Variables(props: Props) {
                 onClose={() => setVariableToShowHistory(null)}
             />}
             {variableToEdit && <EditVariableDialog variable={variableToEdit} namespacePath={data.fullPath} onClose={() => setVariableToEdit(null)} />}
-            <DeleteConfirmationDialog
-                keepMounted
-                variable={variableToDelete}
-                deleteInProgress={commitInFlight}
-                onClose={onCloseDeleteVariableConfirmation}
-            />
+            {variableToDelete && (
+                <ConfirmationDialog
+                    title="Delete Variable"
+                    confirmLabel="Delete"
+                    confirmInProgress={commitInFlight}
+                    onConfirm={() => onCloseDeleteVariableConfirmation(true)}
+                    onClose={() => onCloseDeleteVariableConfirmation()}
+                >
+                    Are you sure you want to delete the variable <strong>{variableToDelete.key}</strong>?
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

@@ -4,8 +4,48 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
+
+func TestRegisterPermission(t *testing.T) {
+	fakeModelType := types.ModelType{}
+
+	t.Run("adds permission to registry", func(t *testing.T) {
+		p := registerPermission(fakeModelType, "test_action_1", false)
+
+		assert.Equal(t, fakeModelType.Name(), p.ResourceType)
+		assert.Equal(t, Action("test_action_1"), p.Action)
+
+		_, exists := permissionRegistry[p.String()]
+		assert.True(t, exists)
+	})
+
+	t.Run("adds assignable permission to assignable map", func(t *testing.T) {
+		p := registerPermission(fakeModelType, "test_action_2", true)
+
+		_, exists := assignablePermissions[p]
+		assert.True(t, exists)
+	})
+
+	t.Run("does not add non-assignable permission to assignable map", func(t *testing.T) {
+		p := registerPermission(fakeModelType, "test_action_3", false)
+
+		_, exists := assignablePermissions[p]
+		assert.False(t, exists)
+	})
+
+	t.Run("panics on duplicate", func(t *testing.T) {
+		assert.Panics(t, func() {
+			registerPermission(fakeModelType, "test_action_1", true)
+		})
+	})
+
+	t.Run("registry is populated", func(t *testing.T) {
+		assert.NotEmpty(t, permissionRegistry)
+		assert.NotEmpty(t, assignablePermissions)
+	})
+}
 
 func TestHasViewerAccess(t *testing.T) {
 	actions := []Action{
@@ -13,6 +53,8 @@ func TestHasViewerAccess(t *testing.T) {
 		CreateAction,
 		UpdateAction,
 		DeleteAction,
+		ViewValueAction,
+		IssueTokenAction,
 	}
 
 	// Positive.

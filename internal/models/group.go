@@ -20,6 +20,7 @@ type Group struct {
 	Metadata             ResourceMetadata
 	RunnerTags           []string
 	EnableDriftDetection *bool
+	EnableProviderMirror *bool
 }
 
 // GetID returns the Metadata ID.
@@ -96,6 +97,11 @@ func (g *Group) DriftDetectionEnabled() *bool {
 	return g.EnableDriftDetection
 }
 
+// ProviderMirrorEnabled returns the provider mirror enabled setting
+func (g *Group) ProviderMirrorEnabled() *bool {
+	return g.EnableProviderMirror
+}
+
 // GetParentPath returns the path for the group's immediate parent.
 func (g *Group) GetParentPath() string {
 	if g.ParentID == "" {
@@ -107,7 +113,7 @@ func (g *Group) GetParentPath() string {
 // ExpandPath returns the expanded path list for the group. The expanded path
 // list includes the full path for the group in addition to all parent paths
 func (g *Group) ExpandPath() []string {
-	return ExpandGroupPath(g.FullPath)
+	return utils.ExpandPath(g.FullPath)
 }
 
 // GetDepth returns the depth of the tree from root to this group.  A root group is counted as 1.
@@ -124,19 +130,4 @@ func (g *Group) IsDescendantOfGroup(otherGroupPath string) bool {
 func GetGroupParentPath(currentPath string) string {
 	pathParts := strings.Split(currentPath, "/")
 	return strings.Join(pathParts[:len(pathParts)-1], "/")
-}
-
-// ExpandGroupPath returns the expanded path list for a group's path. The expanded path
-// list includes the full path for the group in addition to all parent paths
-func ExpandGroupPath(currentPath string) []string {
-	pathParts := strings.Split(currentPath, "/")
-
-	paths := []string{}
-	for len(pathParts) > 0 {
-		paths = append(paths, strings.Join(pathParts, "/"))
-		// Remove last element
-		pathParts = pathParts[:len(pathParts)-1]
-	}
-
-	return paths
 }

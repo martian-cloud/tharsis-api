@@ -57,7 +57,6 @@ func (s *TerraformProviderMirrorServer) GetTerraformProviderVersionMirrors(ctx c
 		Sort:              &sort,
 		PaginationOptions: paginationOpts,
 		NamespacePath:     req.NamespacePath,
-		IncludeInherited:  req.IncludeInherited,
 	}
 
 	result, err := s.serviceCatalog.TerraformProviderMirrorService.GetProviderVersionMirrors(ctx, input)
@@ -97,17 +96,13 @@ func (s *TerraformProviderMirrorServer) GetTerraformProviderVersionMirrors(ctx c
 
 // CreateTerraformProviderVersionMirror creates a new version mirror.
 func (s *TerraformProviderMirrorServer) CreateTerraformProviderVersionMirror(ctx context.Context, req *pb.CreateTerraformProviderVersionMirrorRequest) (*pb.TerraformProviderVersionMirror, error) {
-	groupID, err := s.serviceCatalog.FetchModelID(ctx, req.GroupId)
-	if err != nil {
-		return nil, err
-	}
-
 	input := &providermirror.CreateProviderVersionMirrorInput{
-		GroupID:           groupID,
+		GroupPath:         req.GroupPath,
 		Type:              req.Type,
 		RegistryNamespace: req.RegistryNamespace,
 		RegistryHostname:  req.RegistryHostname,
 		SemanticVersion:   req.SemanticVersion,
+		RegistryToken:     req.RegistryToken,
 	}
 
 	created, err := s.serviceCatalog.TerraformProviderMirrorService.CreateProviderVersionMirror(ctx, input)

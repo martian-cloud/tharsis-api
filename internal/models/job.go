@@ -29,6 +29,11 @@ const (
 	JobApplyType JobType = "apply"
 )
 
+// Job Property Keys
+const (
+	JobPropertyProviderMirrorEnabled = "providerMirrorEnabled"
+)
+
 // JobTimestamps includes the timestamp for each job state change
 type JobTimestamps struct {
 	QueuedTimestamp   *time.Time
@@ -51,6 +56,7 @@ type Job struct {
 	MaxJobDuration           int32
 	CancelRequested          bool
 	Tags                     []string
+	Properties               map[string]string
 }
 
 // GetID returns the Metadata ID.

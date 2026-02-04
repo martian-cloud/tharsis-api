@@ -1,6 +1,5 @@
-import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from '@mui/material';
+import { Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useTheme } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import { LoadingButton } from '@mui/lab';
 import graphql from 'babel-plugin-relay/macro';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useLazyLoadQuery, usePaginationFragment, useMutation } from 'react-relay/hooks';
@@ -9,6 +8,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useState, useMemo } from 'react';
 import { useSnackbar } from 'notistack';
 import AdminAreaBreadcrumbs from '../AdminAreaBreadcrumbs';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import Timestamp from '../../common/Timestamp';
 import ListSkeleton from '../../skeletons/ListSkeleton';
 import AnnouncementAlert from '../../common/AnnouncementAlert';
@@ -44,41 +44,6 @@ const query = graphql`
         ...AdminAreaAnnouncementListFragment_announcements
     }
 `;
-
-interface AnnouncementDeleteConfirmationDialogProps {
-    announcement: { id: string; message: string } | null;
-    deleteInProgress: boolean;
-    onClose: (confirm?: boolean) => void;
-}
-
-function AnnouncementDeleteConfirmationDialog(props: AnnouncementDeleteConfirmationDialogProps) {
-    const { announcement, deleteInProgress, onClose, ...other } = props;
-
-    return (
-        <Dialog
-            maxWidth="xs"
-            open={!!announcement}
-            keepMounted={false}
-            {...other}
-        >
-            <DialogTitle>Delete Announcement</DialogTitle>
-            <DialogContent dividers>
-                Are you sure you want to delete this announcement?
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={() => onClose()}>
-                    Cancel
-                </Button>
-                <LoadingButton
-                    color="error"
-                    loading={deleteInProgress}
-                    onClick={() => onClose(true)}>
-                    Delete
-                </LoadingButton>
-            </DialogActions>
-        </Dialog>
-    );
-}
 
 function AdminAreaAnnouncementList() {
     const theme = useTheme();
@@ -371,11 +336,17 @@ function AdminAreaAnnouncementList() {
                 </InfiniteScroll>
             </Box>
 
-            <AnnouncementDeleteConfirmationDialog
-                announcement={announcementToDelete}
-                deleteInProgress={deleteInFlight}
-                onClose={onDelete}
-            />
+            {announcementToDelete && (
+                <ConfirmationDialog
+                    title="Delete Announcement"
+                    confirmLabel="Delete"
+                    confirmInProgress={deleteInFlight}
+                    onConfirm={() => onDelete(true)}
+                    onClose={() => onDelete()}
+                >
+                    Are you sure you want to delete this announcement?
+                </ConfirmationDialog>
+            )}
         </Box>
     );
 }

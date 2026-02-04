@@ -17,3 +17,11 @@ message NamespaceDriftDetectionEnabledInput {
     bool enabled = 2;
   }
 }
+
+// NamespaceProviderMirrorEnabledInput is the input for setting provider mirror on a namespace.
+message NamespaceProviderMirrorEnabledInput {
+  oneof value {
+    bool inherit = 1;
+    bool enabled = 2;
+  }
+}

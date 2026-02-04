@@ -25,10 +25,10 @@ const (
 type TerraformProviderVersionMirrorSortableField int32
 
 const (
-	TerraformProviderVersionMirrorSortableField_CREATED_AT_ASC        TerraformProviderVersionMirrorSortableField = 0
-	TerraformProviderVersionMirrorSortableField_CREATED_AT_DESC       TerraformProviderVersionMirrorSortableField = 1
-	TerraformProviderVersionMirrorSortableField_SEMANTIC_VERSION_ASC  TerraformProviderVersionMirrorSortableField = 2
-	TerraformProviderVersionMirrorSortableField_SEMANTIC_VERSION_DESC TerraformProviderVersionMirrorSortableField = 3
+	TerraformProviderVersionMirrorSortableField_CREATED_AT_ASC  TerraformProviderVersionMirrorSortableField = 0
+	TerraformProviderVersionMirrorSortableField_CREATED_AT_DESC TerraformProviderVersionMirrorSortableField = 1
+	TerraformProviderVersionMirrorSortableField_TYPE_ASC        TerraformProviderVersionMirrorSortableField = 2
+	TerraformProviderVersionMirrorSortableField_TYPE_DESC       TerraformProviderVersionMirrorSortableField = 3
 )
 
 // Enum value maps for TerraformProviderVersionMirrorSortableField.
@@ -36,14 +36,14 @@ var (
 	TerraformProviderVersionMirrorSortableField_name = map[int32]string{
 		0: "CREATED_AT_ASC",
 		1: "CREATED_AT_DESC",
-		2: "SEMANTIC_VERSION_ASC",
-		3: "SEMANTIC_VERSION_DESC",
+		2: "TYPE_ASC",
+		3: "TYPE_DESC",
 	}
 	TerraformProviderVersionMirrorSortableField_value = map[string]int32{
-		"CREATED_AT_ASC":        0,
-		"CREATED_AT_DESC":       1,
-		"SEMANTIC_VERSION_ASC":  2,
-		"SEMANTIC_VERSION_DESC": 3,
+		"CREATED_AT_ASC":  0,
+		"CREATED_AT_DESC": 1,
+		"TYPE_ASC":        2,
+		"TYPE_DESC":       3,
 	}
 )
 
@@ -124,8 +124,7 @@ type GetTerraformProviderVersionMirrorsRequest struct {
 	state             protoimpl.MessageState                       `protogen:"open.v1"`
 	PaginationOptions *PaginationOptions                           `protobuf:"bytes,1,opt,name=pagination_options,json=paginationOptions,proto3,oneof" json:"pagination_options,omitempty"`
 	Sort              *TerraformProviderVersionMirrorSortableField `protobuf:"varint,2,opt,name=sort,proto3,enum=martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorSortableField,oneof" json:"sort,omitempty"`
-	IncludeInherited  bool                                         `protobuf:"varint,3,opt,name=include_inherited,json=includeInherited,proto3" json:"include_inherited,omitempty"`
-	NamespacePath     string                                       `protobuf:"bytes,4,opt,name=namespace_path,json=namespacePath,proto3" json:"namespace_path,omitempty"`
+	NamespacePath     string                                       `protobuf:"bytes,3,opt,name=namespace_path,json=namespacePath,proto3" json:"namespace_path,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -174,13 +173,6 @@ func (x *GetTerraformProviderVersionMirrorsRequest) GetSort() TerraformProviderV
 	return TerraformProviderVersionMirrorSortableField_CREATED_AT_ASC
 }
 
-func (x *GetTerraformProviderVersionMirrorsRequest) GetIncludeInherited() bool {
-	if x != nil {
-		return x.IncludeInherited
-	}
-	return false
-}
-
 func (x *GetTerraformProviderVersionMirrorsRequest) GetNamespacePath() string {
 	if x != nil {
 		return x.NamespacePath
@@ -191,11 +183,12 @@ func (x *GetTerraformProviderVersionMirrorsRequest) GetNamespacePath() string {
 // CreateTerraformProviderVersionMirrorRequest is the input for creating a version mirror.
 type CreateTerraformProviderVersionMirrorRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	GroupId           string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	GroupPath         string                 `protobuf:"bytes,1,opt,name=group_path,json=groupPath,proto3" json:"group_path,omitempty"`
 	Type              string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	RegistryNamespace string                 `protobuf:"bytes,3,opt,name=registry_namespace,json=registryNamespace,proto3" json:"registry_namespace,omitempty"`
 	RegistryHostname  string                 `protobuf:"bytes,4,opt,name=registry_hostname,json=registryHostname,proto3" json:"registry_hostname,omitempty"`
 	SemanticVersion   string                 `protobuf:"bytes,5,opt,name=semantic_version,json=semanticVersion,proto3" json:"semantic_version,omitempty"`
+	RegistryToken     *string                `protobuf:"bytes,6,opt,name=registry_token,json=registryToken,proto3,oneof" json:"registry_token,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -230,9 +223,9 @@ func (*CreateTerraformProviderVersionMirrorRequest) Descriptor() ([]byte, []int)
 	return file_terraform_provider_version_mirror_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *CreateTerraformProviderVersionMirrorRequest) GetGroupId() string {
+func (x *CreateTerraformProviderVersionMirrorRequest) GetGroupPath() string {
 	if x != nil {
-		return x.GroupId
+		return x.GroupPath
 	}
 	return ""
 }
@@ -261,6 +254,13 @@ func (x *CreateTerraformProviderVersionMirrorRequest) GetRegistryHostname() stri
 func (x *CreateTerraformProviderVersionMirrorRequest) GetSemanticVersion() string {
 	if x != nil {
 		return x.SemanticVersion
+	}
+	return ""
+}
+
+func (x *CreateTerraformProviderVersionMirrorRequest) GetRegistryToken() string {
+	if x != nil && x.RegistryToken != nil {
+		return *x.RegistryToken
 	}
 	return ""
 }
@@ -478,20 +478,22 @@ const file_terraform_provider_version_mirror_proto_rawDesc = "" +
 	"\n" +
 	"'terraform_provider_version_mirror.proto\x12:martiancloud.tharsis.api.terraform_provider_version_mirror\x1a\x0emetadata.proto\x1a\x10pagination.proto\">\n" +
 	",GetTerraformProviderVersionMirrorByIDRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x8e\x03\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xe1\x02\n" +
 	")GetTerraformProviderVersionMirrorsRequest\x12j\n" +
 	"\x12pagination_options\x18\x01 \x01(\v26.martiancloud.tharsis.api.pagination.PaginationOptionsH\x00R\x11paginationOptions\x88\x01\x01\x12\x80\x01\n" +
-	"\x04sort\x18\x02 \x01(\x0e2g.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorSortableFieldH\x01R\x04sort\x88\x01\x01\x12+\n" +
-	"\x11include_inherited\x18\x03 \x01(\bR\x10includeInherited\x12%\n" +
-	"\x0enamespace_path\x18\x04 \x01(\tR\rnamespacePathB\x15\n" +
+	"\x04sort\x18\x02 \x01(\x0e2g.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorSortableFieldH\x01R\x04sort\x88\x01\x01\x12%\n" +
+	"\x0enamespace_path\x18\x03 \x01(\tR\rnamespacePathB\x15\n" +
 	"\x13_pagination_optionsB\a\n" +
-	"\x05_sort\"\xe3\x01\n" +
-	"+CreateTerraformProviderVersionMirrorRequest\x12\x19\n" +
-	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x12\n" +
+	"\x05_sort\"\xa6\x02\n" +
+	"+CreateTerraformProviderVersionMirrorRequest\x12\x1d\n" +
+	"\n" +
+	"group_path\x18\x01 \x01(\tR\tgroupPath\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12-\n" +
 	"\x12registry_namespace\x18\x03 \x01(\tR\x11registryNamespace\x12+\n" +
 	"\x11registry_hostname\x18\x04 \x01(\tR\x10registryHostname\x12)\n" +
-	"\x10semantic_version\x18\x05 \x01(\tR\x0fsemanticVersion\"S\n" +
+	"\x10semantic_version\x18\x05 \x01(\tR\x0fsemanticVersion\x12*\n" +
+	"\x0eregistry_token\x18\x06 \x01(\tH\x00R\rregistryToken\x88\x01\x01B\x11\n" +
+	"\x0f_registry_token\"S\n" +
 	"+DeleteTerraformProviderVersionMirrorRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05force\x18\x02 \x01(\bR\x05force\"\x86\x04\n" +
@@ -510,12 +512,12 @@ const file_terraform_provider_version_mirror_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfe\x01\n" +
 	"*GetTerraformProviderVersionMirrorsResponse\x12J\n" +
 	"\tpage_info\x18\x01 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo\x12\x83\x01\n" +
-	"\x0fversion_mirrors\x18\x02 \x03(\v2Z.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorR\x0eversionMirrors*\x8b\x01\n" +
+	"\x0fversion_mirrors\x18\x02 \x03(\v2Z.martiancloud.tharsis.api.terraform_provider_version_mirror.TerraformProviderVersionMirrorR\x0eversionMirrors*s\n" +
 	"+TerraformProviderVersionMirrorSortableField\x12\x12\n" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
-	"\x0fCREATED_AT_DESC\x10\x01\x12\x18\n" +
-	"\x14SEMANTIC_VERSION_ASC\x10\x02\x12\x19\n" +
-	"\x15SEMANTIC_VERSION_DESC\x10\x03BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\x0fCREATED_AT_DESC\x10\x01\x12\f\n" +
+	"\bTYPE_ASC\x10\x02\x12\r\n" +
+	"\tTYPE_DESC\x10\x03BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_terraform_provider_version_mirror_proto_rawDescOnce sync.Once
@@ -566,6 +568,7 @@ func file_terraform_provider_version_mirror_proto_init() {
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_terraform_provider_version_mirror_proto_msgTypes[1].OneofWrappers = []any{}
+	file_terraform_provider_version_mirror_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

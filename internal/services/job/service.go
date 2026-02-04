@@ -589,6 +589,7 @@ func (s *service) ClaimJob(ctx context.Context, runnerID string) (*ClaimJobRespo
 				Subject:    fmt.Sprintf("job-%s", job.Metadata.ID),
 				Claims: map[string]string{
 					"job_id":       job.GetGlobalID(),
+					"job_trn":      job.Metadata.TRN,
 					"run_id":       gid.ToGlobalID(types.RunModelType, job.RunID),
 					"workspace_id": gid.ToGlobalID(types.WorkspaceModelType, job.WorkspaceID),
 					"type":         auth.JobTokenType,

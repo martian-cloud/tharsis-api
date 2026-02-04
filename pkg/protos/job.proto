@@ -47,6 +47,7 @@ message Job {
   string                    type             = 4;
   string                    status           = 5;
   int32                     max_job_duration = 6;
+  map<string, string>       properties       = 7;
 }
 
 // JobLogStreamEventData contains the log data.

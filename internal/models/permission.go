@@ -9,162 +9,100 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 )
 
-// All possible Permissions.
 var (
-	ViewGPGKeyPermission                    = Permission{ResourceType: types.GPGKeyModelType.Name(), Action: ViewAction}
-	CreateGPGKeyPermission                  = Permission{ResourceType: types.GPGKeyModelType.Name(), Action: CreateAction}
-	DeleteGPGKeyPermission                  = Permission{ResourceType: types.GPGKeyModelType.Name(), Action: DeleteAction}
-	ViewGroupPermission                     = Permission{ResourceType: types.GroupModelType.Name(), Action: ViewAction}
-	CreateGroupPermission                   = Permission{ResourceType: types.GroupModelType.Name(), Action: CreateAction}
-	UpdateGroupPermission                   = Permission{ResourceType: types.GroupModelType.Name(), Action: UpdateAction}
-	DeleteGroupPermission                   = Permission{ResourceType: types.GroupModelType.Name(), Action: DeleteAction}
-	ViewNamespaceMembershipPermission       = Permission{ResourceType: types.NamespaceMembershipModelType.Name(), Action: ViewAction}
-	CreateNamespaceMembershipPermission     = Permission{ResourceType: types.NamespaceMembershipModelType.Name(), Action: CreateAction}
-	UpdateNamespaceMembershipPermission     = Permission{ResourceType: types.NamespaceMembershipModelType.Name(), Action: UpdateAction}
-	DeleteNamespaceMembershipPermission     = Permission{ResourceType: types.NamespaceMembershipModelType.Name(), Action: DeleteAction}
-	ViewWorkspacePermission                 = Permission{ResourceType: types.WorkspaceModelType.Name(), Action: ViewAction}
-	CreateWorkspacePermission               = Permission{ResourceType: types.WorkspaceModelType.Name(), Action: CreateAction}
-	UpdateWorkspacePermission               = Permission{ResourceType: types.WorkspaceModelType.Name(), Action: UpdateAction}
-	DeleteWorkspacePermission               = Permission{ResourceType: types.WorkspaceModelType.Name(), Action: DeleteAction}
-	CreateTeamPermission                    = Permission{ResourceType: types.TeamModelType.Name(), Action: CreateAction}
-	UpdateTeamPermission                    = Permission{ResourceType: types.TeamModelType.Name(), Action: UpdateAction}
-	DeleteTeamPermission                    = Permission{ResourceType: types.TeamModelType.Name(), Action: DeleteAction}
-	ViewRunPermission                       = Permission{ResourceType: types.RunModelType.Name(), Action: ViewAction}
-	CreateRunPermission                     = Permission{ResourceType: types.RunModelType.Name(), Action: CreateAction}
-	ViewJobPermission                       = Permission{ResourceType: types.JobModelType.Name(), Action: ViewAction}
-	ClaimJobPermission                      = Permission{ResourceType: types.JobModelType.Name(), Action: ClaimAction}    // Specifically for claiming jobs.
-	UpdateJobPermission                     = Permission{ResourceType: types.JobModelType.Name(), Action: UpdateAction}   // Write job perm.
-	UpdatePlanPermission                    = Permission{ResourceType: types.PlanModelType.Name(), Action: UpdateAction}  // Write plan perm.
-	UpdateApplyPermission                   = Permission{ResourceType: types.ApplyModelType.Name(), Action: UpdateAction} // Write apply perm.
-	ViewRunnerPermission                    = Permission{ResourceType: types.RunnerModelType.Name(), Action: ViewAction}
-	CreateRunnerPermission                  = Permission{ResourceType: types.RunnerModelType.Name(), Action: CreateAction}
-	UpdateRunnerPermission                  = Permission{ResourceType: types.RunnerModelType.Name(), Action: UpdateAction}
-	DeleteRunnerPermission                  = Permission{ResourceType: types.RunnerModelType.Name(), Action: DeleteAction}
-	CreateRunnerSessionPermission           = Permission{ResourceType: types.RunnerSessionModelType.Name(), Action: CreateAction}
-	UpdateRunnerSessionPermission           = Permission{ResourceType: types.RunnerSessionModelType.Name(), Action: UpdateAction}
-	CreateUserPermission                    = Permission{ResourceType: types.UserModelType.Name(), Action: CreateAction}
-	UpdateUserPermission                    = Permission{ResourceType: types.UserModelType.Name(), Action: UpdateAction}
-	DeleteUserPermission                    = Permission{ResourceType: types.UserModelType.Name(), Action: DeleteAction}
-	ViewVariableValuePermission             = Permission{ResourceType: types.VariableModelType.Name(), Action: ViewValueAction} // Viewing variable values.
-	ViewVariablePermission                  = Permission{ResourceType: types.VariableModelType.Name(), Action: ViewAction}
-	CreateVariablePermission                = Permission{ResourceType: types.VariableModelType.Name(), Action: CreateAction}
-	UpdateVariablePermission                = Permission{ResourceType: types.VariableModelType.Name(), Action: UpdateAction}
-	DeleteVariablePermission                = Permission{ResourceType: types.VariableModelType.Name(), Action: DeleteAction}
-	ViewTerraformProviderPermission         = Permission{ResourceType: types.TerraformProviderModelType.Name(), Action: ViewAction}
-	CreateTerraformProviderPermission       = Permission{ResourceType: types.TerraformProviderModelType.Name(), Action: CreateAction}
-	UpdateTerraformProviderPermission       = Permission{ResourceType: types.TerraformProviderModelType.Name(), Action: UpdateAction}
-	DeleteTerraformProviderPermission       = Permission{ResourceType: types.TerraformProviderModelType.Name(), Action: DeleteAction}
-	ViewTerraformModulePermission           = Permission{ResourceType: types.TerraformModuleModelType.Name(), Action: ViewAction}
-	CreateTerraformModulePermission         = Permission{ResourceType: types.TerraformModuleModelType.Name(), Action: CreateAction}
-	UpdateTerraformModulePermission         = Permission{ResourceType: types.TerraformModuleModelType.Name(), Action: UpdateAction}
-	DeleteTerraformModulePermission         = Permission{ResourceType: types.TerraformModuleModelType.Name(), Action: DeleteAction}
-	ViewStateVersionPermission              = Permission{ResourceType: types.StateVersionModelType.Name(), Action: ViewAction}
-	ViewStateVersionDataPermission          = Permission{ResourceType: types.StateVersionModelType.Name(), Action: ViewValueAction}
-	CreateStateVersionPermission            = Permission{ResourceType: types.StateVersionModelType.Name(), Action: CreateAction}
-	ViewConfigurationVersionPermission      = Permission{ResourceType: types.ConfigurationVersionModelType.Name(), Action: ViewAction}
-	CreateConfigurationVersionPermission    = Permission{ResourceType: types.ConfigurationVersionModelType.Name(), Action: CreateAction}
-	UpdateConfigurationVersionPermission    = Permission{ResourceType: types.ConfigurationVersionModelType.Name(), Action: UpdateAction}
-	ViewServiceAccountPermission            = Permission{ResourceType: types.ServiceAccountModelType.Name(), Action: ViewAction}
-	CreateServiceAccountPermission          = Permission{ResourceType: types.ServiceAccountModelType.Name(), Action: CreateAction}
-	UpdateServiceAccountPermission          = Permission{ResourceType: types.ServiceAccountModelType.Name(), Action: UpdateAction}
-	DeleteServiceAccountPermission          = Permission{ResourceType: types.ServiceAccountModelType.Name(), Action: DeleteAction}
-	ViewManagedIdentityPermission           = Permission{ResourceType: types.ManagedIdentityModelType.Name(), Action: ViewAction}
-	CreateManagedIdentityPermission         = Permission{ResourceType: types.ManagedIdentityModelType.Name(), Action: CreateAction}
-	UpdateManagedIdentityPermission         = Permission{ResourceType: types.ManagedIdentityModelType.Name(), Action: UpdateAction}
-	DeleteManagedIdentityPermission         = Permission{ResourceType: types.ManagedIdentityModelType.Name(), Action: DeleteAction}
-	ViewVCSProviderPermission               = Permission{ResourceType: types.VCSProviderModelType.Name(), Action: ViewAction}
-	CreateVCSProviderPermission             = Permission{ResourceType: types.VCSProviderModelType.Name(), Action: CreateAction}
-	UpdateVCSProviderPermission             = Permission{ResourceType: types.VCSProviderModelType.Name(), Action: UpdateAction}
-	DeleteVCSProviderPermission             = Permission{ResourceType: types.VCSProviderModelType.Name(), Action: DeleteAction}
-	ViewTerraformProviderMirrorPermission   = Permission{ResourceType: types.TerraformProviderMirrorModelType.Name(), Action: ViewAction}
-	CreateTerraformProviderMirrorPermission = Permission{ResourceType: types.TerraformProviderMirrorModelType.Name(), Action: CreateAction}
-	DeleteTerraformProviderMirrorPermission = Permission{ResourceType: types.TerraformProviderMirrorModelType.Name(), Action: DeleteAction}
-	ViewFederatedRegistryPermission         = Permission{ResourceType: types.FederatedRegistryModelType.Name(), Action: ViewAction}
-	CreateFederatedRegistryPermission       = Permission{ResourceType: types.FederatedRegistryModelType.Name(), Action: CreateAction}
-	UpdateFederatedRegistryPermission       = Permission{ResourceType: types.FederatedRegistryModelType.Name(), Action: UpdateAction}
-	DeleteFederatedRegistryPermission       = Permission{ResourceType: types.FederatedRegistryModelType.Name(), Action: DeleteAction}
-	CreateFederatedRegistryTokenPermission  = Permission{ResourceType: types.FederatedRegistryModelType.Name(), Action: CreateAction}
+	permissionRegistry    = map[string]struct{}{}
+	assignablePermissions = map[Permission]struct{}{}
 )
 
-// assignablePermissions contains all the permissions that
-// may be assigned to Tharsis roles.
-var assignablePermissions = map[Permission]struct{}{
-	ViewGPGKeyPermission:                    {},
-	CreateGPGKeyPermission:                  {},
-	DeleteGPGKeyPermission:                  {},
-	ViewGroupPermission:                     {},
-	CreateGroupPermission:                   {},
-	UpdateGroupPermission:                   {},
-	DeleteGroupPermission:                   {},
-	ViewNamespaceMembershipPermission:       {},
-	CreateNamespaceMembershipPermission:     {},
-	UpdateNamespaceMembershipPermission:     {},
-	DeleteNamespaceMembershipPermission:     {},
-	ViewWorkspacePermission:                 {},
-	CreateWorkspacePermission:               {},
-	UpdateWorkspacePermission:               {},
-	DeleteWorkspacePermission:               {},
-	ViewRunPermission:                       {},
-	CreateRunPermission:                     {},
-	ViewJobPermission:                       {},
-	ViewRunnerPermission:                    {},
-	CreateRunnerPermission:                  {},
-	UpdateRunnerPermission:                  {},
-	DeleteRunnerPermission:                  {},
-	CreateUserPermission:                    {},
-	UpdateUserPermission:                    {},
-	DeleteUserPermission:                    {},
-	ViewVariableValuePermission:             {},
-	ViewVariablePermission:                  {},
-	CreateVariablePermission:                {},
-	UpdateVariablePermission:                {},
-	DeleteVariablePermission:                {},
-	ViewTerraformProviderPermission:         {},
-	CreateTerraformProviderPermission:       {},
-	UpdateTerraformProviderPermission:       {},
-	DeleteTerraformProviderPermission:       {},
-	ViewTerraformModulePermission:           {},
-	CreateTerraformModulePermission:         {},
-	UpdateTerraformModulePermission:         {},
-	DeleteTerraformModulePermission:         {},
-	ViewStateVersionPermission:              {},
-	ViewStateVersionDataPermission:          {},
-	CreateStateVersionPermission:            {},
-	ViewConfigurationVersionPermission:      {},
-	CreateConfigurationVersionPermission:    {},
-	UpdateConfigurationVersionPermission:    {},
-	ViewServiceAccountPermission:            {},
-	CreateServiceAccountPermission:          {},
-	UpdateServiceAccountPermission:          {},
-	DeleteServiceAccountPermission:          {},
-	ViewManagedIdentityPermission:           {},
-	CreateManagedIdentityPermission:         {},
-	UpdateManagedIdentityPermission:         {},
-	DeleteManagedIdentityPermission:         {},
-	ViewVCSProviderPermission:               {},
-	CreateVCSProviderPermission:             {},
-	UpdateVCSProviderPermission:             {},
-	DeleteVCSProviderPermission:             {},
-	ViewTerraformProviderMirrorPermission:   {},
-	CreateTerraformProviderMirrorPermission: {},
-	DeleteTerraformProviderMirrorPermission: {},
-	ViewFederatedRegistryPermission:         {},
-	CreateFederatedRegistryPermission:       {},
-	UpdateFederatedRegistryPermission:       {},
-	DeleteFederatedRegistryPermission:       {},
-}
+// All possible Permissions.
+var (
+	ViewGPGKeyPermission                    = registerPermission(types.GPGKeyModelType, ViewAction, true)
+	CreateGPGKeyPermission                  = registerPermission(types.GPGKeyModelType, CreateAction, true)
+	DeleteGPGKeyPermission                  = registerPermission(types.GPGKeyModelType, DeleteAction, true)
+	ViewGroupPermission                     = registerPermission(types.GroupModelType, ViewAction, true)
+	CreateGroupPermission                   = registerPermission(types.GroupModelType, CreateAction, true)
+	UpdateGroupPermission                   = registerPermission(types.GroupModelType, UpdateAction, true)
+	DeleteGroupPermission                   = registerPermission(types.GroupModelType, DeleteAction, true)
+	ViewNamespaceMembershipPermission       = registerPermission(types.NamespaceMembershipModelType, ViewAction, true)
+	CreateNamespaceMembershipPermission     = registerPermission(types.NamespaceMembershipModelType, CreateAction, true)
+	UpdateNamespaceMembershipPermission     = registerPermission(types.NamespaceMembershipModelType, UpdateAction, true)
+	DeleteNamespaceMembershipPermission     = registerPermission(types.NamespaceMembershipModelType, DeleteAction, true)
+	ViewWorkspacePermission                 = registerPermission(types.WorkspaceModelType, ViewAction, true)
+	CreateWorkspacePermission               = registerPermission(types.WorkspaceModelType, CreateAction, true)
+	UpdateWorkspacePermission               = registerPermission(types.WorkspaceModelType, UpdateAction, true)
+	DeleteWorkspacePermission               = registerPermission(types.WorkspaceModelType, DeleteAction, true)
+	CreateTeamPermission                    = registerPermission(types.TeamModelType, CreateAction, false)
+	UpdateTeamPermission                    = registerPermission(types.TeamModelType, UpdateAction, false)
+	DeleteTeamPermission                    = registerPermission(types.TeamModelType, DeleteAction, false)
+	ViewRunPermission                       = registerPermission(types.RunModelType, ViewAction, true)
+	CreateRunPermission                     = registerPermission(types.RunModelType, CreateAction, true)
+	ViewJobPermission                       = registerPermission(types.JobModelType, ViewAction, true)
+	ClaimJobPermission                      = registerPermission(types.JobModelType, ClaimAction, false)    // Specifically for claiming jobs.
+	UpdateJobPermission                     = registerPermission(types.JobModelType, UpdateAction, false)   // Write job perm.
+	UpdatePlanPermission                    = registerPermission(types.PlanModelType, UpdateAction, false)  // Write plan perm.
+	UpdateApplyPermission                   = registerPermission(types.ApplyModelType, UpdateAction, false) // Write apply perm.
+	ViewRunnerPermission                    = registerPermission(types.RunnerModelType, ViewAction, true)
+	CreateRunnerPermission                  = registerPermission(types.RunnerModelType, CreateAction, true)
+	UpdateRunnerPermission                  = registerPermission(types.RunnerModelType, UpdateAction, true)
+	DeleteRunnerPermission                  = registerPermission(types.RunnerModelType, DeleteAction, true)
+	CreateRunnerSessionPermission           = registerPermission(types.RunnerSessionModelType, CreateAction, false)
+	UpdateRunnerSessionPermission           = registerPermission(types.RunnerSessionModelType, UpdateAction, false)
+	CreateUserPermission                    = registerPermission(types.UserModelType, CreateAction, true)
+	UpdateUserPermission                    = registerPermission(types.UserModelType, UpdateAction, true)
+	DeleteUserPermission                    = registerPermission(types.UserModelType, DeleteAction, true)
+	ViewVariableValuePermission             = registerPermission(types.VariableModelType, ViewValueAction, true) // Viewing variable values.
+	ViewVariablePermission                  = registerPermission(types.VariableModelType, ViewAction, true)
+	CreateVariablePermission                = registerPermission(types.VariableModelType, CreateAction, true)
+	UpdateVariablePermission                = registerPermission(types.VariableModelType, UpdateAction, true)
+	DeleteVariablePermission                = registerPermission(types.VariableModelType, DeleteAction, true)
+	ViewTerraformProviderPermission         = registerPermission(types.TerraformProviderModelType, ViewAction, true)
+	CreateTerraformProviderPermission       = registerPermission(types.TerraformProviderModelType, CreateAction, true)
+	UpdateTerraformProviderPermission       = registerPermission(types.TerraformProviderModelType, UpdateAction, true)
+	DeleteTerraformProviderPermission       = registerPermission(types.TerraformProviderModelType, DeleteAction, true)
+	ViewTerraformModulePermission           = registerPermission(types.TerraformModuleModelType, ViewAction, true)
+	CreateTerraformModulePermission         = registerPermission(types.TerraformModuleModelType, CreateAction, true)
+	UpdateTerraformModulePermission         = registerPermission(types.TerraformModuleModelType, UpdateAction, true)
+	DeleteTerraformModulePermission         = registerPermission(types.TerraformModuleModelType, DeleteAction, true)
+	ViewStateVersionPermission              = registerPermission(types.StateVersionModelType, ViewAction, true)
+	ViewStateVersionDataPermission          = registerPermission(types.StateVersionModelType, ViewValueAction, true)
+	CreateStateVersionPermission            = registerPermission(types.StateVersionModelType, CreateAction, true)
+	ViewConfigurationVersionPermission      = registerPermission(types.ConfigurationVersionModelType, ViewAction, true)
+	CreateConfigurationVersionPermission    = registerPermission(types.ConfigurationVersionModelType, CreateAction, true)
+	UpdateConfigurationVersionPermission    = registerPermission(types.ConfigurationVersionModelType, UpdateAction, true)
+	ViewServiceAccountPermission            = registerPermission(types.ServiceAccountModelType, ViewAction, true)
+	CreateServiceAccountPermission          = registerPermission(types.ServiceAccountModelType, CreateAction, true)
+	UpdateServiceAccountPermission          = registerPermission(types.ServiceAccountModelType, UpdateAction, true)
+	DeleteServiceAccountPermission          = registerPermission(types.ServiceAccountModelType, DeleteAction, true)
+	ViewManagedIdentityPermission           = registerPermission(types.ManagedIdentityModelType, ViewAction, true)
+	CreateManagedIdentityPermission         = registerPermission(types.ManagedIdentityModelType, CreateAction, true)
+	UpdateManagedIdentityPermission         = registerPermission(types.ManagedIdentityModelType, UpdateAction, true)
+	DeleteManagedIdentityPermission         = registerPermission(types.ManagedIdentityModelType, DeleteAction, true)
+	ViewVCSProviderPermission               = registerPermission(types.VCSProviderModelType, ViewAction, true)
+	CreateVCSProviderPermission             = registerPermission(types.VCSProviderModelType, CreateAction, true)
+	UpdateVCSProviderPermission             = registerPermission(types.VCSProviderModelType, UpdateAction, true)
+	DeleteVCSProviderPermission             = registerPermission(types.VCSProviderModelType, DeleteAction, true)
+	ViewTerraformProviderMirrorPermission   = registerPermission(types.TerraformProviderMirrorModelType, ViewAction, true)
+	CreateTerraformProviderMirrorPermission = registerPermission(types.TerraformProviderMirrorModelType, CreateAction, true)
+	DeleteTerraformProviderMirrorPermission = registerPermission(types.TerraformProviderMirrorModelType, DeleteAction, true)
+	ViewFederatedRegistryPermission         = registerPermission(types.FederatedRegistryModelType, ViewAction, true)
+	CreateFederatedRegistryPermission       = registerPermission(types.FederatedRegistryModelType, CreateAction, true)
+	UpdateFederatedRegistryPermission       = registerPermission(types.FederatedRegistryModelType, UpdateAction, true)
+	DeleteFederatedRegistryPermission       = registerPermission(types.FederatedRegistryModelType, DeleteAction, true)
+	IssueFederatedRegistryTokenPermission   = registerPermission(types.FederatedRegistryModelType, IssueTokenAction, false)
+)
 
 // Action is an enum representing a CRUD action.
 type Action string
 
 // Action constants.
 const (
-	ViewAction      Action = "view"
-	ViewValueAction Action = "view_value"
-	CreateAction    Action = "create"
-	UpdateAction    Action = "update"
-	DeleteAction    Action = "delete"
-	ClaimAction     Action = "claim"
+	ViewAction       Action = "view"
+	ViewValueAction  Action = "view_value"
+	CreateAction     Action = "create"
+	UpdateAction     Action = "update"
+	DeleteAction     Action = "delete"
+	ClaimAction      Action = "claim"
+	IssueTokenAction Action = "issue_token"
 )
 
 // HasViewerAccess returns true if Action is viewer access or greater.
@@ -174,7 +112,8 @@ func (p Action) HasViewerAccess() bool {
 		CreateAction,
 		UpdateAction,
 		DeleteAction,
-		ViewValueAction:
+		ViewValueAction,
+		IssueTokenAction:
 		return true
 	}
 
@@ -260,4 +199,22 @@ func ParsePermissions(perms []string) ([]Permission, error) {
 	}
 
 	return parsedPerms, nil
+}
+
+// registerPermission creates a new Permission and registers it. Panics if a duplicate is detected.
+func registerPermission(resourceType types.ModelType, action Action, assignable bool) Permission {
+	p := Permission{ResourceType: resourceType.Name(), Action: action}
+	key := p.String()
+
+	if _, exists := permissionRegistry[key]; exists {
+		panic("duplicate permission: " + key)
+	}
+
+	permissionRegistry[key] = struct{}{}
+
+	if assignable {
+		assignablePermissions[p] = struct{}{}
+	}
+
+	return p
 }

@@ -308,6 +308,36 @@ func (_m *MockService) GetDriftDetectionEnabledSetting(ctx context.Context, work
 	return r0, r1
 }
 
+// GetProviderMirrorEnabledSetting provides a mock function with given fields: ctx, workspace
+func (_m *MockService) GetProviderMirrorEnabledSetting(ctx context.Context, workspace *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error) {
+	ret := _m.Called(ctx, workspace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProviderMirrorEnabledSetting")
+	}
+
+	var r0 *namespace.ProviderMirrorEnabledSetting
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) (*namespace.ProviderMirrorEnabledSetting, error)); ok {
+		return rf(ctx, workspace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.Workspace) *namespace.ProviderMirrorEnabledSetting); ok {
+		r0 = rf(ctx, workspace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*namespace.ProviderMirrorEnabledSetting)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.Workspace) error); ok {
+		r1 = rf(ctx, workspace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRunnerTagsSetting provides a mock function with given fields: ctx, workspace
 func (_m *MockService) GetRunnerTagsSetting(ctx context.Context, workspace *models.Workspace) (*namespace.RunnerTagsSetting, error) {
 	ret := _m.Called(ctx, workspace)

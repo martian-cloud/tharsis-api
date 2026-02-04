@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -239,6 +240,14 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrors(t *testing.T) {
 		createdMirrors = append(createdMirrors, *created)
 	}
 
+	// Create a platform mirror for the first version mirror to test HasPackages filter
+	_, err = testClient.client.TerraformProviderPlatformMirrors.CreatePlatformMirror(ctx, &models.TerraformProviderPlatformMirror{
+		VersionMirrorID: createdMirrors[0].Metadata.ID,
+		OS:              "linux",
+		Architecture:    "amd64",
+	})
+	require.NoError(t, err)
+
 	type testCase struct {
 		name            string
 		expectErrorCode errors.CodeType
@@ -314,7 +323,26 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrors(t *testing.T) {
 				},
 			},
 			expectCount: len(createdMirrors),
-		}}
+		},
+		{
+			name: "filter by has packages true",
+			input: &GetProviderVersionMirrorsInput{
+				Filter: &TerraformProviderVersionMirrorFilter{
+					HasPackages: ptr.Bool(true),
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "filter by has packages false",
+			input: &GetProviderVersionMirrorsInput{
+				Filter: &TerraformProviderVersionMirrorFilter{
+					HasPackages: ptr.Bool(false),
+				},
+			},
+			expectCount: 1,
+		},
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -361,8 +389,8 @@ func TestTerraformProviderVersionMirrors_GetVersionMirrorsWithPaginationAndSorti
 	sortableFields := []sortableField{
 		TerraformProviderVersionMirrorSortableFieldCreatedAtAsc,
 		TerraformProviderVersionMirrorSortableFieldCreatedAtDesc,
-		TerraformProviderVersionMirrorSortableFieldSemanticVersionAsc,
-		TerraformProviderVersionMirrorSortableFieldSemanticVersionDesc,
+		TerraformProviderVersionMirrorSortableFieldTypeAsc,
+		TerraformProviderVersionMirrorSortableFieldTypeDesc,
 	}
 
 	testResourcePaginationAndSorting(ctx, t, resourceCount, sortableFields, func(ctx context.Context, sortByField sortableField, paginationOptions *pagination.Options) (*pagination.PageInfo, []pagination.CursorPaginatable, error) {

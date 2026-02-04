@@ -122,7 +122,7 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
                 </TableCell>
                 <TableCell align="right">
                     <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
-                        <TRNButton trn={data.metadata.trn} size="small"/>
+                        <TRNButton trn={data.metadata.trn} size="small" />
                         {showDropdownMenuButton && <Dropdown>
                             <IconButton
                                 color="inherit"
@@ -149,14 +149,18 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
                     </Box>
                 </TableCell>
             </TableRow>
-            {showUpdateUserAdminStatusConfirmation && <ConfirmationDialog
-                title={data.admin ? 'Revoke Admin Permissions' : 'Grant Admin Permissions'}
-                message={<React.Fragment>Are you sure you want to {data.admin ? 'revoke' : 'grant'} admin permissions {data.admin ? 'from' : 'to'} user <strong>{data.username}</strong>?</React.Fragment>}
-                confirmButtonLabel={data.admin ? 'Revoke' : 'Grant'}
-                opInProgress={commitUpdateUserAdminStatusInFlight}
-                onConfirm={onUpdateUserAdminStatus}
-                onClose={() => setShowUpdateUserAdminStatusConfirmation(false)}
-            />}
+            {showUpdateUserAdminStatusConfirmation && (
+                <ConfirmationDialog
+                    title={data.admin ? 'Revoke Admin Permissions' : 'Grant Admin Permissions'}
+                    confirmLabel={data.admin ? 'Revoke' : 'Grant'}
+                    confirmColor="primary"
+                    confirmInProgress={commitUpdateUserAdminStatusInFlight}
+                    onConfirm={onUpdateUserAdminStatus}
+                    onClose={() => setShowUpdateUserAdminStatusConfirmation(false)}
+                >
+                    Are you sure you want to {data.admin ? 'revoke' : 'grant'} admin permissions {data.admin ? 'from' : 'to'} user <strong>{data.username}</strong>?
+                </ConfirmationDialog>
+            )}
         </React.Fragment>
     );
 }

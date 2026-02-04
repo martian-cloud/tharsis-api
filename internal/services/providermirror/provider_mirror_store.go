@@ -12,8 +12,8 @@ import (
 
 // TerraformProviderMirrorStore is the interface for the terraform provider mirror store
 type TerraformProviderMirrorStore interface {
-	GetProviderPlatformPackagePresignedURL(ctx context.Context, checksum []byte) (string, error)
-	UploadProviderPlatformPackage(ctx context.Context, checksum []byte, body io.Reader) error
+	GetProviderPlatformPackagePresignedURL(ctx context.Context, platformMirrorID string) (string, error)
+	UploadProviderPlatformPackage(ctx context.Context, platformMirrorID string, body io.Reader) error
 }
 
 type terraformProviderMirrorStore struct {
@@ -26,16 +26,16 @@ func NewProviderMirrorStore(objectStore objectstore.ObjectStore) TerraformProvid
 }
 
 // GetProviderPlatformPackagePresignedURL returns the presigned URL to download a provider package.
-func (t *terraformProviderMirrorStore) GetProviderPlatformPackagePresignedURL(ctx context.Context, checksum []byte) (string, error) {
-	return t.objectStore.GetPresignedURL(ctx, getPackageObjectKey(checksum))
+func (t *terraformProviderMirrorStore) GetProviderPlatformPackagePresignedURL(ctx context.Context, platformMirrorID string) (string, error) {
+	return t.objectStore.GetPresignedURL(ctx, getPackageObjectKey(platformMirrorID))
 }
 
 // UploadProviderPlatformPackage uploads the terraform provider platform package.
-func (t *terraformProviderMirrorStore) UploadProviderPlatformPackage(ctx context.Context, checksum []byte, body io.Reader) error {
-	return t.objectStore.UploadObject(ctx, getPackageObjectKey(checksum), body)
+func (t *terraformProviderMirrorStore) UploadProviderPlatformPackage(ctx context.Context, platformMirrorID string, body io.Reader) error {
+	return t.objectStore.UploadObject(ctx, getPackageObjectKey(platformMirrorID), body)
 }
 
 // getPackageObjectKey returns the object key for the platform package.
-func getPackageObjectKey(checksum []byte) string {
-	return fmt.Sprintf("provider-mirror/providers/%x.zip", checksum)
+func getPackageObjectKey(platformMirrorID string) string {
+	return fmt.Sprintf("provider-mirror/providers/%s.zip", platformMirrorID)
 }
