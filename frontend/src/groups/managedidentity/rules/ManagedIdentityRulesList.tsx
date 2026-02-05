@@ -1,7 +1,7 @@
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import { Avatar, Box, Button, Chip, Paper, styled, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import { Fragment, useEffect, useState } from 'react';
 import Gravatar from '../../../common/Gravatar';
 

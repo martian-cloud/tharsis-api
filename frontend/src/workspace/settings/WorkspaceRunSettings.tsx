@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-import { Alert, Box, Collapse } from '@mui/material'
-import LoadingButton from '@mui/lab/LoadingButton';
+import { Alert, Box, Button, Collapse } from '@mui/material'
 import { MutationError } from '../../common/error';
 import MaxJobDurationSetting from './MaxJobDurationSetting'
 import TerraformCLIVersionSetting from './TerraformCLIVersionSetting'
@@ -152,7 +151,7 @@ function WorkspaceRunSettings(props: Props) {
                         }}
                     />
                     <Box>
-                        <LoadingButton
+                        <Button
                             size="small"
                             disabled={disableSave}
                             loading={isInFlight}
@@ -161,7 +160,7 @@ function WorkspaceRunSettings(props: Props) {
                             onClick={onUpdate}
                         >
                             Save changes
-                        </LoadingButton>
+                        </Button>
                     </Box>
                 </Box>
             </Collapse>

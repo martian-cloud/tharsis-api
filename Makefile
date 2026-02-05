@@ -1,5 +1,5 @@
 PROTOC_VERSION=25.6
-GO_VERSION = 1.24
+GO_VERSION = 1.25
 MODULE = $(shell go list -m)
 VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo "1.0.0")
 BUILD_TIMESTAMP ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")

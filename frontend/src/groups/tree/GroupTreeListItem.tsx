@@ -1,6 +1,6 @@
 import ExpandIcon from '@mui/icons-material/ExpandMore';
 import { Avatar, Box, Paper, Stack, Typography } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useState } from 'react';

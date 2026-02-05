@@ -1,4 +1,3 @@
-import { LoadingButton } from '@mui/lab';
 import { Alert, AlertTitle, Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
@@ -121,13 +120,13 @@ function MigrateGroupDialog({ onClose, fragmentRef }: Props) {
                     color="inherit"
                     onClick={onClose}>Cancel
                 </Button>
-                <LoadingButton
+                <Button
                     disabled={!newParentPath}
                     color="primary"
                     variant="outlined"
                     loading={isInFlight}
                     onClick={onMigrate}>Migrate
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

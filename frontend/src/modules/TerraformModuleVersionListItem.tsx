@@ -1,4 +1,4 @@
-import { Box, Chip, ListItem, ListItemText, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Chip, ListItemButton, ListItemText, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import { Link as RouterLink } from 'react-router-dom';
@@ -31,8 +31,7 @@ function TerraformModuleVersionListItem(props: Props) {
     `, props.fragmentRef);
 
     return (
-        <ListItem
-            button
+        <ListItemButton
             component={RouterLink}
             to={`/module-registry/${data.module.registryNamespace}/${data.module.name}/${data.module.system}/${data.version}`}
             sx={{
@@ -59,8 +58,8 @@ function TerraformModuleVersionListItem(props: Props) {
                     </Box>
                 </Tooltip>
             </Box>
-        </ListItem>
-    )
+        </ListItemButton>
+    );
 }
 
 export default TerraformModuleVersionListItem;

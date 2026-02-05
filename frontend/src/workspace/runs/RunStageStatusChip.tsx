@@ -1,5 +1,5 @@
 import { Chip } from '@mui/material';
-import grey from '@mui/material/colors/grey';
+import { grey } from '@mui/material/colors';
 import React from 'react';
 import RunStageStatusTypes from './RunStageStatusTypes';
 

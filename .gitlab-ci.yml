@@ -127,7 +127,7 @@ workflow:
     - when: never
 
 variables:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
   CGO_ENABLED: "0"
   GOPATH_RELATIVE_PATH: .go
   GOPATH: "$CI_PROJECT_DIR/$GOPATH_RELATIVE_PATH"
@@ -168,7 +168,7 @@ default:
     prefix: node_modules
 
 .node:
-  image: node:18-alpine
+  image: node:24-alpine
   before_script:
     - cd frontend
     - npm install

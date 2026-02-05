@@ -3,7 +3,7 @@ import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/ico
 import { Avatar, ButtonGroup, Chip, Collapse, Link, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';

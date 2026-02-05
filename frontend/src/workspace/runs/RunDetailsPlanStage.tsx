@@ -1,4 +1,4 @@
-import LoadingButton from '@mui/lab/LoadingButton';
+import { Button } from '@mui/material';
 import { CircularProgress, Divider, Link as MuiLink, Paper, Tooltip, Typography, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -191,9 +191,9 @@ function RunDetailsPlanStage(props: Props) {
                         </Box>
                     </Box>
                     {data.apply && data.apply.status === 'created' && data.plan.hasChanges && <Box>
-                        <LoadingButton loading={commitApplyRunInFlight} variant="outlined" size="medium" onClick={applyRun}>
+                        <Button loading={commitApplyRunInFlight} variant="outlined" size="medium" onClick={applyRun}>
                             Start Apply
-                        </LoadingButton>
+                        </Button>
                     </Box>}
                 </Box>
                 {data.plan.status === 'errored' && !!data.plan.errorMessage && <React.Fragment>

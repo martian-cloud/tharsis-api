@@ -1,5 +1,4 @@
-import { Box, Typography, Chip } from '@mui/material';
-import { LoadingButton } from '@mui/lab';
+import { Box, Button, Typography, Chip } from '@mui/material';
 import { useFragment, useMutation } from 'react-relay';
 import { useSnackbar } from 'notistack';
 import graphql from 'babel-plugin-relay/macro';
@@ -95,7 +94,7 @@ function UserSession({ fragmentRef }: Props) {
                     />
                 </Box>
                 {!data.expired && (
-                    <LoadingButton
+                    <Button
                         variant="outlined"
                         color="error"
                         size="small"
@@ -103,7 +102,7 @@ function UserSession({ fragmentRef }: Props) {
                         loading={isInFlight}
                     >
                         Revoke
-                    </LoadingButton>
+                    </Button>
                 )}
             </Box>
         </Box>

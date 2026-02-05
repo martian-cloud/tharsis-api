@@ -1,6 +1,6 @@
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import { Avatar, Button, ListItem, ListItemText, Typography, useTheme } from '@mui/material';
-import purple from '@mui/material/colors/purple';
+import { purple } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import moment from 'moment';
 import { useFragment } from 'react-relay/hooks';

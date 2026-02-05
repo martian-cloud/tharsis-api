@@ -15,7 +15,6 @@ import { useMutation } from 'react-relay';
 import { MutationError } from '../../common/error';
 import { EditVariableDialogCreateVariableMutation } from './__generated__/EditVariableDialogCreateVariableMutation.graphql';
 import { EditVariableDialogUpdateVariableMutation } from './__generated__/EditVariableDialogUpdateVariableMutation.graphql';
-import LoadingButton from '@mui/lab/LoadingButton';
 
 interface Props {
     variable: any;
@@ -211,9 +210,9 @@ function EditVariableDialog(props: Props) {
                 <Button onClick={onClose} color="inherit">
                     Cancel
                 </Button>
-                <LoadingButton loading={createInFlight || updateInFlight} onClick={saveVariable} variant="contained">
+                <Button loading={createInFlight || updateInFlight} onClick={saveVariable} variant="contained">
                     Save
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     ) : null;

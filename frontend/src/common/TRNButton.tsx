@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Box, Button, Menu, SxProps, Typography, useTheme } from '@mui/material';
+import { Box, Button, Menu, Typography, useTheme } from '@mui/material';
+import { SxProps, Theme } from '@mui/material/styles';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import CopyButton from './CopyButton';
@@ -7,7 +8,7 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 interface Props {
     trn: string;
-    sx?: SxProps;
+    sx?: SxProps<Theme>;
     size?: 'small' | 'medium' | 'large';
 }
 

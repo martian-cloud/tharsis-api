@@ -1,4 +1,3 @@
-import { LoadingButton } from '@mui/lab';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
 import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
@@ -61,9 +60,9 @@ function EditClaimDialog(props: Props) {
                 <Button color="inherit" onClick={() => onClose()}>
                     Cancel
                 </Button>
-                <LoadingButton disabled={data.name === '' || data.value === ''} color="primary" onClick={onUpdate}>
+                <Button disabled={data.name === '' || data.value === ''} color="primary" onClick={onUpdate}>
                     {editMode ? 'Update' : 'Create'}
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

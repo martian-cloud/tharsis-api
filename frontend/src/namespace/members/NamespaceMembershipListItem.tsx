@@ -1,10 +1,9 @@
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import EditIcon from '@mui/icons-material/EditOutlined';
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Avatar, Box, Button, Stack } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
@@ -150,7 +149,7 @@ function NamespaceMembershipListItem(props: Props) {
             </TableCell>
             <TableCell>
                 {editMode && <Stack direction="row" spacing={1}>
-                    <LoadingButton
+                    <Button
                         loading={updateInFlight}
                         onClick={onSave}
                         sx={{ minWidth: 40, padding: '2px' }}
@@ -158,7 +157,7 @@ function NamespaceMembershipListItem(props: Props) {
                         color="secondary"
                         variant="outlined">
                         Save
-                    </LoadingButton>
+                    </Button>
                     <Button
                         onClick={() => setEditMode(false)}
                         sx={{ minWidth: 40, padding: '2px' }}

@@ -1,7 +1,7 @@
 import { Avatar, Box, Stack, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
-import ListItem from '@mui/material/ListItem';
-import teal from '@mui/material/colors/teal';
+import ListItemButton from '@mui/material/ListItemButton';
+import { teal } from '@mui/material/colors';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
@@ -34,8 +34,7 @@ function WorkspaceSearchListItem(props: Props) {
     `, props.workspaceKey);
 
     return (
-        <ListItem
-            button
+        <ListItemButton
             component={LinkRouter}
             to={`/groups/${data.fullPath}`}
             sx={{
@@ -91,7 +90,7 @@ function WorkspaceSearchListItem(props: Props) {
                     </Stack>
                 </Box>
             </Box>
-        </ListItem>
+        </ListItemButton>
     );
 }
 

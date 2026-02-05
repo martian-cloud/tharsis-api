@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Box, Collapse } from '@mui/material';
-import { LoadingButton } from '@mui/lab';
+import { Box, Button, Collapse } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { MutationError } from '../../common/error';
@@ -131,7 +130,7 @@ function WorkspaceRunnerSettings({ fragmentRef }: Props) {
                         error={error}
                     />}
                 <Box marginTop={3}>
-                    <LoadingButton
+                    <Button
                         size="small"
                         loading={isInFlight}
                         disabled={noChanges}
@@ -140,7 +139,7 @@ function WorkspaceRunnerSettings({ fragmentRef }: Props) {
                         sx={{ marginRight: 2 }}
                         onClick={onUpdate}>
                         Save Changes
-                    </LoadingButton>
+                    </Button>
                 </Box>
             </Collapse>
         </Box>

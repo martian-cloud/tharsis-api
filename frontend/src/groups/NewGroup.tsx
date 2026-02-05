@@ -1,7 +1,5 @@
-import LoadingButton from '@mui/lab/LoadingButton';
-import { Breadcrumbs } from '@mui/material';
+import { Breadcrumbs, Button } from '@mui/material';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
@@ -105,7 +103,7 @@ function NewGroup() {
                 error={error} />
             <Divider light />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     disabled={!formData.name}
                     variant="outlined"
@@ -114,7 +112,7 @@ function NewGroup() {
                     onClick={onCreate}
                 >
                     Create Group
-                </LoadingButton>
+                </Button>
                 <Button color="inherit" onClick={() => (navigate(parentGroupPath ? `../groups/${parentGroupPath}` : '..'))}>Cancel</Button>
             </Box>
         </Box>

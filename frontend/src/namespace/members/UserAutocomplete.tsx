@@ -23,7 +23,6 @@ interface Props {
 
 function UserAutocomplete(props: Props) {
     const { onSelected } = props;
-    
     const [options, setOptions] = useState<ReadonlyArray<UserOption> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [inputValue, setInputValue] = useState('');
@@ -92,8 +91,9 @@ function UserAutocomplete(props: Props) {
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: UserOption, { inputValue }) => {
                 const matches = match(option.username, inputValue);
                 const parts = parse(option.username, matches);
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box>
                             <Typography>
                                 {parts.map((part: any, index: number) => (
@@ -118,19 +118,21 @@ function UserAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder='Select a user'
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}
         />
-    )
+    );
 }
 
 export default UserAutocomplete;

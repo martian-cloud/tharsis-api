@@ -1,10 +1,9 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
-import { LoadingButton } from '@mui/lab';
-import { Chip, List, Link as MuiLink, Stack, Tooltip, Typography } from '@mui/material';
+import { Chip, List, Link as MuiLink, Stack, Tooltip, Typography, Button } from '@mui/material';
 import Box from '@mui/material/Box';
 import { red } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
-import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import graphql from 'babel-plugin-relay/macro';
@@ -170,7 +169,7 @@ function RunDetailsSidebar(props: Props) {
                     {!RUN_FINALITY_STATES.includes(data.status) &&
                         !data.plan.currentJob?.cancelRequested &&
                         !data.apply?.currentJob?.cancelRequested &&
-                        <LoadingButton loading={commitCancelRunInFlight} size="small" variant="outlined" color="error" onClick={cancelRun}>Cancel</LoadingButton>}
+                        <Button loading={commitCancelRunInFlight} size="small" variant="outlined" color="error" onClick={cancelRun}>Cancel</Button>}
                 </Box>
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Type</Typography>
@@ -244,18 +243,18 @@ function RunDetailsSidebar(props: Props) {
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Stages</Typography>
                     <List>
-                        <ListItem button selected={stage === 'plan'} component={LinkRouter} replace to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/plan`}>
+                        <ListItemButton selected={stage === 'plan'} component={LinkRouter} replace to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/plan`}>
                             <ListItemIcon>
                                 <PlanStatusIcon />
                             </ListItemIcon>
                             <ListItemText primary="Plan" />
-                        </ListItem>
-                        {data.apply && <ListItem button selected={stage === 'apply'} component={LinkRouter} replace to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/apply`}>
+                        </ListItemButton>
+                        {data.apply && <ListItemButton selected={stage === 'apply'} component={LinkRouter} replace to={`/groups/${data.workspace.fullPath}/-/runs/${data.id}/apply`}>
                             <ListItemIcon>
                                 <ApplyStatusIcon />
                             </ListItemIcon>
                             <ListItemText primary="Apply" />
-                        </ListItem>}
+                        </ListItemButton>}
                     </List>
                 </Box>
             </Box>

@@ -1,5 +1,5 @@
 import { createTheme } from "@mui/material";
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 
 // TODO: In a future story this will be configurable via settings
 const mode = 'dark' as any

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
 import graphql from 'babel-plugin-relay/macro';
 import { MutationError } from '../../../common/error';
 import { useFragment, useMutation } from 'react-relay/hooks';
@@ -108,7 +107,7 @@ function NewManagedIdentityAliasDialog({ onClose, fragmentRef }: Props) {
                     color="inherit"
                     onClick={onClose}>Cancel
                 </Button>
-                <LoadingButton
+                <Button
                     sx={{ marginLeft: 2 }}
                     disabled={formData.name === '' || formData.groupPath === ''}
                     loading={isInFlight}
@@ -116,7 +115,7 @@ function NewManagedIdentityAliasDialog({ onClose, fragmentRef }: Props) {
                     variant="contained"
                     color="primary"
                     onClick={() => onCreate()}>Create Alias
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

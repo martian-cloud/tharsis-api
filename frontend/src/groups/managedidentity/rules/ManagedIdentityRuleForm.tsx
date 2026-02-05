@@ -1,6 +1,6 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Alert, Avatar, Box, Button, IconButton, List, ListItem, ListItemText, Stack, styled, Typography } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { useTheme } from '@mui/material/styles';

@@ -1,5 +1,4 @@
-import { LoadingButton } from '@mui/lab';
-import { Alert, Box, Paper, Typography } from '@mui/material';
+import { Alert, Box, Button, Paper, Typography } from '@mui/material';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -161,7 +160,7 @@ function AssignedManagedIdentityList(props: Props) {
                             assignedManagedIdentityIDs={assignedManagedIdentityIds}
                             onSelected={onManagedIdentitySelected}
                         />
-                        <LoadingButton
+                        <Button
                             loading={assignCommitInFlight}
                             sx={{ marginLeft: 1 }}
                             variant="outlined"
@@ -169,7 +168,7 @@ function AssignedManagedIdentityList(props: Props) {
                             onClick={assignManagedIdentity}
                         >
                             Assign
-                        </LoadingButton>
+                        </Button>
                     </Box>
                     {error && <Alert sx={{ marginTop: 2 }} severity={error.severity}>
                         {error.message}

@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -17,9 +18,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import { darken, useTheme } from '@mui/material/styles';
-import Button from '@mui/material/Button';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { Dropdown } from '@mui/base/Dropdown';
 import { IconButton, Menu, MenuItem } from '@mui/material';
 
 interface Props {
@@ -119,8 +118,10 @@ function RunVariables(props: Props) {
                             size="small"
                             margin='none'
                             placeholder="search for variables"
-                            InputProps={{
-                                sx: { background: darken(theme.palette.background.default, 0.5) }
+                            slotProps={{
+                                input: {
+                                    sx: { background: darken(theme.palette.background.default, 0.5) }
+                                }
                             }}
                             sx={{ width: 300, height: '100%' }}
                             onChange={onSearchChange}
@@ -135,7 +136,7 @@ function RunVariables(props: Props) {
                             {showValues ? 'Hide Values' : 'Show Values'}
                         </Button>
                     </Stack>
-                    <Dropdown>
+                    <>
                         <IconButton
                             color="info"
                             size="small"
@@ -159,7 +160,7 @@ function RunVariables(props: Props) {
                                 {showAllVariables ? 'Hide Unused Variables' : 'Show All Variables'}
                             </MenuItem>
                         </Menu>
-                    </Dropdown>
+                    </>
                 </Box>
             </Box>
             {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2 }} align="center" color="textSecondary">

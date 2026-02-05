@@ -1,5 +1,5 @@
 import { Box, SxProps, Theme, useTheme } from '@mui/material';
-import grey from '@mui/material/colors/grey';
+import { grey } from '@mui/material/colors';
 import Anser from 'anser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -28,7 +28,7 @@ function buildLogTextStyle(entry: Anser.AnserJsonEntry) {
 
 function LogLine({ log, lineNumber, selected, hideLineNumber }: LogLineProps) {
     const theme = useTheme();
-    const ref = useRef<HTMLDivElement>();
+    const ref = useRef<HTMLDivElement>(null);
     const [autoScroll, setAutoscroll] = useState(true);
 
     const parts = useMemo(() => Anser.ansiToJson(log).filter(part => part.content !== '').

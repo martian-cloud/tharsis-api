@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Box, Button, Typography } from "@mui/material";
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { MutationError } from '../../common/error';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
@@ -122,14 +121,14 @@ function EditVCSProvider(props: Props) {
                 error={error}
             />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
                     onClick={onUpdate}>
                     Update VCS Provider
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

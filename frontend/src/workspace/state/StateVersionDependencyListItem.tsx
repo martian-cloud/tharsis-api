@@ -1,5 +1,5 @@
 import { Chip, Tooltip } from '@mui/material';
-import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import graphql from 'babel-plugin-relay/macro';
 import moment from 'moment';
@@ -47,7 +47,7 @@ function StateVersionDependencyListItem(props: Props) {
     const status = !data.workspace ? 'deleted' : data.stateVersion?.id === data.workspace.currentStateVersion?.id ? 'latest' : 'stale';
 
     return (
-        <ListItem button component={LinkRouter} to={`/groups/${data.workspacePath}`} divider>
+        <ListItemButton divider component={LinkRouter} to={`/groups/${data.workspacePath}`}>
             <ListItemText
                 primary={data.workspacePath}
                 secondary={data.stateVersion ? `updated ${moment(data.stateVersion.metadata.updatedAt as moment.MomentInput).fromNow()}` : ''}
@@ -55,7 +55,7 @@ function StateVersionDependencyListItem(props: Props) {
             {status !== 'latest' && <Tooltip title={statusMap[status].tooltip}>
                 <Chip label={status} color={statusMap[status].color} />
             </Tooltip>}
-        </ListItem>
+        </ListItemButton>
     );
 }
 

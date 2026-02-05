@@ -1,9 +1,9 @@
 import { Chip } from '@mui/material';
-import blue from '@mui/material/colors/blue';
-import green from '@mui/material/colors/green';
-import grey from '@mui/material/colors/grey';
-import orange from '@mui/material/colors/orange';
-import red from '@mui/material/colors/red';
+import { blue } from '@mui/material/colors';
+import { green } from '@mui/material/colors';
+import { grey } from '@mui/material/colors';
+import { orange } from '@mui/material/colors';
+import { red } from '@mui/material/colors';
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 

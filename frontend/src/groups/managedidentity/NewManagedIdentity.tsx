@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -117,7 +116,7 @@ function NewManagedIdentity(props: Props) {
             />
             <Divider light sx={{ marginTop: 4 }} />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     disabled={!formData.type}
                     variant="outlined"
@@ -125,7 +124,7 @@ function NewManagedIdentity(props: Props) {
                     sx={{ marginRight: 2 }}
                     onClick={onCreate}>
                     Create Managed Identity
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

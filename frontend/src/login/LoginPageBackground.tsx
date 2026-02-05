@@ -1,5 +1,5 @@
 import { Box, styled } from '@mui/material';
-import React from 'react';
+import React, { ReactElement } from 'react';
 
 interface StarProps {
   size: number;
@@ -32,8 +32,8 @@ const Star = styled('div')<StarProps>(({ size, x, y, animationDuration }) => ({
 }));
 
 // Generate random stars
-const generateStars = (count: number): JSX.Element[] => {
-  const stars: JSX.Element[] = [];
+const generateStars = (count: number): ReactElement[] => {
+  const stars: ReactElement[] = [];
   for (let i = 0; i < count; i++) {
     // Random size between 1 and 4
     const size = Math.random() * 3 + 1; // nosemgrep: nodejs_scan.javascript-crypto-rule-node_insecure_random_generator

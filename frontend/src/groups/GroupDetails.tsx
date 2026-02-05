@@ -1,7 +1,7 @@
 import { TabContext, TabList } from '@mui/lab';
 import MuiTabPanel, { TabPanelProps } from '@mui/lab/TabPanel';
 import { Avatar, Box, Button, CircularProgress, Stack, styled, Typography } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import { TabProps } from '@mui/material/Tab';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useEffect, useState } from 'react';
@@ -200,8 +200,11 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     if (deleteData.deleteGroup.problems.length) {
                         enqueueSnackbar(deleteData.deleteGroup.problems.map(problem => problem.message).join('; '), { variant: 'warning' });
                     } else {
-                        data.fullPath.includes("/") ?
-                            navigate(`../${data.fullPath.slice(0, -data.name.length - 1)}`) : navigate("..")
+                        if (data.fullPath.includes("/")) {
+                            navigate(`../${data.fullPath.slice(0, -data.name.length - 1)}`);
+                        } else {
+                            navigate("..");
+                        }
                     }
                 },
                 onError: error => {

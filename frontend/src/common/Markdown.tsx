@@ -1,10 +1,9 @@
 import { Box, lighten, TableBody, TableCell, TableHead, TableRow, useTheme } from "@mui/material";
 import Link from '@mui/material/Link';
 import Paper from "@mui/material/Paper";
-import { Variant } from '@mui/material/styles/createTypography';
 import Table from "@mui/material/Table";
 import TableContainer from "@mui/material/TableContainer";
-import Typography from '@mui/material/Typography';
+import Typography, { TypographyProps } from '@mui/material/Typography';
 import ReactMarkdown, { Options } from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -23,7 +22,7 @@ function MarkdownParagraph({ ...props }: any) {
 
 function MarkdownHeading({ node, ...props }: any) {
     const level = node?.tagName ? parseInt(node.tagName.charAt(1)) : 1;
-    let variant: Variant;
+    let variant: TypographyProps['variant'];
     switch (level) {
         case 1:
             variant = "h4";

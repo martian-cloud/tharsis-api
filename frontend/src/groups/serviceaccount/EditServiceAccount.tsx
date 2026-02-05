@@ -1,7 +1,6 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import { nanoid } from 'nanoid';
@@ -143,14 +142,14 @@ function EditServiceAccount(props: Props) {
             />
             <Divider light />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
                     onClick={onUpdate}>
                     Update Service Account
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

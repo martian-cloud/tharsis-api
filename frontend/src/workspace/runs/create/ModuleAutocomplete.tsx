@@ -121,20 +121,23 @@ function ModuleAutocomplete({ onSelected, workspacePath }: Props) {
                     {...params}
                     placeholder="Module"
                     label="Module"
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }} />}
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: any, { inputValue }) => {
                 const matches = match(option.label, inputValue)
                 const parts = parse(option.label, matches)
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
                             <Typography>
                                 {parts.map((part: { text: string, highlight: boolean }, index: number) => (

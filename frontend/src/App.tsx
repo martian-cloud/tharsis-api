@@ -1,4 +1,4 @@
-import { Button } from '@mui/material';
+import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from "@mui/material/styles";
 import { SnackbarProvider } from 'notistack';

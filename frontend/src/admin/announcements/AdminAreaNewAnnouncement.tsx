@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import graphql from "babel-plugin-relay/macro";
 import { Box, Button, Divider, Typography } from "@mui/material";
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { MutationError } from "../../common/error";
 import AdminAreaAnnouncementForm, { FormData } from "./AdminAreaAnnouncementForm";
@@ -98,7 +97,7 @@ function AdminAreaNewAnnouncement() {
             />
             <Divider sx={{ opacity: 0.6 }} />
             <Box marginTop={4}>
-                <LoadingButton
+                <Button
                     sx={{ mr: 2 }}
                     loading={isInFlight}
                     disabled={!isFormValid}
@@ -107,7 +106,7 @@ function AdminAreaNewAnnouncement() {
                     onClick={onSave}
                 >
                     Create Announcement
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>
                     Cancel
                 </Button>

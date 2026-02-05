@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Box, Collapse } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
+import { Box, Button, Collapse } from '@mui/material';
 import { MutationError } from '../../common/error';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useSnackbar } from 'notistack';
@@ -114,7 +113,7 @@ function GroupDriftDetectionSettings({ fragmentRef }: Props) {
                     fragmentRef={data.driftDetectionEnabled}
                 />
                 <Box>
-                    <LoadingButton
+                    <Button
                         sx={{ mt: 4 }}
                         size="small"
                         disabled={noChanges}
@@ -124,7 +123,7 @@ function GroupDriftDetectionSettings({ fragmentRef }: Props) {
                         onClick={onUpdate}
                     >
                         Save changes
-                    </LoadingButton>
+                    </Button>
                 </Box>
             </Collapse>
         </Box>

@@ -1,6 +1,5 @@
-import { Box, Chip, ListItemIcon, Typography } from '@mui/material';
+import { Box, Chip, ListItemButton, ListItemIcon, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
-import ListItem from '@mui/material/ListItem';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { Terraform as TerraformIcon } from 'mdi-material-ui';
@@ -33,8 +32,7 @@ function TerraformModuleListItem(props: Props) {
     `, props.fragmentRef);
 
     return (
-        <ListItem
-            button
+        <ListItemButton
             component={RouterLink}
             to={`/module-registry/${data.registryNamespace}/${data.name}/${data.system}`}
             sx={{
@@ -75,7 +73,7 @@ function TerraformModuleListItem(props: Props) {
                 </Box>
                 {data.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
             </Box>
-        </ListItem>
+        </ListItemButton>
     );
 }
 

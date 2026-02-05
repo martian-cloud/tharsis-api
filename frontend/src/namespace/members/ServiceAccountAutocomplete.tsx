@@ -97,8 +97,9 @@ function ServiceAccountAutocomplete(props: Props) {
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: ServiceAccountOption, { inputValue }) => {
                 const matches = match(option.resourcePath, inputValue);
                 const parts = parse(option.resourcePath, matches);
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box>
                             <Typography>
                                 {parts.map((part: any, index: number) => (
@@ -123,19 +124,21 @@ function ServiceAccountAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder='Select a service account'
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}
         />
-    )
+    );
 }
 
 export default ServiceAccountAutocomplete;

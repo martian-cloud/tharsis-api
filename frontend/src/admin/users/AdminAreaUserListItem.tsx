@@ -12,7 +12,6 @@ import React from 'react';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import { UserContext } from '../../UserContext';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { Dropdown } from '@mui/base/Dropdown';
 
 interface Props {
     fragmentRef: AdminAreaUserListItemFragment_user$key
@@ -122,8 +121,8 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
                 </TableCell>
                 <TableCell align="right">
                     <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
-                        <TRNButton trn={data.metadata.trn} size="small" />
-                        {showDropdownMenuButton && <Dropdown>
+                        <TRNButton trn={data.metadata.trn} size="small"/>
+                        {showDropdownMenuButton && <>
                             <IconButton
                                 color="inherit"
                                 size="small"
@@ -144,7 +143,7 @@ function AdminAreaUserListItem({ fragmentRef }: Props) {
                                     {data.admin ? 'Revoke' : 'Grant'} Admin Permissions
                                 </MenuItem>
                             </Menu>
-                        </Dropdown>}
+                        </>}
                         {!showDropdownMenuButton && <IconButton size="small" sx={{ visibility: 'hidden' }}><MoreVertIcon /></IconButton>}
                     </Box>
                 </TableCell>

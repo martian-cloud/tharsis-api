@@ -1,7 +1,7 @@
+import { Button } from '@mui/material';
 import { useState, useEffect } from "react";
 import { Box, Tooltip } from "@mui/material";
 import { FavoriteBorder } from "@mui/icons-material";
-import { LoadingButton } from "@mui/lab";
 import { useMutation, useLazyLoadQuery } from "react-relay/hooks";
 import { useSnackbar } from "notistack";
 import graphql from "babel-plugin-relay/macro";
@@ -104,7 +104,7 @@ function NamespaceFavoriteButton({ namespacePath, namespaceType }: Props) {
     return (
         <Box>
             <Tooltip title={isNamespaceFavorite ? "Remove from favorites" : "Add to favorites"}>
-                <LoadingButton
+                <Button
                     variant="outlined"
                     size="small"
                     color={isNamespaceFavorite ? "primary" : "info"}
@@ -116,7 +116,7 @@ function NamespaceFavoriteButton({ namespacePath, namespaceType }: Props) {
                     }}
                 >
                     <FavoriteBorder fontSize="medium" />
-                </LoadingButton>
+                </Button>
             </Tooltip>
         </Box>
     );

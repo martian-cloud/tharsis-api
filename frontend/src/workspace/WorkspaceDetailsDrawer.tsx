@@ -16,7 +16,7 @@ import MembersIcon from '@mui/icons-material/PeopleOutline';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import ActivityIcon from '@mui/icons-material/TimelineOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 import { AccountLockOutline as ManagedIdentityIcon, ContentDuplicate as ProviderMirrorIcon, RocketLaunchOutline as RunIcon } from 'mdi-material-ui';

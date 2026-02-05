@@ -1,10 +1,9 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { MutationError } from '../../common/error';
@@ -131,14 +130,14 @@ function EditManagedIdentity(props: Props) {
             />
             <Divider light sx={{ marginTop: 4 }} />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
                     onClick={onUpdate}>
                     Update Managed Identity
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

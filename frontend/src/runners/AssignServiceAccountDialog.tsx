@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { MutationError } from '../common/error';
 import ServiceAccountAutocomplete, { ServiceAccountOption } from '../namespace/members/ServiceAccountAutocomplete';
@@ -36,7 +35,7 @@ function AssignServiceAccountDialog({ onClose, assignCommitInFlight, error, name
                     color="inherit"
                 >
                     Cancel</Button>
-                <LoadingButton
+                <Button
                     disabled={!selected || !!error}
                     loading={assignCommitInFlight}
                     size="small"
@@ -46,7 +45,7 @@ function AssignServiceAccountDialog({ onClose, assignCommitInFlight, error, name
                     onClick={() => onClose(selected as ServiceAccountOption)}
                 >
                     Assign
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

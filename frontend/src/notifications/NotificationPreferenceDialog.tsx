@@ -4,7 +4,6 @@ import graphql from 'babel-plugin-relay/macro';
 import { useMutation } from 'react-relay/hooks';
 import { notificationOptions } from './NotificationButton';
 import { MutationError } from '../common/error';
-import { LoadingButton } from '@mui/lab';
 import { InheritedMessage, Preference } from './NotificationButton';
 import CustomNotificationPreference from './CustomNotificationPreference';
 import { NotificationPreferenceDialogMutation, UserNotificationPreferenceScope, UserNotificationPreferenceCustomEventsInput } from './__generated__/NotificationPreferenceDialogMutation.graphql';
@@ -214,13 +213,13 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} color="inherit">Cancel</Button>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     variant="outlined" color="primary"
                     onClick={onSave}
                 >
                     Save
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

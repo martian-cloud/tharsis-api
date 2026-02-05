@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Box, Typography } from '@mui/material'
-import LoadingButton from '@mui/lab/LoadingButton';
+import { Box, Button, Typography } from '@mui/material'
 import VCSProviderLinkForm from './VCSProviderLinkForm';
 import graphql from 'babel-plugin-relay/macro';
 import { VCSFormData } from './VCSProviderLinkForm';
@@ -136,7 +135,7 @@ function NewVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                 onChange={(data: VCSFormData) => setFormData(data)}
             />
             <Box sx={{ mt: 2 }}>
-                <LoadingButton
+                <Button
                     sx={{ mr: 2 }}
                     size="small"
                     disabled={!formData.id || formData.repositoryPath === ''}
@@ -144,7 +143,7 @@ function NewVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                     variant="outlined"
                     color="primary"
                     onClick={onSave}>Save changes
-                </LoadingButton>
+                </Button>
             </Box>
         </Box>
     )
