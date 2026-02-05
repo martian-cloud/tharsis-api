@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { useState } from 'react';
 import { MutationError } from '../../../common/error';
@@ -41,7 +40,7 @@ function NewManagedIdentityRuleDialog(props: Props) {
             </DialogContent>
             <DialogActions>
                 <Button size="small" variant="outlined" onClick={onClose} color="inherit">Cancel</Button>
-                <LoadingButton
+                <Button
                     disabled={!rule.runStage}
                     loading={submitInProgress}
                     size="small"
@@ -50,7 +49,7 @@ function NewManagedIdentityRuleDialog(props: Props) {
                     sx={{ marginLeft: 2 }}
                     onClick={() => onSubmit(rule)}>
                     Create Rule
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     )

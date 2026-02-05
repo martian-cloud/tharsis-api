@@ -3,7 +3,6 @@ import { useMutation } from 'react-relay/hooks';
 import graphql from 'babel-plugin-relay/macro';
 import { MutationError } from '../common/error';
 import { Box, Button, Divider, Typography } from '@mui/material'
-import { LoadingButton } from '@mui/lab';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import NamespaceBreadcrumbs from '../namespace/NamespaceBreadcrumbs';
 import WorkspaceForm, { FormData } from './WorkspaceForm';
@@ -98,7 +97,7 @@ function NewWorkspace(){
             />
             <Divider />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     disabled={!formData.name}
                     variant="outlined"
@@ -107,7 +106,7 @@ function NewWorkspace(){
                     onClick={onCreate}
                     >
                     Create Workspace
-                </LoadingButton>
+                </Button>
                 <Button color="inherit" onClick={()=>(navigate(parentGroupPath ? `../groups/${parentGroupPath}` : '..'))}>Cancel</Button>
             </Box>
         </Box>

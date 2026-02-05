@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Box, Button, Divider, Typography } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
@@ -126,7 +125,7 @@ function EditFederatedRegistry({ fragmentRef }: Props) {
             />
             <Divider sx={{ my: 3, opacity: 0.6 }} />
             <Box>
-                <LoadingButton
+                <Button
                     disabled={isDisabled}
                     loading={isInFlight}
                     variant="outlined"
@@ -134,7 +133,7 @@ function EditFederatedRegistry({ fragmentRef }: Props) {
                     sx={{ mr: 2 }}
                     onClick={onUpdate}>
                     Update Federated Registry
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={`../${federatedRegistryId}`}>Cancel</Button>
             </Box>
         </Box>

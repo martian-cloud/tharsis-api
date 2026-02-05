@@ -1,4 +1,4 @@
-import { LoadingButton } from '@mui/lab';
+import { Button } from '@mui/material';
 import { Divider, Link as MuiLink, Paper, Tooltip, Typography, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -270,7 +270,7 @@ function RunDetailsApplyStage(props: Props) {
                         <Typography color="textSecondary" align="center" sx={{ marginBottom: 2 }}>
                             All previous stages have completed so the apply is ready to be started
                         </Typography>
-                        <LoadingButton loading={commitApplyRunInFlight} variant="outlined" color="primary" onClick={applyRun}>Start Apply</LoadingButton>
+                        <Button loading={commitApplyRunInFlight} variant="outlined" color="primary" onClick={applyRun}>Start Apply</Button>
                     </React.Fragment>}
                 </Box>
             </Box>}

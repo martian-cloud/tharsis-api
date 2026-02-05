@@ -22,7 +22,6 @@ interface Props {
 
 function TeamAutocomplete(props: Props) {
     const { onSelected } = props;
-    
     const [options, setOptions] = useState<ReadonlyArray<TeamOption> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [inputValue, setInputValue] = useState('');
@@ -90,8 +89,9 @@ function TeamAutocomplete(props: Props) {
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: TeamOption, { inputValue }) => {
                 const matches = match(option.name, inputValue);
                 const parts = parse(option.name, matches);
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box>
                             <Typography>
                                 {parts.map((part: any, index: number) => (
@@ -115,19 +115,21 @@ function TeamAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder='Select a team'
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}
         />
-    )
+    );
 }
 
 export default TeamAutocomplete;

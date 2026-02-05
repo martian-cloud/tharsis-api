@@ -14,7 +14,6 @@ import React, { useMemo, useState } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import SearchInput from '../../common/SearchInput';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { Dropdown } from '@mui/base/Dropdown';
 import { IconButton, Menu, MenuItem } from '@mui/material';
 import StateVersionInputVariableListItem from './StateVersionInputVariableListItem';
 import { StateVersionInputVariablesFragment_variables$key } from './__generated__/StateVersionInputVariablesFragment_variables.graphql';
@@ -93,7 +92,7 @@ function StateVersionInputVariables(props: Props) {
                         {showValues ? 'Hide Values' : 'Show Values'}
                     </Button>
                 </Stack>
-                <Dropdown>
+                <>
                     <IconButton
                         color="info"
                         aria-label="more options menu"
@@ -116,7 +115,7 @@ function StateVersionInputVariables(props: Props) {
                             {showAllVariables ? 'Hide Unused Variables' : 'Show All Variables'}
                         </MenuItem>
                     </Menu>
-                </Dropdown>
+                </>
             </Box>}
             {(filteredVariables.length === 0 && search !== '') && <Typography sx={{ padding: 2, marginTop: 4 }} align="center" color="textSecondary">
                 No variables matching search <strong>{search}</strong>

@@ -1,6 +1,5 @@
-import { Box, Chip, ListItemIcon, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, ListItemButton, ListItemIcon, Tooltip, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
-import ListItem from '@mui/material/ListItem';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { Terraform as TerraformIcon } from 'mdi-material-ui';
@@ -35,8 +34,7 @@ function TerraformModuleSearchListItem(props: Props) {
     `, props.fragmentRef);
 
     return (
-        <ListItem
-            button
+        <ListItemButton
             component={LinkRouter}
             to={`/module-registry/${data.registryNamespace}/${data.name}/${data.system}`}
             sx={{
@@ -66,7 +64,7 @@ function TerraformModuleSearchListItem(props: Props) {
                     <Box>
                         {data.latestVersion && <Box display="flex" alignItems="center">
                             <Typography variant="body2" color="textSecondary">
-                                {data.latestVersion.version} published <Timestamp component="span" timestamp={data.latestVersion.metadata.createdAt}/> by
+                                {data.latestVersion.version} published <Timestamp component="span" timestamp={data.latestVersion.metadata.createdAt} /> by
                             </Typography>
                             <Tooltip title={data.latestVersion.createdBy}>
                                 <Box>
@@ -81,7 +79,7 @@ function TerraformModuleSearchListItem(props: Props) {
                 </Box>
                 {data.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
             </Box>
-        </ListItem>
+        </ListItemButton>
     );
 }
 

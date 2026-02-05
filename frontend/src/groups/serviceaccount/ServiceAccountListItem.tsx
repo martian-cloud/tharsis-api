@@ -1,5 +1,5 @@
-import { Avatar, Box, ListItem, ListItemText, Typography, useTheme } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { Avatar, Box, ListItemButton, ListItemText, Typography, useTheme } from '@mui/material';
+import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import { Link as RouterLink } from 'react-router-dom';
@@ -28,8 +28,7 @@ function ServiceAccountListItem({ fragmentRef, inherited }: Props) {
     `, fragmentRef);
 
     return (
-        <ListItem
-            button
+        <ListItemButton
             component={RouterLink}
             to={`/groups/${data.groupPath}/-/service_accounts/${data.id}`}
             sx={{
@@ -51,7 +50,7 @@ function ServiceAccountListItem({ fragmentRef, inherited }: Props) {
                     {inherited && <Typography mt={0.5} color="textSecondary" variant="caption">Inherited from group <strong>{data.groupPath}</strong></Typography>}
                 </Box>} />
             <Timestamp variant="body2" color="textSecondary" timestamp={data.metadata.updatedAt} />
-        </ListItem>
+        </ListItemButton>
     );
 }
 

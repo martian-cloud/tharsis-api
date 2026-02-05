@@ -1,5 +1,5 @@
 import { Avatar, Box, ListItem, ListItemIcon, Typography, useTheme } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import Gravatar from '../common/Gravatar';

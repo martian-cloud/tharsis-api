@@ -1,5 +1,4 @@
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
-import LoadingButton from '@mui/lab/LoadingButton';
 import { MutationError } from "../common/error";
 
 interface Props {
@@ -30,12 +29,12 @@ function UnassignServiceAccountDialog(props: Props) {
                 <Button color="inherit" onClick={() => onClose()}>
                     Cancel
                 </Button>
-                <LoadingButton
+                <Button
                     color="error"
                     loading={unAssignCommitInFlight}
                     onClick={() => onClose(true)}>
                     Unassign
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

@@ -10,7 +10,7 @@ import {
     Typography,
     useTheme
 } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import match from 'autosuggest-highlight/match';
 import parse from 'autosuggest-highlight/parse';
 import graphql from 'babel-plugin-relay/macro';
@@ -316,20 +316,23 @@ function UniversalSearch() {
                         placeholder="Search"
                         onFocus={handleFocus}
                         onBlur={handleBlur}
-                        InputProps={{
-                            ...params.InputProps,
-                            endAdornment: (
-                                <React.Fragment>
-                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                </React.Fragment>
-                            ),
+                        slotProps={{
+                            input: {
+                                ...params.InputProps,
+                                endAdornment: (
+                                    <React.Fragment>
+                                        {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    </React.Fragment>
+                                ),
+                            }
                         }} />}
                 renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: AutocompleteOption, { inputValue }) => {
+                    const { key, ...otherProps } = props as any;
                     const label = option.label
                     const matches = match(label, inputValue)
                     const parts = parse(label, matches)
                     return (
-                        <Box component="li" {...props}>
+                        <Box component="li" key={key} {...otherProps}>
                             <Tooltip title={label}>
                                 <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography color="textSecondary" variant='body2' whiteSpace='nowrap' overflow='hidden' textOverflow='ellipsis' mr={2}>

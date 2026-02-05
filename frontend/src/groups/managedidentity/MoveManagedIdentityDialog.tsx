@@ -1,4 +1,3 @@
-import { LoadingButton } from "@mui/lab";
 import {
     Alert,
     AlertTitle,
@@ -142,7 +141,7 @@ function MoveManagedIdentityDialog({ onClose, fragmentRef, groupId }: Props) {
                 <Button color="inherit" onClick={onClose}>
                     Cancel
                 </Button>
-                <LoadingButton
+                <Button
                     disabled={!newParentPath}
                     color="primary"
                     variant="outlined"
@@ -150,7 +149,7 @@ function MoveManagedIdentityDialog({ onClose, fragmentRef, groupId }: Props) {
                     onClick={onMove}
                 >
                     Move
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

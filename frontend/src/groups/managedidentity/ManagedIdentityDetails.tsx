@@ -28,10 +28,6 @@ import MoveManagedIdentityDialog from './MoveManagedIdentityDialog';
 import ManagedIdentityRules from './rules/ManagedIdentityRules';
 import ManagedIdentityWorkspaceList from './ManagedIdentityWorkspaceList';
 
-interface Props {
-    fragmentRef: ManagedIdentityDetailsFragment_group$key
-}
-
 const ISSUER = config.apiUrl;
 const HOSTNAME = new URL(ISSUER).hostname;
 
@@ -41,13 +37,13 @@ const buildTerraformHCLTemplate = (apiUrl: string, managedIdentityId: string, au
   metadata {
     name = "tharsis-managed-identity-${managedIdentityId}"
   }
-  
+
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
     name      = "cluster-admin"  # Adjust permissions as needed
   }
-  
+
   subject {
     kind      = "User"
     name      = "${apiUrl}#${managedIdentityId}"
@@ -58,7 +54,7 @@ const buildTerraformHCLTemplate = (apiUrl: string, managedIdentityId: string, au
 # Configure OIDC identity provider
 resource "aws_eks_identity_provider_config" "tharsis" {
   cluster_name = "your-cluster-name"
-  
+
   oidc {
     identity_provider_config_name = "tharsis"
     issuer_url                   = "${apiUrl}"

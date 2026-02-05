@@ -1,4 +1,3 @@
-import LoadingButton from "@mui/lab/LoadingButton";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import React from "react";
 
@@ -30,14 +29,14 @@ function ConfirmationDialog({ title, children, confirmLabel, confirmDisabled, co
                 <Button color="inherit" onClick={onClose}>
                     Cancel
                 </Button>
-                <LoadingButton
+                <Button
                     color={confirmColor}
                     loading={confirmInProgress}
                     disabled={confirmDisabled}
                     onClick={onConfirm}
                 >
                     {confirmLabel}
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     );

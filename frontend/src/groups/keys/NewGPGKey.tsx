@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Alert, TextField } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -117,14 +116,14 @@ function NewGPGKey(props: Props) {
             </Box>
             <Divider light />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
                     onClick={onSave}>
                     Create Key
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

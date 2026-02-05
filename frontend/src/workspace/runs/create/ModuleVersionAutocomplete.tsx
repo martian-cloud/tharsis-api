@@ -88,20 +88,23 @@ function ModuleVersionAutocomplete({ registryNamespace, moduleName, system, valu
                     {...params}
                     placeholder="Version"
                     label="Version"
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }} />}
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: string, { inputValue }) => {
                 const matches = match(option, inputValue)
                 const parts = parse(option, matches)
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
                             <Box>
                                 <Typography>

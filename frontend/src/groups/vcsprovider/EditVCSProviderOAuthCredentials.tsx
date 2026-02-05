@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Box, Button, Typography } from "@mui/material";
-import LoadingButton from '@mui/lab/LoadingButton';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { Link as RouterLink, useParams } from 'react-router-dom';
@@ -118,7 +117,7 @@ function EditVCSProviderOAuth(props: Props) {
                 error={error}
             />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     disabled={formData.oAuthClientId === '' || formData.oAuthClientSecret === ''}
                     variant="outlined"
@@ -126,7 +125,7 @@ function EditVCSProviderOAuth(props: Props) {
                     sx={{ marginRight: 2 }}
                     onClick={onUpdate}>
                     Update OAuth Credentials
-                </LoadingButton>
+                </Button>
                 <Button
                     component={RouterLink}
                     color="inherit"

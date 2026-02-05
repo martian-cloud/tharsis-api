@@ -18,14 +18,14 @@ import { useTheme } from '@mui/material/styles';
 import { useCallback, useState } from 'react';
 
 
-export interface LabelFilter {
+export interface LabelFilterItem {
     key: string;
     value: string;
 }
 
 interface Props {
-    filters: LabelFilter[];
-    onFiltersChange: (filters: LabelFilter[]) => void;
+    filters: LabelFilterItem[];
+    onFiltersChange: (filters: LabelFilterItem[]) => void;
     expanded?: boolean;
 }
 
@@ -35,14 +35,14 @@ function LabelFilter({
     expanded = false,
 }: Props) {
     const theme = useTheme();
-    const [newFilter, setNewFilter] = useState<Partial<LabelFilter>>({});
+    const [newFilter, setNewFilter] = useState<Partial<LabelFilterItem>>({});
 
     const handleAddFilter = useCallback(() => {
         if (newFilter.key && newFilter.value) {
             // Check if this exact filter key already exists
             const exists = filters.some(f => f.key === newFilter.key);
             if (!exists) {
-                onFiltersChange([...filters, newFilter as LabelFilter]);
+                onFiltersChange([...filters, newFilter as LabelFilterItem]);
                 setNewFilter({});
             }
         }

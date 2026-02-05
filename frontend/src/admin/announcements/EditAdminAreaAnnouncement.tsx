@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { Box, Button, Divider, Typography } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
 import graphql from 'babel-plugin-relay/macro';
 import { useLazyLoadQuery, useMutation } from 'react-relay/hooks';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
@@ -128,7 +127,7 @@ function EditAdminAreaAnnouncement() {
             />
             <Divider sx={{ opacity: 0.6 }} />
             <Box mt={2}>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     disabled={!isFormValid || !hasFormChanged}
                     variant="outlined"
@@ -137,7 +136,7 @@ function EditAdminAreaAnnouncement() {
                     onClick={onUpdate}
                 >
                     Update Announcement
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>
                     Cancel
                 </Button>

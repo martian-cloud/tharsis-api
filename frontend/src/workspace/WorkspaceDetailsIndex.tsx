@@ -1,7 +1,7 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import StateIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import { Alert, AlertTitle, Avatar, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { CubeOutline as ModuleIcon } from 'mdi-material-ui';
 import React, { useState } from 'react';

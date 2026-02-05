@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import { nanoid } from 'nanoid';
 import { useEffect, useState } from 'react';
@@ -46,7 +45,7 @@ function EditManagedIdentityRuleDialog(props: Props) {
             </DialogContent>
             <DialogActions>
                 <Button size="small" variant="outlined" onClick={onClose} color="inherit">Cancel</Button>
-                <LoadingButton
+                <Button
                     loading={submitInProgress}
                     size="small"
                     variant="contained"
@@ -54,7 +53,7 @@ function EditManagedIdentityRuleDialog(props: Props) {
                     sx={{ marginLeft: 2 }}
                     onClick={() => onSubmit(rule)}>
                     Update Rule
-                </LoadingButton>
+                </Button>
             </DialogActions>
         </Dialog>
     ) : null;

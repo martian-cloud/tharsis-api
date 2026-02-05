@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Alert, Box, Collapse, TextField, Typography } from '@mui/material'
-import LoadingButton from '@mui/lab/LoadingButton';
+import { Alert, Box, Button, Collapse, TextField, Typography } from '@mui/material'
 import { MutationError } from '../../common/error';
 import { useFragment, useMutation } from 'react-relay';
 import graphql from 'babel-plugin-relay/macro'
@@ -118,7 +117,7 @@ const onUpdate = () => {
                     />
                 </Box>
                 <Box>
-                    <LoadingButton
+                    <Button
                         sx={{ mt: 1 }}
                         size="small"
                         disabled={data.description === inputForm.description}
@@ -128,7 +127,7 @@ const onUpdate = () => {
                         onClick={onUpdate}
                     >
                         Save changes
-                    </LoadingButton>
+                    </Button>
                 </Box>
             </Collapse>
         </Box>

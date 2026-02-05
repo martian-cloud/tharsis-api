@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { IconButton, Tooltip } from '@mui/material';
 import CopyIcon from '@mui/icons-material/ContentCopy';
-import { SxProps } from '@mui/system';
+import { SxProps, Theme } from '@mui/material/styles';
 
 interface Props {
     data: string
     toolTip: string
-    sxCopyIconStyles?: SxProps
+    sxCopyIconStyles?: SxProps<Theme>
 }
 
 function CopyButton({ data, toolTip, sxCopyIconStyles = { width: 16, height: 16 } }: Props) {

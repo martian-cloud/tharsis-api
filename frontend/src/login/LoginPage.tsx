@@ -1,5 +1,4 @@
-import LoadingButton from '@mui/lab/LoadingButton';
-import { Alert, Box, TextField, Typography, useTheme } from '@mui/material';
+import { Alert, Box, Button, TextField, Typography, useTheme } from '@mui/material';
 import React, { useContext, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import AuthenticationService from '../auth/AuthenticationService';
@@ -112,9 +111,9 @@ function LoginPage() {
             </Alert>
           )}
 
-          <LoadingButton loading={loginInProgress} type="submit" variant="contained" sx={{ width: '100%' }}>
+          <Button loading={loginInProgress} type="submit" variant="contained" sx={{ width: '100%' }}>
             Login
-          </LoadingButton>
+          </Button>
         </Box>
       </Box>
     </Box>

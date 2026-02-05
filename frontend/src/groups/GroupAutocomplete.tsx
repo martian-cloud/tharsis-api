@@ -85,7 +85,7 @@ function GroupAutocomplete(props: Props) {
 
     return (
         <Autocomplete
-            sx={ sx }
+            sx={sx}
             fullWidth
             size="small"
             onChange={(event: React.SyntheticEvent, value: GroupOption | null) => onSelected(value)}
@@ -96,8 +96,9 @@ function GroupAutocomplete(props: Props) {
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: any, { inputValue }) => {
                 const matches = match(option.fullPath, inputValue);
                 const parts = parse(option.fullPath, matches);
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box>
                             <Typography>
                                 {parts.map((part: any, index: number) => (
@@ -125,14 +126,16 @@ function GroupAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder={placeholder}
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}

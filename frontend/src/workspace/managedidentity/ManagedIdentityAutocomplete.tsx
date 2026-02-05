@@ -105,8 +105,9 @@ function ManagedIdentityAutocomplete(props: Props) {
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: ManagedIdentityOption, { inputValue }) => {
                 const matches = match(option.name, inputValue);
                 const parts = parse(option.name, matches);
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
                             <Box>
                                 <Typography>
@@ -134,19 +135,21 @@ function ManagedIdentityAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder='Select a managed identity'
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}
         />
-    )
+    );
 }
 
 export default ManagedIdentityAutocomplete;

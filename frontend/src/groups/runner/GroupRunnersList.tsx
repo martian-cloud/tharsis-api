@@ -1,6 +1,8 @@
 import graphql from 'babel-plugin-relay/macro';
+import { Box } from "@mui/material";
 import { ConnectionHandler, useFragment, useLazyLoadQuery, usePaginationFragment } from "react-relay";
 import RunnerList from '../../runners/RunnerList';
+import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import { GroupRunnersListFragment_group$key } from './__generated__/GroupRunnersListFragment_group.graphql';
 import { GroupRunnersListFragment_runners$key } from './__generated__/GroupRunnersListFragment_runners.graphql';
 import { GroupRunnersListPaginationQuery } from './__generated__/GroupRunnersListPaginationQuery.graphql';
@@ -23,6 +25,7 @@ function GroupRunnersList({ fragmentRef }: Props) {
         graphql`
             fragment GroupRunnersListFragment_group on Group {
                 id
+                fullPath
             }
         `,
         fragmentRef
@@ -58,9 +61,19 @@ function GroupRunnersList({ fragmentRef }: Props) {
             }
         `, queryData.node);
 
-    return data ? (
-        <RunnerList fragmentRef={data.runners} loadNext={loadNext} hasNext={hasNext} groupPath={queryData?.node?.fullPath} />
-    ) : null;
+    if (!data) return null;
+
+    return (
+        <Box>
+            <NamespaceBreadcrumbs
+                namespacePath={group.fullPath}
+                childRoutes={[
+                    { title: "runners", path: 'runners' }
+                ]}
+            />
+            <RunnerList fragmentRef={data.runners} loadNext={loadNext} hasNext={hasNext} groupPath={queryData?.node?.fullPath} />
+        </Box>
+    );
 }
 
 export default GroupRunnersList;

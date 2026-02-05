@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Box, Button, Divider, Typography } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment, useMutation } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
@@ -104,7 +103,7 @@ function NewFederatedRegistry({ fragmentRef }: Props) {
             />
             <Divider sx={{ my: 3, opacity: 0.6 }} />
             <Box>
-                <LoadingButton
+                <Button
                     disabled={isDisabled}
                     loading={isInFlight}
                     variant="outlined"
@@ -112,7 +111,7 @@ function NewFederatedRegistry({ fragmentRef }: Props) {
                     sx={{ mr: 2 }}
                     onClick={onSave}>
                     Create Federated Registry
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

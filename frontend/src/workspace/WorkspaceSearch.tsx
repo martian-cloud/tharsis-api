@@ -17,8 +17,7 @@ import ListSkeleton from '../skeletons/ListSkeleton';
 import { WorkspaceSearchFragment_workspaces$key } from './__generated__/WorkspaceSearchFragment_workspaces.graphql';
 import { WorkspaceSearchPaginationQuery } from './__generated__/WorkspaceSearchPaginationQuery.graphql';
 import { WorkspaceSearchQuery } from './__generated__/WorkspaceSearchQuery.graphql';
-import type { LabelFilter as LabelFilterType } from './labels/LabelFilter';
-import LabelFilter from './labels/LabelFilter';
+import LabelFilter, { LabelFilterItem } from './labels/LabelFilter';
 import WorkspaceSearchListItem from './WorkspaceSearchListItem';
 
 export const INITIAL_ITEM_COUNT = 100;
@@ -32,7 +31,7 @@ const query = graphql`
 interface Props {
   queryRef: PreloadedQuery<WorkspaceSearchQuery>
   search?: string
-  labelFilters?: LabelFilterType[]
+  labelFilters?: LabelFilterItem[]
   filterExpanded?: boolean
 }
 
@@ -71,7 +70,7 @@ function WorkspaceSearch({ search = '', labelFilters = [], filterExpanded = fals
   const fetch = useMemo(
     () =>
       throttle(
-        (input: string, filters: LabelFilterType[], existingSearchParams: URLSearchParams) => {
+        (input: string, filters: LabelFilterItem[], existingSearchParams: URLSearchParams) => {
           setIsRefreshing(true);
 
           fetchQuery(environment, query, {
@@ -143,13 +142,17 @@ function WorkspaceSearch({ search = '', labelFilters = [], filterExpanded = fals
     fetch(newSearch, labelFilters, searchParams);
   };
 
-  const onLabelFiltersChange = (newFilters: LabelFilterType[]) => {
+  const onLabelFiltersChange = (newFilters: LabelFilterItem[]) => {
     fetch(search, newFilters, searchParams);
     fetch.flush();
   };
 
   const onFilterExpandedChange = (expanded: boolean) => {
-    expanded ? searchParams.set('filterExpanded', 'true') : searchParams.delete('filterExpanded');
+    if (expanded) {
+      searchParams.set('filterExpanded', 'true');
+    } else {
+      searchParams.delete('filterExpanded');
+    }
     setSearchParams(searchParams, { replace: true });
   };
 

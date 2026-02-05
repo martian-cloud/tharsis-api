@@ -1,11 +1,11 @@
 import {
     Alert,
     Box,
+    Button,
     FormControlLabel,
     Switch,
     Typography
 } from "@mui/material";
-import LoadingButton from '@mui/lab/LoadingButton';
 import graphql from 'babel-plugin-relay/macro';
 import { useState } from "react";
 import { useLazyLoadQuery, useMutation } from "react-relay/hooks";
@@ -163,7 +163,7 @@ function MaintenanceSettings() {
                 )}
             </Box>
 
-            <LoadingButton
+            <Button
                 loading={isLoading}
                 disabled={!hasChanges}
                 variant="outlined"
@@ -173,7 +173,7 @@ function MaintenanceSettings() {
                 sx={{ mt: 4 }}
             >
                 Save Changes
-            </LoadingButton>
+            </Button>
         </Box>
     );
 }

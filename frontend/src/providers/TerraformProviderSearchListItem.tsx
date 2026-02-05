@@ -1,6 +1,5 @@
-import { Box, Chip, ListItemIcon, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, ListItemButton, ListItemIcon, Tooltip, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
-import ListItem from '@mui/material/ListItem';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { Terraform as TerraformIcon } from 'mdi-material-ui';
@@ -34,8 +33,7 @@ function TerraformProviderSearchListItem(props: Props) {
     `, props.fragmentRef);
 
     return (
-        <ListItem
-            button
+        <ListItemButton
             component={LinkRouter}
             to={`/provider-registry/${data.registryNamespace}/${data.name}`}
             sx={{
@@ -80,7 +78,7 @@ function TerraformProviderSearchListItem(props: Props) {
                 </Box>
                 {data.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
             </Box>
-        </ListItem>
+        </ListItemButton>
     );
 }
 

@@ -77,7 +77,9 @@ function WorkspaceDetailsDriftViewer({ fragmentRef }: { fragmentRef: WorkspaceDe
     const [search, setSearch] = useState<string>('');
 
     useEffect(() => {
-        Object.values(collapsedState).some((collapsed) => !collapsed) && setCollapseAll(false);
+        if (Object.values(collapsedState).some((collapsed) => !collapsed)) {
+            setCollapseAll(false);
+        }
     }, [collapsedState]);
 
     const onCollapseAllChange = (collapsed: boolean) => {

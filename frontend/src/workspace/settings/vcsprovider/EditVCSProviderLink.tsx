@@ -1,5 +1,4 @@
-import LoadingButton from '@mui/lab/LoadingButton';
-import { Box, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import { useState } from 'react';
@@ -242,7 +241,7 @@ function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                 fragmentRef={data}
             />
             <Box sx={{ mt: 2 }} display="flex" alignItems="baseline">
-                <LoadingButton
+                <Button
                     size="small"
                     loading={updateIsInFlight || deleteIsInFlight}
                     variant="outlined"
@@ -250,7 +249,7 @@ function EditVCSProviderLink({ fragmentRef, handleWebhookDialog }: Props) {
                     onClick={handleChanges}
                 >
                     Save changes
-                </LoadingButton>
+                </Button>
             </Box>
         </Box>
     )

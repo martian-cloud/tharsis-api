@@ -6,7 +6,7 @@ import InProgressIcon from '@mui/icons-material/TimelapseOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
 import { SxProps, Theme } from '@mui/material';
 import { green, grey, orange, red } from '@mui/material/colors';
-import blue from '@mui/material/colors/blue';
+import { blue } from '@mui/material/colors';
 
 interface IconProps {
     sx?: SxProps<Theme>;

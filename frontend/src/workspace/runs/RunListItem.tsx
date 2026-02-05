@@ -4,7 +4,7 @@ import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import { teal } from '@mui/material/colors';
-import red from '@mui/material/colors/red';
+import { red } from '@mui/material/colors';
 import Box from '@mui/system/Box';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';

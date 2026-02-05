@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Box, Button, Typography } from '@mui/material'
-import LoadingButton from '@mui/lab/LoadingButton';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useFragment, useMutation } from 'react-relay';
 import { MutationError } from '../../common/error';
@@ -120,14 +119,14 @@ function NewVCSProvider(props: Props) {
                 error={error}
             />
             <Box>
-                <LoadingButton
+                <Button
                     loading={isInFlight}
                     disabled={formData.oAuthClientId === '' || formData.oAuthClientSecret === ''}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
                     onClick={onSave}>
-                    Create VCS Provider</LoadingButton>
+                    Create VCS Provider</Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

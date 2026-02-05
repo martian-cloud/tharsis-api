@@ -1,6 +1,6 @@
 import { createGraphiQLFetcher, Fetcher } from '@graphiql/toolkit';
 import { Box } from '@mui/material';
-import GraphiQL from 'graphiql';
+import { GraphiQL } from 'graphiql';
 import 'graphiql/graphiql.css';
 import { useContext } from 'react';
 import AuthenticationService from '../auth/AuthenticationService';

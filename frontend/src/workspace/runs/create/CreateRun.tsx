@@ -1,4 +1,3 @@
-import { LoadingButton } from "@mui/lab";
 import { Box, Button, Typography } from "@mui/material";
 import graphql from 'babel-plugin-relay/macro';
 import { useContext, useMemo, useState } from "react";
@@ -274,7 +273,7 @@ function CreateRun({ fragmentRef }: Props) {
                 }}
             />
             <Box marginTop={2}>
-                <LoadingButton
+                <Button
                     sx={{ marginRight: 2 }}
                     loading={vcsRunIsInFlight || moduleRunIsInFlight || runIsInFlight}
                     disabled={!enableButton}
@@ -283,7 +282,7 @@ function CreateRun({ fragmentRef }: Props) {
                     onClick={onCreateRun}
                 >
                     Create Run
-                </LoadingButton>
+                </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
         </Box>

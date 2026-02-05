@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -177,7 +176,7 @@ function NewNamespaceMembership(props: Props) {
                 </Box>
                 <Divider light />
                 <Box marginTop={2}>
-                    <LoadingButton
+                    <Button
                         loading={isInFlight}
                         disabled={!member || !role}
                         variant="outlined"
@@ -185,7 +184,7 @@ function NewNamespaceMembership(props: Props) {
                         sx={{ marginRight: 2 }}
                         onClick={onCreate}>
                         Add Member
-                    </LoadingButton>
+                    </Button>
                     <Button component={RouterLink} color="inherit" to="..">Cancel</Button>
                 </Box>
             </React.Fragment>}

@@ -106,30 +106,33 @@ function VCSProviderAutocomplete(props: Props) {
                     {...params}
                     placeholder="VCS Provider"
                     label="VCS Provider"
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
-                    }}/>}
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
+                    }} />}
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: VCSProviderOption, { inputValue }) => {
                 const matches = match(option.label, inputValue)
                 const parts = parse(option.label, matches)
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box width="100%" display="flex" justifyContent="space-between" alignItems="center">
                             <Box>
                                 <Typography>
                                     {parts.map((part: { text: string, highlight: boolean }, index: number) => (
-                                    <span
-                                        key={index}
-                                    >
-                                        {part.text}
-                                    </span>
-                                ))}
+                                        <span
+                                            key={index}
+                                        >
+                                            {part.text}
+                                        </span>
+                                    ))}
                                 </Typography>
                                 <Typography variant="caption">{option.description}</Typography>
                             </Box>
@@ -139,7 +142,7 @@ function VCSProviderAutocomplete(props: Props) {
                 )
             }}
         />
-    )
+    );
 }
 
-export default VCSProviderAutocomplete
+export default VCSProviderAutocomplete;

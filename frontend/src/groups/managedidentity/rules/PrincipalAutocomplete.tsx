@@ -2,7 +2,7 @@ import TeamIcon from '@mui/icons-material/PeopleOutline';
 import UserIcon from '@mui/icons-material/PersonOutline';
 import { Autocomplete, Avatar, Box, ListItem, ListItemText, styled, TextField, useTheme } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress';
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import match from 'autosuggest-highlight/match';
 import parse from 'autosuggest-highlight/parse';
 import graphql from 'babel-plugin-relay/macro';
@@ -211,14 +211,16 @@ function PrincipalAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder='Select a principal to add'
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}

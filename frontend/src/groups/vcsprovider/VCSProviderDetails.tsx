@@ -3,7 +3,7 @@ import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
 import { LoadingButton } from '@mui/lab';
 import { Avatar, Alert, Box, Button, ButtonGroup, Collapse, Dialog, DialogActions, DialogTitle, DialogContent, Divider, Menu, MenuItem, Link, Paper, Stack, styled, Typography } from '@mui/material'
-import teal from '@mui/material/colors/teal';
+import { teal } from '@mui/material/colors';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import TRNButton from '../../common/TRNButton';

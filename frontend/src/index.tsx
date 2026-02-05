@@ -25,7 +25,14 @@ const container = document.getElementById('root');
 
 // Use createRoot to enable React concurrent mode
 if (!container) throw new Error('Failed to find the root element');
-const root = createRoot(container);
+const root = createRoot(container, {
+  onUncaughtError: (error, errorInfo) => {
+    console.error('Uncaught error:', error, errorInfo);
+  },
+  onCaughtError: (error, errorInfo) => {
+    console.error('Caught error:', error, errorInfo);
+  }
+});
 
 const graphqlEndpoint = `${config.apiUrl}/graphql`;
 

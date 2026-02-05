@@ -93,8 +93,9 @@ function RoleAutocomplete(props: Props) {
             renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: RoleOption, { inputValue }) => {
                 const matches = match(option.name, inputValue);
                 const parts = parse(option.name, matches);
+                const { key, ...otherProps } = props as any;
                 return (
-                    <Box component="li" {...props}>
+                    <Box component="li" key={key} {...otherProps}>
                         <Box>
                             <Typography>
                                 {parts.map((part: any, index: number) => (
@@ -118,19 +119,21 @@ function RoleAutocomplete(props: Props) {
                 <TextField
                     {...params}
                     placeholder='Select a role'
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
+                    slotProps={{
+                        input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }
                     }}
                 />
             )}
         />
-    )
+    );
 }
 
 export default RoleAutocomplete;
