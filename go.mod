@@ -28,7 +28,7 @@ require (
 	github.com/fatih/color v1.16.0
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/go-chi/cors v1.2.1
-	github.com/go-git/go-git/v5 v5.16.2
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/gomodule/redigo v1.9.2
@@ -40,12 +40,12 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/go-slug v0.16.4
 	github.com/hashicorp/go-tfe v1.51.0
-	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/hc-install v0.9.2
 	github.com/hashicorp/hcl/v2 v2.20.1
 	github.com/hashicorp/jsonapi v1.3.1
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20231204233900-a34142ec2a72
-	github.com/hashicorp/terraform-json v0.22.1
+	github.com/hashicorp/terraform-json v0.27.1
 	github.com/hashicorp/terraform-registry-address v0.2.3
 	github.com/hashicorp/terraform-svchost v0.1.1
 	github.com/hexops/gotextdiff v1.0.3
@@ -55,7 +55,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.3
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/lestrrat-go/jwx/v2 v2.0.21
-	github.com/martian-cloud/terraform-exec v0.22.0
+	github.com/martian-cloud/terraform-exec v0.23.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/modelcontextprotocol/go-sdk v1.1.0
@@ -69,7 +69,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/vanng822/go-premailer v1.22.0
-	github.com/zclconf/go-cty v1.15.0
+	github.com/zclconf/go-cty v1.16.4
 	gitlab.com/infor-cloud/martian-cloud/graphql-transport-ws v1.1.0
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-limiter v0.0.0-20230411193226-3247984d5abc
 	gitlab.com/infor-cloud/martian-cloud/tharsis/go-redisstore v0.0.0-20230411194747-eb2ce440abb8
