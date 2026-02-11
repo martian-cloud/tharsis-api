@@ -1265,7 +1265,7 @@ func TestGetLatestMatchingVersion(t *testing.T) {
 			name:        "invalid range string",
 			constraints: ptr.String(""),
 			expected:    "",
-			expectError: fmt.Errorf("failed to parse wanted version range string: Malformed constraint: "),
+			expectError: fmt.Errorf("failed to parse wanted version range string: malformed constraint: "),
 		},
 		{
 			name:        "no constraint, return latest of all",
