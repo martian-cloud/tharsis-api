@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4fbfaff9eb48dd002ef7ad926fe3c4a9>>
+ * @generated SignedSource<<ea1c1793cc4bd2339cb52a7108496cf2>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,6 +13,7 @@ import { FragmentRefs } from "relay-runtime";
 export type RootQuery$variables = Record<PropertyKey, never>;
 export type RootQuery$data = {
   readonly config: {
+    readonly serviceAccountClientSecretMaxExpirationDays: number;
     readonly serviceDiscoveryHost: string;
     readonly tharsisSupportUrl: string;
   };
@@ -86,6 +87,13 @@ v2 = {
       "args": null,
       "kind": "ScalarField",
       "name": "serviceDiscoveryHost",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "serviceAccountClientSecretMaxExpirationDays",
       "storageKey": null
     }
   ],
@@ -196,16 +204,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "0040ddaba047d565d51d049782520e82",
+    "cacheID": "36c74ef049e43b1a84697d08120ee8a9",
     "id": null,
     "metadata": {},
     "name": "RootQuery",
     "operationKind": "query",
-    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
+    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    serviceAccountClientSecretMaxExpirationDays\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
   }
 };
 })();
 
-(node as any).hash = "65471eabac7d3aaad671f1e41148e4d9";
+(node as any).hash = "cf11f8c26b43518c8eb2e1bfb057ee66";
 
 export default node;

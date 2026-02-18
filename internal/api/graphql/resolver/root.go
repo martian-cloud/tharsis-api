@@ -483,6 +483,18 @@ func (r RootResolver) DeleteServiceAccount(ctx context.Context, args *struct{ In
 	return response, nil
 }
 
+// ResetServiceAccountClientCredentials resets client credentials for a service account
+func (r RootResolver) ResetServiceAccountClientCredentials(ctx context.Context, args *struct {
+	Input ResetServiceAccountClientCredentialsInput
+}) (*ServiceAccountMutationPayloadResolver, error) {
+	response, err := resetServiceAccountClientCredentialsMutation(ctx, &args.Input)
+	if err != nil {
+		return handleServiceAccountMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // ServiceAccountCreateToken creates a token for a service account
 func (r RootResolver) ServiceAccountCreateToken(ctx context.Context, args *struct {
 	Input ServiceAccountCreateTokenInput

@@ -7,9 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 )
 
-func TestNewSSEHandler(t *testing.T) {
+func TestNewStreamableHTTPHandler(t *testing.T) {
+	testLogger, _ := logger.NewForTest()
+
 	type testCase struct {
 		name      string
 		opts      *ServerOptions
@@ -23,7 +26,7 @@ func TestNewSSEHandler(t *testing.T) {
 				ServicesCatalog: &services.Catalog{},
 				Version:         "1.0.0",
 				Config:          &config.MCPServerConfig{EnabledToolsets: "workspace,run"},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 		},
 		{
@@ -32,7 +35,7 @@ func TestNewSSEHandler(t *testing.T) {
 				ServicesCatalog: &services.Catalog{},
 				Version:         "1.0.0",
 				Config:          &config.MCPServerConfig{EnabledTools: "get_workspace,get_run"},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 		},
 		{
@@ -41,14 +44,14 @@ func TestNewSSEHandler(t *testing.T) {
 				ServicesCatalog: &services.Catalog{},
 				Version:         "1.0.0",
 				Config:          &config.MCPServerConfig{ReadOnly: true, EnabledToolsets: "workspace"},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler, err := NewSSEHandler(tt.opts)
+			handler, err := NewStreamableHTTPHandler(tt.opts)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, handler)
@@ -61,6 +64,8 @@ func TestNewSSEHandler(t *testing.T) {
 }
 
 func TestNewServer(t *testing.T) {
+	testLogger, _ := logger.NewForTest()
+
 	type testCase struct {
 		name      string
 		opts      *ServerOptions
@@ -74,7 +79,7 @@ func TestNewServer(t *testing.T) {
 				ServicesCatalog: &services.Catalog{},
 				Version:         "2.0.0",
 				Config:          &config.MCPServerConfig{ReadOnly: true, EnabledToolsets: "workspace"},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 		},
 		{
@@ -82,7 +87,7 @@ func TestNewServer(t *testing.T) {
 			opts: &ServerOptions{
 				ServicesCatalog: &services.Catalog{},
 				Config:          &config.MCPServerConfig{EnabledToolsets: "workspace"},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 			expectErr: true,
 		},
@@ -92,7 +97,7 @@ func TestNewServer(t *testing.T) {
 				ServicesCatalog: &services.Catalog{},
 				Version:         "1.0.0",
 				Config:          &config.MCPServerConfig{ReadOnly: false, EnabledToolsets: "workspace"},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 		},
 		{
@@ -101,7 +106,7 @@ func TestNewServer(t *testing.T) {
 				ServicesCatalog: &services.Catalog{},
 				Version:         "1.0.0",
 				Config:          &config.MCPServerConfig{},
-				HTTPClient:      nil,
+				Logger:          testLogger,
 			},
 		},
 	}

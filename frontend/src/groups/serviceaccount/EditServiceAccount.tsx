@@ -1,14 +1,16 @@
 import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
+import moment from 'moment';
 import { nanoid } from 'nanoid';
 import { useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { MutationError } from '../../common/error';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
+import ClientCredentialsDialog from './ClientCredentialsDialog';
 import ServiceAccountForm, { FormData } from './ServiceAccountForm';
 import { EditServiceAccountFragment_group$key } from './__generated__/EditServiceAccountFragment_group.graphql';
 import { EditServiceAccountMutation } from './__generated__/EditServiceAccountMutation.graphql';
@@ -42,6 +44,8 @@ function EditServiceAccount(props: Props) {
                 description
                 resourcePath
                 createdBy
+                clientCredentialsEnabled
+                clientSecretExpiresAt
                 oidcTrustPolicies {
                     issuer
                     boundClaimsType
@@ -63,6 +67,8 @@ function EditServiceAccount(props: Props) {
                     description
                     resourcePath
                     createdBy
+                    clientCredentialsEnabled
+                    clientSecretExpiresAt
                     oidcTrustPolicies {
                         issuer
                         boundClaimsType
@@ -72,6 +78,7 @@ function EditServiceAccount(props: Props) {
                         }
                     }
                 }
+                clientSecret
                 problems {
                     message
                     field
@@ -82,10 +89,13 @@ function EditServiceAccount(props: Props) {
     `);
 
     const [error, setError] = useState<MutationError>()
-    const [formData, setFormData] = useState<FormData | null>(queryData.serviceAccount ? {
+    const [clientCredentials, setClientCredentials] = useState<{ clientId: string; clientSecret: string; expiresAt: string } | null>(null);
+    const [formData, setFormData] = useState<FormData | null>(() => queryData.serviceAccount ? {
         name: queryData.serviceAccount.name,
         description: queryData.serviceAccount.description,
-        oidcTrustPolicies: queryData.serviceAccount.oidcTrustPolicies.map(trustPolicy => ({ ...trustPolicy, _id: nanoid() }))
+        oidcTrustPolicies: queryData.serviceAccount.oidcTrustPolicies.map(trustPolicy => ({ ...trustPolicy, _id: nanoid() })),
+        enableClientCredentials: queryData.serviceAccount.clientCredentialsEnabled,
+        clientSecretExpiresAt: queryData.serviceAccount.clientSecretExpiresAt ? moment(queryData.serviceAccount.clientSecretExpiresAt) : null
     } : null);
 
     const onUpdate = () => {
@@ -95,7 +105,9 @@ function EditServiceAccount(props: Props) {
                     input: {
                         id: serviceAccountId,
                         description: formData.description,
-                        oidcTrustPolicies: formData.oidcTrustPolicies
+                        oidcTrustPolicies: formData.oidcTrustPolicies,
+                        enableClientCredentials: formData.enableClientCredentials,
+                        clientSecretExpiresAt: formData.enableClientCredentials ? formData.clientSecretExpiresAt?.toISOString() : undefined
                     }
                 },
                 onCompleted: data => {
@@ -110,7 +122,15 @@ function EditServiceAccount(props: Props) {
                             message: "Unexpected error occurred"
                         });
                     } else {
-                        navigate(`../${data.updateServiceAccount.serviceAccount.id}`);
+                        if (data.updateServiceAccount.clientSecret) {
+                            setClientCredentials({
+                                clientId: data.updateServiceAccount.serviceAccount.id,
+                                clientSecret: data.updateServiceAccount.clientSecret,
+                                expiresAt: data.updateServiceAccount.serviceAccount.clientSecretExpiresAt
+                            });
+                        } else {
+                            navigate(`../${data.updateServiceAccount.serviceAccount.id}`);
+                        }
                     }
                 },
                 onError: error => {
@@ -121,6 +141,11 @@ function EditServiceAccount(props: Props) {
                 }
             });
         }
+    };
+
+    const onCredentialsDialogClose = () => {
+        setClientCredentials(null);
+        navigate(`../${serviceAccountId}`);
     };
 
     return formData ? (
@@ -137,21 +162,29 @@ function EditServiceAccount(props: Props) {
             <ServiceAccountForm
                 editMode
                 data={formData}
-                onChange={(data: FormData) => setFormData(data)}
+                onChange={setFormData}
                 error={error}
             />
-            <Divider light />
+            <Divider sx={{ marginTop: 4 }} />
             <Box marginTop={2}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
-                    onClick={onUpdate}>
+                    onClick={onUpdate}
+                >
                     Update Service Account
                 </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
+            {clientCredentials && (
+                <ClientCredentialsDialog
+                    clientId={clientCredentials.clientId}
+                    clientSecret={clientCredentials.clientSecret}
+                    onClose={onCredentialsDialogClose}
+                />
+            )}
         </Box>
     ) : <Box>Service Account Not found</Box>;
 }

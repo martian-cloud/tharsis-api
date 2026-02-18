@@ -27,12 +27,13 @@ type EmailType string
 
 // EmailType constant values
 const (
-	FailedRunEmailType EmailType = "failed_run"
+	FailedRunEmailType                      EmailType = "failed_run"
+	ServiceAccountSecretExpirationEmailType EmailType = "service_account_secret_expiration"
 )
 
 // EmailTypes returns a list of email types
 func EmailTypes() []EmailType {
-	return []EmailType{FailedRunEmailType}
+	return []EmailType{FailedRunEmailType, ServiceAccountSecretExpirationEmailType}
 }
 
 // TemplateFilename returns the template filename for this type
@@ -45,6 +46,8 @@ func (et EmailType) NewBuilder() (EmailBuilder, error) {
 	switch et {
 	case FailedRunEmailType:
 		return &FailedRunEmail{}, nil
+	case ServiceAccountSecretExpirationEmailType:
+		return &ServiceAccountSecretExpirationEmail{}, nil
 	default:
 		return nil, fmt.Errorf("unknown email type: %s", et)
 	}

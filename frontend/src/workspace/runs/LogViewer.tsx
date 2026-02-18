@@ -1,4 +1,4 @@
-import { Box, SxProps, Theme, useTheme } from '@mui/material';
+import { alpha, Box, SxProps, Theme, useTheme } from '@mui/material';
 import { grey } from '@mui/material/colors';
 import Anser from 'anser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,7 +8,30 @@ import Link from '../../routes/Link';
 interface Props {
     logs: string
     hideLineNumbers?: boolean
+    loading?: boolean
     sx?: SxProps<Theme>
+}
+
+function LoadingDots() {
+    const [active, setActive] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setActive(a => (a + 1) % 3);
+        }, 400);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <span style={{ fontSize: '36px', letterSpacing: '-2px', lineHeight: '0.5' }}>
+            {[0, 1, 2].map(i => (
+                <span key={i} style={{
+                    opacity: i === active ? 1 : 0.3,
+                    transition: 'opacity 0.6s ease-in-out'
+                }}>.</span>
+            ))}
+        </span>
+    );
 }
 
 interface LogLineProps {
@@ -48,7 +71,11 @@ function LogLine({ log, lineNumber, selected, hideLineNumber }: LogLineProps) {
         }
     }, [selected, autoScroll]);
 
-    return <Box ref={ref} sx={{ padding: `1px 0px 1px ${hideLineNumber ? '0px' : '56px'}` }}>
+    return <Box ref={ref} sx={{
+        padding: `1px 0px 1px ${hideLineNumber ? '0px' : '56px'}`,
+        backgroundColor: selected ? alpha(theme.palette.primary.main, 0.15) : undefined,
+        borderLeft: selected ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent'
+    }}>
         {!hideLineNumber && <Link
             id={`L${lineNumber}`}
             preventScrollReset
@@ -78,8 +105,7 @@ function LogLine({ log, lineNumber, selected, hideLineNumber }: LogLineProps) {
 
 const MemorizedLogLine = React.memo(LogLine);
 
-function LogViewer({ logs, sx, hideLineNumbers }: Props) {
-    const theme = useTheme();
+function LogViewer({ logs, sx, hideLineNumbers, loading }: Props) {
     const [searchParams] = useSearchParams();
 
     const [selectedLine, setSelectedLine] = useState<number | undefined>();
@@ -90,14 +116,16 @@ function LogViewer({ logs, sx, hideLineNumbers }: Props) {
             return;
         }
         const selectedLineParam = searchParams.get('line');
-        if (selectedLineParam) {
-            setSelectedLine(parseInt(selectedLineParam));
-        }
-    }, [searchParams]);
+        setSelectedLine(selectedLineParam ? parseInt(selectedLineParam) : undefined);
+    }, [searchParams, hideLineNumbers]);
 
     const logLines = useMemo(() => {
-        const lines = logs.split(/\r?\n/);
-        if (lines.length === 1 && lines[0] === '') {
+        let lines = logs.split(/\r?\n/);
+        // Remove trailing empty line from logs ending with newline
+        if (lines.length > 0 && lines[lines.length - 1] === '') {
+            lines = lines.slice(0, -1);
+        }
+        if (lines.length === 0) {
             return [];
         }
 
@@ -129,7 +157,6 @@ function LogViewer({ logs, sx, hideLineNumbers }: Props) {
             sx={{
                 fontSize: '13px',
                 fontFamily: 'ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace !important',
-                color: theme.palette.text.primary,
                 wordBreak: 'break-all',
                 whiteSpace: 'pre-wrap',
                 mt: 0,
@@ -144,6 +171,9 @@ function LogViewer({ logs, sx, hideLineNumbers }: Props) {
                 const lineNumber = index + 1;
                 return <MemorizedLogLine key={`L${lineNumber}`} log={l} lineNumber={lineNumber} selected={lineNumber === selectedLine} hideLineNumber={hideLineNumbers} />;
             })}
+            {loading && <Box sx={{ marginLeft: '32px' }}>
+                <LoadingDots />
+            </Box>}
         </Box>
     );
 }

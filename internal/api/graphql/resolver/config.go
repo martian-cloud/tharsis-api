@@ -201,6 +201,11 @@ func (r *ConfigResolver) DisableSensitiveVariableFeature() bool {
 	return r.cfg.DisableSensitiveVariableFeature
 }
 
+// ServiceAccountClientSecretMaxExpirationDays resolver
+func (r *ConfigResolver) ServiceAccountClientSecretMaxExpirationDays() int32 {
+	return int32(r.cfg.ServiceAccountClientSecretMaxExpirationDays)
+}
+
 // EmailFooter resolver
 func (r *ConfigResolver) EmailFooter() *string {
 	if r.cfg.EmailFooter == "" {

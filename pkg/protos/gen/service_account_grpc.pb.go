@@ -20,12 +20,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ServiceAccounts_GetServiceAccountByID_FullMethodName = "/martiancloud.tharsis.api.service_account.ServiceAccounts/GetServiceAccountByID"
-	ServiceAccounts_GetServiceAccounts_FullMethodName    = "/martiancloud.tharsis.api.service_account.ServiceAccounts/GetServiceAccounts"
-	ServiceAccounts_CreateServiceAccount_FullMethodName  = "/martiancloud.tharsis.api.service_account.ServiceAccounts/CreateServiceAccount"
-	ServiceAccounts_UpdateServiceAccount_FullMethodName  = "/martiancloud.tharsis.api.service_account.ServiceAccounts/UpdateServiceAccount"
-	ServiceAccounts_DeleteServiceAccount_FullMethodName  = "/martiancloud.tharsis.api.service_account.ServiceAccounts/DeleteServiceAccount"
-	ServiceAccounts_CreateToken_FullMethodName           = "/martiancloud.tharsis.api.service_account.ServiceAccounts/CreateToken"
+	ServiceAccounts_GetServiceAccountByID_FullMethodName        = "/martiancloud.tharsis.api.service_account.ServiceAccounts/GetServiceAccountByID"
+	ServiceAccounts_GetServiceAccounts_FullMethodName           = "/martiancloud.tharsis.api.service_account.ServiceAccounts/GetServiceAccounts"
+	ServiceAccounts_CreateServiceAccount_FullMethodName         = "/martiancloud.tharsis.api.service_account.ServiceAccounts/CreateServiceAccount"
+	ServiceAccounts_UpdateServiceAccount_FullMethodName         = "/martiancloud.tharsis.api.service_account.ServiceAccounts/UpdateServiceAccount"
+	ServiceAccounts_DeleteServiceAccount_FullMethodName         = "/martiancloud.tharsis.api.service_account.ServiceAccounts/DeleteServiceAccount"
+	ServiceAccounts_CreateOIDCToken_FullMethodName              = "/martiancloud.tharsis.api.service_account.ServiceAccounts/CreateOIDCToken"
+	ServiceAccounts_CreateClientCredentialsToken_FullMethodName = "/martiancloud.tharsis.api.service_account.ServiceAccounts/CreateClientCredentialsToken"
 )
 
 // ServiceAccountsClient is the client API for ServiceAccounts service.
@@ -39,13 +40,15 @@ type ServiceAccountsClient interface {
 	// GetServiceAccounts returns a paginated list of ServiceAccounts.
 	GetServiceAccounts(ctx context.Context, in *GetServiceAccountsRequest, opts ...grpc.CallOption) (*GetServiceAccountsResponse, error)
 	// CreateServiceAccount creates a new ServiceAccount.
-	CreateServiceAccount(ctx context.Context, in *CreateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccount, error)
+	CreateServiceAccount(ctx context.Context, in *CreateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccountResponse, error)
 	// UpdateServiceAccount returns the updated ServiceAccount.
-	UpdateServiceAccount(ctx context.Context, in *UpdateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccount, error)
+	UpdateServiceAccount(ctx context.Context, in *UpdateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccountResponse, error)
 	// DeleteServiceAccount deletes a ServiceAccount.
 	DeleteServiceAccount(ctx context.Context, in *DeleteServiceAccountRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// CreateToken creates a token for a ServiceAccount.
-	CreateToken(ctx context.Context, in *CreateTokenRequest, opts ...grpc.CallOption) (*CreateTokenResponse, error)
+	// CreateOIDCToken creates a token for a ServiceAccount using OIDC token exchange.
+	CreateOIDCToken(ctx context.Context, in *CreateOIDCTokenRequest, opts ...grpc.CallOption) (*CreateTokenResponse, error)
+	// CreateClientCredentialsToken creates a token using client credentials.
+	CreateClientCredentialsToken(ctx context.Context, in *CreateClientCredentialsTokenRequest, opts ...grpc.CallOption) (*CreateTokenResponse, error)
 }
 
 type serviceAccountsClient struct {
@@ -76,9 +79,9 @@ func (c *serviceAccountsClient) GetServiceAccounts(ctx context.Context, in *GetS
 	return out, nil
 }
 
-func (c *serviceAccountsClient) CreateServiceAccount(ctx context.Context, in *CreateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccount, error) {
+func (c *serviceAccountsClient) CreateServiceAccount(ctx context.Context, in *CreateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ServiceAccount)
+	out := new(ServiceAccountResponse)
 	err := c.cc.Invoke(ctx, ServiceAccounts_CreateServiceAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -86,9 +89,9 @@ func (c *serviceAccountsClient) CreateServiceAccount(ctx context.Context, in *Cr
 	return out, nil
 }
 
-func (c *serviceAccountsClient) UpdateServiceAccount(ctx context.Context, in *UpdateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccount, error) {
+func (c *serviceAccountsClient) UpdateServiceAccount(ctx context.Context, in *UpdateServiceAccountRequest, opts ...grpc.CallOption) (*ServiceAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ServiceAccount)
+	out := new(ServiceAccountResponse)
 	err := c.cc.Invoke(ctx, ServiceAccounts_UpdateServiceAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -106,10 +109,20 @@ func (c *serviceAccountsClient) DeleteServiceAccount(ctx context.Context, in *De
 	return out, nil
 }
 
-func (c *serviceAccountsClient) CreateToken(ctx context.Context, in *CreateTokenRequest, opts ...grpc.CallOption) (*CreateTokenResponse, error) {
+func (c *serviceAccountsClient) CreateOIDCToken(ctx context.Context, in *CreateOIDCTokenRequest, opts ...grpc.CallOption) (*CreateTokenResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateTokenResponse)
-	err := c.cc.Invoke(ctx, ServiceAccounts_CreateToken_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ServiceAccounts_CreateOIDCToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serviceAccountsClient) CreateClientCredentialsToken(ctx context.Context, in *CreateClientCredentialsTokenRequest, opts ...grpc.CallOption) (*CreateTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTokenResponse)
+	err := c.cc.Invoke(ctx, ServiceAccounts_CreateClientCredentialsToken_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +140,15 @@ type ServiceAccountsServer interface {
 	// GetServiceAccounts returns a paginated list of ServiceAccounts.
 	GetServiceAccounts(context.Context, *GetServiceAccountsRequest) (*GetServiceAccountsResponse, error)
 	// CreateServiceAccount creates a new ServiceAccount.
-	CreateServiceAccount(context.Context, *CreateServiceAccountRequest) (*ServiceAccount, error)
+	CreateServiceAccount(context.Context, *CreateServiceAccountRequest) (*ServiceAccountResponse, error)
 	// UpdateServiceAccount returns the updated ServiceAccount.
-	UpdateServiceAccount(context.Context, *UpdateServiceAccountRequest) (*ServiceAccount, error)
+	UpdateServiceAccount(context.Context, *UpdateServiceAccountRequest) (*ServiceAccountResponse, error)
 	// DeleteServiceAccount deletes a ServiceAccount.
 	DeleteServiceAccount(context.Context, *DeleteServiceAccountRequest) (*emptypb.Empty, error)
-	// CreateToken creates a token for a ServiceAccount.
-	CreateToken(context.Context, *CreateTokenRequest) (*CreateTokenResponse, error)
+	// CreateOIDCToken creates a token for a ServiceAccount using OIDC token exchange.
+	CreateOIDCToken(context.Context, *CreateOIDCTokenRequest) (*CreateTokenResponse, error)
+	// CreateClientCredentialsToken creates a token using client credentials.
+	CreateClientCredentialsToken(context.Context, *CreateClientCredentialsTokenRequest) (*CreateTokenResponse, error)
 	mustEmbedUnimplementedServiceAccountsServer()
 }
 
@@ -150,17 +165,20 @@ func (UnimplementedServiceAccountsServer) GetServiceAccountByID(context.Context,
 func (UnimplementedServiceAccountsServer) GetServiceAccounts(context.Context, *GetServiceAccountsRequest) (*GetServiceAccountsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetServiceAccounts not implemented")
 }
-func (UnimplementedServiceAccountsServer) CreateServiceAccount(context.Context, *CreateServiceAccountRequest) (*ServiceAccount, error) {
+func (UnimplementedServiceAccountsServer) CreateServiceAccount(context.Context, *CreateServiceAccountRequest) (*ServiceAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateServiceAccount not implemented")
 }
-func (UnimplementedServiceAccountsServer) UpdateServiceAccount(context.Context, *UpdateServiceAccountRequest) (*ServiceAccount, error) {
+func (UnimplementedServiceAccountsServer) UpdateServiceAccount(context.Context, *UpdateServiceAccountRequest) (*ServiceAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateServiceAccount not implemented")
 }
 func (UnimplementedServiceAccountsServer) DeleteServiceAccount(context.Context, *DeleteServiceAccountRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteServiceAccount not implemented")
 }
-func (UnimplementedServiceAccountsServer) CreateToken(context.Context, *CreateTokenRequest) (*CreateTokenResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateToken not implemented")
+func (UnimplementedServiceAccountsServer) CreateOIDCToken(context.Context, *CreateOIDCTokenRequest) (*CreateTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOIDCToken not implemented")
+}
+func (UnimplementedServiceAccountsServer) CreateClientCredentialsToken(context.Context, *CreateClientCredentialsTokenRequest) (*CreateTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateClientCredentialsToken not implemented")
 }
 func (UnimplementedServiceAccountsServer) mustEmbedUnimplementedServiceAccountsServer() {}
 func (UnimplementedServiceAccountsServer) testEmbeddedByValue()                         {}
@@ -273,20 +291,38 @@ func _ServiceAccounts_DeleteServiceAccount_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ServiceAccounts_CreateToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateTokenRequest)
+func _ServiceAccounts_CreateOIDCToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOIDCTokenRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServiceAccountsServer).CreateToken(ctx, in)
+		return srv.(ServiceAccountsServer).CreateOIDCToken(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ServiceAccounts_CreateToken_FullMethodName,
+		FullMethod: ServiceAccounts_CreateOIDCToken_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceAccountsServer).CreateToken(ctx, req.(*CreateTokenRequest))
+		return srv.(ServiceAccountsServer).CreateOIDCToken(ctx, req.(*CreateOIDCTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServiceAccounts_CreateClientCredentialsToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateClientCredentialsTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServiceAccountsServer).CreateClientCredentialsToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServiceAccounts_CreateClientCredentialsToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServiceAccountsServer).CreateClientCredentialsToken(ctx, req.(*CreateClientCredentialsTokenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -319,8 +355,12 @@ var ServiceAccounts_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ServiceAccounts_DeleteServiceAccount_Handler,
 		},
 		{
-			MethodName: "CreateToken",
-			Handler:    _ServiceAccounts_CreateToken_Handler,
+			MethodName: "CreateOIDCToken",
+			Handler:    _ServiceAccounts_CreateOIDCToken_Handler,
+		},
+		{
+			MethodName: "CreateClientCredentialsToken",
+			Handler:    _ServiceAccounts_CreateClientCredentialsToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -24,6 +24,7 @@ type Config {
   asymmetricSigningKeyRotationPeriodDays: Int!
   asymmetricSigningKeyDecommissionPeriodDays: Int!
   disableSensitiveVariableFeature: Boolean!
+  serviceAccountClientSecretMaxExpirationDays: Int!
   emailFooter: String
   objectStorePluginType: String!
   rateLimitStorePluginType: String!

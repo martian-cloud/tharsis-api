@@ -14,7 +14,7 @@ import { ServiceAccountListFragment_serviceAccounts$key } from './__generated__/
 import { ServiceAccountListPaginationQuery } from './__generated__/ServiceAccountListPaginationQuery.graphql';
 import { ServiceAccountListQuery } from './__generated__/ServiceAccountListQuery.graphql';
 
-const DESCRIPTION = 'Service accounts provide access to the Tharsis API using a token from an OpenID Connect-compatible identity provider';
+const DESCRIPTION = 'Service accounts provide access to the Tharsis API using a token from an OpenID Connect-compatible identity provider or Client credentials.';
 const INITIAL_ITEM_COUNT = 100;
 
 const query = graphql`

@@ -3,6 +3,7 @@ import { createContext } from 'react';
 export interface ApiConfig {
     tharsisSupportUrl: string;
     serviceDiscoveryHost: string;
+    serviceAccountClientSecretMaxExpirationDays: number;
 }
 
 // ApiConfig will never be null so it's safe to use an empty object as the default value here

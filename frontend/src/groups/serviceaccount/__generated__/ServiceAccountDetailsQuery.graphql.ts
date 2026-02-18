@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a274bfa456f172f591ce982ce5699590>>
+ * @generated SignedSource<<7a6bfaa1ff7373c42c4a6d4bf6c2fd14>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,8 @@ export type ServiceAccountDetailsQuery$variables = {
 };
 export type ServiceAccountDetailsQuery$data = {
   readonly serviceAccount: {
+    readonly clientCredentialsEnabled: boolean;
+    readonly clientSecretExpiresAt: any | null | undefined;
     readonly createdBy: string;
     readonly description: string;
     readonly id: string;
@@ -126,6 +128,20 @@ v2 = [
       {
         "alias": null,
         "args": null,
+        "kind": "ScalarField",
+        "name": "clientCredentialsEnabled",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "clientSecretExpiresAt",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
         "concreteType": "OIDCTrustPolicy",
         "kind": "LinkedField",
         "name": "oidcTrustPolicies",
@@ -189,16 +205,16 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "36dce8f7ac229170882293aa5ddb832f",
+    "cacheID": "1d72781063c2d6ded9a67eee379e1567",
     "id": null,
     "metadata": {},
     "name": "ServiceAccountDetailsQuery",
     "operationKind": "query",
-    "text": "query ServiceAccountDetailsQuery(\n  $id: String!\n) {\n  serviceAccount(id: $id) {\n    metadata {\n      createdAt\n      trn\n    }\n    id\n    name\n    description\n    resourcePath\n    createdBy\n    oidcTrustPolicies {\n      issuer\n      boundClaimsType\n      boundClaims {\n        name\n        value\n      }\n    }\n  }\n}\n"
+    "text": "query ServiceAccountDetailsQuery(\n  $id: String!\n) {\n  serviceAccount(id: $id) {\n    metadata {\n      createdAt\n      trn\n    }\n    id\n    name\n    description\n    resourcePath\n    createdBy\n    clientCredentialsEnabled\n    clientSecretExpiresAt\n    oidcTrustPolicies {\n      issuer\n      boundClaimsType\n      boundClaims {\n        name\n        value\n      }\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "e80eb2d11d1fa9348a5c99e01d3cbf3b";
+(node as any).hash = "c891a6fdce90b01c0b5fc37184fb4356";
 
 export default node;

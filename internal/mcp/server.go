@@ -10,6 +10,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/mcp/tools"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/mcp"
 )
 
@@ -18,19 +19,23 @@ type ServerOptions struct {
 	ServicesCatalog *services.Catalog
 	Config          *config.MCPServerConfig
 	HTTPClient      *http.Client
+	Logger          logger.Logger
 	Version         string
 }
 
-// NewSSEHandler creates a new MCP server with the provided options and returns an SSE HTTP handler.
-func NewSSEHandler(opts *ServerOptions) (http.Handler, error) {
+// NewStreamableHTTPHandler creates a new MCP server with Streamable HTTP transport.
+func NewStreamableHTTPHandler(opts *ServerOptions) (http.Handler, error) {
 	server, err := newServer(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return mcpsdk.NewSSEHandler(func(_ *http.Request) *mcpsdk.Server {
+	return mcpsdk.NewStreamableHTTPHandler(func(_ *http.Request) *mcpsdk.Server {
 		return server
-	}, nil), nil
+	}, &mcpsdk.StreamableHTTPOptions{
+		// Stateless mode allows the server to run across multiple instances without shared session storage.
+		Stateless: true,
+	}), nil
 }
 
 func newServer(opts *ServerOptions) (*mcpsdk.Server, error) {
@@ -50,6 +55,7 @@ func newServer(opts *ServerOptions) (*mcpsdk.Server, error) {
 		Name:            "tharsis-api",
 		Title:           "Tharsis API MCP Server",
 		Version:         opts.Version,
+		Logger:          opts.Logger.Slog(),
 		Instructions:    mcp.DefaultInstructions(),
 		EnabledToolsets: enabledToolsets,
 		EnabledTools:    opts.Config.EnabledTools,

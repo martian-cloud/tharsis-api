@@ -23,6 +23,8 @@ type GetUsersToNotifyInput struct {
 type NotificationManager interface {
 	// GetUsersToNotify returns the list of users to notify for a given namespace path
 	GetUsersToNotify(ctx context.Context, input *GetUsersToNotifyInput) ([]string, error)
+	// GetNamespaceMembersWithRole returns user IDs of members with the specified role in the namespace hierarchy
+	GetNamespaceMembersWithRole(ctx context.Context, namespacePath string, roleID string) ([]string, error)
 }
 
 type notificationManager struct {
@@ -99,4 +101,25 @@ func (n *notificationManager) GetUsersToNotify(ctx context.Context, input *GetUs
 	}
 
 	return filteredUsersIDs, nil
+}
+
+func (n *notificationManager) GetNamespaceMembersWithRole(ctx context.Context, namespacePath string, roleID string) ([]string, error) {
+	membershipsResponse, err := n.dbClient.NamespaceMemberships.GetNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
+		Filter: &db.NamespaceMembershipFilter{
+			NamespacePaths: utils.ExpandPath(namespacePath),
+			RoleID:         &roleID,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get memberships for namespace %s", namespacePath)
+	}
+
+	userIDs := []string{}
+	for _, membership := range membershipsResponse.NamespaceMemberships {
+		if membership.UserID != nil {
+			userIDs = append(userIDs, *membership.UserID)
+		}
+	}
+
+	return userIDs, nil
 }

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f3f28c4a884a5747a6d2879d352633ee>>
+ * @generated SignedSource<<b6d67c9dcdfdd99d7b6d2698cb40dc47>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,7 +13,9 @@ export type BoundClaimsType = "GLOB" | "STRING" | "%future added value";
 export type ProblemType = "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "%future added value";
 export type UpdateServiceAccountInput = {
   clientMutationId?: string | null | undefined;
+  clientSecretExpiresAt?: any | null | undefined;
   description: string;
+  enableClientCredentials?: boolean | null | undefined;
   id: string;
   metadata?: ResourceMetadataInput | null | undefined;
   oidcTrustPolicies: ReadonlyArray<OIDCTrustPolicyInput>;
@@ -35,12 +37,15 @@ export type EditServiceAccountMutation$variables = {
 };
 export type EditServiceAccountMutation$data = {
   readonly updateServiceAccount: {
+    readonly clientSecret: string | null | undefined;
     readonly problems: ReadonlyArray<{
       readonly field: ReadonlyArray<string> | null | undefined;
       readonly message: string;
       readonly type: ProblemType;
     }>;
     readonly serviceAccount: {
+      readonly clientCredentialsEnabled: boolean;
+      readonly clientSecretExpiresAt: any | null | undefined;
       readonly createdBy: string;
       readonly description: string;
       readonly id: string;
@@ -132,6 +137,20 @@ v2 = [
           {
             "alias": null,
             "args": null,
+            "kind": "ScalarField",
+            "name": "clientCredentialsEnabled",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "clientSecretExpiresAt",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
             "concreteType": "OIDCTrustPolicy",
             "kind": "LinkedField",
             "name": "oidcTrustPolicies",
@@ -174,6 +193,13 @@ v2 = [
             "storageKey": null
           }
         ],
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "clientSecret",
         "storageKey": null
       },
       {
@@ -230,16 +256,16 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "41a4364c62c60a138fcf9a5d48d384e5",
+    "cacheID": "7c62df6bfefc7e63066a2959adc4d6c4",
     "id": null,
     "metadata": {},
     "name": "EditServiceAccountMutation",
     "operationKind": "mutation",
-    "text": "mutation EditServiceAccountMutation(\n  $input: UpdateServiceAccountInput!\n) {\n  updateServiceAccount(input: $input) {\n    serviceAccount {\n      id\n      name\n      description\n      resourcePath\n      createdBy\n      oidcTrustPolicies {\n        issuer\n        boundClaimsType\n        boundClaims {\n          name\n          value\n        }\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
+    "text": "mutation EditServiceAccountMutation(\n  $input: UpdateServiceAccountInput!\n) {\n  updateServiceAccount(input: $input) {\n    serviceAccount {\n      id\n      name\n      description\n      resourcePath\n      createdBy\n      clientCredentialsEnabled\n      clientSecretExpiresAt\n      oidcTrustPolicies {\n        issuer\n        boundClaimsType\n        boundClaims {\n          name\n          value\n        }\n      }\n    }\n    clientSecret\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "2c880a93739bfb39d09f38f6d58cda91";
+(node as any).hash = "797d649bc9b2e1aececa71eb54d35b5d";
 
 export default node;

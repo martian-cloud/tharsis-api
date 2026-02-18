@@ -188,6 +188,20 @@ func (r *ServiceAccountResolver) CreatedBy() string {
 	return r.serviceAccount.CreatedBy
 }
 
+// ClientCredentialsEnabled resolver
+func (r *ServiceAccountResolver) ClientCredentialsEnabled() bool {
+	return r.serviceAccount.ClientCredentialsEnabled()
+}
+
+// ClientSecretExpiresAt resolver
+func (r *ServiceAccountResolver) ClientSecretExpiresAt() *graphql.Time {
+	if r.serviceAccount.ClientSecretExpiresAt == nil {
+		return nil
+	}
+
+	return &graphql.Time{Time: *r.serviceAccount.ClientSecretExpiresAt}
+}
+
 // NamespaceMemberships resolver
 func (r *ServiceAccountResolver) NamespaceMemberships(ctx context.Context,
 	args *ConnectionQueryArgs,
@@ -270,6 +284,7 @@ func serviceAccountQuery(ctx context.Context, args *ServiceAccountQueryArgs) (*S
 type ServiceAccountMutationPayload struct {
 	ClientMutationID *string
 	ServiceAccount   *models.ServiceAccount
+	ClientSecret     *string
 	Problems         []Problem
 }
 
@@ -286,23 +301,32 @@ func (r *ServiceAccountMutationPayloadResolver) ServiceAccount() *ServiceAccount
 	return &ServiceAccountResolver{serviceAccount: r.ServiceAccountMutationPayload.ServiceAccount}
 }
 
+// ClientSecret field resolver
+func (r *ServiceAccountMutationPayloadResolver) ClientSecret() *string {
+	return r.ServiceAccountMutationPayload.ClientSecret
+}
+
 // CreateServiceAccountInput contains the input for creating a new serviceAccount
 type CreateServiceAccountInput struct {
-	ClientMutationID  *string
-	Name              string
-	Description       string
-	GroupID           *string
-	GroupPath         *string // DEPRECATED: use groupID instead with a TRN
-	OIDCTrustPolicies []OIDCTrustPolicy
+	ClientMutationID        *string
+	Name                    string
+	Description             string
+	GroupID                 *string
+	GroupPath               *string // DEPRECATED: use groupID instead with a TRN
+	ClientSecretExpiresAt   *graphql.Time
+	EnableClientCredentials bool
+	OIDCTrustPolicies       []OIDCTrustPolicy
 }
 
 // UpdateServiceAccountInput contains the input for updating a serviceAccount
 type UpdateServiceAccountInput struct {
-	ClientMutationID  *string
-	ID                string
-	Metadata          *MetadataInput
-	Description       string
-	OIDCTrustPolicies []OIDCTrustPolicy
+	ClientMutationID        *string
+	ID                      string
+	Metadata                *MetadataInput
+	Description             string
+	EnableClientCredentials *bool
+	ClientSecretExpiresAt   *graphql.Time
+	OIDCTrustPolicies       []OIDCTrustPolicy
 }
 
 // DeleteServiceAccountInput contains the input for deleting a serviceAccount
@@ -310,6 +334,13 @@ type DeleteServiceAccountInput struct {
 	ClientMutationID *string
 	Metadata         *MetadataInput
 	ID               string
+}
+
+// ResetServiceAccountClientCredentialsInput contains the input for resetting client credentials
+type ResetServiceAccountClientCredentialsInput struct {
+	ClientMutationID      *string
+	ID                    string
+	ClientSecretExpiresAt *graphql.Time
 }
 
 func handleServiceAccountMutationProblem(e error, clientMutationID *string) (*ServiceAccountMutationPayloadResolver, error) {
@@ -333,19 +364,30 @@ func createServiceAccountMutation(ctx context.Context, input *CreateServiceAccou
 		return nil, err
 	}
 
-	serviceAccountCreateOptions := models.ServiceAccount{
-		Name:              input.Name,
-		Description:       input.Description,
-		GroupID:           groupID,
-		OIDCTrustPolicies: oidcTrustPolicies,
+	createInput := &serviceaccount.CreateServiceAccountInput{
+		Name:                    input.Name,
+		Description:             input.Description,
+		GroupID:                 groupID,
+		OIDCTrustPolicies:       oidcTrustPolicies,
+		EnableClientCredentials: input.EnableClientCredentials,
 	}
 
-	createdServiceAccount, err := getServiceCatalog(ctx).ServiceAccountService.CreateServiceAccount(ctx, &serviceAccountCreateOptions)
+	if input.ClientSecretExpiresAt != nil {
+		createInput.ClientSecretExpiresAt = &input.ClientSecretExpiresAt.Time
+	}
+
+	response, err := getServiceCatalog(ctx).ServiceAccountService.CreateServiceAccount(ctx, createInput)
 	if err != nil {
 		return nil, err
 	}
 
-	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: createdServiceAccount, Problems: []Problem{}}
+	payload := ServiceAccountMutationPayload{
+		ClientMutationID: input.ClientMutationID,
+		ServiceAccount:   response.ServiceAccount,
+		ClientSecret:     response.ClientSecret,
+		Problems:         []Problem{},
+	}
+
 	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
 }
 
@@ -357,34 +399,43 @@ func updateServiceAccountMutation(ctx context.Context, input *UpdateServiceAccou
 		return nil, err
 	}
 
-	serviceAccount, err := serviceCatalog.ServiceAccountService.GetServiceAccountByID(ctx, id)
+	oidcTrustPolicies, err := convertOIDCTrustPolicies(input.OIDCTrustPolicies)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if resource version is specified
+	updateInput := &serviceaccount.UpdateServiceAccountInput{
+		ID:                      id,
+		Description:             &input.Description,
+		OIDCTrustPolicies:       oidcTrustPolicies,
+		EnableClientCredentials: input.EnableClientCredentials,
+	}
+
+	if input.ClientSecretExpiresAt != nil {
+		updateInput.ClientSecretExpiresAt = &input.ClientSecretExpiresAt.Time
+	}
+
 	if input.Metadata != nil {
 		v, cErr := strconv.Atoi(input.Metadata.Version)
 		if cErr != nil {
 			return nil, cErr
 		}
 
-		serviceAccount.Metadata.Version = v
+		updateInput.MetadataVersion = &v
 	}
 
-	// Update fields
-	serviceAccount.Description = input.Description
-	serviceAccount.OIDCTrustPolicies, err = convertOIDCTrustPolicies(input.OIDCTrustPolicies)
+	response, err := serviceCatalog.ServiceAccountService.UpdateServiceAccount(ctx, updateInput)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceAccount, err = serviceCatalog.ServiceAccountService.UpdateServiceAccount(ctx, serviceAccount)
-	if err != nil {
-		return nil, err
+	payload := ServiceAccountMutationPayload{
+		ClientMutationID: input.ClientMutationID,
+		ServiceAccount:   response.ServiceAccount,
+		ClientSecret:     response.ClientSecret,
+		Problems:         []Problem{},
 	}
 
-	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: serviceAccount, Problems: []Problem{}}
 	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
 }
 
@@ -396,26 +447,59 @@ func deleteServiceAccountMutation(ctx context.Context, input *DeleteServiceAccou
 		return nil, err
 	}
 
+	// Get service account first to return in response
 	serviceAccount, err := serviceCatalog.ServiceAccountService.GetServiceAccountByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if resource version is specified
+	deleteInput := &serviceaccount.DeleteServiceAccountInput{ID: id}
+
 	if input.Metadata != nil {
 		v, err := strconv.Atoi(input.Metadata.Version)
 		if err != nil {
 			return nil, err
 		}
 
-		serviceAccount.Metadata.Version = v
+		deleteInput.MetadataVersion = &v
 	}
 
-	if err := serviceCatalog.ServiceAccountService.DeleteServiceAccount(ctx, serviceAccount); err != nil {
+	if err := serviceCatalog.ServiceAccountService.DeleteServiceAccount(ctx, deleteInput); err != nil {
 		return nil, err
 	}
 
 	payload := ServiceAccountMutationPayload{ClientMutationID: input.ClientMutationID, ServiceAccount: serviceAccount, Problems: []Problem{}}
+	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
+}
+
+func resetServiceAccountClientCredentialsMutation(ctx context.Context, input *ResetServiceAccountClientCredentialsInput) (*ServiceAccountMutationPayloadResolver, error) {
+	serviceCatalog := getServiceCatalog(ctx)
+
+	id, err := serviceCatalog.FetchModelID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	resetInput := &serviceaccount.ResetClientCredentialsInput{
+		ID: id,
+	}
+
+	if input.ClientSecretExpiresAt != nil {
+		resetInput.ClientSecretExpiresAt = &input.ClientSecretExpiresAt.Time
+	}
+
+	response, err := serviceCatalog.ServiceAccountService.ResetClientCredentials(ctx, resetInput)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := ServiceAccountMutationPayload{
+		ClientMutationID: input.ClientMutationID,
+		ServiceAccount:   response.ServiceAccount,
+		ClientSecret:     response.ClientSecret,
+		Problems:         []Problem{},
+	}
+
 	return &ServiceAccountMutationPayloadResolver{ServiceAccountMutationPayload: payload}, nil
 }
 
@@ -525,7 +609,7 @@ func serviceAccountCreateTokenMutation(ctx context.Context,
 		return nil, errors.New("either serviceAccountID or serviceAccountPath must be specified", errors.WithErrorCode(errors.EInvalid))
 	}
 
-	resp, err := getServiceCatalog(ctx).ServiceAccountService.CreateToken(ctx, &serviceaccount.CreateTokenInput{
+	resp, err := getServiceCatalog(ctx).ServiceAccountService.CreateOIDCToken(ctx, &serviceaccount.CreateOIDCTokenInput{
 		ServiceAccountPublicID: serviceAccountValue,
 		Token:                  []byte(input.Token),
 	})
