@@ -57,6 +57,9 @@ terraform {
 
 	// Ephemeral input minimum version
 	ephemeralInputCapabilityMinimumTerraformVersion = "1.11"
+
+	// sslCertFileEnvVar is the environment variable for specifying a custom CA certificate file
+	sslCertFileEnvVar = "SSL_CERT_FILE"
 )
 
 type capabilities struct {
@@ -336,12 +339,25 @@ func (t *terraformWorkspace) init(ctx context.Context) (*tfexec.Terraform, error
 			t.jobLogger.Infof("Provider mirror enabled, external registry providers will be cached automatically")
 			mirrorURL = ptr.String(proxy.url())
 
-			// Write CA cert for Terraform to trust the local proxy
-			caCertPath, cErr := t.writeCACert(proxy.caCert())
+			// Write CA cert for Terraform to trust the local proxy's self-signed certificate.
+			// We only set SSL_CERT_FILE (not SSL_CERT_DIR) because Go loads certs from both
+			// the file and default system directories. This allows Terraform to verify both
+			// the proxy cert and public TLS certs. Setting SSL_CERT_DIR would override the
+			// default directories and break verification of public certs.
+			proxyCACertFile, cErr := t.writeCACert(proxy.caCert())
 			if cErr != nil {
 				return nil, fmt.Errorf("failed to write CA cert: %v", cErr)
 			}
-			t.fullEnv["SSL_CERT_FILE"] = caCertPath
+
+			t.fullEnv[sslCertFileEnvVar] = proxyCACertFile
+
+			defer func() {
+				// Remove after init so curl/other tools use system certs during plan/apply
+				delete(t.fullEnv, sslCertFileEnvVar)
+				if err := tf.SetEnv(tfexec.CleanEnv(t.fullEnv)); err != nil {
+					t.jobLogger.Errorf("Failed to remove %s from environment: %v", sslCertFileEnvVar, err)
+				}
+			}()
 		}
 	}
 
