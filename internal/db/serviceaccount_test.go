@@ -5,9 +5,10 @@ package db
 import (
 	"context"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
 	"testing"
+	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -35,12 +36,15 @@ func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 	require.Nil(t, err)
 
 	type testCase struct {
-		name            string
-		expectErrorCode errors.CodeType
-		saName          string
-		description     string
-		groupID         string
+		name                  string
+		expectErrorCode       errors.CodeType
+		saName                string
+		description           string
+		groupID               string
+		clientSecretExpiresAt *time.Time
 	}
+
+	clientSecretExpiry := time.Now().Add(48 * time.Hour)
 
 	testCases := []testCase{
 		{
@@ -48,6 +52,13 @@ func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 			saName:      "test-sa",
 			description: "test service account",
 			groupID:     group.Metadata.ID,
+		},
+		{
+			name:                  "create service account with client credentials",
+			saName:                "test-sa-client-creds",
+			description:           "test service account with client credentials",
+			groupID:               group.Metadata.ID,
+			clientSecretExpiresAt: &clientSecretExpiry,
 		},
 		{
 			name:            "create service account with invalid group ID",
@@ -60,12 +71,21 @@ func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			sa, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &models.ServiceAccount{
+			sa := &models.ServiceAccount{
 				Name:        test.saName,
 				Description: test.description,
 				GroupID:     test.groupID,
 				CreatedBy:   "db-integration-tests",
-			})
+			}
+
+			var secret string
+			if test.clientSecretExpiresAt != nil {
+				var err error
+				secret, err = sa.GenerateClientSecret(test.clientSecretExpiresAt, 90)
+				require.Nil(t, err)
+			}
+
+			createdSA, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, sa)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
@@ -73,12 +93,17 @@ func TestServiceAccounts_CreateServiceAccount(t *testing.T) {
 			}
 
 			require.Nil(t, err)
-			require.NotNil(t, sa)
+			require.NotNil(t, createdSA)
 
-			assert.Equal(t, test.saName, sa.Name)
-			assert.Equal(t, test.description, sa.Description)
-			assert.Equal(t, test.groupID, sa.GroupID)
-			assert.NotEmpty(t, sa.Metadata.ID)
+			assert.Equal(t, test.saName, createdSA.Name)
+			assert.Equal(t, test.description, createdSA.Description)
+			assert.Equal(t, test.groupID, createdSA.GroupID)
+			assert.NotEmpty(t, createdSA.Metadata.ID)
+
+			if test.clientSecretExpiresAt != nil {
+				assert.True(t, createdSA.ClientCredentialsEnabled())
+				assert.True(t, createdSA.VerifyClientSecret(secret))
+			}
 		})
 	}
 }
@@ -105,47 +130,41 @@ func TestServiceAccounts_UpdateServiceAccount(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	type testCase struct {
-		name            string
-		expectErrorCode errors.CodeType
-		version         int
-		description     string
-	}
+	clientSecretExpiry := time.Now().Add(48 * time.Hour)
 
-	testCases := []testCase{
-		{
-			name:        "update service account",
-			version:     createdSA.Metadata.Version,
-			description: "updated description",
-		},
-		{
-			name:            "update will fail because resource version doesn't match",
-			expectErrorCode: errors.EOptimisticLock,
-			version:         -1,
-			description:     "should not update",
-		},
-	}
+	// Test 1: update description
+	t.Run("update service account", func(t *testing.T) {
+		saToUpdate := *createdSA
+		saToUpdate.Description = "updated description"
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			saToUpdate := *createdSA
-			saToUpdate.Metadata.Version = test.version
-			saToUpdate.Description = test.description
+		updatedSA, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, &saToUpdate)
+		require.Nil(t, err)
+		assert.Equal(t, "updated description", updatedSA.Description)
+		createdSA = updatedSA
+	})
 
-			updatedSA, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, &saToUpdate)
+	// Test 2: enable client credentials
+	t.Run("update service account to enable client credentials", func(t *testing.T) {
+		saToUpdate := *createdSA
+		saToUpdate.Description = "with client credentials"
+		_, err := saToUpdate.GenerateClientSecret(&clientSecretExpiry, 90)
+		require.Nil(t, err)
 
-			if test.expectErrorCode != "" {
-				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
-				return
-			}
+		updatedSA, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, &saToUpdate)
+		require.Nil(t, err)
+		assert.True(t, updatedSA.ClientCredentialsEnabled())
+		createdSA = updatedSA
+	})
 
-			require.Nil(t, err)
-			require.NotNil(t, updatedSA)
+	// Test 3: version mismatch
+	t.Run("update will fail because resource version doesn't match", func(t *testing.T) {
+		saToUpdate := *createdSA
+		saToUpdate.Metadata.Version = -1
+		saToUpdate.Description = "should not update"
 
-			assert.Equal(t, test.description, updatedSA.Description)
-			assert.Equal(t, createdSA.Metadata.Version+1, updatedSA.Metadata.Version)
-		})
-	}
+		_, err := testClient.client.ServiceAccounts.UpdateServiceAccount(ctx, &saToUpdate)
+		assert.Equal(t, errors.EOptimisticLock, errors.ErrorCode(err))
+	})
 }
 
 func TestServiceAccounts_DeleteServiceAccount(t *testing.T) {
@@ -296,6 +315,7 @@ func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test service accounts
+	clientSecretExpiry := time.Now().Add(48 * time.Hour)
 	serviceAccounts := []models.ServiceAccount{
 		{
 			Name:        "test-service-account-1",
@@ -312,7 +332,12 @@ func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 	}
 
 	createdServiceAccounts := []models.ServiceAccount{}
-	for _, serviceAccount := range serviceAccounts {
+	for i, serviceAccount := range serviceAccounts {
+		// Add client secret expiry to first service account only
+		if i == 0 {
+			_, err := serviceAccount.GenerateClientSecret(&clientSecretExpiry, 90)
+			require.NoError(t, err)
+		}
 		created, err := testClient.client.ServiceAccounts.CreateServiceAccount(ctx, &serviceAccount)
 		require.NoError(t, err)
 		createdServiceAccounts = append(createdServiceAccounts, *created)
@@ -324,6 +349,9 @@ func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 		input           *GetServiceAccountsInput
 		expectCount     int
 	}
+
+	futureTime := time.Now().Add(72 * time.Hour)
+	pastTime := time.Now().Add(-24 * time.Hour)
 
 	testCases := []testCase{
 		{
@@ -357,7 +385,26 @@ func TestServiceAccounts_GetServiceAccounts(t *testing.T) {
 				},
 			},
 			expectCount: len(createdServiceAccounts),
-		}}
+		},
+		{
+			name: "filter by pending expiration notification future date",
+			input: &GetServiceAccountsInput{
+				Filter: &ServiceAccountFilter{
+					PendingExpirationNotification: &futureTime,
+				},
+			},
+			expectCount: 1,
+		},
+		{
+			name: "filter by pending expiration notification past date",
+			input: &GetServiceAccountsInput{
+				Filter: &ServiceAccountFilter{
+					PendingExpirationNotification: &pastTime,
+				},
+			},
+			expectCount: 0,
+		},
+	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {

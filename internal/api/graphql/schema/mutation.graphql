@@ -59,6 +59,9 @@ type Mutation {
   deleteServiceAccount(
     input: DeleteServiceAccountInput!
   ): DeleteServiceAccountPayload!
+  resetServiceAccountClientCredentials(
+    input: ResetServiceAccountClientCredentialsInput!
+  ): ResetServiceAccountClientCredentialsPayload!
   serviceAccountCreateToken(
     input: ServiceAccountCreateTokenInput!
   ): ServiceAccountCreateTokenPayload!
@@ -240,6 +243,10 @@ type Mutation {
   deleteAnnouncement(
     input: DeleteAnnouncementInput!
   ): DeleteAnnouncementPayload!
-  favoriteNamespace(input: NamespaceFavoriteInput!): NamespaceFavoriteMutationPayload!
-  unfavoriteNamespace(input: NamespaceFavoriteInput!): NamespaceUnfavoriteMutationPayload!
+  favoriteNamespace(
+    input: NamespaceFavoriteInput!
+  ): NamespaceFavoriteMutationPayload!
+  unfavoriteNamespace(
+    input: NamespaceFavoriteInput!
+  ): NamespaceUnfavoriteMutationPayload!
 }

@@ -91,7 +91,11 @@ func New(ctx context.Context, logger logger.Logger, pluginData map[string]string
 		awsCfg.Credentials = credentials.NewStaticCredentialsProvider(accessKeyID, secretKey, "")
 	}
 
-	client := s3.NewFromConfig(awsCfg)
+	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		// Suppress log warnings about checksum validation being skipped for GetObject responses.
+		// S3 doesn't always return checksums for all objects, and these warnings add noise without actionable value.
+		o.DisableLogOutputChecksumValidationSkipped = true
+	})
 	uploader := manager.NewUploader(client)
 	downloader := manager.NewDownloader(client)
 

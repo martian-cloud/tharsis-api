@@ -24,6 +24,7 @@ const query = graphql`
         config {
             tharsisSupportUrl
             serviceDiscoveryHost
+            serviceAccountClientSecretMaxExpirationDays
         }
         ...AppHeaderFragment
     }

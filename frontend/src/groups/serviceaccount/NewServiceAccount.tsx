@@ -3,14 +3,13 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
-import { nanoid } from 'nanoid';
 import { useState } from 'react';
 import { useFragment, useMutation } from "react-relay/hooks";
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { MutationError } from '../../common/error';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
+import ClientCredentialsDialog from './ClientCredentialsDialog';
 import ServiceAccountForm, { FormData } from './ServiceAccountForm';
-import { GetConnections } from './ServiceAccountList';
 import { NewServiceAccountFragment_group$key } from './__generated__/NewServiceAccountFragment_group.graphql';
 import { NewServiceAccountMutation } from './__generated__/NewServiceAccountMutation.graphql';
 
@@ -33,15 +32,20 @@ function NewServiceAccount(props: Props) {
     );
 
     const [commit, isInFlight] = useMutation<NewServiceAccountMutation>(graphql`
-        mutation NewServiceAccountMutation($input: CreateServiceAccountInput!, $connections: [ID!]!) {
+        mutation NewServiceAccountMutation($input: CreateServiceAccountInput!) {
             createServiceAccount(input: $input) {
-                # Use @prependNode to add the node to the connection
-                serviceAccount  @prependNode(connections: $connections, edgeTypeName: "ServiceAccountEdge")  {
+                serviceAccount {
                     id
+                    metadata {
+                        updatedAt
+                    }
                     name
                     description
                     resourcePath
+                    groupPath
                     createdBy
+                    clientCredentialsEnabled
+                    clientSecretExpiresAt
                     oidcTrustPolicies {
                         issuer
                         boundClaimsType
@@ -51,6 +55,7 @@ function NewServiceAccount(props: Props) {
                         }
                     }
                 }
+                clientSecret
                 problems {
                     message
                     field
@@ -61,10 +66,12 @@ function NewServiceAccount(props: Props) {
     `);
 
     const [error, setError] = useState<MutationError>()
+    const [clientCredentials, setClientCredentials] = useState<{ clientId: string; clientSecret: string; expiresAt: string } | null>(null);
     const [formData, setFormData] = useState<FormData>({
         name: '',
         description: '',
-        oidcTrustPolicies: [{ _id: nanoid(), issuer: '', boundClaimsType: 'STRING', boundClaims: [] }]
+        oidcTrustPolicies: [],
+        enableClientCredentials: false
     });
 
     const onSave = () => {
@@ -74,9 +81,10 @@ function NewServiceAccount(props: Props) {
                     groupPath: group.fullPath,
                     name: formData.name,
                     description: formData.description,
-                    oidcTrustPolicies: formData.oidcTrustPolicies
-                },
-                connections: GetConnections(group.id)
+                    oidcTrustPolicies: formData.oidcTrustPolicies,
+                    enableClientCredentials: formData.enableClientCredentials,
+                    clientSecretExpiresAt: formData.enableClientCredentials ? formData.clientSecretExpiresAt?.toISOString() : undefined
+                }
             },
             onCompleted: data => {
                 if (data.createServiceAccount.problems.length) {
@@ -90,7 +98,15 @@ function NewServiceAccount(props: Props) {
                         message: "Unexpected error occurred"
                     });
                 } else {
-                    navigate(`../${data.createServiceAccount.serviceAccount.id}`);
+                    if (data.createServiceAccount.serviceAccount.clientCredentialsEnabled) {
+                        setClientCredentials({
+                            clientId: data.createServiceAccount.serviceAccount.id,
+                            clientSecret: data.createServiceAccount.clientSecret!,
+                            expiresAt: data.createServiceAccount.serviceAccount.clientSecretExpiresAt
+                        });
+                    } else {
+                        navigate(`../${data.createServiceAccount.serviceAccount.id}`);
+                    }
                 }
             },
             onError: error => {
@@ -100,6 +116,12 @@ function NewServiceAccount(props: Props) {
                 });
             }
         });
+    };
+
+    const onCredentialsDialogClose = () => {
+        const id = clientCredentials?.clientId;
+        setClientCredentials(null);
+        navigate(`../${id}`);
     };
 
     return (
@@ -114,21 +136,29 @@ function NewServiceAccount(props: Props) {
             <Typography variant="h5">New Service Account</Typography>
             <ServiceAccountForm
                 data={formData}
-                onChange={(data: FormData) => setFormData(data)}
+                onChange={setFormData}
                 error={error}
             />
-            <Divider sx={{ opacity: 0.6 }} />
+            <Divider sx={{ marginTop: 4 }} />
             <Box marginTop={2}>
                 <Button
                     loading={isInFlight}
                     variant="outlined"
                     color="primary"
                     sx={{ marginRight: 2 }}
-                    onClick={onSave}>
+                    onClick={onSave}
+                >
                     Create Service Account
                 </Button>
                 <Button component={RouterLink} color="inherit" to={-1 as any}>Cancel</Button>
             </Box>
+            {clientCredentials && (
+                <ClientCredentialsDialog
+                    clientId={clientCredentials.clientId}
+                    clientSecret={clientCredentials.clientSecret}
+                    onClose={onCredentialsDialogClose}
+                />
+            )}
         </Box>
     );
 }

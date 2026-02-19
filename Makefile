@@ -32,6 +32,8 @@ build-runner:  ## build the binaries
 # Code quality targets
 .PHONY: lint
 lint: ## run linting on Go and UI code
+	@echo "Checking go.mod..."
+	@go mod tidy -diff > /dev/null
 	@echo "Linting Go code..."
 	@revive -set_exit_status $(PACKAGES)
 	@echo "Checking Go formatting..."

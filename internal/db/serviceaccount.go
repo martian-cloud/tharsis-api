@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -77,10 +78,11 @@ func (sf ServiceAccountSortableField) getTransformFunc() pagination.SortTransfor
 
 // ServiceAccountFilter contains the supported fields for filtering ServiceAccount resources
 type ServiceAccountFilter struct {
-	Search            *string
-	RunnerID          *string
-	ServiceAccountIDs []string
-	NamespacePaths    []string
+	Search                        *string
+	RunnerID                      *string
+	ServiceAccountIDs             []string
+	NamespacePaths                []string
+	PendingExpirationNotification *time.Time
 }
 
 // oidcTrustPolicyDBType is the type used to store the trust policies in the DB table
@@ -110,7 +112,7 @@ type serviceAccounts struct {
 	dbClient *Client
 }
 
-var serviceAccountFieldList = append(metadataFieldList, "name", "description", "group_id", "created_by", "oidc_trust_policies")
+var serviceAccountFieldList = append(metadataFieldList, "name", "description", "group_id", "created_by", "oidc_trust_policies", "client_secret_hash", "client_secret_expires_at", "secret_expiration_email_sent_at")
 
 // NewServiceAccounts returns an instance of the ServiceAccount interface
 func NewServiceAccounts(dbClient *Client) ServiceAccounts {
@@ -170,6 +172,12 @@ func (s *serviceAccounts) GetServiceAccounts(ctx context.Context, input *GetServ
 
 		if input.Filter.RunnerID != nil {
 			ex = ex.Append(goqu.I("service_account_runner_relation.runner_id").In(*input.Filter.RunnerID))
+		}
+
+		if input.Filter.PendingExpirationNotification != nil {
+			ex = ex.Append(goqu.I("service_accounts.client_secret_expires_at").Lte(*input.Filter.PendingExpirationNotification))
+			ex = ex.Append(goqu.I("service_accounts.client_secret_expires_at").IsNotNull())
+			ex = ex.Append(goqu.I("service_accounts.secret_expiration_email_sent_at").IsNull())
 		}
 
 		if input.Filter.Search != nil {
@@ -298,15 +306,18 @@ func (s *serviceAccounts) CreateServiceAccount(ctx context.Context, serviceAccou
 		With("service_accounts",
 			dialect.Insert("service_accounts").Rows(
 				goqu.Record{
-					"id":                  newResourceID(),
-					"version":             initialResourceVersion,
-					"created_at":          timestamp,
-					"updated_at":          timestamp,
-					"name":                serviceAccount.Name,
-					"description":         serviceAccount.Description,
-					"group_id":            serviceAccount.GroupID,
-					"created_by":          serviceAccount.CreatedBy,
-					"oidc_trust_policies": trustPoliciesJSON,
+					"id":                              newResourceID(),
+					"version":                         initialResourceVersion,
+					"created_at":                      timestamp,
+					"updated_at":                      timestamp,
+					"name":                            serviceAccount.Name,
+					"description":                     serviceAccount.Description,
+					"group_id":                        serviceAccount.GroupID,
+					"created_by":                      serviceAccount.CreatedBy,
+					"oidc_trust_policies":             trustPoliciesJSON,
+					"client_secret_hash":              serviceAccount.ClientSecretHash,
+					"client_secret_expires_at":        serviceAccount.ClientSecretExpiresAt,
+					"secret_expiration_email_sent_at": serviceAccount.SecretExpirationEmailSentAt,
 				}).Returning("*"),
 		).Select(s.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"service_accounts.group_id": goqu.I("namespaces.group_id")})).
@@ -359,10 +370,13 @@ func (s *serviceAccounts) UpdateServiceAccount(ctx context.Context, serviceAccou
 			dialect.Update("service_accounts").
 				Set(
 					goqu.Record{
-						"version":             goqu.L("? + ?", goqu.C("version"), 1),
-						"updated_at":          timestamp,
-						"description":         serviceAccount.Description,
-						"oidc_trust_policies": trustPoliciesJSON,
+						"version":                         goqu.L("? + ?", goqu.C("version"), 1),
+						"updated_at":                      timestamp,
+						"description":                     serviceAccount.Description,
+						"oidc_trust_policies":             trustPoliciesJSON,
+						"client_secret_hash":              serviceAccount.ClientSecretHash,
+						"client_secret_expires_at":        serviceAccount.ClientSecretExpiresAt,
+						"secret_expiration_email_sent_at": serviceAccount.SecretExpirationEmailSentAt,
 					},
 				).Where(goqu.Ex{"id": serviceAccount.Metadata.ID, "version": serviceAccount.Metadata.Version}).
 				Returning("*"),
@@ -563,6 +577,9 @@ func scanServiceAccount(row scanner) (*models.ServiceAccount, error) {
 		&serviceAccount.GroupID,
 		&serviceAccount.CreatedBy,
 		&policies,
+		&serviceAccount.ClientSecretHash,
+		&serviceAccount.ClientSecretExpiresAt,
+		&serviceAccount.SecretExpirationEmailSentAt,
 		&groupPath,
 	}
 

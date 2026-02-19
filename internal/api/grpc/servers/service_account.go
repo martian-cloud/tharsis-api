@@ -5,6 +5,8 @@ import (
 	"context"
 	"strings"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
@@ -14,6 +16,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	pb "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/aws/smithy-go/ptr"
 )
 
 // ServiceAccountServer embeds the UnimplementedServiceAccountsServer.
@@ -106,90 +110,120 @@ func (s *ServiceAccountServer) GetServiceAccounts(ctx context.Context, req *pb.G
 }
 
 // CreateServiceAccount creates a new ServiceAccount.
-func (s *ServiceAccountServer) CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountRequest) (*pb.ServiceAccount, error) {
+func (s *ServiceAccountServer) CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountRequest) (*pb.ServiceAccountResponse, error) {
 	groupID, err := s.serviceCatalog.FetchModelID(ctx, req.GroupId)
 	if err != nil {
 		return nil, err
 	}
 
-	toCreate := &models.ServiceAccount{
-		Name:              req.Name,
-		Description:       req.Description,
-		GroupID:           groupID,
-		OIDCTrustPolicies: fromPBOIDCTrustPolicies(req.OidcTrustPolicies),
+	input := &serviceaccount.CreateServiceAccountInput{
+		Name:                    req.Name,
+		Description:             req.Description,
+		GroupID:                 groupID,
+		OIDCTrustPolicies:       fromPBOIDCTrustPolicies(req.OidcTrustPolicies),
+		EnableClientCredentials: req.EnableClientCredentials,
 	}
 
-	createdServiceAccount, err := s.serviceCatalog.ServiceAccountService.CreateServiceAccount(ctx, toCreate)
+	if req.ClientSecretExpiresAt != nil {
+		input.ClientSecretExpiresAt = ptr.Time(req.ClientSecretExpiresAt.AsTime())
+	}
+
+	response, err := s.serviceCatalog.ServiceAccountService.CreateServiceAccount(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	return toPBServiceAccount(createdServiceAccount), nil
+	return &pb.ServiceAccountResponse{
+		ServiceAccount: toPBServiceAccount(response.ServiceAccount),
+		ClientSecret:   response.ClientSecret,
+	}, nil
 }
 
 // UpdateServiceAccount returns the updated ServiceAccount.
-func (s *ServiceAccountServer) UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountRequest) (*pb.ServiceAccount, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+func (s *ServiceAccountServer) UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountRequest) (*pb.ServiceAccountResponse, error) {
+	id, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceAccount, ok := model.(*models.ServiceAccount)
-	if !ok {
-		return nil, errors.New("service account with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	updateInput := &serviceaccount.UpdateServiceAccountInput{
+		ID:                      id,
+		EnableClientCredentials: req.EnableClientCredentials,
+	}
+
+	if req.ClientSecretExpiresAt != nil {
+		updateInput.ClientSecretExpiresAt = ptr.Time(req.ClientSecretExpiresAt.AsTime())
 	}
 
 	if req.Version != nil {
-		serviceAccount.Metadata.Version = int(*req.Version)
+		v := int(*req.Version)
+		updateInput.MetadataVersion = &v
 	}
 
 	if req.Description != nil {
-		serviceAccount.Description = *req.Description
+		updateInput.Description = req.Description
 	}
 
 	if len(req.OidcTrustPolicies) > 0 {
-		serviceAccount.OIDCTrustPolicies = fromPBOIDCTrustPolicies(req.OidcTrustPolicies)
+		updateInput.OIDCTrustPolicies = fromPBOIDCTrustPolicies(req.OidcTrustPolicies)
 	}
 
-	updatedServiceAccount, err := s.serviceCatalog.ServiceAccountService.UpdateServiceAccount(ctx, serviceAccount)
+	response, err := s.serviceCatalog.ServiceAccountService.UpdateServiceAccount(ctx, updateInput)
 	if err != nil {
 		return nil, err
 	}
 
-	return toPBServiceAccount(updatedServiceAccount), nil
+	return &pb.ServiceAccountResponse{
+		ServiceAccount: toPBServiceAccount(response.ServiceAccount),
+		ClientSecret:   response.ClientSecret,
+	}, nil
 }
 
 // DeleteServiceAccount deletes a ServiceAccount.
 func (s *ServiceAccountServer) DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountRequest) (*emptypb.Empty, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+	id, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceAccount, ok := model.(*models.ServiceAccount)
-	if !ok {
-		return nil, errors.New("service account with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
-	}
+	deleteInput := &serviceaccount.DeleteServiceAccountInput{ID: id}
 
 	if req.Version != nil {
-		serviceAccount.Metadata.Version = int(*req.Version)
+		v := int(*req.Version)
+		deleteInput.MetadataVersion = &v
 	}
 
-	if err := s.serviceCatalog.ServiceAccountService.DeleteServiceAccount(ctx, serviceAccount); err != nil {
+	if err := s.serviceCatalog.ServiceAccountService.DeleteServiceAccount(ctx, deleteInput); err != nil {
 		return nil, err
 	}
 
 	return &emptypb.Empty{}, nil
 }
 
-// CreateToken creates a token for a ServiceAccount.
-func (s *ServiceAccountServer) CreateToken(ctx context.Context, req *pb.CreateTokenRequest) (*pb.CreateTokenResponse, error) {
-	input := &serviceaccount.CreateTokenInput{
+// CreateOIDCToken creates a token for a ServiceAccount using OIDC token exchange.
+func (s *ServiceAccountServer) CreateOIDCToken(ctx context.Context, req *pb.CreateOIDCTokenRequest) (*pb.CreateTokenResponse, error) {
+	input := &serviceaccount.CreateOIDCTokenInput{
 		ServiceAccountPublicID: req.ServiceAccountId,
 		Token:                  []byte(req.Token),
 	}
 
-	result, err := s.serviceCatalog.ServiceAccountService.CreateToken(ctx, input)
+	result, err := s.serviceCatalog.ServiceAccountService.CreateOIDCToken(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CreateTokenResponse{
+		Token:     string(result.Token),
+		ExpiresIn: result.ExpiresIn,
+	}, nil
+}
+
+// CreateClientCredentialsToken creates a token using client credentials.
+func (s *ServiceAccountServer) CreateClientCredentialsToken(ctx context.Context, req *pb.CreateClientCredentialsTokenRequest) (*pb.CreateTokenResponse, error) {
+	result, err := s.serviceCatalog.ServiceAccountService.CreateClientCredentialsToken(ctx, &serviceaccount.CreateClientCredentialsTokenInput{
+		ClientID:     req.ClientId,
+		ClientSecret: req.ClientSecret,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -202,23 +236,32 @@ func (s *ServiceAccountServer) CreateToken(ctx context.Context, req *pb.CreateTo
 
 // toPBServiceAccount converts from ServiceAccount model to ProtoBuf model.
 func toPBServiceAccount(sa *models.ServiceAccount) *pb.ServiceAccount {
-	return &pb.ServiceAccount{
-		Metadata:          toPBMetadata(&sa.Metadata, types.ServiceAccountModelType),
-		Name:              sa.Name,
-		Description:       sa.Description,
-		GroupId:           gid.ToGlobalID(types.GroupModelType, sa.GroupID),
-		CreatedBy:         sa.CreatedBy,
-		OidcTrustPolicies: toPBOIDCTrustPolicies(sa.OIDCTrustPolicies),
+	result := &pb.ServiceAccount{
+		Metadata:                 toPBMetadata(&sa.Metadata, types.ServiceAccountModelType),
+		Name:                     sa.Name,
+		Description:              sa.Description,
+		GroupId:                  gid.ToGlobalID(types.GroupModelType, sa.GroupID),
+		CreatedBy:                sa.CreatedBy,
+		OidcTrustPolicies:        toPBOIDCTrustPolicies(sa.OIDCTrustPolicies),
+		ClientCredentialsEnabled: sa.ClientCredentialsEnabled(),
 	}
+
+	if sa.ClientSecretExpiresAt != nil {
+		result.ClientSecretExpiresAt = timestamppb.New(*sa.ClientSecretExpiresAt)
+	}
+
+	return result
 }
 
 // toPBOIDCTrustPolicies converts from model OIDC trust policies to ProtoBuf.
 func toPBOIDCTrustPolicies(policies []models.OIDCTrustPolicy) []*pb.OIDCTrustPolicy {
 	pbPolicies := make([]*pb.OIDCTrustPolicy, len(policies))
 	for i, policy := range policies {
+		boundClaimType := pb.BoundClaimsType(pb.BoundClaimsType_value[string(policy.BoundClaimsType)])
+
 		pbPolicies[i] = &pb.OIDCTrustPolicy{
 			Issuer:          policy.Issuer,
-			BoundClaimsType: toPBBoundClaimsType(policy.BoundClaimsType),
+			BoundClaimsType: &boundClaimType,
 			BoundClaims:     policy.BoundClaims,
 		}
 	}
@@ -236,10 +279,4 @@ func fromPBOIDCTrustPolicies(pbPolicies []*pb.OIDCTrustPolicy) []models.OIDCTrus
 		}
 	}
 	return policies
-}
-
-// toPBBoundClaimsType converts from model BoundClaimsType to ProtoBuf.
-func toPBBoundClaimsType(claimsType models.BoundClaimsType) *pb.BoundClaimsType {
-	val := pb.BoundClaimsType(pb.BoundClaimsType_value[string(claimsType)])
-	return &val
 }

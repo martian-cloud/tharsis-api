@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ae7b360811d38008f55bf0bf32108386>>
+ * @generated SignedSource<<678cc7386564a037ac6c3194312d202d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,6 +20,7 @@ export type SetUserNotificationPreferenceInput = {
 };
 export type UserNotificationPreferenceCustomEventsInput = {
   failedRun: boolean;
+  serviceAccountSecretExpiration: boolean;
 };
 export type NotificationPreferenceDialogMutation$variables = {
   input: SetUserNotificationPreferenceInput;
@@ -29,6 +30,7 @@ export type NotificationPreferenceDialogMutation$data = {
     readonly preference: {
       readonly customEvents: {
         readonly failedRun: boolean;
+        readonly serviceAccountSecretExpiration: boolean;
       } | null | undefined;
       readonly global: boolean;
       readonly inherited: boolean;
@@ -120,6 +122,13 @@ v1 = [
                 "kind": "ScalarField",
                 "name": "failedRun",
                 "storageKey": null
+              },
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "serviceAccountSecretExpiration",
+                "storageKey": null
               }
             ],
             "storageKey": null
@@ -181,16 +190,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "0c5cecb73d50bcc264166994418c5f48",
+    "cacheID": "5191acc3f969fef18a368b21d605d48e",
     "id": null,
     "metadata": {},
     "name": "NotificationPreferenceDialogMutation",
     "operationKind": "mutation",
-    "text": "mutation NotificationPreferenceDialogMutation(\n  $input: SetUserNotificationPreferenceInput!\n) {\n  setUserNotificationPreference(input: $input) {\n    preference {\n      scope\n      inherited\n      global\n      namespacePath\n      customEvents {\n        failedRun\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
+    "text": "mutation NotificationPreferenceDialogMutation(\n  $input: SetUserNotificationPreferenceInput!\n) {\n  setUserNotificationPreference(input: $input) {\n    preference {\n      scope\n      inherited\n      global\n      namespacePath\n      customEvents {\n        failedRun\n        serviceAccountSecretExpiration\n      }\n    }\n    problems {\n      message\n      field\n      type\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0574297d05e96c995077bd3f27a2a4cf";
+(node as any).hash = "5a5fb1e6315544411c46adc73bcfec77";
 
 export default node;

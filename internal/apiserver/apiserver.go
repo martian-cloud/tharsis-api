@@ -209,7 +209,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		workspaceService           = workspacesvc.NewService(logger, dbClient, limits, artifactStore, eventManager, cliService, activityService, inheritedSettingsResolver)
 		jobService                 = job.NewService(logger, dbClient, signingKeyManager, logStreamManager, eventManager, runStateManager)
 		managedIdentityService     = managedidentity.NewService(logger, dbClient, limits, managedIdentityDelegates, workspaceService, jobService, activityService)
-		saService                  = serviceaccount.NewService(logger, dbClient, limits, signingKeyManager, openIDConfigFetcher, activityService)
+		saService                  = serviceaccount.NewService(logger, dbClient, limits, signingKeyManager, openIDConfigFetcher, activityService, cfg.ServiceAccountClientSecretMaxExpirationDays)
 		variableService            = variable.NewService(logger, dbClient, limits, activityService, pluginCatalog.SecretManager, cfg.DisableSensitiveVariableFeature)
 		teamService                = team.NewService(logger, dbClient, activityService)
 		providerRegistryService    = providerregistry.NewService(logger, dbClient, limits, providerRegistryStore, activityService)
@@ -289,6 +289,15 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		maintenanceMonitor,
 		time.Duration(cfg.WorkspaceAssessmentIntervalHours)*time.Hour,
 		cfg.WorkspaceAssessmentRunLimit,
+	).Start(ctx)
+
+	// Start service account secret expiration scheduler
+	serviceaccount.NewSecretExpirationScheduler(
+		dbClient,
+		logger,
+		emailClient,
+		maintenanceMonitor,
+		notificationManager,
 	).Start(ctx)
 
 	// Create the admin user if an email is provided.

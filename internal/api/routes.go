@@ -151,17 +151,27 @@ func BuildRouter(
 		router.Method("GET", "/.well-known/terraform.json", tfeHandler)
 	}
 
+	// OAuth Protected Resource Metadata (RFC 9728) for MCP
+	router.Get("/.well-known/oauth-protected-resource", func(w http.ResponseWriter, r *http.Request) {
+		respWriter.RespondWithJSON(r.Context(), w, map[string]any{
+			"resource":                 cfg.TharsisAPIURL + "/mcp",
+			"authorization_servers":    []string{cfg.TharsisAPIURL},
+			"bearer_methods_supported": []string{"header"},
+		}, http.StatusOK)
+	})
+
 	router.Group(func(r chi.Router) {
 		r.Use(csrfMiddleware)
 		r.Handle("/graphql", graphqlHandler)
 	})
 
-	// MCP SSE handler
-	mcpHandler, err := mcp.NewSSEHandler(&mcp.ServerOptions{
+	// MCP Streamable HTTP handler
+	mcpHandler, err := mcp.NewStreamableHTTPHandler(&mcp.ServerOptions{
 		ServicesCatalog: serviceCatalog,
 		Version:         apiVersion,
 		Config:          &cfg.MCPServerConfig,
 		HTTPClient:      tharsishttp.NewHTTPClient(),
+		Logger:          logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize MCP handler: %v", err)

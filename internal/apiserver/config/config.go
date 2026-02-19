@@ -17,29 +17,30 @@ import (
 )
 
 const (
-	defaultServerPort                                 = "8000"
-	defaultGRPCServerPort                             = "50051"
-	envOidcProviderConfigPrefix                       = "THARSIS_OAUTH_PROVIDERS_"
-	envRunnerConfigPrefix                             = "THARSIS_INTERNAL_RUNNERS_"
-	envFederatedRegistryTrustPolicyName               = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
-	defaultMaxGraphQLComplexity                       = 0
-	defaultRateLimitStorePluginType                   = "memory"
-	defaultModuleRegistryMaxUploadSize                = 1024 * 1024 * 128 // 128 MiB
-	defaultVCSRepositorySizeLimit                     = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
-	defaultAsyncTaskTimeout                           = 180               // seconds
-	defaultDBAutoMigrateEnabled                       = true
-	defaultOtelTraceEnabled                           = false
-	defaultHTTPRateLimit                              = 60 // in calls per second
-	defaultTerraformCLIVersions                       = ">= 1.0.0"
-	defaultWorkspaceAssessmentIntervalHours           = 24
-	defaultWorkspaceAssessmentRunLimit                = 20
-	defaultUserSessionAccessTokenExpirationMinutes    = 5
-	defaultUserSessionRefreshTokenExpirationMinutes   = 60 * 12 // 12 hours
-	defaultUserSessionMaxSessionsPerUser              = 20
-	defaultAsymmetricSigningKeyDecommissionPeriodDays = 7
-	defaultCLILoginOIDCScopes                         = "openid tharsis"
-	defaultJWSProviderPluginType                      = "memory"
-	defaultOIDCInternalIdentityProviderClientID       = "tharsis"
+	defaultServerPort                                  = "8000"
+	defaultGRPCServerPort                              = "50051"
+	envOidcProviderConfigPrefix                        = "THARSIS_OAUTH_PROVIDERS_"
+	envRunnerConfigPrefix                              = "THARSIS_INTERNAL_RUNNERS_"
+	envFederatedRegistryTrustPolicyName                = "THARSIS_FEDERATED_REGISTRY_TRUST_POLICIES"
+	defaultMaxGraphQLComplexity                        = 0
+	defaultRateLimitStorePluginType                    = "memory"
+	defaultModuleRegistryMaxUploadSize                 = 1024 * 1024 * 128 // 128 MiB
+	defaultVCSRepositorySizeLimit                      = 1024 * 1024 * 5   // 5 MebiBytes in bytes.
+	defaultAsyncTaskTimeout                            = 180               // seconds
+	defaultDBAutoMigrateEnabled                        = true
+	defaultOtelTraceEnabled                            = false
+	defaultHTTPRateLimit                               = 60 // in calls per second
+	defaultTerraformCLIVersions                        = ">= 1.0.0"
+	defaultWorkspaceAssessmentIntervalHours            = 24
+	defaultWorkspaceAssessmentRunLimit                 = 20
+	defaultUserSessionAccessTokenExpirationMinutes     = 5
+	defaultUserSessionRefreshTokenExpirationMinutes    = 60 * 12 // 12 hours
+	defaultUserSessionMaxSessionsPerUser               = 20
+	defaultAsymmetricSigningKeyDecommissionPeriodDays  = 7
+	defaultCLILoginOIDCScopes                          = "openid tharsis"
+	defaultJWSProviderPluginType                       = "memory"
+	defaultOIDCInternalIdentityProviderClientID        = "tharsis"
+	defaultServiceAccountClientSecretMaxExpirationDays = 90
 )
 
 // IdpConfig contains the config fields for an Identity Provider
@@ -204,6 +205,9 @@ type Config struct {
 
 	// OIDCInternalIdentityProviderClientID is the client ID to use for OIDC authentication flows with the internal identity provider
 	OIDCInternalIdentityProviderClientID string `yaml:"oidc_internal_identity_provider_client_id" env:"OIDC_INTERNAL_IDENTITY_PROVIDER_CLIENT_ID"`
+
+	// ServiceAccountClientSecretMaxExpirationDays is the maximum number of days a service account client secret can be valid
+	ServiceAccountClientSecretMaxExpirationDays int `yaml:"service_account_client_secret_max_expiration_days" env:"SERVICE_ACCOUNT_CLIENT_SECRET_MAX_EXPIRATION_DAYS"`
 }
 
 // Validate validates the application configuration.
@@ -223,26 +227,27 @@ func (c Config) Validate() error {
 func Load(file string, logger logger.Logger) (*Config, error) {
 	// default config
 	c := Config{
-		ServerPort:                                 defaultServerPort,
-		GRPCServerPort:                             defaultGRPCServerPort,
-		MaxGraphQLComplexity:                       defaultMaxGraphQLComplexity,
-		RateLimitStorePluginType:                   defaultRateLimitStorePluginType,
-		ModuleRegistryMaxUploadSize:                defaultModuleRegistryMaxUploadSize,
-		VCSRepositorySizeLimit:                     defaultVCSRepositorySizeLimit,
-		AsyncTaskTimeout:                           defaultAsyncTaskTimeout,
-		DBAutoMigrateEnabled:                       defaultDBAutoMigrateEnabled,
-		OtelTraceEnabled:                           defaultOtelTraceEnabled,
-		HTTPRateLimit:                              defaultHTTPRateLimit,
-		TerraformCLIVersionConstraint:              defaultTerraformCLIVersions,
-		WorkspaceAssessmentIntervalHours:           defaultWorkspaceAssessmentIntervalHours,
-		WorkspaceAssessmentRunLimit:                defaultWorkspaceAssessmentRunLimit,
-		UserSessionAccessTokenExpirationMinutes:    defaultUserSessionAccessTokenExpirationMinutes,
-		UserSessionRefreshTokenExpirationMinutes:   defaultUserSessionRefreshTokenExpirationMinutes,
-		UserSessionMaxSessionsPerUser:              defaultUserSessionMaxSessionsPerUser,
-		AsymmetricSigningKeyDecommissionPeriodDays: defaultAsymmetricSigningKeyDecommissionPeriodDays,
-		CLILoginOIDCScopes:                         defaultCLILoginOIDCScopes,
-		JWSProviderPluginType:                      defaultJWSProviderPluginType,
-		OIDCInternalIdentityProviderClientID:       defaultOIDCInternalIdentityProviderClientID,
+		ServerPort:                                  defaultServerPort,
+		GRPCServerPort:                              defaultGRPCServerPort,
+		MaxGraphQLComplexity:                        defaultMaxGraphQLComplexity,
+		RateLimitStorePluginType:                    defaultRateLimitStorePluginType,
+		ModuleRegistryMaxUploadSize:                 defaultModuleRegistryMaxUploadSize,
+		VCSRepositorySizeLimit:                      defaultVCSRepositorySizeLimit,
+		AsyncTaskTimeout:                            defaultAsyncTaskTimeout,
+		DBAutoMigrateEnabled:                        defaultDBAutoMigrateEnabled,
+		OtelTraceEnabled:                            defaultOtelTraceEnabled,
+		HTTPRateLimit:                               defaultHTTPRateLimit,
+		TerraformCLIVersionConstraint:               defaultTerraformCLIVersions,
+		WorkspaceAssessmentIntervalHours:            defaultWorkspaceAssessmentIntervalHours,
+		WorkspaceAssessmentRunLimit:                 defaultWorkspaceAssessmentRunLimit,
+		UserSessionAccessTokenExpirationMinutes:     defaultUserSessionAccessTokenExpirationMinutes,
+		UserSessionRefreshTokenExpirationMinutes:    defaultUserSessionRefreshTokenExpirationMinutes,
+		UserSessionMaxSessionsPerUser:               defaultUserSessionMaxSessionsPerUser,
+		AsymmetricSigningKeyDecommissionPeriodDays:  defaultAsymmetricSigningKeyDecommissionPeriodDays,
+		CLILoginOIDCScopes:                          defaultCLILoginOIDCScopes,
+		JWSProviderPluginType:                       defaultJWSProviderPluginType,
+		OIDCInternalIdentityProviderClientID:        defaultOIDCInternalIdentityProviderClientID,
+		ServiceAccountClientSecretMaxExpirationDays: defaultServiceAccountClientSecretMaxExpirationDays,
 	}
 
 	// load from YAML config file

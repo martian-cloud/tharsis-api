@@ -10,6 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -261,13 +262,15 @@ func (x *GetServiceAccountsRequest) GetIncludeInherited() bool {
 
 // CreateServiceAccountRequest is the input for creating a new ServiceAccount.
 type CreateServiceAccountRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description       string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	GroupId           string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	OidcTrustPolicies []*OIDCTrustPolicy     `protobuf:"bytes,4,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Name                    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description             string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	GroupId                 string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	OidcTrustPolicies       []*OIDCTrustPolicy     `protobuf:"bytes,4,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
+	EnableClientCredentials bool                   `protobuf:"varint,5,opt,name=enable_client_credentials,json=enableClientCredentials,proto3" json:"enable_client_credentials,omitempty"`
+	ClientSecretExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=client_secret_expires_at,json=clientSecretExpiresAt,proto3,oneof" json:"client_secret_expires_at,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *CreateServiceAccountRequest) Reset() {
@@ -328,15 +331,31 @@ func (x *CreateServiceAccountRequest) GetOidcTrustPolicies() []*OIDCTrustPolicy 
 	return nil
 }
 
+func (x *CreateServiceAccountRequest) GetEnableClientCredentials() bool {
+	if x != nil {
+		return x.EnableClientCredentials
+	}
+	return false
+}
+
+func (x *CreateServiceAccountRequest) GetClientSecretExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ClientSecretExpiresAt
+	}
+	return nil
+}
+
 // UpdateServiceAccountRequest is the input for updating a ServiceAccount.
 type UpdateServiceAccountRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Description       *string                `protobuf:"bytes,2,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	Version           *int64                 `protobuf:"varint,3,opt,name=version,proto3,oneof" json:"version,omitempty"`
-	OidcTrustPolicies []*OIDCTrustPolicy     `protobuf:"bytes,4,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Description             *string                `protobuf:"bytes,2,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	Version                 *int64                 `protobuf:"varint,3,opt,name=version,proto3,oneof" json:"version,omitempty"`
+	OidcTrustPolicies       []*OIDCTrustPolicy     `protobuf:"bytes,4,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
+	EnableClientCredentials *bool                  `protobuf:"varint,5,opt,name=enable_client_credentials,json=enableClientCredentials,proto3,oneof" json:"enable_client_credentials,omitempty"`
+	ClientSecretExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=client_secret_expires_at,json=clientSecretExpiresAt,proto3,oneof" json:"client_secret_expires_at,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *UpdateServiceAccountRequest) Reset() {
@@ -397,6 +416,20 @@ func (x *UpdateServiceAccountRequest) GetOidcTrustPolicies() []*OIDCTrustPolicy 
 	return nil
 }
 
+func (x *UpdateServiceAccountRequest) GetEnableClientCredentials() bool {
+	if x != nil && x.EnableClientCredentials != nil {
+		return *x.EnableClientCredentials
+	}
+	return false
+}
+
+func (x *UpdateServiceAccountRequest) GetClientSecretExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ClientSecretExpiresAt
+	}
+	return nil
+}
+
 // DeleteServiceAccountRequest is the input for deleting a ServiceAccount.
 type DeleteServiceAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -450,8 +483,8 @@ func (x *DeleteServiceAccountRequest) GetVersion() int64 {
 	return 0
 }
 
-// CreateTokenRequest is the input for creating a service account token.
-type CreateTokenRequest struct {
+// CreateOIDCTokenRequest is the input for creating a service account token via OIDC Token exchange.
+type CreateOIDCTokenRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	ServiceAccountId string                 `protobuf:"bytes,1,opt,name=service_account_id,json=serviceAccountId,proto3" json:"service_account_id,omitempty"`
 	Token            string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
@@ -459,20 +492,20 @@ type CreateTokenRequest struct {
 	sizeCache        protoimpl.SizeCache
 }
 
-func (x *CreateTokenRequest) Reset() {
-	*x = CreateTokenRequest{}
+func (x *CreateOIDCTokenRequest) Reset() {
+	*x = CreateOIDCTokenRequest{}
 	mi := &file_service_account_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateTokenRequest) String() string {
+func (x *CreateOIDCTokenRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateTokenRequest) ProtoMessage() {}
+func (*CreateOIDCTokenRequest) ProtoMessage() {}
 
-func (x *CreateTokenRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateOIDCTokenRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_service_account_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -484,21 +517,74 @@ func (x *CreateTokenRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateTokenRequest.ProtoReflect.Descriptor instead.
-func (*CreateTokenRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateOIDCTokenRequest.ProtoReflect.Descriptor instead.
+func (*CreateOIDCTokenRequest) Descriptor() ([]byte, []int) {
 	return file_service_account_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *CreateTokenRequest) GetServiceAccountId() string {
+func (x *CreateOIDCTokenRequest) GetServiceAccountId() string {
 	if x != nil {
 		return x.ServiceAccountId
 	}
 	return ""
 }
 
-func (x *CreateTokenRequest) GetToken() string {
+func (x *CreateOIDCTokenRequest) GetToken() string {
 	if x != nil {
 		return x.Token
+	}
+	return ""
+}
+
+// CreateClientCredentialsTokenRequest is the input for creating a token using client credentials.
+type CreateClientCredentialsTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ClientSecret  string                 `protobuf:"bytes,2,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateClientCredentialsTokenRequest) Reset() {
+	*x = CreateClientCredentialsTokenRequest{}
+	mi := &file_service_account_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateClientCredentialsTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateClientCredentialsTokenRequest) ProtoMessage() {}
+
+func (x *CreateClientCredentialsTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_account_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateClientCredentialsTokenRequest.ProtoReflect.Descriptor instead.
+func (*CreateClientCredentialsTokenRequest) Descriptor() ([]byte, []int) {
+	return file_service_account_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CreateClientCredentialsTokenRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *CreateClientCredentialsTokenRequest) GetClientSecret() string {
+	if x != nil {
+		return x.ClientSecret
 	}
 	return ""
 }
@@ -515,7 +601,7 @@ type OIDCTrustPolicy struct {
 
 func (x *OIDCTrustPolicy) Reset() {
 	*x = OIDCTrustPolicy{}
-	mi := &file_service_account_proto_msgTypes[6]
+	mi := &file_service_account_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -527,7 +613,7 @@ func (x *OIDCTrustPolicy) String() string {
 func (*OIDCTrustPolicy) ProtoMessage() {}
 
 func (x *OIDCTrustPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_service_account_proto_msgTypes[6]
+	mi := &file_service_account_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -540,7 +626,7 @@ func (x *OIDCTrustPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OIDCTrustPolicy.ProtoReflect.Descriptor instead.
 func (*OIDCTrustPolicy) Descriptor() ([]byte, []int) {
-	return file_service_account_proto_rawDescGZIP(), []int{6}
+	return file_service_account_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *OIDCTrustPolicy) GetIssuer() string {
@@ -566,20 +652,22 @@ func (x *OIDCTrustPolicy) GetBoundClaims() map[string]string {
 
 // ServiceAccount defines a service account within Tharsis.
 type ServiceAccount struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Metadata          *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Name              string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description       string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	GroupId           string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	CreatedBy         string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	OidcTrustPolicies []*OIDCTrustPolicy     `protobuf:"bytes,6,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                 *ResourceMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Name                     string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description              string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	GroupId                  string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	CreatedBy                string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	OidcTrustPolicies        []*OIDCTrustPolicy     `protobuf:"bytes,6,rep,name=oidc_trust_policies,json=oidcTrustPolicies,proto3" json:"oidc_trust_policies,omitempty"`
+	ClientCredentialsEnabled bool                   `protobuf:"varint,7,opt,name=client_credentials_enabled,json=clientCredentialsEnabled,proto3" json:"client_credentials_enabled,omitempty"`
+	ClientSecretExpiresAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=client_secret_expires_at,json=clientSecretExpiresAt,proto3,oneof" json:"client_secret_expires_at,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ServiceAccount) Reset() {
 	*x = ServiceAccount{}
-	mi := &file_service_account_proto_msgTypes[7]
+	mi := &file_service_account_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +679,7 @@ func (x *ServiceAccount) String() string {
 func (*ServiceAccount) ProtoMessage() {}
 
 func (x *ServiceAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_service_account_proto_msgTypes[7]
+	mi := &file_service_account_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +692,7 @@ func (x *ServiceAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceAccount.ProtoReflect.Descriptor instead.
 func (*ServiceAccount) Descriptor() ([]byte, []int) {
-	return file_service_account_proto_rawDescGZIP(), []int{7}
+	return file_service_account_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ServiceAccount) GetMetadata() *ResourceMetadata {
@@ -649,6 +737,73 @@ func (x *ServiceAccount) GetOidcTrustPolicies() []*OIDCTrustPolicy {
 	return nil
 }
 
+func (x *ServiceAccount) GetClientCredentialsEnabled() bool {
+	if x != nil {
+		return x.ClientCredentialsEnabled
+	}
+	return false
+}
+
+func (x *ServiceAccount) GetClientSecretExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ClientSecretExpiresAt
+	}
+	return nil
+}
+
+// ServiceAccountResponse is the response for service account mutations.
+type ServiceAccountResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ServiceAccount *ServiceAccount        `protobuf:"bytes,1,opt,name=service_account,json=serviceAccount,proto3" json:"service_account,omitempty"`
+	ClientSecret   *string                `protobuf:"bytes,2,opt,name=client_secret,json=clientSecret,proto3,oneof" json:"client_secret,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ServiceAccountResponse) Reset() {
+	*x = ServiceAccountResponse{}
+	mi := &file_service_account_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServiceAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServiceAccountResponse) ProtoMessage() {}
+
+func (x *ServiceAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_account_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServiceAccountResponse.ProtoReflect.Descriptor instead.
+func (*ServiceAccountResponse) Descriptor() ([]byte, []int) {
+	return file_service_account_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ServiceAccountResponse) GetServiceAccount() *ServiceAccount {
+	if x != nil {
+		return x.ServiceAccount
+	}
+	return nil
+}
+
+func (x *ServiceAccountResponse) GetClientSecret() string {
+	if x != nil && x.ClientSecret != nil {
+		return *x.ClientSecret
+	}
+	return ""
+}
+
 // CreateTokenResponse is the response for creating a service account token.
 type CreateTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -660,7 +815,7 @@ type CreateTokenResponse struct {
 
 func (x *CreateTokenResponse) Reset() {
 	*x = CreateTokenResponse{}
-	mi := &file_service_account_proto_msgTypes[8]
+	mi := &file_service_account_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -672,7 +827,7 @@ func (x *CreateTokenResponse) String() string {
 func (*CreateTokenResponse) ProtoMessage() {}
 
 func (x *CreateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_account_proto_msgTypes[8]
+	mi := &file_service_account_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -685,7 +840,7 @@ func (x *CreateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTokenResponse.ProtoReflect.Descriptor instead.
 func (*CreateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_service_account_proto_rawDescGZIP(), []int{8}
+	return file_service_account_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateTokenResponse) GetToken() string {
@@ -713,7 +868,7 @@ type GetServiceAccountsResponse struct {
 
 func (x *GetServiceAccountsResponse) Reset() {
 	*x = GetServiceAccountsResponse{}
-	mi := &file_service_account_proto_msgTypes[9]
+	mi := &file_service_account_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +880,7 @@ func (x *GetServiceAccountsResponse) String() string {
 func (*GetServiceAccountsResponse) ProtoMessage() {}
 
 func (x *GetServiceAccountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_account_proto_msgTypes[9]
+	mi := &file_service_account_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +893,7 @@ func (x *GetServiceAccountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetServiceAccountsResponse.ProtoReflect.Descriptor instead.
 func (*GetServiceAccountsResponse) Descriptor() ([]byte, []int) {
-	return file_service_account_proto_rawDescGZIP(), []int{9}
+	return file_service_account_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetServiceAccountsResponse) GetServiceAccounts() []*ServiceAccount {
@@ -759,7 +914,7 @@ var File_service_account_proto protoreflect.FileDescriptor
 
 const file_service_account_proto_rawDesc = "" +
 	"\n" +
-	"\x15service_account.proto\x12(martiancloud.tharsis.api.service_account\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\".\n" +
+	"\x15service_account.proto\x12(martiancloud.tharsis.api.service_account\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\".\n" +
 	"\x1cGetServiceAccountByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xb3\x03\n" +
 	"\x19GetServiceAccountsRequest\x12j\n" +
@@ -773,28 +928,38 @@ const file_service_account_proto_rawDesc = "" +
 	"\x05_sortB\t\n" +
 	"\a_searchB\f\n" +
 	"\n" +
-	"_runner_id\"\xd9\x01\n" +
+	"_runner_id\"\x8c\x03\n" +
 	"\x1bCreateServiceAccountRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x19\n" +
 	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12i\n" +
-	"\x13oidc_trust_policies\x18\x04 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPolicies\"\xfa\x01\n" +
+	"\x13oidc_trust_policies\x18\x04 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPolicies\x12:\n" +
+	"\x19enable_client_credentials\x18\x05 \x01(\bR\x17enableClientCredentials\x12X\n" +
+	"\x18client_secret_expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x15clientSecretExpiresAt\x88\x01\x01B\x1b\n" +
+	"\x19_client_secret_expires_at\"\xd0\x03\n" +
 	"\x1bUpdateServiceAccountRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x03 \x01(\x03H\x01R\aversion\x88\x01\x01\x12i\n" +
-	"\x13oidc_trust_policies\x18\x04 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPoliciesB\x0e\n" +
+	"\x13oidc_trust_policies\x18\x04 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPolicies\x12?\n" +
+	"\x19enable_client_credentials\x18\x05 \x01(\bH\x02R\x17enableClientCredentials\x88\x01\x01\x12X\n" +
+	"\x18client_secret_expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x03R\x15clientSecretExpiresAt\x88\x01\x01B\x0e\n" +
 	"\f_descriptionB\n" +
 	"\n" +
-	"\b_version\"X\n" +
+	"\b_versionB\x1c\n" +
+	"\x1a_enable_client_credentialsB\x1b\n" +
+	"\x19_client_secret_expires_at\"X\n" +
 	"\x1bDeleteServiceAccountRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01B\n" +
 	"\n" +
-	"\b_version\"X\n" +
-	"\x12CreateTokenRequest\x12,\n" +
+	"\b_version\"\\\n" +
+	"\x16CreateOIDCTokenRequest\x12,\n" +
 	"\x12service_account_id\x18\x01 \x01(\tR\x10serviceAccountId\x12\x14\n" +
-	"\x05token\x18\x02 \x01(\tR\x05token\"\xda\x02\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"g\n" +
+	"#CreateClientCredentialsTokenRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12#\n" +
+	"\rclient_secret\x18\x02 \x01(\tR\fclientSecret\"\xda\x02\n" +
 	"\x0fOIDCTrustPolicy\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12j\n" +
 	"\x11bound_claims_type\x18\x02 \x01(\x0e29.martiancloud.tharsis.api.service_account.BoundClaimsTypeH\x00R\x0fboundClaimsType\x88\x01\x01\x12m\n" +
@@ -802,7 +967,7 @@ const file_service_account_proto_rawDesc = "" +
 	"\x10BoundClaimsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x14\n" +
-	"\x12_bound_claims_type\"\xbc\x02\n" +
+	"\x12_bound_claims_type\"\xf1\x03\n" +
 	"\x0eServiceAccount\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -810,7 +975,14 @@ const file_service_account_proto_rawDesc = "" +
 	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x1d\n" +
 	"\n" +
 	"created_by\x18\x05 \x01(\tR\tcreatedBy\x12i\n" +
-	"\x13oidc_trust_policies\x18\x06 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPolicies\"J\n" +
+	"\x13oidc_trust_policies\x18\x06 \x03(\v29.martiancloud.tharsis.api.service_account.OIDCTrustPolicyR\x11oidcTrustPolicies\x12<\n" +
+	"\x1aclient_credentials_enabled\x18\a \x01(\bR\x18clientCredentialsEnabled\x12X\n" +
+	"\x18client_secret_expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x15clientSecretExpiresAt\x88\x01\x01B\x1b\n" +
+	"\x19_client_secret_expires_at\"\xb7\x01\n" +
+	"\x16ServiceAccountResponse\x12a\n" +
+	"\x0fservice_account\x18\x01 \x01(\v28.martiancloud.tharsis.api.service_account.ServiceAccountR\x0eserviceAccount\x12(\n" +
+	"\rclient_secret\x18\x02 \x01(\tH\x00R\fclientSecret\x88\x01\x01B\x10\n" +
+	"\x0e_client_secret\"J\n" +
 	"\x13CreateTokenResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1d\n" +
 	"\n" +
@@ -828,14 +1000,15 @@ const file_service_account_proto_rawDesc = "" +
 	"\x0fBoundClaimsType\x12\n" +
 	"\n" +
 	"\x06STRING\x10\x00\x12\b\n" +
-	"\x04GLOB\x10\x012\x87\a\n" +
+	"\x04GLOB\x10\x012\xce\b\n" +
 	"\x0fServiceAccounts\x12\x99\x01\n" +
 	"\x15GetServiceAccountByID\x12F.martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest\x1a8.martiancloud.tharsis.api.service_account.ServiceAccount\x12\x9f\x01\n" +
-	"\x12GetServiceAccounts\x12C.martiancloud.tharsis.api.service_account.GetServiceAccountsRequest\x1aD.martiancloud.tharsis.api.service_account.GetServiceAccountsResponse\x12\x97\x01\n" +
-	"\x14CreateServiceAccount\x12E.martiancloud.tharsis.api.service_account.CreateServiceAccountRequest\x1a8.martiancloud.tharsis.api.service_account.ServiceAccount\x12\x97\x01\n" +
-	"\x14UpdateServiceAccount\x12E.martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest\x1a8.martiancloud.tharsis.api.service_account.ServiceAccount\x12u\n" +
-	"\x14DeleteServiceAccount\x12E.martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest\x1a\x16.google.protobuf.Empty\x12\x8a\x01\n" +
-	"\vCreateToken\x12<.martiancloud.tharsis.api.service_account.CreateTokenRequest\x1a=.martiancloud.tharsis.api.service_account.CreateTokenResponseBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\x12GetServiceAccounts\x12C.martiancloud.tharsis.api.service_account.GetServiceAccountsRequest\x1aD.martiancloud.tharsis.api.service_account.GetServiceAccountsResponse\x12\x9f\x01\n" +
+	"\x14CreateServiceAccount\x12E.martiancloud.tharsis.api.service_account.CreateServiceAccountRequest\x1a@.martiancloud.tharsis.api.service_account.ServiceAccountResponse\x12\x9f\x01\n" +
+	"\x14UpdateServiceAccount\x12E.martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest\x1a@.martiancloud.tharsis.api.service_account.ServiceAccountResponse\x12u\n" +
+	"\x14DeleteServiceAccount\x12E.martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest\x1a\x16.google.protobuf.Empty\x12\x92\x01\n" +
+	"\x0fCreateOIDCToken\x12@.martiancloud.tharsis.api.service_account.CreateOIDCTokenRequest\x1a=.martiancloud.tharsis.api.service_account.CreateTokenResponse\x12\xac\x01\n" +
+	"\x1cCreateClientCredentialsToken\x12M.martiancloud.tharsis.api.service_account.CreateClientCredentialsTokenRequest\x1a=.martiancloud.tharsis.api.service_account.CreateTokenResponseBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_service_account_proto_rawDescOnce sync.Once
@@ -850,54 +1023,63 @@ func file_service_account_proto_rawDescGZIP() []byte {
 }
 
 var file_service_account_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_service_account_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_service_account_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_service_account_proto_goTypes = []any{
-	(ServiceAccountSortableField)(0),     // 0: martiancloud.tharsis.api.service_account.ServiceAccountSortableField
-	(BoundClaimsType)(0),                 // 1: martiancloud.tharsis.api.service_account.BoundClaimsType
-	(*GetServiceAccountByIDRequest)(nil), // 2: martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest
-	(*GetServiceAccountsRequest)(nil),    // 3: martiancloud.tharsis.api.service_account.GetServiceAccountsRequest
-	(*CreateServiceAccountRequest)(nil),  // 4: martiancloud.tharsis.api.service_account.CreateServiceAccountRequest
-	(*UpdateServiceAccountRequest)(nil),  // 5: martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest
-	(*DeleteServiceAccountRequest)(nil),  // 6: martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest
-	(*CreateTokenRequest)(nil),           // 7: martiancloud.tharsis.api.service_account.CreateTokenRequest
-	(*OIDCTrustPolicy)(nil),              // 8: martiancloud.tharsis.api.service_account.OIDCTrustPolicy
-	(*ServiceAccount)(nil),               // 9: martiancloud.tharsis.api.service_account.ServiceAccount
-	(*CreateTokenResponse)(nil),          // 10: martiancloud.tharsis.api.service_account.CreateTokenResponse
-	(*GetServiceAccountsResponse)(nil),   // 11: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse
-	nil,                                  // 12: martiancloud.tharsis.api.service_account.OIDCTrustPolicy.BoundClaimsEntry
-	(*PaginationOptions)(nil),            // 13: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),             // 14: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                     // 15: martiancloud.tharsis.api.pagination.PageInfo
-	(*emptypb.Empty)(nil),                // 16: google.protobuf.Empty
+	(ServiceAccountSortableField)(0),            // 0: martiancloud.tharsis.api.service_account.ServiceAccountSortableField
+	(BoundClaimsType)(0),                        // 1: martiancloud.tharsis.api.service_account.BoundClaimsType
+	(*GetServiceAccountByIDRequest)(nil),        // 2: martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest
+	(*GetServiceAccountsRequest)(nil),           // 3: martiancloud.tharsis.api.service_account.GetServiceAccountsRequest
+	(*CreateServiceAccountRequest)(nil),         // 4: martiancloud.tharsis.api.service_account.CreateServiceAccountRequest
+	(*UpdateServiceAccountRequest)(nil),         // 5: martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest
+	(*DeleteServiceAccountRequest)(nil),         // 6: martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest
+	(*CreateOIDCTokenRequest)(nil),              // 7: martiancloud.tharsis.api.service_account.CreateOIDCTokenRequest
+	(*CreateClientCredentialsTokenRequest)(nil), // 8: martiancloud.tharsis.api.service_account.CreateClientCredentialsTokenRequest
+	(*OIDCTrustPolicy)(nil),                     // 9: martiancloud.tharsis.api.service_account.OIDCTrustPolicy
+	(*ServiceAccount)(nil),                      // 10: martiancloud.tharsis.api.service_account.ServiceAccount
+	(*ServiceAccountResponse)(nil),              // 11: martiancloud.tharsis.api.service_account.ServiceAccountResponse
+	(*CreateTokenResponse)(nil),                 // 12: martiancloud.tharsis.api.service_account.CreateTokenResponse
+	(*GetServiceAccountsResponse)(nil),          // 13: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse
+	nil,                                         // 14: martiancloud.tharsis.api.service_account.OIDCTrustPolicy.BoundClaimsEntry
+	(*PaginationOptions)(nil),                   // 15: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*timestamppb.Timestamp)(nil),               // 16: google.protobuf.Timestamp
+	(*ResourceMetadata)(nil),                    // 17: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),                            // 18: martiancloud.tharsis.api.pagination.PageInfo
+	(*emptypb.Empty)(nil),                       // 19: google.protobuf.Empty
 }
 var file_service_account_proto_depIdxs = []int32{
-	13, // 0: martiancloud.tharsis.api.service_account.GetServiceAccountsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	15, // 0: martiancloud.tharsis.api.service_account.GetServiceAccountsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
 	0,  // 1: martiancloud.tharsis.api.service_account.GetServiceAccountsRequest.sort:type_name -> martiancloud.tharsis.api.service_account.ServiceAccountSortableField
-	8,  // 2: martiancloud.tharsis.api.service_account.CreateServiceAccountRequest.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
-	8,  // 3: martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
-	1,  // 4: martiancloud.tharsis.api.service_account.OIDCTrustPolicy.bound_claims_type:type_name -> martiancloud.tharsis.api.service_account.BoundClaimsType
-	12, // 5: martiancloud.tharsis.api.service_account.OIDCTrustPolicy.bound_claims:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy.BoundClaimsEntry
-	14, // 6: martiancloud.tharsis.api.service_account.ServiceAccount.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	8,  // 7: martiancloud.tharsis.api.service_account.ServiceAccount.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
-	9,  // 8: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.service_accounts:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
-	15, // 9: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	2,  // 10: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest
-	3,  // 11: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsRequest
-	4,  // 12: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.CreateServiceAccountRequest
-	5,  // 13: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest
-	6,  // 14: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:input_type -> martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest
-	7,  // 15: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateToken:input_type -> martiancloud.tharsis.api.service_account.CreateTokenRequest
-	9,  // 16: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:output_type -> martiancloud.tharsis.api.service_account.ServiceAccount
-	11, // 17: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:output_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsResponse
-	9,  // 18: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccount
-	9,  // 19: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccount
-	16, // 20: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:output_type -> google.protobuf.Empty
-	10, // 21: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
-	16, // [16:22] is the sub-list for method output_type
-	10, // [10:16] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	9,  // 2: martiancloud.tharsis.api.service_account.CreateServiceAccountRequest.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
+	16, // 3: martiancloud.tharsis.api.service_account.CreateServiceAccountRequest.client_secret_expires_at:type_name -> google.protobuf.Timestamp
+	9,  // 4: martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
+	16, // 5: martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest.client_secret_expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 6: martiancloud.tharsis.api.service_account.OIDCTrustPolicy.bound_claims_type:type_name -> martiancloud.tharsis.api.service_account.BoundClaimsType
+	14, // 7: martiancloud.tharsis.api.service_account.OIDCTrustPolicy.bound_claims:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy.BoundClaimsEntry
+	17, // 8: martiancloud.tharsis.api.service_account.ServiceAccount.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	9,  // 9: martiancloud.tharsis.api.service_account.ServiceAccount.oidc_trust_policies:type_name -> martiancloud.tharsis.api.service_account.OIDCTrustPolicy
+	16, // 10: martiancloud.tharsis.api.service_account.ServiceAccount.client_secret_expires_at:type_name -> google.protobuf.Timestamp
+	10, // 11: martiancloud.tharsis.api.service_account.ServiceAccountResponse.service_account:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
+	10, // 12: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.service_accounts:type_name -> martiancloud.tharsis.api.service_account.ServiceAccount
+	18, // 13: martiancloud.tharsis.api.service_account.GetServiceAccountsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	2,  // 14: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountByIDRequest
+	3,  // 15: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:input_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsRequest
+	4,  // 16: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.CreateServiceAccountRequest
+	5,  // 17: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:input_type -> martiancloud.tharsis.api.service_account.UpdateServiceAccountRequest
+	6,  // 18: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:input_type -> martiancloud.tharsis.api.service_account.DeleteServiceAccountRequest
+	7,  // 19: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateOIDCToken:input_type -> martiancloud.tharsis.api.service_account.CreateOIDCTokenRequest
+	8,  // 20: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateClientCredentialsToken:input_type -> martiancloud.tharsis.api.service_account.CreateClientCredentialsTokenRequest
+	10, // 21: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccountByID:output_type -> martiancloud.tharsis.api.service_account.ServiceAccount
+	13, // 22: martiancloud.tharsis.api.service_account.ServiceAccounts.GetServiceAccounts:output_type -> martiancloud.tharsis.api.service_account.GetServiceAccountsResponse
+	11, // 23: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccountResponse
+	11, // 24: martiancloud.tharsis.api.service_account.ServiceAccounts.UpdateServiceAccount:output_type -> martiancloud.tharsis.api.service_account.ServiceAccountResponse
+	19, // 25: martiancloud.tharsis.api.service_account.ServiceAccounts.DeleteServiceAccount:output_type -> google.protobuf.Empty
+	12, // 26: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateOIDCToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
+	12, // 27: martiancloud.tharsis.api.service_account.ServiceAccounts.CreateClientCredentialsToken:output_type -> martiancloud.tharsis.api.service_account.CreateTokenResponse
+	21, // [21:28] is the sub-list for method output_type
+	14, // [14:21] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_service_account_proto_init() }
@@ -908,16 +1090,19 @@ func file_service_account_proto_init() {
 	file_metadata_proto_init()
 	file_pagination_proto_init()
 	file_service_account_proto_msgTypes[1].OneofWrappers = []any{}
+	file_service_account_proto_msgTypes[2].OneofWrappers = []any{}
 	file_service_account_proto_msgTypes[3].OneofWrappers = []any{}
 	file_service_account_proto_msgTypes[4].OneofWrappers = []any{}
-	file_service_account_proto_msgTypes[6].OneofWrappers = []any{}
+	file_service_account_proto_msgTypes[7].OneofWrappers = []any{}
+	file_service_account_proto_msgTypes[8].OneofWrappers = []any{}
+	file_service_account_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_account_proto_rawDesc), len(file_service_account_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

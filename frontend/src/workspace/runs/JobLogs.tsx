@@ -117,6 +117,7 @@ function JobLogs(props: Props) {
             {data.status === 'finished' && loadedPercent < 100 && <LinearProgress variant="determinate" value={loadedPercent} />}
             <LogViewer
                 logs={logs}
+                loading={data.status !== 'finished'}
                 sx={{
                     backgroundColor: darken(theme.palette.background.default, 0.5),
                     paddingTop: 1,

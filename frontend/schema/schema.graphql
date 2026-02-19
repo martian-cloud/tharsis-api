@@ -319,6 +319,7 @@ type Config {
   secretManagerPluginData: [KeyValueEntry!]!
   secretManagerPluginType: String!
   serverPort: String!
+  serviceAccountClientSecretMaxExpirationDays: Int!
   serviceDiscoveryHost: String!
   terraformCliVersionConstraint: String!
   tharsisApiUrl: String!
@@ -581,7 +582,9 @@ type CreateSCIMTokenPayload {
 
 input CreateServiceAccountInput {
   clientMutationId: String
+  clientSecretExpiresAt: Time
   description: String!
+  enableClientCredentials: Boolean!
   groupId: String
   groupPath: String
   name: String!
@@ -590,6 +593,7 @@ input CreateServiceAccountInput {
 
 type CreateServiceAccountPayload {
   clientMutationId: String
+  clientSecret: String
   problems: [Problem!]!
   serviceAccount: ServiceAccount
 }
@@ -709,8 +713,7 @@ input CreateTerraformProviderVersionInput {
 
 input CreateTerraformProviderVersionMirrorInput {
   clientMutationId: String
-  groupId: String
-  groupPath: String
+  groupPath: String!
   registryHostname: String!
   registryNamespace: String!
   registryToken: String
@@ -1609,6 +1612,7 @@ type Mutation {
   migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
   moveManagedIdentity(input: MoveManagedIdentityInput!): MoveManagedIdentityPayload!
   removeUserFromTeam(input: RemoveUserFromTeamInput): RemoveUserFromTeamPayload!
+  resetServiceAccountClientCredentials(input: ResetServiceAccountClientCredentialsInput!): ResetServiceAccountClientCredentialsPayload!
   resetVCSProviderOAuthToken(input: ResetVCSProviderOAuthTokenInput!): ResetVCSProviderOAuthTokenPayload!
   revokeUserSession(input: RevokeUserSessionInput!): RevokeUserSessionPayload!
   runnerSessionHeartbeat(input: RunnerSessionHeartbeatInput!): RunnerSessionHeartbeatPayload!
@@ -2001,6 +2005,19 @@ type RemoveUserFromTeamPayload {
   teamMember: TeamMember
 }
 
+input ResetServiceAccountClientCredentialsInput {
+  clientMutationId: String
+  clientSecretExpiresAt: Time
+  id: ID!
+}
+
+type ResetServiceAccountClientCredentialsPayload {
+  clientMutationId: String
+  clientSecret: String
+  problems: [Problem!]!
+  serviceAccount: ServiceAccount
+}
+
 input ResetVCSProviderOAuthTokenInput {
   clientMutationId: String
   providerId: String!
@@ -2306,6 +2323,8 @@ type SearchResponse {
 
 type ServiceAccount implements Node {
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, last: Int, namespacePath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time): ActivityEventConnection!
+  clientCredentialsEnabled: Boolean!
+  clientSecretExpiresAt: Time
   createdBy: String!
   description: String!
   group: Group!
@@ -2973,7 +2992,9 @@ type UpdateRunnerPayload {
 
 input UpdateServiceAccountInput {
   clientMutationId: String
+  clientSecretExpiresAt: Time
   description: String!
+  enableClientCredentials: Boolean
   id: ID!
   metadata: ResourceMetadataInput
   oidcTrustPolicies: [OIDCTrustPolicyInput!]!
@@ -2981,6 +3002,7 @@ input UpdateServiceAccountInput {
 
 type UpdateServiceAccountPayload {
   clientMutationId: String
+  clientSecret: String
   problems: [Problem!]!
   serviceAccount: ServiceAccount
 }
@@ -3176,10 +3198,12 @@ type UserNotificationPreference {
 
 type UserNotificationPreferenceCustomEvents {
   failedRun: Boolean!
+  serviceAccountSecretExpiration: Boolean!
 }
 
 input UserNotificationPreferenceCustomEventsInput {
   failedRun: Boolean!
+  serviceAccountSecretExpiration: Boolean!
 }
 
 enum UserNotificationPreferenceScope {
@@ -3408,8 +3432,4 @@ type WorkspaceVCSProviderLink implements Node {
   webhookDisabled: Boolean!
   webhookId: String
   workspace: Workspace!
-}
-
-type _Service {
-  sdl: String!
 }

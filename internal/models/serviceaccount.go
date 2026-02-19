@@ -1,11 +1,16 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"golang.org/x/crypto/bcrypt"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -15,6 +20,9 @@ var _ Model = (*ServiceAccount)(nil)
 
 const (
 	maximumTrustPolicies = 10
+	clientSecretBytes    = 48 // 384 bits; NIST recommends minimum 128 bits for strong secrets
+	// minClientSecretExpiration is the minimum expiration time for client secrets (1 day)
+	minClientSecretExpiration = 24 * time.Hour
 )
 
 // BoundClaimsType defines the type of comparison to be used for bound claims
@@ -36,12 +44,20 @@ type OIDCTrustPolicy struct {
 
 // ServiceAccount provided M2M authentication
 type ServiceAccount struct {
-	Metadata          ResourceMetadata
-	Name              string
-	Description       string
-	GroupID           string
-	CreatedBy         string
-	OIDCTrustPolicies []OIDCTrustPolicy
+	Metadata                    ResourceMetadata
+	ClientSecretExpiresAt       *time.Time
+	SecretExpirationEmailSentAt *time.Time
+	Name                        string
+	Description                 string
+	GroupID                     string
+	CreatedBy                   string
+	OIDCTrustPolicies           []OIDCTrustPolicy
+	ClientSecretHash            *string
+}
+
+// ClientCredentialsEnabled returns true if client credentials are configured
+func (s *ServiceAccount) ClientCredentialsEnabled() bool {
+	return s.ClientSecretHash != nil
 }
 
 // GetID returns the Metadata ID.
@@ -86,11 +102,12 @@ func (s *ServiceAccount) Validate() error {
 		return err
 	}
 
-	// Verify at least one trust policy is defined
+	// Verify at least one authentication method is enabled
 	policyCount := len(s.OIDCTrustPolicies)
-	if policyCount == 0 {
-		return errors.New("A minimum of one OIDC trust policy is required", errors.WithErrorCode(errors.EInvalid))
+	if policyCount == 0 && !s.ClientCredentialsEnabled() {
+		return errors.New("at least one OIDC trust policy or client credentials must be configured", errors.WithErrorCode(errors.EInvalid))
 	}
+
 	if policyCount > maximumTrustPolicies {
 		return errors.New(fmt.Sprintf("%d exceeds the limit of %d OIDC trust policies", policyCount, maximumTrustPolicies), errors.WithErrorCode(errors.EInvalid))
 	}
@@ -98,22 +115,22 @@ func (s *ServiceAccount) Validate() error {
 	for _, policy := range s.OIDCTrustPolicies {
 		// Verify issuer is defined
 		if policy.Issuer == "" {
-			return errors.New("Issuer URL is required for trust policy", errors.WithErrorCode(errors.EInvalid))
+			return errors.New("issuer URL is required for trust policy", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Verify that bound claims type is defined
 		if policy.BoundClaimsType == "" {
-			return errors.New("Bound claims type is required for trust policy", errors.WithErrorCode(errors.EInvalid))
+			return errors.New("bound claims type is required for trust policy", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Verify that issuer is a valid URL
 		if _, err := url.ParseRequestURI(policy.Issuer); err != nil {
-			return errors.New("Invalid issuer URL", errors.WithErrorCode(errors.EInvalid))
+			return errors.New("invalid issuer URL", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		// Verify at least one claim is present in each trust policy
 		if len(policy.BoundClaims) == 0 {
-			return errors.New("A minimum of one claim is required in each OIDC trust policy", errors.WithErrorCode(errors.EInvalid))
+			return errors.New("a minimum of one claim is required in each OIDC trust policy", errors.WithErrorCode(errors.EInvalid))
 		}
 
 		if policy.BoundClaimsType == BoundClaimsTypeGlob {
@@ -123,6 +140,11 @@ func (s *ServiceAccount) Validate() error {
 				}
 			}
 		}
+	}
+
+	// Verify client secret and expiration are both set or both nil
+	if (s.ClientSecretHash == nil) != (s.ClientSecretExpiresAt == nil) {
+		return errors.New("client secret and expiration must both be set or both be nil")
 	}
 
 	return nil
@@ -137,4 +159,61 @@ func (s *ServiceAccount) GetResourcePath() string {
 func (s *ServiceAccount) GetGroupPath() string {
 	resourcePath := s.GetResourcePath()
 	return resourcePath[:strings.LastIndex(resourcePath, "/")]
+}
+
+// GenerateClientSecret generates and sets a cryptographically secure client secret.
+// expiresAt is optional; if nil, defaults to maxExpirationDays from now.
+// Must be between 1 day and maxExpirationDays from now.
+// If maxExpirationDays is 0, client credentials are disabled.
+func (s *ServiceAccount) GenerateClientSecret(expiresAt *time.Time, maxExpirationDays int) (string, error) {
+	if maxExpirationDays <= 0 {
+		return "", errors.New("client credentials are disabled", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	now := time.Now()
+	minExpiration := now.Add(minClientSecretExpiration)
+	maxExpiration := now.Add(time.Duration(maxExpirationDays) * 24 * time.Hour)
+
+	expiration := maxExpiration
+	if expiresAt != nil {
+		if expiresAt.Before(minExpiration) || expiresAt.After(maxExpiration) {
+			return "", errors.New(
+				"client secret expiration must be between 1 and %d days from now", maxExpirationDays,
+				errors.WithErrorCode(errors.EInvalid),
+			)
+		}
+
+		expiration = *expiresAt
+	}
+
+	secretBytes := make([]byte, clientSecretBytes)
+	if _, err := rand.Read(secretBytes); err != nil {
+		return "", err
+	}
+
+	secret := base64.URLEncoding.EncodeToString(secretBytes)
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	s.ClientSecretHash = ptr.String(string(hash))
+	s.ClientSecretExpiresAt = ptr.Time(expiration)
+	s.SecretExpirationEmailSentAt = nil
+
+	return secret, nil
+}
+
+// VerifyClientSecret verifies the provided secret against the stored hash and checks expiration.
+func (s *ServiceAccount) VerifyClientSecret(secret string) bool {
+	if s.ClientSecretHash == nil {
+		return false
+	}
+
+	if s.ClientSecretExpiresAt != nil && time.Now().After(*s.ClientSecretExpiresAt) {
+		return false
+	}
+
+	return bcrypt.CompareHashAndPassword([]byte(*s.ClientSecretHash), []byte(secret)) == nil
 }

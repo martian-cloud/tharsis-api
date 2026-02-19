@@ -1,14 +1,20 @@
-import { Box, Button, TextField, Typography, useTheme } from '@mui/material';
-import Alert from '@mui/material/Alert';
-import Divider from '@mui/material/Divider';
+import { Alert, Box, Button, Checkbox, Divider, FormControlLabel, Link, TextField, Typography } from '@mui/material';
+import moment, { Moment } from 'moment';
 import { nanoid } from 'nanoid';
+import { useContext, useRef } from 'react';
+import { ApiConfigContext } from '../../ApiConfigContext';
 import { MutationError } from '../../common/error';
+import ExpirationDateTimePicker from './ExpirationDateTimePicker';
 import ServiceAccountFormTrustPolicy from './ServiceAccountFormTrustPolicy';
+
+export const CLIENT_CREDENTIALS_DESCRIPTION = 'Allows authentication using a client ID and secret via the client credentials grant.';
 
 export interface FormData {
     name: string
     description: string
     oidcTrustPolicies: any[]
+    enableClientCredentials: boolean
+    clientSecretExpiresAt?: Moment | null
 }
 
 interface Props {
@@ -19,39 +25,21 @@ interface Props {
 }
 
 function ServiceAccountForm({ data, onChange, editMode, error }: Props) {
-    const theme = useTheme();
+    const { serviceAccountClientSecretMaxExpirationDays: maxExpirationDays } = useContext(ApiConfigContext);
+    const initialData = useRef(data).current;
 
-    const onNewIdentityProvider = () => {
+    const onDeleteIdentityProvider = (id: string) => {
         onChange({
             ...data,
-            oidcTrustPolicies: [...data.oidcTrustPolicies, { issuer: '', boundClaims: [], _id: nanoid() }]
+            oidcTrustPolicies: data.oidcTrustPolicies.filter(p => p._id !== id)
         });
     };
 
-    const onDeleteIdentityProvider = (id: string) => {
-        const index = data.oidcTrustPolicies.findIndex(trustPolicy => trustPolicy._id === id);
-        if (index !== -1) {
-            const oidcTrustPoliciesCopy = [...data.oidcTrustPolicies];
-            oidcTrustPoliciesCopy.splice(index, 1)
-            onChange({
-                ...data,
-                oidcTrustPolicies: oidcTrustPoliciesCopy
-            });
-        }
-    };
-
     const onTrustPolicyChange = (trustPolicy: any) => {
-        // Find trust policy
-        const trustPolicyIndex = data.oidcTrustPolicies.findIndex(({ _id }) => _id === trustPolicy._id);
-        if (trustPolicyIndex !== -1) {
-            const trustPoliciesCopy = [...data.oidcTrustPolicies];
-            trustPoliciesCopy[trustPolicyIndex] = trustPolicy;
-
-            onChange({
-                ...data,
-                oidcTrustPolicies: trustPoliciesCopy
-            });
-        }
+        onChange({
+            ...data,
+            oidcTrustPolicies: data.oidcTrustPolicies.map(p => p._id === trustPolicy._id ? trustPolicy : p)
+        });
     };
 
     return (
@@ -79,29 +67,12 @@ function ServiceAccountForm({ data, onChange, editMode, error }: Props) {
                     onChange={event => onChange({ ...data, description: event.target.value })}
                 />
             </Box>
-            <Box sx={{
-                marginBottom: 1,
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                [theme.breakpoints.down('md')]: {
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    '& > *': { marginBottom: 2 },
-                }
-            }}>
-                <Box mb={1}>
-                    <Typography variant="subtitle1">Trusted Identity Providers</Typography>
-                    <Typography variant="caption" color="textSecondary">
-                        Tokens issued by the following identity providers will be able to login to this service account provided that the bound claims match the token claims
-                    </Typography>
-                </Box>
-                <Box>
-                    <Button variant="outlined" size="small" sx={{ textTransform: 'none', minWidth: 200 }} color="secondary" onClick={onNewIdentityProvider}>
-                        New Identity Provider
-                    </Button>
-                </Box>
+            <Typography sx={{ marginTop: 3 }} variant="subtitle1" gutterBottom>OIDC Authentication</Typography>
+            <Divider sx={{ opacity: 0.6 }} />
+            <Box sx={{ my: 1 }}>
+                <Typography variant="caption" color="textSecondary">
+                    Tokens issued by trusted identity providers can authenticate to this service account if the bound claims match the token claims.
+                </Typography>
             </Box>
             {data.oidcTrustPolicies.map(trustPolicy => (
                 <ServiceAccountFormTrustPolicy
@@ -111,6 +82,52 @@ function ServiceAccountForm({ data, onChange, editMode, error }: Props) {
                     onDelete={() => onDeleteIdentityProvider(trustPolicy._id)}
                 />
             ))}
+            <Button
+                variant="outlined"
+                size="small"
+                sx={{ textTransform: 'none', minWidth: 200, mt: 1, mb: 1 }}
+                color="secondary"
+                onClick={() => onChange({ ...data, oidcTrustPolicies: [...data.oidcTrustPolicies, { issuer: '', boundClaims: [], _id: nanoid() }] })}
+            >
+                New Identity Provider
+            </Button>
+            <Typography sx={{ marginTop: 3 }} variant="subtitle1" gutterBottom>Client Credentials Authentication</Typography>
+            <Divider sx={{ opacity: 0.6 }} />
+            <Box sx={{ my: 1 }}>
+                <Typography variant="caption" color="textSecondary">
+                    {CLIENT_CREDENTIALS_DESCRIPTION}{' '}
+                    <Link
+                        href="https://auth0.com/docs/get-started/authentication-and-authorization-flow/client-credentials-flow"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        underline="hover"
+                    >
+                        Learn more
+                    </Link>
+                </Typography>
+                <FormControlLabel
+                    sx={{ display: 'block', mt: 1 }}
+                    control={
+                        <Checkbox
+                            checked={data.enableClientCredentials}
+                            onChange={event => onChange({
+                                ...data,
+                                enableClientCredentials: event.target.checked,
+                                clientSecretExpiresAt: event.target.checked ? moment().add(maxExpirationDays, 'days') : null
+                            })}
+                        />
+                    }
+                    label="Enable"
+                />
+            </Box>
+            {data.enableClientCredentials && (
+                <ExpirationDateTimePicker
+                    value={data.clientSecretExpiresAt ?? null}
+                    onChange={value => onChange({ ...data, clientSecretExpiresAt: value })}
+                    maxExpirationDays={maxExpirationDays}
+                    disabled={initialData.enableClientCredentials}
+                />
+            )}
         </Box>
     );
 }

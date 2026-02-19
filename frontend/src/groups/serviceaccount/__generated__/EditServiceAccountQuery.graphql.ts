@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7e360009177ccb4543681f6d36fccf7e>>
+ * @generated SignedSource<<6e8fdbe352e65ee1499d1ef8dec59787>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,8 @@ export type EditServiceAccountQuery$variables = {
 };
 export type EditServiceAccountQuery$data = {
   readonly serviceAccount: {
+    readonly clientCredentialsEnabled: boolean;
+    readonly clientSecretExpiresAt: any | null | undefined;
     readonly createdBy: string;
     readonly description: string;
     readonly id: string;
@@ -97,6 +99,20 @@ v2 = [
       {
         "alias": null,
         "args": null,
+        "kind": "ScalarField",
+        "name": "clientCredentialsEnabled",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "clientSecretExpiresAt",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
         "concreteType": "OIDCTrustPolicy",
         "kind": "LinkedField",
         "name": "oidcTrustPolicies",
@@ -160,16 +176,16 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "cf6f817ee24850aa30984bc03ac4bfeb",
+    "cacheID": "d2ed933b81445b76758f7073cc61572d",
     "id": null,
     "metadata": {},
     "name": "EditServiceAccountQuery",
     "operationKind": "query",
-    "text": "query EditServiceAccountQuery(\n  $id: String!\n) {\n  serviceAccount(id: $id) {\n    id\n    name\n    description\n    resourcePath\n    createdBy\n    oidcTrustPolicies {\n      issuer\n      boundClaimsType\n      boundClaims {\n        name\n        value\n      }\n    }\n  }\n}\n"
+    "text": "query EditServiceAccountQuery(\n  $id: String!\n) {\n  serviceAccount(id: $id) {\n    id\n    name\n    description\n    resourcePath\n    createdBy\n    clientCredentialsEnabled\n    clientSecretExpiresAt\n    oidcTrustPolicies {\n      issuer\n      boundClaimsType\n      boundClaims {\n        name\n        value\n      }\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "cf3debf62324a0cf74626e1cd4b2e34e";
+(node as any).hash = "9a53cdf87299c5deafaba35b062b1b91";
 
 export default node;

@@ -3,9 +3,11 @@ package logger
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/exp/zapslog"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 )
@@ -17,6 +19,9 @@ type Logger interface {
 
 	// WithContextFields returns a logger with the available context fields
 	WithContextFields(ctx context.Context) Logger
+
+	// Slog returns an *slog.Logger that wraps this logger
+	Slog() *slog.Logger
 
 	// Debug uses fmt.Sprint to construct and log a message at DEBUG level
 	Debug(args ...interface{})
@@ -92,6 +97,10 @@ func (l *logger) With(args ...interface{}) Logger {
 		return &logger{l.SugaredLogger.With(args...)}
 	}
 	return l
+}
+
+func (l *logger) Slog() *slog.Logger {
+	return slog.New(zapslog.NewHandler(l.SugaredLogger.Desugar().Core()))
 }
 
 func (l *logger) WithContextFields(ctx context.Context) Logger {

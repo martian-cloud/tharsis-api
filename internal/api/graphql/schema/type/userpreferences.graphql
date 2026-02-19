@@ -17,21 +17,22 @@ type UserNamespacePreferenceEdge {
 }
 
 type UserNamespacePreferences {
-    id: ID!
-    path: String!
-    notificationPreference: UserNotificationPreference!
+  id: ID!
+  path: String!
+  notificationPreference: UserNotificationPreference!
 }
 
 type UserNotificationPreferenceCustomEvents {
-    failedRun: Boolean!
+  failedRun: Boolean!
+  serviceAccountSecretExpiration: Boolean!
 }
 
 type UserNotificationPreference {
-    inherited: Boolean!
-    global: Boolean!
-    namespacePath: String
-    scope: UserNotificationPreferenceScope!
-    customEvents: UserNotificationPreferenceCustomEvents
+  inherited: Boolean!
+  global: Boolean!
+  namespacePath: String
+  scope: UserNotificationPreferenceScope!
+  customEvents: UserNotificationPreferenceCustomEvents
 }
 
 type SetUserNotificationPreferencePayload {
@@ -41,7 +42,7 @@ type SetUserNotificationPreferencePayload {
 }
 
 type GlobalUserPreferences {
-    notificationPreference: UserNotificationPreference!
+  notificationPreference: UserNotificationPreference!
 }
 
 type UserPreferences {
@@ -64,6 +65,7 @@ type UserPreferences {
 
 input UserNotificationPreferenceCustomEventsInput {
   failedRun: Boolean!
+  serviceAccountSecretExpiration: Boolean!
 }
 
 input SetUserNotificationPreferenceInput {

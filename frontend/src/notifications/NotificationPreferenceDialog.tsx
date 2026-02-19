@@ -5,7 +5,7 @@ import { useMutation } from 'react-relay/hooks';
 import { notificationOptions } from './NotificationButton';
 import { MutationError } from '../common/error';
 import { InheritedMessage, Preference } from './NotificationButton';
-import CustomNotificationPreference from './CustomNotificationPreference';
+import CustomNotificationPreference, { CustomEvents } from './CustomNotificationPreference';
 import { NotificationPreferenceDialogMutation, UserNotificationPreferenceScope, UserNotificationPreferenceCustomEventsInput } from './__generated__/NotificationPreferenceDialogMutation.graphql';
 
 const NOTIFICATION_SCOPE_CUSTOM = 'CUSTOM' as UserNotificationPreferenceScope;
@@ -43,6 +43,7 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
                     namespacePath
                     customEvents {
                         failedRun
+                        serviceAccountSecretExpiration
                     }
                 }
                 problems {
@@ -94,15 +95,15 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
     };
 
     const handleInheritedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ... formData, inherit: event.target.checked});
+        setFormData({ ...formData, inherit: event.target.checked });
     };
 
     const handleScopeChange = (event: SelectChangeEvent) => {
-        setFormData({ ... formData, scope: event.target.value as UserNotificationPreferenceScope});
+        setFormData({ ...formData, scope: event.target.value as UserNotificationPreferenceScope });
     };
 
-    const handleFailedRunChange = (settings: { failedRun: boolean }) => {
-        setFormData({ ... formData, customEvents: { ... formData.customEvents, failedRun: settings.failedRun }});
+    const handleCustomEventsChange = (events: CustomEvents) => {
+        setFormData({ ...formData, customEvents: events });
     }
 
     const optionDescription = useMemo(() => {
@@ -180,17 +181,17 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
                                     ))}
                                 </Select>
                                 <Typography
-                                variant="caption"
-                                color="text.secondary" sx={{ mt: 1 }}>
+                                    variant="caption"
+                                    color="text.secondary" sx={{ mt: 1 }}>
                                     {optionDescription}
                                 </Typography>
-                               <InheritedMessage preferenceData={preferenceData} />
+                                <InheritedMessage preferenceData={preferenceData} />
                             </FormControl>
 
                             {preferenceData.scope === NOTIFICATION_SCOPE_CUSTOM && (
                                 <CustomNotificationPreference
-                                    failedRun={preferenceData.customEvents?.failedRun || false}
-                                    onChange={() => ({})} // No-op function since it's disabled
+                                    events={preferenceData.customEvents}
+                                    onChange={() => { }} // No-op since disabled
                                     disabled={true}
                                 />
                             )}
@@ -205,8 +206,8 @@ function NotificationPreferenceDialog({ onClose, path, preferenceData, isGlobalP
 
                     {!formData.inherit && formData.scope === NOTIFICATION_SCOPE_CUSTOM && (
                         <CustomNotificationPreference
-                            failedRun={formData.customEvents?.failedRun || false}
-                            onChange={handleFailedRunChange}
+                            events={formData.customEvents}
+                            onChange={handleCustomEventsChange}
                         />
                     )}
                 </Box>

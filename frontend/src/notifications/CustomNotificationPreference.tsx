@@ -1,12 +1,40 @@
 import { Box, Checkbox, Divider, Paper, Typography, FormControlLabel } from '@mui/material';
 
-interface Props {
+export interface CustomEvents {
     failedRun: boolean;
-    onChange: (settings: { failedRun: boolean }) => void;
+    serviceAccountSecretExpiration: boolean;
+}
+
+interface EventConfig {
+    key: keyof CustomEvents;
+    label: string;
+    description: string;
+}
+
+// Single source of truth: add new events here
+const EVENT_CONFIG: Record<string, EventConfig[]> = {
+    'Run Events': [
+        { key: 'failedRun', label: 'Failed Run', description: 'Receive a notification when a run fails' },
+    ],
+    'Service Account Events': [
+        { key: 'serviceAccountSecretExpiration', label: 'Secret Expiration', description: 'Receive a notification when a service account client secret is about to expire' },
+    ],
+};
+
+// Default values derived from EVENT_CONFIG
+const DEFAULT_CUSTOM_EVENTS = Object.fromEntries(
+    Object.values(EVENT_CONFIG).flat().map(e => [e.key, false])
+) as unknown as CustomEvents;
+
+interface Props {
+    events: Partial<CustomEvents> | null | undefined;
+    onChange: (events: CustomEvents) => void;
     disabled?: boolean;
 }
 
-function CustomNotificationPreference({ failedRun, onChange, disabled = false }: Props) {
+function CustomNotificationPreference({ events, onChange, disabled = false }: Props) {
+    const resolvedEvents: CustomEvents = { ...DEFAULT_CUSTOM_EVENTS, ...events };
+
     return (
         <Paper variant="outlined" sx={{ p: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
@@ -17,32 +45,37 @@ function CustomNotificationPreference({ failedRun, onChange, disabled = false }:
                 Select specific events you want to be notified about.
             </Typography>
 
-            <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 2 }}>
-                    Run Events
-                </Typography>
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={failedRun}
-                            onChange={(event) => onChange({ failedRun: event.target.checked })}
-                            color="primary"
-                            size="small"
-                            disabled={disabled}
+            {Object.entries(EVENT_CONFIG).map(([category, categoryEvents]) => (
+                <Box key={category} sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                        {category}
+                    </Typography>
+                    {categoryEvents.map(event => (
+                        <FormControlLabel
+                            key={event.key}
+                            control={
+                                <Checkbox
+                                    checked={resolvedEvents[event.key]}
+                                    onChange={(e) => onChange({ ...resolvedEvents, [event.key]: e.target.checked })}
+                                    color="primary"
+                                    size="small"
+                                    disabled={disabled}
+                                />
+                            }
+                            label={
+                                <Box>
+                                    <Typography variant="body2">{event.label}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {event.description}
+                                    </Typography>
+                                </Box>
+                            }
                         />
-                    }
-                    label={
-                        <Box>
-                            <Typography variant="body2">Failed Run</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Receive a notification when a run fails
-                            </Typography>
-                        </Box>
-                    }
-                />
-            </Box>
+                    ))}
+                </Box>
+            ))}
         </Paper>
     );
 }
 
-export default CustomNotificationPreference
+export default CustomNotificationPreference;
