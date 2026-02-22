@@ -1119,7 +1119,7 @@ func TestCreateClientCredentialsToken(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.NotEmpty(t, response.Token)
-			assert.Equal(t, int32(3600), response.ExpiresIn)
+			assert.Equal(t, int32(serviceAccountLoginDuration.Seconds()), response.ExpiresIn)
 		})
 	}
 }
