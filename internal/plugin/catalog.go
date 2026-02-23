@@ -26,6 +26,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore/aws"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/objectstore/filesystem"
 )
 
 // Catalog contains the available plugins
@@ -146,6 +147,8 @@ func newObjectStorePlugin(ctx context.Context, logger logger.Logger, cfg *config
 	switch cfg.ObjectStorePluginType {
 	case "aws_s3":
 		store, err = aws.New(ctx, logger, cfg.ObjectStorePluginData)
+	case "filesystem":
+		store, err = filesystem.New(logger, cfg.TharsisAPIURL, cfg.ObjectStorePluginData)
 	default:
 		err = errors.New(
 			"The specified object store %q is not currently supported", cfg.ObjectStorePluginType,

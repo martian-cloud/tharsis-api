@@ -22,6 +22,7 @@
 
 # Martian Cloud Common Ignore
 testdata/postgres/*
+testdata/objectstore/*
 **/.env*
 .env*
 .coverage

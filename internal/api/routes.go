@@ -252,6 +252,14 @@ func BuildRouter(
 			authenticator,
 			serviceCatalog.VCSService,
 		))
+
+		// Object store download endpoint (for filesystem plugin presigned URLs)
+		// This endpoint does not require authentication as it uses signed URLs
+		AddRoutes(r, controllers.NewObjectStoreController(
+			logger,
+			respWriter,
+			pluginCatalog.ObjectStore,
+		))
 	})
 
 	v1Router.Group(func(r chi.Router) {
