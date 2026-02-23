@@ -98,7 +98,7 @@ func (l *batchedLog) flush() {
 		return
 	}
 
-	l.logger.Printf("\n%sProvider caching summary...%s", ansi.Bold, ansi.Reset)
+	l.logger.Printf("\n%sProvider mirror cache summary:%s", ansi.Bold, ansi.Reset)
 
 	for _, e := range l.entries {
 		switch e.level {
@@ -109,7 +109,7 @@ func (l *batchedLog) flush() {
 		}
 	}
 
-	l.logger.Printf("%sProvider caching has been completed%s\n", ansi.Bold, ansi.Reset)
+	l.logger.Write([]byte("\n"))
 }
 
 // packagesResponse is the response for the packages endpoint.

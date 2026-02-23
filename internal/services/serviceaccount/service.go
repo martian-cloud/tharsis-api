@@ -35,7 +35,7 @@ const (
 )
 
 var (
-	serviceAccountLoginDuration = 5 * time.Minute
+	serviceAccountLoginDuration = 15 * time.Minute
 
 	errFailedCreateOIDCToken = errors.New(
 		"Failed to create service account token due to one of the "+

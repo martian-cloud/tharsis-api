@@ -357,23 +357,28 @@ func (f *ObjectStore) sanitizeKey(key string) (string, error) {
 
 // isSafePath checks if userPath resolves to a location within base directory
 func isSafePath(base, userPath string) (bool, error) {
-	resolved, err := filepath.EvalSymlinks(userPath)
+	evaluatedUserPath, err := filepath.EvalSymlinks(userPath)
 	if err != nil {
 		return false, err
 	}
 
-	absBase, err := filepath.Abs(base)
+	absUserPath, err := filepath.Abs(evaluatedUserPath)
 	if err != nil {
 		return false, err
 	}
 
-	absResolved, err := filepath.Abs(resolved)
+	evaluatedBasePath, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return false, err
+	}
+
+	absBasePath, err := filepath.Abs(evaluatedBasePath)
 	if err != nil {
 		return false, err
 	}
 
 	// Check prefix (after cleaning)
-	rel, err := filepath.Rel(absBase, absResolved)
+	rel, err := filepath.Rel(absBasePath, absUserPath)
 	if err != nil {
 		return false, err
 	}
