@@ -20,4 +20,5 @@ type ObjectStore interface {
 	GetObjectStream(ctx context.Context, key string, options *DownloadOptions) (io.ReadCloser, error)
 	GetPresignedURL(ctx context.Context, key string) (string, error)
 	DoesObjectExist(ctx context.Context, key string) (bool, error)
+	VerifyPresignedURL(ctx context.Context, urlStr string) (string, error)
 }

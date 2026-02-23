@@ -214,3 +214,8 @@ func (s *ObjectStore) GetPresignedURL(ctx context.Context, key string) (string, 
 
 	return presignedReq.URL, nil
 }
+
+// VerifyPresignedURL is not supported for AWS S3 object store
+func (s *ObjectStore) VerifyPresignedURL(context.Context, string) (string, error) {
+	return "", errors.New("verifying presigned URLs is not supported for AWS S3 object store")
+}

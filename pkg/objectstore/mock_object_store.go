@@ -136,6 +136,34 @@ func (_m *MockObjectStore) UploadObject(ctx context.Context, key string, body io
 	return r0
 }
 
+// VerifyPresignedURL provides a mock function with given fields: ctx, urlStr
+func (_m *MockObjectStore) VerifyPresignedURL(ctx context.Context, urlStr string) (string, error) {
+	ret := _m.Called(ctx, urlStr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for VerifyPresignedURL")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, urlStr)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, urlStr)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, urlStr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewMockObjectStore creates a new instance of MockObjectStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockObjectStore(t interface {
