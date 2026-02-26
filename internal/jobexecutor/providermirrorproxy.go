@@ -175,8 +175,14 @@ func newProviderMirrorProxy(
 
 	mux := chi.NewRouter()
 	mux.Get("/{hostname}/{namespace}/{type}/index.json", proxy.handleVersions)
-	mux.Get("/{hostname}/{namespace}/{type}/{version:.+\\.json}", proxy.handlePackages)
-	proxy.server = &http.Server{Handler: mux}
+	mux.Get(`/{hostname}/{namespace}/{type}/{version:.+\.json}`, proxy.handlePackages)
+	proxy.server = &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 
 	return proxy, nil
 }
