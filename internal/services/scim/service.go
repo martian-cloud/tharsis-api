@@ -59,8 +59,14 @@ type Operation struct {
 	Path  string
 }
 
-// GetSCIMResourceInput is the input for retrieving a SCIM resource.
-type GetSCIMResourceInput struct {
+// GetSCIMUsersInput is the input for retrieving a SCIM Users.
+type GetSCIMUsersInput struct {
+	SCIMExternalID *string
+	Username       *string
+}
+
+// GetSCIMGroupsInput is the input for retrieving a SCIM Groups.
+type GetSCIMGroupsInput struct {
 	SCIMExternalID string
 }
 
@@ -91,11 +97,11 @@ type DeleteSCIMResourceInput struct {
 // Service encapsulates the logic for interacting with the SCIM service.
 type Service interface {
 	CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]byte, error)
-	GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput) ([]models.User, error)
+	GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([]models.User, error)
 	CreateSCIMUser(ctx context.Context, input *CreateSCIMUserInput) (*models.User, error)
 	UpdateSCIMUser(ctx context.Context, input *UpdateResourceInput) (*models.User, error)
 	DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceInput) error
-	GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput) ([]models.Team, error)
+	GetSCIMGroups(ctx context.Context, input *GetSCIMGroupsInput) ([]models.Team, error)
 	CreateSCIMGroup(ctx context.Context, input *CreateSCIMGroupInput) (*models.Team, error)
 	UpdateSCIMGroup(ctx context.Context, input *UpdateResourceInput) (*models.Team, error)
 	DeleteSCIMGroup(ctx context.Context, input *DeleteSCIMResourceInput) error
@@ -235,22 +241,23 @@ func (s *service) CreateSCIMToken(ctx context.Context, idpIssuerURL string) ([]b
 	return scimToken, nil
 }
 
-func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput) ([]models.User, error) {
+func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMUsersInput) ([]models.User, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetSCIMUsers")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
 
 	// Any authenticated user can view basic user information.
-	if _, err := auth.AuthorizeCaller(ctx); err != nil {
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
 		tracing.RecordError(span, err, "caller authorization failed")
 		return nil, err
 	}
 
-	var users []models.User
+	users := []models.User{}
 
 	// If SCIMExternalID is specified, use that instead.
-	if input.SCIMExternalID != "" {
-		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, input.SCIMExternalID)
+	if input.SCIMExternalID != nil && *input.SCIMExternalID != "" {
+		user, err := s.dbClient.Users.GetUserBySCIMExternalID(ctx, *input.SCIMExternalID)
 		if err != nil {
 			tracing.RecordError(span, err, "failed to get a SCIM user by scimExternalID")
 			return nil, errors.Wrap(err, "failed to get a SCIM user by scimExternalID", errors.WithErrorCode(errors.ENotFound))
@@ -259,6 +266,29 @@ func (s *service) GetSCIMUsers(ctx context.Context, input *GetSCIMResourceInput)
 		// If a user is not found, do not return an error.
 		// Per SCIM, return an empty slice.
 		if user != nil {
+			users = append(users, *user)
+		}
+	} else if input.Username != nil && *input.Username != "" {
+		user, err := s.dbClient.Users.GetUserByTRN(ctx, types.UserModelType.BuildTRN(*input.Username))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get a SCIM user by username", errors.WithSpan(span))
+		}
+
+		if user == nil || user.SCIMExternalID == "" {
+			return users, nil
+		}
+
+		scimCaller, ok := caller.(*auth.SCIMCaller)
+		if !ok {
+			return nil, errors.New("caller is not a SCIM caller", errors.WithErrorCode(errors.EForbidden), errors.WithSpan(span))
+		}
+		linkedUser, err := s.dbClient.Users.GetUserByExternalID(ctx, scimCaller.GetIDPIssuerURL(), user.SCIMExternalID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to verify user external ID", errors.WithSpan(span))
+		}
+
+		// Only add user if linked to issuer
+		if linkedUser != nil {
 			users = append(users, *user)
 		}
 	} else {
@@ -529,7 +559,7 @@ func (s *service) DeleteSCIMUser(ctx context.Context, input *DeleteSCIMResourceI
 	return s.dbClient.Users.DeleteUser(ctx, user)
 }
 
-func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMResourceInput) ([]models.Team, error) {
+func (s *service) GetSCIMGroups(ctx context.Context, input *GetSCIMGroupsInput) ([]models.Team, error) {
 	ctx, span := tracer.Start(ctx, "svc.GetSCIMGroups")
 	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()

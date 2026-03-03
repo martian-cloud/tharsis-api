@@ -121,6 +121,13 @@ const (
 	GroupResourceType SCIMResourceType = "Group"
 )
 
+const (
+	scimFilterAttributeExternalID = "externalid"
+	scimFilterAttributeUsername   = "username"
+
+	scimFilterOperatorEq = "eq"
+)
+
 var (
 	// errInvalidStartIndex indicates an invalid start index for pagination
 	errInvalidStartIndex = errors.New(
@@ -139,6 +146,10 @@ var (
 		"supplied filter is invalid or not supported",
 		errors.WithErrorCode(errors.EInvalid),
 	)
+
+	// Allowed filter attributes per resource type
+	userFilterAttributes  = []string{scimFilterAttributeExternalID, scimFilterAttributeUsername}
+	groupFilterAttributes = []string{scimFilterAttributeExternalID}
 )
 
 type scimController struct {
@@ -211,14 +222,24 @@ func (c *scimController) GetUsers(w http.ResponseWriter, r *http.Request) {
 	startIndex := r.URL.Query().Get("startIndex")
 	count := r.URL.Query().Get("count")
 
-	value, err := parseFilter(filter)
+	parsedFilter, err := parseFilter(filter)
 	if err != nil {
 		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	input := &scim.GetSCIMResourceInput{
-		SCIMExternalID: value,
+	input := &scim.GetSCIMUsersInput{}
+	if parsedFilter != nil {
+		if err = parsedFilter.validate(userFilterAttributes); err != nil {
+			c.respondWithSCIMError(r.Context(), w, err)
+			return
+		}
+
+		if parsedFilter.Name == scimFilterAttributeExternalID {
+			input.SCIMExternalID = &parsedFilter.Value
+		} else if parsedFilter.Name == scimFilterAttributeUsername {
+			input.Username = &parsedFilter.Value
+		}
 	}
 
 	users, err := c.scimService.GetSCIMUsers(r.Context(), input)
@@ -329,14 +350,19 @@ func (c *scimController) GetGroups(w http.ResponseWriter, r *http.Request) {
 	startIndex := r.URL.Query().Get("startIndex")
 	count := r.URL.Query().Get("count")
 
-	value, err := parseFilter(filter)
+	parsedFilter, err := parseFilter(filter)
 	if err != nil {
 		c.respondWithSCIMError(r.Context(), w, err)
 		return
 	}
 
-	input := &scim.GetSCIMResourceInput{
-		SCIMExternalID: value,
+	input := &scim.GetSCIMGroupsInput{}
+	if parsedFilter != nil {
+		if err = parsedFilter.validate(groupFilterAttributes); err != nil {
+			c.respondWithSCIMError(r.Context(), w, err)
+			return
+		}
+		input.SCIMExternalID = parsedFilter.Value
 	}
 
 	groups, err := c.scimService.GetSCIMGroups(r.Context(), input)
@@ -538,44 +564,54 @@ func toListResponse(value interface{}, startIndex, count string) (*SCIMListRespo
 	}, nil
 }
 
-/* Filter parsing */
+// Filter represents a SCIM filter with name, value, and operator.
+type Filter struct {
+	Name  string
+	Value string
+	Op    string
+}
+
+func (f *Filter) validate(allowedAttributes []string) error {
+	if f.Op != scimFilterOperatorEq {
+		return errUnsupportedFilter
+	}
+	for _, attr := range allowedAttributes {
+		if f.Name == attr {
+			return nil
+		}
+	}
+	return errUnsupportedFilter
+}
 
 // parseFilter parses a simple request filter, such as, filter=userName Eq "john".
-// Returns an error is the filter is not supported. Currently, just returns the
-// filter value.
-func parseFilter(filter string) (string, error) {
-	parts := strings.SplitAfterN(filter, " ", 3)
+// Returns an error if the filter is not supported.
+func parseFilter(filter string) (*Filter, error) {
+	if filter == "" {
+		return nil, nil
+	}
 
+	// Check for unsupported complex filters with logical operators
+	filterLower := strings.ToLower(filter)
+	if strings.Contains(filterLower, " and ") || strings.Contains(filterLower, " or ") {
+		return nil, errUnsupportedFilter
+	}
+
+	parts := strings.SplitAfterN(filter, " ", 3)
 	if len(parts) < 3 {
-		return "", errUnsupportedFilter
+		return nil, errUnsupportedFilter
 	}
 
 	// Lowercasing as these must be case-insensitive per RFC specifications.
 	attribute := strings.ToLower(strings.TrimSpace(parts[0]))
 	operator := strings.ToLower(strings.TrimSpace(parts[1]))
-	value := strings.ToLower(strings.ReplaceAll(parts[2], "\"", "")) // Remove quotes around value.
+	value := strings.ReplaceAll(parts[2], "\"", "")
 
-	// Check if filter is supported.
-	if err := isFilterSupported(attribute, operator); err != nil {
-		return "", err
+	// Only lowercase value for externalId attribute
+	if attribute == scimFilterAttributeExternalID {
+		value = strings.ToLower(value)
 	}
 
-	return value, nil
-}
-
-// isFilterSupported returns an error if the filter is not supported.
-func isFilterSupported(attribute, operator string) error {
-	// Check if filter attribute is supported.
-	if attribute != "externalid" {
-		return errUnsupportedFilter
-	}
-
-	// Check if filter operator is supported.
-	if operator != "eq" {
-		return errUnsupportedFilter
-	}
-
-	return nil
+	return &Filter{Name: attribute, Value: value, Op: operator}, nil
 }
 
 /* Helper functions */
