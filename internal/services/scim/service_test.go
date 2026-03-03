@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -137,7 +138,9 @@ func TestCreateSCIMToken(t *testing.T) {
 }
 
 func TestGetSCIMUsers(t *testing.T) {
-	ctx := auth.WithCaller(context.Background(), &auth.SCIMCaller{})
+	issuerURL := "https://test-idp.example.com"
+	scimCaller := auth.NewSCIMCaller(nil, nil, issuerURL)
+	ctx := auth.WithCaller(context.Background(), scimCaller)
 
 	expectedUser := models.User{
 		Username:       "expected-user-name",
@@ -149,32 +152,81 @@ func TestGetSCIMUsers(t *testing.T) {
 		Admin:  false,
 		Active: false,
 	}
+
 	expectedUsersList := []models.User{expectedUser}
+
+	userWithoutSCIMID := models.User{
+		Username:       "user-no-scim",
+		Email:          "user-no-scim@example.com",
+		SCIMExternalID: "",
+		Metadata: models.ResourceMetadata{
+			ID: "no-scim-uuid",
+		},
+		Admin:  false,
+		Active: true,
+	}
 
 	testCases := []struct {
 		name          string
-		input         *GetSCIMResourceInput
+		input         *GetSCIMUsersInput
 		expectedError string
 		expectedUsers []models.User
+		mockUser      *models.User
+		mockLinked    *models.User
 	}{
 		{
 			name: "positive: SCIMExternalID is valid; expect a slice of users.",
-			input: &GetSCIMResourceInput{
-				SCIMExternalID: externalID,
+			input: &GetSCIMUsersInput{
+				SCIMExternalID: ptr.String(externalID),
 			},
 			expectedUsers: expectedUsersList,
 			// expect nil errors
 		},
 		{
 			name:          "positive: input is empty; expect a slice of all users.",
-			input:         &GetSCIMResourceInput{},
+			input:         &GetSCIMUsersInput{},
 			expectedUsers: expectedUsersList,
 		},
 		{
-			name: "negative: input has an invalid scimExternalID; expect a nil slice of users.",
-			input: &GetSCIMResourceInput{
-				SCIMExternalID: "invalid-id",
+			name: "negative: input has an invalid scimExternalID; expect a empty slice of users.",
+			input: &GetSCIMUsersInput{
+				SCIMExternalID: ptr.String("invalid-id"),
 			},
+			expectedUsers: []models.User{},
+		},
+		{
+			name: "positive: username with matching issuer URL",
+			input: &GetSCIMUsersInput{
+				Username: ptr.String("expected-user-name"),
+			},
+			mockUser:      &expectedUser,
+			mockLinked:    &expectedUser,
+			expectedUsers: []models.User{expectedUser},
+		},
+		{
+			name: "negative: username not found; expect empty slice",
+			input: &GetSCIMUsersInput{
+				Username: ptr.String("invalid-username"),
+			},
+			mockUser:      nil,
+			expectedUsers: []models.User{}, // not nil
+		},
+		{
+			name: "negative: user has no SCIM external ID; expect empty slice",
+			input: &GetSCIMUsersInput{
+				Username: ptr.String("user-no-scim"),
+			},
+			mockUser:      &userWithoutSCIMID,
+			expectedUsers: []models.User{}, // not nil
+		},
+		{
+			name: "negative: user not linked to issuer; expect empty slice",
+			input: &GetSCIMUsersInput{
+				Username: ptr.String("expected-user-name"),
+			},
+			mockUser:      &expectedUser,
+			mockLinked:    nil,
+			expectedUsers: []models.User{}, // not nil
 		},
 	}
 
@@ -188,13 +240,20 @@ func TestGetSCIMUsers(t *testing.T) {
 					SCIMExternalID: true,
 				}}
 
-			externalIDUser := &expectedUser
-			if len(test.expectedUsers) == 0 {
-				externalIDUser = nil
+			if test.input.SCIMExternalID != nil && *test.input.SCIMExternalID != "" {
+				externalIDUser := &expectedUser
+				if len(test.expectedUsers) == 0 {
+					externalIDUser = nil
+				}
+				mockUsers.On("GetUserBySCIMExternalID", mock.Anything, *test.input.SCIMExternalID).Return(externalIDUser, nil)
+			} else if test.input.Username != nil && *test.input.Username != "" {
+				mockUsers.On("GetUserByTRN", mock.Anything, types.UserModelType.BuildTRN(*test.input.Username)).Return(test.mockUser, nil)
+				if test.mockUser != nil && test.mockUser.SCIMExternalID != "" {
+					mockUsers.On("GetUserByExternalID", mock.Anything, issuerURL, test.mockUser.SCIMExternalID).Return(test.mockLinked, nil)
+				}
+			} else {
+				mockUsers.On("GetUsers", mock.Anything, getUsersInput).Return(&db.UsersResult{Users: expectedUsersList}, nil)
 			}
-
-			mockUsers.On("GetUserBySCIMExternalID", mock.Anything, test.input.SCIMExternalID).Return(externalIDUser, nil)
-			mockUsers.On("GetUsers", mock.Anything, getUsersInput).Return(&db.UsersResult{Users: expectedUsersList}, nil)
 
 			dbClient := &db.Client{
 				Users: &mockUsers,
@@ -559,13 +618,13 @@ func TestGetSCIMGroups(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		input              *GetSCIMResourceInput
+		input              *GetSCIMGroupsInput
 		expectedError      string
 		expectedSCIMGroups []models.Team
 	}{
 		{
 			name: "positive: SCIMExternalID is valid; expect a slice of SCIM groups (teams).",
-			input: &GetSCIMResourceInput{
+			input: &GetSCIMGroupsInput{
 				SCIMExternalID: getFilter("externalId", expectedSCIMGroup.SCIMExternalID),
 			},
 			expectedSCIMGroups: expectedSCIMGroupsList,
@@ -573,12 +632,12 @@ func TestGetSCIMGroups(t *testing.T) {
 		},
 		{
 			name:               "positive: SCIMExternalID is empty; expect a slice of all SCIM groups (teams).",
-			input:              &GetSCIMResourceInput{},
+			input:              &GetSCIMGroupsInput{},
 			expectedSCIMGroups: expectedSCIMGroupsList,
 		},
 		{
 			name: "negative: input has an invalid scimExternalID; expect a nil slice of users.",
-			input: &GetSCIMResourceInput{
+			input: &GetSCIMGroupsInput{
 				SCIMExternalID: "invalid-id",
 			},
 		},
