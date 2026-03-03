@@ -304,7 +304,13 @@ func TestVerifyPresignedURL(t *testing.T) {
 		parsed, _ := url.Parse(validURL)
 		query := parsed.Query()
 		sig := query.Get("X-Amz-Signature")
-		query.Set("X-Amz-Signature", sig[:len(sig)-1]+"0")
+		// Flip the last character to ensure it's different from original
+		lastChar := sig[len(sig)-1]
+		if lastChar == '0' {
+			query.Set("X-Amz-Signature", sig[:len(sig)-1]+"1")
+		} else {
+			query.Set("X-Amz-Signature", sig[:len(sig)-1]+"0")
+		}
 		parsed.RawQuery = query.Encode()
 
 		_, err := store.VerifyPresignedURL(ctx, parsed.RequestURI())
