@@ -37,20 +37,37 @@ func TestGPGKeys_CreateGPGKey(t *testing.T) {
 		name            string
 		expectErrorCode errors.CodeType
 		keyID           uint64
+		fingerprint     string
 		groupID         string
 		asciiArmor      string
 	}
 
 	testCases := []testCase{
 		{
-			name:       "create gpg key",
-			keyID:      12345,
-			groupID:    group.Metadata.ID,
-			asciiArmor: "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest key data\n-----END PGP PUBLIC KEY BLOCK-----",
+			name:        "create gpg key",
+			keyID:       12345,
+			fingerprint: "ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+			groupID:     group.Metadata.ID,
+			asciiArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest key data\n-----END PGP PUBLIC KEY BLOCK-----",
+		},
+		{
+			name:        "create gpg key with high bit set (appears negative in BIGINT)",
+			keyID:       0x8ABCDEF012345678, // High bit set, stored as negative int64 in DB
+			fingerprint: "8ABCDEF012345678FEDCBA9876543210FEDCBA98",
+			groupID:     group.Metadata.ID,
+			asciiArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\nP625W9vdaha6AVmlKJgBALpkqlOhfDJW5ZYktZxIj15ZaFMtW8te+pWfXQonJjoF\n=EU1P\n-----END PGP PUBLIC KEY BLOCK-----",
+		},
+		{
+			name:        "create gpg key with negative ID (regression test)",
+			keyID:       0x8013E3B43CBDD845, // High bit set, stored as negative int64 in DB
+			fingerprint: "F760FB8604F061525099C74A9813E3B43CBDD842",
+			groupID:     group.Metadata.ID,
+			asciiArmor:  "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest negative\n-----END PGP PUBLIC KEY BLOCK-----",
 		},
 		{
 			name:            "create gpg key with invalid group ID",
 			keyID:           67890,
+			fingerprint:     "1234567890ABCDEF1234567890ABCDEF12345678",
 			groupID:         invalidID,
 			asciiArmor:      "-----BEGIN PGP PUBLIC KEY BLOCK-----\ntest key data\n-----END PGP PUBLIC KEY BLOCK-----",
 			expectErrorCode: errors.EInternal,
@@ -60,10 +77,11 @@ func TestGPGKeys_CreateGPGKey(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			gpgKey, err := testClient.client.GPGKeys.CreateGPGKey(ctx, &models.GPGKey{
-				GPGKeyID:   test.keyID,
-				GroupID:    test.groupID,
-				ASCIIArmor: test.asciiArmor,
-				CreatedBy:  "db-integration-tests",
+				GPGKeyID:    test.keyID,
+				Fingerprint: test.fingerprint,
+				GroupID:     test.groupID,
+				ASCIIArmor:  test.asciiArmor,
+				CreatedBy:   "db-integration-tests",
 			})
 
 			if test.expectErrorCode != "" {
