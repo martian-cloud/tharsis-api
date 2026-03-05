@@ -247,7 +247,7 @@ func (t *terraformProviderVersions) CreateProviderVersion(ctx context.Context, p
 					"updated_at":            timestamp,
 					"provider_id":           providerVersion.ProviderID,
 					"provider_sem_version":  providerVersion.SemanticVersion,
-					"gpg_key_id":            providerVersion.GPGKeyID,
+					"gpg_key_id":            castUint64PtrToInt64Ptr(providerVersion.GPGKeyID), // Cast *uint64 to *int64 for PostgreSQL
 					"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
 					"protocols":             protocolsJSON,
 					"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
@@ -302,7 +302,7 @@ func (t *terraformProviderVersions) UpdateProviderVersion(ctx context.Context, p
 					goqu.Record{
 						"version":               goqu.L("? + ?", goqu.C("version"), 1),
 						"updated_at":            timestamp,
-						"gpg_key_id":            providerVersion.GPGKeyID,
+						"gpg_key_id":            castUint64PtrToInt64Ptr(providerVersion.GPGKeyID), // Cast *uint64 to *int64 for PostgreSQL
 						"gpg_ascii_armor":       providerVersion.GPGASCIIArmor,
 						"protocols":             protocolsJSON,
 						"sha_sums_uploaded":     providerVersion.SHASumsUploaded,
@@ -419,6 +419,7 @@ func (t *terraformProviderVersions) getSelectFields() []interface{} {
 
 func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion, error) {
 	var groupPath, providerName string
+	var gpgKeyID *int64 // Scan as *int64 from PostgreSQL BIGINT
 	providerVersion := &models.TerraformProviderVersion{}
 
 	fields := []interface{}{
@@ -428,7 +429,7 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		&providerVersion.Metadata.Version,
 		&providerVersion.ProviderID,
 		&providerVersion.SemanticVersion,
-		&providerVersion.GPGKeyID,
+		&gpgKeyID, // Scan into *int64
 		&providerVersion.GPGASCIIArmor,
 		&providerVersion.Protocols,
 		&providerVersion.SHASumsUploaded,
@@ -445,6 +446,12 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 		return nil, err
 	}
 
+	// Cast *int64 to *uint64 for the model
+	if gpgKeyID != nil {
+		val := uint64(*gpgKeyID)
+		providerVersion.GPGKeyID = &val
+	}
+
 	providerVersion.Metadata.TRN = types.TerraformProviderVersionModelType.BuildTRN(
 		groupPath,
 		providerName,
@@ -452,4 +459,13 @@ func scanTerraformProviderVersion(row scanner) (*models.TerraformProviderVersion
 	)
 
 	return providerVersion, nil
+}
+
+// castUint64PtrToInt64Ptr casts *uint64 to *int64 for PostgreSQL BIGINT storage
+func castUint64PtrToInt64Ptr(val *uint64) *int64 {
+	if val == nil {
+		return nil
+	}
+	result := int64(*val)
+	return &result
 }

@@ -142,7 +142,7 @@ func (t *terraformGPGKeys) GetGPGKeys(ctx context.Context, input *GetGPGKeysInpu
 
 	if input.Filter != nil {
 		if input.Filter.GPGKeyID != nil {
-			ex = ex.Append(goqu.I("gpg_keys.gpg_key_id").Eq(*input.Filter.GPGKeyID))
+			ex = ex.Append(goqu.I("gpg_keys.gpg_key_id").Eq(int64(*input.Filter.GPGKeyID))) // Cast uint64 to int64 for DB query
 		}
 
 		if input.Filter.KeyIDs != nil {
@@ -232,7 +232,7 @@ func (t *terraformGPGKeys) CreateGPGKey(ctx context.Context, gpgKey *models.GPGK
 						"created_at":  timestamp,
 						"updated_at":  timestamp,
 						"group_id":    gpgKey.GroupID,
-						"gpg_key_id":  gpgKey.GPGKeyID,
+						"gpg_key_id":  int64(gpgKey.GPGKeyID), // Cast uint64 to int64 for PostgreSQL BIGINT
 						"fingerprint": gpgKey.Fingerprint,
 						"ascii_armor": gpgKey.ASCIIArmor,
 						"created_by":  gpgKey.CreatedBy,
@@ -346,6 +346,7 @@ func (t *terraformGPGKeys) getSelectFields() []interface{} {
 
 func scanGPGKey(row scanner) (*models.GPGKey, error) {
 	var groupPath string
+	var gpgKeyID int64 // Scan as int64 from PostgreSQL BIGINT
 	gpgKey := &models.GPGKey{}
 
 	fields := []interface{}{
@@ -354,7 +355,7 @@ func scanGPGKey(row scanner) (*models.GPGKey, error) {
 		&gpgKey.Metadata.LastUpdatedTimestamp,
 		&gpgKey.Metadata.Version,
 		&gpgKey.GroupID,
-		&gpgKey.GPGKeyID,
+		&gpgKeyID, // Scan into int64
 		&gpgKey.Fingerprint,
 		&gpgKey.ASCIIArmor,
 		&gpgKey.CreatedBy,
@@ -366,6 +367,8 @@ func scanGPGKey(row scanner) (*models.GPGKey, error) {
 		return nil, err
 	}
 
+	// Cast int64 to uint64 for the model
+	gpgKey.GPGKeyID = uint64(gpgKeyID)
 	gpgKey.Metadata.TRN = types.GPGKeyModelType.BuildTRN(groupPath, gpgKey.Fingerprint)
 
 	return gpgKey, nil
