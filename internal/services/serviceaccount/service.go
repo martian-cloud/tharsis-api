@@ -2,7 +2,9 @@
 package serviceaccount
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -24,8 +26,8 @@ import (
 )
 
 const (
-	failedToVerifyJWSSignature = "Failed to verify token could not verify message using any of the signatures or keys"
-	expiredTokenDetector       = "Failed to verify token exp not satisfied"
+	failedToVerifyJWSSignature = "failed to verify token: could not verify message using any of the signatures or keys"
+	expiredTokenDetector       = `"exp" not satisfied`
 )
 
 // Grant types for service account tokens
@@ -36,18 +38,6 @@ const (
 
 var (
 	serviceAccountLoginDuration = 15 * time.Minute
-
-	errFailedCreateOIDCToken = errors.New(
-		"Failed to create service account token due to one of the "+
-			"following reasons: the service account does not exist; the JWT token used as input is invalid; the issuer "+
-			"for the token is not a valid issuer.",
-		errors.WithErrorCode(errors.EUnauthorized),
-	)
-
-	errExpiredToken = errors.New(
-		"failed to create service account token due to an expired token",
-		errors.WithErrorCode(errors.EUnauthorized),
-	)
 
 	errFailedCreateClientCredentialsToken = errors.New(
 		"failed to create service account token due to one of the following reasons: "+
@@ -127,6 +117,51 @@ type DeleteServiceAccountInput struct {
 type ResetClientCredentialsInput struct {
 	ID                    string
 	ClientSecretExpiresAt *time.Time
+}
+
+// newLoginError returns an error wrapping with serviceAccount and tokenClaims
+func createGenericOIDCLoginError(serviceAccountID string, token jwt.Token) error {
+	msg := fmt.Sprintf("failed to create service account token for service account %q due to one of the following reasons: "+
+		"the service account does not exist; the JWT token used as input is invalid; the issuer "+
+		"for the token is not a valid issuer; the claims in the token do not satisfy the trust policy requirements",
+		serviceAccountID)
+
+	claimsJSON, err := extractClaimsFromToken(token)
+	if err == nil {
+		msg += fmt.Sprintf("; token claims provided: %s", claimsJSON)
+	}
+
+	return errors.New(msg, errors.WithErrorCode(errors.EUnauthorized))
+}
+
+func extractClaimsFromToken(token jwt.Token) (string, error) {
+	claims := token.PrivateClaims()
+	if iss := token.Issuer(); iss != "" {
+		claims["iss"] = iss
+	}
+	if aud := token.Audience(); len(aud) > 0 {
+		claims["aud"] = aud
+	}
+	if sub := token.Subject(); sub != "" {
+		claims["sub"] = sub
+	}
+	if exp := token.Expiration(); !exp.IsZero() {
+		claims["exp"] = exp.Unix()
+	}
+	if nbf := token.NotBefore(); !nbf.IsZero() {
+		claims["nbf"] = nbf.Unix()
+	}
+	if iat := token.IssuedAt(); !iat.IsZero() {
+		claims["iat"] = iat.Unix()
+	}
+	if jti := token.JwtID(); jti != "" {
+		claims["jti"] = jti
+	}
+	claimsBytes, marshalErr := json.Marshal(claims)
+	if marshalErr != nil {
+		return "", errors.Wrap(marshalErr, "unable to marshal token claims")
+	}
+	return string(claimsBytes), nil
 }
 
 // Service implements all service account related functionality
@@ -602,25 +637,58 @@ func (s *service) UpdateServiceAccount(ctx context.Context, input *UpdateService
 
 func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInput) (*CreateTokenResponse, error) {
 	ctx, span := tracer.Start(ctx, "svc.CreateOIDCToken")
-	// TODO: Consider setting trace/span attributes for the input.
 	defer span.End()
+
+	// Validate service account ID
+	var validationErrors []string
+	serviceAccountID := strings.TrimSpace(input.ServiceAccountPublicID)
+
+	if serviceAccountID == "" {
+		validationErrors = append(validationErrors, "service account ID is empty")
+	} else if types.IsTRN(serviceAccountID) {
+		_, resourcePathErr := types.ServiceAccountModelType.ResourcePathFromTRN(serviceAccountID)
+		if resourcePathErr != nil {
+			validationErrors = append(validationErrors, fmt.Sprintf("service account path is not valid - %s", resourcePathErr.Error()))
+		}
+	}
+
+	// Check if token is empty
+	if len(bytes.TrimSpace(input.Token)) == 0 {
+		validationErrors = append(validationErrors, "service account token is empty")
+	}
+
+	// If there are validation errors, return them all
+	if len(validationErrors) > 0 {
+		errorMsg := strings.Join(validationErrors, "; ")
+		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account: %s", errorMsg)
+		return nil, errors.New(errorMsg, errors.WithErrorCode(errors.EUnauthorized))
+	}
 
 	// Parse token
 	token, err := jwt.Parse(input.Token, jwt.WithVerify(false))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode token", errors.WithErrorCode(errors.EUnauthorized), errors.WithSpan(span))
+		// Check if the error is due to token expiration
+		if strings.Contains(err.Error(), expiredTokenDetector) {
+			s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s; token is expired", input.ServiceAccountPublicID)
+			return nil, errors.New("failed to create token for service account %s - token is expired", input.ServiceAccountPublicID,
+				errors.WithErrorCode(errors.EUnauthorized),
+			)
+		}
+		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s; token is not a valid JWT", input.ServiceAccountPublicID)
+		return nil, errors.Wrap(err, "failed to create token for service account %s - token is not a valid JWT", input.ServiceAccountPublicID,
+			errors.WithErrorCode(errors.EUnauthorized),
+		)
 	}
 
 	// Check if token is from a valid issuer associated with the service account
 	issuer := token.Issuer()
 	if issuer == "" {
-		return nil, errors.New("JWT is missing issuer claim", errors.WithErrorCode(errors.EUnauthorized), errors.WithSpan(span))
-	}
-
-	if input.ServiceAccountPublicID == "" {
-		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account; service account ID is empty")
-		tracing.RecordError(span, nil, "service account ID is empty")
-		return nil, errFailedCreateOIDCToken
+		return nil, errors.Wrap(
+			err,
+			"failed to create token for service account %s - issuer claim in token is empty",
+			input.ServiceAccountPublicID,
+			errors.WithErrorCode(errors.EUnauthorized),
+		)
 	}
 
 	// Get service account based on the ID type (TRN or GID)
@@ -633,17 +701,13 @@ func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInp
 
 	if err != nil || serviceAccount == nil {
 		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account; service account %s does not exist", input.ServiceAccountPublicID)
-		tracing.RecordError(span, nil,
-			"failed to create token for service account; service account does not exist")
-		return nil, errFailedCreateOIDCToken
+		return nil, createGenericOIDCLoginError(input.ServiceAccountPublicID, token)
 	}
 
 	trustPolicies := s.findMatchingTrustPolicies(issuer, serviceAccount.OIDCTrustPolicies)
 	if len(trustPolicies) == 0 {
-		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.GetResourcePath(), issuer)
-		tracing.RecordError(span, nil,
-			"failed to create token for service account; issuer not found in trust policy")
-		return nil, errFailedCreateOIDCToken
+		s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s; issuer %s not found in trust policy", serviceAccount.Metadata.TRN, issuer)
+		return nil, createGenericOIDCLoginError(input.ServiceAccountPublicID, token)
 	}
 
 	// One satisfied trust policy is sufficient for service account token creation.
@@ -657,19 +721,8 @@ func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInp
 			// Catch bubbled-up invalid token signature errors here.
 			if strings.Contains(err.Error(), failedToVerifyJWSSignature) {
 				s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s due to invalid token signature",
-					serviceAccount.GetResourcePath())
-				tracing.RecordError(span, nil,
-					"failed to create token for service account; invalid token signature")
-				return nil, errFailedCreateOIDCToken
-			}
-
-			// Catch token expiration here.  An expired token will be expired for all trust policies.
-			if strings.Contains(err.Error(), expiredTokenDetector) {
-				s.logger.WithContextFields(ctx).Infof("Failed to create token for service account %s due to expired token",
-					serviceAccount.GetResourcePath())
-				tracing.RecordError(span, nil,
-					"failed to create token for service account; expired token")
-				return nil, errExpiredToken
+					serviceAccount.Metadata.TRN)
+				return nil, createGenericOIDCLoginError(input.ServiceAccountPublicID, token)
 			}
 
 			// Record this claim mismatch in case no other, later trust policy is satisfied
@@ -685,11 +738,7 @@ func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInp
 
 	// We know there was at least one trust policy checked, otherwise we would have returned before the for loop.
 	// To get here, all of the trust policies that were checked must have failed.
-	return nil, errors.New(
-		fmt.Sprintf("of the trust policies for issuer %s, none was satisfied", issuer),
-		errors.WithErrorCode(errors.EUnauthorized),
-		errors.WithSpan(span),
-	)
+	return nil, createGenericOIDCLoginError(input.ServiceAccountPublicID, token)
 }
 
 func (s *service) CreateClientCredentialsToken(ctx context.Context, input *CreateClientCredentialsTokenInput) (*CreateTokenResponse, error) {

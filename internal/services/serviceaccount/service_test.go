@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -744,9 +745,18 @@ func TestCreateOIDCToken(t *testing.T) {
 		},
 	}
 
+	genericErrPrefix := fmt.Sprintf(
+		"failed to create service account token for service account %q due to one of the following reasons: "+
+			"the service account does not exist; the JWT token used as input is invalid; "+
+			"the issuer for the token is not a valid issuer; "+
+			"the claims in the token do not satisfy the trust policy requirements",
+		serviceAccountTRN,
+	)
+
 	// Test cases
 	tests := []struct {
 		expectErr      error
+		verifyErr      error
 		name           string
 		serviceAccount string
 		policy         []models.OIDCTrustPolicy
@@ -754,15 +764,38 @@ func TestCreateOIDCToken(t *testing.T) {
 		isTRN          bool
 	}{
 		{
-			name:           "subject claim doesn't match",
+			name:           "empty token",
 			serviceAccount: serviceAccountID,
+			token:          []byte(""),
+			policy:         basicPolicy,
+			expectErr:      errors.New("service account token is empty"),
+		},
+		{
+			name:           "whitespace-only token",
+			serviceAccount: serviceAccountID,
+			token:          []byte("   \t\n  "),
+			policy:         basicPolicy,
+			expectErr:      errors.New("service account token is empty"),
+		},
+		{
+			name:           "extremely long invalid token",
+			serviceAccount: serviceAccountTRN,
+			token:          []byte(string(make([]byte, 10000)) + "invalidtoken"),
+			policy:         basicPolicy,
+			expectErr:      errors.New("failed to create token for service account trn:service_account:groupA/serviceAccount1 - token is not a valid JWT"),
+			isTRN:          true,
+		},
+		{
+			name:           "subject claim doesn't match",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "invalidsubject", time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      errors.New("of the trust policies for issuer https://test.tharsis, none was satisfied"),
+			expectErr:      errors.New(genericErrPrefix),
+			isTRN:          true,
 		},
 		{
 			name:           "no matching trust policy",
-			serviceAccount: serviceAccountID,
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy: []models.OIDCTrustPolicy{
 				{
@@ -770,35 +803,46 @@ func TestCreateOIDCToken(t *testing.T) {
 					BoundClaims: map[string]string{},
 				},
 			},
-			expectErr: errFailedCreateOIDCToken,
+			expectErr: errors.New(genericErrPrefix),
+			isTRN:     true,
 		},
 		{
 			name:           "empty trust policy",
-			serviceAccount: serviceAccountID,
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         []models.OIDCTrustPolicy{},
-			expectErr:      errFailedCreateOIDCToken,
+			expectErr:      errors.New(genericErrPrefix),
+			isTRN:          true,
 		},
 		{
 			name:           "invalid token",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          []byte("invalidtoken"),
 			policy:         basicPolicy,
-			expectErr:      errors.New("failed to decode token: invalid JWT"),
+			expectErr:      errors.New("failed to create token for service account trn:service_account:groupA/serviceAccount1 - token is not a valid JWT"),
+			isTRN:          true,
 		},
 		{
 			name:           "missing issuer",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, "", sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      errors.New("JWT is missing issuer claim"),
+			expectErr:      errors.New("failed to create token for service account trn:service_account:groupA/serviceAccount1 - issuer claim in token is empty"),
+			isTRN:          true,
 		},
 		{
 			name:           "empty service account ID",
 			serviceAccount: "",
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
 			policy:         basicPolicy,
-			expectErr:      errFailedCreateOIDCToken,
+			expectErr:      errors.New("service account ID is empty"),
+		},
+		{
+			name:           "whitespace-only service account path",
+			serviceAccount: "   ",
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy:         basicPolicy,
+			expectErr:      errors.New("service account ID is empty"),
 		},
 		{
 			name:           "using TRN as service account ID",
@@ -815,7 +859,7 @@ func TestCreateOIDCToken(t *testing.T) {
 		},
 		{
 			name:           "negative: multiple trust policies with same issuer: all mismatch",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "noMatchSubject", time.Now().Add(time.Minute)),
 			policy: []models.OIDCTrustPolicy{
 				{
@@ -827,11 +871,12 @@ func TestCreateOIDCToken(t *testing.T) {
 					BoundClaims: map[string]string{"sub": "secondSubject"},
 				},
 			},
-			expectErr: errors.New("of the trust policies for issuer https://test.tharsis, none was satisfied"),
+			expectErr: errors.New(genericErrPrefix),
+			isTRN:     true,
 		},
 		{
 			name:           "positive: multiple trust policies with same issuer: match first",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "firstSubject", time.Now().Add(time.Minute)),
 			policy: []models.OIDCTrustPolicy{
 				{
@@ -843,10 +888,11 @@ func TestCreateOIDCToken(t *testing.T) {
 					BoundClaims: map[string]string{"sub": "secondSubject"},
 				},
 			},
+			isTRN: true,
 		},
 		{
 			name:           "positive: multiple trust policies with same issuer: match second",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, issuer, "secondSubject", time.Now().Add(time.Minute)),
 			policy: []models.OIDCTrustPolicy{
 				{
@@ -858,10 +904,11 @@ func TestCreateOIDCToken(t *testing.T) {
 					BoundClaims: map[string]string{"sub": "secondSubject"},
 				},
 			},
+			isTRN: true,
 		},
 		{
 			name:           "positive: trust policy issuer has forward slash, token issuer does not",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, "https://test.tharsis", sub, time.Now().Add(time.Minute)),
 			policy: []models.OIDCTrustPolicy{
 				{
@@ -869,10 +916,11 @@ func TestCreateOIDCToken(t *testing.T) {
 					BoundClaims: map[string]string{},
 				},
 			},
+			isTRN: true,
 		},
 		{
 			name:           "positive: token issuer has forward slash, trust policy issuer does not",
-			serviceAccount: "groupA/serviceAccount1",
+			serviceAccount: serviceAccountTRN,
 			token:          createJWT(t, validKeyPair.priv, keyID, "https://test.tharsis/", sub, time.Now().Add(time.Minute)),
 			policy: []models.OIDCTrustPolicy{
 				{
@@ -880,6 +928,24 @@ func TestCreateOIDCToken(t *testing.T) {
 					BoundClaims: map[string]string{},
 				},
 			},
+			isTRN: true,
+		},
+		{
+			name:           "negative: expired token",
+			serviceAccount: serviceAccountTRN,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(-time.Minute)),
+			policy:         basicPolicy,
+			expectErr:      errors.New("failed to create token for service account trn:service_account:groupA/serviceAccount1 - token is expired"),
+			isTRN:          true,
+		},
+		{
+			name:           "negative: invalid signature",
+			serviceAccount: serviceAccountTRN,
+			token:          createJWT(t, validKeyPair.priv, keyID, issuer, sub, time.Now().Add(time.Minute)),
+			policy:         basicPolicy,
+			verifyErr:      terrs.New(failedToVerifyJWSSignature, terrs.WithErrorCode(terrs.EUnauthorized)),
+			expectErr:      errors.New(genericErrPrefix),
+			isTRN:          true,
 		},
 	}
 	for _, test := range tests {
@@ -901,7 +967,7 @@ func TestCreateOIDCToken(t *testing.T) {
 			// Set up the appropriate mock based on whether we're testing with a TRN or GID
 			if test.serviceAccount != "" {
 				if test.isTRN {
-					mockServiceAccounts.On("GetServiceAccountByTRN", mock.Anything, test.serviceAccount).Return(&sa, nil)
+					mockServiceAccounts.On("GetServiceAccountByTRN", mock.Anything, test.serviceAccount).Return(&sa, nil).Maybe()
 				} else {
 					mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, mock.Anything).Return(&sa, nil).Maybe()
 				}
@@ -936,6 +1002,11 @@ func TestCreateOIDCToken(t *testing.T) {
 			mockTokenVerifier.On("VerifyToken", mock.Anything, string(test.token), mock.Anything).Return(
 				nil,
 				func(_ context.Context, token string, validationOptions []jwt.ValidateOption) error {
+					if test.verifyErr != nil {
+						return test.verifyErr
+					}
+
+					// Validate JWT claims (expiration, etc.)
 					parseOptions := []jwt.ParseOption{
 						jwt.WithVerify(false),
 						jwt.WithValidate(true),
@@ -976,7 +1047,7 @@ func TestCreateOIDCToken(t *testing.T) {
 
 				assert.Equal(t, &expected, resp)
 			} else {
-				assert.EqualError(t, err, test.expectErr.Error())
+				assert.Contains(t, err.Error(), test.expectErr.Error())
 			}
 		})
 	}
