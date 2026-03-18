@@ -1,0 +1,24 @@
+<h6 class="text">
+    Signing Key Decommissioning
+</h6>
+<hr class="divider" />
+
+<div class="alert-warning">
+    <p class="text">
+        A signing key has entered the decommissioning state and will be permanently deleted on <strong>{{.this.DeletionTime.Format "January 2, 2006 at 3:04 PM MST"}}</strong>.
+    </p>
+</div>
+
+<p class="text">
+    <strong>Signing Key ID:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.KeyID}}
+</p>
+
+<p class="text">
+    <strong>Entered decommissioning state on:</strong>
+</p>
+<p class="text gutter-bottom">
+    {{.this.DecommissioningStartedAt.Format "January 2, 2006 at 3:04 PM MST"}}
+</p>
