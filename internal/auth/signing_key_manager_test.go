@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	jwsplugin "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/jws"
@@ -397,7 +398,7 @@ func TestNewSigningKeyManager(t *testing.T) {
 
 			tc.setupMocks(mockAsymSigningKeys, mockJWSPlugin)
 
-			result, err := newSigningKeyManager(ctx, logger, mockJWSPlugin, mockDBClient, mockEventManager, tc.config, false)
+			result, err := newSigningKeyManager(ctx, logger, mockJWSPlugin, mockDBClient, mockEventManager, tc.config, nil, false)
 
 			if tc.expectErrorMessage != "" {
 				require.Error(t, err)
@@ -757,7 +758,7 @@ func TestSigningKeyManager_rotateKey(t *testing.T) {
 			name: "successful key rotation",
 			setupMocks: func(mockAsymSigningKeys *db.MockAsymSigningKeys, mockTransactions *db.MockTransactions, mockJWSPlugin *jwsplugin.MockProvider) {
 				expiredKey := &models.AsymSigningKey{
-					Metadata: models.ResourceMetadata{ID: "expired-key"},
+					Metadata: models.ResourceMetadata{ID: "expired-key", LastUpdatedTimestamp: ptr.Time(time.Now())},
 					Status:   models.AsymSigningKeyStatusActive,
 				}
 
@@ -790,9 +791,12 @@ func TestSigningKeyManager_rotateKey(t *testing.T) {
 
 			mockAsymSigningKeys := db.NewMockAsymSigningKeys(t)
 			mockTransactions := db.NewMockTransactions(t)
+			mockUsers := db.NewMockUsers(t)
+			mockUsers.On("GetUsers", mock.Anything, mock.Anything).Return(&db.UsersResult{Users: []models.User{}}, nil).Maybe()
 			mockDBClient := &db.Client{
 				AsymSigningKeys: mockAsymSigningKeys,
 				Transactions:    mockTransactions,
+				Users:           mockUsers,
 			}
 			mockJWSPlugin := jwsplugin.NewMockProvider(t)
 
@@ -802,6 +806,7 @@ func TestSigningKeyManager_rotateKey(t *testing.T) {
 				jwsPlugin:             mockJWSPlugin,
 				dbClient:              mockDBClient,
 				logger:                logger,
+				emailClient:           email.NewMockClient(t),
 				jwsProviderPluginType: "test-plugin",
 			}
 
@@ -817,6 +822,7 @@ func TestSigningKeyManager_rotateKey(t *testing.T) {
 				assert.Contains(t, err.Error(), tc.expectErrorMessage)
 			} else {
 				require.NoError(t, err)
+				time.Sleep(50 * time.Millisecond) // Wait for background goroutine
 			}
 		})
 	}
@@ -901,8 +907,9 @@ func TestSigningKeyManager_checkForExpiredKey(t *testing.T) {
 				oldTime := time.Now().Add(-24 * time.Hour)
 				expiredKey := models.AsymSigningKey{
 					Metadata: models.ResourceMetadata{
-						ID:                "expired-key",
-						CreationTimestamp: &oldTime,
+						ID:                   "expired-key",
+						CreationTimestamp:    &oldTime,
+						LastUpdatedTimestamp: ptr.Time(time.Now()),
 					},
 					Status: models.AsymSigningKeyStatusActive,
 				}
@@ -968,9 +975,12 @@ func TestSigningKeyManager_checkForExpiredKey(t *testing.T) {
 
 			mockAsymSigningKeys := db.NewMockAsymSigningKeys(t)
 			mockTransactions := db.NewMockTransactions(t)
+			mockUsers := db.NewMockUsers(t)
+			mockUsers.On("GetUsers", mock.Anything, mock.Anything).Return(&db.UsersResult{Users: []models.User{}}, nil).Maybe()
 			mockDBClient := &db.Client{
 				AsymSigningKeys: mockAsymSigningKeys,
 				Transactions:    mockTransactions,
+				Users:           mockUsers,
 			}
 			mockJWSPlugin := jwsplugin.NewMockProvider(t)
 
@@ -980,12 +990,135 @@ func TestSigningKeyManager_checkForExpiredKey(t *testing.T) {
 				jwsPlugin:             mockJWSPlugin,
 				dbClient:              mockDBClient,
 				logger:                logger,
+				emailClient:           email.NewMockClient(t),
 				keyRotationPeriod:     6 * time.Hour,
 				jwsProviderPluginType: "test-plugin",
 			}
 
 			err := manager.checkForExpiredKey(ctx)
 			require.NoError(t, err)
+			time.Sleep(50 * time.Millisecond) // Wait for background goroutine
+		})
+	}
+}
+
+func TestSigningKeyManager_sendKeyDecommissionAlert(t *testing.T) {
+	now := time.Now()
+	decommissionedKey := &models.AsymSigningKey{
+		Metadata: models.ResourceMetadata{
+			ID:                   "key-1",
+			LastUpdatedTimestamp: &now,
+		},
+		Status: models.AsymSigningKeyStatusDecommissioning,
+	}
+
+	adminUser1 := models.User{
+		Metadata: models.ResourceMetadata{ID: "admin-1"},
+		Email:    "admin1@example.com",
+		Admin:    true,
+		Active:   true,
+	}
+
+	adminUser2 := models.User{
+		Metadata: models.ResourceMetadata{ID: "admin-2"},
+		Email:    "admin2@example.com",
+		Admin:    true,
+		Active:   true,
+	}
+
+	testCases := []struct {
+		name           string
+		emailClient    bool
+		setupMocks     func(*db.MockUsers)
+		expectSendMail bool
+	}{
+		{
+			name:        "sends email to admin users",
+			emailClient: true,
+			setupMocks: func(mockUsers *db.MockUsers) {
+				mockUsers.On("GetUsers", mock.Anything, &db.GetUsersInput{
+					Filter: &db.UserFilter{
+						Admin:  ptr.Bool(true),
+						Active: true,
+					},
+				}).Return(&db.UsersResult{
+					Users: []models.User{adminUser1, adminUser2},
+				}, nil)
+			},
+			expectSendMail: true,
+		},
+		{
+			name:        "no email sent when no admin users",
+			emailClient: true,
+			setupMocks: func(mockUsers *db.MockUsers) {
+				mockUsers.On("GetUsers", mock.Anything, &db.GetUsersInput{
+					Filter: &db.UserFilter{
+						Admin:  ptr.Bool(true),
+						Active: true,
+					},
+				}).Return(&db.UsersResult{
+					Users: []models.User{},
+				}, nil)
+			},
+			expectSendMail: false,
+		},
+		{
+			name:        "no email sent when emailClient is nil",
+			emailClient: false,
+			setupMocks: func(mockUsers *db.MockUsers) {
+				mockUsers.On("GetUsers", mock.Anything, mock.Anything).Return(&db.UsersResult{Users: []models.User{}}, nil)
+			},
+			expectSendMail: false,
+		},
+		{
+			name:        "handles GetUsers error gracefully",
+			emailClient: true,
+			setupMocks: func(mockUsers *db.MockUsers) {
+				mockUsers.On("GetUsers", mock.Anything, &db.GetUsersInput{
+					Filter: &db.UserFilter{
+						Admin:  ptr.Bool(true),
+						Active: true,
+					},
+				}).Return(nil, assert.AnError)
+			},
+			expectSendMail: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			logger, _ := logger.NewForTest()
+
+			mockUsers := db.NewMockUsers(t)
+			mockDBClient := &db.Client{
+				Users: mockUsers,
+			}
+
+			var mockEmailClient email.Client
+			if tc.emailClient {
+				mockEmail := email.NewMockClient(t)
+				if tc.expectSendMail {
+					mockEmail.On("SendMail", mock.Anything, mock.MatchedBy(func(input *email.SendMailInput) bool {
+						return input.Subject == "Signing Key Decommissioning" &&
+							len(input.UsersIDs) == 2 &&
+							input.UsersIDs[0] == "admin-1" &&
+							input.UsersIDs[1] == "admin-2"
+					})).Return()
+				}
+				mockEmailClient = mockEmail
+			}
+
+			tc.setupMocks(mockUsers)
+
+			manager := &signingKeyManager{
+				dbClient:                 mockDBClient,
+				emailClient:              mockEmailClient,
+				logger:                   logger,
+				keyDecommissioningPeriod: 24 * time.Hour,
+			}
+
+			manager.sendKeyDecommissionAlert(ctx, decommissionedKey)
 		})
 	}
 }

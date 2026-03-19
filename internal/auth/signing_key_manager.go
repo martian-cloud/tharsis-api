@@ -16,6 +16,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/builder"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
@@ -63,6 +65,7 @@ type signingKeyManager struct {
 	issuerURL                string
 	dbClient                 *db.Client
 	eventManager             *events.EventManager
+	emailClient              email.Client
 	keySet                   jwk.Set
 	keySetLock               sync.RWMutex
 	logger                   logger.Logger
@@ -79,8 +82,9 @@ func NewSigningKeyManager(
 	dbClient *db.Client,
 	eventManager *events.EventManager,
 	cfg *config.Config,
+	emailClient email.Client,
 ) (SigningKeyManager, error) {
-	return newSigningKeyManager(ctx, logger, jwsPlugin, dbClient, eventManager, cfg, true)
+	return newSigningKeyManager(ctx, logger, jwsPlugin, dbClient, eventManager, cfg, emailClient, true)
 }
 
 func newSigningKeyManager(
@@ -90,6 +94,7 @@ func newSigningKeyManager(
 	dbClient *db.Client,
 	eventManager *events.EventManager,
 	cfg *config.Config,
+	emailClient email.Client,
 	startBackgroundTasks bool,
 ) (SigningKeyManager, error) {
 	if cfg.AsymmetricSigningKeyRotationPeriodDays > 0 && !jwsPlugin.SupportsKeyRotation() {
@@ -101,6 +106,7 @@ func newSigningKeyManager(
 		issuerURL:                cfg.JWTIssuerURL,
 		dbClient:                 dbClient,
 		eventManager:             eventManager,
+		emailClient:              emailClient,
 		keySet:                   jwk.NewSet(),
 		logger:                   logger,
 		keyRotationPeriod:        time.Duration(cfg.AsymmetricSigningKeyRotationPeriodDays) * 24 * time.Hour,
@@ -391,6 +397,43 @@ func (s *signingKeyManager) checkForExpiredKey(ctx context.Context) error {
 	return nil
 }
 
+func (s *signingKeyManager) sendKeyDecommissionAlert(ctx context.Context, decommissioningKey *models.AsymSigningKey) {
+	// Calculate deletion time
+	deletionTime := decommissioningKey.Metadata.LastUpdatedTimestamp.Add(s.keyDecommissioningPeriod)
+
+	// Query admin users
+	adminUsers, err := s.dbClient.Users.GetUsers(ctx, &db.GetUsersInput{
+		Filter: &db.UserFilter{
+			Admin:  ptr.Bool(true),
+			Active: true,
+		},
+	})
+	if err != nil {
+		s.logger.Errorf("failed to get admin users for key decommission alert: %v", err)
+		return
+	}
+
+	if len(adminUsers.Users) == 0 {
+		return
+	}
+
+	// Extract admin user IDs
+	adminUserIDs := make([]string, len(adminUsers.Users))
+	for i, user := range adminUsers.Users {
+		adminUserIDs[i] = user.Metadata.ID
+	}
+
+	// Send email
+	s.emailClient.SendMail(ctx, &email.SendMailInput{
+		UsersIDs: adminUserIDs,
+		Subject:  "Signing Key Decommissioning",
+		Builder: &builder.SigningKeyDecommissionEmail{
+			KeyID:                    decommissioningKey.Metadata.ID,
+			DecommissioningStartedAt: *decommissioningKey.Metadata.LastUpdatedTimestamp,
+			DeletionTime:             deletionTime,
+		},
+	})
+}
 func (s *signingKeyManager) rotateKey(ctx context.Context, expiredKey *models.AsymSigningKey) error {
 	// Start db transaction
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
@@ -405,7 +448,8 @@ func (s *signingKeyManager) rotateKey(ctx context.Context, expiredKey *models.As
 	}()
 
 	expiredKey.Status = models.AsymSigningKeyStatusDecommissioning
-	if _, err := s.dbClient.AsymSigningKeys.UpdateAsymSigningKey(txContext, expiredKey); err != nil {
+	updatedKey, err := s.dbClient.AsymSigningKeys.UpdateAsymSigningKey(txContext, expiredKey)
+	if err != nil {
 		return fmt.Errorf("failed to mark signing key as decommissioning %q: %w", expiredKey.Metadata.ID, err)
 	}
 
@@ -413,7 +457,15 @@ func (s *signingKeyManager) rotateKey(ctx context.Context, expiredKey *models.As
 		return fmt.Errorf("failed to create new signing key: %w", err)
 	}
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	// Commit transaction first
+	if err := s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		return fmt.Errorf("failed to commit transaction for key rotation: %w", err)
+	}
+
+	// Send email alert in background after successful commit
+	go s.sendKeyDecommissionAlert(ctx, updatedKey)
+
+	return nil
 }
 
 func (s *signingKeyManager) syncKeySet(ctx context.Context) error {

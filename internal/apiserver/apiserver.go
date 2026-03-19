@@ -137,6 +137,9 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	maintenanceMonitor := maintenance.NewMonitor(logger, dbClient, eventManager)
 	maintenanceMonitor.Start(ctx)
 
+	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
+	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
+
 	signingKeyManager, err := auth.NewSigningKeyManager(
 		ctx,
 		logger,
@@ -144,6 +147,7 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		dbClient,
 		eventManager,
 		cfg,
+		emailClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize identity provider: %w", err)
@@ -173,8 +177,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 
 	respWriter := response.NewWriter(logger)
 
-	taskManager := asynctask.NewManager(time.Duration(cfg.AsyncTaskTimeout) * time.Second)
-
 	artifactStore := workspacesvc.NewArtifactStore(pluginCatalog.ObjectStore)
 	providerRegistryStore := providerregistry.NewRegistryStore(pluginCatalog.ObjectStore)
 	moduleRegistryStore := moduleregistry.NewRegistryStore(pluginCatalog.ObjectStore)
@@ -193,7 +195,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 	notificationManager := namespace.NewNotificationManager(dbClient, inheritedSettingsResolver)
 	federatedRegistryClient := registry.NewFederatedRegistryClient(signingKeyManager)
 
-	emailClient := email.NewClient(pluginCatalog.EmailProvider, taskManager, dbClient, logger, cfg.TharsisUIURL, cfg.EmailFooter)
 	runStateManager := state.NewRunStateManager(dbClient, logger)
 	eventhandlers.NewErroredRunEmailHandler(logger, dbClient, runStateManager, emailClient, notificationManager, taskManager).RegisterHandlers()
 	eventhandlers.NewAssessmentRunHandler(logger, dbClient, runStateManager).RegisterHandlers()

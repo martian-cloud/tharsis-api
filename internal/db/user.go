@@ -65,6 +65,7 @@ type UserFilter struct {
 	UsernamePrefix *string
 	UserIDs        []string
 	SCIMExternalID bool
+	Admin          *bool
 	Active         bool
 }
 
@@ -255,6 +256,13 @@ func (u *users) GetUsers(ctx context.Context, input *GetUsersInput) (*UsersResul
 		}
 		if input.Filter.Active {
 			ex = ex.Append(goqu.I("users.active").IsTrue()) // Return only active users.
+		}
+		if input.Filter.Admin != nil {
+			if *input.Filter.Admin {
+				ex = ex.Append(goqu.I("users.admin").IsTrue())
+			} else {
+				ex = ex.Append(goqu.I("users.admin").IsFalse())
+			}
 		}
 	}
 
