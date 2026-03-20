@@ -38,17 +38,19 @@ func (e *ToolDoesNotExistError) Error() string {
 // ServerTool wraps an MCP tool with its registration function.
 type ServerTool struct {
 	tool         mcp.Tool
-	registerFunc func(*mcp.Server)
+	registerFunc func(*mcp.Server, string)
 }
 
 // NewServerTool creates a ServerTool with type-safe handler.
 func NewServerTool[In any, Out any](tool mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) ServerTool {
 	return ServerTool{
 		tool: tool,
-		registerFunc: func(s *mcp.Server) {
+		registerFunc: func(s *mcp.Server, prefix string) {
+			t := tool
+			t.Name = prefix + t.Name
 			// use mcp.AddTool instead of s.AddTool() since mcp.AddTool does a lot
 			// automatically, and forces tools to conform to the MCP spec.
-			mcp.AddTool(s, &tool, handler)
+			mcp.AddTool(s, &t, handler)
 		},
 	}
 }
@@ -63,15 +65,17 @@ func NewServerTool[In any, Out any](tool mcp.Tool, handler mcp.ToolHandlerFor[In
 // For dynamic or parameterized resources, use ServerResourceTemplate instead.
 type ServerResource struct {
 	resource     mcp.Resource
-	registerFunc func(*mcp.Server)
+	registerFunc func(*mcp.Server, string)
 }
 
 // NewServerResource creates a ServerResource with type-safe handler.
 func NewServerResource(resource mcp.Resource, handler mcp.ResourceHandler) ServerResource {
 	return ServerResource{
 		resource: resource,
-		registerFunc: func(s *mcp.Server) {
-			s.AddResource(&resource, handler)
+		registerFunc: func(s *mcp.Server, prefix string) {
+			r := resource
+			r.Name = prefix + r.Name
+			s.AddResource(&r, handler)
 		},
 	}
 }
@@ -92,15 +96,17 @@ func NewServerResource(resource mcp.Resource, handler mcp.ResourceHandler) Serve
 //   - Tools: Actions that perform operations or have side effects (e.g., creating resources, triggering runs)
 type ServerResourceTemplate struct {
 	template     mcp.ResourceTemplate
-	registerFunc func(*mcp.Server)
+	registerFunc func(*mcp.Server, string)
 }
 
 // NewServerResourceTemplate creates a ServerResourceTemplate with type-safe handler.
 func NewServerResourceTemplate(template mcp.ResourceTemplate, handler mcp.ResourceHandler) ServerResourceTemplate {
 	return ServerResourceTemplate{
 		template: template,
-		registerFunc: func(s *mcp.Server) {
-			s.AddResourceTemplate(&template, handler)
+		registerFunc: func(s *mcp.Server, prefix string) {
+			t := template
+			t.Name = prefix + t.Name
+			s.AddResourceTemplate(&t, handler)
 		},
 	}
 }
@@ -172,16 +178,16 @@ func (t *Toolset) HasReadTools() bool {
 }
 
 // RegisterTools registers all enabled tools in the toolset.
-func (t *Toolset) RegisterTools(s *mcp.Server) {
+func (t *Toolset) RegisterTools(s *mcp.Server, prefix string) {
 	if !t.enabled {
 		return
 	}
 	for _, tool := range t.readTools {
-		tool.registerFunc(s)
+		tool.registerFunc(s, prefix)
 	}
 	if !t.readOnly {
 		for _, tool := range t.writeTools {
-			tool.registerFunc(s)
+			tool.registerFunc(s, prefix)
 		}
 	}
 }
@@ -193,12 +199,14 @@ func (t *Toolset) AddPrompts(prompts ...ServerPrompt) *Toolset {
 }
 
 // RegisterPrompts registers all enabled prompts in the toolset.
-func (t *Toolset) RegisterPrompts(s *mcp.Server) {
+func (t *Toolset) RegisterPrompts(s *mcp.Server, prefix string) {
 	if !t.enabled {
 		return
 	}
 	for _, prompt := range t.prompts {
-		s.AddPrompt(&prompt.prompt, prompt.handler)
+		p := prompt.prompt
+		p.Name = prefix + p.Name
+		s.AddPrompt(&p, prompt.handler)
 	}
 }
 
@@ -209,12 +217,12 @@ func (t *Toolset) AddResources(resources ...ServerResource) *Toolset {
 }
 
 // RegisterResources registers all enabled resources in the toolset.
-func (t *Toolset) RegisterResources(s *mcp.Server) {
+func (t *Toolset) RegisterResources(s *mcp.Server, prefix string) {
 	if !t.enabled {
 		return
 	}
 	for _, resource := range t.resources {
-		resource.registerFunc(s)
+		resource.registerFunc(s, prefix)
 	}
 }
 
@@ -225,12 +233,12 @@ func (t *Toolset) AddResourceTemplates(templates ...ServerResourceTemplate) *Too
 }
 
 // RegisterResourceTemplates registers all enabled resource templates in the toolset.
-func (t *Toolset) RegisterResourceTemplates(s *mcp.Server) {
+func (t *Toolset) RegisterResourceTemplates(s *mcp.Server, prefix string) {
 	if !t.enabled {
 		return
 	}
 	for _, template := range t.resourceTemplates {
-		template.registerFunc(s)
+		template.registerFunc(s, prefix)
 	}
 }
 
@@ -262,6 +270,7 @@ func (t *Toolset) AddReadTools(tools ...ServerTool) *Toolset {
 type ToolsetGroup struct {
 	toolsets map[string]*Toolset
 	readOnly bool
+	prefix   string
 }
 
 // Toolsets returns a copy of the toolsets map.
@@ -289,6 +298,11 @@ func (tg *ToolsetGroup) AddToolset(ts *Toolset) {
 	tg.toolsets[ts.name] = ts
 }
 
+// SetPrefix sets a prefix to prepend to all registered names during registration.
+func (tg *ToolsetGroup) SetPrefix(prefix string) {
+	tg.prefix = prefix
+}
+
 // EnableToolsets enables the specified toolsets by name.
 func (tg *ToolsetGroup) EnableToolsets(names ...string) error {
 	for _, name := range names {
@@ -310,10 +324,10 @@ func (tg *ToolsetGroup) EnableToolsets(names ...string) error {
 // RegisterAll registers all enabled toolsets with the MCP server.
 func (tg *ToolsetGroup) RegisterAll(s *mcp.Server) {
 	for _, toolset := range tg.toolsets {
-		toolset.RegisterTools(s)
-		toolset.RegisterPrompts(s)
-		toolset.RegisterResources(s)
-		toolset.RegisterResourceTemplates(s)
+		toolset.RegisterTools(s, tg.prefix)
+		toolset.RegisterPrompts(s, tg.prefix)
+		toolset.RegisterResources(s, tg.prefix)
+		toolset.RegisterResourceTemplates(s, tg.prefix)
 	}
 }
 
@@ -368,7 +382,7 @@ func (tg *ToolsetGroup) RegisterSpecificTools(s *mcp.Server, toolNames []string,
 			continue
 		}
 
-		tool.registerFunc(s)
+		tool.registerFunc(s, tg.prefix)
 	}
 
 	if len(skippedTools) > 0 {

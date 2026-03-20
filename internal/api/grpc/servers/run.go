@@ -418,6 +418,7 @@ func toPBRun(r *models.Run) *pb.Run {
 		ForceCanceledBy:  r.ForceCanceledBy,
 		HasChanges:       r.HasChanges,
 		IsDestroy:        r.IsDestroy,
+		Speculative:      r.Speculative(),
 		ModuleDigest:     ptr.String(hex.EncodeToString(r.ModuleDigest)),
 		ModuleSource:     r.ModuleSource,
 		ModuleVersion:    r.ModuleVersion,

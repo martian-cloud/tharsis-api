@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<cf16fb641005ec5e48cd45651ab3d7e3>>
+ * @generated SignedSource<<201ea03291f7472eec290efbf405ce9f>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,6 +19,7 @@ export type ProviderMirrorVersionDetailsQuery$data = {
     readonly id?: string;
     readonly metadata?: {
       readonly createdAt: any;
+      readonly trn: string;
     };
     readonly platformMirrors?: ReadonlyArray<{
       readonly arch: string;
@@ -69,6 +70,13 @@ v3 = {
       "args": null,
       "kind": "ScalarField",
       "name": "createdAt",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "trn",
       "storageKey": null
     }
   ],
@@ -205,16 +213,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "fe2b06005f35e6ca00f6524d44cc3b62",
+    "cacheID": "bd87d8de1b5fb4ac457a6811b768b54f",
     "id": null,
     "metadata": {},
     "name": "ProviderMirrorVersionDetailsQuery",
     "operationKind": "query",
-    "text": "query ProviderMirrorVersionDetailsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on TerraformProviderVersionMirror {\n      id\n      metadata {\n        createdAt\n      }\n      version\n      createdBy\n      providerAddress\n      groupPath\n      platformMirrors {\n        id\n        os\n        arch\n      }\n    }\n    id\n  }\n}\n"
+    "text": "query ProviderMirrorVersionDetailsQuery(\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ... on TerraformProviderVersionMirror {\n      id\n      metadata {\n        createdAt\n        trn\n      }\n      version\n      createdBy\n      providerAddress\n      groupPath\n      platformMirrors {\n        id\n        os\n        arch\n      }\n    }\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "41ef3069619dfdc01fcaa5a49720ef59";
+(node as any).hash = "ee4ea07946021cd3fdbae0006bda785f";
 
 export default node;

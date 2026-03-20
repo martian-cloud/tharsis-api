@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.state_version_output;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "metadata.proto";
+
+// GetStateVersionOutputByIDRequest is the input for retrieving a StateVersionOutput by its ID.
+message GetStateVersionOutputByIDRequest {
+  string id = 1;
+}
+
+// GetStateVersionOutputsRequest is the input for retrieving a list of StateVersionOutputs.
+message GetStateVersionOutputsRequest {
+  string state_version_id = 1;
+}
+
+// StateVersionOutput represents a terraform state version output.
+message StateVersionOutput {
+  metadata.ResourceMetadata metadata         = 1;
+  string                    name             = 2;
+  string                    state_version_id = 3;
+  bytes                     value            = 4;
+  bytes                     type             = 5;
+  bool                      sensitive        = 6;
+}
+
+// GetStateVersionOutputsResponse is the list of StateVersionOutputs.
+message GetStateVersionOutputsResponse {
+  repeated StateVersionOutput state_version_outputs = 1;
+}

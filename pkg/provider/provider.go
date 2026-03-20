@@ -13,21 +13,17 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/apparentlymart/go-versions/versions"
 	tfaddr "github.com/hashicorp/terraform-registry-address"
 	svchost "github.com/hashicorp/terraform-svchost"
-	"github.com/hashicorp/terraform-svchost/disco"
 )
 
 const (
 	// TerraformPublicRegistryHost is the public Terraform registry that doesn't require authentication.
 	TerraformPublicRegistryHost = "registry.terraform.io"
-	// ProvidersServiceID is the Terraform service discovery ID for the provider registry protocol.
-	ProvidersServiceID = "providers.v1"
 )
 
 const (
@@ -146,14 +142,14 @@ type RegistryProtocol interface {
 
 type registryClient struct {
 	httpClient *http.Client
-	discovery  serviceDiscoverer
+	discovery  ServiceDiscoverer
 }
 
 // NewRegistryClient creates a new provider registry client.
 func NewRegistryClient(httpClient *http.Client) RegistryProtocol {
 	return &registryClient{
 		httpClient: httpClient,
-		discovery:  &quietDisco{inner: disco.New()},
+		discovery:  NewServiceDiscoverer(httpClient),
 	}
 }
 
@@ -166,17 +162,22 @@ func (c *registryClient) ListVersions(ctx context.Context, provider *Provider, o
 		opt(options)
 	}
 
-	serviceURL, err := c.discovery.DiscoverServiceURL(svchost.Hostname(provider.Hostname), ProvidersServiceID)
+	discovered, err := c.discovery.DiscoverTFEServices(ctx, provider.Hostname)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover provider registry's service URL: %w", err)
 	}
 
-	endpoint, err := url.Parse(path.Join(provider.Namespace, provider.Type, "versions"))
+	serviceURL, ok := discovered.Services[ProvidersServiceID]
+	if !ok {
+		return nil, fmt.Errorf("service url for %q not found", ProvidersServiceID)
+	}
+
+	endpoint, err := url.JoinPath(serviceURL.String(), provider.Namespace, provider.Type, "versions")
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := c.doRequest(ctx, http.MethodGet, serviceURL.ResolveReference(endpoint).String(), options.token, acceptJSON)
+	resp, err := c.doRequest(ctx, http.MethodGet, endpoint, options.token, acceptJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform http request: %w", err)
 	}
@@ -225,20 +226,25 @@ func (c *registryClient) GetPackageInfo(ctx context.Context, provider *Provider,
 		opt(options)
 	}
 
-	serviceURL, err := c.discovery.DiscoverServiceURL(svchost.Hostname(provider.Hostname), ProvidersServiceID)
+	discovered, err := c.discovery.DiscoverTFEServices(ctx, provider.Hostname)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover provider registry's service URL: %w", err)
+	}
+
+	serviceURL, ok := discovered.Services[ProvidersServiceID]
+	if !ok {
+		return nil, fmt.Errorf("service url for %q not found", ProvidersServiceID)
 	}
 
 	// Build the URL to the provider's download endpoint which will give us access to the
 	// SHASUMS, SHASUMS.sig and GPG key used to sign the checksums file. These are generally
 	// hosted in a different location than the provider's registry.
-	endpoint, err := url.Parse(path.Join(provider.Namespace, provider.Type, version, "download", os, arch))
+	endpoint, err := url.JoinPath(serviceURL.String(), provider.Namespace, provider.Type, version, "download", os, arch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build package download URL: %w", err)
 	}
 
-	resp, err := c.doRequest(ctx, http.MethodGet, serviceURL.ResolveReference(endpoint).String(), options.token, acceptJSON)
+	resp, err := c.doRequest(ctx, http.MethodGet, endpoint, options.token, acceptJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get package download URL: %w", err)
 	}

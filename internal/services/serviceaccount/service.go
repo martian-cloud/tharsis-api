@@ -683,8 +683,7 @@ func (s *service) CreateOIDCToken(ctx context.Context, input *CreateOIDCTokenInp
 	// Check if token is from a valid issuer associated with the service account
 	issuer := token.Issuer()
 	if issuer == "" {
-		return nil, errors.Wrap(
-			err,
+		return nil, errors.New(
 			"failed to create token for service account %s - issuer claim in token is empty",
 			input.ServiceAccountPublicID,
 			errors.WithErrorCode(errors.EUnauthorized),

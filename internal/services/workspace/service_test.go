@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/auth"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/events"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	namespace "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
@@ -1294,6 +1297,183 @@ func TestGetWorkspaces(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectResult, result.Workspaces)
+		})
+	}
+}
+
+func TestGetStateVersionDependencies(t *testing.T) {
+	workspaceID := "workspace-1"
+
+	buildStateJSON := func(attributes json.RawMessage) string {
+		state := stateV4{
+			Version: version4,
+			Resources: []resourceStateV4{
+				{
+					ProviderConfig: tharsisTerraformProviderConfig,
+					Type:           tharsisWorkspaceOutputsDatasourceName,
+					Name:           "test",
+					Instances: []instanceObjectStateV4{
+						{AttributesRaw: attributes},
+					},
+				},
+			},
+		}
+		b, _ := json.Marshal(state)
+		return string(b)
+	}
+
+	// setupCaller creates a mock caller with the given permission error and adds it to the context.
+	setupCaller := func(ctx context.Context, t *testing.T, permErr error) context.Context {
+		mockCaller := auth.MockCaller{}
+		mockCaller.Test(t)
+		mockCaller.On("RequirePermission", mock.Anything, models.ViewStateVersionPermission, mock.Anything).
+			Return(permErr)
+		return auth.WithCaller(ctx, &mockCaller)
+	}
+
+	// setupService creates a service with the given artifact store reader.
+	setupService := func(t *testing.T, reader io.ReadCloser, readErr error) *service {
+		mockArtifactStore := NewMockArtifactStore(t)
+		mockArtifactStore.On("GetStateVersion", mock.Anything, mock.Anything).
+			Return(reader, readErr)
+		return &service{dbClient: &db.Client{}, artifactStore: mockArtifactStore}
+	}
+
+	tests := []struct {
+		mockSetup       func(ctx context.Context, t *testing.T) (context.Context, *service)
+		name            string
+		expectResult    []StateVersionDependency
+		expectErrorCode errors.CodeType
+	}{
+		{
+			name: "auth failure",
+			mockSetup: func(ctx context.Context, _ *testing.T) (context.Context, *service) {
+				return ctx, &service{dbClient: &db.Client{}}
+			},
+			expectErrorCode: errors.EUnauthorized,
+		},
+		{
+			name: "permission error",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)))
+				return ctx, &service{dbClient: &db.Client{}}
+			},
+			expectErrorCode: errors.EForbidden,
+		},
+		{
+			name: "artifact store error",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				svc := setupService(t, nil, errors.New("store error", errors.WithErrorCode(errors.EInternal)))
+				return ctx, svc
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "invalid state JSON",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				svc := setupService(t, io.NopCloser(strings.NewReader("not-json")), nil)
+				return ctx, svc
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "wrong state version",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				state, _ := json.Marshal(stateV4{Version: 3})
+				svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
+				return ctx, svc
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "valid dependencies",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":"group/ws","state_version_id":"SV_abc","workspace_id":"WS_123"}`))
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+				return ctx, svc
+			},
+			expectResult: []StateVersionDependency{
+				{
+					WorkspacePath:  "group/ws",
+					WorkspaceID:    gid.FromGlobalID("WS_123"),
+					StateVersionID: gid.FromGlobalID("SV_abc"),
+				},
+			},
+		},
+		{
+			name: "nil attribute values are skipped",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":null,"state_version_id":null,"workspace_id":null}`))
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+				return ctx, svc
+			},
+			expectResult: []StateVersionDependency{},
+		},
+		{
+			name: "partially nil attribute values are skipped",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":"group/ws","state_version_id":null,"workspace_id":"WS_123"}`))
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+				return ctx, svc
+			},
+			expectResult: []StateVersionDependency{},
+		},
+		{
+			name: "missing full_path attribute",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				stateJSON := buildStateJSON(json.RawMessage(`{"state_version_id":"SV_abc","workspace_id":"WS_123"}`))
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+				return ctx, svc
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "non-string full_path attribute",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				stateJSON := buildStateJSON(json.RawMessage(`{"full_path":123,"state_version_id":"SV_abc","workspace_id":"WS_123"}`))
+				svc := setupService(t, io.NopCloser(strings.NewReader(stateJSON)), nil)
+				return ctx, svc
+			},
+			expectErrorCode: errors.EInternal,
+		},
+		{
+			name: "no tharsis resources in state",
+			mockSetup: func(ctx context.Context, t *testing.T) (context.Context, *service) {
+				ctx = setupCaller(ctx, t, nil)
+				state, _ := json.Marshal(stateV4{
+					Version: version4,
+					Resources: []resourceStateV4{
+						{ProviderConfig: "provider[\"registry.terraform.io/hashicorp/aws\"]", Type: "aws_instance", Name: "test"},
+					},
+				})
+				svc := setupService(t, io.NopCloser(strings.NewReader(string(state))), nil)
+				return ctx, svc
+			},
+			expectResult: []StateVersionDependency{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, svc := test.mockSetup(t.Context(), t)
+
+			result, err := svc.GetStateVersionDependencies(ctx, &models.StateVersion{WorkspaceID: workspaceID})
+
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, test.expectResult, result)
 		})
 	}
 }

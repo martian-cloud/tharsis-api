@@ -67,7 +67,7 @@ func NewServer(options *ServerOptions) *Server {
 			Timeout: 30 * time.Second,
 		}),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			// Minumum time a client should wait before sending a keepalive ping.
+			// Minimum time a client should wait before sending a keepalive ping.
 			// IMPORTANT: This value should be less than the client's keepalive time.
 			MinTime: 30 * time.Second,
 			// Permit keepalive pings without active streams.
@@ -80,6 +80,7 @@ func NewServer(options *ServerOptions) *Server {
 	// Create server instances.
 	var (
 		authSettingsServer            = servers.NewAuthSettingsServer(options.OAuthProviders)
+		callerIdentityServer          = servers.NewCallerIdentityServer(options.ServiceCatalog)
 		configurationVersionServer    = servers.NewConfigurationVersionServer(options.ServiceCatalog)
 		gpgKeyServer                  = servers.NewGPGKeyServer(options.ServiceCatalog)
 		groupServer                   = servers.NewGroupServer(options.ServiceCatalog)
@@ -105,6 +106,7 @@ func NewServer(options *ServerOptions) *Server {
 
 	// Register servers.
 	pb.RegisterAuthSettingsServer(s, authSettingsServer)
+	pb.RegisterCallerIdentityServer(s, callerIdentityServer)
 	pb.RegisterConfigurationVersionsServer(s, configurationVersionServer)
 	pb.RegisterGPGKeysServer(s, gpgKeyServer)
 	pb.RegisterGroupsServer(s, groupServer)

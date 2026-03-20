@@ -3,7 +3,6 @@ package servers
 
 import (
 	"context"
-	"strings"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
@@ -64,7 +63,7 @@ func (s *NamespaceVariableServer) GetNamespaceVariables(ctx context.Context, req
 // CreateNamespaceVariable creates a new NamespaceVariable.
 func (s *NamespaceVariableServer) CreateNamespaceVariable(ctx context.Context, req *pb.CreateNamespaceVariableRequest) (*pb.NamespaceVariable, error) {
 	input := &variable.CreateVariableInput{
-		Category:      models.VariableCategory(strings.ToLower(req.Category.String())),
+		Category:      models.VariableCategory(req.Category.String()),
 		Key:           req.Key,
 		NamespacePath: req.NamespacePath,
 		Sensitive:     req.Sensitive,
@@ -135,7 +134,7 @@ func (s *NamespaceVariableServer) SetNamespaceVariables(ctx context.Context, req
 	}
 
 	input := &variable.SetVariablesInput{
-		Category:      models.VariableCategory(strings.ToLower(req.Category.String())),
+		Category:      models.VariableCategory(req.Category.String()),
 		NamespacePath: req.NamespacePath,
 		Variables:     variables,
 	}
@@ -149,14 +148,15 @@ func (s *NamespaceVariableServer) SetNamespaceVariables(ctx context.Context, req
 
 // GetNamespaceVariableVersionByID returns a NamespaceVariableVersion by an ID.
 func (s *NamespaceVariableServer) GetNamespaceVariableVersionByID(ctx context.Context, req *pb.GetNamespaceVariableVersionByIDRequest) (*pb.NamespaceVariableVersion, error) {
-	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+	// Model fetcher does support sensitive variables, so don't use FetchModel() here.
+	id, err := s.serviceCatalog.FetchModelID(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	variableVersion, ok := model.(*models.VariableVersion)
-	if !ok {
-		return nil, errors.New("namespace variable version with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	variableVersion, err := s.serviceCatalog.VariableService.GetVariableVersionByID(ctx, id, req.IncludeSensitiveValue)
+	if err != nil {
+		return nil, err
 	}
 
 	return toPBNamespaceVariableVersion(variableVersion), nil

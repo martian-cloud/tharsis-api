@@ -9,6 +9,7 @@ import NamespaceBreadcrumbs from '../NamespaceBreadcrumbs';
 import Gravatar from '../../common/Gravatar';
 import Timestamp from '../../common/Timestamp';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
+import TRNButton from '../../common/TRNButton';
 import { ProviderMirrorVersionDetailsQuery } from './__generated__/ProviderMirrorVersionDetailsQuery.graphql';
 import { ProviderMirrorVersionDetailsDeletePlatformMutation } from './__generated__/ProviderMirrorVersionDetailsDeletePlatformMutation.graphql';
 import { ProviderMirrorVersionDetailsDeleteMutation } from './__generated__/ProviderMirrorVersionDetailsDeleteMutation.graphql';
@@ -33,6 +34,7 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                     id
                     metadata {
                         createdAt
+                        trn
                     }
                     version
                     createdBy
@@ -170,11 +172,14 @@ function ProviderMirrorVersionDetails({ namespacePath }: Props) {
                         )}
                     </Box>
                 </Box>
-                {!isInherited && (
-                    <Button variant="outlined" color="error" onClick={() => setShowDeleteVersion(true)}>
-                        Delete Mirror
-                    </Button>
-                )}
+                <Box display="flex" gap={1}>
+                    <TRNButton trn={mirror.metadata.trn} />
+                    {!isInherited && (
+                        <Button variant="outlined" color="error" onClick={() => setShowDeleteVersion(true)}>
+                            Delete Mirror
+                        </Button>
+                    )}
+                </Box>
             </Box>
 
             <Paper sx={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: `1px solid ${theme.palette.divider}` }}>

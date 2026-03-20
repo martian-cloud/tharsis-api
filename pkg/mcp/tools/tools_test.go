@@ -271,19 +271,19 @@ func TestToolsetRegisterResources(t *testing.T) {
 	registered := false
 	resource := ServerResource{
 		resource: mcp.Resource{URI: "test://resource"},
-		registerFunc: func(_ *mcp.Server) {
+		registerFunc: func(_ *mcp.Server, _ string) {
 			registered = true
 		},
 	}
 	toolset.AddResources(resource)
 
 	// Should not register when disabled
-	toolset.RegisterResources(server)
+	toolset.RegisterResources(server, "")
 	assert.False(t, registered, "resource should not be registered when toolset is disabled")
 
 	// Enable and register
 	toolset.enabled = true
-	toolset.RegisterResources(server)
+	toolset.RegisterResources(server, "")
 	assert.True(t, registered, "resource should be registered when toolset is enabled")
 }
 
@@ -315,18 +315,124 @@ func TestToolsetRegisterResourceTemplates(t *testing.T) {
 	registered := false
 	template := ServerResourceTemplate{
 		template: mcp.ResourceTemplate{URITemplate: "test://resource/{id}"},
-		registerFunc: func(_ *mcp.Server) {
+		registerFunc: func(_ *mcp.Server, _ string) {
 			registered = true
 		},
 	}
 	toolset.AddResourceTemplates(template)
 
 	// Should not register when disabled
-	toolset.RegisterResourceTemplates(server)
+	toolset.RegisterResourceTemplates(server, "")
 	assert.False(t, registered, "resource template should not be registered when toolset is disabled")
 
 	// Enable and register
 	toolset.enabled = true
-	toolset.RegisterResourceTemplates(server)
+	toolset.RegisterResourceTemplates(server, "")
 	assert.True(t, registered, "resource template should be registered when toolset is enabled")
+}
+
+func TestToolsetGroupRegisterAllWithPrefix(t *testing.T) {
+	group := NewToolsetGroup(false)
+	group.SetPrefix("myprefix_")
+
+	var registeredToolName string
+	var registeredResourceName string
+	var registeredTemplateName string
+
+	ts := NewToolset(ToolsetMetadata{Name: "test", Description: "Test"})
+
+	ts.AddReadTools(ServerTool{
+		tool: mcp.Tool{
+			Name:        "get_thing",
+			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		},
+		registerFunc: func(_ *mcp.Server, prefix string) {
+			registeredToolName = prefix + "get_thing"
+		},
+	})
+
+	ts.AddResources(ServerResource{
+		resource: mcp.Resource{Name: "my_resource"},
+		registerFunc: func(_ *mcp.Server, prefix string) {
+			registeredResourceName = prefix + "my_resource"
+		},
+	})
+
+	ts.AddResourceTemplates(ServerResourceTemplate{
+		template: mcp.ResourceTemplate{Name: "my_template"},
+		registerFunc: func(_ *mcp.Server, prefix string) {
+			registeredTemplateName = prefix + "my_template"
+		},
+	})
+
+	group.AddToolset(ts)
+	require.NoError(t, group.EnableToolsets("test"))
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name: "test", Title: "Test", Version: "1.0.0",
+	}, nil)
+
+	group.RegisterAll(server)
+
+	assert.Equal(t, "myprefix_get_thing", registeredToolName)
+	assert.Equal(t, "myprefix_my_resource", registeredResourceName)
+	assert.Equal(t, "myprefix_my_template", registeredTemplateName)
+}
+
+func TestToolsetGroupRegisterAllWithoutPrefix(t *testing.T) {
+	group := NewToolsetGroup(false)
+
+	var registeredToolName string
+
+	ts := NewToolset(ToolsetMetadata{Name: "test", Description: "Test"})
+	ts.AddReadTools(ServerTool{
+		tool: mcp.Tool{
+			Name:        "get_thing",
+			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		},
+		registerFunc: func(_ *mcp.Server, prefix string) {
+			registeredToolName = prefix + "get_thing"
+		},
+	})
+
+	group.AddToolset(ts)
+	require.NoError(t, group.EnableToolsets("test"))
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name: "test", Title: "Test", Version: "1.0.0",
+	}, nil)
+
+	group.RegisterAll(server)
+
+	assert.Equal(t, "get_thing", registeredToolName)
+}
+
+func TestToolsetGroupRegisterSpecificToolsWithPrefix(t *testing.T) {
+	group := NewToolsetGroup(false)
+	group.SetPrefix("api_")
+
+	var registeredToolName string
+
+	ts := NewToolset(ToolsetMetadata{Name: "test", Description: "Test"})
+	ts.AddReadTools(ServerTool{
+		tool: mcp.Tool{
+			Name:        "get_workspace",
+			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		},
+		registerFunc: func(_ *mcp.Server, prefix string) {
+			registeredToolName = prefix + "get_workspace"
+		},
+	})
+
+	group.AddToolset(ts)
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name: "test", Title: "Test", Version: "1.0.0",
+	}, nil)
+
+	// Lookup uses original name, registration applies prefix.
+	err := group.RegisterSpecificTools(server, []string{"get_workspace"}, false)
+	require.NoError(t, err)
+
+	assert.Equal(t, "api_get_workspace", registeredToolName)
 }

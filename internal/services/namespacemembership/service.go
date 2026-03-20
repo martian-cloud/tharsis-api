@@ -306,7 +306,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 		count++
 	}
 	if count != 1 {
-		return nil, errors.New("Exactly one of User, ServiceAccount, team field must be defined", errors.WithErrorCode(errors.EInvalid))
+		return nil, errors.New("exactly one of User, ServiceAccount, team field must be defined", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// If this is a service account, we need to verify that it's being added to the group that it is associated with
@@ -318,7 +318,7 @@ func (s *service) CreateNamespaceMembership(ctx context.Context,
 
 		if serviceAccountNamespace != input.NamespacePath && !utils.IsDescendantOfPath(input.NamespacePath, serviceAccountNamespace) {
 			return nil, errors.New(
-				"Service account cannot be added as a member to group %s because it doesn't exist in the group or a parent group",
+				"service account cannot be added as a member to group %s because it doesn't exist in the group or a parent group",
 				input.NamespacePath,
 				errors.WithErrorCode(errors.EInvalid),
 			)

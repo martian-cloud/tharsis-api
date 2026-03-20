@@ -6,7 +6,6 @@ option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pk
 
 import "metadata.proto";
 import "pagination.proto";
-import "job.proto";
 import "plan.proto";
 import "apply.proto";
 import "google/protobuf/timestamp.proto";
@@ -33,10 +32,6 @@ service Runs {
   rpc UpdatePlan(plan.UpdatePlanRequest) returns (plan.Plan);
   // UpdateApply updates an Apply.
   rpc UpdateApply(apply.UpdateApplyRequest) returns (apply.Apply);
-  // GetLatestJobForPlan returns the latest job for a Plan.
-  rpc GetLatestJobForPlan(plan.GetLatestJobForPlanRequest) returns (job.Job);
-  // GetLatestJobForApply returns the latest job for an Apply.
-  rpc GetLatestJobForApply(apply.GetLatestJobForApplyRequest) returns (job.Job);
   // SubscribeToRunEvents subscribes to run events.
   rpc SubscribeToRunEvents(SubscribeToRunEventsRequest) returns (stream RunEvent);
 }
@@ -111,11 +106,11 @@ message RunVariableInput {
 
 // Run represents a Terraform plan/apply operation.
 message Run {
-  metadata.ResourceMetadata          metadata                  = 1;
-  string                             apply_id                  = 2;
-  optional string                    configuration_version_id  = 3;
-  string                             created_by                = 4;
-  bool                               force_canceled            = 5;
+  metadata.ResourceMetadata metadata                           = 1;
+  string                    apply_id                           = 2;
+  optional string           configuration_version_id           = 3;
+  string                    created_by                         = 4;
+  bool                      force_canceled                     = 5;
   optional google.protobuf.Timestamp force_cancel_available_at = 6;
   optional string                    force_canceled_by         = 7;
   bool                               has_changes               = 8;
@@ -130,6 +125,7 @@ message Run {
   repeated string                    target_addresses          = 17;
   string                             terraform_version         = 18;
   string                             workspace_id              = 19;
+  bool                               speculative               = 20;
 }
 
 // RunVariable represents a variable used in a run.

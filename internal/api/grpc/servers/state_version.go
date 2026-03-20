@@ -128,6 +128,43 @@ func (s *StateVersionServer) CreateStateVersion(ctx context.Context, req *pb.Cre
 	return toPBStateVersion(createdStateVersion), nil
 }
 
+// GetStateVersionOutputByID returns a StateVersionOutput by an ID.
+func (s *StateVersionServer) GetStateVersionOutputByID(ctx context.Context, req *pb.GetStateVersionOutputByIDRequest) (*pb.StateVersionOutput, error) {
+	model, err := s.serviceCatalog.FetchModel(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	output, ok := model.(*models.StateVersionOutput)
+	if !ok {
+		return nil, errors.New("state version output with id %s not found", req.Id, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	return toPBStateVersionOutput(output), nil
+}
+
+// GetStateVersionOutputs returns a list of StateVersionOutputs for a state version.
+func (s *StateVersionServer) GetStateVersionOutputs(ctx context.Context, req *pb.GetStateVersionOutputsRequest) (*pb.GetStateVersionOutputsResponse, error) {
+	id, err := s.serviceCatalog.FetchModelID(ctx, req.StateVersionId)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs, err := s.serviceCatalog.WorkspaceService.GetStateVersionOutputs(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	pbOutputs := make([]*pb.StateVersionOutput, len(outputs))
+	for ix := range outputs {
+		pbOutputs[ix] = toPBStateVersionOutput(&outputs[ix])
+	}
+
+	return &pb.GetStateVersionOutputsResponse{
+		StateVersionOutputs: pbOutputs,
+	}, nil
+}
+
 // toPBStateVersion converts from StateVersion model to ProtoBuf model.
 func toPBStateVersion(sv *models.StateVersion) *pb.StateVersion {
 	var runID *string
@@ -141,5 +178,17 @@ func toPBStateVersion(sv *models.StateVersion) *pb.StateVersion {
 		WorkspaceId: gid.ToGlobalID(types.WorkspaceModelType, sv.WorkspaceID),
 		RunId:       runID,
 		CreatedBy:   sv.CreatedBy,
+	}
+}
+
+// toPBStateVersionOutput converts from StateVersionOutput model to ProtoBuf model.
+func toPBStateVersionOutput(output *models.StateVersionOutput) *pb.StateVersionOutput {
+	return &pb.StateVersionOutput{
+		Metadata:       toPBMetadata(&output.Metadata, types.StateVersionOutputModelType),
+		Name:           output.Name,
+		StateVersionId: gid.ToGlobalID(types.StateVersionModelType, output.StateVersionID),
+		Value:          output.Value,
+		Type:           output.Type,
+		Sensitive:      output.Sensitive,
 	}
 }

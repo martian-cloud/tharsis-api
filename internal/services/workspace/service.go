@@ -1042,13 +1042,11 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 	// Attempt to unmarshal to a stateV4:
 	var state stateV4
 	if err := json.NewDecoder(reader).Decode(&state); err != nil {
-		tracing.RecordError(span, nil, "failed to unmarshal decoded data: %s", err)
-		return nil, fmt.Errorf("failed to unmarshal decoded data: %s", err)
+		return nil, errors.Wrap(err, "failed to unmarshal decoded data", errors.WithSpan(span))
 	}
 
 	if state.Version != version4 {
-		tracing.RecordError(span, nil, "expected stateVersionV4, got %d", state.Version)
-		return nil, fmt.Errorf("expected stateVersionV4, got %d", state.Version)
+		return nil, errors.New("expected stateVersionV4, got %d", state.Version, errors.WithSpan(span))
 	}
 
 	response := []StateVersionDependency{}
@@ -1057,36 +1055,48 @@ func (s *service) GetStateVersionDependencies(ctx context.Context, stateVersion 
 		if r.ProviderConfig == tharsisTerraformProviderConfig && r.Type == tharsisWorkspaceOutputsDatasourceName && len(r.Instances) > 0 {
 			attributes := map[string]interface{}{}
 			if err := json.Unmarshal(r.Instances[0].AttributesRaw, &attributes); err != nil {
-				tracing.RecordError(span, nil,
-					"failed to unmarshal attributes for tharsis terraform provider %v", err)
-				return nil, fmt.Errorf("failed to unmarshal attributes for tharsis terraform provider %v", err)
+				return nil, errors.Wrap(err, "failed to unmarshal attributes for tharsis terraform provider", errors.WithSpan(span))
 			}
 
-			fullPath, ok := attributes["full_path"]
-			if !ok {
-				tracing.RecordError(span, nil,
-					"full_path attribute missing from %s resource %s", r.Type, r.Name)
-				return nil, fmt.Errorf("full_path attribute missing from %s resource %s", r.Type, r.Name)
+			fullPathVal, exists := attributes["full_path"]
+			if !exists {
+				return nil, errors.New("full_path attribute missing from %s resource %s", r.Type, r.Name, errors.WithSpan(span))
 			}
 
-			stateVersionID, ok := attributes["state_version_id"]
-			if !ok {
-				tracing.RecordError(span, nil,
-					"state_version_id attribute missing from %s resource %s", r.Type, r.Name)
-				return nil, fmt.Errorf("state_version_id attribute missing from %s resource %s", r.Type, r.Name)
+			stateVersionIDVal, exists := attributes["state_version_id"]
+			if !exists {
+				return nil, errors.New("state_version_id attribute missing from %s resource %s", r.Type, r.Name, errors.WithSpan(span))
 			}
 
-			workspaceID, ok := attributes["workspace_id"]
+			workspaceIDVal, exists := attributes["workspace_id"]
+			if !exists {
+				return nil, errors.New("workspace_id attribute missing from %s resource %s", r.Type, r.Name, errors.WithSpan(span))
+			}
+
+			// Skip resources with nil attribute values (e.g., stale data source references).
+			if fullPathVal == nil || stateVersionIDVal == nil || workspaceIDVal == nil {
+				continue
+			}
+
+			fullPath, ok := fullPathVal.(string)
 			if !ok {
-				tracing.RecordError(span, nil,
-					"workspace_id attribute missing from %s resource %s", r.Type, r.Name)
-				return nil, fmt.Errorf("workspace_id attribute missing from %s resource %s", r.Type, r.Name)
+				return nil, errors.New("full_path attribute is not a string in %s resource %s", r.Type, r.Name, errors.WithSpan(span))
+			}
+
+			stateVersionID, ok := stateVersionIDVal.(string)
+			if !ok {
+				return nil, errors.New("state_version_id attribute is not a string in %s resource %s", r.Type, r.Name, errors.WithSpan(span))
+			}
+
+			workspaceID, ok := workspaceIDVal.(string)
+			if !ok {
+				return nil, errors.New("workspace_id attribute is not a string in %s resource %s", r.Type, r.Name, errors.WithSpan(span))
 			}
 
 			response = append(response, StateVersionDependency{
-				WorkspacePath:  fullPath.(string),
-				WorkspaceID:    gid.FromGlobalID(workspaceID.(string)),
-				StateVersionID: gid.FromGlobalID(stateVersionID.(string)),
+				WorkspacePath:  fullPath,
+				WorkspaceID:    gid.FromGlobalID(workspaceID),
+				StateVersionID: gid.FromGlobalID(stateVersionID),
 			})
 		}
 	}

@@ -30,6 +30,8 @@ type ServerConfig struct {
 	EnabledToolsets string
 	// EnabledTools is a comma-separated list of specific tool names to enable (overrides toolsets)
 	EnabledTools string
+	// Prefix is an optional prefix to prepend to all registered names (e.g., "tharsis_")
+	Prefix string
 	// ReadOnly indicates whether to skip registering write tools
 	ReadOnly bool
 }
@@ -89,6 +91,8 @@ func NewServer(cfg *ServerConfig, toolsetGroup *tools.ToolsetGroup) (*mcp.Server
 		Logger:       cfg.Logger,
 		Instructions: cfg.Instructions,
 	})
+
+	toolsetGroup.SetPrefix(cfg.Prefix)
 
 	if len(enabledToolsets) > 0 {
 		toolsetGroup.RegisterAll(server)

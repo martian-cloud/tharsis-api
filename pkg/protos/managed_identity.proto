@@ -49,16 +49,16 @@ service ManagedIdentities {
 
 // ManagedIdentityType defines the type of managed identity.
 enum ManagedIdentityType {
-  AZURE_FEDERATED      = 0;
-  AWS_FEDERATED        = 1;
-  THARSIS_FEDERATED    = 2;
-  KUBERNETES_FEDERATED = 3;
+  azure_federated      = 0;
+  aws_federated        = 1;
+  tharsis_federated    = 2;
+  kubernetes_federated = 3;
 }
 
 // ManagedIdentityAccessRuleType defines the type of access rule.
 enum ManagedIdentityAccessRuleType {
-  ELIGIBLE_PRINCIPALS = 0;
-  MODULE_ATTESTATION  = 1;
+  eligible_principals = 0;
+  module_attestation  = 1;
 }
 
 // ManagedIdentitySortableField defines enums that allow sorting a paginated list of ManagedIdentities.
@@ -156,12 +156,11 @@ message CreateManagedIdentityAccessRuleRequest {
 // UpdateManagedIdentityAccessRuleRequest is the input for updating an access rule.
 message UpdateManagedIdentityAccessRuleRequest {
   string                                                    id                          = 1;
-  job.JobType                                               run_stage                   = 2;
-  repeated string                                           allowed_users               = 3;
-  repeated string                                           allowed_service_accounts    = 4;
-  repeated string                                           allowed_teams               = 5;
-  optional bool                                             verify_state_lineage        = 6;
-  repeated ManagedIdentityAccessRuleModuleAttestationPolicy module_attestation_policies = 7;
+  repeated string                                           allowed_users               = 2;
+  repeated string                                           allowed_service_accounts    = 3;
+  repeated string                                           allowed_teams               = 4;
+  optional bool                                             verify_state_lineage        = 5;
+  repeated ManagedIdentityAccessRuleModuleAttestationPolicy module_attestation_policies = 6;
 }
 
 // DeleteManagedIdentityAccessRuleRequest is the input for deleting an access rule.

@@ -26,19 +26,19 @@ const (
 type VariableCategory int32
 
 const (
-	VariableCategory_TERRAFORM   VariableCategory = 0
-	VariableCategory_ENVIRONMENT VariableCategory = 1
+	VariableCategory_terraform   VariableCategory = 0
+	VariableCategory_environment VariableCategory = 1
 )
 
 // Enum value maps for VariableCategory.
 var (
 	VariableCategory_name = map[int32]string{
-		0: "TERRAFORM",
-		1: "ENVIRONMENT",
+		0: "terraform",
+		1: "environment",
 	}
 	VariableCategory_value = map[string]int32{
-		"TERRAFORM":   0,
-		"ENVIRONMENT": 1,
+		"terraform":   0,
+		"environment": 1,
 	}
 )
 
@@ -252,7 +252,7 @@ func (x *CreateNamespaceVariableRequest) GetCategory() VariableCategory {
 	if x != nil {
 		return x.Category
 	}
-	return VariableCategory_TERRAFORM
+	return VariableCategory_terraform
 }
 
 func (x *CreateNamespaceVariableRequest) GetKey() string {
@@ -441,7 +441,7 @@ func (x *SetNamespaceVariablesRequest) GetCategory() VariableCategory {
 	if x != nil {
 		return x.Category
 	}
-	return VariableCategory_TERRAFORM
+	return VariableCategory_terraform
 }
 
 func (x *SetNamespaceVariablesRequest) GetNamespacePath() string {
@@ -954,8 +954,8 @@ const file_namespace_variable_proto_rawDesc = "" +
 	"\tpage_info\x18\x01 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo\x12\x85\x01\n" +
 	"\x1bnamespace_variable_versions\x18\x02 \x03(\v2E.martiancloud.tharsis.api.namespace_variable.NamespaceVariableVersionR\x19namespaceVariableVersions*2\n" +
 	"\x10VariableCategory\x12\r\n" +
-	"\tTERRAFORM\x10\x00\x12\x0f\n" +
-	"\vENVIRONMENT\x10\x01*P\n" +
+	"\tterraform\x10\x00\x12\x0f\n" +
+	"\venvironment\x10\x01*P\n" +
 	"%NamespaceVariableVersionSortableField\x12\x12\n" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x012\xc4\n" +

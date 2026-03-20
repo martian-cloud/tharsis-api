@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	svchost "github.com/hashicorp/terraform-svchost"
 	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -200,12 +200,6 @@ func newTestHTTPClient(fn roundTripFunc) *http.Client {
 	return &http.Client{Transport: fn}
 }
 
-type fakeDiscoverer struct{}
-
-func (f *fakeDiscoverer) DiscoverServiceURL(_ svchost.Hostname, _ string) (*url.URL, error) {
-	return &url.URL{Scheme: "https", Host: "test.io", Path: "/v1/providers/"}, nil
-}
-
 func TestProviderString(t *testing.T) {
 	t.Run("public registry omits hostname", func(t *testing.T) {
 		p := &Provider{Hostname: TerraformPublicRegistryHost, Namespace: "hashicorp", Type: "aws"}
@@ -274,7 +268,19 @@ func TestListVersions(t *testing.T) {
 			client := newTestHTTPClient(func(_ *http.Request) *http.Response {
 				return &http.Response{StatusCode: tc.responseStatus, Body: io.NopCloser(bytes.NewReader([]byte(tc.responseBody)))}
 			})
-			resolver := &registryClient{httpClient: client, discovery: &fakeDiscoverer{}}
+
+			mockDiscovery := NewMockServiceDiscoverer(t)
+			mockDiscovery.On("DiscoverTFEServices", mock.Anything, provider.Hostname).Return(&TFEServices{
+				Services: map[ServiceID]*url.URL{
+					ProvidersServiceID: &url.URL{
+						Scheme: "https",
+						Host:   "test.io",
+						Path:   "/v1/tfe",
+					},
+				},
+			}, nil)
+
+			resolver := &registryClient{httpClient: client, discovery: mockDiscovery}
 
 			versions, err := resolver.ListVersions(t.Context(), provider)
 			if tc.expectError != "" {
@@ -317,7 +323,19 @@ func TestGetPackageInfo(t *testing.T) {
 			client := newTestHTTPClient(func(_ *http.Request) *http.Response {
 				return &http.Response{StatusCode: tc.responseStatus, Body: io.NopCloser(bytes.NewReader([]byte(tc.responseBody)))}
 			})
-			resolver := &registryClient{httpClient: client, discovery: &fakeDiscoverer{}}
+
+			mockDiscovery := NewMockServiceDiscoverer(t)
+			mockDiscovery.On("DiscoverTFEServices", mock.Anything, provider.Hostname).Return(&TFEServices{
+				Services: map[ServiceID]*url.URL{
+					ProvidersServiceID: &url.URL{
+						Scheme: "https",
+						Host:   "test.io",
+						Path:   "/v1/tfe",
+					},
+				},
+			}, nil)
+
+			resolver := &registryClient{httpClient: client, discovery: mockDiscovery}
 
 			info, err := resolver.GetPackageInfo(t.Context(), provider, "1.0.0", "linux", "amd64")
 			if tc.expectError != "" {
@@ -357,7 +375,7 @@ func TestDownloadPackage(t *testing.T) {
 			client := newTestHTTPClient(func(_ *http.Request) *http.Response {
 				return &http.Response{StatusCode: tc.responseStatus, Body: io.NopCloser(bytes.NewReader(content)), ContentLength: int64(len(content))}
 			})
-			resolver := &registryClient{httpClient: client, discovery: &fakeDiscoverer{}}
+			resolver := &registryClient{httpClient: client}
 
 			body, size, err := resolver.DownloadPackage(t.Context(), "http://test/pkg.zip")
 			if tc.expectError != "" {
@@ -430,7 +448,7 @@ func TestGetChecksums(t *testing.T) {
 				data, _ := base64.StdEncoding.DecodeString(tc.signatureData)
 				return &http.Response{StatusCode: tc.signatureStatus, Body: io.NopCloser(bytes.NewReader(data))}
 			})
-			resolver := &registryClient{httpClient: client, discovery: &fakeDiscoverer{}}
+			resolver := &registryClient{httpClient: client}
 
 			packageInfo := &PackageInfo{
 				SHASumsURL:          "http://test/sums",

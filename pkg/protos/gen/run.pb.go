@@ -617,6 +617,7 @@ type Run struct {
 	TargetAddresses        []string               `protobuf:"bytes,17,rep,name=target_addresses,json=targetAddresses,proto3" json:"target_addresses,omitempty"`
 	TerraformVersion       string                 `protobuf:"bytes,18,opt,name=terraform_version,json=terraformVersion,proto3" json:"terraform_version,omitempty"`
 	WorkspaceId            string                 `protobuf:"bytes,19,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Speculative            bool                   `protobuf:"varint,20,opt,name=speculative,proto3" json:"speculative,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -782,6 +783,13 @@ func (x *Run) GetWorkspaceId() string {
 		return x.WorkspaceId
 	}
 	return ""
+}
+
+func (x *Run) GetSpeculative() bool {
+	if x != nil {
+		return x.Speculative
+	}
+	return false
 }
 
 // RunVariable represents a variable used in a run.
@@ -1032,7 +1040,7 @@ var File_run_proto protoreflect.FileDescriptor
 
 const file_run_proto_rawDesc = "" +
 	"\n" +
-	"\trun.proto\x12\x1cmartiancloud.tharsis.api.run\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\tjob.proto\x1a\n" +
+	"\trun.proto\x12\x1cmartiancloud.tharsis.api.run\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\n" +
 	"plan.proto\x1a\vapply.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"#\n" +
 	"\x11GetRunByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x98\x03\n" +
@@ -1086,7 +1094,7 @@ const file_run_proto_rawDesc = "" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x19\n" +
 	"\x05value\x18\x03 \x01(\tH\x00R\x05value\x88\x01\x01B\b\n" +
-	"\x06_value\"\xb4\a\n" +
+	"\x06_value\"\xd6\a\n" +
 	"\x03Run\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x19\n" +
 	"\bapply_id\x18\x02 \x01(\tR\aapplyId\x12=\n" +
@@ -1110,7 +1118,8 @@ const file_run_proto_rawDesc = "" +
 	"\x06status\x18\x10 \x01(\tR\x06status\x12)\n" +
 	"\x10target_addresses\x18\x11 \x03(\tR\x0ftargetAddresses\x12+\n" +
 	"\x11terraform_version\x18\x12 \x01(\tR\x10terraformVersion\x12!\n" +
-	"\fworkspace_id\x18\x13 \x01(\tR\vworkspaceIdB\x1b\n" +
+	"\fworkspace_id\x18\x13 \x01(\tR\vworkspaceId\x12 \n" +
+	"\vspeculative\x18\x14 \x01(\bR\vspeculativeB\x1b\n" +
 	"\x19_configuration_version_idB\x1c\n" +
 	"\x1a_force_cancel_available_atB\x14\n" +
 	"\x12_force_canceled_byB\x10\n" +
@@ -1141,8 +1150,7 @@ const file_run_proto_rawDesc = "" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x02\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x032\xfa\n" +
-	"\n" +
+	"\x0fUPDATED_AT_DESC\x10\x032\x8d\t\n" +
 	"\x04Runs\x12`\n" +
 	"\n" +
 	"GetRunByID\x12/.martiancloud.tharsis.api.run.GetRunByIDRequest\x1a!.martiancloud.tharsis.api.run.Run\x12f\n" +
@@ -1155,9 +1163,7 @@ const file_run_proto_rawDesc = "" +
 	"\fGetApplyByID\x123.martiancloud.tharsis.api.apply.GetApplyByIDRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12c\n" +
 	"\n" +
 	"UpdatePlan\x120.martiancloud.tharsis.api.plan.UpdatePlanRequest\x1a#.martiancloud.tharsis.api.plan.Plan\x12h\n" +
-	"\vUpdateApply\x122.martiancloud.tharsis.api.apply.UpdateApplyRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12s\n" +
-	"\x13GetLatestJobForPlan\x129.martiancloud.tharsis.api.plan.GetLatestJobForPlanRequest\x1a!.martiancloud.tharsis.api.job.Job\x12v\n" +
-	"\x14GetLatestJobForApply\x12;.martiancloud.tharsis.api.apply.GetLatestJobForApplyRequest\x1a!.martiancloud.tharsis.api.job.Job\x12{\n" +
+	"\vUpdateApply\x122.martiancloud.tharsis.api.apply.UpdateApplyRequest\x1a%.martiancloud.tharsis.api.apply.Apply\x12{\n" +
 	"\x14SubscribeToRunEvents\x129.martiancloud.tharsis.api.run.SubscribeToRunEventsRequest\x1a&.martiancloud.tharsis.api.run.RunEvent0\x01BIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
@@ -1197,11 +1203,8 @@ var file_run_proto_goTypes = []any{
 	(*GetApplyByIDRequest)(nil),         // 19: martiancloud.tharsis.api.apply.GetApplyByIDRequest
 	(*UpdatePlanRequest)(nil),           // 20: martiancloud.tharsis.api.plan.UpdatePlanRequest
 	(*UpdateApplyRequest)(nil),          // 21: martiancloud.tharsis.api.apply.UpdateApplyRequest
-	(*GetLatestJobForPlanRequest)(nil),  // 22: martiancloud.tharsis.api.plan.GetLatestJobForPlanRequest
-	(*GetLatestJobForApplyRequest)(nil), // 23: martiancloud.tharsis.api.apply.GetLatestJobForApplyRequest
-	(*Plan)(nil),                        // 24: martiancloud.tharsis.api.plan.Plan
-	(*Apply)(nil),                       // 25: martiancloud.tharsis.api.apply.Apply
-	(*Job)(nil),                         // 26: martiancloud.tharsis.api.job.Job
+	(*Plan)(nil),                        // 22: martiancloud.tharsis.api.plan.Plan
+	(*Apply)(nil),                       // 23: martiancloud.tharsis.api.apply.Apply
 }
 var file_run_proto_depIdxs = []int32{
 	14, // 0: martiancloud.tharsis.api.run.GetRunsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
@@ -1223,24 +1226,20 @@ var file_run_proto_depIdxs = []int32{
 	19, // 16: martiancloud.tharsis.api.run.Runs.GetApplyByID:input_type -> martiancloud.tharsis.api.apply.GetApplyByIDRequest
 	20, // 17: martiancloud.tharsis.api.run.Runs.UpdatePlan:input_type -> martiancloud.tharsis.api.plan.UpdatePlanRequest
 	21, // 18: martiancloud.tharsis.api.run.Runs.UpdateApply:input_type -> martiancloud.tharsis.api.apply.UpdateApplyRequest
-	22, // 19: martiancloud.tharsis.api.run.Runs.GetLatestJobForPlan:input_type -> martiancloud.tharsis.api.plan.GetLatestJobForPlanRequest
-	23, // 20: martiancloud.tharsis.api.run.Runs.GetLatestJobForApply:input_type -> martiancloud.tharsis.api.apply.GetLatestJobForApplyRequest
-	7,  // 21: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
-	9,  // 22: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
-	12, // 23: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
-	9,  // 24: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
-	9,  // 25: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
-	9,  // 26: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
-	13, // 27: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
-	24, // 28: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
-	25, // 29: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
-	24, // 30: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
-	25, // 31: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
-	26, // 32: martiancloud.tharsis.api.run.Runs.GetLatestJobForPlan:output_type -> martiancloud.tharsis.api.job.Job
-	26, // 33: martiancloud.tharsis.api.run.Runs.GetLatestJobForApply:output_type -> martiancloud.tharsis.api.job.Job
-	11, // 34: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
-	22, // [22:35] is the sub-list for method output_type
-	9,  // [9:22] is the sub-list for method input_type
+	7,  // 19: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:input_type -> martiancloud.tharsis.api.run.SubscribeToRunEventsRequest
+	9,  // 20: martiancloud.tharsis.api.run.Runs.GetRunByID:output_type -> martiancloud.tharsis.api.run.Run
+	12, // 21: martiancloud.tharsis.api.run.Runs.GetRuns:output_type -> martiancloud.tharsis.api.run.GetRunsResponse
+	9,  // 22: martiancloud.tharsis.api.run.Runs.CreateRun:output_type -> martiancloud.tharsis.api.run.Run
+	9,  // 23: martiancloud.tharsis.api.run.Runs.ApplyRun:output_type -> martiancloud.tharsis.api.run.Run
+	9,  // 24: martiancloud.tharsis.api.run.Runs.CancelRun:output_type -> martiancloud.tharsis.api.run.Run
+	13, // 25: martiancloud.tharsis.api.run.Runs.GetRunVariables:output_type -> martiancloud.tharsis.api.run.GetRunVariablesResponse
+	22, // 26: martiancloud.tharsis.api.run.Runs.GetPlanByID:output_type -> martiancloud.tharsis.api.plan.Plan
+	23, // 27: martiancloud.tharsis.api.run.Runs.GetApplyByID:output_type -> martiancloud.tharsis.api.apply.Apply
+	22, // 28: martiancloud.tharsis.api.run.Runs.UpdatePlan:output_type -> martiancloud.tharsis.api.plan.Plan
+	23, // 29: martiancloud.tharsis.api.run.Runs.UpdateApply:output_type -> martiancloud.tharsis.api.apply.Apply
+	11, // 30: martiancloud.tharsis.api.run.Runs.SubscribeToRunEvents:output_type -> martiancloud.tharsis.api.run.RunEvent
+	20, // [20:31] is the sub-list for method output_type
+	9,  // [9:20] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -1253,7 +1252,6 @@ func file_run_proto_init() {
 	}
 	file_metadata_proto_init()
 	file_pagination_proto_init()
-	file_job_proto_init()
 	file_plan_proto_init()
 	file_apply_proto_init()
 	file_run_proto_msgTypes[1].OneofWrappers = []any{}
