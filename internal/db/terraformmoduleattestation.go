@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -119,8 +120,13 @@ func (t *terraformModuleAttestations) GetModuleAttestationByTRN(ctx context.Cont
 		)
 	}
 
+	sum, err := hex.DecodeString(parts[len(parts)-1])
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid module sha sum in TRN", errors.WithErrorCode(errors.EInvalid))
+	}
+
 	return t.getModuleAttestation(ctx, goqu.Ex{
-		"terraform_module_attestations.data_sha_sum": parts[len(parts)-1],
+		"terraform_module_attestations.data_sha_sum": sum,
 		"terraform_modules.system":                   parts[len(parts)-2],
 		"terraform_modules.name":                     parts[len(parts)-3],
 		"namespaces.path":                            strings.Join(parts[:len(parts)-3], "/"),
@@ -435,7 +441,7 @@ func scanTerraformModuleAttestation(row scanner) (*models.TerraformModuleAttesta
 		groupPath,
 		moduleName,
 		moduleSystem,
-		string(moduleAttestation.DataSHASum),
+		hex.EncodeToString(moduleAttestation.DataSHASum),
 	)
 
 	return moduleAttestation, nil

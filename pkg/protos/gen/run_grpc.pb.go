@@ -29,8 +29,6 @@ const (
 	Runs_GetApplyByID_FullMethodName         = "/martiancloud.tharsis.api.run.Runs/GetApplyByID"
 	Runs_UpdatePlan_FullMethodName           = "/martiancloud.tharsis.api.run.Runs/UpdatePlan"
 	Runs_UpdateApply_FullMethodName          = "/martiancloud.tharsis.api.run.Runs/UpdateApply"
-	Runs_GetLatestJobForPlan_FullMethodName  = "/martiancloud.tharsis.api.run.Runs/GetLatestJobForPlan"
-	Runs_GetLatestJobForApply_FullMethodName = "/martiancloud.tharsis.api.run.Runs/GetLatestJobForApply"
 	Runs_SubscribeToRunEvents_FullMethodName = "/martiancloud.tharsis.api.run.Runs/SubscribeToRunEvents"
 )
 
@@ -60,10 +58,6 @@ type RunsClient interface {
 	UpdatePlan(ctx context.Context, in *UpdatePlanRequest, opts ...grpc.CallOption) (*Plan, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(ctx context.Context, in *UpdateApplyRequest, opts ...grpc.CallOption) (*Apply, error)
-	// GetLatestJobForPlan returns the latest job for a Plan.
-	GetLatestJobForPlan(ctx context.Context, in *GetLatestJobForPlanRequest, opts ...grpc.CallOption) (*Job, error)
-	// GetLatestJobForApply returns the latest job for an Apply.
-	GetLatestJobForApply(ctx context.Context, in *GetLatestJobForApplyRequest, opts ...grpc.CallOption) (*Job, error)
 	// SubscribeToRunEvents subscribes to run events.
 	SubscribeToRunEvents(ctx context.Context, in *SubscribeToRunEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error)
 }
@@ -176,26 +170,6 @@ func (c *runsClient) UpdateApply(ctx context.Context, in *UpdateApplyRequest, op
 	return out, nil
 }
 
-func (c *runsClient) GetLatestJobForPlan(ctx context.Context, in *GetLatestJobForPlanRequest, opts ...grpc.CallOption) (*Job, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Job)
-	err := c.cc.Invoke(ctx, Runs_GetLatestJobForPlan_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *runsClient) GetLatestJobForApply(ctx context.Context, in *GetLatestJobForApplyRequest, opts ...grpc.CallOption) (*Job, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Job)
-	err := c.cc.Invoke(ctx, Runs_GetLatestJobForApply_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *runsClient) SubscribeToRunEvents(ctx context.Context, in *SubscribeToRunEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Runs_ServiceDesc.Streams[0], Runs_SubscribeToRunEvents_FullMethodName, cOpts...)
@@ -241,10 +215,6 @@ type RunsServer interface {
 	UpdatePlan(context.Context, *UpdatePlanRequest) (*Plan, error)
 	// UpdateApply updates an Apply.
 	UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error)
-	// GetLatestJobForPlan returns the latest job for a Plan.
-	GetLatestJobForPlan(context.Context, *GetLatestJobForPlanRequest) (*Job, error)
-	// GetLatestJobForApply returns the latest job for an Apply.
-	GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error)
 	// SubscribeToRunEvents subscribes to run events.
 	SubscribeToRunEvents(*SubscribeToRunEventsRequest, grpc.ServerStreamingServer[RunEvent]) error
 	mustEmbedUnimplementedRunsServer()
@@ -286,12 +256,6 @@ func (UnimplementedRunsServer) UpdatePlan(context.Context, *UpdatePlanRequest) (
 }
 func (UnimplementedRunsServer) UpdateApply(context.Context, *UpdateApplyRequest) (*Apply, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateApply not implemented")
-}
-func (UnimplementedRunsServer) GetLatestJobForPlan(context.Context, *GetLatestJobForPlanRequest) (*Job, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetLatestJobForPlan not implemented")
-}
-func (UnimplementedRunsServer) GetLatestJobForApply(context.Context, *GetLatestJobForApplyRequest) (*Job, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetLatestJobForApply not implemented")
 }
 func (UnimplementedRunsServer) SubscribeToRunEvents(*SubscribeToRunEventsRequest, grpc.ServerStreamingServer[RunEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeToRunEvents not implemented")
@@ -497,42 +461,6 @@ func _Runs_UpdateApply_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Runs_GetLatestJobForPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetLatestJobForPlanRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RunsServer).GetLatestJobForPlan(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Runs_GetLatestJobForPlan_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunsServer).GetLatestJobForPlan(ctx, req.(*GetLatestJobForPlanRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Runs_GetLatestJobForApply_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetLatestJobForApplyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RunsServer).GetLatestJobForApply(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Runs_GetLatestJobForApply_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunsServer).GetLatestJobForApply(ctx, req.(*GetLatestJobForApplyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Runs_SubscribeToRunEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SubscribeToRunEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -590,14 +518,6 @@ var Runs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateApply",
 			Handler:    _Runs_UpdateApply_Handler,
-		},
-		{
-			MethodName: "GetLatestJobForPlan",
-			Handler:    _Runs_GetLatestJobForPlan_Handler,
-		},
-		{
-			MethodName: "GetLatestJobForApply",
-			Handler:    _Runs_GetLatestJobForApply_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

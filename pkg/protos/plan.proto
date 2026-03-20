@@ -30,11 +30,6 @@ message UpdatePlanRequest {
   optional string error_message = 5;
 }
 
-// GetLatestJobForPlanRequest is the input for getting the latest job for a plan.
-message GetLatestJobForPlanRequest {
-  string plan_id = 1;
-}
-
 // Plan represents a Terraform plan.
 message Plan {
   metadata.ResourceMetadata metadata      = 1;

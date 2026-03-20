@@ -6,6 +6,7 @@ option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pk
 
 import "metadata.proto";
 import "pagination.proto";
+import "state_version_output.proto";
 
 // StateVersions implements all functionality related to Tharsis State Versions.
 service StateVersions {
@@ -15,6 +16,12 @@ service StateVersions {
   rpc GetStateVersions(GetStateVersionsRequest) returns (GetStateVersionsResponse);
   // CreateStateVersion creates a new StateVersion.
   rpc CreateStateVersion(CreateStateVersionRequest) returns (StateVersion);
+  // GetStateVersionOutputByID returns a StateVersionOutput by an ID.
+  rpc GetStateVersionOutputByID(state_version_output.GetStateVersionOutputByIDRequest)
+      returns (state_version_output.StateVersionOutput);
+  // GetStateVersionOutputs returns a list of StateVersionOutputs for a state version.
+  rpc GetStateVersionOutputs(state_version_output.GetStateVersionOutputsRequest)
+      returns (state_version_output.GetStateVersionOutputsResponse);
 }
 
 // StateVersionSortableField defines enums that allow sorting a paginated list of StateVersions.

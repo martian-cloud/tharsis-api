@@ -674,6 +674,10 @@ func (s *service) CreateRunner(ctx context.Context, input *CreateRunnerInput) (*
 		RunUntaggedJobs: input.RunUntaggedJobs,
 	}
 
+	if input.Disabled != nil {
+		runnerToCreate.Disabled = *input.Disabled
+	}
+
 	// Validate model
 	if err = runnerToCreate.Validate(); err != nil {
 		tracing.RecordError(span, err, "failed to validate runner model")

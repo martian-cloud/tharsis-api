@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StateVersions_GetStateVersionByID_FullMethodName = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersionByID"
-	StateVersions_GetStateVersions_FullMethodName    = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersions"
-	StateVersions_CreateStateVersion_FullMethodName  = "/martiancloud.tharsis.api.state_version.StateVersions/CreateStateVersion"
+	StateVersions_GetStateVersionByID_FullMethodName       = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersionByID"
+	StateVersions_GetStateVersions_FullMethodName          = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersions"
+	StateVersions_CreateStateVersion_FullMethodName        = "/martiancloud.tharsis.api.state_version.StateVersions/CreateStateVersion"
+	StateVersions_GetStateVersionOutputByID_FullMethodName = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersionOutputByID"
+	StateVersions_GetStateVersionOutputs_FullMethodName    = "/martiancloud.tharsis.api.state_version.StateVersions/GetStateVersionOutputs"
 )
 
 // StateVersionsClient is the client API for StateVersions service.
@@ -36,6 +38,10 @@ type StateVersionsClient interface {
 	GetStateVersions(ctx context.Context, in *GetStateVersionsRequest, opts ...grpc.CallOption) (*GetStateVersionsResponse, error)
 	// CreateStateVersion creates a new StateVersion.
 	CreateStateVersion(ctx context.Context, in *CreateStateVersionRequest, opts ...grpc.CallOption) (*StateVersion, error)
+	// GetStateVersionOutputByID returns a StateVersionOutput by an ID.
+	GetStateVersionOutputByID(ctx context.Context, in *GetStateVersionOutputByIDRequest, opts ...grpc.CallOption) (*StateVersionOutput, error)
+	// GetStateVersionOutputs returns a list of StateVersionOutputs for a state version.
+	GetStateVersionOutputs(ctx context.Context, in *GetStateVersionOutputsRequest, opts ...grpc.CallOption) (*GetStateVersionOutputsResponse, error)
 }
 
 type stateVersionsClient struct {
@@ -76,6 +82,26 @@ func (c *stateVersionsClient) CreateStateVersion(ctx context.Context, in *Create
 	return out, nil
 }
 
+func (c *stateVersionsClient) GetStateVersionOutputByID(ctx context.Context, in *GetStateVersionOutputByIDRequest, opts ...grpc.CallOption) (*StateVersionOutput, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StateVersionOutput)
+	err := c.cc.Invoke(ctx, StateVersions_GetStateVersionOutputByID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *stateVersionsClient) GetStateVersionOutputs(ctx context.Context, in *GetStateVersionOutputsRequest, opts ...grpc.CallOption) (*GetStateVersionOutputsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStateVersionOutputsResponse)
+	err := c.cc.Invoke(ctx, StateVersions_GetStateVersionOutputs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StateVersionsServer is the server API for StateVersions service.
 // All implementations must embed UnimplementedStateVersionsServer
 // for forward compatibility.
@@ -88,6 +114,10 @@ type StateVersionsServer interface {
 	GetStateVersions(context.Context, *GetStateVersionsRequest) (*GetStateVersionsResponse, error)
 	// CreateStateVersion creates a new StateVersion.
 	CreateStateVersion(context.Context, *CreateStateVersionRequest) (*StateVersion, error)
+	// GetStateVersionOutputByID returns a StateVersionOutput by an ID.
+	GetStateVersionOutputByID(context.Context, *GetStateVersionOutputByIDRequest) (*StateVersionOutput, error)
+	// GetStateVersionOutputs returns a list of StateVersionOutputs for a state version.
+	GetStateVersionOutputs(context.Context, *GetStateVersionOutputsRequest) (*GetStateVersionOutputsResponse, error)
 	mustEmbedUnimplementedStateVersionsServer()
 }
 
@@ -106,6 +136,12 @@ func (UnimplementedStateVersionsServer) GetStateVersions(context.Context, *GetSt
 }
 func (UnimplementedStateVersionsServer) CreateStateVersion(context.Context, *CreateStateVersionRequest) (*StateVersion, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateStateVersion not implemented")
+}
+func (UnimplementedStateVersionsServer) GetStateVersionOutputByID(context.Context, *GetStateVersionOutputByIDRequest) (*StateVersionOutput, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStateVersionOutputByID not implemented")
+}
+func (UnimplementedStateVersionsServer) GetStateVersionOutputs(context.Context, *GetStateVersionOutputsRequest) (*GetStateVersionOutputsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStateVersionOutputs not implemented")
 }
 func (UnimplementedStateVersionsServer) mustEmbedUnimplementedStateVersionsServer() {}
 func (UnimplementedStateVersionsServer) testEmbeddedByValue()                       {}
@@ -182,6 +218,42 @@ func _StateVersions_CreateStateVersion_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StateVersions_GetStateVersionOutputByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStateVersionOutputByIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateVersionsServer).GetStateVersionOutputByID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StateVersions_GetStateVersionOutputByID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateVersionsServer).GetStateVersionOutputByID(ctx, req.(*GetStateVersionOutputByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StateVersions_GetStateVersionOutputs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStateVersionOutputsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StateVersionsServer).GetStateVersionOutputs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StateVersions_GetStateVersionOutputs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StateVersionsServer).GetStateVersionOutputs(ctx, req.(*GetStateVersionOutputsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StateVersions_ServiceDesc is the grpc.ServiceDesc for StateVersions service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -200,6 +272,14 @@ var StateVersions_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateStateVersion",
 			Handler:    _StateVersions_CreateStateVersion_Handler,
+		},
+		{
+			MethodName: "GetStateVersionOutputByID",
+			Handler:    _StateVersions_GetStateVersionOutputByID_Handler,
+		},
+		{
+			MethodName: "GetStateVersionOutputs",
+			Handler:    _StateVersions_GetStateVersionOutputs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

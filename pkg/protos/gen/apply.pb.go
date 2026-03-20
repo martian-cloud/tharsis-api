@@ -197,51 +197,6 @@ func (x *UpdateApplyRequest) GetErrorMessage() string {
 	return ""
 }
 
-// GetLatestJobForApplyRequest is the input for getting the latest job for an apply.
-type GetLatestJobForApplyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ApplyId       string                 `protobuf:"bytes,1,opt,name=apply_id,json=applyId,proto3" json:"apply_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetLatestJobForApplyRequest) Reset() {
-	*x = GetLatestJobForApplyRequest{}
-	mi := &file_apply_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetLatestJobForApplyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetLatestJobForApplyRequest) ProtoMessage() {}
-
-func (x *GetLatestJobForApplyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_apply_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetLatestJobForApplyRequest.ProtoReflect.Descriptor instead.
-func (*GetLatestJobForApplyRequest) Descriptor() ([]byte, []int) {
-	return file_apply_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GetLatestJobForApplyRequest) GetApplyId() string {
-	if x != nil {
-		return x.ApplyId
-	}
-	return ""
-}
-
 // Apply represents a Terraform apply.
 type Apply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -255,7 +210,7 @@ type Apply struct {
 
 func (x *Apply) Reset() {
 	*x = Apply{}
-	mi := &file_apply_proto_msgTypes[3]
+	mi := &file_apply_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +222,7 @@ func (x *Apply) String() string {
 func (*Apply) ProtoMessage() {}
 
 func (x *Apply) ProtoReflect() protoreflect.Message {
-	mi := &file_apply_proto_msgTypes[3]
+	mi := &file_apply_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +235,7 @@ func (x *Apply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Apply.ProtoReflect.Descriptor instead.
 func (*Apply) Descriptor() ([]byte, []int) {
-	return file_apply_proto_rawDescGZIP(), []int{3}
+	return file_apply_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Apply) GetMetadata() *ResourceMetadata {
@@ -325,9 +280,7 @@ const file_apply_proto_rawDesc = "" +
 	"\rerror_message\x18\x04 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_message\"8\n" +
-	"\x1bGetLatestJobForApplyRequest\x12\x19\n" +
-	"\bapply_id\x18\x01 \x01(\tR\aapplyId\"\xcf\x01\n" +
+	"\x0e_error_message\"\xcf\x01\n" +
 	"\x05Apply\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12!\n" +
@@ -357,18 +310,17 @@ func file_apply_proto_rawDescGZIP() []byte {
 }
 
 var file_apply_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_apply_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_apply_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_apply_proto_goTypes = []any{
-	(ApplyStatus)(0),                    // 0: martiancloud.tharsis.api.apply.ApplyStatus
-	(*GetApplyByIDRequest)(nil),         // 1: martiancloud.tharsis.api.apply.GetApplyByIDRequest
-	(*UpdateApplyRequest)(nil),          // 2: martiancloud.tharsis.api.apply.UpdateApplyRequest
-	(*GetLatestJobForApplyRequest)(nil), // 3: martiancloud.tharsis.api.apply.GetLatestJobForApplyRequest
-	(*Apply)(nil),                       // 4: martiancloud.tharsis.api.apply.Apply
-	(*ResourceMetadata)(nil),            // 5: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(ApplyStatus)(0),            // 0: martiancloud.tharsis.api.apply.ApplyStatus
+	(*GetApplyByIDRequest)(nil), // 1: martiancloud.tharsis.api.apply.GetApplyByIDRequest
+	(*UpdateApplyRequest)(nil),  // 2: martiancloud.tharsis.api.apply.UpdateApplyRequest
+	(*Apply)(nil),               // 3: martiancloud.tharsis.api.apply.Apply
+	(*ResourceMetadata)(nil),    // 4: martiancloud.tharsis.api.metadata.ResourceMetadata
 }
 var file_apply_proto_depIdxs = []int32{
 	0, // 0: martiancloud.tharsis.api.apply.UpdateApplyRequest.status:type_name -> martiancloud.tharsis.api.apply.ApplyStatus
-	5, // 1: martiancloud.tharsis.api.apply.Apply.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	4, // 1: martiancloud.tharsis.api.apply.Apply.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -383,14 +335,14 @@ func file_apply_proto_init() {
 	}
 	file_metadata_proto_init()
 	file_apply_proto_msgTypes[1].OneofWrappers = []any{}
-	file_apply_proto_msgTypes[3].OneofWrappers = []any{}
+	file_apply_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_apply_proto_rawDesc), len(file_apply_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

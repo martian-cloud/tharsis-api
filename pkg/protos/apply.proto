@@ -30,11 +30,6 @@ message UpdateApplyRequest {
   optional string error_message = 4;
 }
 
-// GetLatestJobForApplyRequest is the input for getting the latest job for an apply.
-message GetLatestJobForApplyRequest {
-  string apply_id = 1;
-}
-
 // Apply represents a Terraform apply.
 message Apply {
   metadata.ResourceMetadata metadata      = 1;

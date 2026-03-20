@@ -216,6 +216,9 @@ func (s *TerraformModuleServer) GetTerraformModuleVersions(ctx context.Context, 
 		Sort:              &sort,
 		PaginationOptions: paginationOpts,
 		ModuleID:          moduleID,
+		Search:            req.Search,
+		SemanticVersion:   req.SemanticVersion,
+		Latest:            req.Latest,
 	}
 
 	result, err := s.serviceCatalog.TerraformModuleRegistryService.GetModuleVersions(ctx, input)

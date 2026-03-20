@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package martiancloud.tharsis.api.caller;
+
+option go_package = "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/gen";
+
+import "user.proto";
+import "service_account.proto";
+import "google/protobuf/empty.proto";
+
+// CallerIdentity implements functionality to get information about the authenticated caller.
+service CallerIdentity {
+  // GetCallerIdentity returns information about the authenticated caller.
+  rpc GetCallerIdentity(google.protobuf.Empty) returns (GetCallerIdentityResponse);
+}
+
+// GetCallerIdentityResponse is the response containing caller information.
+message GetCallerIdentityResponse {
+  oneof caller {
+    user.User                      user            = 1;
+    service_account.ServiceAccount service_account = 2;
+  }
+}

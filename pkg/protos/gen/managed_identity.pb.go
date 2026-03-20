@@ -26,25 +26,25 @@ const (
 type ManagedIdentityType int32
 
 const (
-	ManagedIdentityType_AZURE_FEDERATED      ManagedIdentityType = 0
-	ManagedIdentityType_AWS_FEDERATED        ManagedIdentityType = 1
-	ManagedIdentityType_THARSIS_FEDERATED    ManagedIdentityType = 2
-	ManagedIdentityType_KUBERNETES_FEDERATED ManagedIdentityType = 3
+	ManagedIdentityType_azure_federated      ManagedIdentityType = 0
+	ManagedIdentityType_aws_federated        ManagedIdentityType = 1
+	ManagedIdentityType_tharsis_federated    ManagedIdentityType = 2
+	ManagedIdentityType_kubernetes_federated ManagedIdentityType = 3
 )
 
 // Enum value maps for ManagedIdentityType.
 var (
 	ManagedIdentityType_name = map[int32]string{
-		0: "AZURE_FEDERATED",
-		1: "AWS_FEDERATED",
-		2: "THARSIS_FEDERATED",
-		3: "KUBERNETES_FEDERATED",
+		0: "azure_federated",
+		1: "aws_federated",
+		2: "tharsis_federated",
+		3: "kubernetes_federated",
 	}
 	ManagedIdentityType_value = map[string]int32{
-		"AZURE_FEDERATED":      0,
-		"AWS_FEDERATED":        1,
-		"THARSIS_FEDERATED":    2,
-		"KUBERNETES_FEDERATED": 3,
+		"azure_federated":      0,
+		"aws_federated":        1,
+		"tharsis_federated":    2,
+		"kubernetes_federated": 3,
 	}
 )
 
@@ -79,19 +79,19 @@ func (ManagedIdentityType) EnumDescriptor() ([]byte, []int) {
 type ManagedIdentityAccessRuleType int32
 
 const (
-	ManagedIdentityAccessRuleType_ELIGIBLE_PRINCIPALS ManagedIdentityAccessRuleType = 0
-	ManagedIdentityAccessRuleType_MODULE_ATTESTATION  ManagedIdentityAccessRuleType = 1
+	ManagedIdentityAccessRuleType_eligible_principals ManagedIdentityAccessRuleType = 0
+	ManagedIdentityAccessRuleType_module_attestation  ManagedIdentityAccessRuleType = 1
 )
 
 // Enum value maps for ManagedIdentityAccessRuleType.
 var (
 	ManagedIdentityAccessRuleType_name = map[int32]string{
-		0: "ELIGIBLE_PRINCIPALS",
-		1: "MODULE_ATTESTATION",
+		0: "eligible_principals",
+		1: "module_attestation",
 	}
 	ManagedIdentityAccessRuleType_value = map[string]int32{
-		"ELIGIBLE_PRINCIPALS": 0,
-		"MODULE_ATTESTATION":  1,
+		"eligible_principals": 0,
+		"module_attestation":  1,
 	}
 )
 
@@ -358,7 +358,7 @@ func (x *CreateManagedIdentityRequest) GetType() ManagedIdentityType {
 	if x != nil {
 		return x.Type
 	}
-	return ManagedIdentityType_AZURE_FEDERATED
+	return ManagedIdentityType_azure_federated
 }
 
 func (x *CreateManagedIdentityRequest) GetName() string {
@@ -845,14 +845,14 @@ func (x *CreateManagedIdentityAccessRuleRequest) GetType() ManagedIdentityAccess
 	if x != nil {
 		return x.Type
 	}
-	return ManagedIdentityAccessRuleType_ELIGIBLE_PRINCIPALS
+	return ManagedIdentityAccessRuleType_eligible_principals
 }
 
 func (x *CreateManagedIdentityAccessRuleRequest) GetRunStage() JobType {
 	if x != nil {
 		return x.RunStage
 	}
-	return JobType_PLAN
+	return JobType_plan
 }
 
 func (x *CreateManagedIdentityAccessRuleRequest) GetManagedIdentityId() string {
@@ -901,12 +901,11 @@ func (x *CreateManagedIdentityAccessRuleRequest) GetModuleAttestationPolicies() 
 type UpdateManagedIdentityAccessRuleRequest struct {
 	state                     protoimpl.MessageState                              `protogen:"open.v1"`
 	Id                        string                                              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	RunStage                  JobType                                             `protobuf:"varint,2,opt,name=run_stage,json=runStage,proto3,enum=martiancloud.tharsis.api.job.JobType" json:"run_stage,omitempty"`
-	AllowedUsers              []string                                            `protobuf:"bytes,3,rep,name=allowed_users,json=allowedUsers,proto3" json:"allowed_users,omitempty"`
-	AllowedServiceAccounts    []string                                            `protobuf:"bytes,4,rep,name=allowed_service_accounts,json=allowedServiceAccounts,proto3" json:"allowed_service_accounts,omitempty"`
-	AllowedTeams              []string                                            `protobuf:"bytes,5,rep,name=allowed_teams,json=allowedTeams,proto3" json:"allowed_teams,omitempty"`
-	VerifyStateLineage        *bool                                               `protobuf:"varint,6,opt,name=verify_state_lineage,json=verifyStateLineage,proto3,oneof" json:"verify_state_lineage,omitempty"`
-	ModuleAttestationPolicies []*ManagedIdentityAccessRuleModuleAttestationPolicy `protobuf:"bytes,7,rep,name=module_attestation_policies,json=moduleAttestationPolicies,proto3" json:"module_attestation_policies,omitempty"`
+	AllowedUsers              []string                                            `protobuf:"bytes,2,rep,name=allowed_users,json=allowedUsers,proto3" json:"allowed_users,omitempty"`
+	AllowedServiceAccounts    []string                                            `protobuf:"bytes,3,rep,name=allowed_service_accounts,json=allowedServiceAccounts,proto3" json:"allowed_service_accounts,omitempty"`
+	AllowedTeams              []string                                            `protobuf:"bytes,4,rep,name=allowed_teams,json=allowedTeams,proto3" json:"allowed_teams,omitempty"`
+	VerifyStateLineage        *bool                                               `protobuf:"varint,5,opt,name=verify_state_lineage,json=verifyStateLineage,proto3,oneof" json:"verify_state_lineage,omitempty"`
+	ModuleAttestationPolicies []*ManagedIdentityAccessRuleModuleAttestationPolicy `protobuf:"bytes,6,rep,name=module_attestation_policies,json=moduleAttestationPolicies,proto3" json:"module_attestation_policies,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -946,13 +945,6 @@ func (x *UpdateManagedIdentityAccessRuleRequest) GetId() string {
 		return x.Id
 	}
 	return ""
-}
-
-func (x *UpdateManagedIdentityAccessRuleRequest) GetRunStage() JobType {
-	if x != nil {
-		return x.RunStage
-	}
-	return JobType_PLAN
 }
 
 func (x *UpdateManagedIdentityAccessRuleRequest) GetAllowedUsers() []string {
@@ -1250,14 +1242,14 @@ func (x *ManagedIdentityAccessRuleInput) GetType() ManagedIdentityAccessRuleType
 	if x != nil {
 		return x.Type
 	}
-	return ManagedIdentityAccessRuleType_ELIGIBLE_PRINCIPALS
+	return ManagedIdentityAccessRuleType_eligible_principals
 }
 
 func (x *ManagedIdentityAccessRuleInput) GetRunStage() JobType {
 	if x != nil {
 		return x.RunStage
 	}
-	return JobType_PLAN
+	return JobType_plan
 }
 
 func (x *ManagedIdentityAccessRuleInput) GetAllowedUsers() []string {
@@ -1758,15 +1750,14 @@ const file_managed_identity_proto_rawDesc = "" +
 	"\x18allowed_service_accounts\x18\x05 \x03(\tR\x16allowedServiceAccounts\x12#\n" +
 	"\rallowed_teams\x18\x06 \x03(\tR\fallowedTeams\x120\n" +
 	"\x14verify_state_lineage\x18\a \x01(\bR\x12verifyStateLineage\x12\x9b\x01\n" +
-	"\x1bmodule_attestation_policies\x18\b \x03(\v2[.martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicyR\x19moduleAttestationPolicies\"\xee\x03\n" +
+	"\x1bmodule_attestation_policies\x18\b \x03(\v2[.martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicyR\x19moduleAttestationPolicies\"\xaa\x03\n" +
 	"&UpdateManagedIdentityAccessRuleRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12B\n" +
-	"\trun_stage\x18\x02 \x01(\x0e2%.martiancloud.tharsis.api.job.JobTypeR\brunStage\x12#\n" +
-	"\rallowed_users\x18\x03 \x03(\tR\fallowedUsers\x128\n" +
-	"\x18allowed_service_accounts\x18\x04 \x03(\tR\x16allowedServiceAccounts\x12#\n" +
-	"\rallowed_teams\x18\x05 \x03(\tR\fallowedTeams\x125\n" +
-	"\x14verify_state_lineage\x18\x06 \x01(\bH\x00R\x12verifyStateLineage\x88\x01\x01\x12\x9b\x01\n" +
-	"\x1bmodule_attestation_policies\x18\a \x03(\v2[.martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicyR\x19moduleAttestationPoliciesB\x17\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rallowed_users\x18\x02 \x03(\tR\fallowedUsers\x128\n" +
+	"\x18allowed_service_accounts\x18\x03 \x03(\tR\x16allowedServiceAccounts\x12#\n" +
+	"\rallowed_teams\x18\x04 \x03(\tR\fallowedTeams\x125\n" +
+	"\x14verify_state_lineage\x18\x05 \x01(\bH\x00R\x12verifyStateLineage\x88\x01\x01\x12\x9b\x01\n" +
+	"\x1bmodule_attestation_policies\x18\x06 \x03(\v2[.martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicyR\x19moduleAttestationPoliciesB\x17\n" +
 	"\x15_verify_state_lineage\"8\n" +
 	"&DeleteManagedIdentityAccessRuleRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"z\n" +
@@ -1824,13 +1815,13 @@ const file_managed_identity_proto_rawDesc = "" +
 	"%GetManagedIdentityAccessRulesResponse\x12g\n" +
 	"\faccess_rules\x18\x01 \x03(\v2D.martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleR\vaccessRules*n\n" +
 	"\x13ManagedIdentityType\x12\x13\n" +
-	"\x0fAZURE_FEDERATED\x10\x00\x12\x11\n" +
-	"\rAWS_FEDERATED\x10\x01\x12\x15\n" +
-	"\x11THARSIS_FEDERATED\x10\x02\x12\x18\n" +
-	"\x14KUBERNETES_FEDERATED\x10\x03*P\n" +
+	"\x0fazure_federated\x10\x00\x12\x11\n" +
+	"\raws_federated\x10\x01\x12\x15\n" +
+	"\x11tharsis_federated\x10\x02\x12\x18\n" +
+	"\x14kubernetes_federated\x10\x03*P\n" +
 	"\x1dManagedIdentityAccessRuleType\x12\x17\n" +
-	"\x13ELIGIBLE_PRINCIPALS\x10\x00\x12\x16\n" +
-	"\x12MODULE_ATTESTATION\x10\x01*\x9b\x01\n" +
+	"\x13eligible_principals\x10\x00\x12\x16\n" +
+	"\x12module_attestation\x10\x01*\x9b\x01\n" +
 	"\x1cManagedIdentitySortableField\x12\x12\n" +
 	"\x0eCREATED_AT_ASC\x10\x00\x12\x13\n" +
 	"\x0fCREATED_AT_DESC\x10\x01\x12\x12\n" +
@@ -1913,56 +1904,55 @@ var file_managed_identity_proto_depIdxs = []int32{
 	1,  // 4: martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAccessRuleRequest.type:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleType
 	28, // 5: martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAccessRuleRequest.run_stage:type_name -> martiancloud.tharsis.api.job.JobType
 	21, // 6: martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAccessRuleRequest.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
-	28, // 7: martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityAccessRuleRequest.run_stage:type_name -> martiancloud.tharsis.api.job.JobType
-	21, // 8: martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityAccessRuleRequest.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
-	1,  // 9: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleInput.type:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleType
-	28, // 10: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleInput.run_stage:type_name -> martiancloud.tharsis.api.job.JobType
-	21, // 11: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleInput.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
-	29, // 12: martiancloud.tharsis.api.managed_identity.ManagedIdentity.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	29, // 13: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	21, // 14: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
-	22, // 15: martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse.managed_identities:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
-	30, // 16: martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	23, // 17: martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRulesResponse.access_rules:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
-	3,  // 18: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityByID:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityByIDRequest
-	4,  // 19: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentities:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesRequest
-	5,  // 20: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityRequest
-	6,  // 21: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityRequest
-	7,  // 22: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.DeleteManagedIdentityRequest
-	8,  // 23: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityCredentials:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityCredentialsRequest
-	9,  // 24: martiancloud.tharsis.api.managed_identity.ManagedIdentities.AssignManagedIdentityToWorkspace:input_type -> martiancloud.tharsis.api.managed_identity.AssignManagedIdentityToWorkspaceRequest
-	10, // 25: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentitiesForWorkspace:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesForWorkspaceRequest
-	11, // 26: martiancloud.tharsis.api.managed_identity.ManagedIdentities.RemoveManagedIdentityFromWorkspace:input_type -> martiancloud.tharsis.api.managed_identity.RemoveManagedIdentityFromWorkspaceRequest
-	12, // 27: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRules:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRulesRequest
-	13, // 28: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRuleByID:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRuleByIDRequest
-	14, // 29: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAccessRule:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAccessRuleRequest
-	15, // 30: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentityAccessRule:input_type -> martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityAccessRuleRequest
-	16, // 31: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAccessRule:input_type -> martiancloud.tharsis.api.managed_identity.DeleteManagedIdentityAccessRuleRequest
-	17, // 32: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAlias:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAliasRequest
-	18, // 33: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAlias:input_type -> martiancloud.tharsis.api.managed_identity.DeleteManagedIdentityAliasRequest
-	19, // 34: martiancloud.tharsis.api.managed_identity.ManagedIdentities.MoveManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.MoveManagedIdentityRequest
-	22, // 35: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityByID:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
-	24, // 36: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentities:output_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse
-	22, // 37: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentity:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
-	22, // 38: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentity:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
-	31, // 39: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentity:output_type -> google.protobuf.Empty
-	25, // 40: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityCredentials:output_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityCredentialsResponse
-	31, // 41: martiancloud.tharsis.api.managed_identity.ManagedIdentities.AssignManagedIdentityToWorkspace:output_type -> google.protobuf.Empty
-	24, // 42: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentitiesForWorkspace:output_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse
-	31, // 43: martiancloud.tharsis.api.managed_identity.ManagedIdentities.RemoveManagedIdentityFromWorkspace:output_type -> google.protobuf.Empty
-	26, // 44: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRules:output_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRulesResponse
-	23, // 45: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRuleByID:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
-	23, // 46: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAccessRule:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
-	23, // 47: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentityAccessRule:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
-	31, // 48: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAccessRule:output_type -> google.protobuf.Empty
-	22, // 49: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAlias:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
-	31, // 50: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAlias:output_type -> google.protobuf.Empty
-	22, // 51: martiancloud.tharsis.api.managed_identity.ManagedIdentities.MoveManagedIdentity:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
-	35, // [35:52] is the sub-list for method output_type
-	18, // [18:35] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	21, // 7: martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityAccessRuleRequest.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
+	1,  // 8: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleInput.type:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleType
+	28, // 9: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleInput.run_stage:type_name -> martiancloud.tharsis.api.job.JobType
+	21, // 10: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleInput.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
+	29, // 11: martiancloud.tharsis.api.managed_identity.ManagedIdentity.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	29, // 12: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	21, // 13: martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule.module_attestation_policies:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRuleModuleAttestationPolicy
+	22, // 14: martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse.managed_identities:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
+	30, // 15: martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	23, // 16: martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRulesResponse.access_rules:type_name -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
+	3,  // 17: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityByID:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityByIDRequest
+	4,  // 18: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentities:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesRequest
+	5,  // 19: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityRequest
+	6,  // 20: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityRequest
+	7,  // 21: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.DeleteManagedIdentityRequest
+	8,  // 22: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityCredentials:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityCredentialsRequest
+	9,  // 23: martiancloud.tharsis.api.managed_identity.ManagedIdentities.AssignManagedIdentityToWorkspace:input_type -> martiancloud.tharsis.api.managed_identity.AssignManagedIdentityToWorkspaceRequest
+	10, // 24: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentitiesForWorkspace:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesForWorkspaceRequest
+	11, // 25: martiancloud.tharsis.api.managed_identity.ManagedIdentities.RemoveManagedIdentityFromWorkspace:input_type -> martiancloud.tharsis.api.managed_identity.RemoveManagedIdentityFromWorkspaceRequest
+	12, // 26: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRules:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRulesRequest
+	13, // 27: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRuleByID:input_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRuleByIDRequest
+	14, // 28: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAccessRule:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAccessRuleRequest
+	15, // 29: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentityAccessRule:input_type -> martiancloud.tharsis.api.managed_identity.UpdateManagedIdentityAccessRuleRequest
+	16, // 30: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAccessRule:input_type -> martiancloud.tharsis.api.managed_identity.DeleteManagedIdentityAccessRuleRequest
+	17, // 31: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAlias:input_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityAliasRequest
+	18, // 32: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAlias:input_type -> martiancloud.tharsis.api.managed_identity.DeleteManagedIdentityAliasRequest
+	19, // 33: martiancloud.tharsis.api.managed_identity.ManagedIdentities.MoveManagedIdentity:input_type -> martiancloud.tharsis.api.managed_identity.MoveManagedIdentityRequest
+	22, // 34: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityByID:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
+	24, // 35: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentities:output_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse
+	22, // 36: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentity:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
+	22, // 37: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentity:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
+	31, // 38: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentity:output_type -> google.protobuf.Empty
+	25, // 39: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityCredentials:output_type -> martiancloud.tharsis.api.managed_identity.CreateManagedIdentityCredentialsResponse
+	31, // 40: martiancloud.tharsis.api.managed_identity.ManagedIdentities.AssignManagedIdentityToWorkspace:output_type -> google.protobuf.Empty
+	24, // 41: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentitiesForWorkspace:output_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentitiesResponse
+	31, // 42: martiancloud.tharsis.api.managed_identity.ManagedIdentities.RemoveManagedIdentityFromWorkspace:output_type -> google.protobuf.Empty
+	26, // 43: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRules:output_type -> martiancloud.tharsis.api.managed_identity.GetManagedIdentityAccessRulesResponse
+	23, // 44: martiancloud.tharsis.api.managed_identity.ManagedIdentities.GetManagedIdentityAccessRuleByID:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
+	23, // 45: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAccessRule:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
+	23, // 46: martiancloud.tharsis.api.managed_identity.ManagedIdentities.UpdateManagedIdentityAccessRule:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentityAccessRule
+	31, // 47: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAccessRule:output_type -> google.protobuf.Empty
+	22, // 48: martiancloud.tharsis.api.managed_identity.ManagedIdentities.CreateManagedIdentityAlias:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
+	31, // 49: martiancloud.tharsis.api.managed_identity.ManagedIdentities.DeleteManagedIdentityAlias:output_type -> google.protobuf.Empty
+	22, // 50: martiancloud.tharsis.api.managed_identity.ManagedIdentities.MoveManagedIdentity:output_type -> martiancloud.tharsis.api.managed_identity.ManagedIdentity
+	34, // [34:51] is the sub-list for method output_type
+	17, // [17:34] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_managed_identity_proto_init() }

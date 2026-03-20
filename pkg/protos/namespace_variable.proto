@@ -30,8 +30,8 @@ service NamespaceVariables {
 
 // VariableCategory specifies if the variable is a terraform or environment variable.
 enum VariableCategory {
-  TERRAFORM   = 0;
-  ENVIRONMENT = 1;
+  terraform   = 0;
+  environment = 1;
 }
 
 // NamespaceVariableVersionSortableField represents fields that a list of variable versions can be sorted by.

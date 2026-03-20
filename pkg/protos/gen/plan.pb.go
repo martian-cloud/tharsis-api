@@ -202,51 +202,6 @@ func (x *UpdatePlanRequest) GetErrorMessage() string {
 	return ""
 }
 
-// GetLatestJobForPlanRequest is the input for getting the latest job for a plan.
-type GetLatestJobForPlanRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PlanId        string                 `protobuf:"bytes,1,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetLatestJobForPlanRequest) Reset() {
-	*x = GetLatestJobForPlanRequest{}
-	mi := &file_plan_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetLatestJobForPlanRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetLatestJobForPlanRequest) ProtoMessage() {}
-
-func (x *GetLatestJobForPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plan_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetLatestJobForPlanRequest.ProtoReflect.Descriptor instead.
-func (*GetLatestJobForPlanRequest) Descriptor() ([]byte, []int) {
-	return file_plan_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GetLatestJobForPlanRequest) GetPlanId() string {
-	if x != nil {
-		return x.PlanId
-	}
-	return ""
-}
-
 // Plan represents a Terraform plan.
 type Plan struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -260,7 +215,7 @@ type Plan struct {
 
 func (x *Plan) Reset() {
 	*x = Plan{}
-	mi := &file_plan_proto_msgTypes[3]
+	mi := &file_plan_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -272,7 +227,7 @@ func (x *Plan) String() string {
 func (*Plan) ProtoMessage() {}
 
 func (x *Plan) ProtoReflect() protoreflect.Message {
-	mi := &file_plan_proto_msgTypes[3]
+	mi := &file_plan_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -285,7 +240,7 @@ func (x *Plan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Plan.ProtoReflect.Descriptor instead.
 func (*Plan) Descriptor() ([]byte, []int) {
-	return file_plan_proto_rawDescGZIP(), []int{3}
+	return file_plan_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Plan) GetMetadata() *ResourceMetadata {
@@ -333,9 +288,7 @@ const file_plan_proto_rawDesc = "" +
 	"\rerror_message\x18\x05 \x01(\tH\x01R\ferrorMessage\x88\x01\x01B\n" +
 	"\n" +
 	"\b_versionB\x10\n" +
-	"\x0e_error_message\"5\n" +
-	"\x1aGetLatestJobForPlanRequest\x12\x17\n" +
-	"\aplan_id\x18\x01 \x01(\tR\x06planId\"\xcc\x01\n" +
+	"\x0e_error_message\"\xcc\x01\n" +
 	"\x04Plan\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12(\n" +
@@ -366,18 +319,17 @@ func file_plan_proto_rawDescGZIP() []byte {
 }
 
 var file_plan_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_plan_proto_goTypes = []any{
-	(PlanStatus)(0),                    // 0: martiancloud.tharsis.api.plan.PlanStatus
-	(*GetPlanByIDRequest)(nil),         // 1: martiancloud.tharsis.api.plan.GetPlanByIDRequest
-	(*UpdatePlanRequest)(nil),          // 2: martiancloud.tharsis.api.plan.UpdatePlanRequest
-	(*GetLatestJobForPlanRequest)(nil), // 3: martiancloud.tharsis.api.plan.GetLatestJobForPlanRequest
-	(*Plan)(nil),                       // 4: martiancloud.tharsis.api.plan.Plan
-	(*ResourceMetadata)(nil),           // 5: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(PlanStatus)(0),            // 0: martiancloud.tharsis.api.plan.PlanStatus
+	(*GetPlanByIDRequest)(nil), // 1: martiancloud.tharsis.api.plan.GetPlanByIDRequest
+	(*UpdatePlanRequest)(nil),  // 2: martiancloud.tharsis.api.plan.UpdatePlanRequest
+	(*Plan)(nil),               // 3: martiancloud.tharsis.api.plan.Plan
+	(*ResourceMetadata)(nil),   // 4: martiancloud.tharsis.api.metadata.ResourceMetadata
 }
 var file_plan_proto_depIdxs = []int32{
 	0, // 0: martiancloud.tharsis.api.plan.UpdatePlanRequest.status:type_name -> martiancloud.tharsis.api.plan.PlanStatus
-	5, // 1: martiancloud.tharsis.api.plan.Plan.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	4, // 1: martiancloud.tharsis.api.plan.Plan.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -392,14 +344,14 @@ func file_plan_proto_init() {
 	}
 	file_metadata_proto_init()
 	file_plan_proto_msgTypes[1].OneofWrappers = []any{}
-	file_plan_proto_msgTypes[3].OneofWrappers = []any{}
+	file_plan_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plan_proto_rawDesc), len(file_plan_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -8,6 +8,12 @@ import "metadata.proto";
 
 // Jobs implements all functionality related to Tharsis Jobs.
 service Jobs {
+  // GetJobLogs retrieves job logs.
+  rpc GetJobLogs(GetJobLogsRequest) returns (GetJobLogsResponse);
+  // GetLatestJobForPlan retrieves the latest job for a plan ID.
+  rpc GetLatestJobForPlan(GetLatestJobForPlanRequest) returns (Job);
+  // GetLatestJobForApply retrieves the latest job for an apply ID.
+  rpc GetLatestJobForApply(GetLatestJobForApplyRequest) returns (Job);
   // SubscribeToJobLogStream subscribes to job log stream events.
   rpc SubscribeToJobLogStream(SubscribeToJobLogStreamRequest) returns (stream JobLogStreamEvent);
   // SubscribeToJobEvents subscribes to job events.
@@ -18,8 +24,25 @@ service Jobs {
 
 // JobType defines the type of job.
 enum JobType {
-  PLAN  = 0;
-  APPLY = 1;
+  plan  = 0;
+  apply = 1;
+}
+
+// GetJobLogsRequest is the input for getting job logs.
+message GetJobLogsRequest {
+  string job_id       = 1;
+  int32  start_offset = 2;
+  int32  limit        = 3;
+}
+
+// GetLatestJobForPlanRequest is the input for getting the latest job for a plan.
+message GetLatestJobForPlanRequest {
+  string plan_id = 1;
+}
+
+// GetLatestJobForApplyRequest is the input for getting the latest job for an apply.
+message GetLatestJobForApplyRequest {
+  string apply_id = 1;
 }
 
 // SubscribeToJobLogStreamRequest is the input for subscribing to job log stream events.
@@ -72,4 +95,9 @@ message JobEvent {
 // JobCancellationEvent represents a job cancellation event.
 message JobCancellationEvent {
   Job job = 1;
+}
+
+// GetJobLogsResponse is the response for getting job logs.
+message GetJobLogsResponse {
+  string logs = 1;
 }

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
@@ -18,6 +19,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // Retry configuration with maximum of 4 attempts. Add more services and methods under 'name'.
@@ -27,6 +30,7 @@ const retryPolicy = `{
 	"methodConfig": [{
 		"name": [
 			{"service": "martiancloud.tharsis.api.auth_settings.AuthSettings"},
+			{"service": "martiancloud.tharsis.api.caller.Caller"},
 			{"service": "martiancloud.tharsis.api.configuration_version.ConfigurationVersions"},
 			{"service": "martiancloud.tharsis.api.gpg_key.GPGKeys"},
 			{"service": "martiancloud.tharsis.api.group.Groups"},
@@ -86,7 +90,7 @@ func (c *contextCredentials) RequireTransportSecurity() bool {
 	return false
 }
 
-// TokenGetter is an interface for retrieving and renewing a service account token.
+// TokenGetter is an interface for retrieving and renewing the authentication token.
 type TokenGetter interface {
 	Token(ctx context.Context) (string, error)
 }
@@ -108,6 +112,7 @@ type LeveledLogger interface {
 type Client struct {
 	connection                     *grpc.ClientConn
 	AuthSettingsClient             pb.AuthSettingsClient
+	CallerIdentityClient           pb.CallerIdentityClient
 	ConfigurationVersionsClient    pb.ConfigurationVersionsClient
 	GPGKeysClient                  pb.GPGKeysClient
 	GroupsClient                   pb.GroupsClient
@@ -145,6 +150,11 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 	dialOptions := []grpc.DialOption{
 		// Set Retry policy.
 		grpc.WithDefaultServiceConfig(retryPolicy),
+		// Disable DNS TXT service config lookups. The service config is already
+		// provided above via WithDefaultServiceConfig. Without this, the gRPC DNS
+		// resolver queries _grpc_config.<host> TXT records on every cold start,
+		// which times out after ~15s when no such record exists.
+		grpc.WithDisableServiceConfig(),
 		// Configure keepalive
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			// After a duration of this time if the client doesn't see any activity it pings the server to see if the transport is still alive.
@@ -207,9 +217,53 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 	}
 
 	if c.Logger != nil {
+		// Log gRPC requests at debug level to help debug issues.
+		// Empty inputs (e.g. emptypb.Empty) are omitted to reduce noise.
+		dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			if msg, ok := req.(proto.Message); ok && proto.Size(msg) > 0 {
+				if b, err := protojson.Marshal(msg); err == nil {
+					c.Logger.Debug("gRPC request", "method", path.Base(method), "input", string(b))
+				} else {
+					c.Logger.Debug("gRPC request", "method", path.Base(method))
+				}
+			} else {
+				c.Logger.Debug("gRPC request", "method", path.Base(method))
+			}
+
+			start := time.Now()
+			err := invoker(ctx, method, req, reply, cc, opts...)
+			if err != nil {
+				c.Logger.Debug("gRPC response", "method", path.Base(method), "duration", time.Since(start), "error", err)
+			} else {
+				c.Logger.Debug("gRPC response", "method", path.Base(method), "duration", time.Since(start))
+			}
+			return err
+		}))
+
+		dialOptions = append(dialOptions, grpc.WithStreamInterceptor(func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			c.Logger.Debug("gRPC stream opened", "method", path.Base(method))
+			start := time.Now()
+			stream, err := streamer(ctx, desc, cc, method, opts...)
+			if err != nil {
+				c.Logger.Debug("gRPC stream error", "method", path.Base(method), "duration", time.Since(start), "error", err)
+			}
+			return stream, err
+		}))
+	}
+
+	if c.Logger != nil {
 		c.Logger.Info("dialing GRPC connection", "host", discoveryDocument.Host, "port", discoveryDocument.Port)
 	}
 
+	// grpc.NewClient creates a virtual connection pool that establishes connections lazily.
+	// The first RPC call will trigger connection establishment, which may cause a delay.
+	// Subsequent calls reuse the established connection and are fast.
+	//
+	// This is the intended behavior per gRPC-Go best practices - connections are dynamic
+	// and may come/go over time, so checking connection state upfront provides little value.
+	// RPCs automatically wait for connection establishment (or fail per their deadline/context).
+	//
+	// See: https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md
 	clientConn, err := grpc.NewClient(
 		fmt.Sprintf("%s:%s", discoveryDocument.Host, discoveryDocument.Port),
 		dialOptions...,
@@ -225,6 +279,7 @@ func New(ctx context.Context, c *Config) (*Client, error) {
 	return &Client{
 		connection:                     clientConn,
 		AuthSettingsClient:             pb.NewAuthSettingsClient(clientConn),
+		CallerIdentityClient:           pb.NewCallerIdentityClient(clientConn),
 		ConfigurationVersionsClient:    pb.NewConfigurationVersionsClient(clientConn),
 		GPGKeysClient:                  pb.NewGPGKeysClient(clientConn),
 		GroupsClient:                   pb.NewGroupsClient(clientConn),
@@ -305,9 +360,9 @@ func NewGRPCDiscoveryDocument(ctx context.Context, endpoint string, options ...G
 			Timeout: 60 * time.Second,
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
-				Dial: (&net.Dialer{
+				DialContext: (&net.Dialer{
 					Timeout: 60 * time.Second,
-				}).Dial,
+				}).DialContext,
 				DisableKeepAlives:   true,
 				TLSHandshakeTimeout: 30 * time.Second,
 			},

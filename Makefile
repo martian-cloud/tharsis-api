@@ -3,7 +3,7 @@ GO_VERSION = 1.25
 MODULE = $(shell go list -m)
 VERSION ?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || echo "1.0.0")
 BUILD_TIMESTAMP ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-PACKAGES := $(shell go list -tags noui ./... | grep -v /vendor/)
+PACKAGES := $(shell go list -tags noui ./... | grep -v /vendor/ | grep -v /node_modules/)
 LDFLAGS := -ldflags "-X main.Version=${VERSION} -X main.BuildTimestamp=${BUILD_TIMESTAMP}"
 
 DB_URI ?= pgx://postgres:postgres@localhost:5432/tharsis?sslmode=disable#gitleaks:allow
@@ -37,7 +37,7 @@ lint: ## run linting on Go and UI code
 	@echo "Linting Go code..."
 	@revive -set_exit_status $(PACKAGES)
 	@echo "Checking Go formatting..."
-	@UNFORMATTED=$$(gofmt -l . 2>/dev/null | grep -v vendor | grep -v testdata | grep -v '/pkg/mod/'); \
+	@UNFORMATTED=$$(gofmt -l . 2>/dev/null | grep -v vendor | grep -v testdata | grep -v '/pkg/mod/' | grep -v node_modules); \
 	if [ -n "$$UNFORMATTED" ]; then \
 		echo "Files not formatted:"; \
 		echo "$$UNFORMATTED"; \

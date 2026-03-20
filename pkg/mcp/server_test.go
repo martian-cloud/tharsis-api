@@ -197,6 +197,54 @@ func TestNewServer(t *testing.T) {
 			}(),
 			expectError: "failed to enable toolsets",
 		},
+		{
+			name: "valid with prefix and enabled toolsets",
+			config: &ServerConfig{
+				Name:            "test-server",
+				Title:           "Test Server",
+				Version:         "1.0.0",
+				Logger:          logger,
+				Prefix:          "tharsis_",
+				EnabledToolsets: "test",
+			},
+			toolsetGroup: func() *tools.ToolsetGroup {
+				group := tools.NewToolsetGroup(false)
+				ts := tools.NewToolset(tools.ToolsetMetadata{Name: "test", Description: "Test"})
+				ts.AddReadTools(tools.NewServerTool(mcp.Tool{
+					Name:        "get_workspace",
+					Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+				}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
+					return nil, struct{}{}, nil
+				}))
+				group.AddToolset(ts)
+				return group
+			}(),
+			expectError: "",
+		},
+		{
+			name: "valid with prefix and enabled tools",
+			config: &ServerConfig{
+				Name:         "test-server",
+				Title:        "Test Server",
+				Version:      "1.0.0",
+				Logger:       logger,
+				Prefix:       "tharsis_",
+				EnabledTools: "get_workspace",
+			},
+			toolsetGroup: func() *tools.ToolsetGroup {
+				group := tools.NewToolsetGroup(false)
+				ts := tools.NewToolset(tools.ToolsetMetadata{Name: "test", Description: "Test"})
+				ts.AddReadTools(tools.NewServerTool(mcp.Tool{
+					Name:        "get_workspace",
+					Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+				}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
+					return nil, struct{}{}, nil
+				}))
+				group.AddToolset(ts)
+				return group
+			}(),
+			expectError: "",
+		},
 	}
 
 	for _, tt := range tests {

@@ -353,7 +353,7 @@ var File_state_version_proto protoreflect.FileDescriptor
 
 const file_state_version_proto_rawDesc = "" +
 	"\n" +
-	"\x13state_version.proto\x12&martiancloud.tharsis.api.state_version\x1a\x0emetadata.proto\x1a\x10pagination.proto\",\n" +
+	"\x13state_version.proto\x12&martiancloud.tharsis.api.state_version\x1a\x0emetadata.proto\x1a\x10pagination.proto\x1a\x1astate_version_output.proto\",\n" +
 	"\x1aGetStateVersionByIDRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\xa4\x02\n" +
 	"\x17GetStateVersionsRequest\x12!\n" +
@@ -378,11 +378,13 @@ const file_state_version_proto_rawDesc = "" +
 	"\tpage_info\x18\x02 \x01(\v2-.martiancloud.tharsis.api.pagination.PageInfoR\bpageInfo*D\n" +
 	"\x19StateVersionSortableField\x12\x12\n" +
 	"\x0eUPDATED_AT_ASC\x10\x00\x12\x13\n" +
-	"\x0fUPDATED_AT_DESC\x10\x012\xc9\x03\n" +
+	"\x0fUPDATED_AT_DESC\x10\x012\xb3\x06\n" +
 	"\rStateVersions\x12\x8f\x01\n" +
 	"\x13GetStateVersionByID\x12B.martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersion\x12\x95\x01\n" +
 	"\x10GetStateVersions\x12?.martiancloud.tharsis.api.state_version.GetStateVersionsRequest\x1a@.martiancloud.tharsis.api.state_version.GetStateVersionsResponse\x12\x8d\x01\n" +
-	"\x12CreateStateVersion\x12A.martiancloud.tharsis.api.state_version.CreateStateVersionRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersionBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
+	"\x12CreateStateVersion\x12A.martiancloud.tharsis.api.state_version.CreateStateVersionRequest\x1a4.martiancloud.tharsis.api.state_version.StateVersion\x12\xaf\x01\n" +
+	"\x19GetStateVersionOutputByID\x12O.martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest\x1aA.martiancloud.tharsis.api.state_version_output.StateVersionOutput\x12\xb5\x01\n" +
+	"\x16GetStateVersionOutputs\x12L.martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest\x1aM.martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponseBIZGgitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/protos/genb\x06proto3"
 
 var (
 	file_state_version_proto_rawDescOnce sync.Once
@@ -399,33 +401,41 @@ func file_state_version_proto_rawDescGZIP() []byte {
 var file_state_version_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_state_version_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_state_version_proto_goTypes = []any{
-	(StateVersionSortableField)(0),     // 0: martiancloud.tharsis.api.state_version.StateVersionSortableField
-	(*GetStateVersionByIDRequest)(nil), // 1: martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest
-	(*GetStateVersionsRequest)(nil),    // 2: martiancloud.tharsis.api.state_version.GetStateVersionsRequest
-	(*CreateStateVersionRequest)(nil),  // 3: martiancloud.tharsis.api.state_version.CreateStateVersionRequest
-	(*StateVersion)(nil),               // 4: martiancloud.tharsis.api.state_version.StateVersion
-	(*GetStateVersionsResponse)(nil),   // 5: martiancloud.tharsis.api.state_version.GetStateVersionsResponse
-	(*PaginationOptions)(nil),          // 6: martiancloud.tharsis.api.pagination.PaginationOptions
-	(*ResourceMetadata)(nil),           // 7: martiancloud.tharsis.api.metadata.ResourceMetadata
-	(*PageInfo)(nil),                   // 8: martiancloud.tharsis.api.pagination.PageInfo
+	(StateVersionSortableField)(0),           // 0: martiancloud.tharsis.api.state_version.StateVersionSortableField
+	(*GetStateVersionByIDRequest)(nil),       // 1: martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest
+	(*GetStateVersionsRequest)(nil),          // 2: martiancloud.tharsis.api.state_version.GetStateVersionsRequest
+	(*CreateStateVersionRequest)(nil),        // 3: martiancloud.tharsis.api.state_version.CreateStateVersionRequest
+	(*StateVersion)(nil),                     // 4: martiancloud.tharsis.api.state_version.StateVersion
+	(*GetStateVersionsResponse)(nil),         // 5: martiancloud.tharsis.api.state_version.GetStateVersionsResponse
+	(*PaginationOptions)(nil),                // 6: martiancloud.tharsis.api.pagination.PaginationOptions
+	(*ResourceMetadata)(nil),                 // 7: martiancloud.tharsis.api.metadata.ResourceMetadata
+	(*PageInfo)(nil),                         // 8: martiancloud.tharsis.api.pagination.PageInfo
+	(*GetStateVersionOutputByIDRequest)(nil), // 9: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest
+	(*GetStateVersionOutputsRequest)(nil),    // 10: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest
+	(*StateVersionOutput)(nil),               // 11: martiancloud.tharsis.api.state_version_output.StateVersionOutput
+	(*GetStateVersionOutputsResponse)(nil),   // 12: martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponse
 }
 var file_state_version_proto_depIdxs = []int32{
-	6, // 0: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
-	0, // 1: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.sort:type_name -> martiancloud.tharsis.api.state_version.StateVersionSortableField
-	7, // 2: martiancloud.tharsis.api.state_version.StateVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
-	4, // 3: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.state_versions:type_name -> martiancloud.tharsis.api.state_version.StateVersion
-	8, // 4: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
-	1, // 5: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest
-	2, // 6: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionsRequest
-	3, // 7: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:input_type -> martiancloud.tharsis.api.state_version.CreateStateVersionRequest
-	4, // 8: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:output_type -> martiancloud.tharsis.api.state_version.StateVersion
-	5, // 9: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:output_type -> martiancloud.tharsis.api.state_version.GetStateVersionsResponse
-	4, // 10: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:output_type -> martiancloud.tharsis.api.state_version.StateVersion
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	6,  // 0: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.pagination_options:type_name -> martiancloud.tharsis.api.pagination.PaginationOptions
+	0,  // 1: martiancloud.tharsis.api.state_version.GetStateVersionsRequest.sort:type_name -> martiancloud.tharsis.api.state_version.StateVersionSortableField
+	7,  // 2: martiancloud.tharsis.api.state_version.StateVersion.metadata:type_name -> martiancloud.tharsis.api.metadata.ResourceMetadata
+	4,  // 3: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.state_versions:type_name -> martiancloud.tharsis.api.state_version.StateVersion
+	8,  // 4: martiancloud.tharsis.api.state_version.GetStateVersionsResponse.page_info:type_name -> martiancloud.tharsis.api.pagination.PageInfo
+	1,  // 5: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionByIDRequest
+	2,  // 6: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:input_type -> martiancloud.tharsis.api.state_version.GetStateVersionsRequest
+	3,  // 7: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:input_type -> martiancloud.tharsis.api.state_version.CreateStateVersionRequest
+	9,  // 8: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputByID:input_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputByIDRequest
+	10, // 9: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputs:input_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsRequest
+	4,  // 10: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionByID:output_type -> martiancloud.tharsis.api.state_version.StateVersion
+	5,  // 11: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersions:output_type -> martiancloud.tharsis.api.state_version.GetStateVersionsResponse
+	4,  // 12: martiancloud.tharsis.api.state_version.StateVersions.CreateStateVersion:output_type -> martiancloud.tharsis.api.state_version.StateVersion
+	11, // 13: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputByID:output_type -> martiancloud.tharsis.api.state_version_output.StateVersionOutput
+	12, // 14: martiancloud.tharsis.api.state_version.StateVersions.GetStateVersionOutputs:output_type -> martiancloud.tharsis.api.state_version_output.GetStateVersionOutputsResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_state_version_proto_init() }
@@ -435,6 +445,7 @@ func file_state_version_proto_init() {
 	}
 	file_metadata_proto_init()
 	file_pagination_proto_init()
+	file_state_version_output_proto_init()
 	file_state_version_proto_msgTypes[1].OneofWrappers = []any{}
 	file_state_version_proto_msgTypes[2].OneofWrappers = []any{}
 	file_state_version_proto_msgTypes[3].OneofWrappers = []any{}

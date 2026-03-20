@@ -2,6 +2,8 @@
 package servers
 
 import (
+	"context"
+
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
@@ -21,6 +23,53 @@ func NewJobServer(serviceCatalog *services.Catalog) *JobServer {
 	return &JobServer{
 		serviceCatalog: serviceCatalog,
 	}
+}
+
+// GetJobLogs retrieves job logs.
+func (s *JobServer) GetJobLogs(ctx context.Context, req *pb.GetJobLogsRequest) (*pb.GetJobLogsResponse, error) {
+	jobID, err := s.serviceCatalog.FetchModelID(ctx, req.JobId)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := s.serviceCatalog.JobService.ReadLogs(ctx, jobID, int(req.StartOffset), int(req.Limit))
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GetJobLogsResponse{
+		Logs: string(logs),
+	}, nil
+}
+
+// GetLatestJobForPlan retrieves the latest job for a plan ID.
+func (s *JobServer) GetLatestJobForPlan(ctx context.Context, req *pb.GetLatestJobForPlanRequest) (*pb.Job, error) {
+	planID, err := s.serviceCatalog.FetchModelID(ctx, req.PlanId)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := s.serviceCatalog.RunService.GetLatestJobForPlan(ctx, planID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBJob(job), nil
+}
+
+// GetLatestJobForApply retrieves the latest job for an apply ID.
+func (s *JobServer) GetLatestJobForApply(ctx context.Context, req *pb.GetLatestJobForApplyRequest) (*pb.Job, error) {
+	applyID, err := s.serviceCatalog.FetchModelID(ctx, req.ApplyId)
+	if err != nil {
+		return nil, err
+	}
+
+	job, err := s.serviceCatalog.RunService.GetLatestJobForApply(ctx, applyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toPBJob(job), nil
 }
 
 // SubscribeToJobLogStream subscribes to job log stream events.

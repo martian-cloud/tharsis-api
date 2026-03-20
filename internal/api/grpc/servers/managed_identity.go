@@ -147,8 +147,8 @@ func (s *ManagedIdentityServer) CreateManagedIdentity(ctx context.Context, req *
 			AllowedTeamIDs            []string
 			VerifyStateLineage        bool
 		}{
-			Type:                     models.ManagedIdentityAccessRuleType(strings.ToLower(rule.Type.String())),
-			RunStage:                 models.JobType(strings.ToLower(rule.RunStage.String())),
+			Type:                     models.ManagedIdentityAccessRuleType(rule.Type.String()),
+			RunStage:                 models.JobType(rule.RunStage.String()),
 			AllowedUserIDs:           allowedUserIDs,
 			AllowedServiceAccountIDs: allowedServiceAccountIDs,
 			AllowedTeamIDs:           allowedTeamIDs,
@@ -165,7 +165,7 @@ func (s *ManagedIdentityServer) CreateManagedIdentity(ctx context.Context, req *
 	}
 
 	toCreate := &managedidentity.CreateManagedIdentityInput{
-		Type:        models.ManagedIdentityType(strings.ToLower(req.Type.String())),
+		Type:        models.ManagedIdentityType(req.Type.String()),
 		Name:        req.Name,
 		Description: req.Description,
 		GroupID:     groupID,
@@ -447,8 +447,6 @@ func (s *ManagedIdentityServer) UpdateManagedIdentityAccessRule(ctx context.Cont
 			}
 		}
 	}
-
-	rule.RunStage = models.JobType(strings.ToLower(req.RunStage.String()))
 
 	if req.VerifyStateLineage != nil {
 		rule.VerifyStateLineage = *req.VerifyStateLineage
