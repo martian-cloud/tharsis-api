@@ -105,6 +105,7 @@ type Group implements Node, Namespace {
     search: String
     includeInherited: Boolean
     sort: TerraformModuleSort
+    labelFilter: TerraformModuleLabelsFilter
   ): TerraformModuleConnection!
   runners(
     after: String

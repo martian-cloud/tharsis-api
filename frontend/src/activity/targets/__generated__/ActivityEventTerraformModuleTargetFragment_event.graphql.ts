@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4e6e6a77d4b083a7fdd243a489e27cba>>
+ * @generated SignedSource<<68a659b03f34affcb8153261b014ac57>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,6 +14,30 @@ import { FragmentRefs } from "relay-runtime";
 export type ActivityEventTerraformModuleTargetFragment_event$data = {
   readonly action: ActivityEventAction;
   readonly namespacePath: string | null | undefined;
+  readonly payload: {
+    readonly __typename: "ActivityEventCreateTerraformModulePayload";
+    readonly labels: ReadonlyArray<{
+      readonly key: string;
+      readonly value: string;
+    }> | null | undefined;
+  } | {
+    readonly __typename: "ActivityEventUpdateTerraformModulePayload";
+    readonly labelChanges: {
+      readonly added: ReadonlyArray<{
+        readonly key: string;
+        readonly value: string;
+      }> | null | undefined;
+      readonly removed: ReadonlyArray<string> | null | undefined;
+      readonly updated: ReadonlyArray<{
+        readonly key: string;
+        readonly value: string;
+      }> | null | undefined;
+    } | null | undefined;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
+  } | null | undefined;
   readonly target: {
     readonly name?: string;
     readonly registryNamespace?: string;
@@ -27,7 +51,24 @@ export type ActivityEventTerraformModuleTargetFragment_event$key = {
   readonly " $fragmentSpreads": FragmentRefs<"ActivityEventTerraformModuleTargetFragment_event">;
 };
 
-const node: ReaderFragment = {
+const node: ReaderFragment = (function(){
+var v0 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "key",
+    "storageKey": null
+  },
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "value",
+    "storageKey": null
+  }
+];
+return {
   "argumentDefinitions": [],
   "kind": "Fragment",
   "metadata": null,
@@ -87,6 +128,86 @@ const node: ReaderFragment = {
       "storageKey": null
     },
     {
+      "alias": null,
+      "args": null,
+      "concreteType": null,
+      "kind": "LinkedField",
+      "name": "payload",
+      "plural": false,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "__typename",
+          "storageKey": null
+        },
+        {
+          "kind": "InlineFragment",
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "concreteType": "TerraformModuleLabel",
+              "kind": "LinkedField",
+              "name": "labels",
+              "plural": true,
+              "selections": (v0/*: any*/),
+              "storageKey": null
+            }
+          ],
+          "type": "ActivityEventCreateTerraformModulePayload",
+          "abstractKey": null
+        },
+        {
+          "kind": "InlineFragment",
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "concreteType": "LabelChangePayload",
+              "kind": "LinkedField",
+              "name": "labelChanges",
+              "plural": false,
+              "selections": [
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "WorkspaceLabel",
+                  "kind": "LinkedField",
+                  "name": "added",
+                  "plural": true,
+                  "selections": (v0/*: any*/),
+                  "storageKey": null
+                },
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "WorkspaceLabel",
+                  "kind": "LinkedField",
+                  "name": "updated",
+                  "plural": true,
+                  "selections": (v0/*: any*/),
+                  "storageKey": null
+                },
+                {
+                  "alias": null,
+                  "args": null,
+                  "kind": "ScalarField",
+                  "name": "removed",
+                  "storageKey": null
+                }
+              ],
+              "storageKey": null
+            }
+          ],
+          "type": "ActivityEventUpdateTerraformModulePayload",
+          "abstractKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
       "args": null,
       "kind": "FragmentSpread",
       "name": "ActivityEventListItemFragment_event"
@@ -95,7 +216,8 @@ const node: ReaderFragment = {
   "type": "ActivityEvent",
   "abstractKey": null
 };
+})();
 
-(node as any).hash = "1882083987d0fb9a2418c1a032418df3";
+(node as any).hash = "eec0df3a5e56ddb84f05d70de6353c57";
 
 export default node;

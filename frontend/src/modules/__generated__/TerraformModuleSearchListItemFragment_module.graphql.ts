@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<561bb93779d8c4228fbd6dddefe44925>>
+ * @generated SignedSource<<b56656fe6d75261aca94a72863eabacd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,6 +12,10 @@ import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type TerraformModuleSearchListItemFragment_module$data = {
   readonly id: string;
+  readonly labels: ReadonlyArray<{
+    readonly key: string;
+    readonly value: string;
+  }>;
   readonly latestVersion: {
     readonly createdBy: string;
     readonly metadata: {
@@ -74,6 +78,31 @@ const node: ReaderFragment = {
     {
       "alias": null,
       "args": null,
+      "concreteType": "TerraformModuleLabel",
+      "kind": "LinkedField",
+      "name": "labels",
+      "plural": true,
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "key",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "value",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "TerraformModuleVersion",
       "kind": "LinkedField",
       "name": "latestVersion",
@@ -119,6 +148,6 @@ const node: ReaderFragment = {
   "abstractKey": null
 };
 
-(node as any).hash = "be93542aec17552e4d5ccbbf52ff659d";
+(node as any).hash = "7d6f3dde0eef67057e05b27ce7f12a52";
 
 export default node;

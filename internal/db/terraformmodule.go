@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -70,6 +71,12 @@ func (ts TerraformModuleSortableField) getTransformFunc() pagination.SortTransfo
 	}
 }
 
+// TerraformModuleLabelFilter represents a key/value pair for filtering modules by label
+type TerraformModuleLabelFilter struct {
+	Key   string
+	Value string
+}
+
 // TerraformModuleFilter contains the supported fields for filtering TerraformModule resources
 type TerraformModuleFilter struct {
 	Search             *string
@@ -81,6 +88,7 @@ type TerraformModuleFilter struct {
 	ServiceAccountID   *string
 	TerraformModuleIDs []string
 	NamespacePaths     []string
+	LabelFilters       []TerraformModuleLabelFilter
 }
 
 // GetModulesInput is the input for listing terraform modules
@@ -103,7 +111,7 @@ type terraformModules struct {
 	dbClient *Client
 }
 
-var moduleFieldList = append(metadataFieldList, "group_id", "root_group_id", "name", "system", "private", "repo_url", "created_by")
+var moduleFieldList = append(metadataFieldList, "group_id", "root_group_id", "name", "system", "private", "repo_url", "created_by", "labels")
 
 // NewTerraformModules returns an instance of the TerraformModules interface
 func NewTerraformModules(dbClient *Client) TerraformModules {
@@ -197,6 +205,12 @@ func (t *terraformModules) GetModules(ctx context.Context, input *GetModulesInpu
 					}.build(),
 				))
 		}
+		if len(input.Filter.LabelFilters) > 0 {
+			for _, labelFilter := range input.Filter.LabelFilters {
+				labelJSON := fmt.Sprintf(`{"%s": "%s"}`, labelFilter.Key, labelFilter.Value)
+				ex = ex.Append(goqu.L("terraform_modules.labels @> ?::jsonb", labelJSON))
+			}
+		}
 	}
 
 	query = query.Where(ex)
@@ -263,6 +277,12 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 
 	timestamp := currentTime()
 
+	labelsJSON, labelsErr := json.Marshal(module.Labels)
+	if labelsErr != nil {
+		tracing.RecordError(span, labelsErr, "failed to marshal labels to JSON")
+		return nil, labelsErr
+	}
+
 	sql, args, err := dialect.From("terraform_modules").
 		Prepared(true).
 		With("terraform_modules",
@@ -279,6 +299,7 @@ func (t *terraformModules) CreateModule(ctx context.Context, module *models.Terr
 					"private":       module.Private,
 					"repo_url":      module.RepositoryURL,
 					"created_by":    module.CreatedBy,
+					"labels":        labelsJSON,
 				}).Returning("*"),
 		).Select(t.getSelectFields()...).
 		InnerJoin(goqu.T("namespaces"), goqu.On(goqu.Ex{"terraform_modules.group_id": goqu.I("namespaces.group_id")})).
@@ -311,6 +332,12 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 
 	timestamp := currentTime()
 
+	labelsJSON, labelsErr := json.Marshal(module.Labels)
+	if labelsErr != nil {
+		tracing.RecordError(span, labelsErr, "failed to marshal labels to JSON")
+		return nil, labelsErr
+	}
+
 	sql, args, err := dialect.From("terraform_modules").
 		Prepared(true).
 		With("terraform_modules",
@@ -321,6 +348,7 @@ func (t *terraformModules) UpdateModule(ctx context.Context, module *models.Terr
 						"updated_at": timestamp,
 						"private":    module.Private,
 						"repo_url":   module.RepositoryURL,
+						"labels":     labelsJSON,
 					},
 				).Where(goqu.Ex{"id": module.Metadata.ID, "version": module.Metadata.Version}).
 				Returning("*"),
@@ -433,6 +461,7 @@ func (t *terraformModules) getSelectFields() []interface{} {
 
 func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
 	var groupPath string
+	var labelsJSON []byte
 	module := &models.TerraformModule{}
 
 	fields := []interface{}{
@@ -447,12 +476,19 @@ func scanTerraformModule(row scanner) (*models.TerraformModule, error) {
 		&module.Private,
 		&module.RepositoryURL,
 		&module.CreatedBy,
+		&labelsJSON,
 		&groupPath,
 	}
 
 	err := row.Scan(fields...)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(labelsJSON) > 0 {
+		if err := json.Unmarshal(labelsJSON, &module.Labels); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal labels JSON: %w", err)
+		}
 	}
 
 	module.Metadata.TRN = types.TerraformModuleModelType.BuildTRN(groupPath, module.Name, module.System)

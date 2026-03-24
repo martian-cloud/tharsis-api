@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3e90aeec3788463161d4a0c80df4db17>>
+ * @generated SignedSource<<f870bf3586568bbfcbb43f9e3890b94b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,11 +10,19 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type TerraformModuleLabelsFilter = {
+  labels: ReadonlyArray<TerraformModuleLabelInput>;
+};
+export type TerraformModuleLabelInput = {
+  key: string;
+  value: string;
+};
 export type TerraformModuleListPaginationQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
   id: string;
+  labelFilter?: TerraformModuleLabelsFilter | null | undefined;
   last?: number | null | undefined;
   search?: string | null | undefined;
 };
@@ -52,35 +60,40 @@ v3 = {
 v4 = {
   "defaultValue": null,
   "kind": "LocalArgument",
-  "name": "last"
+  "name": "labelFilter"
 },
 v5 = {
   "defaultValue": null,
   "kind": "LocalArgument",
+  "name": "last"
+},
+v6 = {
+  "defaultValue": null,
+  "kind": "LocalArgument",
   "name": "search"
 },
-v6 = [
+v7 = [
   {
     "kind": "Variable",
     "name": "id",
     "variableName": "id"
   }
 ],
-v7 = {
+v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "__typename",
   "storageKey": null
 },
-v8 = {
+v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "id",
   "storageKey": null
 },
-v9 = [
+v10 = [
   {
     "kind": "Variable",
     "name": "after",
@@ -100,6 +113,11 @@ v9 = [
     "kind": "Literal",
     "name": "includeInherited",
     "value": true
+  },
+  {
+    "kind": "Variable",
+    "name": "labelFilter",
+    "variableName": "labelFilter"
   },
   {
     "kind": "Variable",
@@ -125,7 +143,8 @@ return {
       (v2/*: any*/),
       (v3/*: any*/),
       (v4/*: any*/),
-      (v5/*: any*/)
+      (v5/*: any*/),
+      (v6/*: any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -133,7 +152,7 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v7/*: any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
@@ -159,6 +178,7 @@ return {
       (v2/*: any*/),
       (v4/*: any*/),
       (v5/*: any*/),
+      (v6/*: any*/),
       (v3/*: any*/)
     ],
     "kind": "Operation",
@@ -166,20 +186,20 @@ return {
     "selections": [
       {
         "alias": null,
-        "args": (v6/*: any*/),
+        "args": (v7/*: any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "node",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
           (v8/*: any*/),
+          (v9/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
-                "args": (v9/*: any*/),
+                "args": (v10/*: any*/),
                 "concreteType": "TerraformModuleConnection",
                 "kind": "LinkedField",
                 "name": "terraformModules",
@@ -208,7 +228,7 @@ return {
                         "name": "node",
                         "plural": false,
                         "selections": [
-                          (v8/*: any*/),
+                          (v9/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -247,6 +267,31 @@ return {
                           {
                             "alias": null,
                             "args": null,
+                            "concreteType": "TerraformModuleLabel",
+                            "kind": "LinkedField",
+                            "name": "labels",
+                            "plural": true,
+                            "selections": [
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "key",
+                                "storageKey": null
+                              },
+                              {
+                                "alias": null,
+                                "args": null,
+                                "kind": "ScalarField",
+                                "name": "value",
+                                "storageKey": null
+                              }
+                            ],
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
                             "concreteType": "TerraformModuleVersion",
                             "kind": "LinkedField",
                             "name": "latestVersion",
@@ -259,11 +304,11 @@ return {
                                 "name": "version",
                                 "storageKey": null
                               },
-                              (v8/*: any*/)
+                              (v9/*: any*/)
                             ],
                             "storageKey": null
                           },
-                          (v7/*: any*/)
+                          (v8/*: any*/)
                         ],
                         "storageKey": null
                       },
@@ -321,11 +366,12 @@ return {
               },
               {
                 "alias": null,
-                "args": (v9/*: any*/),
+                "args": (v10/*: any*/),
                 "filters": [
                   "search",
                   "sort",
-                  "includeInherited"
+                  "includeInherited",
+                  "labelFilter"
                 ],
                 "handle": "connection",
                 "key": "TerraformModuleList_terraformModules",
@@ -342,16 +388,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "53359b794783abaac2441c99cd42ef7e",
+    "cacheID": "ecd8d8d7bd106b3ed6f8f735889e05e1",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleListPaginationQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $search: String\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...TerraformModuleListFragment_terraformModules\n    id\n  }\n}\n\nfragment TerraformModuleListFragment_terraformModules on Group {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: GROUP_LEVEL_DESC, includeInherited: true) {\n    totalCount\n    edges {\n      node {\n        id\n        groupPath\n        ...TerraformModuleListItemFragment_terraformModule\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment TerraformModuleListItemFragment_terraformModule on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  groupPath\n  latestVersion {\n    version\n    id\n  }\n}\n"
+    "text": "query TerraformModuleListPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $labelFilter: TerraformModuleLabelsFilter\n  $last: Int\n  $search: String\n  $id: String!\n) {\n  node(id: $id) {\n    __typename\n    ...TerraformModuleListFragment_terraformModules\n    id\n  }\n}\n\nfragment TerraformModuleListFragment_terraformModules on Group {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: GROUP_LEVEL_DESC, includeInherited: true, labelFilter: $labelFilter) {\n    totalCount\n    edges {\n      node {\n        id\n        groupPath\n        ...TerraformModuleListItemFragment_terraformModule\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n  id\n}\n\nfragment TerraformModuleListItemFragment_terraformModule on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  groupPath\n  labels {\n    key\n    value\n  }\n  latestVersion {\n    version\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "4ebdc62314c97ec89ab6e8e65e72e966";
+(node as any).hash = "009536d615010d75bdf79f3cf58ef9cb";
 
 export default node;

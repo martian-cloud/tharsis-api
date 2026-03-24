@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<24be8596e59b6864613dd126368fcea9>>
+ * @generated SignedSource<<a5b2f5776d4eaf6c24a8f402383e3f56>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,10 +10,18 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type TerraformModuleLabelsFilter = {
+  labels: ReadonlyArray<TerraformModuleLabelInput>;
+};
+export type TerraformModuleLabelInput = {
+  key: string;
+  value: string;
+};
 export type TerraformModuleSearchPaginationQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
+  labelFilter?: TerraformModuleLabelsFilter | null | undefined;
   last?: number | null | undefined;
   search?: string | null | undefined;
 };
@@ -45,6 +53,11 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
+    "name": "labelFilter"
+  },
+  {
+    "defaultValue": null,
+    "kind": "LocalArgument",
     "name": "last"
   },
   {
@@ -68,6 +81,11 @@ v1 = [
     "kind": "Variable",
     "name": "first",
     "variableName": "first"
+  },
+  {
+    "kind": "Variable",
+    "name": "labelFilter",
+    "variableName": "labelFilter"
   },
   {
     "kind": "Variable",
@@ -172,6 +190,31 @@ return {
                     "args": null,
                     "kind": "ScalarField",
                     "name": "private",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "TerraformModuleLabel",
+                    "kind": "LinkedField",
+                    "name": "labels",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "key",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "value",
+                        "storageKey": null
+                      }
+                    ],
                     "storageKey": null
                   },
                   {
@@ -285,7 +328,8 @@ return {
         "args": (v1/*: any*/),
         "filters": [
           "search",
-          "sort"
+          "sort",
+          "labelFilter"
         ],
         "handle": "connection",
         "key": "TerraformModuleSearch_terraformModules",
@@ -295,16 +339,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "177298bc2b14bb89298338ee23a26c9a",
+    "cacheID": "40500f7400bcf1400fecfccd0b61bc88",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleSearchPaginationQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleSearchPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $last: Int\n  $search: String\n) {\n  ...TerraformModuleSearchFragment_modules\n}\n\nfragment TerraformModuleSearchFragment_modules on Query {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformModuleSearchListItemFragment_module\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment TerraformModuleSearchListItemFragment_module on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  latestVersion {\n    version\n    createdBy\n    metadata {\n      createdAt\n    }\n    id\n  }\n}\n"
+    "text": "query TerraformModuleSearchPaginationQuery(\n  $after: String\n  $before: String\n  $first: Int\n  $labelFilter: TerraformModuleLabelsFilter\n  $last: Int\n  $search: String\n) {\n  ...TerraformModuleSearchFragment_modules\n}\n\nfragment TerraformModuleSearchFragment_modules on Query {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC, labelFilter: $labelFilter) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformModuleSearchListItemFragment_module\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment TerraformModuleSearchListItemFragment_module on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  labels {\n    key\n    value\n  }\n  latestVersion {\n    version\n    createdBy\n    metadata {\n      createdAt\n    }\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "9bbed260b94eb9a5ba7485a592e234df";
+(node as any).hash = "2a5556fdeefe02571d28627ecdee199c";
 
 export default node;

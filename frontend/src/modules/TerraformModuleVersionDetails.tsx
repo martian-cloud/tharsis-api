@@ -214,7 +214,7 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
                             <Tab label="Docs" value="docs" />
                             <Tab label="How To Use" value="usage" />
                             <Tab label="Versions" value="versions" />
-                            <Tab label="Attestations" value="attestations" />"
+                            <Tab label="Attestations" value="attestations" />
                         </Tabs>
                     </Box>
                     <React.Fragment>

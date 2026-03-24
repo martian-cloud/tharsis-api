@@ -53,11 +53,20 @@ func (s *TerraformModuleServer) GetTerraformModules(ctx context.Context, req *pb
 		return nil, err
 	}
 
+	labelFilters := make([]db.TerraformModuleLabelFilter, 0, len(req.LabelFilters))
+	for key, value := range req.LabelFilters {
+		labelFilters = append(labelFilters, db.TerraformModuleLabelFilter{
+			Key:   key,
+			Value: value,
+		})
+	}
+
 	input := &moduleregistry.GetModulesInput{
 		Search:            req.Search,
 		Sort:              &sort,
 		PaginationOptions: paginationOpts,
 		IncludeInherited:  req.IncludeInherited,
+		LabelFilters:      labelFilters,
 	}
 
 	if req.GroupId != nil {
@@ -122,6 +131,7 @@ func (s *TerraformModuleServer) CreateTerraformModule(ctx context.Context, req *
 		GroupID:       groupID,
 		RepositoryURL: req.RepositoryUrl,
 		Private:       req.Private,
+		Labels:        req.Labels,
 	}
 
 	createdModule, err := s.serviceCatalog.TerraformModuleRegistryService.CreateModule(ctx, input)
@@ -154,6 +164,10 @@ func (s *TerraformModuleServer) UpdateTerraformModule(ctx context.Context, req *
 
 	if req.Private != nil {
 		module.Private = *req.Private
+	}
+
+	if len(req.Labels) > 0 {
+		module.Labels = req.Labels
 	}
 
 	updatedModule, err := s.serviceCatalog.TerraformModuleRegistryService.UpdateModule(ctx, module)
@@ -451,6 +465,7 @@ func toPBTerraformModule(m *models.TerraformModule) *pb.TerraformModule {
 		RepositoryUrl: m.RepositoryURL,
 		Private:       m.Private,
 		CreatedBy:     m.CreatedBy,
+		Labels:        m.Labels,
 	}
 }
 

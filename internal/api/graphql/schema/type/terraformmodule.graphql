@@ -36,6 +36,20 @@ type DeleteTerraformModulePayload {
   problems: [Problem!]!
 }
 
+type TerraformModuleLabel {
+  key: String!
+  value: String!
+}
+
+input TerraformModuleLabelInput {
+  key: String!
+  value: String!
+}
+
+input TerraformModuleLabelsFilter {
+  labels: [TerraformModuleLabelInput!]!
+}
+
 type TerraformModule implements Node {
   id: ID!
   metadata: ResourceMetadata!
@@ -49,6 +63,7 @@ type TerraformModule implements Node {
   registryNamespace: String!
   groupPath: String!
   resourcePath: String!
+  labels: [TerraformModuleLabel!]!
   latestVersion: TerraformModuleVersion
   versions(
     after: String
@@ -79,6 +94,7 @@ input CreateTerraformModuleInput {
   system: String!
   private: Boolean
   repositoryUrl: String
+  labels: [TerraformModuleLabelInput!]
 }
 
 input UpdateTerraformModuleInput {
@@ -87,6 +103,7 @@ input UpdateTerraformModuleInput {
   metadata: ResourceMetadataInput
   private: Boolean
   repositoryUrl: String
+  labels: [TerraformModuleLabelInput!]
 }
 
 input DeleteTerraformModuleInput {

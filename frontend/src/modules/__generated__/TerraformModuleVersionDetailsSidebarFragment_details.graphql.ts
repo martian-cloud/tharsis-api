@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<75d8a6bd4a443e359b1ccb2055d3f2e6>>
+ * @generated SignedSource<<e1f303b4f0374ec8ddbf9cd78d3a1bbe>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,6 +20,10 @@ export type TerraformModuleVersionDetailsSidebarFragment_details$data = {
   readonly module: {
     readonly groupPath: string;
     readonly id: string;
+    readonly labels: ReadonlyArray<{
+      readonly key: string;
+      readonly value: string;
+    }>;
     readonly name: string;
     readonly private: boolean;
     readonly registryNamespace: string;
@@ -146,6 +150,31 @@ return {
           "kind": "ScalarField",
           "name": "groupPath",
           "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "TerraformModuleLabel",
+          "kind": "LinkedField",
+          "name": "labels",
+          "plural": true,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "key",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "value",
+              "storageKey": null
+            }
+          ],
+          "storageKey": null
         }
       ],
       "storageKey": null
@@ -156,6 +185,6 @@ return {
 };
 })();
 
-(node as any).hash = "1cd78a51aa43f391e6b3c4490407ee8d";
+(node as any).hash = "aafc3dd50f7b71168b1d637e6fca608a";
 
 export default node;

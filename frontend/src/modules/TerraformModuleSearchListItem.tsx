@@ -7,6 +7,7 @@ import { useFragment } from "react-relay/hooks";
 import { Link as LinkRouter } from 'react-router-dom';
 import Gravatar from '../common/Gravatar';
 import Timestamp from '../common/Timestamp';
+import LabelList from '../workspace/labels/LabelList';
 import { TerraformModuleSearchListItemFragment_module$key } from './__generated__/TerraformModuleSearchListItemFragment_module.graphql';
 
 interface Props {
@@ -23,6 +24,10 @@ function TerraformModuleSearchListItem(props: Props) {
             system
             registryNamespace
             private
+            labels {
+                key
+                value
+            }
             latestVersion {
                 version
                 createdBy
@@ -76,6 +81,15 @@ function TerraformModuleSearchListItem(props: Props) {
                             0 versions
                         </Typography>}
                     </Box>
+                    {data.labels && data.labels.length > 0 && (
+                        <Box mt={0.5}>
+                            <LabelList
+                                labels={data.labels.map((l: any) => ({ key: l.key, value: l.value }))}
+                                maxVisible={5}
+                                size="xs"
+                            />
+                        </Box>
+                    )}
                 </Box>
                 {data.private && <Chip sx={{ marginLeft: 2 }} variant="outlined" color="warning" size="small" label="private" />}
             </Box>

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f201be4b286261b0ae790f98b55e6fcc>>
+ * @generated SignedSource<<8a9119da36b2f4c5f922348980375d90>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -58,6 +58,10 @@ return {
     },
     {
       "kind": "RootArgument",
+      "name": "labelFilter"
+    },
+    {
+      "kind": "RootArgument",
       "name": "last"
     },
     {
@@ -106,6 +110,11 @@ return {
           "kind": "Literal",
           "name": "includeInherited",
           "value": true
+        },
+        {
+          "kind": "Variable",
+          "name": "labelFilter",
+          "variableName": "labelFilter"
         },
         {
           "kind": "Variable",
@@ -228,6 +237,6 @@ return {
 };
 })();
 
-(node as any).hash = "4ebdc62314c97ec89ab6e8e65e72e966";
+(node as any).hash = "009536d615010d75bdf79f3cf58ef9cb";
 
 export default node;

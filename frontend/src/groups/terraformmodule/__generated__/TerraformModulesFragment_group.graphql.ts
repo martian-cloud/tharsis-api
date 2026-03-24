@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c158d2371b012506a0180747df011592>>
+ * @generated SignedSource<<b6e3f2f42ddcc8204d26baff02785e86>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -11,7 +11,7 @@
 import { ReaderFragment } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
 export type TerraformModulesFragment_group$data = {
-  readonly " $fragmentSpreads": FragmentRefs<"TerraformModuleListFragment_group">;
+  readonly " $fragmentSpreads": FragmentRefs<"EditTerraformModuleFragment_group" | "TerraformModuleListFragment_group">;
   readonly " $fragmentType": "TerraformModulesFragment_group";
 };
 export type TerraformModulesFragment_group$key = {
@@ -29,12 +29,17 @@ const node: ReaderFragment = {
       "args": null,
       "kind": "FragmentSpread",
       "name": "TerraformModuleListFragment_group"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "EditTerraformModuleFragment_group"
     }
   ],
   "type": "Group",
   "abstractKey": null
 };
 
-(node as any).hash = "37f1c4803d8e2971135086e41162265f";
+(node as any).hash = "8c3ec4d43b348fb114b2c102bad9f377";
 
 export default node;

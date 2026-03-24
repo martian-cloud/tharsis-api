@@ -6,6 +6,7 @@ import { useFragment } from 'react-relay/hooks';
 import Gravatar from '../common/Gravatar';
 import Timestamp from '../common/Timestamp';
 import Link from '../routes/Link';
+import LabelList from '../workspace/labels/LabelList';
 import { TerraformModuleVersionDetailsSidebarFragment_details$key } from './__generated__/TerraformModuleVersionDetailsSidebarFragment_details.graphql';
 
 interface Props {
@@ -52,6 +53,10 @@ function TerraformModuleVersionDetailsSidebar(props: Props) {
             private
             repositoryUrl
             groupPath
+            labels {
+                key
+                value
+            }
         }
     }
   `, props.fragmentRef);
@@ -132,6 +137,15 @@ function TerraformModuleVersionDetailsSidebar(props: Props) {
                     </Typography>}
                     {!data.module.repositoryUrl && <Typography>None</Typography>}
                 </Section>
+                {data.module.labels && data.module.labels.length > 0 && (
+                    <Section>
+                        <FieldLabel>Labels</FieldLabel>
+                        <LabelList
+                            labels={data.module.labels.map((l: any) => ({ key: l.key, value: l.value }))}
+                            maxVisible={10}
+                        />
+                    </Section>
+                )}
             </Box>
         </Drawer>
     );

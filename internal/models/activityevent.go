@@ -133,6 +133,16 @@ type ActivityEventUpdateWorkspacePayload struct {
 	LabelChanges *LabelChangePayload `json:"labelChanges,omitempty"`
 }
 
+// ActivityEventCreateTerraformModulePayload is the custom payload for creating a terraform module with labels.
+type ActivityEventCreateTerraformModulePayload struct {
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// ActivityEventUpdateTerraformModulePayload is the custom payload for updating a terraform module with label changes.
+type ActivityEventUpdateTerraformModulePayload struct {
+	LabelChanges *LabelChangePayload `json:"labelChanges,omitempty"`
+}
+
 // LabelChangePayload represents changes made to workspace labels
 type LabelChangePayload struct {
 	Added   map[string]string `json:"added,omitempty"`

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c7bfc1612e9f2ac011375c5e52d8156f>>
+ * @generated SignedSource<<454d2e14d9eafc5d72bd0cb97df43b9d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,10 +10,18 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 import { FragmentRefs } from "relay-runtime";
+export type TerraformModuleLabelsFilter = {
+  labels: ReadonlyArray<TerraformModuleLabelInput>;
+};
+export type TerraformModuleLabelInput = {
+  key: string;
+  value: string;
+};
 export type TerraformModuleSearchQuery$variables = {
   after?: string | null | undefined;
   before?: string | null | undefined;
   first?: number | null | undefined;
+  labelFilter?: TerraformModuleLabelsFilter | null | undefined;
   last?: number | null | undefined;
   search?: string | null | undefined;
 };
@@ -44,14 +52,19 @@ v2 = {
 v3 = {
   "defaultValue": null,
   "kind": "LocalArgument",
-  "name": "last"
+  "name": "labelFilter"
 },
 v4 = {
   "defaultValue": null,
   "kind": "LocalArgument",
+  "name": "last"
+},
+v5 = {
+  "defaultValue": null,
+  "kind": "LocalArgument",
   "name": "search"
 },
-v5 = [
+v6 = [
   {
     "kind": "Variable",
     "name": "after",
@@ -69,6 +82,11 @@ v5 = [
   },
   {
     "kind": "Variable",
+    "name": "labelFilter",
+    "variableName": "labelFilter"
+  },
+  {
+    "kind": "Variable",
     "name": "last",
     "variableName": "last"
   },
@@ -83,7 +101,7 @@ v5 = [
     "value": "NAME_ASC"
   }
 ],
-v6 = {
+v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -97,7 +115,8 @@ return {
       (v1/*: any*/),
       (v2/*: any*/),
       (v3/*: any*/),
-      (v4/*: any*/)
+      (v4/*: any*/),
+      (v5/*: any*/)
     ],
     "kind": "Fragment",
     "metadata": null,
@@ -116,17 +135,18 @@ return {
   "operation": {
     "argumentDefinitions": [
       (v2/*: any*/),
-      (v3/*: any*/),
+      (v4/*: any*/),
       (v0/*: any*/),
       (v1/*: any*/),
-      (v4/*: any*/)
+      (v5/*: any*/),
+      (v3/*: any*/)
     ],
     "kind": "Operation",
     "name": "TerraformModuleSearchQuery",
     "selections": [
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v6/*: any*/),
         "concreteType": "TerraformModuleConnection",
         "kind": "LinkedField",
         "name": "terraformModules",
@@ -155,7 +175,7 @@ return {
                 "name": "node",
                 "plural": false,
                 "selections": [
-                  (v6/*: any*/),
+                  (v7/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -182,6 +202,31 @@ return {
                     "args": null,
                     "kind": "ScalarField",
                     "name": "private",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "TerraformModuleLabel",
+                    "kind": "LinkedField",
+                    "name": "labels",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "key",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "value",
+                        "storageKey": null
+                      }
+                    ],
                     "storageKey": null
                   },
                   {
@@ -224,7 +269,7 @@ return {
                         ],
                         "storageKey": null
                       },
-                      (v6/*: any*/)
+                      (v7/*: any*/)
                     ],
                     "storageKey": null
                   },
@@ -292,10 +337,11 @@ return {
       },
       {
         "alias": null,
-        "args": (v5/*: any*/),
+        "args": (v6/*: any*/),
         "filters": [
           "search",
-          "sort"
+          "sort",
+          "labelFilter"
         ],
         "handle": "connection",
         "key": "TerraformModuleSearch_terraformModules",
@@ -305,16 +351,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "6928171db697314f37fb3c25f4911bfe",
+    "cacheID": "f0797d4de354effa393589043ec63b6c",
     "id": null,
     "metadata": {},
     "name": "TerraformModuleSearchQuery",
     "operationKind": "query",
-    "text": "query TerraformModuleSearchQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n) {\n  ...TerraformModuleSearchFragment_modules\n}\n\nfragment TerraformModuleSearchFragment_modules on Query {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformModuleSearchListItemFragment_module\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment TerraformModuleSearchListItemFragment_module on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  latestVersion {\n    version\n    createdBy\n    metadata {\n      createdAt\n    }\n    id\n  }\n}\n"
+    "text": "query TerraformModuleSearchQuery(\n  $first: Int\n  $last: Int\n  $after: String\n  $before: String\n  $search: String\n  $labelFilter: TerraformModuleLabelsFilter\n) {\n  ...TerraformModuleSearchFragment_modules\n}\n\nfragment TerraformModuleSearchFragment_modules on Query {\n  terraformModules(after: $after, before: $before, first: $first, last: $last, search: $search, sort: NAME_ASC, labelFilter: $labelFilter) {\n    totalCount\n    edges {\n      node {\n        id\n        ...TerraformModuleSearchListItemFragment_module\n        __typename\n      }\n      cursor\n    }\n    pageInfo {\n      endCursor\n      hasNextPage\n      hasPreviousPage\n      startCursor\n    }\n  }\n}\n\nfragment TerraformModuleSearchListItemFragment_module on TerraformModule {\n  id\n  name\n  system\n  registryNamespace\n  private\n  labels {\n    key\n    value\n  }\n  latestVersion {\n    version\n    createdBy\n    metadata {\n      createdAt\n    }\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "a1e560216248f1d0f872f294fca437db";
+(node as any).hash = "17e8fbe406e8e14a269c0738321d49e4";
 
 export default node;
