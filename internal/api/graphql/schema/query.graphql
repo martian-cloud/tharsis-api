@@ -79,6 +79,7 @@ type Query {
     last: Int
     search: String
     sort: TerraformModuleSort
+    labelFilter: TerraformModuleLabelsFilter
   ): TerraformModuleConnection!
   terraformModule(
     registryNamespace: String!

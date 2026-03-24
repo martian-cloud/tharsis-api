@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<604242ed9437806affc256d023d43437>>
+ * @generated SignedSource<<71eef3fa8695b71d42e1c4885b355de4>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -49,6 +49,10 @@ return {
     },
     {
       "kind": "RootArgument",
+      "name": "labelFilter"
+    },
+    {
+      "kind": "RootArgument",
       "name": "last"
     },
     {
@@ -87,6 +91,11 @@ return {
     {
       "alias": "terraformModules",
       "args": [
+        {
+          "kind": "Variable",
+          "name": "labelFilter",
+          "variableName": "labelFilter"
+        },
         {
           "kind": "Variable",
           "name": "search",
@@ -206,6 +215,6 @@ return {
 };
 })();
 
-(node as any).hash = "9bbed260b94eb9a5ba7485a592e234df";
+(node as any).hash = "2a5556fdeefe02571d28627ecdee199c";
 
 export default node;

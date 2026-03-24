@@ -854,6 +854,9 @@ func TestUpdateModule(t *testing.T) {
 			mockModules := db.NewMockTerraformModules(t)
 
 			if test.authError == nil {
+				mockModules.On("GetModuleByID", mock.Anything, test.input.Metadata.ID).
+					Return(test.input, nil)
+
 				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
 				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
 				mockTransactions.On("CommitTx", mock.Anything).Return(nil)

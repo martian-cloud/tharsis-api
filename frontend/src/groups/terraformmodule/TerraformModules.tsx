@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from 'react-relay/hooks';
 import { Route, Routes } from 'react-router-dom';
+import EditTerraformModule from './EditTerraformModule';
 import TerraformModuleList from './TerraformModuleList';
 import { TerraformModulesFragment_group$key } from './__generated__/TerraformModulesFragment_group.graphql';
 
@@ -15,6 +16,7 @@ function TerraformModules(props: Props) {
         fragment TerraformModulesFragment_group on Group
         {
             ...TerraformModuleListFragment_group
+            ...EditTerraformModuleFragment_group
         }
       `, props.fragmentRef);
 
@@ -22,6 +24,7 @@ function TerraformModules(props: Props) {
         <Box>
             <Routes>
                 <Route index element={<TerraformModuleList fragmentRef={data} />} />
+                <Route path=":name/:system/edit" element={<EditTerraformModule fragmentRef={data} />} />
             </Routes>
         </Box>
     );

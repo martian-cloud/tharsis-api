@@ -124,6 +124,14 @@ type LabelChangePayload {
   removed: [String!]
 }
 
+type ActivityEventCreateTerraformModulePayload {
+  labels: [TerraformModuleLabel!]
+}
+
+type ActivityEventUpdateTerraformModulePayload {
+  labelChanges: LabelChangePayload
+}
+
 union ActivityEventPayload =
     ActivityEventCreateNamespaceMembershipPayload
   | ActivityEventUpdateNamespaceMembershipPayload
@@ -137,6 +145,8 @@ union ActivityEventPayload =
   | ActivityEventMoveManagedIdentityPayload
   | ActivityEventCreateWorkspacePayload
   | ActivityEventUpdateWorkspacePayload
+  | ActivityEventCreateTerraformModulePayload
+  | ActivityEventUpdateTerraformModulePayload
 
 type ActivityEvent implements Node {
   id: ID!

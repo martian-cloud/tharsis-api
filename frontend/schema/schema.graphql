@@ -45,6 +45,10 @@ type ActivityEventCreateNamespaceMembershipPayload {
   role: String!
 }
 
+type ActivityEventCreateTerraformModulePayload {
+  labels: [TerraformModuleLabel!]
+}
+
 type ActivityEventCreateWorkspacePayload {
   labels: [WorkspaceLabel!]
 }
@@ -72,7 +76,7 @@ type ActivityEventMoveManagedIdentityPayload {
   previousGroupPath: String!
 }
 
-union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateWorkspacePayload
+union ActivityEventPayload = ActivityEventAddTeamMemberPayload | ActivityEventCreateNamespaceMembershipPayload | ActivityEventCreateTerraformModulePayload | ActivityEventCreateWorkspacePayload | ActivityEventDeleteChildResourcePayload | ActivityEventMigrateGroupPayload | ActivityEventMigrateWorkspacePayload | ActivityEventMoveManagedIdentityPayload | ActivityEventRemoveNamespaceMembershipPayload | ActivityEventRemoveTeamMemberPayload | ActivityEventUpdateNamespaceMembershipPayload | ActivityEventUpdateTeamMemberPayload | ActivityEventUpdateTerraformModulePayload | ActivityEventUpdateWorkspacePayload
 
 type ActivityEventRemoveNamespaceMembershipPayload {
   member: Member
@@ -123,6 +127,10 @@ type ActivityEventUpdateNamespaceMembershipPayload {
 type ActivityEventUpdateTeamMemberPayload {
   maintainer: Boolean!
   user: User
+}
+
+type ActivityEventUpdateTerraformModulePayload {
+  labelChanges: LabelChangePayload
 }
 
 type ActivityEventUpdateWorkspacePayload {
@@ -647,6 +655,7 @@ input CreateTerraformModuleInput {
   clientMutationId: String
   groupId: String
   groupPath: String
+  labels: [TerraformModuleLabelInput!]
   name: String!
   private: Boolean
   repositoryUrl: String
@@ -1229,7 +1238,7 @@ type Group implements Namespace & Node {
   runners(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, sort: RunnerSort): RunnerConnection!
   runs(after: String, before: String, first: Int, includeNestedRuns: Boolean, last: Int, sort: RunSort, workspaceAssessment: Boolean): RunConnection!
   serviceAccounts(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: ServiceAccountSort): ServiceAccountConnection!
-  terraformModules(after: String, before: String, first: Int, includeInherited: Boolean, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
+  terraformModules(after: String, before: String, first: Int, includeInherited: Boolean, labelFilter: TerraformModuleLabelsFilter, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
   terraformProviderMirrors(after: String, before: String, first: Int, last: Int, search: String, sort: TerraformProviderVersionMirrorSort): TerraformProviderVersionMirrorConnection!
   terraformProviders(after: String, before: String, first: Int, last: Int, search: String): TerraformProviderConnection!
   variables: [NamespaceVariable!]!
@@ -1980,7 +1989,7 @@ type Query {
   terraformCLIVersions: TerraformCLIVersions
   terraformModule(moduleName: String!, registryNamespace: String!, system: String!): TerraformModule @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   terraformModuleVersion(moduleName: String!, registryNamespace: String!, system: String!, version: String): TerraformModuleVersion
-  terraformModules(after: String, before: String, first: Int, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
+  terraformModules(after: String, before: String, first: Int, labelFilter: TerraformModuleLabelsFilter, last: Int, search: String, sort: TerraformModuleSort): TerraformModuleConnection!
   terraformProvider(providerName: String!, registryNamespace: String!): TerraformProvider @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   terraformProviderVersion(providerName: String!, registryNamespace: String!, version: String): TerraformProviderVersion
   terraformProviderVersionMirror(groupPath: String!, registryHostname: String!, registryNamespace: String!, type: String!, version: String!): TerraformProviderVersionMirror @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
@@ -2542,6 +2551,7 @@ type TerraformModule implements Node {
   group: Group!
   groupPath: String!
   id: ID!
+  labels: [TerraformModuleLabel!]!
   latestVersion: TerraformModuleVersion
   metadata: ResourceMetadata!
   name: String!
@@ -2645,6 +2655,20 @@ type TerraformModuleConnection {
 type TerraformModuleEdge {
   cursor: String!
   node: TerraformModule
+}
+
+type TerraformModuleLabel {
+  key: String!
+  value: String!
+}
+
+input TerraformModuleLabelInput {
+  key: String!
+  value: String!
+}
+
+input TerraformModuleLabelsFilter {
+  labels: [TerraformModuleLabelInput!]!
 }
 
 """The End."""
@@ -3050,6 +3074,7 @@ type UpdateTerraformModuleAttestationPayload {
 input UpdateTerraformModuleInput {
   clientMutationId: String
   id: ID!
+  labels: [TerraformModuleLabelInput!]
   metadata: ResourceMetadataInput
   private: Boolean
   repositoryUrl: String

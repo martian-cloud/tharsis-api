@@ -322,6 +322,14 @@ func (r *GroupResolver) TerraformModules(ctx context.Context, args *TerraformMod
 		Search: args.Search,
 	}
 
+	if args.LabelFilter != nil {
+		labelFilters := make([]db.TerraformModuleLabelFilter, len(args.LabelFilter.Labels))
+		for i, l := range args.LabelFilter.Labels {
+			labelFilters[i] = db.TerraformModuleLabelFilter{Key: l.Key, Value: l.Value}
+		}
+		input.LabelFilters = labelFilters
+	}
+
 	if args.IncludeInherited != nil && *args.IncludeInherited {
 		input.IncludeInherited = true
 	}

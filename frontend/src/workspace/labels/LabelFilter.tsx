@@ -148,7 +148,7 @@ function LabelFilter({
                                     label="Label Key"
                                     placeholder="e.g., environment"
                                     value={newFilter.key || ''}
-                                    onChange={(e) => setNewFilter(prev => ({ ...prev, key: e.target.value, value: '' }))}
+                                    onChange={(e) => setNewFilter(prev => ({ ...prev, key: e.target.value }))}
                                     sx={{ width: '100%' }}
                                 />
                             </Box>

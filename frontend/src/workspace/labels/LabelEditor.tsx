@@ -39,7 +39,6 @@ function LabelEditor({
     const getFieldError = (index: number, field: 'key' | 'value'): string | undefined => {
         return validationErrors.find(e => e.index === index && e.field === field)?.message;
     };
-    // Ensure there's always at least one empty label for better UX
     useEffect(() => {
         if (labels.length === 0) {
             onChange([{ key: '', value: '' }]);

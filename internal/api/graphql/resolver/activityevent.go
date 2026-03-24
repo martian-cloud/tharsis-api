@@ -289,6 +289,18 @@ func (r *ActivityEventPayloadResolver) ToActivityEventUpdateWorkspacePayload() (
 	return res, ok
 }
 
+// ToActivityEventCreateTerraformModulePayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventCreateTerraformModulePayload() (*ActivityEventCreateTerraformModulePayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventCreateTerraformModulePayloadResolver)
+	return res, ok
+}
+
+// ToActivityEventUpdateTerraformModulePayload resolver
+func (r *ActivityEventPayloadResolver) ToActivityEventUpdateTerraformModulePayload() (*ActivityEventUpdateTerraformModulePayloadResolver, bool) {
+	res, ok := r.result.(*ActivityEventUpdateTerraformModulePayloadResolver)
+	return res, ok
+}
+
 // ActivityEventResolver resolves an activity event resource
 type ActivityEventResolver struct {
 	activityEvent *models.ActivityEvent
@@ -578,6 +590,20 @@ func (r *ActivityEventResolver) Payload() (*ActivityEventPayloadResolver, error)
 				return nil, err
 			}
 			return &ActivityEventPayloadResolver{result: &ActivityEventUpdateWorkspacePayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionCreate) &&
+			(r.activityEvent.TargetType == models.TargetTerraformModule):
+			var payload models.ActivityEventCreateTerraformModulePayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventCreateTerraformModulePayloadResolver{payload: &payload}}, nil
+		case (r.activityEvent.Action == models.ActionUpdate) &&
+			(r.activityEvent.TargetType == models.TargetTerraformModule):
+			var payload models.ActivityEventUpdateTerraformModulePayload
+			if err := json.Unmarshal(r.activityEvent.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return &ActivityEventPayloadResolver{result: &ActivityEventUpdateTerraformModulePayloadResolver{payload: &payload}}, nil
 		default:
 			return nil, fmt.Errorf("payload supplied without a supported target type and action")
 
@@ -728,6 +754,33 @@ type ActivityEventUpdateWorkspacePayloadResolver struct {
 
 // LabelChanges resolver
 func (r *ActivityEventUpdateWorkspacePayloadResolver) LabelChanges() *LabelChangePayloadResolver {
+	if r.payload.LabelChanges == nil {
+		return nil
+	}
+	return &LabelChangePayloadResolver{payload: r.payload.LabelChanges}
+}
+
+// ActivityEventCreateTerraformModulePayloadResolver resolves terraform module creation payload
+type ActivityEventCreateTerraformModulePayloadResolver struct {
+	payload *models.ActivityEventCreateTerraformModulePayload
+}
+
+// Labels resolver
+func (r *ActivityEventCreateTerraformModulePayloadResolver) Labels() (*[]*TerraformModuleLabelResolver, error) {
+	var resolvers []*TerraformModuleLabelResolver
+	for key, value := range r.payload.Labels {
+		resolvers = append(resolvers, &TerraformModuleLabelResolver{key: key, value: value})
+	}
+	return &resolvers, nil
+}
+
+// ActivityEventUpdateTerraformModulePayloadResolver resolves terraform module update payload
+type ActivityEventUpdateTerraformModulePayloadResolver struct {
+	payload *models.ActivityEventUpdateTerraformModulePayload
+}
+
+// LabelChanges resolver
+func (r *ActivityEventUpdateTerraformModulePayloadResolver) LabelChanges() *LabelChangePayloadResolver {
 	if r.payload.LabelChanges == nil {
 		return nil
 	}

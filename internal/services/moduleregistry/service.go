@@ -40,6 +40,7 @@ type CreateModuleInput struct {
 	System        string
 	GroupID       string
 	RepositoryURL string
+	Labels        map[string]string
 	Private       bool
 }
 
@@ -67,6 +68,8 @@ type GetModulesInput struct {
 	Group *models.Group
 	// Search filters module list by modules with a name that contains the search query
 	Search *string
+	// LabelFilters filters modules by label key/value pairs (AND logic)
+	LabelFilters []db.TerraformModuleLabelFilter
 	// IncludeInherited will include inherited modules in the results when true
 	IncludeInherited bool
 }
@@ -300,7 +303,8 @@ func (s *service) GetModules(ctx context.Context, input *GetModulesInput) (*db.M
 		Sort:              input.Sort,
 		PaginationOptions: input.PaginationOptions,
 		Filter: &db.TerraformModuleFilter{
-			Search: input.Search,
+			Search:       input.Search,
+			LabelFilters: input.LabelFilters,
 		},
 	}
 
@@ -366,6 +370,19 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 		return nil, vErr
 	}
 
+	// Fetch current module to detect label changes.
+	currentModule, err := s.dbClient.TerraformModules.GetModuleByID(ctx, module.Metadata.ID)
+	if err != nil {
+		tracing.RecordError(span, err, "failed to get current module")
+		return nil, err
+	}
+	if currentModule == nil {
+		tracing.RecordError(span, nil, "module with ID %s not found", module.Metadata.ID)
+		return nil, errors.New("module with ID %s not found", module.Metadata.ID, errors.WithErrorCode(errors.ENotFound))
+	}
+
+	labelChanges := detectModuleLabelChanges(currentModule.Labels, module.Labels)
+
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
@@ -386,13 +403,20 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 
 	groupPath := updatedModule.GetGroupPath()
 
-	if _, err = s.activityService.CreateActivityEvent(txContext,
-		&activityevent.CreateActivityEventInput{
-			NamespacePath: &groupPath,
-			Action:        models.ActionUpdate,
-			TargetType:    models.TargetTerraformModule,
-			TargetID:      updatedModule.Metadata.ID,
-		}); err != nil {
+	activityEventInput := &activityevent.CreateActivityEventInput{
+		NamespacePath: &groupPath,
+		Action:        models.ActionUpdate,
+		TargetType:    models.TargetTerraformModule,
+		TargetID:      updatedModule.Metadata.ID,
+	}
+
+	if labelChanges != nil {
+		activityEventInput.Payload = &models.ActivityEventUpdateTerraformModulePayload{
+			LabelChanges: labelChanges,
+		}
+	}
+
+	if _, err = s.activityService.CreateActivityEvent(txContext, activityEventInput); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err
 	}
@@ -403,6 +427,44 @@ func (s *service) UpdateModule(ctx context.Context, module *models.TerraformModu
 	}
 
 	return updatedModule, nil
+}
+
+// detectModuleLabelChanges compares old and new labels and returns the changes.
+func detectModuleLabelChanges(oldLabels, newLabels map[string]string) *models.LabelChangePayload {
+	if oldLabels == nil {
+		oldLabels = make(map[string]string)
+	}
+	if newLabels == nil {
+		newLabels = make(map[string]string)
+	}
+
+	changes := &models.LabelChangePayload{
+		Added:   make(map[string]string),
+		Updated: make(map[string]string),
+		Removed: []string{},
+	}
+
+	for key, newValue := range newLabels {
+		if oldValue, exists := oldLabels[key]; exists {
+			if oldValue != newValue {
+				changes.Updated[key] = newValue
+			}
+		} else {
+			changes.Added[key] = newValue
+		}
+	}
+
+	for key := range oldLabels {
+		if _, exists := newLabels[key]; !exists {
+			changes.Removed = append(changes.Removed, key)
+		}
+	}
+
+	if len(changes.Added) == 0 && len(changes.Updated) == 0 && len(changes.Removed) == 0 {
+		return nil
+	}
+
+	return changes
 }
 
 func (s *service) CreateModuleAttestation(ctx context.Context, input *CreateModuleAttestationInput) (*models.TerraformModuleAttestation, error) {
@@ -807,6 +869,7 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 		RootGroupID:   rootGroupID,
 		Private:       input.Private,
 		RepositoryURL: input.RepositoryURL,
+		Labels:        input.Labels,
 		CreatedBy:     caller.GetSubject(),
 	}
 
@@ -859,6 +922,9 @@ func (s *service) CreateModule(ctx context.Context, input *CreateModuleInput) (*
 			Action:        models.ActionCreate,
 			TargetType:    models.TargetTerraformModule,
 			TargetID:      createdModule.Metadata.ID,
+			Payload: &models.ActivityEventCreateTerraformModulePayload{
+				Labels: createdModule.Labels,
+			},
 		}); err != nil {
 		tracing.RecordError(span, err, "failed to create activity event")
 		return nil, err

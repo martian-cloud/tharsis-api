@@ -18,6 +18,7 @@ type TerraformModule struct {
 	GroupID       string
 	RootGroupID   string // the module namespace is the path of the root group
 	RepositoryURL string
+	Labels        map[string]string
 	Metadata      ResourceMetadata
 	Private       bool
 }
@@ -56,7 +57,10 @@ func (t *TerraformModule) ResolveMetadata(key string) (*string, error) {
 
 // Validate returns an error if the model is not valid
 func (t *TerraformModule) Validate() error {
-	return verifyValidName(t.Name)
+	if err := verifyValidName(t.Name); err != nil {
+		return err
+	}
+	return validateLabels(t.Labels)
 }
 
 // GetResourcePath returns the resource path for the terraform module

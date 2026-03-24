@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/graphql/loader"
@@ -20,10 +21,38 @@ import (
 
 /* TerraformModule Query Resolvers */
 
+// TerraformModuleLabelResolver resolves a label key/value pair on a module
+type TerraformModuleLabelResolver struct {
+	key   string
+	value string
+}
+
+// Key resolver
+func (r *TerraformModuleLabelResolver) Key() string {
+	return r.key
+}
+
+// Value resolver
+func (r *TerraformModuleLabelResolver) Value() string {
+	return r.value
+}
+
+// TerraformModuleLabelInput represents a label key/value pair input
+type TerraformModuleLabelInput struct {
+	Key   string
+	Value string
+}
+
+// TerraformModuleLabelsFilter represents label filtering criteria
+type TerraformModuleLabelsFilter struct {
+	Labels []TerraformModuleLabelInput
+}
+
 // TerraformModuleConnectionQueryArgs are used to query a module connection
 type TerraformModuleConnectionQueryArgs struct {
 	ConnectionQueryArgs
 	Search           *string
+	LabelFilter      *TerraformModuleLabelsFilter
 	IncludeInherited *bool
 }
 
@@ -178,6 +207,24 @@ func (r *TerraformModuleResolver) RegistryNamespace() string {
 	return r.module.GetRegistryNamespace()
 }
 
+// Labels resolver - converts JSONB labels to GraphQL label array sorted by key
+func (r *TerraformModuleResolver) Labels() ([]*TerraformModuleLabelResolver, error) {
+	if len(r.module.Labels) == 0 {
+		return []*TerraformModuleLabelResolver{}, nil
+	}
+
+	resolvers := make([]*TerraformModuleLabelResolver, 0, len(r.module.Labels))
+	for key, value := range r.module.Labels {
+		resolvers = append(resolvers, &TerraformModuleLabelResolver{key: key, value: value})
+	}
+
+	sort.Slice(resolvers, func(i, j int) bool {
+		return resolvers[i].key < resolvers[j].key
+	})
+
+	return resolvers, nil
+}
+
 // Metadata resolver
 func (r *TerraformModuleResolver) Metadata() *MetadataResolver {
 	return &MetadataResolver{metadata: &r.module.Metadata}
@@ -270,6 +317,14 @@ func terraformModulesQuery(ctx context.Context, args *TerraformModuleConnectionQ
 		Search:            args.Search,
 	}
 
+	if args.LabelFilter != nil && len(args.LabelFilter.Labels) > 0 {
+		labelFilters := make([]db.TerraformModuleLabelFilter, len(args.LabelFilter.Labels))
+		for i, l := range args.LabelFilter.Labels {
+			labelFilters[i] = db.TerraformModuleLabelFilter{Key: l.Key, Value: l.Value}
+		}
+		input.LabelFilters = labelFilters
+	}
+
 	if args.Sort != nil {
 		sort := db.TerraformModuleSortableField(*args.Sort)
 		input.Sort = &sort
@@ -318,6 +373,7 @@ type UpdateTerraformModuleInput struct {
 	Metadata         *MetadataInput
 	RepositoryURL    *string
 	Private          *bool
+	Labels           *[]TerraformModuleLabelInput
 	ID               string
 }
 
@@ -326,6 +382,7 @@ type CreateTerraformModuleInput struct {
 	ClientMutationID *string
 	Private          *bool
 	RepositoryURL    *string
+	Labels           *[]TerraformModuleLabelInput
 	Name             string
 	System           string
 	GroupID          *string
@@ -375,6 +432,14 @@ func createTerraformModuleMutation(ctx context.Context, input *CreateTerraformMo
 		createOptions.RepositoryURL = *input.RepositoryURL
 	}
 
+	if input.Labels != nil && len(*input.Labels) > 0 {
+		labels := make(map[string]string, len(*input.Labels))
+		for _, l := range *input.Labels {
+			labels[l.Key] = l.Value
+		}
+		createOptions.Labels = labels
+	}
+
 	module, err := serviceCatalog.TerraformModuleRegistryService.CreateModule(ctx, &createOptions)
 	if err != nil {
 		return nil, err
@@ -414,6 +479,14 @@ func updateTerraformModuleMutation(ctx context.Context, input *UpdateTerraformMo
 
 	if input.RepositoryURL != nil {
 		module.RepositoryURL = *input.RepositoryURL
+	}
+
+	if input.Labels != nil {
+		labels := make(map[string]string, len(*input.Labels))
+		for _, l := range *input.Labels {
+			labels[l.Key] = l.Value
+		}
+		module.Labels = labels
 	}
 
 	module, err = serviceCatalog.TerraformModuleRegistryService.UpdateModule(ctx, module)
