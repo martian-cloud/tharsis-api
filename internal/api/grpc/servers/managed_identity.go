@@ -584,14 +584,29 @@ func toPBManagedIdentityAccessRule(r *models.ManagedIdentityAccessRule) *pb.Mana
 		}
 	}
 
+	var userIDs []string
+	for _, id := range r.AllowedUserIDs {
+		userIDs = append(userIDs, gid.ToGlobalID(types.UserModelType, id))
+	}
+
+	var serviceAccountIDs []string
+	for _, id := range r.AllowedServiceAccountIDs {
+		serviceAccountIDs = append(serviceAccountIDs, gid.ToGlobalID(types.ServiceAccountModelType, id))
+	}
+
+	var teamIDs []string
+	for _, id := range r.AllowedTeamIDs {
+		teamIDs = append(teamIDs, gid.ToGlobalID(types.TeamModelType, id))
+	}
+
 	return &pb.ManagedIdentityAccessRule{
 		Metadata:                  toPBMetadata(&r.Metadata, types.ManagedIdentityAccessRuleModelType),
 		Type:                      string(r.Type),
 		RunStage:                  string(r.RunStage),
 		ManagedIdentityId:         gid.ToGlobalID(types.ManagedIdentityModelType, r.ManagedIdentityID),
-		AllowedUsers:              r.AllowedUserIDs,
-		AllowedServiceAccounts:    r.AllowedServiceAccountIDs,
-		AllowedTeams:              r.AllowedTeamIDs,
+		AllowedUsers:              userIDs,
+		AllowedServiceAccounts:    serviceAccountIDs,
+		AllowedTeams:              teamIDs,
 		VerifyStateLineage:        r.VerifyStateLineage,
 		ModuleAttestationPolicies: moduleAttestationPolicies,
 	}

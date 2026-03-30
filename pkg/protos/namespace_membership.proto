@@ -85,10 +85,9 @@ message DeleteNamespaceMembershipRequest {
 
 // MembershipNamespace represents the namespace for a membership.
 message MembershipNamespace {
-  string          id           = 1;
-  string          path         = 2;
-  optional string group_id     = 3;
-  optional string workspace_id = 4;
+  string          path         = 1;
+  optional string group_id     = 2;
+  optional string workspace_id = 3;
 }
 
 // NamespaceMembership defines a namespace membership within Tharsis.
