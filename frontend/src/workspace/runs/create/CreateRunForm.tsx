@@ -1,4 +1,4 @@
-import { Alert, Box, Divider, Stack, Typography } from "@mui/material";
+import { Alert, Box, Checkbox, Divider, FormControlLabel, Stack, Typography } from "@mui/material";
 import { MutationError } from '../../../common/error';
 import PanelButton from "../../../common/PanelButton";
 import ConfigurationVersionSource, { ConfigVersionRunDataOptions, DefaultConfigVersionRunDataOptions } from "./ConfigurationVersionSource";
@@ -10,6 +10,7 @@ import { VCSWorkspaceLinkSourceFragment_workspace$key } from "./__generated__/VC
 export type RunFormData = {
     source: string;
     runType: string | null;
+    refreshOnly: boolean;
     options: ModuleRunDataOptions | ConfigVersionRunDataOptions | VCSRunDataOptions | null;
 };
 
@@ -56,6 +57,7 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                             onChange({
                                 source: source.name,
                                 runType: '',
+                                refreshOnly: false,
                                 options: DEFAULT_RUN_OPTIONS[source.name]
                             })
                         }}>
@@ -81,6 +83,23 @@ function CreateRunForm({ error, data, onChange, fragmentRef }: Props) {
                         </Typography>
                     </PanelButton>)}
                 </Stack>
+            </Box>}
+            {(data.source === 'module' || data.source === 'configuration_version') && <Box marginBottom={4}>
+                <Typography variant="subtitle1" gutterBottom>Options</Typography>
+                <Divider light />
+                <FormControlLabel
+                    sx={{ mt: 1 }}
+                    control={
+                        <Checkbox
+                            checked={data.refreshOnly}
+                            onChange={(e) => onChange({ ...data, refreshOnly: e.target.checked })}
+                        />
+                    }
+                    label="Refresh Only"
+                />
+                <Typography variant="caption" display="block" sx={{ ml: 4, color: 'text.secondary' }}>
+                    Only update Terraform state to reflect real infrastructure. No resources will be created, changed, or destroyed.
+                </Typography>
             </Box>}
             {data.source === 'module' &&
                 <ModuleSource
