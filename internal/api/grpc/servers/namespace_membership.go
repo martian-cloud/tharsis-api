@@ -245,7 +245,6 @@ func toPBNamespaceMembership(nm *models.NamespaceMembership) *pb.NamespaceMember
 		Metadata: toPBMetadata(&nm.Metadata, types.NamespaceMembershipModelType),
 		RoleId:   gid.ToGlobalID(types.RoleModelType, nm.RoleID),
 		Namespace: &pb.MembershipNamespace{
-			Id:   nm.Namespace.ID,
 			Path: nm.Namespace.Path,
 		},
 	}

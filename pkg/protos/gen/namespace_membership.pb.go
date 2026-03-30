@@ -526,10 +526,9 @@ func (x *DeleteNamespaceMembershipRequest) GetVersion() int64 {
 // MembershipNamespace represents the namespace for a membership.
 type MembershipNamespace struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	GroupId       *string                `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3,oneof" json:"group_id,omitempty"`
-	WorkspaceId   *string                `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3,oneof" json:"workspace_id,omitempty"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	GroupId       *string                `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3,oneof" json:"group_id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3,oneof" json:"workspace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -562,13 +561,6 @@ func (x *MembershipNamespace) ProtoReflect() protoreflect.Message {
 // Deprecated: Use MembershipNamespace.ProtoReflect.Descriptor instead.
 func (*MembershipNamespace) Descriptor() ([]byte, []int) {
 	return file_namespace_membership_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *MembershipNamespace) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
 }
 
 func (x *MembershipNamespace) GetPath() string {
@@ -722,12 +714,11 @@ const file_namespace_membership_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\x03H\x00R\aversion\x88\x01\x01B\n" +
 	"\n" +
-	"\b_version\"\x9f\x01\n" +
-	"\x13MembershipNamespace\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1e\n" +
-	"\bgroup_id\x18\x03 \x01(\tH\x00R\agroupId\x88\x01\x01\x12&\n" +
-	"\fworkspace_id\x18\x04 \x01(\tH\x01R\vworkspaceId\x88\x01\x01B\v\n" +
+	"\b_version\"\x8f\x01\n" +
+	"\x13MembershipNamespace\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1e\n" +
+	"\bgroup_id\x18\x02 \x01(\tH\x00R\agroupId\x88\x01\x01\x12&\n" +
+	"\fworkspace_id\x18\x03 \x01(\tH\x01R\vworkspaceId\x88\x01\x01B\v\n" +
 	"\t_group_idB\x0f\n" +
 	"\r_workspace_id\"\xff\x02\n" +
 	"\x13NamespaceMembership\x12O\n" +
