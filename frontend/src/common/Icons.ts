@@ -6,6 +6,7 @@ import StateVersionIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import VariableIcon from '@mui/icons-material/WindowOutlined';
 import UserIcon from '@mui/icons-material/PersonOutline';
 import AnnouncementIcon from '@mui/icons-material/Campaign';
+import TharsisIcon from './TharsisIcon';
 import {
     SourceMerge as VCSProviderIcon,
     RocketLaunchOutline as RunIcon,
@@ -36,4 +37,5 @@ export {
     UserIcon,
     FederatedRegistryIcon,
     AnnouncementIcon,
+    TharsisIcon,
 };
