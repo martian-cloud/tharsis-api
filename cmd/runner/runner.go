@@ -19,9 +19,13 @@ import (
 var Version = "1.0.0"
 
 // BuildTimestamp is passed in via ldflags at build time
-var BuildTimestamp = time.Now().UTC().Format(time.RFC3339)
+var BuildTimestamp string
 
 func main() {
+	if BuildTimestamp == "" {
+		BuildTimestamp = time.Now().UTC().Format(time.RFC3339)
+	}
+
 	// create root logger tagged with server version
 	logger := logger.New().With("version", Version)
 
