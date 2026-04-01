@@ -502,16 +502,25 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 		}
 	}
 
+	deleteStartTime := time.Now()
+
 	s.logger.WithContextFields(ctx).Infow("Requested deletion of a workspace.",
 		"fullPath", workspace.FullPath,
 		"workspaceID", workspace.Metadata.ID,
+		"force", force,
+		"currentStateVersionID", workspace.CurrentStateVersionID,
 	)
 
+	stepStart := time.Now()
 	txContext, err := s.dbClient.Transactions.BeginTx(ctx)
 	if err != nil {
 		tracing.RecordError(span, err, "failed to begin DB transaction")
 		return err
 	}
+	s.logger.WithContextFields(ctx).Infow("BeginTx completed for workspace deletion.",
+		"workspaceID", workspace.Metadata.ID,
+		"duration", time.Since(stepStart).String(),
+	)
 
 	defer func() {
 		if txErr := s.dbClient.Transactions.RollbackTx(txContext); txErr != nil {
@@ -521,12 +530,23 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 
 	// The foreign key with on cascade delete should remove activity events whose target ID is this group.
 
+	stepStart = time.Now()
 	err = s.dbClient.Workspaces.DeleteWorkspace(txContext, workspace)
 	if err != nil {
+		s.logger.WithContextFields(ctx).Errorw("DeleteWorkspace DB call failed.",
+			"workspaceID", workspace.Metadata.ID,
+			"duration", time.Since(stepStart).String(),
+			"error", err,
+		)
 		tracing.RecordError(span, err, "failed to delete workspace")
 		return err
 	}
+	s.logger.WithContextFields(ctx).Infow("DeleteWorkspace DB call completed.",
+		"workspaceID", workspace.Metadata.ID,
+		"duration", time.Since(stepStart).String(),
+	)
 
+	stepStart = time.Now()
 	parentGroupPath := workspace.GetGroupPath()
 	if _, err = s.activityService.CreateActivityEvent(txContext,
 		&activityevent.CreateActivityEventInput{
@@ -540,11 +560,40 @@ func (s *service) DeleteWorkspace(ctx context.Context, workspace *models.Workspa
 				Type: string(models.TargetWorkspace),
 			},
 		}); err != nil {
+		s.logger.WithContextFields(ctx).Errorw("CreateActivityEvent failed during workspace deletion.",
+			"workspaceID", workspace.Metadata.ID,
+			"duration", time.Since(stepStart).String(),
+			"error", err,
+		)
 		tracing.RecordError(span, err, "failed to create activity event")
 		return err
 	}
+	s.logger.WithContextFields(ctx).Infow("CreateActivityEvent completed for workspace deletion.",
+		"workspaceID", workspace.Metadata.ID,
+		"duration", time.Since(stepStart).String(),
+	)
 
-	return s.dbClient.Transactions.CommitTx(txContext)
+	stepStart = time.Now()
+	if err = s.dbClient.Transactions.CommitTx(txContext); err != nil {
+		s.logger.WithContextFields(ctx).Errorw("CommitTx failed for workspace deletion.",
+			"workspaceID", workspace.Metadata.ID,
+			"duration", time.Since(stepStart).String(),
+			"error", err,
+		)
+		return err
+	}
+	s.logger.WithContextFields(ctx).Infow("CommitTx completed for workspace deletion.",
+		"workspaceID", workspace.Metadata.ID,
+		"duration", time.Since(stepStart).String(),
+	)
+
+	s.logger.WithContextFields(ctx).Infow("Workspace deletion completed successfully.",
+		"workspaceID", workspace.Metadata.ID,
+		"fullPath", workspace.FullPath,
+		"totalDuration", time.Since(deleteStartTime).String(),
+	)
+
+	return nil
 }
 
 func (s *service) CreateWorkspace(ctx context.Context, workspace *models.Workspace) (*models.Workspace, error) {
