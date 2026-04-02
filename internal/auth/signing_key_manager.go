@@ -428,7 +428,7 @@ func (s *signingKeyManager) sendKeyDecommissionAlert(ctx context.Context, decomm
 		UsersIDs: adminUserIDs,
 		Subject:  "Signing Key Decommissioning",
 		Builder: &builder.SigningKeyDecommissionEmail{
-			KeyID:                    decommissioningKey.Metadata.ID,
+			KeyID:                    decommissioningKey.GetGlobalID(),
 			DecommissioningStartedAt: *decommissioningKey.Metadata.LastUpdatedTimestamp,
 			DeletionTime:             deletionTime,
 		},
