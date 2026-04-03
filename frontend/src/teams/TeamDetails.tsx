@@ -1,6 +1,5 @@
 import React, { Suspense } from 'react';
 import { Avatar, Box, CircularProgress, Stack, Typography, useTheme } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import { PreloadedQuery, useFragment, usePreloadedQuery } from 'react-relay/hooks';
 import graphql from 'babel-plugin-relay/macro';
 import TeamMemberList from './TeamMemberList';
@@ -68,7 +67,7 @@ function TeamDetails({ queryRef }: Props) {
                                     width: 56,
                                     height: 56,
                                     marginRight: 2,
-                                    bgcolor: teal[200]
+                                    bgcolor: 'avatar.default'
                                 }}
                                 variant="rounded">{data.name[0].toUpperCase()}
                             </Avatar>

@@ -1,5 +1,4 @@
 import { alpha, Box, SxProps, Theme, useTheme } from '@mui/material';
-import { grey } from '@mui/material/colors';
 import Anser from 'anser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -80,7 +79,7 @@ function LogLine({ log, lineNumber, selected, hideLineNumber }: LogLineProps) {
             id={`L${lineNumber}`}
             preventScrollReset
             sx={{
-                color: selected ? theme.palette.primary.main : grey[500],
+                color: selected ? theme.palette.primary.main : 'grey.500',
                 marginLeft: '-48px',
                 paddingLeft: 1,
                 paddingRight: 2,

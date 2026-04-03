@@ -151,6 +151,9 @@ export default function Markdown(props: Options) {
     return (
         <Box
             sx={{
+                '&>:first-child': {
+                    marginTop: 0
+                },
                 '&>:last-child': {
                     marginBottom: 0
                 }

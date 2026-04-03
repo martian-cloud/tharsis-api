@@ -3,7 +3,6 @@ import { CircularProgress, Divider, Link as MuiLink, Paper, Tooltip, Typography,
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import { grey } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import humanizeDuration from 'humanize-duration';
 import moment from 'moment';
@@ -141,7 +140,7 @@ function RunDetailsPlanStage(props: Props) {
             moment.duration(moment(timestamps.finishedAt as moment.MomentInput).diff(moment(timestamps.runningAt as moment.MomentInput))) : null;
     }, [data.plan.currentJob]);
 
-    const planStatusType = RunStageStatusTypes[data.plan.status] ?? { label: 'unknown', color: grey[500] };
+    const planStatusType = RunStageStatusTypes[data.plan.status] ?? { label: 'unknown', color: 'runStatus.unknown' };
     const StatusIcon = planStatusType.icon;
 
     const maxDiffSizeExceeded = useMemo(() => data.plan.diffSize > MaxDiffSize, [data.plan.diffSize]);

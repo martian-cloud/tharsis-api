@@ -1,7 +1,6 @@
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import { Avatar, Box, Button, Chip, Paper, styled, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import { Fragment, useEffect, useState } from 'react';
 import Gravatar from '../../../common/Gravatar';
 
@@ -22,7 +21,7 @@ const StyledAvatar = styled(
     width: 24,
     height: 24,
     marginRight: 1,
-    backgroundColor: teal[200],
+    backgroundColor: 'avatar.default',
 }));
 
 const StyledTableRow = styled(

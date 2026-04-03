@@ -3,7 +3,6 @@ import { Divider, Link as MuiLink, Paper, Tooltip, Typography, useTheme } from '
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import { grey } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import humanizeDuration from 'humanize-duration';
 import moment from 'moment';
@@ -130,7 +129,7 @@ function RunDetailsApplyStage(props: Props) {
     const duration = timestamps?.finishedAt ?
         moment.duration(moment(timestamps.finishedAt as moment.MomentInput).diff(moment(timestamps.runningAt as moment.MomentInput))) : null;
 
-    const applyStatusType = data.apply ? (RunStageStatusTypes[data.apply?.status] ?? { label: 'unknown', color: grey[500] }) : null;
+    const applyStatusType = data.apply ? (RunStageStatusTypes[data.apply?.status] ?? { label: 'unknown', color: 'runStatus.unknown' }) : null;
     const StatusIcon = applyStatusType?.icon;
 
     return (

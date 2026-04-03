@@ -5,8 +5,6 @@ import PendingIcon from '@mui/icons-material/PauseCircleOutline';
 import InProgressIcon from '@mui/icons-material/TimelapseOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
 import { SxProps, Theme } from '@mui/material';
-import { green, grey, orange, red } from '@mui/material/colors';
-import { blue } from '@mui/material/colors';
 
 interface IconProps {
     sx?: SxProps<Theme>;
@@ -15,86 +13,86 @@ interface IconProps {
 export default {
     created: {
         label: 'Not Started',
-        color: grey[500],
-        icon: ({sx}: IconProps) => <NotStartedIcon sx={{ ...sx, color: grey[500] }} />,
+        color: 'runStatus.created',
+        icon: ({sx}: IconProps) => <NotStartedIcon sx={{ ...sx, color: 'runStatus.created' }} />,
         tooltip: 'has not started'
     },
     canceled: {
         label: 'Canceled',
-        color: red[500],
-        icon: ({sx}: IconProps) => <WarningIcon sx={{ ...sx, color: red[500] }} />,
+        color: 'runStatus.canceled',
+        icon: ({sx}: IconProps) => <WarningIcon sx={{ ...sx, color: 'runStatus.canceled' }} />,
         tooltip: 'was canceled while in progress'
     },
     errored: {
         label: 'Failed',
-        color: red[500],
-        icon: ({sx}: IconProps) => <ErrorIcon sx={{ ...sx, color: red[500] }} />,
+        color: 'runStatus.errored',
+        icon: ({sx}: IconProps) => <ErrorIcon sx={{ ...sx, color: 'runStatus.errored' }} />,
         tooltip: 'returned an error'
     },
     finished: {
         label: 'Completed',
-        color: green[400],
-        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: green[400] }} />,
+        color: 'runStatus.finished',
+        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: 'runStatus.finished' }} />,
         tooltip: 'has completed'
     },
     pending: {
         label: 'Pending',
-        color: orange[500],
-        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: orange[500] }} />,
+        color: 'runStatus.pending',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.pending' }} />,
         tooltip: 'is pending'
     },
     queued: {
         label: 'Queued',
-        color: orange[500],
-        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: orange[500] }} />,
+        color: 'runStatus.queued',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.queued' }} />,
         tooltip: 'is queued'
     },
     running: {
         label: 'In Progress',
-        color: blue[500],
-        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: blue[500] }} />,
+        color: 'runStatus.running',
+        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: 'runStatus.running' }} />,
         tooltip: 'is in progress'
     },
     applied: {
         label: 'Applied',
-        color: green[400],
-        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: green[400] }} />,
+        color: 'runStatus.applied',
+        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: 'runStatus.applied' }} />,
         tooltip: 'has applied'
     },
     apply_queued: {
         label: 'Apply Queued',
-        color: orange[500],
-        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: orange[500] }} />,
+        color: 'runStatus.apply_queued',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.apply_queued' }} />,
         tooltip: 'is queued'
     },
     applying: {
         label: 'Applying',
-        color: blue[500],
-        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: blue[500] }} />,
+        color: 'runStatus.applying',
+        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: 'runStatus.applying' }} />,
         tooltip: 'is applying'
     },
     plan_queued: {
         label: 'Plan Queued',
-        color: orange[500],
-        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: orange[500] }} />,
+        color: 'runStatus.plan_queued',
+        icon: ({sx}: IconProps) => <PendingIcon sx={{ ...sx, color: 'runStatus.plan_queued' }} />,
         tooltip: 'is queued'
     },
     planned: {
         label: 'Applying',
-        color: blue[500],
-        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: blue[500] }} />,
+        color: 'runStatus.planned',
+        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: 'runStatus.planned' }} />,
         tooltip: 'is planned'
     },
     planned_and_finished: {
         label: 'Planned and Finished',
-        color: green[400],
-        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: green[400] }} />,
+        color: 'runStatus.planned_and_finished',
+        icon: ({sx}: IconProps) => <CheckCircleIcon sx={{ ...sx, color: 'runStatus.planned_and_finished' }} />,
         tooltip: 'has planned and finished'
     },
     planning: {
         label: 'Planning',
-        color: blue[500],
-        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: blue[500] }} />,
+        color: 'runStatus.planning',
+        icon: ({sx}: IconProps) => <InProgressIcon sx={{ ...sx, color: 'runStatus.planning' }} />,
         tooltip: 'is planning'
     }
 } as any;

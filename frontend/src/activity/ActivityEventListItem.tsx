@@ -1,5 +1,4 @@
 import { Avatar, Box, ListItem, ListItemIcon, Typography, useTheme } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import Gravatar from '../common/Gravatar';
@@ -57,7 +56,7 @@ function ActivityEventListItem({ fragmentRef, icon, primary, secondary }: Props)
                         {data.initiator.__typename === 'User' && <Gravatar width={18} height={18} email={data.initiator.email} />}
                         {data.initiator.__typename === 'ServiceAccount' && <Avatar
                             variant="rounded"
-                            sx={{ width: 18, height: 18, bgcolor: teal[200], fontSize: 14, fontWeight: 500 }}
+                            sx={{ width: 18, height: 18, bgcolor: 'avatar.default', fontSize: 14, fontWeight: 500 }}
                         >
                             {data.initiator.name[0].toUpperCase()}
                         </Avatar>}

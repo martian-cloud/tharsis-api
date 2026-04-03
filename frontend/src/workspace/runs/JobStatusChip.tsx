@@ -1,28 +1,13 @@
 import { Chip } from '@mui/material';
-import { blue } from '@mui/material/colors';
-import { green } from '@mui/material/colors';
-import { grey } from '@mui/material/colors';
-import { orange } from '@mui/material/colors';
+import { useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 
-export const JOB_STATUS_TYPES = {
-    "finished": {
-        label: "Completed",
-        color: green[500]
-    },
-    "running": {
-        label: "In Progress",
-        color: blue[500]
-    },
-    "pending": {
-        label: "Pending",
-        color: orange[500]
-    },
-    "queued": {
-        label: "Queued",
-        color: orange[500]
-    },
-} as any;
+const JOB_STATUS_MAP: Record<string, { label: string }> = {
+    finished: { label: 'Completed' },
+    running: { label: 'In Progress' },
+    pending: { label: 'Pending' },
+    queued: { label: 'Queued' },
+};
 
 interface Props {
     to?: string
@@ -31,7 +16,13 @@ interface Props {
 }
 
 function JobStatusChip({ to, status, onClick }: Props) {
-    const type = JOB_STATUS_TYPES[status] ?? { label: 'Unknown', color: grey[500] }
+    const theme = useTheme();
+    const entry = JOB_STATUS_MAP[status];
+    const color = entry
+        ? theme.palette.runStatus[status as keyof typeof theme.palette.runStatus]
+        : theme.palette.runStatus.unknown;
+    const label = entry?.label ?? 'Unknown';
+
     return to ? (
         <Chip
             to={to}
@@ -39,8 +30,8 @@ function JobStatusChip({ to, status, onClick }: Props) {
             clickable
             size="small"
             variant="outlined"
-            label={type.label}
-            sx={{ color: type.color, borderColor: type.color, fontWeight: 500 }}
+            label={label}
+            sx={{ color, borderColor: color, fontWeight: 500 }}
         />
     ) : (
         <Chip
@@ -48,8 +39,8 @@ function JobStatusChip({ to, status, onClick }: Props) {
             clickable
             size="small"
             variant="outlined"
-            label={type.label}
-            sx={{ color: type.color, borderColor: type.color, fontWeight: 500 }}
+            label={label}
+            sx={{ color, borderColor: color, fontWeight: 500 }}
         />
     );
 }

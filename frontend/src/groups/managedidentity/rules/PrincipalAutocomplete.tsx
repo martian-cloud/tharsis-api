@@ -2,7 +2,6 @@ import TeamIcon from '@mui/icons-material/PeopleOutline';
 import UserIcon from '@mui/icons-material/PersonOutline';
 import { Autocomplete, Avatar, Box, ListItem, ListItemText, styled, TextField, useTheme } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress';
-import { teal } from '@mui/material/colors';
 import match from 'autosuggest-highlight/match';
 import parse from 'autosuggest-highlight/parse';
 import graphql from 'babel-plugin-relay/macro';
@@ -53,7 +52,7 @@ const StyledAvatar = styled(
 )(() => ({
     width: 24,
     height: 24,
-    backgroundColor: teal[200],
+    backgroundColor: 'avatar.default',
 }))
 
 function PrincipalAutocomplete(props: Props) {

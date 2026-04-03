@@ -6,7 +6,6 @@ import graphql from 'babel-plugin-relay/macro';
 import React, { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { RunDetailsPlanSummaryFragment_plan$key } from './__generated__/RunDetailsPlanSummaryFragment_plan.graphql';
-import planDiffColors from './plandiff/RunDetailsPlanDiffColors';
 
 const planSummaryLabels = {
     resourceAdditions: {
@@ -44,14 +43,14 @@ const planSummaryLabels = {
 };
 
 const planSummaryColors = {
-    resourceAdditions: planDiffColors.create,
-    resourceChanges: planDiffColors.update,
-    resourceDestructions: planDiffColors.delete,
-    resourceImports: planDiffColors.import,
-    resourceDrift: planDiffColors.drift,
-    outputAdditions: planDiffColors.create,
-    outputChanges: planDiffColors.update,
-    outputDestructions: planDiffColors.delete
+    resourceAdditions: 'planDiff.create',
+    resourceChanges: 'planDiff.update',
+    resourceDestructions: 'planDiff.delete',
+    resourceImports: 'planDiff.import',
+    resourceDrift: 'planDiff.drift',
+    outputAdditions: 'planDiff.create',
+    outputChanges: 'planDiff.update',
+    outputDestructions: 'planDiff.delete'
 };
 
 function InfoIcon({ text }: { text: string }) {
@@ -145,7 +144,10 @@ function RunDetailsPlanStageSummary({ fragmentRef, ml, mr, completed }: Props) {
                             label={`+${item.value}`}
                             size="small"
                             variant="outlined"
-                            sx={{ color: item.color, backgroundColor: alpha(item.color, 0.1) }}
+                            sx={(theme) => {
+                                const resolved = item.color.split('.').reduce((obj: any, key: string) => obj?.[key], theme.palette) as string;
+                                return { color: item.color, backgroundColor: alpha(resolved, 0.1) };
+                            }}
                         />
                     </SummaryRowCol>
                 ))}

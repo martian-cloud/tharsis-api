@@ -1,7 +1,6 @@
 import { Avatar, Box, Stack, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
 import ListItemButton from '@mui/material/ListItemButton';
-import { teal } from '@mui/material/colors';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
@@ -48,7 +47,7 @@ function WorkspaceSearchListItem(props: Props) {
             }}
         >
             <Box flex={1} display="flex" alignItems="center">
-                <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: teal[200] }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+                <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
                 <Box sx={{
                     display: 'flex',
                     flexDirection: 'column',

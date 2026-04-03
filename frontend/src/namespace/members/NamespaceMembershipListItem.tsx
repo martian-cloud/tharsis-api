@@ -3,7 +3,6 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import { Avatar, Box, Button, Stack } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
-import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
@@ -111,13 +110,13 @@ function NamespaceMembershipListItem(props: Props) {
                         <Box>{data.member?.username}</Box>
                     </React.Fragment>}
                     {type === 'Team' && <React.Fragment>
-                        <Avatar variant="rounded" sx={{ width: 24, height: 24, bgcolor: teal[200], fontSize: 14, marginRight: 1 }}>
+                        <Avatar variant="rounded" sx={{ width: 24, height: 24, bgcolor: 'avatar.default', fontSize: 14, marginRight: 1 }}>
                             {(data.member?.name ?? '')[0].toUpperCase()}
                         </Avatar>
                         <Box>{data.member?.name}</Box>
                     </React.Fragment>}
                     {type === 'ServiceAccount' && <React.Fragment>
-                        <Avatar variant="rounded" sx={{ width: 24, height: 24, bgcolor: teal[200], fontSize: 14, marginRight: 1 }}>
+                        <Avatar variant="rounded" sx={{ width: 24, height: 24, bgcolor: 'avatar.default', fontSize: 14, marginRight: 1 }}>
                             {data.member?.name[0].toUpperCase()}
                         </Avatar>
                         <Box>

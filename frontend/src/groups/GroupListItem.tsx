@@ -1,5 +1,4 @@
 import { Avatar, Box, Stack, Typography } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import Link from '@mui/material/Link';
 import ListItemButton from '@mui/material/ListItemButton';
 import { useTheme } from '@mui/material/styles';
@@ -40,7 +39,7 @@ function GroupListItem(props: Props) {
         <ListItemButton
             divider={!last}
             component={LinkRouter} to={`/groups/${data.fullPath}`}>
-            <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: teal[200] }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+            <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
             <Box sx={{
                 display: 'flex',
                 flexDirection: 'column',

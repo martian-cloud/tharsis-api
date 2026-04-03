@@ -1,6 +1,5 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Alert, Avatar, Box, Button, IconButton, List, ListItem, ListItemText, Stack, styled, Typography } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { useTheme } from '@mui/material/styles';
@@ -18,7 +17,7 @@ const StyledAvatar = styled(
     width: 24,
     height: 24,
     marginRight: 2,
-    backgroundColor: teal[200],
+    backgroundColor: 'avatar.default',
 }));
 
 const RUN_STAGES = [
