@@ -1,7 +1,6 @@
 import { ArrowDropUp } from '@mui/icons-material';
 import { default as ArrowDropDown, default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown';
 import { Alert, Box, Button, ButtonGroup, Chip, Collapse, Link, Menu, MenuItem, Stack, Tab, Tabs, Typography, useTheme } from "@mui/material";
-import { green } from "@mui/material/colors";
 import graphql from 'babel-plugin-relay/macro';
 import moment from 'moment';
 import { useSnackbar } from 'notistack';
@@ -208,7 +207,7 @@ function RunnerDetails({ fragmentRef, getConnections }: Props) {
                 }
             }}>
                 <Box display="flex" alignItems="center" mb={2}>
-                    <RunnerIcon sx={{ color: active ? green[400] : null, mr: 2 }} />
+                    <RunnerIcon sx={{ color: active ? 'success.main' : null, mr: 2 }} />
                     <Box>
                         <Typography variant="h5">
                             {runner.name}

@@ -1,7 +1,6 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import { Chip, List, Link as MuiLink, Stack, Tooltip, Typography, Button } from '@mui/material';
 import Box from '@mui/material/Box';
-import { red } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -174,7 +173,7 @@ function RunDetailsSidebar(props: Props) {
                 <Box marginBottom={3}>
                     <Typography sx={{ marginBottom: 1 }}>Type</Typography>
                     {!data.isDestroy && data.apply && <Chip size="small" label="Apply" />}
-                    {data.isDestroy && <Chip size="small" label="Destroy" sx={{ color: red[500] }} />}
+                    {data.isDestroy && <Chip size="small" label="Destroy" sx={{ color: 'runStatus.destroy' }} />}
                     {!data.apply && <Chip size="small" label={data.assessment ? "Assessment" : "Speculative"} />}
                 </Box>
                 <Box marginBottom={3}>

@@ -1,5 +1,4 @@
 import { Avatar, Box, ListItemButton, ListItemText, Typography, useTheme } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useFragment } from "react-relay/hooks";
 import { Link as RouterLink } from 'react-router-dom';
@@ -40,7 +39,7 @@ function ServiceAccountListItem({ fragmentRef, inherited }: Props) {
                     borderBottomRightRadius: 4
                 }
             }}>
-            <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: teal[200], marginRight: 2 }}>
+            <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'avatar.default', marginRight: 2 }}>
                 {data.name[0].toUpperCase()}
             </Avatar>
             <ListItemText

@@ -10,7 +10,6 @@ import {
     Typography,
     useTheme
 } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import match from 'autosuggest-highlight/match';
 import parse from 'autosuggest-highlight/parse';
 import graphql from 'babel-plugin-relay/macro';
@@ -136,7 +135,7 @@ const ICON_GENERATORS = {
     Group: (): React.ReactNode => <GroupIcon color="disabled" />,
     Workspace: (): React.ReactNode => <WorkspaceIcon color="disabled" />,
     Team: (result: TeamResult): React.ReactNode => <Avatar
-        sx={{ width: 32, height: 32, bgcolor: teal[200] }}
+        sx={{ width: 32, height: 32, bgcolor: 'avatar.default' }}
         variant="rounded"
     >{result.name[0].toUpperCase()}</Avatar>,
     TerraformModule: (): React.ReactNode => <TerraformIcon color="disabled" />,

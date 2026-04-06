@@ -3,7 +3,6 @@ import MembersIcon from '@mui/icons-material/PeopleOutline';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import VariablesIcon from '@mui/icons-material/WindowOutlined';
 import { Avatar, Box, List, ListItem, ListItemAvatar, ListItemIcon, ListItemText, ListItemButton, Typography, useMediaQuery, useTheme } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import { Link } from 'react-router-dom';
 import Drawer from '../common/Drawer';
 import { AccountLockOutline as ManagedIdentityIcon, LanConnect as ServiceAccountIcon, KeyVariant as KeyIcon, SourceMerge as VCSProviderIcon, RobotOutline as RunnersIcon, ServerNetwork as FederatedRegistryIcon, CubeOutline as TerraformModuleIcon, RocketLaunchOutline as RunIcon, ContentDuplicate as ProviderMirrorIcon } from 'mdi-material-ui';
@@ -53,7 +52,7 @@ function GroupDetailsDrawer(props: Props) {
                         to={`/groups/${groupPath}`}
                     >
                         <ListItemAvatar>
-                            <Avatar sx={{ width: 24, height: 24, bgcolor: teal[200] }} variant="rounded">{groupName[0].toUpperCase()}</Avatar>
+                            <Avatar sx={{ width: 24, height: 24, bgcolor: 'avatar.default' }} variant="rounded">{groupName[0].toUpperCase()}</Avatar>
                         </ListItemAvatar>
                         <ListItemText primary={groupName} />
                     </ListItemButton>

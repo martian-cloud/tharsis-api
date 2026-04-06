@@ -1,7 +1,6 @@
 import CopyIcon from '@mui/icons-material/ContentCopy';
 import StateIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import { Alert, AlertTitle, Avatar, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { CubeOutline as ModuleIcon } from 'mdi-material-ui';
 import React, { useState } from 'react';
@@ -191,7 +190,7 @@ function WorkspaceDetailsIndex(props: Props) {
                     }
                 }}>
                 <Box display="flex" alignItems="center">
-                    <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: teal[200] }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+                    <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
                     <Stack>
                         <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>
                         <Typography color="textSecondary" variant="subtitle2">{data.description}</Typography>

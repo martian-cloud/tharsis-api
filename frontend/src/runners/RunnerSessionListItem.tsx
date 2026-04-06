@@ -1,5 +1,4 @@
 import { Box, Chip, ListItem, Typography, useTheme } from '@mui/material';
-import { green, grey } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import moment from 'moment';
 import { useFragment } from 'react-relay/hooks';
@@ -40,7 +39,7 @@ function RunnerSessionListItem({ fragmentRef, onClick }: Props) {
             }}>
             <Box display="flex" alignItems="center" justifyContent="space-between" flex={1} padding={1}>
                 <Box display="flex" alignItems="center">
-                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: data.active ? green[400] : grey[400], mr: 2 }} />
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: data.active ? 'success.main' : 'runStatus.unknown', mr: 2 }} />
                     <Box>
                         <Box display="flex" alignItems="center">
                             <Box sx={{ textDecoration: 'none', minWidth: 100 }}>

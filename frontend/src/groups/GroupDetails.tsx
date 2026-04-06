@@ -1,7 +1,6 @@
 import { TabContext, TabList } from '@mui/lab';
 import MuiTabPanel, { TabPanelProps } from '@mui/lab/TabPanel';
 import { Avatar, Box, Button, CircularProgress, Stack, styled, Typography } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import { TabProps } from '@mui/material/Tab';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useEffect, useState } from 'react';
@@ -231,7 +230,7 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
                     }
                 }}>
                     <Box display="flex" marginBottom={4} alignItems="center">
-                        <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: teal[200] }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+                        <Avatar sx={{ width: 56, height: 56, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
                         <Stack>
                             <Typography noWrap variant="h5" sx={{ maxWidth: 400, fontWeight: "bold" }}>{data.name}</Typography>
                             <Typography color="textSecondary" variant="subtitle2">{data.description}</Typography>

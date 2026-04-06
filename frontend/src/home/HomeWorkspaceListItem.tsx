@@ -1,5 +1,4 @@
 import { Avatar, ListItemButton, ListItemText, Tooltip, Typography } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
@@ -41,7 +40,7 @@ function HomeWorkspaceListItem({ fragmentRef, last }: Props) {
                     width: 24,
                     height: 24,
                     mr: 2,
-                    bgcolor: teal[200]
+                    bgcolor: 'avatar.default'
                 }}
                 variant="rounded">{data.name[0].toUpperCase()}
             </Avatar>

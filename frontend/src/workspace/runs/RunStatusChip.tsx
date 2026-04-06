@@ -1,54 +1,20 @@
 import { Chip } from '@mui/material';
-import { blue } from '@mui/material/colors';
-import { green } from '@mui/material/colors';
-import { grey } from '@mui/material/colors';
-import { orange } from '@mui/material/colors';
-import { red } from '@mui/material/colors';
+import { useTheme } from '@mui/material/styles';
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
-const RUN_STATUS_TYPES = {
-  "applied": {
-    label: "Complete",
-    color: green[500]
-  },
-  "apply_queued": {
-    label: "Apply Queued",
-    color: orange[500]
-  },
-  "applying": {
-    label: "Applying",
-    color: blue[500]
-  },
-  "canceled": {
-    label: "Canceled",
-    color: red[500]
-  },
-  "errored": {
-    label: "Errored",
-    color: red[500]
-  },
-  "pending": {
-    label: "Pending",
-    color: orange[500]
-  },
-  "plan_queued": {
-    label: "Plan Queued",
-    color: orange[500]
-  },
-  "planned": {
-    label: "Plan Created",
-    color: green[400]
-  },
-  "planned_and_finished": {
-    label: "Complete",
-    color: green[400]
-  },
-  "planning": {
-    label: "Planning",
-    color: blue[500]
-  }
-} as any;
+const STATUS_MAP: Record<string, { label: string }> = {
+  applied: { label: 'Complete' },
+  apply_queued: { label: 'Apply Queued' },
+  applying: { label: 'Applying' },
+  canceled: { label: 'Canceled' },
+  errored: { label: 'Errored' },
+  pending: { label: 'Pending' },
+  plan_queued: { label: 'Plan Queued' },
+  planned: { label: 'Plan Created' },
+  planned_and_finished: { label: 'Complete' },
+  planning: { label: 'Planning' },
+};
 
 interface Props {
   to: string
@@ -56,7 +22,13 @@ interface Props {
 }
 
 function RunStatusChip(props: Props) {
-  const type = RUN_STATUS_TYPES[props.status] ?? { label: 'unknown', color: grey[500] }
+  const theme = useTheme();
+  const entry = STATUS_MAP[props.status];
+  const color = entry
+    ? theme.palette.runStatus[props.status as keyof typeof theme.palette.runStatus]
+    : theme.palette.runStatus.unknown;
+  const label = entry?.label ?? 'unknown';
+
   return (
     <Chip
       to={props.to}
@@ -64,8 +36,8 @@ function RunStatusChip(props: Props) {
       clickable
       size="small"
       variant="outlined"
-      label={type.label}
-      sx={{ color: type.color, borderColor: type.color, fontWeight: 500 }}
+      label={label}
+      sx={{ color, borderColor: color, fontWeight: 500 }}
     />
   );
 }

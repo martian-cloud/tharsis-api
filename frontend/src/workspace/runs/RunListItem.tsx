@@ -3,8 +3,6 @@ import Chip from '@mui/material/Chip';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
-import { teal } from '@mui/material/colors';
-import { red } from '@mui/material/colors';
 import Box from '@mui/system/Box';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
@@ -74,7 +72,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
                 sx={{
                     width: 24,
                     height: 24,
-                    bgcolor: teal[200],
+                    bgcolor: 'avatar.default',
                     fontSize: 14,
                     fontWeight: 500
                 }}>
@@ -103,7 +101,7 @@ function RunListItem({ runFragment, displayWorkspacePath, mobile, last }: Props)
             </TableCell>}
             <TableCell>
                 {!data.isDestroy && data.apply && <Chip size="small" label="Apply" />}
-                {data.isDestroy && <Chip size="small" label="Destroy" sx={{ color: red[500] }} />}
+                {data.isDestroy && <Chip size="small" label="Destroy" sx={{ color: 'runStatus.destroy' }} />}
                 {!data.apply && <Chip size="small" label={data.assessment ? "Assessment" : "Speculative"} />}
             </TableCell>
             <TableCell>

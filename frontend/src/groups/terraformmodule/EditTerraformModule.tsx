@@ -44,7 +44,7 @@ function EditTerraformModule(props: Props) {
                 }
             }
         }
-    `, { registryNamespace: group.fullPath, moduleName: name as string, system: system as string });
+    `, { registryNamespace: group.fullPath.split('/')[0], moduleName: name as string, system: system as string });
 
     const [commit, isInFlight] = useMutation<EditTerraformModuleMutation>(graphql`
         mutation EditTerraformModuleMutation($input: UpdateTerraformModuleInput!) {

@@ -2,7 +2,6 @@ import { default as ArrowDropDownIcon } from '@mui/icons-material/ArrowDropDown'
 import { Alert, Avatar, ButtonGroup, Chip, Menu, MenuItem, Paper, Stack, Tab, Tabs, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import { teal } from '@mui/material/colors';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import moment, { Moment } from 'moment';
@@ -213,7 +212,7 @@ function ServiceAccountDetails(props: Props) {
                 )}
                 <Box display="flex" justifyContent="space-between" marginBottom={2}>
                     <Box display="flex" alignItems="center">
-                        <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: teal[200] }}>
+                        <Avatar variant="rounded" sx={{ width: 32, height: 32, marginRight: 1, bgcolor: 'avatar.default' }}>
                             {data.serviceAccount.name[0].toUpperCase()}
                         </Avatar>
                         <Box>

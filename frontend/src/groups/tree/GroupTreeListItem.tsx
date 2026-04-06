@@ -1,6 +1,5 @@
 import ExpandIcon from '@mui/icons-material/ExpandMore';
 import { Avatar, Box, Paper, Stack, Typography } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import { useTheme } from '@mui/material/styles';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useState } from 'react';
@@ -48,7 +47,7 @@ function GroupTreeListItem(props: Props) {
                 sx={{ cursor: 'pointer', '&:hover': { boxShadow: 1 } }}
             >
                 <Box display="flex" padding={1} alignItems="center" justifyContent="space-between">
-                    <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: teal[200] }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
+                    <Avatar sx={{ width: 32, height: 32, marginRight: 2, bgcolor: 'avatar.default' }} variant="rounded">{data.name[0].toUpperCase()}</Avatar>
                     <Box display="flex" justifyContent="space-between" alignItems="center" flex={1}>
                         <Box sx={{
                             display: 'flex',

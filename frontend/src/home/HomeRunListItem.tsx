@@ -10,7 +10,6 @@ import {
     Tooltip,
     Typography
 } from '@mui/material';
-import { teal } from '@mui/material/colors';
 import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
@@ -68,7 +67,7 @@ function HomeRunListItem({ fragmentRef, last }: Props) {
                 sx={{
                     width: 20,
                     height: 20,
-                    bgcolor: teal[200],
+                    bgcolor: 'avatar.default',
                     fontSize: 14,
                     fontWeight: 500
                 }}>
