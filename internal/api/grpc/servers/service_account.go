@@ -3,7 +3,6 @@ package servers
 
 import (
 	"context"
-	"strings"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -257,11 +256,9 @@ func toPBServiceAccount(sa *models.ServiceAccount) *pb.ServiceAccount {
 func toPBOIDCTrustPolicies(policies []models.OIDCTrustPolicy) []*pb.OIDCTrustPolicy {
 	pbPolicies := make([]*pb.OIDCTrustPolicy, len(policies))
 	for i, policy := range policies {
-		boundClaimType := pb.BoundClaimsType(pb.BoundClaimsType_value[string(policy.BoundClaimsType)])
-
 		pbPolicies[i] = &pb.OIDCTrustPolicy{
 			Issuer:          policy.Issuer,
-			BoundClaimsType: &boundClaimType,
+			BoundClaimsType: pb.BoundClaimsType(pb.BoundClaimsType_value[string(policy.BoundClaimsType)]),
 			BoundClaims:     policy.BoundClaims,
 		}
 	}
@@ -274,7 +271,7 @@ func fromPBOIDCTrustPolicies(pbPolicies []*pb.OIDCTrustPolicy) []models.OIDCTrus
 	for i, pbPolicy := range pbPolicies {
 		policies[i] = models.OIDCTrustPolicy{
 			Issuer:          pbPolicy.Issuer,
-			BoundClaimsType: models.BoundClaimsType(strings.ToLower(pbPolicy.GetBoundClaimsType().String())),
+			BoundClaimsType: models.BoundClaimsType(pbPolicy.GetBoundClaimsType().String()),
 			BoundClaims:     pbPolicy.BoundClaims,
 		}
 	}

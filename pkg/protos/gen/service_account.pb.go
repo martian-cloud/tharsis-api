@@ -593,7 +593,7 @@ func (x *CreateClientCredentialsTokenRequest) GetClientSecret() string {
 type OIDCTrustPolicy struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Issuer          string                 `protobuf:"bytes,1,opt,name=issuer,proto3" json:"issuer,omitempty"`
-	BoundClaimsType *BoundClaimsType       `protobuf:"varint,2,opt,name=bound_claims_type,json=boundClaimsType,proto3,enum=martiancloud.tharsis.api.service_account.BoundClaimsType,oneof" json:"bound_claims_type,omitempty"`
+	BoundClaimsType BoundClaimsType        `protobuf:"varint,2,opt,name=bound_claims_type,json=boundClaimsType,proto3,enum=martiancloud.tharsis.api.service_account.BoundClaimsType" json:"bound_claims_type,omitempty"`
 	BoundClaims     map[string]string      `protobuf:"bytes,3,rep,name=bound_claims,json=boundClaims,proto3" json:"bound_claims,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -637,8 +637,8 @@ func (x *OIDCTrustPolicy) GetIssuer() string {
 }
 
 func (x *OIDCTrustPolicy) GetBoundClaimsType() BoundClaimsType {
-	if x != nil && x.BoundClaimsType != nil {
-		return *x.BoundClaimsType
+	if x != nil {
+		return x.BoundClaimsType
 	}
 	return BoundClaimsType_STRING
 }
@@ -959,15 +959,14 @@ const file_service_account_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\tR\x05token\"g\n" +
 	"#CreateClientCredentialsTokenRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12#\n" +
-	"\rclient_secret\x18\x02 \x01(\tR\fclientSecret\"\xda\x02\n" +
+	"\rclient_secret\x18\x02 \x01(\tR\fclientSecret\"\xbf\x02\n" +
 	"\x0fOIDCTrustPolicy\x12\x16\n" +
-	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12j\n" +
-	"\x11bound_claims_type\x18\x02 \x01(\x0e29.martiancloud.tharsis.api.service_account.BoundClaimsTypeH\x00R\x0fboundClaimsType\x88\x01\x01\x12m\n" +
+	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12e\n" +
+	"\x11bound_claims_type\x18\x02 \x01(\x0e29.martiancloud.tharsis.api.service_account.BoundClaimsTypeR\x0fboundClaimsType\x12m\n" +
 	"\fbound_claims\x18\x03 \x03(\v2J.martiancloud.tharsis.api.service_account.OIDCTrustPolicy.BoundClaimsEntryR\vboundClaims\x1a>\n" +
 	"\x10BoundClaimsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x14\n" +
-	"\x12_bound_claims_type\"\xf1\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf1\x03\n" +
 	"\x0eServiceAccount\x12O\n" +
 	"\bmetadata\x18\x01 \x01(\v23.martiancloud.tharsis.api.metadata.ResourceMetadataR\bmetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1093,7 +1092,6 @@ func file_service_account_proto_init() {
 	file_service_account_proto_msgTypes[2].OneofWrappers = []any{}
 	file_service_account_proto_msgTypes[3].OneofWrappers = []any{}
 	file_service_account_proto_msgTypes[4].OneofWrappers = []any{}
-	file_service_account_proto_msgTypes[7].OneofWrappers = []any{}
 	file_service_account_proto_msgTypes[8].OneofWrappers = []any{}
 	file_service_account_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}

@@ -1109,7 +1109,7 @@ func (s *service) GetProviderPlatforms(ctx context.Context, input *GetProviderPl
 
 	// Verify at least one filter is set
 	if input.ProviderID == nil && input.ProviderVersionID == nil {
-		return nil, errors.New("the provider id or provider version id filter must be set when querying for provider platforms")
+		return nil, errors.New("the provider id or provider version id filter must be set when querying for provider platforms", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	var provider *models.TerraformProvider
