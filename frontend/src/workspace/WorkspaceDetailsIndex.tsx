@@ -17,6 +17,7 @@ import WorkspaceDetailsCurrentJob from './WorkspaceDetailsCurrentJob';
 import WorkspaceDetailsEmpty from './WorkspaceDetailsEmpty';
 import { WorkspaceDetailsIndexFragment_workspace$key } from './__generated__/WorkspaceDetailsIndexFragment_workspace.graphql';
 import { WorkspaceDetailsIndex_DestroyWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_DestroyWorkspaceMutation.graphql';
+import { WorkspaceDetailsIndex_ReconcileWorkspaceMutation } from './__generated__/WorkspaceDetailsIndex_ReconcileWorkspaceMutation.graphql';
 import LabelList from './labels/LabelList';
 import RunStatusChip from './runs/RunStatusChip';
 import StateVersionDependencies from './state/StateVersionDependencies';
@@ -40,6 +41,7 @@ function WorkspaceDetailsIndex(props: Props) {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [showDestroyRunConfirmationDialog, setShowDestroyRunConfirmationDialog] = useState<boolean>(false);
+    const [showReconcileDialog, setShowReconcileDialog] = useState(false);
     const [error, setError] = useState<MutationError>();
 
     const tab = searchParams.get('tab') ?? 'resources';
@@ -167,6 +169,54 @@ function WorkspaceDetailsIndex(props: Props) {
         setShowDestroyRunConfirmationDialog(false);
     };
 
+    const [commitReconcile, isReconcileInFlight] = useMutation<WorkspaceDetailsIndex_ReconcileWorkspaceMutation>(graphql`
+        mutation WorkspaceDetailsIndex_ReconcileWorkspaceMutation($input: ReconcileWorkspaceInput!) {
+            reconcileWorkspace(input: $input) {
+                run {
+                    id
+                }
+                problems {
+                    message
+                    field
+                    type
+                }
+            }
+        }`)
+
+    const onReconcileDialogClosed = (confirm?: boolean) => {
+        if (confirm) {
+            commitReconcile({
+                variables: {
+                    input: {
+                        workspaceId: data.id
+                    }
+                },
+                onCompleted: data => {
+                    if (data.reconcileWorkspace.problems.length) {
+                        setError({
+                            severity: 'warning',
+                            message: data.reconcileWorkspace.problems.map(problem => problem.message).join('; ')
+                        })
+                    } else if (!data.reconcileWorkspace.run) {
+                        setError({
+                            severity: 'error',
+                            message: "Unexpected error occurred"
+                        })
+                    } else {
+                        setShowReconcileDialog(false);
+                    }
+                },
+                onError: error => {
+                    setError({
+                        severity: 'error',
+                        message: error.message
+                    })
+                }
+            })
+        }
+        setShowReconcileDialog(false);
+    };
+
     const onTabChange = (event: React.SyntheticEvent, newValue: string) => {
         navigate({
             search: `?tab=${newValue}`
@@ -195,7 +245,7 @@ function WorkspaceDetailsIndex(props: Props) {
                         <Typography variant="h5" sx={{ fontWeight: "bold" }}>{data.name}</Typography>
                         <Typography color="textSecondary" variant="subtitle2">{data.description}</Typography>
                         {data.labels && data.labels.length > 0 && (
-                            <Box sx={{ mt: 1 }}>
+                            <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-end" }}>
                                 <LabelList
                                     labels={[...data.labels]}
                                     size="small"
@@ -242,6 +292,21 @@ function WorkspaceDetailsIndex(props: Props) {
                     severity='warning'>
                     <AlertTitle>Drift detected</AlertTitle>
                     {DRIFT_ALERT_DESCRIPTION}
+                    <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-end" }}>
+                        <Tooltip
+                            title="Creates a new apply run using the last applied configuration to reconcile the detected drift"
+                            placement="bottom"
+                        >
+                            <Button
+                                variant="outlined"
+                                color="warning"
+                                size="small"
+                                onClick={() => setShowReconcileDialog(true)}
+                            >
+                                Reconcile Workspace Drift
+                            </Button>
+                        </Tooltip>
+                    </Box>
                 </Alert>
             }
 
@@ -360,6 +425,18 @@ function WorkspaceDetailsIndex(props: Props) {
                         This operation will use the same module or configuration version that created the current workspace state. Any variables used in
                         the most recent successful apply operation will automatically be included. The created plan will have to be applied manually.
                     </Alert>
+                </ConfirmationDialog>
+            )}
+            {showReconcileDialog && (
+                <ConfirmationDialog
+                    title="Reconcile Workspace Drift"
+                    confirmLabel="Confirm"
+                    confirmColor="primary"
+                    confirmInProgress={isReconcileInFlight}
+                    onConfirm={() => onReconcileDialogClosed(true)}
+                    onClose={() => onReconcileDialogClosed()}
+                >
+                    Are you sure you want to reconcile the workspace drift?
                 </ConfirmationDialog>
             )}
         </Box>

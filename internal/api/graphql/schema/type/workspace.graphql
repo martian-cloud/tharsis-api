@@ -52,6 +52,12 @@ type DestroyWorkspacePayload {
   problems: [Problem!]!
 }
 
+type ReconcileWorkspacePayload {
+  clientMutationId: String
+  run: Run
+  problems: [Problem!]!
+}
+
 type AssessWorkspacePayload {
   clientMutationId: String
   run: Run
@@ -245,6 +251,11 @@ input DestroyWorkspaceInput {
     @deprecated(
       reason: "Use workspaceId field instead, which accepts a TRN (Tharsis Resource Name)"
     )
+}
+
+input ReconcileWorkspaceInput {
+  clientMutationId: String
+  workspaceId: String!
 }
 
 input AssessWorkspaceInput {

@@ -144,6 +144,18 @@ func (r RootResolver) DestroyWorkspace(ctx context.Context,
 	return response, nil
 }
 
+// ReconcileWorkspace creates a reconcile run for an existing workspace
+func (r RootResolver) ReconcileWorkspace(ctx context.Context,
+	args *struct{ Input ReconcileWorkspaceInput },
+) (*RunMutationPayloadResolver, error) {
+	response, err := reconcileWorkspaceMutation(ctx, &args.Input)
+	if err != nil {
+		return handleRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+
+	return response, nil
+}
+
 // AssessWorkspace creates an assessment run for an existing workspace
 func (r RootResolver) AssessWorkspace(ctx context.Context,
 	args *struct{ Input AssessWorkspaceInput },

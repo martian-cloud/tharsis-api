@@ -142,6 +142,36 @@ func (_m *MockService) CreateDestroyRunForWorkspace(ctx context.Context, options
 	return r0, r1
 }
 
+// CreateReconcileRunForWorkspace provides a mock function with given fields: ctx, options
+func (_m *MockService) CreateReconcileRunForWorkspace(ctx context.Context, options *CreateReconcileRunForWorkspaceInput) (*models.Run, error) {
+	ret := _m.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateReconcileRunForWorkspace")
+	}
+
+	var r0 *models.Run
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *CreateReconcileRunForWorkspaceInput) (*models.Run, error)); ok {
+		return rf(ctx, options)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *CreateReconcileRunForWorkspaceInput) *models.Run); ok {
+		r0 = rf(ctx, options)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Run)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *CreateReconcileRunForWorkspaceInput) error); ok {
+		r1 = rf(ctx, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateRun provides a mock function with given fields: ctx, options
 func (_m *MockService) CreateRun(ctx context.Context, options *CreateRunInput) (*models.Run, error) {
 	ret := _m.Called(ctx, options)

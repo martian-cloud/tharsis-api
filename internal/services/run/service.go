@@ -123,6 +123,12 @@ type CreateDestroyRunForWorkspaceInput struct {
 	WorkspaceID string
 }
 
+// CreateReconcileRunForWorkspaceInput is the input for creating a reconcile run using the current
+// configuration version or module that is applied.
+type CreateReconcileRunForWorkspaceInput struct {
+	WorkspaceID string
+}
+
 // CreateAssessmentRunForWorkspaceInput is the input for creating an assessment run
 type CreateAssessmentRunForWorkspaceInput struct {
 	WorkspaceID             string
@@ -228,6 +234,7 @@ type Service interface {
 	GetRunVariables(ctx context.Context, runID string, includeSensitiveValues bool) ([]Variable, error)
 	CreateAssessmentRunForWorkspace(ctx context.Context, options *CreateAssessmentRunForWorkspaceInput) (*models.Run, error)
 	CreateDestroyRunForWorkspace(ctx context.Context, options *CreateDestroyRunForWorkspaceInput) (*models.Run, error)
+	CreateReconcileRunForWorkspace(ctx context.Context, options *CreateReconcileRunForWorkspaceInput) (*models.Run, error)
 	SetVariablesIncludedInTFConfig(ctx context.Context, input *SetVariablesIncludedInTFConfigInput) error
 	GetPlansByIDs(ctx context.Context, idList []string) ([]models.Plan, error)
 	GetPlanByID(ctx context.Context, planID string) (*models.Plan, error)
@@ -722,6 +729,91 @@ func (s *service) CreateDestroyRunForWorkspace(ctx context.Context, options *Cre
 	}
 
 	return s.createRun(ctx, destroyRunInput)
+}
+
+func (s *service) CreateReconcileRunForWorkspace(ctx context.Context, options *CreateReconcileRunForWorkspaceInput) (*models.Run, error) {
+	ctx, span := tracer.Start(ctx, "svc.CreateReconcileRunForWorkspace")
+	defer span.End()
+
+	caller, err := auth.AuthorizeCaller(ctx)
+	if err != nil {
+		tracing.RecordError(span, err, "caller authorization failed")
+		return nil, err
+	}
+
+	err = caller.RequirePermission(ctx, models.CreateRunPermission, auth.WithWorkspaceID(options.WorkspaceID))
+	if err != nil {
+		tracing.RecordError(span, err, "permission check failed")
+		return nil, err
+	}
+
+	// Get the workspace
+	workspace, err := s.dbClient.Workspaces.GetWorkspaceByID(ctx, options.WorkspaceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get workspace with ID %s", options.WorkspaceID, errors.WithSpan(span))
+	}
+
+	if workspace == nil {
+		return nil, errors.New("workspace not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if workspace.CurrentStateVersionID == "" {
+		return nil, errors.New(
+			"reconcile run cannot be created because workspace has no current state version",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get the current state version for the workspace
+	stateVersion, err := s.dbClient.StateVersions.GetStateVersionByID(ctx, workspace.CurrentStateVersionID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get state version with ID %s", workspace.CurrentStateVersionID, errors.WithSpan(span))
+	}
+
+	if stateVersion == nil {
+		return nil, errors.New("state version not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	if stateVersion.RunID == nil {
+		return nil, errors.New(
+			"cannot create reconcile run because state version was created manually and has no module or configuration version associated",
+			errors.WithErrorCode(errors.EConflict),
+			errors.WithSpan(span),
+		)
+	}
+
+	// Get the run
+	run, err := s.dbClient.Runs.GetRunByID(ctx, *stateVersion.RunID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run with ID %s", *stateVersion.RunID, errors.WithSpan(span))
+	}
+
+	if run == nil {
+		return nil, errors.New("run not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
+	}
+
+	// Get run variables
+	variables, err := s.getRunVariables(ctx, run, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get run variables for run with ID %s", run.Metadata.ID, errors.WithSpan(span))
+	}
+
+	// Clear namespace path from variables
+	for i := range variables {
+		variables[i].NamespacePath = nil
+	}
+
+	reconcileRunInput := &createRunInput{
+		Refresh:                true,
+		WorkspaceID:            options.WorkspaceID,
+		ConfigurationVersionID: run.ConfigurationVersionID,
+		ModuleSource:           run.ModuleSource,
+		ModuleVersion:          run.ModuleVersion,
+		Variables:              variables,
+	}
+
+	return s.createRun(ctx, reconcileRunInput)
 }
 
 // CreateRun creates a new run and associates a Plan with it
