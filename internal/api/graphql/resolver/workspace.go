@@ -663,6 +663,12 @@ type DestroyWorkspaceInput struct {
 	WorkspaceID      *string
 }
 
+// ReconcileWorkspaceInput contains the input for reconciling a workspace
+type ReconcileWorkspaceInput struct {
+	ClientMutationID *string
+	WorkspaceID      string
+}
+
 // AssessWorkspaceInput contains the input for running a workspace assessment
 type AssessWorkspaceInput struct {
 	ClientMutationID *string
@@ -958,6 +964,23 @@ func destroyWorkspaceMutation(ctx context.Context, input *DestroyWorkspaceInput)
 	}
 
 	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: run, Problems: []Problem{}}
+	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
+}
+
+func reconcileWorkspaceMutation(ctx context.Context, input *ReconcileWorkspaceInput) (*RunMutationPayloadResolver, error) {
+	workspaceID, err := getServiceCatalog(ctx).FetchModelID(ctx, input.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := getServiceCatalog(ctx).RunService.CreateReconcileRunForWorkspace(ctx, &run.CreateReconcileRunForWorkspaceInput{
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	payload := RunMutationPayload{ClientMutationID: input.ClientMutationID, Run: r, Problems: []Problem{}}
 	return &RunMutationPayloadResolver{RunMutationPayload: payload}, nil
 }
 

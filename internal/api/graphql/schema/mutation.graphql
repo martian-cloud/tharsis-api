@@ -9,6 +9,7 @@ type Mutation {
   lockWorkspace(input: LockWorkspaceInput!): LockWorkspacePayload!
   unlockWorkspace(input: UnlockWorkspaceInput!): UnlockWorkspacePayload!
   destroyWorkspace(input: DestroyWorkspaceInput!): DestroyWorkspacePayload!
+  reconcileWorkspace(input: ReconcileWorkspaceInput!): ReconcileWorkspacePayload!
   assessWorkspace(input: AssessWorkspaceInput!): AssessWorkspacePayload!
   createGroup(input: CreateGroupInput!): CreateGroupPayload!
   updateGroup(input: UpdateGroupInput!): UpdateGroupPayload!

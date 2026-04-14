@@ -1121,6 +1121,17 @@ type DestroyWorkspacePayload {
   run: Run
 }
 
+input ReconcileWorkspaceInput {
+  clientMutationId: String
+  workspaceId: String!
+}
+
+type ReconcileWorkspacePayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  run: Run
+}
+
 input DisableMaintenanceModeInput {
   clientMutationId: String
 }
@@ -1620,6 +1631,7 @@ type Mutation {
   migrateGroup(input: MigrateGroupInput!): MigrateGroupPayload!
   migrateWorkspace(input: MigrateWorkspaceInput!): MigrateWorkspacePayload!
   moveManagedIdentity(input: MoveManagedIdentityInput!): MoveManagedIdentityPayload!
+  reconcileWorkspace(input: ReconcileWorkspaceInput!): ReconcileWorkspacePayload!
   removeUserFromTeam(input: RemoveUserFromTeamInput): RemoveUserFromTeamPayload!
   resetServiceAccountClientCredentials(input: ResetServiceAccountClientCredentialsInput!): ResetServiceAccountClientCredentialsPayload!
   resetVCSProviderOAuthToken(input: ResetVCSProviderOAuthTokenInput!): ResetVCSProviderOAuthTokenPayload!
