@@ -131,6 +131,31 @@ func (_m *MockCaller) RequirePermission(ctx context.Context, perms models.Permis
 	return r0
 }
 
+// RequireRole provides a mock function with given fields: ctx, roleID, checks
+func (_m *MockCaller) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
+	_va := make([]interface{}, len(checks))
+	for _i := range checks {
+		_va[_i] = checks[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, roleID)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequireRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...func(*constraints)) error); ok {
+		r0 = rf(ctx, roleID, checks...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UnauthorizedError provides a mock function with given fields: ctx, hasViewerAccess
 func (_m *MockCaller) UnauthorizedError(ctx context.Context, hasViewerAccess bool) error {
 	ret := _m.Called(ctx, hasViewerAccess)

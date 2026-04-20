@@ -190,3 +190,39 @@ func requireInheritedAccessAuthorizerFunc(_ context.Context, modelTypes []types.
 
 	return nil
 }
+
+func TestServiceAccountCaller_RequireRole(t *testing.T) {
+	caller := ServiceAccountCaller{}
+	ctx := WithCaller(t.Context(), &caller)
+
+	testCases := []struct {
+		name            string
+		expectErrorCode errors.CodeType
+		authorizerError error
+	}{
+		{
+			name: "delegates to authorizer successfully",
+		},
+		{
+			name:            "denied by authorizer",
+			authorizerError: errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockAuthorizer := NewMockAuthorizer(t)
+			mockAuthorizer.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).Return(test.authorizerError)
+
+			caller.authorizer = mockAuthorizer
+
+			err := caller.RequireRole(ctx, models.OwnerRoleID.String(), WithNamespacePaths([]string{"ns1"}))
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}

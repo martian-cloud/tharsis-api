@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"sync"
 
-	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,7 +21,8 @@ const (
 	searchIndexURL     = docsBaseURL + "/search-index.json"
 	defaultSearchLimit = 10
 	maxSearchLimit     = 100
-	indexDirPrefix     = "tharsis-docs-index-"
+	maxIndexSize       = 4 * 1024 * 1024 // 4 MiB
+	maxPageSize        = 2 * 1024 * 1024 // 2 MiB
 )
 
 // docSearchDocument represents a document from the Docusaurus search index.
@@ -30,6 +31,18 @@ type docSearchDocument struct {
 	URL         string   `json:"u"`
 	Breadcrumbs []string `json:"b"`
 	Section     string   `json:"s,omitempty"`
+}
+
+// searchIndexEntry represents one entry in the Docusaurus search index array.
+type searchIndexEntry struct {
+	Documents []docSearchDocument `json:"documents"`
+}
+
+// searchIndex holds the parsed search index data.
+type searchIndex struct {
+	documents    []docSearchDocument
+	keywords     map[string]string
+	descriptions map[string]string
 }
 
 // docResult represents a single search result.
@@ -43,32 +56,28 @@ type docResult struct {
 
 // documentRepository handles fetching documentation data.
 type documentRepository interface {
-	getSearchIndex(ctx context.Context) ([]docSearchDocument, error)
+	getSearchIndex(ctx context.Context) (*searchIndex, error)
 	getPageContent(ctx context.Context, urlPath string) (string, error)
 }
 
 // httpDocumentRepository fetches documentation via HTTP with caching.
 type httpDocumentRepository struct {
-	mu         sync.RWMutex
-	client     *http.Client
-	cachedDocs []docSearchDocument
-	converter  *md.Converter
+	mu     sync.RWMutex
+	client *http.Client
+	cached *searchIndex
 }
 
 // newHTTPDocumentRepository creates a new HTTP-based repository.
 func newHTTPDocumentRepository(client *http.Client) *httpDocumentRepository {
-	return &httpDocumentRepository{
-		client:    client,
-		converter: md.NewConverter(docsBaseURL, true, nil),
-	}
+	return &httpDocumentRepository{client: client}
 }
 
 // getSearchIndex fetches the search index once and caches it.
-func (r *httpDocumentRepository) getSearchIndex(ctx context.Context) ([]docSearchDocument, error) {
+func (r *httpDocumentRepository) getSearchIndex(ctx context.Context) (*searchIndex, error) {
 	r.mu.RLock()
-	if r.cachedDocs != nil {
+	if r.cached != nil {
 		defer r.mu.RUnlock()
-		return r.cachedDocs, nil
+		return r.cached, nil
 	}
 	r.mu.RUnlock()
 
@@ -77,11 +86,7 @@ func (r *httpDocumentRepository) getSearchIndex(ctx context.Context) ([]docSearc
 		return nil, err
 	}
 
-	r.mu.RLock()
-	client := r.client
-	r.mu.RUnlock()
-
-	resp, err := client.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +96,8 @@ func (r *httpDocumentRepository) getSearchIndex(ctx context.Context) ([]docSearc
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var indexes []struct {
-		Documents []docSearchDocument `json:"documents"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&indexes); err != nil {
+	var indexes []searchIndexEntry
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxIndexSize)).Decode(&indexes); err != nil {
 		return nil, err
 	}
 
@@ -102,16 +105,29 @@ func (r *httpDocumentRepository) getSearchIndex(ctx context.Context) ([]docSearc
 		return nil, fmt.Errorf("empty search index")
 	}
 
-	r.mu.Lock()
-	r.cachedDocs = indexes[0].Documents
-	r.mu.Unlock()
+	// Index 0 = titles, 1 = headings, 2 = descriptions, 3 = keywords, 4 = content.
+	idx := &searchIndex{
+		documents:    indexes[0].Documents,
+		keywords:     extractMetadata(indexes, 3),
+		descriptions: extractMetadata(indexes, 2),
+	}
 
-	return indexes[0].Documents, nil
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Re-check after acquiring write lock to avoid redundant fetches.
+	if r.cached != nil {
+		return r.cached, nil
+	}
+
+	r.cached = idx
+
+	return idx, nil
 }
 
-// getPageContent fetches and extracts formatted content from a documentation page.
+// getPageContent fetches markdown content by appending .md to the URL.
 func (r *httpDocumentRepository) getPageContent(ctx context.Context, urlPath string) (string, error) {
-	fullURL, err := url.JoinPath(docsBaseURL, urlPath)
+	fullURL, err := url.JoinPath(docsBaseURL, urlPath+".md")
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
 	}
@@ -121,12 +137,7 @@ func (r *httpDocumentRepository) getPageContent(ctx context.Context, urlPath str
 		return "", err
 	}
 
-	r.mu.RLock()
-	client := r.client
-	converter := r.converter
-	r.mu.RUnlock()
-
-	resp, err := client.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -136,12 +147,17 @@ func (r *httpDocumentRepository) getPageContent(ctx context.Context, urlPath str
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	markdown, err := converter.ConvertResponse(resp)
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "text/") && !strings.Contains(contentType, "markdown") {
+		return "", fmt.Errorf("unexpected content type: %s, expected markdown", contentType)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxPageSize))
 	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(markdown), nil
+	return strings.TrimSpace(string(body)), nil
 }
 
 // DocumentSearchService handles search operations using Bleve.
@@ -150,25 +166,17 @@ type DocumentSearchService struct {
 	repo      documentRepository
 	index     bleve.Index
 	documents map[string]*docSearchDocument
-	indexPath string
 }
 
 // NewDocumentSearchService creates a new search service with an HTTP repository.
-func NewDocumentSearchService(client *http.Client) (*DocumentSearchService, error) {
-	// Create unique temp directory for this instance
-	indexPath, err := os.MkdirTemp("", indexDirPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory for search index: %w", err)
-	}
-
+func NewDocumentSearchService(client *http.Client) *DocumentSearchService {
 	return &DocumentSearchService{
 		repo:      newHTTPDocumentRepository(client),
 		documents: make(map[string]*docSearchDocument),
-		indexPath: indexPath,
-	}, nil
+	}
 }
 
-// EnsureIndexReady builds the search index if not already initialized.
+// ensureIndexReady builds the search index if not already initialized.
 func (s *DocumentSearchService) ensureIndexReady(ctx context.Context) error {
 	s.mu.RLock()
 	hasIndex := s.index != nil
@@ -178,30 +186,41 @@ func (s *DocumentSearchService) ensureIndexReady(ctx context.Context) error {
 		return nil
 	}
 
-	docs, err := s.repo.getSearchIndex(ctx)
+	idx, err := s.repo.getSearchIndex(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch search index: %w", err)
 	}
 
-	return s.buildIndex(docs)
+	// Re-check under write path; another goroutine may have built it.
+	s.mu.RLock()
+	hasIndex = s.index != nil
+	s.mu.RUnlock()
+
+	if hasIndex {
+		return nil
+	}
+
+	return s.buildIndex(idx)
 }
 
-// buildIndex creates a new Bleve index from documentation documents.
-func (s *DocumentSearchService) buildIndex(documents []docSearchDocument) error {
-	index, err := bleve.New(s.indexPath, bleve.NewIndexMapping())
+// buildIndex creates a new in-memory Bleve index from the search index data.
+func (s *DocumentSearchService) buildIndex(idx *searchIndex) error {
+	index, err := bleve.NewMemOnly(bleve.NewIndexMapping())
 	if err != nil {
 		return err
 	}
 
-	newDocuments := make(map[string]*docSearchDocument, len(documents))
-	for i := range documents {
-		doc := &documents[i]
+	newDocuments := make(map[string]*docSearchDocument, len(idx.documents))
+	for i := range idx.documents {
+		doc := &idx.documents[i]
 		newDocuments[doc.URL] = doc
 
 		if err := index.Index(doc.URL, map[string]interface{}{
 			"title":       doc.Title,
 			"breadcrumbs": strings.Join(doc.Breadcrumbs, " "),
 			"section":     doc.Section,
+			"keywords":    idx.keywords[doc.URL],
+			"description": idx.descriptions[doc.URL],
 		}); err != nil {
 			index.Close()
 			return err
@@ -219,27 +238,24 @@ func (s *DocumentSearchService) buildIndex(documents []docSearchDocument) error 
 	return nil
 }
 
-// Search performs a full-text search with field boosting and fuzzy matching.
+// search performs a full-text search with field boosting and fuzzy matching.
 func (s *DocumentSearchService) search(queryStr string, limit int) ([]docResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	titleMatch := bleve.NewMatchQuery(queryStr)
-	titleMatch.SetField("title")
-	titleMatch.SetBoost(3.0)
-
-	breadcrumbsMatch := bleve.NewMatchQuery(queryStr)
-	breadcrumbsMatch.SetField("breadcrumbs")
-	breadcrumbsMatch.SetBoost(1.5)
-
-	sectionMatch := bleve.NewMatchQuery(queryStr)
-	sectionMatch.SetField("section")
-
 	fuzzyQuery := bleve.NewMatchQuery(queryStr)
 	fuzzyQuery.SetFuzziness(1)
 
-	query := bleve.NewDisjunctionQuery(titleMatch, breadcrumbsMatch, sectionMatch, fuzzyQuery)
-	searchRequest := bleve.NewSearchRequest(query)
+	q := bleve.NewDisjunctionQuery(
+		boostedMatchQuery(queryStr, "title", 3.0),
+		boostedMatchQuery(queryStr, "keywords", 2.0),
+		boostedMatchQuery(queryStr, "breadcrumbs", 1.5),
+		boostedMatchQuery(queryStr, "description", 1.5),
+		boostedMatchQuery(queryStr, "section", 1.0),
+		fuzzyQuery,
+	)
+
+	searchRequest := bleve.NewSearchRequest(q)
 	searchRequest.Size = limit
 
 	searchResults, err := s.index.Search(searchRequest)
@@ -354,6 +370,11 @@ func GetDocumentationPage(service *DocumentSearchService) (mcp.Tool, mcp.ToolHan
 		if err != nil {
 			return nil, getDocumentationPageOutput{}, fmt.Errorf("invalid URL format '%s': must be a full URL (e.g. https://tharsis.martian-cloud.io/path)", input.URL)
 		}
+
+		if parsedURL.Host != "" && "https://"+parsedURL.Host != docsBaseURL {
+			return nil, getDocumentationPageOutput{}, fmt.Errorf("URL must be from %s", docsBaseURL)
+		}
+
 		cleanPath := path.Clean(parsedURL.Path)
 
 		doc := service.getDocument(cleanPath)
@@ -375,4 +396,23 @@ func GetDocumentationPage(service *DocumentSearchService) (mcp.Tool, mcp.ToolHan
 	}
 
 	return tool, handler
+}
+
+// boostedMatchQuery creates a match query on a specific field with a boost value.
+func boostedMatchQuery(queryStr, field string, boost float64) *query.MatchQuery {
+	q := bleve.NewMatchQuery(queryStr)
+	q.SetField(field)
+	q.SetBoost(boost)
+	return q
+}
+
+// extractMetadata pulls URL -> title mappings from a specific index array.
+func extractMetadata(indexes []searchIndexEntry, i int) map[string]string {
+	m := map[string]string{}
+	if i < len(indexes) {
+		for _, doc := range indexes[i].Documents {
+			m[doc.URL] = doc.Title
+		}
+	}
+	return m
 }

@@ -8,9 +8,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/aws/smithy-go/ptr"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/db"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // Authorizer is used to authorize access to namespaces
@@ -18,6 +20,7 @@ type Authorizer interface {
 	GetRootNamespaces(ctx context.Context) ([]models.MembershipNamespace, error)
 	RequireAccess(ctx context.Context, perms []models.Permission, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, modelTypes []types.ModelType, checks ...func(*constraints)) error
+	RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error
 }
 
 type cacheKey struct {
@@ -148,6 +151,45 @@ func (a *authorizer) RequireAccessToInheritableResource(ctx context.Context, mod
 	}
 
 	return nil
+}
+
+func (a *authorizer) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
+	c := getConstraints(checks...)
+
+	if len(c.namespacePaths) == 0 {
+		return errMissingConstraints
+	}
+
+	for _, namespacePath := range c.namespacePaths {
+		if err := a.requireRoleInNamespace(ctx, namespacePath, roleID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (a *authorizer) requireRoleInNamespace(ctx context.Context, namespacePath string, roleID string) error {
+	sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
+	resp, err := a.getNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
+		Sort: &sortBy,
+		PaginationOptions: &pagination.Options{
+			First: ptr.Int32(0),
+		},
+		Filter: &db.NamespaceMembershipFilter{
+			NamespacePaths: expandNamespaceDescOrder(namespacePath),
+			RoleID:         &roleID,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.PageInfo.TotalCount > 0 {
+		return nil
+	}
+
+	return a.authorizationError(ctx, false)
 }
 
 func (a *authorizer) requireAccessToGroup(ctx context.Context, groupID string, perm *models.Permission) error {

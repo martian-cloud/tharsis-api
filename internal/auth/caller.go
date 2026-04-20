@@ -191,6 +191,12 @@ func (s *SystemCaller) RequirePermission(_ context.Context, _ models.Permission,
 	return nil
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (s *SystemCaller) RequireRole(_ context.Context, _ string, _ ...func(*constraints)) error {
+	// Return nil because system caller is authorized to perform any action
+	return nil
+}
+
 // RequireAccessToInheritableResource will return an error if the caller doesn't have access to the specified resource type
 func (s *SystemCaller) RequireAccessToInheritableResource(_ context.Context, _ types.ModelType, _ ...func(*constraints)) error {
 	// Return nil because system caller is authorized to perform any action
@@ -219,6 +225,7 @@ type Caller interface {
 	IsAdmin() bool
 	GetNamespaceAccessPolicy(ctx context.Context) (*NamespaceAccessPolicy, error)
 	RequirePermission(ctx context.Context, perms models.Permission, checks ...func(*constraints)) error
+	RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error
 	RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error
 	UnauthorizedError(ctx context.Context, hasViewerAccess bool) error
 }

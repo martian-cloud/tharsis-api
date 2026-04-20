@@ -416,3 +416,12 @@ func TestJobCaller_RequireInheritedPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestJobCaller_RequireRole(t *testing.T) {
+	mockWorkspaces := db.NewMockWorkspaces(t)
+	mockWorkspaces.On("GetWorkspaceByID", mock.Anything, "ws-1").Return(&models.Workspace{FullPath: "group/workspace"}, nil)
+
+	caller := JobCaller{WorkspaceID: "ws-1", dbClient: &db.Client{Workspaces: mockWorkspaces}}
+	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
+	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+}

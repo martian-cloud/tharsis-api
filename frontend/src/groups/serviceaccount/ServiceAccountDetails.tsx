@@ -19,6 +19,7 @@ import TRNButton from '../../common/TRNButton';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
 import ClientCredentialsDialog from './ClientCredentialsDialog';
 import { CLIENT_CREDENTIALS_DESCRIPTION } from './ServiceAccountForm';
+import ServiceAccountNamespaceMemberships from './ServiceAccountNamespaceMemberships';
 import { GetConnections } from './ServiceAccountList';
 import { ServiceAccountDetailsDeleteMutation } from './__generated__/ServiceAccountDetailsDeleteMutation.graphql';
 import { ServiceAccountDetailsFragment_group$key } from './__generated__/ServiceAccountDetailsFragment_group.graphql';
@@ -38,7 +39,7 @@ function ServiceAccountDetails(props: Props) {
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
 
     const serviceAccountId = id as string;
-    const validTabs = ['oidc', 'clientCredentials'];
+    const validTabs = ['oidc', 'clientCredentials', 'namespaceMemberships'];
     const tabParam = searchParams.get('tab');
     const tab = tabParam && validTabs.includes(tabParam) ? tabParam : 'oidc';
 
@@ -267,6 +268,7 @@ function ServiceAccountDetails(props: Props) {
                     <Tabs value={tab} onChange={onTabChange} aria-label="authentication methods">
                         <Tab label="OIDC Federation" value="oidc" />
                         <Tab label="Client Credentials" value="clientCredentials" />
+                        <Tab label="Namespace Memberships" value="namespaceMemberships" />
                     </Tabs>
                 </Box>
                 <Box sx={{ border: 1, borderTop: 0, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, borderColor: 'divider', padding: 2 }}>
@@ -352,6 +354,12 @@ function ServiceAccountDetails(props: Props) {
                                 </Typography>
                             </Paper>
                         )}
+                    </Box>}
+                    {tab === 'namespaceMemberships' && <Box>
+                        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                            Namespaces where this service account is a member. To modify this service account, you must be an owner in all of these namespaces.
+                        </Typography>
+                        <ServiceAccountNamespaceMemberships serviceAccountId={serviceAccountId} />
                     </Box>}
                 </Box>
                 {showDeleteConfirmationDialog && (

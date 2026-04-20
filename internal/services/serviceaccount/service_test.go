@@ -36,6 +36,40 @@ type keyPair struct {
 	pub  jwk.Key
 }
 
+type serviceAccountMocks struct {
+	caller               *auth.MockCaller
+	serviceAccounts      *db.MockServiceAccounts
+	namespaceMemberships *db.MockNamespaceMemberships
+	transactions         *db.MockTransactions
+	activityEvents       *activityevent.MockService
+	limitChecker         *limits.MockLimitChecker
+	signingKeyMgr        *auth.MockSigningKeyManager
+	configFetcher        *auth.MockOpenIDConfigFetcher
+	tokenVerifier        *auth.MockOIDCTokenVerifier
+}
+
+func newServiceAccountMocks(t *testing.T) *serviceAccountMocks {
+	return &serviceAccountMocks{
+		caller:               auth.NewMockCaller(t),
+		serviceAccounts:      db.NewMockServiceAccounts(t),
+		namespaceMemberships: db.NewMockNamespaceMemberships(t),
+		transactions:         db.NewMockTransactions(t),
+		activityEvents:       activityevent.NewMockService(t),
+		limitChecker:         limits.NewMockLimitChecker(t),
+		signingKeyMgr:        auth.NewMockSigningKeyManager(t),
+		configFetcher:        auth.NewMockOpenIDConfigFetcher(t),
+		tokenVerifier:        auth.NewMockOIDCTokenVerifier(t),
+	}
+}
+
+func (m *serviceAccountMocks) dbClient() *db.Client {
+	return &db.Client{
+		ServiceAccounts:      m.serviceAccounts,
+		NamespaceMemberships: m.namespaceMemberships,
+		Transactions:         m.transactions,
+	}
+}
+
 func TestGetServiceAccountByID(t *testing.T) {
 	sampleServiceAccount := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
@@ -49,50 +83,43 @@ func TestGetServiceAccountByID(t *testing.T) {
 
 	type testCase struct {
 		name            string
-		authError       error
-		serviceAccount  *models.ServiceAccount
+		setupMocks      func(*serviceAccountMocks)
 		expectErrorCode terrs.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:           "successfully get service account by ID",
-			serviceAccount: sampleServiceAccount,
+			name: "successfully get service account by ID",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(sampleServiceAccount, nil)
+				m.caller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(nil)
+			},
 		},
 		{
-			name:            "service account not found",
+			name: "service account not found",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(nil, nil)
+			},
 			expectErrorCode: terrs.ENotFound,
 		},
 		{
-			name:            "subject is not authorized to view service account",
-			serviceAccount:  sampleServiceAccount,
-			authError:       terrs.New("Forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			name: "subject is not authorized to view service account",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(sampleServiceAccount, nil)
+				m.caller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(terrs.New("Forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrorCode: terrs.EForbidden,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
-			mockCaller := auth.NewMockCaller(t)
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
+			service := &service{dbClient: m.dbClient()}
 
-			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, sampleServiceAccount.Metadata.ID).Return(test.serviceAccount, nil)
-
-			if test.serviceAccount != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(test.authError)
-			}
-
-			dbClient := &db.Client{
-				ServiceAccounts: mockServiceAccounts,
-			}
-
-			service := &service{
-				dbClient: dbClient,
-			}
-
-			actualServiceAccount, err := service.GetServiceAccountByID(auth.WithCaller(ctx, mockCaller), sampleServiceAccount.Metadata.ID)
+			actualServiceAccount, err := service.GetServiceAccountByID(auth.WithCaller(t.Context(), m.caller), sampleServiceAccount.Metadata.ID)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, terrs.ErrorCode(err))
@@ -100,7 +127,7 @@ func TestGetServiceAccountByID(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, test.serviceAccount, actualServiceAccount)
+			assert.Equal(t, sampleServiceAccount, actualServiceAccount)
 		})
 	}
 }
@@ -118,50 +145,43 @@ func TestGetServiceAccountByTRN(t *testing.T) {
 
 	type testCase struct {
 		name            string
-		authError       error
-		serviceAccount  *models.ServiceAccount
+		setupMocks      func(*serviceAccountMocks)
 		expectErrorCode terrs.CodeType
 	}
 
 	testCases := []testCase{
 		{
-			name:           "successfully get service account by trn",
-			serviceAccount: sampleServiceAccount,
+			name: "successfully get service account by trn",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByTRN", mock.Anything, sampleServiceAccount.Metadata.TRN).Return(sampleServiceAccount, nil)
+				m.caller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(nil)
+			},
 		},
 		{
-			name:            "service account not found",
+			name: "service account not found",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByTRN", mock.Anything, sampleServiceAccount.Metadata.TRN).Return(nil, nil)
+			},
 			expectErrorCode: terrs.ENotFound,
 		},
 		{
-			name:            "subject is not authorized to view service account",
-			serviceAccount:  sampleServiceAccount,
-			authError:       terrs.New("Forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			name: "subject is not authorized to view service account",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByTRN", mock.Anything, sampleServiceAccount.Metadata.TRN).Return(sampleServiceAccount, nil)
+				m.caller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(terrs.New("Forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrorCode: terrs.EForbidden,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
-			mockCaller := auth.NewMockCaller(t)
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
+			service := &service{dbClient: m.dbClient()}
 
-			mockServiceAccounts.On("GetServiceAccountByTRN", mock.Anything, sampleServiceAccount.Metadata.TRN).Return(test.serviceAccount, nil)
-
-			if test.serviceAccount != nil {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything, mock.Anything).Return(test.authError)
-			}
-
-			dbClient := &db.Client{
-				ServiceAccounts: mockServiceAccounts,
-			}
-
-			service := &service{
-				dbClient: dbClient,
-			}
-
-			actualServiceAccount, err := service.GetServiceAccountByTRN(auth.WithCaller(ctx, mockCaller), sampleServiceAccount.Metadata.TRN)
+			actualServiceAccount, err := service.GetServiceAccountByTRN(auth.WithCaller(t.Context(), m.caller), sampleServiceAccount.Metadata.TRN)
 
 			if test.expectErrorCode != "" {
 				assert.Equal(t, test.expectErrorCode, terrs.ErrorCode(err))
@@ -169,7 +189,7 @@ func TestGetServiceAccountByTRN(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, test.serviceAccount, actualServiceAccount)
+			assert.Equal(t, sampleServiceAccount, actualServiceAccount)
 		})
 	}
 }
@@ -187,58 +207,52 @@ func TestDeleteServiceAccount(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		existingSA    *models.ServiceAccount
-		authError     error
+		setupMocks    func(*serviceAccountMocks)
 		expectErrCode terrs.CodeType
 	}{
 		{
-			name:       "delete service account",
-			existingSA: existingSA,
+			name: "delete service account",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.DeleteServiceAccountPermission, mock.Anything).Return(nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.serviceAccounts.On("DeleteServiceAccount", mock.Anything, existingSA).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
+			},
 		},
 		{
-			name:          "not found",
-			existingSA:    nil,
+			name: "not found",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(nil, nil)
+			},
 			expectErrCode: terrs.ENotFound,
 		},
 		{
-			name:          "permission denied",
-			existingSA:    existingSA,
-			authError:     terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			name: "permission denied",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.DeleteServiceAccountPermission, mock.Anything).Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrCode: terrs.EForbidden,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
-			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(test.existingSA, nil)
-
-			if test.existingSA != nil {
-				mockCaller.On("RequirePermission", mock.Anything, models.DeleteServiceAccountPermission, mock.Anything).Return(test.authError)
-
-				if test.authError == nil {
-					mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-					mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-					mockServiceAccounts.On("DeleteServiceAccount", mock.Anything, test.existingSA).Return(nil)
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-				}
-			}
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
 			testLogger, _ := logger.NewForTest()
-			dbClient := &db.Client{ServiceAccounts: mockServiceAccounts, Transactions: mockTransactions}
+			service := &service{
+				logger:                  testLogger,
+				dbClient:                m.dbClient(),
+				activityService:         m.activityEvents,
+				secretMaxExpirationDays: 90,
+			}
 
-			service := &service{logger: testLogger, dbClient: dbClient, activityService: mockActivityEvents, secretMaxExpirationDays: 90}
-
-			err := service.DeleteServiceAccount(auth.WithCaller(ctx, &mockCaller), &DeleteServiceAccountInput{ID: serviceAccountID})
+			err := service.DeleteServiceAccount(auth.WithCaller(t.Context(), m.caller), &DeleteServiceAccountInput{ID: serviceAccountID})
 
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))
@@ -255,40 +269,34 @@ func TestGetServiceAccounts(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		authError     error
+		setupMocks    func(*serviceAccountMocks)
 		expectErrCode terrs.CodeType
 	}{
 		{
 			name: "get service accounts",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.caller.On("RequirePermission", mock.Anything, models.ViewServiceAccountPermission, mock.Anything).Return(nil)
+				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{}, nil)
+			},
 		},
 		{
-			name:          "permission denied",
-			authError:     terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			name: "permission denied",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.caller.On("RequirePermission", mock.Anything, models.ViewServiceAccountPermission, mock.Anything).Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrCode: terrs.EForbidden,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
-
-			mockCaller.On("RequirePermission", mock.Anything, models.ViewServiceAccountPermission, mock.Anything).Return(test.authError)
-
-			if test.authError == nil {
-				mockServiceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{}, nil)
-			}
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
 			testLogger, _ := logger.NewForTest()
-			dbClient := &db.Client{ServiceAccounts: mockServiceAccounts}
+			service := &service{logger: testLogger, dbClient: m.dbClient()}
 
-			service := &service{logger: testLogger, dbClient: dbClient}
-
-			_, err := service.GetServiceAccounts(auth.WithCaller(ctx, &mockCaller), &GetServiceAccountsInput{NamespacePath: groupPath})
+			_, err := service.GetServiceAccounts(auth.WithCaller(t.Context(), m.caller), &GetServiceAccountsInput{NamespacePath: groupPath})
 
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))
@@ -313,47 +321,37 @@ func TestGetServiceAccountsByIDs(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		ids           []string
-		dbResult      []models.ServiceAccount
-		authError     error
+		setupMocks    func(*serviceAccountMocks)
 		expectErrCode terrs.CodeType
 	}{
 		{
-			name:     "get by ids",
-			ids:      []string{saID},
-			dbResult: []models.ServiceAccount{sa},
+			name: "get by ids",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).
+					Return(&db.ServiceAccountsResult{ServiceAccounts: []models.ServiceAccount{sa}}, nil)
+				m.caller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything).Return(nil)
+			},
 		},
 		{
-			name:          "permission denied",
-			ids:           []string{saID},
-			dbResult:      []models.ServiceAccount{sa},
-			authError:     terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			name: "permission denied",
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).
+					Return(&db.ServiceAccountsResult{ServiceAccounts: []models.ServiceAccount{sa}}, nil)
+				m.caller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything).Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrCode: terrs.EForbidden,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
-
-			mockServiceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).
-				Return(&db.ServiceAccountsResult{ServiceAccounts: test.dbResult}, nil)
-
-			if len(test.dbResult) > 0 {
-				mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.ServiceAccountModelType, mock.Anything).Return(test.authError)
-			}
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
 			testLogger, _ := logger.NewForTest()
-			dbClient := &db.Client{ServiceAccounts: mockServiceAccounts}
+			service := &service{logger: testLogger, dbClient: m.dbClient()}
 
-			service := &service{logger: testLogger, dbClient: dbClient}
-
-			result, err := service.GetServiceAccountsByIDs(auth.WithCaller(ctx, &mockCaller), test.ids)
+			result, err := service.GetServiceAccountsByIDs(auth.WithCaller(t.Context(), m.caller), []string{saID})
 
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))
@@ -361,7 +359,7 @@ func TestGetServiceAccountsByIDs(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Len(t, result, len(test.dbResult))
+			assert.Len(t, result, 1)
 		})
 	}
 }
@@ -371,7 +369,6 @@ func TestCreateServiceAccount(t *testing.T) {
 	serviceAccountDescription := "test service account description"
 	groupName := "group-name"
 	groupID := "group123"
-	createdBy := "service-account-created-by"
 	resourcePath := groupName + "/" + serviceAccountName
 	issuer := "http://some/identity/issuer"
 	claimKey := "bound-claim-key"
@@ -379,51 +376,54 @@ func TestCreateServiceAccount(t *testing.T) {
 
 	clientSecretExpiry := time.Now().Add(48 * time.Hour)
 
-	// Test cases
+	sampleOIDCTrustPolicy := []models.OIDCTrustPolicy{
+		{
+			Issuer:          issuer,
+			BoundClaimsType: models.BoundClaimsTypeString,
+			BoundClaims:     map[string]string{claimKey: claimVal},
+		},
+	}
+
+	createdSA := &models.ServiceAccount{
+		Metadata: models.ResourceMetadata{
+			ID:  groupID,
+			TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
+		},
+		Name:              serviceAccountName,
+		Description:       serviceAccountDescription,
+		GroupID:           groupID,
+		CreatedBy:         "mockSubject",
+		OIDCTrustPolicies: sampleOIDCTrustPolicy,
+	}
+
 	tests := []struct {
-		authError                      error
-		expectCreatedServiceAccount    *models.ServiceAccount
 		name                           string
-		expectErrCode                  terrs.CodeType
 		input                          CreateServiceAccountInput
-		limit                          int
-		injectServiceAccountsPerGroup  int32
-		exceedsLimit                   bool
+		setupMocks                     func(*serviceAccountMocks)
+		expectErrCode                  terrs.CodeType
 		expectClientCredentialsEnabled bool
 	}{
 		{
 			name: "create service account",
 			input: CreateServiceAccountInput{
-				Name:        serviceAccountName,
-				Description: serviceAccountDescription,
-				GroupID:     groupID,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:          issuer,
-						BoundClaimsType: models.BoundClaimsTypeString,
-						BoundClaims:     map[string]string{claimKey: claimVal},
-					},
-				},
+				Name:              serviceAccountName,
+				Description:       serviceAccountDescription,
+				GroupID:           groupID,
+				OIDCTrustPolicies: sampleOIDCTrustPolicy,
 			},
-			expectCreatedServiceAccount: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:  groupID,
-					TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
-				},
-				Name:        serviceAccountName,
-				Description: serviceAccountDescription,
-				GroupID:     groupID,
-				CreatedBy:   createdBy,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:          issuer,
-						BoundClaimsType: models.BoundClaimsTypeString,
-						BoundClaims:     map[string]string{claimKey: claimVal},
-					},
-				},
+			setupMocks: func(m *serviceAccountMocks) {
+				m.caller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("GetSubject").Return("mockSubject")
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(createdSA, nil)
+				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 5},
+				}, nil)
+				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, int32(5)).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
-			limit:                         5,
-			injectServiceAccountsPerGroup: 5,
 		},
 		{
 			name: "create service account with client credentials",
@@ -434,160 +434,90 @@ func TestCreateServiceAccount(t *testing.T) {
 				EnableClientCredentials: true,
 				ClientSecretExpiresAt:   &clientSecretExpiry,
 			},
-			expectCreatedServiceAccount: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:  groupID,
-					TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
-				},
-				Name:                  serviceAccountName,
-				Description:           serviceAccountDescription,
-				GroupID:               groupID,
-				CreatedBy:             createdBy,
-				ClientSecretHash:      ptr.String("hash"),
-				ClientSecretExpiresAt: &clientSecretExpiry,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.caller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("GetSubject").Return("mockSubject")
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(&models.ServiceAccount{
+					Metadata:              createdSA.Metadata,
+					Name:                  serviceAccountName,
+					Description:           serviceAccountDescription,
+					GroupID:               groupID,
+					CreatedBy:             "mockSubject",
+					ClientSecretHash:      ptr.String("hash"),
+					ClientSecretExpiresAt: &clientSecretExpiry,
+				}, nil)
+				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 5},
+				}, nil)
+				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, int32(5)).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
 			},
-			limit:                          5,
-			injectServiceAccountsPerGroup:  5,
 			expectClientCredentialsEnabled: true,
 		},
 		{
 			name: "subject does not have permission",
 			input: CreateServiceAccountInput{
-				Name:        serviceAccountName,
-				Description: serviceAccountDescription,
-				GroupID:     groupID,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:          issuer,
-						BoundClaimsType: models.BoundClaimsTypeString,
-						BoundClaims:     map[string]string{claimKey: claimVal},
-					},
-				},
+				Name:              serviceAccountName,
+				Description:       serviceAccountDescription,
+				GroupID:           groupID,
+				OIDCTrustPolicies: sampleOIDCTrustPolicy,
 			},
-			authError:     terrs.New("Unauthorized", terrs.WithErrorCode(terrs.EForbidden)),
+			setupMocks: func(m *serviceAccountMocks) {
+				m.caller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(terrs.New("Unauthorized", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrCode: terrs.EForbidden,
 		},
 		{
 			name: "exceeds limit",
 			input: CreateServiceAccountInput{
-				Name:        serviceAccountName,
-				Description: serviceAccountDescription,
-				GroupID:     groupID,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:          issuer,
-						BoundClaimsType: models.BoundClaimsTypeString,
-						BoundClaims:     map[string]string{claimKey: claimVal},
-					},
-				},
+				Name:              serviceAccountName,
+				Description:       serviceAccountDescription,
+				GroupID:           groupID,
+				OIDCTrustPolicies: sampleOIDCTrustPolicy,
 			},
-			expectCreatedServiceAccount: &models.ServiceAccount{
-				Metadata: models.ResourceMetadata{
-					ID:  groupID,
-					TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
-				},
-				Name:        serviceAccountName,
-				Description: serviceAccountDescription,
-				GroupID:     groupID,
-				CreatedBy:   createdBy,
-				OIDCTrustPolicies: []models.OIDCTrustPolicy{
-					{
-						Issuer:          issuer,
-						BoundClaimsType: models.BoundClaimsTypeString,
-						BoundClaims:     map[string]string{claimKey: claimVal},
-					},
-				},
+			setupMocks: func(m *serviceAccountMocks) {
+				m.caller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("GetSubject").Return("mockSubject")
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.serviceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).Return(createdSA, nil)
+				m.serviceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.ServiceAccountsResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 6},
+				}, nil)
+				m.limitChecker.On("CheckLimit", mock.Anything, mock.Anything, int32(6)).Return(terrs.New("limit exceeded", terrs.WithErrorCode(terrs.EInvalid)))
 			},
-			limit:                         5,
-			injectServiceAccountsPerGroup: 6,
-			exceedsLimit:                  true,
-			expectErrCode:                 terrs.EInvalid,
+			expectErrCode: terrs.EInvalid,
 		},
 	}
-	for _, t1 := range tests {
-		t.Run(t1.name, func(t *testing.T) {
-			test := t1
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockCaller.On("RequirePermission", mock.Anything, models.CreateServiceAccountPermission, mock.Anything).Return(test.authError)
-
-			mockCaller.On("GetSubject").Return("mockSubject")
-
-			mockTransactions := db.NewMockTransactions(t)
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
-			mockResourceLimits := db.NewMockResourceLimits(t)
-
-			if test.authError == nil {
-				mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-				mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-				if !test.exceedsLimit {
-					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-				}
-			}
-
-			if (test.expectCreatedServiceAccount != nil) || test.exceedsLimit {
-				mockServiceAccounts.On("CreateServiceAccount", mock.Anything, mock.Anything).
-					Return(test.expectCreatedServiceAccount, nil)
-			}
-
-			dbClient := db.Client{
-				Transactions:    mockTransactions,
-				ServiceAccounts: mockServiceAccounts,
-				ResourceLimits:  mockResourceLimits,
-			}
-
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			if test.authError == nil && !test.exceedsLimit {
-				mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).Return(&models.ActivityEvent{}, nil)
-			}
-
-			// Called inside transaction to check resource limits.
-			if test.limit > 0 {
-				mockServiceAccounts.On("GetServiceAccounts", mock.Anything, mock.Anything).Return(&db.GetServiceAccountsInput{
-					Filter: &db.ServiceAccountFilter{
-						NamespacePaths: []string{groupName},
-					},
-					PaginationOptions: &pagination.Options{
-						First: ptr.Int32(0),
-					},
-				}).Return(func(ctx context.Context, input *db.GetServiceAccountsInput) *db.ServiceAccountsResult {
-					_ = ctx
-					_ = input
-
-					return &db.ServiceAccountsResult{
-						PageInfo: &pagination.PageInfo{
-							TotalCount: test.injectServiceAccountsPerGroup,
-						},
-					}
-				}, nil)
-
-				mockResourceLimits.On("GetResourceLimit", mock.Anything, mock.Anything).
-					Return(&models.ResourceLimit{Value: test.limit}, nil)
-			}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
 			testLogger, _ := logger.NewForTest()
+			service := &service{
+				logger:                  testLogger,
+				dbClient:                m.dbClient(),
+				limitChecker:            m.limitChecker,
+				activityService:         m.activityEvents,
+				secretMaxExpirationDays: 90,
+			}
 
-			service := &service{logger: testLogger, dbClient: &dbClient, limitChecker: limits.NewLimitChecker(&dbClient), activityService: mockActivityEvents, secretMaxExpirationDays: 90}
+			response, err := service.CreateServiceAccount(auth.WithCaller(t.Context(), m.caller), &test.input)
 
-			response, err := service.CreateServiceAccount(auth.WithCaller(ctx, &mockCaller), &test.input)
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, test.expectCreatedServiceAccount.Name, response.ServiceAccount.Name)
-			assert.Equal(t, test.expectCreatedServiceAccount.Description, response.ServiceAccount.Description)
-			assert.Equal(t, test.expectCreatedServiceAccount.GroupID, response.ServiceAccount.GroupID)
+			require.NoError(t, err)
+			assert.Equal(t, serviceAccountName, response.ServiceAccount.Name)
+			assert.Equal(t, serviceAccountDescription, response.ServiceAccount.Description)
+			assert.Equal(t, groupID, response.ServiceAccount.GroupID)
 
 			if test.expectClientCredentialsEnabled {
 				assert.True(t, response.ServiceAccount.ClientCredentialsEnabled())
@@ -600,7 +530,9 @@ func TestCreateServiceAccount(t *testing.T) {
 func TestUpdateServiceAccount(t *testing.T) {
 	serviceAccountID := "12345678-1234-1234-1234-123456789012"
 	groupID := "group-123"
-	resourcePath := "group-name/test-sa"
+	groupPath := "group-name"
+	resourcePath := groupPath + "/test-sa"
+	updatedDescription := "updated"
 	clientSecretExpiry := time.Now().Add(48 * time.Hour)
 
 	existingSA := &models.ServiceAccount{
@@ -617,21 +549,129 @@ func TestUpdateServiceAccount(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
+	type testCase struct {
 		name                           string
 		input                          *UpdateServiceAccountInput
-		existingSA                     *models.ServiceAccount
-		authError                      error
+		setupMocks                     func(*serviceAccountMocks)
 		expectErrCode                  terrs.CodeType
 		expectClientCredentialsEnabled bool
-	}{
+	}
+
+	tests := []testCase{
 		{
-			name: "update description",
+			name: "update description with no memberships",
 			input: &UpdateServiceAccountInput{
 				ID:          serviceAccountID,
-				Description: ptr.String("updated"),
+				Description: &updatedDescription,
 			},
-			existingSA: existingSA,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 0},
+				}, nil)
+
+				updated := *existingSA
+				updated.Description = updatedDescription
+				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, &updated).Return(&updated, nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
+					NamespacePath: &groupPath,
+					Action:        models.ActionUpdate,
+					TargetType:    models.TargetServiceAccount,
+					TargetID:      serviceAccountID,
+				}).Return(&models.ActivityEvent{}, nil)
+			},
+		},
+		{
+			name: "update with memberships when caller is owner",
+			input: &UpdateServiceAccountInput{
+				ID:          serviceAccountID,
+				Description: &updatedDescription,
+			},
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					NamespaceMemberships: []models.NamespaceMembership{
+						{Namespace: models.MembershipNamespace{Path: "other-group"}},
+					},
+					PageInfo: &pagination.PageInfo{TotalCount: 1},
+				}, nil)
+				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).Return(nil)
+
+				updated := *existingSA
+				updated.Description = updatedDescription
+				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, &updated).Return(&updated, nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
+					NamespacePath: &groupPath,
+					Action:        models.ActionUpdate,
+					TargetType:    models.TargetServiceAccount,
+					TargetID:      serviceAccountID,
+				}).Return(&models.ActivityEvent{}, nil)
+			},
+		},
+		{
+			name: "admin bypasses ownership check on service account with memberships",
+			input: &UpdateServiceAccountInput{
+				ID:          serviceAccountID,
+				Description: &updatedDescription,
+			},
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("IsAdmin").Return(true)
+
+				updated := *existingSA
+				updated.Description = updatedDescription
+				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, &updated).Return(&updated, nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
+					NamespacePath: &groupPath,
+					Action:        models.ActionUpdate,
+					TargetType:    models.TargetServiceAccount,
+					TargetID:      serviceAccountID,
+				}).Return(&models.ActivityEvent{}, nil)
+			},
+		},
+		{
+			name: "non-owner cannot update service account with memberships",
+			input: &UpdateServiceAccountInput{
+				ID:          serviceAccountID,
+				Description: &updatedDescription,
+			},
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					NamespaceMemberships: []models.NamespaceMembership{
+						{Namespace: models.MembershipNamespace{Path: "other-group"}},
+					},
+					PageInfo: &pagination.PageInfo{TotalCount: 1},
+				}, nil)
+				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).
+					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
+			expectErrCode: terrs.EForbidden,
 		},
 		{
 			name: "enable client credentials",
@@ -640,74 +680,88 @@ func TestUpdateServiceAccount(t *testing.T) {
 				EnableClientCredentials: ptr.Bool(true),
 				ClientSecretExpiresAt:   &clientSecretExpiry,
 			},
-			existingSA:                     existingSA,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 0},
+				}, nil)
+
+				// Can't match exact model since client secret hash is generated
+				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, mock.Anything).Return(&models.ServiceAccount{
+					Metadata:              existingSA.Metadata,
+					Name:                  existingSA.Name,
+					GroupID:               existingSA.GroupID,
+					Description:           existingSA.Description,
+					OIDCTrustPolicies:     existingSA.OIDCTrustPolicies,
+					ClientSecretHash:      ptr.String("hash"),
+					ClientSecretExpiresAt: &clientSecretExpiry,
+				}, nil)
+				m.transactions.On("BeginTx", mock.Anything).Return(t.Context(), nil)
+				m.transactions.On("RollbackTx", mock.Anything).Return(nil)
+				m.transactions.On("CommitTx", mock.Anything).Return(nil)
+				m.activityEvents.On("CreateActivityEvent", mock.Anything, &activityevent.CreateActivityEventInput{
+					NamespacePath: &groupPath,
+					Action:        models.ActionUpdate,
+					TargetType:    models.TargetServiceAccount,
+					TargetID:      serviceAccountID,
+				}).Return(&models.ActivityEvent{}, nil)
+			},
 			expectClientCredentialsEnabled: true,
 		},
 		{
 			name: "permission denied",
 			input: &UpdateServiceAccountInput{
 				ID:          serviceAccountID,
-				Description: ptr.String("updated"),
+				Description: &updatedDescription,
 			},
-			existingSA:    existingSA,
-			authError:     terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)),
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(existingSA, nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 0},
+				}, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
+					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
 			expectErrCode: terrs.EForbidden,
 		},
 		{
 			name: "not found",
 			input: &UpdateServiceAccountInput{
 				ID:          serviceAccountID,
-				Description: ptr.String("updated"),
+				Description: &updatedDescription,
 			},
-			existingSA:    nil,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(nil, nil)
+			},
 			expectErrCode: terrs.ENotFound,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
-			mockTransactions := db.NewMockTransactions(t)
-			mockActivityEvents := activityevent.NewMockService(t)
-
-			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).
-				Return(test.existingSA, nil)
-
-			if test.existingSA != nil {
-				mockCaller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
-					Return(test.authError)
-
-				if test.authError == nil {
-					mockTransactions.On("BeginTx", mock.Anything).Return(ctx, nil)
-					mockTransactions.On("RollbackTx", mock.Anything).Return(nil)
-					mockTransactions.On("CommitTx", mock.Anything).Return(nil)
-
-					updatedSA := *test.existingSA
-					if test.expectClientCredentialsEnabled {
-						updatedSA.ClientSecretHash = ptr.String("hash")
-						updatedSA.ClientSecretExpiresAt = &clientSecretExpiry
-					}
-					mockServiceAccounts.On("UpdateServiceAccount", mock.Anything, mock.Anything).
-						Return(&updatedSA, nil)
-					mockActivityEvents.On("CreateActivityEvent", mock.Anything, mock.Anything).
-						Return(&models.ActivityEvent{}, nil)
-				}
-			}
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
 			testLogger, _ := logger.NewForTest()
-			dbClient := &db.Client{
-				ServiceAccounts: mockServiceAccounts,
-				Transactions:    mockTransactions,
+			service := &service{
+				logger:                  testLogger,
+				dbClient:                m.dbClient(),
+				activityService:         m.activityEvents,
+				secretMaxExpirationDays: 90,
 			}
 
-			service := &service{logger: testLogger, dbClient: dbClient, activityService: mockActivityEvents, secretMaxExpirationDays: 90}
-
-			response, err := service.UpdateServiceAccount(auth.WithCaller(ctx, &mockCaller), test.input)
+			response, err := service.UpdateServiceAccount(auth.WithCaller(t.Context(), m.caller), test.input)
 
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))
@@ -1197,7 +1251,8 @@ func TestCreateClientCredentialsToken(t *testing.T) {
 
 func TestResetClientCredentials(t *testing.T) {
 	serviceAccountID := "12345678-1234-1234-1234-123456789012"
-	resourcePath := "group-123/test-sa"
+	groupID := "group-123"
+	resourcePath := groupID + "/test-sa"
 
 	saWithClientCreds := &models.ServiceAccount{
 		Metadata: models.ResourceMetadata{
@@ -1206,7 +1261,7 @@ func TestResetClientCredentials(t *testing.T) {
 			Version: 1,
 		},
 		Name:             "test-sa",
-		GroupID:          "group-123",
+		GroupID:          groupID,
 		ClientSecretHash: ptr.String("existing-hash"),
 	}
 
@@ -1216,82 +1271,121 @@ func TestResetClientCredentials(t *testing.T) {
 			TRN: types.ServiceAccountModelType.BuildTRN(resourcePath),
 		},
 		Name:    "test-sa-no-client-creds",
-		GroupID: "group-123",
+		GroupID: groupID,
 	}
 
 	tests := []struct {
-		name           string
-		input          *ResetClientCredentialsInput
-		serviceAccount *models.ServiceAccount
-		authError      error
-		expectErrCode  terrs.CodeType
+		name          string
+		input         *ResetClientCredentialsInput
+		setupMocks    func(*serviceAccountMocks)
+		expectErrCode terrs.CodeType
 	}{
 		{
 			name: "successful reset",
 			input: &ResetClientCredentialsInput{
 				ID: serviceAccountID,
 			},
-			serviceAccount: saWithClientCreds,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 0},
+				}, nil)
+				m.serviceAccounts.On("UpdateServiceAccount", mock.Anything, mock.Anything).Return(saWithClientCreds, nil)
+			},
 		},
 		{
 			name: "service account not found",
 			input: &ResetClientCredentialsInput{
 				ID: serviceAccountID,
 			},
-			serviceAccount: nil,
-			expectErrCode:  terrs.ENotFound,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(nil, nil)
+			},
+			expectErrCode: terrs.ENotFound,
 		},
 		{
 			name: "permission denied",
 			input: &ResetClientCredentialsInput{
 				ID: serviceAccountID,
 			},
-			serviceAccount: saWithClientCreds,
-			authError:      terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)),
-			expectErrCode:  terrs.EForbidden,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 0},
+				}, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
+					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
+			expectErrCode: terrs.EForbidden,
+		},
+		{
+			name: "non-owner cannot reset with memberships",
+			input: &ResetClientCredentialsInput{
+				ID: serviceAccountID,
+			},
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithClientCreds, nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					NamespaceMemberships: []models.NamespaceMembership{
+						{Namespace: models.MembershipNamespace{Path: "other-group"}},
+					},
+					PageInfo: &pagination.PageInfo{TotalCount: 1},
+				}, nil)
+				m.caller.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).
+					Return(terrs.New("forbidden", terrs.WithErrorCode(terrs.EForbidden)))
+			},
+			expectErrCode: terrs.EForbidden,
 		},
 		{
 			name: "client credentials not enabled",
 			input: &ResetClientCredentialsInput{
 				ID: serviceAccountID,
 			},
-			serviceAccount: saWithoutClientCreds,
-			expectErrCode:  terrs.EInvalid,
+			setupMocks: func(m *serviceAccountMocks) {
+				m.serviceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).Return(saWithoutClientCreds, nil)
+				m.caller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).Return(nil)
+				m.caller.On("IsAdmin").Return(false)
+				m.namespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Filter: &db.NamespaceMembershipFilter{
+						ServiceAccountID: &serviceAccountID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					PageInfo: &pagination.PageInfo{TotalCount: 0},
+				}, nil)
+			},
+			expectErrCode: terrs.EInvalid,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			mockCaller := auth.MockCaller{}
-			mockCaller.Test(t)
-
-			mockServiceAccounts := db.NewMockServiceAccounts(t)
-
-			mockServiceAccounts.On("GetServiceAccountByID", mock.Anything, serviceAccountID).
-				Return(test.serviceAccount, nil)
-
-			if test.serviceAccount != nil {
-				mockCaller.On("RequirePermission", mock.Anything, models.UpdateServiceAccountPermission, mock.Anything).
-					Return(test.authError)
-			}
-
-			if test.expectErrCode == "" {
-				mockServiceAccounts.On("UpdateServiceAccount", mock.Anything, mock.Anything).
-					Return(test.serviceAccount, nil)
-			}
+			m := newServiceAccountMocks(t)
+			test.setupMocks(m)
 
 			testLogger, _ := logger.NewForTest()
-			dbClient := &db.Client{ServiceAccounts: mockServiceAccounts}
-
 			service := &service{
 				logger:                  testLogger,
-				dbClient:                dbClient,
+				dbClient:                m.dbClient(),
 				secretMaxExpirationDays: 90,
 			}
 
-			response, err := service.ResetClientCredentials(auth.WithCaller(ctx, &mockCaller), test.input)
+			response, err := service.ResetClientCredentials(auth.WithCaller(t.Context(), m.caller), test.input)
 
 			if test.expectErrCode != "" {
 				assert.Equal(t, test.expectErrCode, terrs.ErrorCode(err))

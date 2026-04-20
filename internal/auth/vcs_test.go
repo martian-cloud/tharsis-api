@@ -149,3 +149,15 @@ func TestVCSWorkspaceLinkCaller_RequireInheritedPermissions(t *testing.T) {
 	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.ApplyModelType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }
+
+func TestVCSWorkspaceLinkCaller_RequireRole(t *testing.T) {
+	caller := VCSWorkspaceLinkCaller{
+		Provider: &models.VCSProvider{
+			Metadata: models.ResourceMetadata{
+				TRN: types.VCSProviderModelType.BuildTRN("group-1/test-provider"),
+			},
+		},
+	}
+	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
+	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+}

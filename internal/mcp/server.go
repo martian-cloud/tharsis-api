@@ -40,10 +40,7 @@ func NewStreamableHTTPHandler(opts *ServerOptions) (http.Handler, error) {
 
 func newServer(opts *ServerOptions) (*mcpsdk.Server, error) {
 	toolContext := tools.NewToolContext(opts.ServicesCatalog, opts.HTTPClient)
-	toolsetGroup, err := tools.BuildToolsetGroup(opts.Config.ReadOnly, toolContext)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build toolset group: %w", err)
-	}
+	toolsetGroup := tools.BuildToolsetGroup(opts.Config.ReadOnly, toolContext)
 
 	// Enable all toolsets by default if none are specified.
 	enabledToolsets := opts.Config.EnabledToolsets

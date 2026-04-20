@@ -12,6 +12,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 func TestGetRootNamespaces(t *testing.T) {
@@ -1409,6 +1410,110 @@ func TestCheckCache(t *testing.T) {
 
 			cacheHit := authorizer.checkCache(&test.key, test.requiredPermissions)
 			assert.Equal(t, test.expectCacheHit, cacheHit)
+		})
+	}
+}
+
+func TestRequireRole(t *testing.T) {
+	userID := "user-1"
+
+	tests := []struct {
+		name                 string
+		expectErrorCode      errors.CodeType
+		roleID               string
+		namespaceMemberships []models.NamespaceMembership
+		constraints          []func(*constraints)
+	}{
+		{
+			name:        "caller has owner role in namespace",
+			roleID:      models.OwnerRoleID.String(),
+			constraints: []func(*constraints){WithNamespacePaths([]string{"ns1"})},
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+		},
+		{
+			name:        "caller has owner role via parent namespace",
+			roleID:      models.OwnerRoleID.String(),
+			constraints: []func(*constraints){WithNamespacePaths([]string{"ns1/ns2"})},
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+		},
+		{
+			name:        "caller has owner role in multiple namespaces",
+			roleID:      models.OwnerRoleID.String(),
+			constraints: []func(*constraints){WithNamespacePaths([]string{"ns1", "ns2"})},
+			namespaceMemberships: []models.NamespaceMembership{
+				{RoleID: models.OwnerRoleID.String(), Namespace: models.MembershipNamespace{Path: "ns1"}},
+			},
+		},
+		{
+			name:            "caller does not have required role",
+			roleID:          models.OwnerRoleID.String(),
+			constraints:     []func(*constraints){WithNamespacePaths([]string{"ns1"})},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "caller has no memberships in namespace",
+			roleID:          models.OwnerRoleID.String(),
+			constraints:     []func(*constraints){WithNamespacePaths([]string{"ns1"})},
+			expectErrorCode: errors.ENotFound,
+		},
+		{
+			name:            "missing constraints",
+			roleID:          models.OwnerRoleID.String(),
+			expectErrorCode: errors.EInternal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			mockNamespaceMemberships := db.NewMockNamespaceMemberships(t)
+			mockCaller := NewMockCaller(t)
+
+			mockCaller.On("GetSubject").Return("testsubject").Maybe()
+			mockCaller.On("UnauthorizedError", mock.Anything, mock.Anything).Return(func(_ context.Context, hasViewerAccess bool) error {
+				if hasViewerAccess {
+					return errors.New("forbidden", errors.WithErrorCode(errors.EForbidden))
+				}
+				return errors.New("not found", errors.WithErrorCode(errors.ENotFound))
+			}).Maybe()
+
+			c := getConstraints(test.constraints...)
+			sortBy := db.NamespaceMembershipSortableFieldNamespacePathDesc
+
+			for _, namespacePath := range c.namespacePaths {
+				mockNamespaceMemberships.On("GetNamespaceMemberships", mock.Anything, &db.GetNamespaceMembershipsInput{
+					Sort: &sortBy,
+					PaginationOptions: &pagination.Options{
+						First: ptr.Int32(0),
+					},
+					Filter: &db.NamespaceMembershipFilter{
+						UserID:         &userID,
+						NamespacePaths: expandNamespaceDescOrder(namespacePath),
+						RoleID:         &test.roleID,
+					},
+				}).Return(&db.NamespaceMembershipResult{
+					NamespaceMemberships: test.namespaceMemberships,
+					PageInfo:             &pagination.PageInfo{TotalCount: int32(len(test.namespaceMemberships))},
+				}, nil)
+			}
+
+			dbClient := db.Client{
+				NamespaceMemberships: mockNamespaceMemberships,
+			}
+
+			authorizer := newNamespaceMembershipAuthorizer(&dbClient, &userID, nil, false)
+
+			err := authorizer.RequireRole(WithCaller(ctx, mockCaller), test.roleID, test.constraints...)
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
