@@ -30,3 +30,8 @@ func TestSystemCaller_RequireInheritedPermissions(t *testing.T) {
 	caller := SystemCaller{}
 	assert.Nil(t, caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunModelType, nil))
 }
+
+func TestSystemCaller_RequireRole(t *testing.T) {
+	caller := SystemCaller{}
+	assert.Nil(t, caller.RequireRole(t.Context(), models.OwnerRoleID.String()))
+}

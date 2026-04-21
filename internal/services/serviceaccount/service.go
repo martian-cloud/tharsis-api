@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -556,9 +557,8 @@ func (s *service) UpdateServiceAccount(ctx context.Context, input *UpdateService
 		return nil, errors.New("service account not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
-	if err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	if err = s.authorizeServiceAccountUpdate(ctx, caller, serviceAccount); err != nil {
+		return nil, err
 	}
 
 	if input.MetadataVersion != nil {
@@ -801,9 +801,8 @@ func (s *service) ResetClientCredentials(ctx context.Context, input *ResetClient
 		return nil, errors.New("service account not found", errors.WithErrorCode(errors.ENotFound), errors.WithSpan(span))
 	}
 
-	err = caller.RequirePermission(ctx, models.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
-	if err != nil {
-		return nil, errors.Wrap(err, "permission check failed", errors.WithSpan(span))
+	if err = s.authorizeServiceAccountUpdate(ctx, caller, serviceAccount); err != nil {
+		return nil, err
 	}
 
 	if !serviceAccount.ClientCredentialsEnabled() {
@@ -879,6 +878,59 @@ func (s *service) verifyOneTrustPolicy(ctx context.Context, inputToken []byte, t
 	}
 
 	_, err := verifier.VerifyToken(ctx, string(inputToken), options)
+	return err
+}
+
+// authorizeServiceAccountUpdate checks authorization for modifying a service account.
+// If the service account has namespace memberships, the caller must be an owner in all of them.
+// Otherwise, falls back to a standard permission check.
+func (s *service) authorizeServiceAccountUpdate(ctx context.Context, caller auth.Caller, serviceAccount *models.ServiceAccount) error {
+	if caller.IsAdmin() {
+		return nil
+	}
+
+	saMemberships, err := s.dbClient.NamespaceMemberships.GetNamespaceMemberships(ctx, &db.GetNamespaceMembershipsInput{
+		Filter: &db.NamespaceMembershipFilter{
+			ServiceAccountID: &serviceAccount.Metadata.ID,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to get service account memberships")
+	}
+
+	if saMemberships.PageInfo.TotalCount == 0 {
+		return caller.RequirePermission(ctx, models.UpdateServiceAccountPermission, auth.WithGroupID(serviceAccount.GroupID))
+	}
+
+	// Since we skip RequirePermission when memberships exist, verify the owner role
+	// includes the update permission to prevent privilege escalation if it's ever removed.
+	ownerPerms, ok := models.OwnerRoleID.Permissions()
+	if !ok {
+		return errors.New("owner role permissions not found")
+	}
+
+	if !slices.Contains(ownerPerms, models.UpdateServiceAccountPermission) {
+		return errors.New("owner role does not include update service account permission")
+	}
+
+	var namespacePaths []string
+	for _, m := range saMemberships.NamespaceMemberships {
+		namespacePaths = append(namespacePaths, m.Namespace.Path)
+	}
+
+	err = caller.RequireRole(ctx, models.OwnerRoleID.String(), auth.WithNamespacePaths(namespacePaths))
+	if err == nil {
+		return nil
+	}
+
+	code := errors.ErrorCode(err)
+	if code == errors.EForbidden || code == errors.ENotFound {
+		return errors.New(
+			"this service account is a member of one or more namespaces; you must be an owner in all of them to modify it",
+			errors.WithErrorCode(errors.EForbidden),
+		)
+	}
+
 	return err
 }
 

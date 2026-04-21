@@ -1,8 +1,6 @@
 package tools
 
 import (
-	"fmt"
-
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/mcp/tools"
 )
 
@@ -48,7 +46,7 @@ func AllToolsets() []string {
 }
 
 // BuildToolsetGroup creates and configures all toolsets for the API MCP server.
-func BuildToolsetGroup(readOnly bool, tc *ToolContext) (*tools.ToolsetGroup, error) {
+func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 	group := tools.NewToolsetGroup(readOnly)
 
 	// Apply tools
@@ -58,10 +56,7 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) (*tools.ToolsetGroup, err
 		)
 
 	// Documentation tools
-	docService, err := tools.NewDocumentSearchService(tc.httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create documentation search service: %v", err)
-	}
+	docService := tools.NewDocumentSearchService(tc.httpClient)
 
 	documentation := tools.NewToolset(ToolsetMetadataDocumentation).
 		AddReadTools(
@@ -102,5 +97,5 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) (*tools.ToolsetGroup, err
 	group.AddToolset(runs)
 	group.AddToolset(workspaces)
 
-	return group, nil
+	return group
 }

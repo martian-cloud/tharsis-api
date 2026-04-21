@@ -227,3 +227,48 @@ func TestUserCaller_RequireInheritedPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestUserCaller_RequireRole(t *testing.T) {
+	caller := UserCaller{User: &models.User{Metadata: models.ResourceMetadata{ID: "user1"}, Email: "user@email"}}
+	ctx := WithCaller(t.Context(), &caller)
+
+	testCases := []struct {
+		name            string
+		expectErrorCode errors.CodeType
+		isAdmin         bool
+		authorizerError error
+	}{
+		{
+			name:    "admin bypasses role check",
+			isAdmin: true,
+		},
+		{
+			name: "non-admin delegates to authorizer",
+		},
+		{
+			name:            "non-admin denied by authorizer",
+			authorizerError: errors.New("forbidden", errors.WithErrorCode(errors.EForbidden)),
+			expectErrorCode: errors.EForbidden,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			mockAuthorizer := NewMockAuthorizer(t)
+
+			if !test.isAdmin {
+				mockAuthorizer.On("RequireRole", mock.Anything, models.OwnerRoleID.String(), mock.Anything).Return(test.authorizerError)
+			}
+
+			caller.User.Admin = test.isAdmin
+			caller.authorizer = mockAuthorizer
+
+			err := caller.RequireRole(ctx, models.OwnerRoleID.String(), WithNamespacePaths([]string{"ns1"}))
+			if test.expectErrorCode != "" {
+				assert.Equal(t, test.expectErrorCode, errors.ErrorCode(err))
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}

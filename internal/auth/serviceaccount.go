@@ -98,6 +98,11 @@ func (s *ServiceAccountCaller) RequirePermission(ctx context.Context, perm model
 	return s.authorizer.RequireAccess(ctx, []models.Permission{perm}, checks...)
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (s *ServiceAccountCaller) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
+	return s.authorizer.RequireRole(ctx, roleID, checks...)
+}
+
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (s *ServiceAccountCaller) RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error {
 

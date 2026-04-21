@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 )
 
@@ -28,9 +27,8 @@ func TestBuildToolsetGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tc := &ToolContext{servicesCatalog: &services.Catalog{}}
-			group, err := BuildToolsetGroup(tt.readOnly, tc)
+			group := BuildToolsetGroup(tt.readOnly, tc)
 
-			require.NoError(t, err)
 			assert.NotNil(t, group)
 			assert.True(t, group.HasToolsets())
 

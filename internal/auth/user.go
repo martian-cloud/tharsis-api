@@ -116,6 +116,15 @@ func (u *UserCaller) RequirePermission(ctx context.Context, perm models.Permissi
 	return u.authorizer.RequireAccess(ctx, []models.Permission{perm}, checks...)
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (u *UserCaller) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
+	if u.User.Admin {
+		return nil
+	}
+
+	return u.authorizer.RequireRole(ctx, roleID, checks...)
+}
+
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (u *UserCaller) RequireAccessToInheritableResource(ctx context.Context, modelType types.ModelType, checks ...func(*constraints)) error {
 	perm := models.Permission{Action: models.ViewAction, ResourceType: modelType.Name()}

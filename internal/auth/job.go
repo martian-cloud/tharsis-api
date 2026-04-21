@@ -111,6 +111,11 @@ func (j *JobCaller) RequirePermission(ctx context.Context, perm models.Permissio
 	return handlerFunc(ctx, &perm, getConstraints(checks...))
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (j *JobCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
+	return j.UnauthorizedError(ctx, false)
+}
+
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (j *JobCaller) RequireAccessToInheritableResource(ctx context.Context, _ types.ModelType, checks ...func(*constraints)) error {
 	c := getConstraints(checks...)

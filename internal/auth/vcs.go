@@ -98,6 +98,11 @@ func (v *VCSWorkspaceLinkCaller) RequireAccessToInheritableResource(ctx context.
 	return v.UnauthorizedError(ctx, false)
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (v *VCSWorkspaceLinkCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
+	return v.UnauthorizedError(ctx, false)
+}
+
 // requireAccessToWorkspace will return an error if the caller doesn't have permission to view the specified workspace.
 func (v *VCSWorkspaceLinkCaller) requireAccessToWorkspace(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.workspaceID == nil {

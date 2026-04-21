@@ -163,6 +163,11 @@ func (f *FederatedRegistryCaller) RequirePermission(ctx context.Context, _ model
 	return f.UnauthorizedError(ctx, false)
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (f *FederatedRegistryCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
+	return f.UnauthorizedError(ctx, false)
+}
+
 // RequireAccessToInheritableResource will return an error if caller doesn't have permissions to inherited resources.
 func (f *FederatedRegistryCaller) RequireAccessToInheritableResource(ctx context.Context,
 	modelType types.ModelType, checks ...func(*constraints),

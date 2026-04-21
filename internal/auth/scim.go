@@ -99,6 +99,11 @@ func (s *SCIMCaller) RequireAccessToInheritableResource(ctx context.Context, _ t
 	return s.UnauthorizedError(ctx, false)
 }
 
+// RequireRole will return an error if the caller doesn't have the specified role.
+func (s *SCIMCaller) RequireRole(ctx context.Context, _ string, _ ...func(*constraints)) error {
+	return s.UnauthorizedError(ctx, false)
+}
+
 // requireTeamDeleteAccess will return an error if the specified access is not allowed to the indicated team.
 func (s *SCIMCaller) requireTeamDeleteAccess(ctx context.Context, _ *models.Permission, checks *constraints) error {
 	if checks.teamID == nil {

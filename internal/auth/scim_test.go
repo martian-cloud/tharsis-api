@@ -157,3 +157,9 @@ func TestSCIMCaller_RequireInheritedPermissions(t *testing.T) {
 	err := caller.RequireAccessToInheritableResource(WithCaller(context.Background(), &caller), types.RunnerModelType, nil)
 	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
 }
+
+func TestSCIMCaller_RequireRole(t *testing.T) {
+	caller := SCIMCaller{}
+	err := caller.RequireRole(WithCaller(t.Context(), &caller), models.OwnerRoleID.String())
+	assert.Equal(t, errors.ENotFound, errors.ErrorCode(err))
+}

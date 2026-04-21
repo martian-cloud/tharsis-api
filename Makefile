@@ -13,7 +13,7 @@ MIGRATE := docker run -v $(shell pwd)/internal/db/migrations:/migrations --netwo
 .PHONY: build-tharsis
 build-tharsis:  ## build the tharsis binary (includes UI)
 	@echo "Building UI..."
-	@cd frontend && npm install >/dev/null && npm run build
+	@cd frontend && npm ci >/dev/null && npm run build
 	@echo "Building tharsis binary..."
 	CGO_ENABLED=0 go build ${LDFLAGS} -a -o apiserver $(MODULE)/cmd/apiserver
 
@@ -44,7 +44,7 @@ lint: ## run linting on Go and UI code
 		exit 1; \
 	fi
 	@echo "Linting UI code..."
-	@cd frontend && npm install >/dev/null && npm run lint
+	@cd frontend && npm ci >/dev/null && npm run lint
 
 .PHONY: vet
 vet: ## run golint on all Go package
@@ -89,11 +89,11 @@ integration: ## run DB layer integration tests
 # UI targets
 .PHONY: build-ui
 build-ui: ## build the UI for production
-	cd frontend && npm install >/dev/null && npm run build
+	cd frontend && npm ci >/dev/null && npm run build
 
 .PHONY: dev-ui
 dev-ui: ## start the UI development server
-	cd frontend && npm install && npm start
+	cd frontend && npm ci && npm start
 
 .PHONY: relay
 relay: ## run the UI relay compiler

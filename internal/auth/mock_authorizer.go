@@ -95,6 +95,31 @@ func (_m *MockAuthorizer) RequireAccessToInheritableResource(ctx context.Context
 	return r0
 }
 
+// RequireRole provides a mock function with given fields: ctx, roleID, checks
+func (_m *MockAuthorizer) RequireRole(ctx context.Context, roleID string, checks ...func(*constraints)) error {
+	_va := make([]interface{}, len(checks))
+	for _i := range checks {
+		_va[_i] = checks[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, roleID)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequireRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...func(*constraints)) error); ok {
+		r0 = rf(ctx, roleID, checks...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // NewMockAuthorizer creates a new instance of MockAuthorizer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockAuthorizer(t interface {
