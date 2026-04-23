@@ -8,7 +8,11 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -624,4 +628,71 @@ func TestChecksums_ZipHash(t *testing.T) {
 		assert.False(t, ok)
 		assert.Empty(t, hash)
 	})
+}
+
+func TestVerifySumsSignature(t *testing.T) {
+	// Generate a key with a 1-second lifetime created in the past so it's already expired at current time.
+	pastTime := time.Now().Add(-24 * time.Hour)
+	pastConfig := &packet.Config{
+		KeyLifetimeSecs: 1,
+		Time:            func() time.Time { return pastTime },
+	}
+
+	entity, err := openpgp.NewEntity("test", "", "test@test.com", pastConfig)
+	require.NoError(t, err)
+
+	// Sign data using the past time when the key was still valid.
+	data := []byte("test checksums data")
+	var sigBuf bytes.Buffer
+	err = openpgp.DetachSign(&sigBuf, entity, bytes.NewReader(data), pastConfig)
+	require.NoError(t, err)
+
+	// Armor the public key.
+	var keyBuf bytes.Buffer
+	armorWriter, err := armor.Encode(&keyBuf, "PGP PUBLIC KEY BLOCK", nil)
+	require.NoError(t, err)
+	err = entity.Serialize(armorWriter)
+	require.NoError(t, err)
+	err = armorWriter.Close()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		gpgKeys   []string
+		data      []byte
+		signature []byte
+		expectErr bool
+	}{
+		{
+			name:      "expired key should be accepted",
+			gpgKeys:   []string{keyBuf.String()},
+			data:      data,
+			signature: sigBuf.Bytes(),
+		},
+		{
+			name:      "wrong data should fail",
+			gpgKeys:   []string{keyBuf.String()},
+			data:      []byte("wrong data"),
+			signature: sigBuf.Bytes(),
+			expectErr: true,
+		},
+		{
+			name:      "no matching key should fail",
+			gpgKeys:   []string{},
+			data:      data,
+			signature: sigBuf.Bytes(),
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := verifySumsSignature(bytes.NewReader(test.data), bytes.NewReader(test.signature), test.gpgKeys)
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

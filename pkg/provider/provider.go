@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	openpgpErrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 	"github.com/apparentlymart/go-versions/versions"
 	tfaddr "github.com/hashicorp/terraform-registry-address"
 	svchost "github.com/hashicorp/terraform-svchost"
@@ -432,7 +433,19 @@ func verifySumsSignature(checksums, signature io.Reader, gpgKeys []string) error
 			return err
 		}
 
-		if _, err := openpgp.CheckDetachedSignature(entityList, checksums, signature, nil); err == nil {
+		_, err = openpgp.CheckDetachedSignature(entityList, checksums, signature, nil)
+		if err == nil {
+			matchFound = true
+			break
+		}
+
+		// Ignore expired keys since providers are not required to update signing
+		// keys for older releases, so keys may have expired since the provider
+		// was published. The original signature was already verified by the
+		// registry at upload time. The openpgp library checks signature details
+		// last, so ErrKeyExpired means all other validation has already passed.
+		// See: https://github.com/hashicorp/terraform/blob/80a9d6b94530d25858c818fcf61a986afb7c030d/internal/getproviders/package_authentication.go#L460
+		if err == openpgpErrors.ErrKeyExpired {
 			matchFound = true
 			break
 		}
