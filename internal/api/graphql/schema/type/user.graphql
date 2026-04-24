@@ -63,6 +63,7 @@ type User implements Node {
   admin: Boolean!
   active: Boolean!
   scimExternalId: String
+  agentCreditUsage: Float!
   activityEvents(
     after: String
     before: String

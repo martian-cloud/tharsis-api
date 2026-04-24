@@ -39,7 +39,7 @@ type run struct {
 
 // getRunInput defines the parameters for retrieving a run.
 type getRunInput struct {
-	ID string `json:"id" jsonschema:"required,Run ID or TRN (e.g. Ul8yZ... or trn:run:workspace-path/run-id)"`
+	ID string `json:"id" jsonschema:"required, Run ID or TRN"`
 }
 
 // getRunOutput wraps the run response.

@@ -233,4 +233,5 @@ type Query {
     active: Boolean
   ): AnnouncementConnection!
   version: Version!
+  agentTrace(input: AgentTraceInput!): String
 }

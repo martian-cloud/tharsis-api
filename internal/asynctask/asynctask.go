@@ -12,6 +12,7 @@ import (
 // Manager handles the lifecycle for async tasks
 type Manager interface {
 	StartTask(fn func(ctx context.Context))
+	Timeout() time.Duration
 	Shutdown()
 }
 
@@ -24,6 +25,10 @@ type manager struct {
 // NewManager creates a new Manager instance
 func NewManager(taskTimeout time.Duration) Manager {
 	return &manager{taskTimeout: taskTimeout}
+}
+
+func (m *manager) Timeout() time.Duration {
+	return m.taskTimeout
 }
 
 // StartTask starts a new async task

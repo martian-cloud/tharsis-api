@@ -9,17 +9,16 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useState } from 'react';
 import { PreloadedQuery, useFragment, usePreloadedQuery } from 'react-relay/hooks';
-import { useSearchParams, useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import remarkGfm from 'remark-gfm';
 import MuiMarkdown from '../common/Markdown';
 import TRNButton from '../common/TRNButton';
 import ListSkeleton from '../skeletons/ListSkeleton';
-import TerraformProviderVersionDetailsSidebar, { SidebarWidth } from './TerraformProviderVersionDetailsSidebar';
-import TerraformProviderVersionList from './TerraformProviderVersionList';
 import { TerraformProviderVersionDetailsIndexFragment_details$key } from './__generated__/TerraformProviderVersionDetailsIndexFragment_details.graphql';
 import { TerraformProviderVersionDetailsQuery } from './__generated__/TerraformProviderVersionDetailsQuery.graphql';
+import TerraformProviderVersionDetailsSidebar, { SidebarWidth } from './TerraformProviderVersionDetailsSidebar';
+import TerraformProviderVersionList from './TerraformProviderVersionList';
 
 const query = graphql`
     query TerraformProviderVersionDetailsQuery($registryNamespace: String!, $providerName: String!, $version: String) {
@@ -182,7 +181,6 @@ function TerraformProviderVersionDetailsIndex(props: IndexProps) {
           <React.Fragment>
             {tab === 'readme' && <MuiMarkdown
               children={data.readme}
-              remarkPlugins={[remarkGfm]}
             />}
             {tab === 'usage' && <Box marginTop={2} position="relative">
               <IconButton sx={{ padding: 2, position: 'absolute', top: 0, right: 0 }} onClick={() => navigator.clipboard.writeText(usageInfo)}>

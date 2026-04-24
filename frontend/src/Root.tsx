@@ -1,15 +1,17 @@
 import { CircularProgress } from '@mui/material';
 import Box from '@mui/material/Box';
+import graphql from 'babel-plugin-relay/macro';
 import React, { Suspense, useEffect } from 'react';
+import { PreloadedQuery, usePreloadedQuery, useQueryLoader } from 'react-relay/hooks';
+import { RootQuery } from './__generated__/RootQuery.graphql';
+import { useAgentCopilot } from './ai/AgentCopilotProvider';
+import AgentSessionChatSidebar from './ai/AgentSessionChatSidebar';
+import { ApiConfig, ApiConfigContext } from './ApiConfigContext';
+import { AppHeaderHeightProvider, useAppHeaderHeight } from './contexts/AppHeaderHeightProvider';
 import ErrorBoundary from './ErrorBoundary';
 import AppHeader from './nav/AppHeader';
 import AppRoutes from './routes/AppRoutes';
-import graphql from 'babel-plugin-relay/macro';
-import { PreloadedQuery, usePreloadedQuery, useQueryLoader } from 'react-relay/hooks';
-import { RootQuery } from './__generated__/RootQuery.graphql';
 import { User, UserContext } from './UserContext';
-import { AppHeaderHeightProvider, useAppHeaderHeight } from './contexts/AppHeaderHeightProvider';
-import { ApiConfig, ApiConfigContext } from './ApiConfigContext';
 
 const query = graphql`
     query RootQuery {
@@ -25,6 +27,7 @@ const query = graphql`
             tharsisSupportUrl
             serviceDiscoveryHost
             serviceAccountClientSecretMaxExpirationDays
+            aiEnabled
         }
         ...AppHeaderFragment
     }
@@ -62,11 +65,12 @@ function Root({ queryRef }: Props) {
 
 function RootContent({ fragmentRef }: { fragmentRef: RootQuery['response'] }) {
     const { headerHeight } = useAppHeaderHeight();
+    const { sidebarWidth: agentCopilotSidebarWidth } = useAgentCopilot();
 
     return (
         <>
             <AppHeader fragmentRef={fragmentRef} />
-            <Box sx={{ paddingTop: `${headerHeight}px` }}>
+            <Box sx={{ paddingTop: `${headerHeight}px`, marginRight: `${agentCopilotSidebarWidth}px`, transition: 'margin-right 0.2s ease' }}>
                 <ErrorBoundary>
                     <Suspense fallback={<Box
                         sx={{
@@ -86,6 +90,7 @@ function RootContent({ fragmentRef }: { fragmentRef: RootQuery['response'] }) {
                     </Suspense>
                 </ErrorBoundary>
             </Box>
+            <AgentSessionChatSidebar />
         </>
     );
 }

@@ -66,7 +66,9 @@ function ActivityEventListItem({ fragmentRef, icon, primary, secondary }: Props)
                         </Typography>
                         <Timestamp ml={2} variant="body2" color="textSecondary" timestamp={data.metadata.createdAt} />
                     </Box>
-                    <Typography variant="body1">{primary}</Typography>
+                    <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
+                        {primary}
+                    </Typography>
                 </Box>
                 {secondary && <Box mt={1} display="flex">
                     {secondary}

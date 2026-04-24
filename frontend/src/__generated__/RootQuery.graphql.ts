@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ea1c1793cc4bd2339cb52a7108496cf2>>
+ * @generated SignedSource<<166ec720cd3bc49986d0a3c6d212f163>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -13,6 +13,7 @@ import { FragmentRefs } from "relay-runtime";
 export type RootQuery$variables = Record<PropertyKey, never>;
 export type RootQuery$data = {
   readonly config: {
+    readonly aiEnabled: boolean;
     readonly serviceAccountClientSecretMaxExpirationDays: number;
     readonly serviceDiscoveryHost: string;
     readonly tharsisSupportUrl: string;
@@ -94,6 +95,13 @@ v2 = {
       "args": null,
       "kind": "ScalarField",
       "name": "serviceAccountClientSecretMaxExpirationDays",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "aiEnabled",
       "storageKey": null
     }
   ],
@@ -204,16 +212,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "36c74ef049e43b1a84697d08120ee8a9",
+    "cacheID": "731ac7051d41349012aa6b58f7df3cee",
     "id": null,
     "metadata": {},
     "name": "RootQuery",
     "operationKind": "query",
-    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    serviceAccountClientSecretMaxExpirationDays\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
+    "text": "query RootQuery {\n  me {\n    __typename\n    ... on User {\n      id\n      username\n      email\n      admin\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  config {\n    tharsisSupportUrl\n    serviceDiscoveryHost\n    serviceAccountClientSecretMaxExpirationDays\n    aiEnabled\n  }\n  ...AppHeaderFragment\n}\n\nfragment AccountMenuFragment on Query {\n  version {\n    version\n    dbMigrationVersion\n    dbMigrationDirty\n    buildTimestamp\n  }\n}\n\nfragment AppHeaderFragment on Query {\n  ...AccountMenuFragment\n}\n"
   }
 };
 })();
 
-(node as any).hash = "cf11f8c26b43518c8eb2e1bfb057ee66";
+(node as any).hash = "e1e4603f26e568e13ae3d3ad0eb29d92";
 
 export default node;

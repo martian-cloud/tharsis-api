@@ -4,6 +4,7 @@ export interface ApiConfig {
     tharsisSupportUrl: string;
     serviceDiscoveryHost: string;
     serviceAccountClientSecretMaxExpirationDays: number;
+    aiEnabled: boolean;
 }
 
 // ApiConfig will never be null so it's safe to use an empty object as the default value here

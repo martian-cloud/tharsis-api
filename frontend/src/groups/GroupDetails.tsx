@@ -36,6 +36,7 @@ import GroupNotificationPreference from '../notifications/GroupNotificationPrefe
 import TerraformModules from './terraformmodule/TerraformModules';
 import GroupRuns from './GroupRuns';
 import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
+import { useAgentCopilot } from '../ai/AgentCopilotProvider';
 
 const TABS = ['workspaces', 'subgroups'];
 
@@ -133,6 +134,7 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
+    const { setState: setCopilotState } = useAgentCopilot();
 
     const data = useFragment<GroupDetailsIndexFragment_group$key>(
         graphql`
@@ -215,6 +217,16 @@ function GroupDetailsIndex(props: GroupDetailsIndexProps) {
             setShowDeleteConfirmationDialog(false);
         }
     };
+
+    useEffect(() => {
+        setCopilotState({
+            contextMessage: `The user is currently viewing the tharsis group ${data.fullPath} with ID: ${data.id}.`,
+            suggestions: []
+        });
+        return () => {
+            setCopilotState(undefined);
+        }
+    }, [data.fullPath, setCopilotState]);
 
     return (
         <Box>

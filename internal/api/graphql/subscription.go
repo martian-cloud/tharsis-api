@@ -24,15 +24,16 @@ const (
 
 // subscriptionAuthenticator is used to authenticate graphql subscription requests. The BuildContext function will be called
 // when the connection is established; therefore, the caller will be added to the context if the request has a valid token.
-type subscriptionAuthenticator struct{}
+type subscriptionAuthenticator struct {
+	tharsisUIOrigin string
+}
 
 func (c *subscriptionAuthenticator) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
 	// subscriptions must always be authenticated
 	caller, err := auth.AuthorizeCaller(r.Context())
-	if err != nil && err != auth.ErrNoCaller {
-		// We only return the error here if the request had an invalid caller. If the request
-		// does not contain any caller then we continue since this subscription may be using connection
-		// params to authenticate the caller.
+	if err != nil && r.Header.Get("Origin") == c.tharsisUIOrigin {
+		// We only return the error here if the request has an invalid caller and is coming from the Tharsis UI.
+		// This allows other clients using the SDK to pass the auth token via the connection params instead of using cookie based authentication
 		return nil, err
 	}
 
@@ -51,6 +52,7 @@ func newSubscriptionHandler(
 	loaders *loader.Collection,
 	authenticator auth.Authenticator,
 	maxConnectionDuration time.Duration,
+	tharsisUIOrigin string,
 ) http.HandlerFunc {
 	return graphqlws.NewHandlerFunc(
 		&graphqlSubscriptions{schema: schema, authenticator: authenticator},
@@ -61,7 +63,7 @@ func newSubscriptionHandler(
 			// Disable cache for subscriptions since they don't refresh the context per response
 			disableCache: true,
 		}),
-		graphqlws.WithContextGenerator(&subscriptionAuthenticator{}),
+		graphqlws.WithContextGenerator(&subscriptionAuthenticator{tharsisUIOrigin: tharsisUIOrigin}),
 		graphqlws.WithReadLimit(graphqlSubscriptionMaxMessageSize),
 		graphqlws.WithWriteTimeout(graphqlSubscriptionWriteTimeout),
 		graphqlws.WithConnectionTimeout(maxConnectionDuration),

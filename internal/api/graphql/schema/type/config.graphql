@@ -31,6 +31,7 @@ type Config {
   jwsProviderPluginType: String!
   secretManagerPluginType: String!
   emailClientPluginType: String!
+  aiEnabled: Boolean!
   oauthProviders: [IdpConfig!]!
   federatedRegistryTrustPolicies: [FederatedRegistryTrustPolicy!]!
   internalRunners: [RunnerConfig!]!

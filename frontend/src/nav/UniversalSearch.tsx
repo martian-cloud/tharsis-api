@@ -276,7 +276,7 @@ function UniversalSearch() {
         <Box sx={{
             width: '100%',
             maxWidth: 600,
-            minWidth: 300,
+            minWidth: 200,
             [theme.breakpoints.down('lg')]: {
                 maxWidth: 400,
             },

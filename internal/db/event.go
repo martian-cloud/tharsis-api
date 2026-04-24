@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	eventTableJobs           = "jobs"
-	eventTableLogStreams     = "log_streams"
-	eventTableRuns           = "runs"
-	eventTableRunnerSessions = "runner_sessions"
+	eventTableJobs             = "jobs"
+	eventTableLogStreams       = "log_streams"
+	eventTableRuns             = "runs"
+	eventTableRunnerSessions   = "runner_sessions"
+	eventTableAgentSessionRuns = "agent_session_runs"
 )
 
 // Events provides the ability to listen for async events from the database
@@ -59,6 +60,15 @@ type RunEventData struct {
 type RunnerSessionEventData struct {
 	ID       string `json:"id"`
 	RunnerID string `json:"runner_id"`
+}
+
+// AgentSessionRunEventData contains the event response data for a row from the agent_session_runs table.
+type AgentSessionRunEventData struct {
+	ID            string  `json:"id"`
+	SessionID     string  `json:"session_id"`
+	LastMessageID *string `json:"last_message_id"`
+	Status        string  `json:"status"`
+	ErrorMessage  *string `json:"error_message"`
 }
 
 type events struct {
@@ -198,6 +208,20 @@ func (e *Event) ToRunnerSessionEventData() (*RunnerSessionEventData, error) {
 	d := RunnerSessionEventData{}
 	if err := json.Unmarshal(e.Data, &d); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal db runner_sessions event data, %v", err)
+	}
+
+	return &d, nil
+}
+
+// ToAgentSessionRunEventData is a shorthand method to return type-checked event data.
+func (e *Event) ToAgentSessionRunEventData() (*AgentSessionRunEventData, error) {
+	if e.Table != eventTableAgentSessionRuns {
+		return nil, fmt.Errorf("invalid event table, expected '%s': %s", eventTableAgentSessionRuns, e.Table)
+	}
+
+	d := AgentSessionRunEventData{}
+	if err := json.Unmarshal(e.Data, &d); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal db agent_session_runs event data, %v", err)
 	}
 
 	return &d, nil

@@ -125,6 +125,10 @@ type Client struct {
 	NotificationPreferences          NotificationPreferences
 	FederatedRegistries              FederatedRegistries
 	NamespaceFavorites               NamespaceFavorites
+	AgentSessions                    AgentSessions
+	AgentSessionRuns                 AgentSessionRuns
+	AgentSessionMessages             AgentSessionMessages
+	AgentCreditQuotas                AgentCreditQuotas
 }
 
 // NewClient creates a new Client
@@ -233,6 +237,10 @@ func NewClient(
 	dbClient.NotificationPreferences = NewNotificationPreferences(dbClient)
 	dbClient.FederatedRegistries = NewFederatedRegistries(dbClient)
 	dbClient.NamespaceFavorites = NewNamespaceFavorites(dbClient)
+	dbClient.AgentSessions = NewAgentSessions(dbClient)
+	dbClient.AgentSessionRuns = NewAgentSessionRuns(dbClient)
+	dbClient.AgentSessionMessages = NewAgentSessionMessages(dbClient)
+	dbClient.AgentCreditQuotas = NewAgentCreditQuotas(dbClient)
 
 	return dbClient, nil
 }

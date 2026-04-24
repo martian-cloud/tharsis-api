@@ -6,9 +6,10 @@ import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import moment, { Moment } from 'moment';
 import { useSnackbar } from 'notistack';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useAgentCopilot } from '../../ai/AgentCopilotProvider';
 import { ApiConfigContext } from '../../ApiConfigContext';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import CopyButton from '../../common/CopyButton';
@@ -34,6 +35,7 @@ function ServiceAccountDetails(props: Props) {
     const { id } = useParams();
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
+    const { setState: setCopilotState } = useAgentCopilot();
     const [searchParams, setSearchParams] = useSearchParams();
     const [menuAnchorEl, setMenuAnchorEl] = useState<Element | null>(null);
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
@@ -191,6 +193,18 @@ function ServiceAccountDetails(props: Props) {
         setMenuAnchorEl(null);
         actionCallback();
     };
+
+    useEffect(() => {
+        if (data.serviceAccount) {
+            setCopilotState({
+                contextMessage: `The user is currently viewing service account "${data.serviceAccount.name}" with ID: ${serviceAccountId}.`,
+                suggestions: []
+            });
+        }
+        return () => {
+            setCopilotState(undefined);
+        };
+    }, [serviceAccountId, data.serviceAccount, setCopilotState]);
 
     const secretExpiresSoon = data.serviceAccount?.clientCredentialsEnabled &&
         data.serviceAccount.clientSecretExpiresAt &&

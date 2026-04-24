@@ -1293,6 +1293,12 @@ func (s *service) ApplyRun(ctx context.Context, runID string, comment *string) (
 		)
 	}
 
+	if apply.Status != models.ApplyCreated {
+		return nil, errors.New(
+			"the apply phase has already been started for this run",
+			errors.WithErrorCode(errors.EConflict))
+	}
+
 	apply.Status = models.ApplyQueued
 	apply.TriggeredBy = caller.GetSubject()
 

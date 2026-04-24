@@ -54,6 +54,7 @@ func TestToolsetMetadata(t *testing.T) {
 		{"plans", ToolsetMetadataPlans.Name, ToolsetMetadataPlans.Description},
 		{"runs", ToolsetMetadataRuns.Name, ToolsetMetadataRuns.Description},
 		{"workspaces", ToolsetMetadataWorkspaces.Name, ToolsetMetadataWorkspaces.Description},
+		{"groups", ToolsetMetadataGroups.Name, ToolsetMetadataGroups.Description},
 	}
 
 	for _, tt := range tests {
@@ -67,11 +68,12 @@ func TestToolsetMetadata(t *testing.T) {
 func TestAllToolsets(t *testing.T) {
 	toolsets := AllToolsets()
 
-	assert.Len(t, toolsets, 6)
+	assert.Len(t, toolsets, 7)
 	assert.Contains(t, toolsets, "apply")
 	assert.Contains(t, toolsets, "documentation")
 	assert.Contains(t, toolsets, "job")
 	assert.Contains(t, toolsets, "plan")
 	assert.Contains(t, toolsets, "run")
 	assert.Contains(t, toolsets, "workspace")
+	assert.Contains(t, toolsets, "group")
 }

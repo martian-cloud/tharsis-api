@@ -7,11 +7,12 @@ import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import graphql from 'babel-plugin-relay/macro';
 import { useSnackbar } from 'notistack';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFragment, useLazyLoadQuery, useMutation } from "react-relay/hooks";
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useAgentCopilot } from '../../ai/AgentCopilotProvider';
 import config from '../../common/config';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import TRNButton from '../../common/TRNButton';
@@ -103,6 +104,7 @@ function ManagedIdentityDetails(props: Props) {
     const [searchParams, setSearchParams] = useSearchParams();
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
+    const { setState: setCopilotState } = useAgentCopilot();
     const [menuAnchorEl, setMenuAnchorEl] = useState<Element | null>(null);
     const [showDeleteConfirmationDialog, setShowDeleteConfirmationDialog] = useState<boolean>(false);
     const [showMoveManagedIdentityDialog, setShowMoveManagedIdentityDialog] = useState<boolean>(false);
@@ -255,6 +257,18 @@ function ManagedIdentityDetails(props: Props) {
     const onMenuClose = () => {
         setMenuAnchorEl(null);
     };
+
+    useEffect(() => {
+        if (data.managedIdentity) {
+            setCopilotState({
+                contextMessage: `The user is currently viewing managed identity "${data.managedIdentity.name}" (type: ${data.managedIdentity.type}) with ID: ${managedIdentityId}.`,
+                suggestions: []
+            });
+        }
+        return () => {
+            setCopilotState(undefined);
+        };
+    }, [managedIdentityId, data.managedIdentity, setCopilotState]);
 
     const onMenuAction = (actionCallback: () => void) => {
         setMenuAnchorEl(null);

@@ -127,9 +127,13 @@ func (r *httpDocumentRepository) getSearchIndex(ctx context.Context) (*searchInd
 
 // getPageContent fetches markdown content by appending .md to the URL.
 func (r *httpDocumentRepository) getPageContent(ctx context.Context, urlPath string) (string, error) {
-	fullURL, err := url.JoinPath(docsBaseURL, urlPath+".md")
+	fullURL, err := url.JoinPath(docsBaseURL, urlPath)
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
+	}
+
+	if !strings.HasSuffix(fullURL, ".md") {
+		fullURL += ".md"
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)

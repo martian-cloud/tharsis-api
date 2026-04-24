@@ -81,6 +81,7 @@ type Config struct {
 	JWSProviderPluginData    map[string]string `yaml:"jws_provider_plugin_data" sensitive:"true"`
 	SecretManagerPluginData  map[string]string `yaml:"secret_manager_plugin_data" sensitive:"true"`
 	EmailClientPluginData    map[string]string `yaml:"email_client_plugin_data" sensitive:"true"`
+	LLMClientPluginData      map[string]string `yaml:"llm_client_plugin_data" sensitive:"true"`
 
 	// Plugin Type
 	ObjectStorePluginType    string `yaml:"object_store_plugin_type" env:"OBJECT_STORE_PLUGIN_TYPE"`
@@ -88,8 +89,11 @@ type Config struct {
 	JWSProviderPluginType    string `yaml:"jws_provider_plugin_type" env:"JWS_PROVIDER_PLUGIN_TYPE"`
 	SecretManagerPluginType  string `yaml:"secret_manager_plugin_type" env:"SECRET_MANAGER_PLUGIN_TYPE"`
 	EmailClientPluginType    string `yaml:"email_client_plugin_type" env:"EMAIL_CLIENT_PLUGIN_TYPE"`
+	LLMClientPluginType      string `yaml:"llm_client_plugin_type" env:"LLM_CLIENT_PLUGIN_TYPE"`
 
 	DisableSensitiveVariableFeature bool `yaml:"disable_sensitive_variable_feature" env:"DISABLE_SENSITIVE_VARIABLE_FEATURE"`
+
+	AIEnabled bool `yaml:"ai_enabled" env:"AI_ENABLED"`
 
 	EmailFooter string `yaml:"email_footer" env:"EMAIL_FOOTER"`
 
@@ -332,6 +336,10 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 		c.EmailClientPluginData = make(map[string]string)
 	}
 
+	if c.LLMClientPluginData == nil {
+		c.LLMClientPluginData = make(map[string]string)
+	}
+
 	// Load JWS Provider plugin data
 	for k, v := range loadPluginData("THARSIS_JWS_PROVIDER_PLUGIN_DATA_") {
 		c.JWSProviderPluginData[k] = v
@@ -355,6 +363,11 @@ func Load(file string, logger logger.Logger) (*Config, error) {
 	// Load Email Client plugin data
 	for k, v := range loadPluginData("THARSIS_EMAIL_CLIENT_PLUGIN_DATA_") {
 		c.EmailClientPluginData[k] = v
+	}
+
+	// Load LLM Client plugin data
+	for k, v := range loadPluginData("THARSIS_LLM_CLIENT_PLUGIN_DATA_") {
+		c.LLMClientPluginData[k] = v
 	}
 
 	// Load MCP Server config from env vars

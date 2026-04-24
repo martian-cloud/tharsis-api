@@ -1,17 +1,21 @@
-import AppBar, { AppBarProps } from '@mui/material/AppBar';
-import graphql from 'babel-plugin-relay/macro';
 import { Box, Button, Stack } from '@mui/material';
+import AppBar, { AppBarProps } from '@mui/material/AppBar';
 import { styled } from "@mui/material/styles";
 import Toolbar from '@mui/material/Toolbar';
-import { useEffect, useRef } from 'react';
-import AccountMenu from '../nav/AccountMenu';
-import Link from '../routes/Link';
-import { Link as RouterLink } from 'react-router-dom';
-import RegistryMenu from './RegistryMenu';
+import graphql from 'babel-plugin-relay/macro';
+import { useContext, useEffect, useRef } from 'react';
 import { useFragment } from 'react-relay/hooks';
-import { AppHeaderFragment$key } from './__generated__/AppHeaderFragment.graphql';
+import { Link as RouterLink } from 'react-router-dom';
+import { useAgentCopilot } from '../ai/AgentCopilotProvider';
+import MartianAgentIcon from '../ai/MartianAgentIcon';
+import { ApiConfigContext } from '../ApiConfigContext';
 import AnnouncementBanner from '../common/AnnouncementBanner';
 import { useAppHeaderHeight } from '../contexts/AppHeaderHeightProvider';
+import { useMediaQuery, useTheme } from '@mui/material';
+import AccountMenu from '../nav/AccountMenu';
+import Link from '../routes/Link';
+import { AppHeaderFragment$key } from './__generated__/AppHeaderFragment.graphql';
+import RegistryMenu from './RegistryMenu';
 import UniversalSearch from './UniversalSearch';
 
 const StyledAppBar = styled(AppBar)<AppBarProps>(({ theme }) => ({
@@ -38,6 +42,11 @@ function AppHeader(props: Props) {
 
     const headerRef = useRef<HTMLDivElement>(null);
     const { setHeaderHeight: setContextHeaderHeight } = useAppHeaderHeight();
+    const { togglePanel, sidebarWidth, expanded: copilotExpanded } = useAgentCopilot();
+    const { aiEnabled } = useContext(ApiConfigContext);
+    const theme = useTheme();
+    const isMdOrSmaller = useMediaQuery(theme.breakpoints.down('lg'));
+    const hideSearch = copilotExpanded && isMdOrSmaller;
 
     useEffect(() => {
         const updateHeaderHeight = () => {
@@ -67,8 +76,9 @@ function AppHeader(props: Props) {
                     position: 'fixed',
                     top: 0,
                     left: 0,
-                    right: 0,
+                    right: sidebarWidth,
                     zIndex: 1200,
+                    transition: 'right 0.2s ease',
                 }}
             >
                 <StyledAppBar position="static" color="inherit">
@@ -77,7 +87,16 @@ function AppHeader(props: Props) {
                             <Link underline="none" color="primary" variant="h5" sx={{ fontWeight: "bold" }} to="/">Tharsis</Link>
                         </Box>
                         <Box display="flex" flex="1" alignItems="center" justifyContent="center">
-                            <UniversalSearch />
+                            {!hideSearch && <UniversalSearch />}
+                            {aiEnabled && !copilotExpanded && <Button
+                                color="primary"
+                                variant="outlined"
+                                startIcon={<MartianAgentIcon />}
+                                onClick={() => togglePanel()}
+                                sx={{ textTransform: 'none', fontWeight: 600, ml: 2, whiteSpace: 'nowrap' }}
+                            >
+                                Copilot
+                            </Button>}
                         </Box>
                         <Box display="flex" justifyContent="flex-end" alignItems="center">
                             <Stack direction="row" spacing={1} alignItems="center" marginRight={3}>

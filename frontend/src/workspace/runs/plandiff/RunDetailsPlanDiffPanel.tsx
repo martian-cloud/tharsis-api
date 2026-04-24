@@ -97,12 +97,16 @@ function DiffView({ diffType, hunks, oldSrc, warnings }: { diffType: DiffType, h
     const processedHunks = useExpandedHunks(hunks, oldSrc);
     const widgets = useWidgets(processedHunks, warnings);
 
-    const { tokens } = useTokenizeWorker(tokenizeWorker, {
-        oldSource: oldSrc,
-        language: 'hcl',
-        hunks: processedHunks,
-        enhancers: []
-    });
+    const workerOptions = useMemo(() => {
+        return {
+            oldSource: oldSrc,
+            language: 'hcl',
+            hunks: processedHunks,
+            enhancers: []
+        };
+    }, [oldSrc, processedHunks]);
+
+    const { tokens } = useTokenizeWorker(tokenizeWorker, workerOptions);
 
     return (
         <Diff

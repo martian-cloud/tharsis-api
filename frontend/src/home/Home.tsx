@@ -1,16 +1,17 @@
-import React, { Suspense, useContext } from 'react';
-import { Box, CircularProgress, Link, ListItemButton, Paper, ToggleButton, Typography, useTheme } from '@mui/material';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunchOutlined';
 import HelpIcon from '@mui/icons-material/HelpOutline';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunchOutlined';
+import { Box, CircularProgress, Link, ListItemButton, Paper, ToggleButton, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
-import config from '../common/config';
-import { useSearchParams } from 'react-router-dom';
+import React, { Suspense, useContext } from 'react';
 import { PreloadedQuery, useFragment, usePreloadedQuery } from 'react-relay/hooks';
-import { HomeQuery } from './__generated__/HomeQuery.graphql';
-import { HomeFragment_activity$key } from './__generated__/HomeFragment_activity.graphql';
+import { useSearchParams } from 'react-router-dom';
+import { useAgentCopilot } from '../ai/AgentCopilotProvider';
+import config from '../common/config';
 import { UserContext } from '../UserContext';
-import HomeDrawer from './HomeDrawer';
+import { HomeFragment_activity$key } from './__generated__/HomeFragment_activity.graphql';
+import { HomeQuery } from './__generated__/HomeQuery.graphql';
 import HomeActivityFeed from './HomeActivityFeed';
+import HomeDrawer from './HomeDrawer';
 import HomeRunList from './HomeRunList';
 
 const query = graphql`
@@ -28,6 +29,7 @@ function Home(props: Props) {
     const user = useContext(UserContext);
     const queryData = usePreloadedQuery<HomeQuery>(query, props.queryRef);
     const [searchParams, setSearchParams] = useSearchParams();
+    const { expanded: copilotExpanded } = useAgentCopilot();
 
     // This filter will only show the current users activity when true
     const showMyActivity = searchParams.get('filter') === 'myActivity';
@@ -102,7 +104,7 @@ function Home(props: Props) {
                                 <HomeActivityFeed username={showMyActivity ? user.username : undefined} />
                             </Suspense>
                         </Box>
-                        <Box sx={{
+                        {!copilotExpanded && <Box sx={{
                             padding: 2,
                             width: '100%',
                             [theme.breakpoints.up('lg')]: {
@@ -131,7 +133,7 @@ function Home(props: Props) {
                             <Paper sx={{ padding: 2 }}>
                                 <HomeRunList />
                             </Paper>
-                        </Box>
+                        </Box>}
                     </React.Fragment>}
                 </Box>
             </Box>

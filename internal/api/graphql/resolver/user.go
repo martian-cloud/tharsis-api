@@ -197,6 +197,11 @@ func (r *UserResolver) SCIMExternalID() *string {
 	return &r.user.SCIMExternalID
 }
 
+// AgentCreditUsage resolver
+func (r *UserResolver) AgentCreditUsage(ctx context.Context) (float64, error) {
+	return getServiceCatalog(ctx).AgentService.GetAgentCreditUsage(ctx, r.user.Metadata.ID)
+}
+
 // ActivityEvents resolver
 func (r *UserResolver) ActivityEvents(ctx context.Context,
 	args *ActivityEventConnectionQueryArgs,

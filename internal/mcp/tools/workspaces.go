@@ -7,6 +7,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/gid"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
+	workspacesvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/workspace"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/pagination"
 )
 
 // workspace represents a Terraform workspace configuration.
@@ -83,6 +85,96 @@ func GetWorkspace(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getWorkspaceInp
 				RunnerTags:            ws.RunnerTags,
 				Labels:                ws.Labels,
 			},
+		}, nil
+	}
+
+	return tool, handler
+}
+
+// getWorkspacesInput defines the parameters for listing workspaces.
+type getWorkspacesInput struct {
+	Search *string `json:"search,omitempty" jsonschema:"Search by workspace name or path"`
+	After  *string `json:"after,omitempty" jsonschema:"Cursor for forward pagination (from previous response)"`
+	First  *int32  `json:"first,omitempty" jsonschema:"Number of items to return from the beginning (defaults to 100)"`
+}
+
+// getWorkspacesOutput wraps the workspaces list response.
+type getWorkspacesOutput struct {
+	Workspaces []workspace `json:"workspaces" jsonschema:"List of workspaces"`
+	PageInfo   pageInfo    `json:"page_info" jsonschema:"Pagination information"`
+}
+
+// GetWorkspaces returns an MCP tool for listing workspaces with search and cursor-based pagination.
+func GetWorkspaces(tc *ToolContext) (mcp.Tool, mcp.ToolHandlerFor[getWorkspacesInput, getWorkspacesOutput]) {
+	tool := mcp.Tool{
+		Name:        "get_workspaces",
+		Description: "List workspaces with optional search and cursor-based pagination. Use 'search' to filter by name or path. Use 'first'/'after' for forward pagination or 'last'/'before' for backward pagination.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:        "Get Workspaces",
+			ReadOnlyHint: true,
+		},
+	}
+
+	handler := func(ctx context.Context, _ *mcp.CallToolRequest, input getWorkspacesInput) (*mcp.CallToolResult, getWorkspacesOutput, error) {
+		var first int32
+		if input.First != nil {
+			first = *input.First
+		} else {
+			first = 100
+		}
+
+		svcInput := &workspacesvc.GetWorkspacesInput{
+			Search: input.Search,
+			PaginationOptions: &pagination.Options{
+				First: &first,
+				After: input.After,
+			},
+		}
+
+		result, err := tc.servicesCatalog.WorkspaceService.GetWorkspaces(ctx, svcInput)
+		if err != nil {
+			return nil, getWorkspacesOutput{}, WrapMCPToolError(err, "failed to list workspaces")
+		}
+
+		workspaces := make([]workspace, len(result.Workspaces))
+		for i, ws := range result.Workspaces {
+			workspaces[i] = workspace{
+				WorkspaceID:           ws.GetGlobalID(),
+				TRN:                   ws.Metadata.TRN,
+				Name:                  ws.Name,
+				FullPath:              ws.FullPath,
+				Description:           ws.Description,
+				GroupID:               gid.ToGlobalID(types.GroupModelType, ws.GroupID),
+				TerraformVersion:      ws.TerraformVersion,
+				MaxJobDuration:        ws.MaxJobDuration,
+				CurrentJobID:          gid.ToGlobalID(types.JobModelType, ws.CurrentJobID),
+				CurrentStateVersionID: gid.ToGlobalID(types.StateVersionModelType, ws.CurrentStateVersionID),
+				CreatedBy:             ws.CreatedBy,
+				DirtyState:            ws.DirtyState,
+				Locked:                ws.Locked,
+				PreventDestroyPlan:    ws.PreventDestroyPlan,
+				EnableDriftDetection:  ws.EnableDriftDetection,
+				RunnerTags:            ws.RunnerTags,
+				Labels:                ws.Labels,
+			}
+		}
+
+		pi := pageInfo{
+			HasNextPage:     result.PageInfo.HasNextPage,
+			HasPreviousPage: result.PageInfo.HasPreviousPage,
+			TotalCount:      result.PageInfo.TotalCount,
+		}
+
+		if len(result.Workspaces) > 0 {
+			startCursor, _ := result.PageInfo.Cursor(&result.Workspaces[0])
+			endCursor, _ := result.PageInfo.Cursor(&result.Workspaces[len(result.Workspaces)-1])
+			pi.StartCursor = startCursor
+			pi.EndCursor = endCursor
+		}
+
+		return nil, getWorkspacesOutput{
+			Workspaces: workspaces,
+			PageInfo:   pi,
 		}, nil
 	}
 

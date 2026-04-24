@@ -8,6 +8,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	agentsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
@@ -42,6 +43,7 @@ type modelFetcherFunc func(ctx context.Context, value string) (models.Model, err
 // Catalog provides a unified interface for accessing all Tharsis resources
 // by their Global ID (GID) or Tharsis Resource Name (TRN)
 type Catalog struct {
+	AgentService                     agentsvc.Service
 	ActivityEventService             activityevent.Service
 	AnnouncementService              announcement.Service
 	CLIService                       cli.Service
@@ -481,6 +483,26 @@ func (c *Catalog) Init() {
 		},
 		func(ctx context.Context, value string) (models.Model, error) {
 			return c.WorkspaceService.GetWorkspaceAssessmentByTRN(ctx, value)
+		},
+	)
+
+	// Agent Session
+	c.addModelFetchers(types.AgentSessionModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.AgentService.GetAgentSessionByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.AgentService.GetAgentSessionByTRN(ctx, value)
+		},
+	)
+
+	// Agent Session Run
+	c.addModelFetchers(types.AgentSessionRunModelType,
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.AgentService.GetAgentSessionRunByID(ctx, value)
+		},
+		func(ctx context.Context, value string) (models.Model, error) {
+			return c.AgentService.GetAgentSessionRunByTRN(ctx, value)
 		},
 	)
 }

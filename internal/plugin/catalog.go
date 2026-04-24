@@ -16,6 +16,8 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/ses"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/email/smtp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/email"
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/llm"
+	llmbedrock "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/llm/bedrock"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/ratelimitstore"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret"
 	secretawskms "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/plugin/secret/awskms"
@@ -37,6 +39,7 @@ type Catalog struct {
 	HTTPRateLimitStore    ratelimitstore.Store
 	SecretManager         secret.Manager
 	EmailProvider         email.Provider
+	LLMClient             llm.Client
 }
 
 // NewCatalog creates a new Catalog
@@ -74,6 +77,11 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		return nil, err
 	}
 
+	llmClient, err := newLLMClientPlugin(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize LLM client plugin: %v", err)
+	}
+
 	return &Catalog{
 		ObjectStore:           objectStore,
 		JWSProvider:           jwsProvider,
@@ -81,6 +89,7 @@ func NewCatalog(ctx context.Context, logger logger.Logger, cfg *config.Config) (
 		HTTPRateLimitStore:    httpRateLimitStore,
 		SecretManager:         secretManager,
 		EmailProvider:         emailProvider,
+		LLMClient:             llmClient,
 	}, nil
 }
 
@@ -273,5 +282,20 @@ func newEmailProvider(ctx context.Context, logger logger.Logger, pluginType stri
 		return &email.NoopProvider{}, nil
 	default:
 		return nil, fmt.Errorf("the specified email client plugin %s is not currently supported", pluginType)
+	}
+}
+
+func newLLMClientPlugin(ctx context.Context, cfg *config.Config) (llm.Client, error) {
+	if !cfg.AIEnabled {
+		return &llm.NoopClient{}, nil
+	}
+
+	switch cfg.LLMClientPluginType {
+	case "bedrock":
+		return llmbedrock.NewPlugin(ctx, cfg.LLMClientPluginData)
+	default:
+		return nil, errors.New(
+			"The specified LLM client plugin %q is not currently supported", cfg.LLMClientPluginType,
+		)
 	}
 }
