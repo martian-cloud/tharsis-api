@@ -46,6 +46,8 @@ const (
 	ResourceLimitConfigurationVersionsPerWorkspacePerTimePeriod ResourceLimitName = "ResourceLimitConfigurationVersionsPerWorkspacePerTimePeriod"
 	ResourceLimitStateVersionsPerWorkspacePerTimePeriod         ResourceLimitName = "ResourceLimitStateVersionsPerWorkspacePerTimePeriod"
 	ResourceLimitFederatedRegistriesPerGroup                    ResourceLimitName = "ResourceLimitFederatedRegistriesPerGroup"
+	ResourceLimitAgentCreditsPerUserPerMonth                    ResourceLimitName = "ResourceLimitAgentCreditsPerUserPerMonth"
+	ResourceLimitAgentSessionRunsPerSession                     ResourceLimitName = "ResourceLimitAgentSessionRunsPerSession"
 )
 
 // LimitChecker implements functionality related to resource limits.

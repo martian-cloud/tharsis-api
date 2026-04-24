@@ -8,4 +8,5 @@ type Subscription {
   jobCancellationEvent(input: JobCancellationEventSubscriptionInput!): JobCancellationEvent!
   runnerSessionEvents(input: RunnerSessionEventSubscriptionInput!): RunnerSessionEvent!
   runnerSessionErrorLogEvents(input: RunnerSessionErrorLogSubscriptionInput!): RunnerSessionErrorLogEvent!
+  agentSessionEvents(input: AgentSessionEventSubscriptionInput!): AgentSessionEvent!
 }

@@ -150,6 +150,181 @@ type AddUserToTeamPayload {
   teamMember: TeamMember
 }
 
+type AgentSession implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  runs(after: String, before: String, first: Int, last: Int, sort: AgentSessionRunSort): AgentSessionRunConnection!
+  totalCredits: Float!
+  userID: String!
+}
+
+type AgentSessionCustomEvent {
+  name: String!
+  timestamp: Int
+  type: String!
+  value: String
+}
+
+"""AG-UI event union type"""
+union AgentSessionEvent = AgentSessionCustomEvent | AgentSessionReasoningEndEvent | AgentSessionReasoningMessageContentEvent | AgentSessionReasoningMessageEndEvent | AgentSessionReasoningMessageStartEvent | AgentSessionReasoningStartEvent | AgentSessionRunErrorEvent | AgentSessionRunFinishedEvent | AgentSessionRunStartedEvent | AgentSessionStepFinishedEvent | AgentSessionStepStartedEvent | AgentSessionTextMessageContentEvent | AgentSessionTextMessageEndEvent | AgentSessionTextMessageStartEvent | AgentSessionToolCallArgsEvent | AgentSessionToolCallEndEvent | AgentSessionToolCallResultEvent | AgentSessionToolCallStartEvent
+
+"""Subscription input"""
+input AgentSessionEventSubscriptionInput {
+  sessionId: String!
+}
+
+type AgentSessionReasoningEndEvent {
+  messageId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionReasoningMessageContentEvent {
+  delta: String!
+  messageId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionReasoningMessageEndEvent {
+  messageId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionReasoningMessageStartEvent {
+  messageId: String!
+  role: String!
+  timestamp: Int
+  type: String!
+}
+
+"""Reasoning events"""
+type AgentSessionReasoningStartEvent {
+  messageId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionRun implements Node {
+  cancelRequested: Boolean!
+  errorMessage: String
+  id: ID!
+  lastMessageID: String
+  metadata: ResourceMetadata!
+  previousRunID: String
+  sessionID: String!
+  status: String!
+}
+
+type AgentSessionRunConnection {
+  edges: [AgentSessionRunEdge]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AgentSessionRunEdge {
+  cursor: String!
+  node: AgentSessionRun
+}
+
+type AgentSessionRunErrorEvent {
+  message: String!
+  runId: String!
+  threadId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionRunFinishedEvent {
+  runId: String!
+  threadId: String!
+  timestamp: Int
+  type: String!
+}
+
+enum AgentSessionRunSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+"""Lifecycle events"""
+type AgentSessionRunStartedEvent {
+  runId: String!
+  threadId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionStepFinishedEvent {
+  stepName: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionStepStartedEvent {
+  stepName: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionTextMessageContentEvent {
+  delta: String!
+  messageId: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionTextMessageEndEvent {
+  messageId: String!
+  timestamp: Int
+  type: String!
+}
+
+"""Text message events"""
+type AgentSessionTextMessageStartEvent {
+  messageId: String!
+  role: String!
+  timestamp: Int
+  type: String!
+}
+
+type AgentSessionToolCallArgsEvent {
+  delta: String!
+  timestamp: Int
+  toolCallId: String!
+  type: String!
+}
+
+type AgentSessionToolCallEndEvent {
+  timestamp: Int
+  toolCallId: String!
+  type: String!
+}
+
+type AgentSessionToolCallResultEvent {
+  content: String!
+  messageId: String!
+  role: String!
+  timestamp: Int
+  toolCallId: String!
+  type: String!
+}
+
+"""Tool call events"""
+type AgentSessionToolCallStartEvent {
+  parentMessageId: String
+  timestamp: Int
+  toolCallId: String!
+  toolCallName: String!
+  type: String!
+}
+
+"""Query input"""
+input AgentTraceInput {
+  runId: String!
+}
+
 type Announcement implements Node {
   active: Boolean!
   createdBy: String!
@@ -265,6 +440,17 @@ enum BoundClaimsType {
   STRING
 }
 
+input CancelAgentRunInput {
+  clientMutationId: String
+  runId: String!
+}
+
+type CancelAgentRunPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  run: AgentSessionRun
+}
+
 input CancelRunInput {
   clientMutationId: String
   comment: String
@@ -287,6 +473,7 @@ type ClaimJobPayload {
 
 type Config {
   adminUserEmail: String!
+  aiEnabled: Boolean!
   asymmetricSigningKeyDecommissionPeriodDays: Int!
   asymmetricSigningKeyRotationPeriodDays: Int!
   asyncTaskTimeout: Int!
@@ -358,6 +545,31 @@ type ConfigurationVersionMutationPayload {
   clientMutationId: String
   configurationVersion: ConfigurationVersion
   problems: [Problem!]!
+}
+
+input CreateAgentRunInput {
+  clientMutationId: String
+  context: [String!]
+  message: String!
+  previousRunId: String
+  sessionId: String!
+}
+
+type CreateAgentRunPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  run: AgentSessionRun
+}
+
+"""Mutation inputs and payloads"""
+input CreateAgentSessionInput {
+  clientMutationId: String
+}
+
+type CreateAgentSessionPayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  session: AgentSession
 }
 
 input CreateAnnouncementInput {
@@ -1121,17 +1333,6 @@ type DestroyWorkspacePayload {
   run: Run
 }
 
-input ReconcileWorkspaceInput {
-  clientMutationId: String
-  workspaceId: String!
-}
-
-type ReconcileWorkspacePayload {
-  clientMutationId: String
-  problems: [Problem!]!
-  run: Run
-}
-
 input DisableMaintenanceModeInput {
   clientMutationId: String
 }
@@ -1562,8 +1763,11 @@ type Mutation {
   assessWorkspace(input: AssessWorkspaceInput!): AssessWorkspacePayload!
   assignManagedIdentity(input: AssignManagedIdentityInput!): AssignManagedIdentityPayload!
   assignServiceAccountToRunner(input: AssignServiceAccountToRunnerInput!): AssignServiceAccountToRunnerPayload!
+  cancelAgentRun(input: CancelAgentRunInput!): CancelAgentRunPayload!
   cancelRun(input: CancelRunInput!): RunMutationPayload!
   claimJob(input: ClaimJobInput!): ClaimJobPayload!
+  createAgentRun(input: CreateAgentRunInput!): CreateAgentRunPayload!
+  createAgentSession(input: CreateAgentSessionInput!): CreateAgentSessionPayload!
   createAnnouncement(input: CreateAnnouncementInput!): CreateAnnouncementPayload!
   createConfigurationVersion(input: CreateConfigurationVersionInput!): ConfigurationVersionMutationPayload!
   createFederatedRegistry(input: CreateFederatedRegistryInput!): FederatedRegistryMutationPayload!
@@ -1973,6 +2177,7 @@ enum ProblemType {
 type Query {
   """There is no query for an activity event by ID."""
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, includeNested: Boolean, last: Int, namespacePath: String, serviceAccountId: String, serviceAccountPath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time, userId: String, username: String): ActivityEventConnection!
+  agentTrace(input: AgentTraceInput!): String
   announcements(active: Boolean, after: String, before: String, first: Int, last: Int, sort: AnnouncementSort): AnnouncementConnection!
   authSettings: AuthSettings
   availableRolePermissions: [String!]!
@@ -2011,6 +2216,17 @@ type Query {
   version: Version!
   workspace(fullPath: String!): Workspace @deprecated(reason: "Use node query instead, which accepts a TRN (Tharsis Resource Name)")
   workspaces(after: String, before: String, favorites: Boolean, first: Int, groupId: String, groupPath: String, labelFilter: WorkspaceLabelsFilter, last: Int, search: String, sort: WorkspaceSort): WorkspaceConnection!
+}
+
+input ReconcileWorkspaceInput {
+  clientMutationId: String
+  workspaceId: String!
+}
+
+type ReconcileWorkspacePayload {
+  clientMutationId: String
+  problems: [Problem!]!
+  run: Run
 }
 
 input RemoveUserFromTeamInput {
@@ -2485,6 +2701,7 @@ enum StateVersionSort {
 }
 
 type Subscription {
+  agentSessionEvents(input: AgentSessionEventSubscriptionInput!): AgentSessionEvent!
   jobCancellationEvent(input: JobCancellationEventSubscriptionInput!): JobCancellationEvent!
   jobEvents(input: JobSubscriptionInput!): JobEvent!
   jobLogStreamEvents(input: JobLogStreamSubscriptionInput!): JobLogStreamEvent!
@@ -3181,6 +3398,7 @@ type User implements Node {
   active: Boolean!
   activityEvents(actions: [ActivityEventAction!], after: String, before: String, first: Int, last: Int, namespacePath: String, sort: ActivityEventSort, targetTypes: [ActivityEventTargetType!], timeRangeEnd: Time, timeRangeStart: Time): ActivityEventConnection!
   admin: Boolean!
+  agentCreditUsage: Float!
   email: String!
   id: ID!
   metadata: ResourceMetadata!

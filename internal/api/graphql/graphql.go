@@ -77,6 +77,7 @@ func NewGraphQL(
 	authenticator auth.Authenticator,
 	maxGraphqlComplexity int,
 	maxSubscriptionDuration time.Duration,
+	tharsisUIOrigin string,
 ) (*GraphQL, error) {
 	schemaStr, err := schema.String()
 	if err != nil {
@@ -142,6 +143,7 @@ func NewGraphQL(
 			loaderCollection,
 			authenticator,
 			maxSubscriptionDuration,
+			tharsisUIOrigin,
 		),
 	}, nil
 }

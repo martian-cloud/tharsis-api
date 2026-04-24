@@ -32,6 +32,30 @@ func (r *NodeResolver) ID() (graphql.ID, error) {
 	}
 }
 
+// ToAgentSession resolver
+func (r *NodeResolver) ToAgentSession() (*AgentSessionResolver, bool) {
+	switch res := r.result.(type) {
+	case *AgentSessionResolver:
+		return res, true
+	case *models.AgentSession:
+		return &AgentSessionResolver{session: res}, true
+	default:
+		return nil, false
+	}
+}
+
+// ToAgentSessionRun resolver
+func (r *NodeResolver) ToAgentSessionRun() (*AgentSessionRunResolver, bool) {
+	switch res := r.result.(type) {
+	case *AgentSessionRunResolver:
+		return res, true
+	case *models.AgentSessionRun:
+		return &AgentSessionRunResolver{run: res}, true
+	default:
+		return nil, false
+	}
+}
+
 // ToApply resolver
 func (r *NodeResolver) ToApply() (*ApplyResolver, bool) {
 	switch res := r.result.(type) {

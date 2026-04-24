@@ -62,7 +62,7 @@ func BuildRouter(
 	// The connection timeout will use the same timeout as the session refresh token to ensure that a graphql subscription
 	// cannot persist longer than the refresh token duration
 	maxSubscriptionDuration := time.Duration(cfg.UserSessionRefreshTokenExpirationMinutes) * time.Minute
-	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, authenticator, cfg.MaxGraphQLComplexity, maxSubscriptionDuration)
+	graphqlHandler, err := graphql.NewGraphQL(&resolverState, logger, pluginCatalog.GraphqlRateLimitStore, authenticator, cfg.MaxGraphQLComplexity, maxSubscriptionDuration, cfg.TharsisUIURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize graphql handler %v", err)
 	}

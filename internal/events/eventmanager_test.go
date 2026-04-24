@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -79,6 +80,30 @@ func TestGetEvent(t *testing.T) {
 				{Table: "jobs", Action: "INSERT", ID: "1"},
 				{Table: "jobs", Action: "UPDATE", ID: "2"},
 				{Table: "jobs", Action: "DELETE", ID: "3"},
+			},
+		},
+		{
+			name: "custom filter on event data",
+			subscriptions: []Subscription{
+				{
+					Type:    AgentSessionRunSubscription,
+					Actions: []SubscriptionAction{CreateAction, UpdateAction},
+					Filter: func(data json.RawMessage) bool {
+						var d struct {
+							SessionID string `json:"session_id"`
+						}
+						return json.Unmarshal(data, &d) == nil && d.SessionID == "target-session"
+					},
+				},
+			},
+			events: []db.Event{
+				{Table: "agent_session_runs", Action: "INSERT", ID: "1", Data: json.RawMessage(`{"session_id":"target-session"}`)},
+				{Table: "agent_session_runs", Action: "INSERT", ID: "2", Data: json.RawMessage(`{"session_id":"other-session"}`)},
+				{Table: "agent_session_runs", Action: "UPDATE", ID: "1", Data: json.RawMessage(`{"session_id":"target-session"}`)},
+			},
+			expectEvents: []db.Event{
+				{Table: "agent_session_runs", Action: "INSERT", ID: "1", Data: json.RawMessage(`{"session_id":"target-session"}`)},
+				{Table: "agent_session_runs", Action: "UPDATE", ID: "1", Data: json.RawMessage(`{"session_id":"target-session"}`)},
 			},
 		},
 	}

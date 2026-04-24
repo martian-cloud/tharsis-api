@@ -14,6 +14,10 @@ var (
 		Name:        "documentation",
 		Description: "Tools for searching and retrieving Tharsis documentation.",
 	}
+	ToolsetMetadataGroups = tools.ToolsetMetadata{
+		Name:        "group",
+		Description: "Tools for retrieving group configuration.",
+	}
 	ToolsetMetadataJobs = tools.ToolsetMetadata{
 		Name:        "job",
 		Description: "Tools for retrieving job status and logs.",
@@ -38,6 +42,7 @@ func AllToolsets() []string {
 	return []string{
 		ToolsetMetadataApplies.Name,
 		ToolsetMetadataDocumentation.Name,
+		ToolsetMetadataGroups.Name,
 		ToolsetMetadataJobs.Name,
 		ToolsetMetadataPlans.Name,
 		ToolsetMetadataRuns.Name,
@@ -64,6 +69,14 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 			tools.NewServerTool(tools.GetDocumentationPage(docService)),
 		)
 
+	// Group tools
+	groups := tools.NewToolset(ToolsetMetadataGroups).
+		AddReadTools(
+			tools.NewServerTool(GetGroup(tc)),
+			tools.NewServerTool(GetManagedIdentity(tc)),
+			tools.NewServerTool(GetServiceAccount(tc)),
+		)
+
 	// Job tools
 	jobs := tools.NewToolset(ToolsetMetadataJobs).
 		AddReadTools(
@@ -76,6 +89,7 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 	plans := tools.NewToolset(ToolsetMetadataPlans).
 		AddReadTools(
 			tools.NewServerTool(GetPlan(tc)),
+			tools.NewServerTool(GetPlanDiff(tc)),
 		)
 
 	// Run tools
@@ -88,10 +102,12 @@ func BuildToolsetGroup(readOnly bool, tc *ToolContext) *tools.ToolsetGroup {
 	workspaces := tools.NewToolset(ToolsetMetadataWorkspaces).
 		AddReadTools(
 			tools.NewServerTool(GetWorkspace(tc)),
+			tools.NewServerTool(GetWorkspaces(tc)),
 		)
 
 	group.AddToolset(applies)
 	group.AddToolset(documentation)
+	group.AddToolset(groups)
 	group.AddToolset(jobs)
 	group.AddToolset(plans)
 	group.AddToolset(runs)

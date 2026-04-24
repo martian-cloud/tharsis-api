@@ -57,6 +57,10 @@ var (
 	TerraformProviderVersionMirrorModelType  = ModelType{name: "terraform_provider_version_mirror", gidCode: "TVM"}
 	TerraformProviderVersionModelType        = ModelType{name: "terraform_provider_version", gidCode: "TPV"}
 	UserModelType                            = ModelType{name: "user", gidCode: "U"}
+	AgentSessionModelType                    = ModelType{name: "agent_session", gidCode: "AGS"}
+	AgentSessionRunModelType                 = ModelType{name: "agent_session_run", gidCode: "ASR"}
+	AgentSessionMessageModelType             = ModelType{name: "agent_session_message", gidCode: "ASM"}
+	AgentCreditQuotaModelType                = ModelType{name: "agent_credit_quota", gidCode: "ACQ"}
 	UserSessionModelType                     = ModelType{name: "user_session", gidCode: "US"}
 	VariableModelType                        = ModelType{name: "variable", gidCode: "V"}
 	VariableVersionModelType                 = ModelType{name: "variable_version", gidCode: "VV"}

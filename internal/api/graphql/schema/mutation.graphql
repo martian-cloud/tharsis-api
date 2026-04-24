@@ -250,4 +250,13 @@ type Mutation {
   unfavoriteNamespace(
     input: NamespaceFavoriteInput!
   ): NamespaceUnfavoriteMutationPayload!
+  createAgentSession(
+    input: CreateAgentSessionInput!
+  ): CreateAgentSessionPayload!
+  createAgentRun(
+    input: CreateAgentRunInput!
+  ): CreateAgentRunPayload!
+  cancelAgentRun(
+    input: CancelAgentRunInput!
+  ): CancelAgentRunPayload!
 }

@@ -3,7 +3,7 @@ import StateIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import { Alert, AlertTitle, Avatar, Box, Button, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme } from '@mui/material';
 import graphql from 'babel-plugin-relay/macro';
 import { CubeOutline as ModuleIcon } from 'mdi-material-ui';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFragment, useMutation } from 'react-relay/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmationDialog from '../common/ConfirmationDialog';
@@ -28,6 +28,7 @@ import StateVersionResources from './state/StateVersionResources';
 import WorkspaceDetailsDriftDetection from './WorkspaceDetailsDriftDetection';
 import WorkspaceNotificationPreference from '../notifications/WorkspaceNotificationPreference';
 import NamespaceFavoriteButton from '../common/NamespaceFavoriteButton';
+import { useAgentCopilot } from '../ai/AgentCopilotProvider';
 
 const DRIFT_ALERT_DESCRIPTION = "This workspace has drifted from its configuration; this can happen if the resources were modified outside of Tharsis, or if the infrastructure was changed directly through the cloud provider console."
 
@@ -43,6 +44,7 @@ function WorkspaceDetailsIndex(props: Props) {
     const [showDestroyRunConfirmationDialog, setShowDestroyRunConfirmationDialog] = useState<boolean>(false);
     const [showReconcileDialog, setShowReconcileDialog] = useState(false);
     const [error, setError] = useState<MutationError>();
+    const { setState: setCopilotState } = useAgentCopilot();
 
     const tab = searchParams.get('tab') ?? 'resources';
 
@@ -224,6 +226,16 @@ function WorkspaceDetailsIndex(props: Props) {
             replace: true
         });
     };
+
+    useEffect(() => {
+        setCopilotState({
+            contextMessage: `The user is currently viewing workspace ${data.fullPath} with ID: ${data.id}.`,
+            suggestions: []
+        });
+        return () => {
+            setCopilotState(undefined);
+        }
+    }, [data.fullPath, setCopilotState]);
 
     return (
         <Box>

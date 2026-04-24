@@ -2,6 +2,7 @@ import { alpha, Box, SxProps, Theme, useTheme } from '@mui/material';
 import Anser from 'anser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import LoadingDots from '../../common/LoadingDots';
 import Link from '../../routes/Link';
 
 interface Props {
@@ -9,28 +10,6 @@ interface Props {
     hideLineNumbers?: boolean
     loading?: boolean
     sx?: SxProps<Theme>
-}
-
-function LoadingDots() {
-    const [active, setActive] = useState(0);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setActive(a => (a + 1) % 3);
-        }, 400);
-        return () => clearInterval(interval);
-    }, []);
-
-    return (
-        <span style={{ fontSize: '36px', letterSpacing: '-2px', lineHeight: '0.5' }}>
-            {[0, 1, 2].map(i => (
-                <span key={i} style={{
-                    opacity: i === active ? 1 : 0.3,
-                    transition: 'opacity 0.6s ease-in-out'
-                }}>.</span>
-            ))}
-        </span>
-    );
 }
 
 interface LogLineProps {

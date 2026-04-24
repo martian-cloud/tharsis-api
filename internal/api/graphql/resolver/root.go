@@ -1605,3 +1605,44 @@ func (r RootResolver) CreateFederatedRegistryTokens(ctx context.Context,
 
 	return response, nil
 }
+
+/* Agent Session Mutations and Subscriptions */
+
+// CreateAgentSession creates a new agent session
+func (r RootResolver) CreateAgentSession(ctx context.Context, args *struct{ Input CreateAgentSessionInput }) (*CreateAgentSessionPayloadResolver, error) {
+	response, err := createAgentSessionMutation(ctx, &args.Input)
+	if err != nil {
+		return handleCreateAgentSessionMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// CreateAgentRun creates a new agent run in an existing session
+func (r RootResolver) CreateAgentRun(ctx context.Context, args *struct{ Input CreateAgentRunInput }) (*CreateAgentRunPayloadResolver, error) {
+	response, err := createAgentRunMutation(ctx, &args.Input)
+	if err != nil {
+		return handleCreateAgentRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// CancelAgentRun cancels an in-progress agent run
+func (r RootResolver) CancelAgentRun(ctx context.Context, args *struct{ Input CancelAgentRunInput }) (*CancelAgentRunPayloadResolver, error) {
+	response, err := cancelAgentRunMutation(ctx, &args.Input)
+	if err != nil {
+		return handleCancelAgentRunMutationProblem(err, args.Input.ClientMutationID)
+	}
+	return response, nil
+}
+
+// AgentTrace returns trace data for a specific agent run
+func (r RootResolver) AgentTrace(ctx context.Context, args *struct{ Input AgentTraceInput }) (*string, error) {
+	return agentTraceQuery(ctx, &args.Input)
+}
+
+// AgentSessionEvents subscribes to AG-UI events for an agent session
+func (r RootResolver) AgentSessionEvents(ctx context.Context, args *struct {
+	Input AgentSessionEventSubscriptionInput
+}) (<-chan *AgentSessionEventResolver, error) {
+	return r.agentSessionEventsSubscription(ctx, &args.Input)
+}

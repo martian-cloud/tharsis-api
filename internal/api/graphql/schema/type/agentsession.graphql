@@ -1,0 +1,242 @@
+type AgentSession implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  userID: String!
+  totalCredits: Float!
+  runs(
+    after: String
+    before: String
+    first: Int
+    last: Int
+    sort: AgentSessionRunSort
+  ): AgentSessionRunConnection!
+}
+
+enum AgentSessionRunSort {
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+type AgentSessionRunConnection {
+  totalCount: Int!
+  pageInfo: PageInfo!
+  edges: [AgentSessionRunEdge]
+}
+
+type AgentSessionRunEdge {
+  cursor: String!
+  node: AgentSessionRun
+}
+
+# AG-UI event union type
+
+union AgentSessionEvent =
+  | AgentSessionRunStartedEvent
+  | AgentSessionRunFinishedEvent
+  | AgentSessionRunErrorEvent
+  | AgentSessionCustomEvent
+  | AgentSessionStepStartedEvent
+  | AgentSessionStepFinishedEvent
+  | AgentSessionTextMessageStartEvent
+  | AgentSessionTextMessageContentEvent
+  | AgentSessionTextMessageEndEvent
+  | AgentSessionToolCallStartEvent
+  | AgentSessionToolCallArgsEvent
+  | AgentSessionToolCallEndEvent
+  | AgentSessionToolCallResultEvent
+  | AgentSessionReasoningStartEvent
+  | AgentSessionReasoningMessageStartEvent
+  | AgentSessionReasoningMessageContentEvent
+  | AgentSessionReasoningMessageEndEvent
+  | AgentSessionReasoningEndEvent
+
+# Lifecycle events
+
+type AgentSessionRunStartedEvent {
+  type: String!
+  threadId: String!
+  runId: String!
+  timestamp: Int
+}
+
+type AgentSessionRunFinishedEvent {
+  type: String!
+  threadId: String!
+  runId: String!
+  timestamp: Int
+}
+
+type AgentSessionRunErrorEvent {
+  type: String!
+  threadId: String!
+  runId: String!
+  message: String!
+  timestamp: Int
+}
+
+type AgentSessionCustomEvent {
+  type: String!
+  name: String!
+  value: String
+  timestamp: Int
+}
+
+type AgentSessionStepStartedEvent {
+  type: String!
+  stepName: String!
+  timestamp: Int
+}
+
+type AgentSessionStepFinishedEvent {
+  type: String!
+  stepName: String!
+  timestamp: Int
+}
+
+# Text message events
+
+type AgentSessionTextMessageStartEvent {
+  type: String!
+  messageId: String!
+  role: String!
+  timestamp: Int
+}
+
+type AgentSessionTextMessageContentEvent {
+  type: String!
+  messageId: String!
+  delta: String!
+  timestamp: Int
+}
+
+type AgentSessionTextMessageEndEvent {
+  type: String!
+  messageId: String!
+  timestamp: Int
+}
+
+# Tool call events
+
+type AgentSessionToolCallStartEvent {
+  type: String!
+  toolCallId: String!
+  toolCallName: String!
+  parentMessageId: String
+  timestamp: Int
+}
+
+type AgentSessionToolCallArgsEvent {
+  type: String!
+  toolCallId: String!
+  delta: String!
+  timestamp: Int
+}
+
+type AgentSessionToolCallEndEvent {
+  type: String!
+  toolCallId: String!
+  timestamp: Int
+}
+
+type AgentSessionToolCallResultEvent {
+  type: String!
+  messageId: String!
+  toolCallId: String!
+  content: String!
+  role: String!
+  timestamp: Int
+}
+
+# Reasoning events
+
+type AgentSessionReasoningStartEvent {
+  type: String!
+  messageId: String!
+  timestamp: Int
+}
+
+type AgentSessionReasoningMessageStartEvent {
+  type: String!
+  messageId: String!
+  role: String!
+  timestamp: Int
+}
+
+type AgentSessionReasoningMessageContentEvent {
+  type: String!
+  messageId: String!
+  delta: String!
+  timestamp: Int
+}
+
+type AgentSessionReasoningMessageEndEvent {
+  type: String!
+  messageId: String!
+  timestamp: Int
+}
+
+type AgentSessionReasoningEndEvent {
+  type: String!
+  messageId: String!
+  timestamp: Int
+}
+
+type AgentSessionRun implements Node {
+  id: ID!
+  metadata: ResourceMetadata!
+  sessionID: String!
+  previousRunID: String
+  lastMessageID: String
+  status: String!
+  errorMessage: String
+  cancelRequested: Boolean!
+}
+
+# Mutation inputs and payloads
+
+input CreateAgentSessionInput {
+  clientMutationId: String
+}
+
+type CreateAgentSessionPayload {
+  clientMutationId: String
+  session: AgentSession
+  problems: [Problem!]!
+}
+
+input CreateAgentRunInput {
+  clientMutationId: String
+  sessionId: String!
+  previousRunId: String
+  message: String!
+  context: [String!]
+}
+
+type CreateAgentRunPayload {
+  clientMutationId: String
+  run: AgentSessionRun
+  problems: [Problem!]!
+}
+
+input CancelAgentRunInput {
+  clientMutationId: String
+  runId: String!
+}
+
+type CancelAgentRunPayload {
+  clientMutationId: String
+  run: AgentSessionRun
+  problems: [Problem!]!
+}
+
+# Subscription input
+
+input AgentSessionEventSubscriptionInput {
+  sessionId: String!
+}
+
+# Query input
+
+input AgentTraceInput {
+  runId: String!
+}

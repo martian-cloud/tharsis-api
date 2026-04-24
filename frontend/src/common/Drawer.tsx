@@ -1,11 +1,13 @@
-import { styled } from '@mui/material/styles';
 import MuiDrawer, { DrawerProps as MuiDrawerProps } from '@mui/material/Drawer';
+import { styled } from '@mui/material/styles';
+import { useAgentCopilot } from '../ai/AgentCopilotProvider';
 import { useAppHeaderHeight } from '../contexts/AppHeaderHeightProvider';
 
 interface DrawerProps extends MuiDrawerProps {
     width?: number | string;
     mobileWidth?: number | string;
     temporary?: boolean;
+    hideWhenCopilotOpen?: boolean;
 }
 
 const StyledDrawer = styled(MuiDrawer, {
@@ -37,17 +39,26 @@ function Drawer({
     mobileWidth = 0,
     temporary = false,
     open = true,
+    hideWhenCopilotOpen = false,
     variant,
     sx,
     ...otherProps
 }: DrawerProps) {
     const { headerHeight } = useAppHeaderHeight();
+    const { sidebarWidth, expanded } = useAgentCopilot();
 
-    // Header positioning
+    const isRight = otherProps.anchor === 'right';
+    const hide = hideWhenCopilotOpen && expanded;
+
+    // Header positioning + right offset for AI sidebar
     const headerStyles = {
+        // When hiding a right drawer, collapse its width
+        ...(hide && { width: 0 }),
         [`& .MuiDrawer-paper`]: {
             top: `${headerHeight}px`,
             height: `calc(100vh - ${headerHeight}px)`,
+            ...(isRight && { right: `${sidebarWidth}px`, transition: 'right 0.2s ease, width 0.2s ease' }),
+            ...(hide && { width: 0, overflow: 'hidden' }),
         },
     };
 
@@ -56,11 +67,11 @@ function Drawer({
 
     return (
         <StyledDrawer
-            width={width}
-            mobileWidth={mobileWidth}
+            width={hide ? 0 : width}
+            mobileWidth={hide ? 0 : mobileWidth}
             temporary={temporary}
             variant={variant || (temporary ? 'temporary' : 'permanent')}
-            open={open}
+            open={hide ? false : open}
             sx={mergedSx}
             {...otherProps}
         >

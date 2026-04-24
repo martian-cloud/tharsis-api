@@ -51,7 +51,7 @@
             "unusedvariable": true,
         },
         "build.buildFlags": [
-            "-tags=noui"
+            "-tags=noui,integration"
         ],
         "build.directoryFilters": [
             "-frontend"

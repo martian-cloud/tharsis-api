@@ -239,6 +239,11 @@ func (r *ConfigResolver) EmailClientPluginType() string {
 	return r.cfg.EmailClientPluginType
 }
 
+// AIEnabled resolver
+func (r *ConfigResolver) AIEnabled() bool {
+	return r.cfg.AIEnabled
+}
+
 // TLSCertFile resolver
 func (r *ConfigResolver) TLSCertFile() string {
 	return r.cfg.TLSCertFile

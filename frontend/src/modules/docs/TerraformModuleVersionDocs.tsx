@@ -3,7 +3,6 @@ import graphql from 'babel-plugin-relay/macro';
 import { useMemo } from 'react';
 import { useFragment } from 'react-relay/hooks';
 import { useSearchParams } from 'react-router-dom';
-import remarkGfm from 'remark-gfm';
 import MuiMarkdown from '../../common/Markdown';
 import { TerraformModuleVersionDocsFragment_configurationDetails$key } from './__generated__/TerraformModuleVersionDocsFragment_configurationDetails.graphql';
 import TerraformModuleVersionDocsDataSources from './TerraformModuleVersionDocsDataSources';
@@ -83,7 +82,6 @@ function TerraformModuleVersionDocs({ fragmentRef }: Props) {
                     <Box>
                         <MuiMarkdown
                             children={data.readme}
-                            remarkPlugins={[remarkGfm]}
                         />
                     </Box>
                 )}

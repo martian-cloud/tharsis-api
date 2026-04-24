@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,7 +17,10 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	_ "gitlab.com/infor-cloud/martian-cloud/tharsis/graphql-query-complexity" // Placeholder to ensure private packages are being downloaded
+	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api"
+
+	"github.com/m-mizutani/gollem"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/grpc"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/api/response"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/apiserver/config"
@@ -29,6 +33,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/limits"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/logstream"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/maintenance"
+	mcptools "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/mcp/tools"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/models/types"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/namespace"
@@ -37,6 +42,7 @@ import (
 	rnr "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/runner"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/activityevent"
+	agentsvc "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/agent"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/announcement"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/cli"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/services/federatedregistry"
@@ -68,6 +74,7 @@ import (
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/internal/workspace"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/errors"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/logger"
+	mcpserver "gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/mcp"
 	"gitlab.com/infor-cloud/martian-cloud/tharsis/tharsis-api/pkg/provider"
 )
 
@@ -278,7 +285,6 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		VersionService:                   versionService,
 		WorkspaceService:                 workspaceService,
 	}
-	serviceCatalog.Init()
 	// Initialize universal search service
 	universalSearchManager := universalsearch.NewManager(serviceCatalog, logger)
 	// Start workspace assessment scheduler
@@ -300,6 +306,34 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger, apiVersi
 		maintenanceMonitor,
 		notificationManager,
 	).Start(ctx)
+
+	agentStore := agent.NewAgentStore(pluginCatalog.ObjectStore)
+
+	systemAgent := agent.NewSystemAgent(
+		logger,
+		dbClient,
+		agentStore,
+		pluginCatalog.LLMClient,
+	)
+
+	toolContext := mcptools.NewToolContext(serviceCatalog, httpClient)
+	agentService := agentsvc.NewService(logger, dbClient, systemAgent, agentStore, eventManager, func(ctx context.Context) (gollem.ToolSet, error) {
+		toolsetGroup := mcptools.BuildToolsetGroup(true, toolContext)
+		srv, err := mcpserver.NewServer(&mcpserver.ServerConfig{
+			Name:            "tharsis-agent",
+			Title:           "Tharsis Agent MCP Server",
+			Version:         apiVersion,
+			EnabledToolsets: strings.Join(mcptools.AllToolsets(), ","),
+			ReadOnly:        true,
+		}, toolsetGroup)
+		if err != nil {
+			return nil, err
+		}
+		return agent.NewInMemoryToolSet(ctx, srv)
+	}, taskManager, limits, cfg.AIEnabled)
+
+	serviceCatalog.AgentService = agentService
+	serviceCatalog.Init()
 
 	// Create the admin user if an email is provided.
 	if cfg.AdminUserEmail != "" {

@@ -4,18 +4,19 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import graphql from 'babel-plugin-relay/macro';
-import { useMemo, useState } from 'react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
 import { useFragment, useLazyLoadQuery } from 'react-relay/hooks';
 import { Route, Routes, useParams } from 'react-router-dom';
+import { useAgentCopilot } from '../../ai/AgentCopilotProvider';
 import { MutationError } from '../../common/error';
 import NamespaceBreadcrumbs from '../../namespace/NamespaceBreadcrumbs';
+import Link from '../../routes/Link';
 import RunDetailsApplyStage from './RunDetailsApplyStage';
 import RunDetailsPlanStage from './RunDetailsPlanStage';
 import RunDetailsSidebar, { SidebarWidth } from './RunDetailsSidebar';
 import { RunDetailsFragment_details$key } from './__generated__/RunDetailsFragment_details.graphql';
 import { RunDetailsQuery } from './__generated__/RunDetailsQuery.graphql';
-import Link from '../../routes/Link';
-import moment from 'moment';
 
 const RUN_STAGE_NAMES = {
     plan: 'Plan',
@@ -33,10 +34,11 @@ function RunDetails(props: Props) {
 
     const theme = useTheme();
     const mobile = useMediaQuery(theme.breakpoints.down('md'));
+    const { setState: setCopilotState } = useAgentCopilot();
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [error, setError] = useState<MutationError>();
 
+    const [error, setError] = useState<MutationError>();
     const data = useFragment<RunDetailsFragment_details$key>(
         graphql`
         fragment RunDetailsFragment_details on Workspace
@@ -69,6 +71,16 @@ function RunDetails(props: Props) {
             }
         }
     `, { id: runId }, { fetchPolicy: 'store-and-network' });
+
+    useEffect(() => {
+        setCopilotState({
+            contextMessage: `The user is currently viewing run ID: ${runId} in workspace ${data.fullPath}.`,
+            suggestions: [{ title: "Troubleshoot run", prompt: `Troubleshoot the run with ID: ${runId}` }]
+        });
+        return () => {
+            setCopilotState(undefined);
+        }
+    }, [runId, data.fullPath, setCopilotState]);
 
     const onToggleSidebar = () => {
         setSidebarOpen(prev => !prev);

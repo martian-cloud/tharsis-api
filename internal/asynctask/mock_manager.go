@@ -4,6 +4,7 @@ package asynctask
 
 import (
 	context "context"
+	time "time"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -21,6 +22,24 @@ func (_m *MockManager) Shutdown() {
 // StartTask provides a mock function with given fields: fn
 func (_m *MockManager) StartTask(fn func(context.Context)) {
 	_m.Called(fn)
+}
+
+// Timeout provides a mock function with no fields
+func (_m *MockManager) Timeout() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Timeout")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
 }
 
 // NewMockManager creates a new instance of MockManager. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

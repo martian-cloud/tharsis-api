@@ -3,6 +3,7 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ const (
 	RunnerSubscription          SubscriptionType = "runners"
 	MaintenanceModeSubscription SubscriptionType = "maintenance_mode"
 	RunnerSessionSubscription   SubscriptionType = "runner_sessions"
+	AgentSessionRunSubscription SubscriptionType = "agent_session_runs"
 )
 
 // SubscriptionAction type represents the available actions that can be subscribed type
@@ -48,8 +50,9 @@ const (
 // Subscription includes the table to subscribe to
 type Subscription struct {
 	Type    SubscriptionType
-	ID      string               // Optional ID of resource to subscribe to
-	Actions []SubscriptionAction // Empty Actions list will subscribe to all action types
+	ID      string                          // Optional ID of resource to subscribe to
+	Actions []SubscriptionAction            // Empty Actions list will subscribe to all action types
+	Filter  func(data json.RawMessage) bool // Optional custom filter on event data
 }
 
 // Subscriber is used to subscribe to database events
@@ -228,15 +231,23 @@ func (e *EventManager) match(event db.Event, subscriber *Subscriber) bool {
 			continue
 		}
 
-		if len(subscription.Actions) == 0 {
-			return true
-		}
-
+		actionMatch := len(subscription.Actions) == 0
 		for _, action := range subscription.Actions {
 			if action == SubscriptionAction(event.Action) {
-				return true
+				actionMatch = true
+				break
 			}
 		}
+
+		if !actionMatch {
+			continue
+		}
+
+		if subscription.Filter != nil && !subscription.Filter(event.Data) {
+			continue
+		}
+
+		return true
 	}
 
 	return false

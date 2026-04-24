@@ -15,8 +15,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark as prismTheme } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import AuthServiceContext from '../auth/AuthServiceContext';
 import AuthenticationService from '../auth/AuthenticationService';
-import cfg from '../common/config';
 import TRNButton from '../common/TRNButton';
+import cfg from '../common/config';
 import downloadFile from '../common/filedownload';
 import ListSkeleton from '../skeletons/ListSkeleton';
 import TerraformModuleVersionAttestList from './TerraformModuleVersionAttestList';
@@ -88,6 +88,7 @@ function TerraformModuleVersionDetailsIndex(props: IndexProps) {
 
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
     const authService = useContext<AuthenticationService>(AuthServiceContext);
     const { enqueueSnackbar } = useSnackbar();
 

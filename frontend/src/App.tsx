@@ -7,6 +7,7 @@ import { CookiesProvider } from 'react-cookie';
 import { RelayEnvironmentProvider } from 'react-relay';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import Root from './Root';
+import { AgentCopilotProvider } from './ai/AgentCopilotProvider';
 import AuthServiceContext from './auth/AuthServiceContext';
 import AuthenticationService from './auth/AuthenticationService';
 import LoginPage from './login/LoginPage';
@@ -16,7 +17,6 @@ function MainContent() {
     const location = useLocation();
     return location.pathname === '/login' ? <LoginPage /> : <Root />;
 }
-
 
 interface Props {
     authService: AuthenticationService
@@ -36,17 +36,19 @@ function App(props: Props) {
                 <RelayEnvironmentProvider environment={props.environment}>
                     <AuthServiceContext.Provider value={props.authService}>
                         <ThemeProvider theme={theme}>
-                            <SnackbarProvider
-                                ref={notistackRef}
-                                action={(key) => (
-                                    <Button onClick={onClickDismiss(key)} color="inherit">
-                                        Dismiss
-                                    </Button>
-                                )}
-                            >
-                                <CssBaseline />
-                                <MainContent />
-                            </SnackbarProvider>
+                            <AgentCopilotProvider>
+                                <SnackbarProvider
+                                    ref={notistackRef}
+                                    action={(key) => (
+                                        <Button onClick={onClickDismiss(key)} color="inherit">
+                                            Dismiss
+                                        </Button>
+                                    )}
+                                >
+                                    <CssBaseline />
+                                    <MainContent />
+                                </SnackbarProvider>
+                            </AgentCopilotProvider>
                         </ThemeProvider>
                     </AuthServiceContext.Provider>
                 </RelayEnvironmentProvider>
