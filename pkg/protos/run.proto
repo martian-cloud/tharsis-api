@@ -71,6 +71,11 @@ message CreateRunRequest {
   repeated RunVariableInput variables                = 9;
   optional string           module_source            = 10;
   optional string           module_version           = 11;
+  // When true and module_version is unset or a constraint range, prerelease
+  // module versions are eligible to be selected as "latest". Defaults to
+  // false. Has no effect when module_version is an exact match. Requires
+  // module_source to be set.
+  optional bool             include_module_prereleases = 12;
 }
 
 // ApplyRunRequest is the input for applying a Run.

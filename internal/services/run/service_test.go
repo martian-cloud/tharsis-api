@@ -1766,11 +1766,14 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 
 	// Test cases
 	tests := []struct {
-		input           *CreateRunInput
-		expectCreateRun *models.Run
-		name            string
-		moduleAuthError error
-		expectErrorCode errors.CodeType
+		input                  *CreateRunInput
+		expectCreateRun        *models.Run
+		name                   string
+		moduleAuthError        error
+		expectErrorCode        errors.CodeType
+		expectWantVersion      *string
+		expectIncludeModulePre bool
+		resolvedVersion        string
 	}{
 		{
 			name: "create run with tharsis module source",
@@ -1789,6 +1792,8 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 				ModuleVersion: &moduleVersion,
 				ModuleDigest:  moduleDigest,
 			},
+			expectWantVersion: &moduleVersion,
+			resolvedVersion:   moduleVersion,
 		},
 		{
 			name: "return unauthorized error when caller is not authorized to use module",
@@ -1797,8 +1802,31 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 				ModuleSource:  &moduleSource,
 				ModuleVersion: &moduleVersion,
 			},
-			moduleAuthError: errors.New("unauthorized", errors.WithErrorCode(errors.EUnauthorized)),
-			expectErrorCode: errors.EUnauthorized,
+			moduleAuthError:   errors.New("unauthorized", errors.WithErrorCode(errors.EUnauthorized)),
+			expectErrorCode:   errors.EUnauthorized,
+			expectWantVersion: &moduleVersion,
+			resolvedVersion:   moduleVersion,
+		},
+		{
+			name: "create run with no version and includeModulePrereleases selects prerelease",
+			input: &CreateRunInput{
+				WorkspaceID:              ws.Metadata.ID,
+				ModuleSource:             &moduleSource,
+				IncludeModulePrereleases: true,
+			},
+			expectCreateRun: &models.Run{
+				WorkspaceID:   ws.Metadata.ID,
+				ModuleSource:  &moduleSource,
+				CreatedBy:     createdBySubject,
+				PlanID:        planID,
+				ApplyID:       applyID,
+				Status:        models.RunPlanQueued,
+				ModuleVersion: ptr.String("2.0.0-rc.1"),
+				ModuleDigest:  moduleDigest,
+			},
+			expectWantVersion:      nil,
+			expectIncludeModulePre: true,
+			resolvedVersion:        "2.0.0-rc.1",
 		},
 	}
 
@@ -1904,9 +1932,9 @@ func TestCreateRunWithTharsisModule(t *testing.T) {
 			mockCaller.On("RequireAccessToInheritableResource", mock.Anything, types.TerraformModuleModelType, mock.Anything).Return(test.moduleAuthError)
 
 			if test.moduleAuthError == nil {
-				mockModuleRegistrySource.On("ResolveSemanticVersion", mock.Anything, &moduleVersion).Return(moduleVersion, nil)
+				mockModuleRegistrySource.On("ResolveSemanticVersion", mock.Anything, test.expectWantVersion, test.expectIncludeModulePre).Return(test.resolvedVersion, nil)
 
-				mockModuleRegistrySource.On("ResolveDigest", mock.Anything, moduleVersion).Return(moduleDigest, nil)
+				mockModuleRegistrySource.On("ResolveDigest", mock.Anything, test.resolvedVersion).Return(moduleDigest, nil)
 			}
 
 			mockModuleResolver.On("ParseModuleRegistrySource", mock.Anything, ptr.ToString(test.input.ModuleSource), mock.Anything, mock.Anything).

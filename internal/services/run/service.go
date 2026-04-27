@@ -115,6 +115,16 @@ type CreateRunInput struct {
 	IsDestroy              bool
 	Refresh                bool
 	RefreshOnly            bool
+	// IncludeModulePrereleases, when true and ModuleVersion is nil or a
+	// constraint range, allows prerelease module versions to be selected as
+	// "latest". Has no effect when ModuleVersion is an exact match (which
+	// already resolves to that version regardless of prerelease status).
+	// Requires ModuleSource to be set.
+	// TODO: pair this with a workspace-level default (e.g.,
+	// Workspace.PreferModulePrereleases) so users can opt in once per
+	// workspace instead of on every run; per-run flag should override the
+	// workspace default.
+	IncludeModulePrereleases bool
 }
 
 // CreateDestroyRunForWorkspaceInput is the input for creating a destroy run using the current
@@ -156,6 +166,11 @@ func (c CreateRunInput) Validate() error {
 	// Make sure module version is not specified without module source.
 	if (c.ModuleSource == nil) && (c.ModuleVersion != nil) {
 		return errors.New("module version is not allowed without module source", errors.WithErrorCode(errors.EInvalid))
+	}
+
+	// Make sure includeModulePrereleases is not set without a module source.
+	if (c.ModuleSource == nil) && c.IncludeModulePrereleases {
+		return errors.New("includeModulePrereleases is not allowed without module source", errors.WithErrorCode(errors.EInvalid))
 	}
 
 	// If a module version is specified, validate it.
@@ -207,19 +222,20 @@ type UpdatePlanInput struct {
 }
 
 type createRunInput struct {
-	ConfigurationVersionID *string
-	Comment                *string
-	ModuleSource           *string
-	ModuleVersion          *string
-	Speculative            *bool // optional field, defaults to false unless using a speculative configuration version
-	WorkspaceID            string
-	TerraformVersion       string
-	Variables              []Variable
-	TargetAddresses        []string
-	IsDestroy              bool
-	Refresh                bool
-	RefreshOnly            bool
-	IsAssessmentRun        bool
+	ConfigurationVersionID   *string
+	Comment                  *string
+	ModuleSource             *string
+	ModuleVersion            *string
+	Speculative              *bool // optional field, defaults to false unless using a speculative configuration version
+	WorkspaceID              string
+	TerraformVersion         string
+	Variables                []Variable
+	TargetAddresses          []string
+	IsDestroy                bool
+	Refresh                  bool
+	RefreshOnly              bool
+	IsAssessmentRun          bool
+	IncludeModulePrereleases bool
 }
 
 // Service encapsulates Terraform Enterprise Support
@@ -849,18 +865,19 @@ func (s *service) CreateRun(ctx context.Context, options *CreateRunInput) (*mode
 	}
 
 	return s.createRun(ctx, &createRunInput{
-		ConfigurationVersionID: options.ConfigurationVersionID,
-		Comment:                options.Comment,
-		ModuleSource:           options.ModuleSource,
-		ModuleVersion:          options.ModuleVersion,
-		Speculative:            options.Speculative,
-		WorkspaceID:            options.WorkspaceID,
-		TerraformVersion:       options.TerraformVersion,
-		Variables:              runVariables,
-		TargetAddresses:        options.TargetAddresses,
-		IsDestroy:              options.IsDestroy,
-		Refresh:                options.Refresh,
-		RefreshOnly:            options.RefreshOnly,
+		ConfigurationVersionID:   options.ConfigurationVersionID,
+		Comment:                  options.Comment,
+		ModuleSource:             options.ModuleSource,
+		ModuleVersion:            options.ModuleVersion,
+		Speculative:              options.Speculative,
+		WorkspaceID:              options.WorkspaceID,
+		TerraformVersion:         options.TerraformVersion,
+		Variables:                runVariables,
+		TargetAddresses:          options.TargetAddresses,
+		IsDestroy:                options.IsDestroy,
+		Refresh:                  options.Refresh,
+		RefreshOnly:              options.RefreshOnly,
+		IncludeModulePrereleases: options.IncludeModulePrereleases,
 	})
 }
 
@@ -932,7 +949,7 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 			}
 
 			var resolvedVersion string
-			resolvedVersion, err = moduleRegistrySource.ResolveSemanticVersion(ctx, options.ModuleVersion)
+			resolvedVersion, err = moduleRegistrySource.ResolveSemanticVersion(ctx, options.ModuleVersion, options.IncludeModulePrereleases)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to resolve module source", errors.WithErrorCode(errors.EInvalid), errors.WithSpan(span))
 			}
@@ -1204,6 +1221,18 @@ func (s *service) createRun(ctx context.Context, options *createRunInput) (*mode
 	s.logger.WithContextFields(ctx).Infow("Created a new run.",
 		"workspaceID", run.WorkspaceID,
 		"runID", run.Metadata.ID,
+		"configurationVersionID", options.ConfigurationVersionID,
+		"moduleSource", options.ModuleSource,
+		"requestedModuleVersion", options.ModuleVersion,
+		"resolvedModuleVersion", run.ModuleVersion,
+		"terraformVersion", options.TerraformVersion,
+		"targetAddresses", options.TargetAddresses,
+		"refresh", options.Refresh,
+		"refreshOnly", options.RefreshOnly,
+		"speculative", options.Speculative,
+		"isDestroy", options.IsDestroy,
+		"isAssessmentRun", options.IsAssessmentRun,
+		"includeModulePrereleases", options.IncludeModulePrereleases,
 	)
 	return run, nil
 }

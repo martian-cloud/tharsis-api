@@ -48,7 +48,7 @@ type ModuleRegistrySource interface {
 	GetAttestations(ctx context.Context, semanticVersion string, moduleDigest string) ([]string, error)
 	LocalRegistryModule(ctx context.Context) (*models.TerraformModule, error)
 	ResolveDigest(ctx context.Context, version string) ([]byte, error)
-	ResolveSemanticVersion(ctx context.Context, wantVersion *string) (string, error)
+	ResolveSemanticVersion(ctx context.Context, wantVersion *string, includeModulePrereleases bool) (string, error)
 }
 
 type commonRegistrySource struct {
@@ -158,7 +158,7 @@ func (m *localTharsisRegistrySource) ResolveDigest(ctx context.Context, version 
 	return versionsResponse.ModuleVersions[0].SHASum, nil
 }
 
-func (m *localTharsisRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string) (string, error) {
+func (m *localTharsisRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string, includeModulePrereleases bool) (string, error) {
 	var versions map[string]bool
 
 	statusFilter := models.TerraformModuleVersionStatusUploaded
@@ -180,7 +180,7 @@ func (m *localTharsisRegistrySource) ResolveSemanticVersion(ctx context.Context,
 	versions = results
 
 	// Get or verify the version.
-	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion)
+	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion, includeModulePrereleases)
 	if err != nil {
 		return "", err
 	}
@@ -248,7 +248,7 @@ func (m *federatedTharsisRegistrySource) ResolveDigest(ctx context.Context, vers
 	return moduleDigest, nil
 }
 
-func (m *federatedTharsisRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string) (string, error) {
+func (m *federatedTharsisRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string, includeModulePrereleases bool) (string, error) {
 	var versions map[string]bool
 
 	// Build federated registry token
@@ -276,7 +276,7 @@ func (m *federatedTharsisRegistrySource) ResolveSemanticVersion(ctx context.Cont
 	versions = results
 
 	// Get or verify the version.
-	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion)
+	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion, includeModulePrereleases)
 	if err != nil {
 		return "", err
 	}
@@ -289,7 +289,7 @@ type genericRegistrySource struct {
 	tokenGetter TokenGetterFunc
 }
 
-func (m *genericRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string) (string, error) {
+func (m *genericRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string, includeModulePrereleases bool) (string, error) {
 	var versions map[string]bool
 
 	// Get the auth token for the specified host.
@@ -311,7 +311,7 @@ func (m *genericRegistrySource) ResolveSemanticVersion(ctx context.Context, want
 	versions = results
 
 	// Get or verify the version.
-	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion)
+	chosenVersion, err := getLatestMatchingVersion(versions, wantVersion, includeModulePrereleases)
 	if err != nil {
 		return "", err
 	}
@@ -550,7 +550,9 @@ func GetModuleByAddress(ctx context.Context, dbClient *db.Client, namespace stri
 // If wantVersion is nil, it returns the latest version available.
 // Otherwise, it returns the latest version that matches the wanted version constraints.
 // However, it prefers an exact match if there is one.
-func getLatestMatchingVersion(versions map[string]bool, wantVersion *string) (string, error) {
+// When includeModulePrereleases is false, prerelease versions are skipped during latest/range
+// resolution; an exact-match prerelease (matched in the first pass) is still returned.
+func getLatestMatchingVersion(versions map[string]bool, wantVersion *string, includeModulePrereleases bool) (string, error) {
 	// First, check for an exact match of a single specified version.
 	if wantVersion != nil {
 		_, ok := versions[*wantVersion]
@@ -578,14 +580,22 @@ func getLatestMatchingVersion(versions map[string]bool, wantVersion *string) (st
 			return "", fmt.Errorf("failed to parse version string: %s", err)
 		}
 
-		// A pre-release is always disqualified--unless the earlier first check found an exact match.
-		if v.Prerelease() != "" {
+		if !includeModulePrereleases && v.Prerelease() != "" {
 			continue
 		}
 
 		// If there is a wanted version range, disqualify a non-match.
 		if wantVersion != nil {
-			if !constraints.Check(v) {
+			// hashicorp/go-version's Constraint.Check rejects prerelease versions
+			// unless the constraint itself includes a prerelease segment with the
+			// same base. When includeModulePrereleases is true, evaluate the constraint
+			// against the core (MAJOR.MINOR.PATCH) so that prereleases inside the
+			// range can match plain non-prerelease constraints like ">= 2.0.0".
+			checkVer := v
+			if includeModulePrereleases && v.Prerelease() != "" {
+				checkVer = v.Core()
+			}
+			if !constraints.Check(checkVer) {
 				continue
 			}
 		}

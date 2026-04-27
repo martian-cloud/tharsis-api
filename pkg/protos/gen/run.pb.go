@@ -211,8 +211,13 @@ type CreateRunRequest struct {
 	Variables              []*RunVariableInput    `protobuf:"bytes,9,rep,name=variables,proto3" json:"variables,omitempty"`
 	ModuleSource           *string                `protobuf:"bytes,10,opt,name=module_source,json=moduleSource,proto3,oneof" json:"module_source,omitempty"`
 	ModuleVersion          *string                `protobuf:"bytes,11,opt,name=module_version,json=moduleVersion,proto3,oneof" json:"module_version,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// When true and module_version is unset or a constraint range, prerelease
+	// module versions are eligible to be selected as "latest". Defaults to
+	// false. Has no effect when module_version is an exact match. Requires
+	// module_source to be set.
+	IncludeModulePrereleases *bool `protobuf:"varint,12,opt,name=include_module_prereleases,json=includeModulePrereleases,proto3,oneof" json:"include_module_prereleases,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *CreateRunRequest) Reset() {
@@ -320,6 +325,13 @@ func (x *CreateRunRequest) GetModuleVersion() string {
 		return *x.ModuleVersion
 	}
 	return ""
+}
+
+func (x *CreateRunRequest) GetIncludeModulePrereleases() bool {
+	if x != nil && x.IncludeModulePrereleases != nil {
+		return *x.IncludeModulePrereleases
+	}
+	return false
 }
 
 // ApplyRunRequest is the input for applying a Run.
@@ -1054,7 +1066,7 @@ const file_run_proto_rawDesc = "" +
 	"\x05_sortB\x0f\n" +
 	"\r_workspace_idB\v\n" +
 	"\t_group_idB\x16\n" +
-	"\x14_include_nested_runs\"\xe0\x04\n" +
+	"\x14_include_nested_runs\"\xc2\x05\n" +
 	"\x10CreateRunRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12=\n" +
 	"\x18configuration_version_id\x18\x02 \x01(\tH\x00R\x16configurationVersionId\x88\x01\x01\x12\x1d\n" +
@@ -1068,12 +1080,14 @@ const file_run_proto_rawDesc = "" +
 	"\tvariables\x18\t \x03(\v2..martiancloud.tharsis.api.run.RunVariableInputR\tvariables\x12(\n" +
 	"\rmodule_source\x18\n" +
 	" \x01(\tH\x03R\fmoduleSource\x88\x01\x01\x12*\n" +
-	"\x0emodule_version\x18\v \x01(\tH\x04R\rmoduleVersion\x88\x01\x01B\x1b\n" +
+	"\x0emodule_version\x18\v \x01(\tH\x04R\rmoduleVersion\x88\x01\x01\x12A\n" +
+	"\x1ainclude_module_prereleases\x18\f \x01(\bH\x05R\x18includeModulePrereleases\x88\x01\x01B\x1b\n" +
 	"\x19_configuration_version_idB\x14\n" +
 	"\x12_terraform_versionB\x0e\n" +
 	"\f_speculativeB\x10\n" +
 	"\x0e_module_sourceB\x11\n" +
-	"\x0f_module_version\"(\n" +
+	"\x0f_module_versionB\x1d\n" +
+	"\x1b_include_module_prereleases\"(\n" +
 	"\x0fApplyRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\"G\n" +
 	"\x10CancelRunRequest\x12\x0e\n" +

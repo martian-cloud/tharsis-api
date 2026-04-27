@@ -176,9 +176,9 @@ func (_m *MockModuleRegistrySource) ResolveDigest(ctx context.Context, version s
 	return r0, r1
 }
 
-// ResolveSemanticVersion provides a mock function with given fields: ctx, wantVersion
-func (_m *MockModuleRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string) (string, error) {
-	ret := _m.Called(ctx, wantVersion)
+// ResolveSemanticVersion provides a mock function with given fields: ctx, wantVersion, includeModulePrereleases
+func (_m *MockModuleRegistrySource) ResolveSemanticVersion(ctx context.Context, wantVersion *string, includeModulePrereleases bool) (string, error) {
+	ret := _m.Called(ctx, wantVersion, includeModulePrereleases)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ResolveSemanticVersion")
@@ -186,17 +186,17 @@ func (_m *MockModuleRegistrySource) ResolveSemanticVersion(ctx context.Context, 
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *string) (string, error)); ok {
-		return rf(ctx, wantVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *string, bool) (string, error)); ok {
+		return rf(ctx, wantVersion, includeModulePrereleases)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *string) string); ok {
-		r0 = rf(ctx, wantVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *string, bool) string); ok {
+		r0 = rf(ctx, wantVersion, includeModulePrereleases)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *string) error); ok {
-		r1 = rf(ctx, wantVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, *string, bool) error); ok {
+		r1 = rf(ctx, wantVersion, includeModulePrereleases)
 	} else {
 		r1 = ret.Error(1)
 	}
