@@ -494,13 +494,14 @@ type CreateRunInput struct {
 		// DEPRECATED: HCL is DEPRECATED, to be removed in a future release.
 		Hcl *bool
 	}
-	TerraformVersion *string
-	TargetAddresses  *[]string
-	Refresh          *bool
-	RefreshOnly      *bool
-	Speculative      *bool
-	WorkspaceID      *string
-	WorkspacePath    *string // DEPRECATED: use workspaceID instead with a TRN
+	TerraformVersion         *string
+	TargetAddresses          *[]string
+	Refresh                  *bool
+	RefreshOnly              *bool
+	Speculative              *bool
+	IncludeModulePrereleases *bool
+	WorkspaceID              *string
+	WorkspacePath            *string // DEPRECATED: use workspaceID instead with a TRN
 }
 
 // ApplyRunInput is the input for applying a run
@@ -600,6 +601,10 @@ func createRunMutation(ctx context.Context, input *CreateRunInput) (*RunMutation
 	runOptions.RefreshOnly = false // default to false unless the option was set
 	if input.RefreshOnly != nil {
 		runOptions.RefreshOnly = *input.RefreshOnly
+	}
+
+	if input.IncludeModulePrereleases != nil {
+		runOptions.IncludeModulePrereleases = *input.IncludeModulePrereleases
 	}
 
 	run, err := serviceCatalog.RunService.CreateRun(ctx, runOptions)

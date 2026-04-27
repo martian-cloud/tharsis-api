@@ -322,11 +322,12 @@ func TestLocalTharsisRegistrySource_ResolveDigest(t *testing.T) {
 
 func TestLocalTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 	testCases := []struct {
-		name               string
-		wantVersion        *string
-		setupMocks         func(*db.MockTerraformModuleVersions)
-		expectedVersion    string
-		expectErrorMessage string
+		name                     string
+		wantVersion              *string
+		setupMocks               func(*db.MockTerraformModuleVersions)
+		expectedVersion          string
+		expectErrorMessage       string
+		includeModulePrereleases bool
 	}{
 		{
 			name:        "get latest version",
@@ -399,7 +400,7 @@ func TestLocalTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 			}
 
 			// Call the method
-			version, err := source.ResolveSemanticVersion(context.Background(), tc.wantVersion)
+			version, err := source.ResolveSemanticVersion(context.Background(), tc.wantVersion, tc.includeModulePrereleases)
 
 			// Verify results
 			if tc.expectErrorMessage != "" {
@@ -609,11 +610,12 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 
 	// Test cases
 	testCases := []struct {
-		name                string
-		wantVersion         *string
-		tokenGeneratorSetup func(*auth.MockSigningKeyManager)
-		expectedVersion     string
-		expectErrorMessage  string
+		name                     string
+		wantVersion              *string
+		tokenGeneratorSetup      func(*auth.MockSigningKeyManager)
+		expectedVersion          string
+		expectErrorMessage       string
+		includeModulePrereleases bool
 	}{
 		{
 			name: "get latest version",
@@ -667,7 +669,7 @@ func TestFederatedTharsisRegistrySource_ResolveSemanticVersion(t *testing.T) {
 			}
 
 			// Call the method
-			version, err := source.ResolveSemanticVersion(context.Background(), tc.wantVersion)
+			version, err := source.ResolveSemanticVersion(context.Background(), tc.wantVersion, tc.includeModulePrereleases)
 
 			// Verify results
 			if tc.expectErrorMessage != "" {
@@ -896,11 +898,12 @@ func TestGenericRegistrySource_ResolveSemanticVersion(t *testing.T) {
 
 	// Test cases
 	testCases := []struct {
-		name               string
-		wantVersion        *string
-		tokenGetterSetup   func() (string, error)
-		expectedVersion    string
-		expectErrorMessage string
+		name                     string
+		wantVersion              *string
+		tokenGetterSetup         func() (string, error)
+		expectedVersion          string
+		expectErrorMessage       string
+		includeModulePrereleases bool
 	}{
 		{
 			name: "get latest version",
@@ -963,7 +966,7 @@ func TestGenericRegistrySource_ResolveSemanticVersion(t *testing.T) {
 			}
 
 			// Call the method
-			version, err := source.ResolveSemanticVersion(context.Background(), tc.wantVersion)
+			version, err := source.ResolveSemanticVersion(context.Background(), tc.wantVersion, tc.includeModulePrereleases)
 
 			// Verify results
 			if tc.expectErrorMessage != "" {
@@ -1248,18 +1251,21 @@ func TestGetModuleByAddress(t *testing.T) {
 func TestGetLatestMatchingVersion(t *testing.T) {
 
 	versions := map[string]bool{
-		"0.0.1": true,
-		"0.0.2": true,
-		"0.0.3": true,
-		"2.1.0": true,
+		"0.0.1":       true,
+		"0.0.2":       true,
+		"0.0.3":       true,
+		"2.1.0":       true,
+		"2.2.0-beta1": true,
+		"3.0.0-rc.1":  true,
 	}
 
 	// Test cases:
 	tests := []struct {
-		expectError error
-		constraints *string
-		name        string
-		expected    string
+		expectError              error
+		constraints              *string
+		name                     string
+		expected                 string
+		includeModulePrereleases bool
 	}{
 		{
 			name:        "invalid range string",
@@ -1268,14 +1274,25 @@ func TestGetLatestMatchingVersion(t *testing.T) {
 			expectError: fmt.Errorf("failed to parse wanted version range string: malformed constraint: "),
 		},
 		{
-			name:        "no constraint, return latest of all",
+			name:        "no constraint, return latest stable",
 			constraints: nil,
 			expected:    "2.1.0",
 		},
 		{
-			name:        "exact match",
+			name:                     "no constraint, include prerelease returns latest prerelease",
+			constraints:              nil,
+			includeModulePrereleases: true,
+			expected:                 "3.0.0-rc.1",
+		},
+		{
+			name:        "exact match stable",
 			constraints: ptr.String("0.0.2"),
 			expected:    "0.0.2",
+		},
+		{
+			name:        "exact match prerelease without flag still returns it",
+			constraints: ptr.String("3.0.0-rc.1"),
+			expected:    "3.0.0-rc.1",
 		},
 		{
 			name:        "exact match but does not exist",
@@ -1309,6 +1326,12 @@ func TestGetLatestMatchingVersion(t *testing.T) {
 			expected:    "2.1.0",
 		},
 		{
+			name:                     "greater than with prerelease included",
+			constraints:              ptr.String("> 1.0"),
+			includeModulePrereleases: true,
+			expected:                 "3.0.0-rc.1",
+		},
+		{
 			name:        "between exclusive",
 			constraints: ptr.String("> 0.0.1 , < 0.0.3"),
 			expected:    "0.0.2",
@@ -1319,6 +1342,17 @@ func TestGetLatestMatchingVersion(t *testing.T) {
 			expected:    "0.0.3",
 		},
 		{
+			name:        "range covers prerelease, prerelease excluded by default",
+			constraints: ptr.String(">= 2.0.0 , < 3.0.0"),
+			expected:    "2.1.0",
+		},
+		{
+			name:                     "range covers prerelease, includeModulePrereleases selects it",
+			constraints:              ptr.String(">= 2.0.0 , < 3.0.0"),
+			includeModulePrereleases: true,
+			expected:                 "2.2.0-beta1",
+		},
+		{
 			name:        "contradictory",
 			constraints: ptr.String("< 0.0.1 , > 0.0.3"),
 			expected:    "nil",
@@ -1327,7 +1361,7 @@ func TestGetLatestMatchingVersion(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, err := getLatestMatchingVersion(versions, test.constraints)
+		got, err := getLatestMatchingVersion(versions, test.constraints, test.includeModulePrereleases)
 		assert.Equal(t, test.expectError, err)
 		if (err == nil) && (test.expectError == nil) {
 			// Don't report noise if there is or should have been an error.

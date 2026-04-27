@@ -128,6 +128,12 @@ input CreateRunInput {
   refresh: Boolean
   refreshOnly: Boolean
   speculative: Boolean
+  """
+  When true and moduleVersion is unset or a constraint range, prerelease module
+  versions are eligible to be selected as "latest". Defaults to false. Has no
+  effect when moduleVersion is an exact match. Requires moduleSource to be set.
+  """
+  includeModulePrereleases: Boolean
 }
 
 input ApplyRunInput {

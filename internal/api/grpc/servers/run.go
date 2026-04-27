@@ -147,17 +147,18 @@ func (s *RunServer) CreateRun(ctx context.Context, req *pb.CreateRunRequest) (*p
 	}
 
 	toCreate := &run.CreateRunInput{
-		WorkspaceID:            workspaceID,
-		ConfigurationVersionID: cvID,
-		IsDestroy:              req.IsDestroy,
-		TerraformVersion:       req.GetTerraformVersion(),
-		Speculative:            req.Speculative,
-		TargetAddresses:        req.TargetAddresses,
-		Refresh:                req.Refresh,
-		RefreshOnly:            req.RefreshOnly,
-		Variables:              variables,
-		ModuleSource:           req.ModuleSource,
-		ModuleVersion:          req.ModuleVersion,
+		WorkspaceID:              workspaceID,
+		ConfigurationVersionID:   cvID,
+		IsDestroy:                req.IsDestroy,
+		TerraformVersion:         req.GetTerraformVersion(),
+		Speculative:              req.Speculative,
+		TargetAddresses:          req.TargetAddresses,
+		Refresh:                  req.Refresh,
+		RefreshOnly:              req.RefreshOnly,
+		Variables:                variables,
+		ModuleSource:             req.ModuleSource,
+		ModuleVersion:            req.ModuleVersion,
+		IncludeModulePrereleases: req.GetIncludeModulePrereleases(),
 	}
 
 	createdRun, err := s.serviceCatalog.RunService.CreateRun(ctx, toCreate)
