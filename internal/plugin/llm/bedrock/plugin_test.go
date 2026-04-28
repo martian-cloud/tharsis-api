@@ -103,6 +103,21 @@ func TestNewPlugin_InvalidMaxTokens(t *testing.T) {
 	assert.Contains(t, err.Error(), "max_tokens")
 }
 
+func TestNewPlugin_InvalidTopK(t *testing.T) {
+	loader := func(_ context.Context, _ string) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+
+	_, err := newPlugin(context.Background(), map[string]string{
+		"region": "us-east-1",
+		"model":  "us.amazon.nova-pro-v1:0",
+		"top_k":  "not-a-number",
+	}, loader)
+
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "top_k")
+}
+
 func TestNewPlugin_ConfigLoaderError(t *testing.T) {
 	loader := func(_ context.Context, _ string) (aws.Config, error) {
 		return aws.Config{}, fmt.Errorf("aws config error")
