@@ -1,4 +1,4 @@
-FROM golang:1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa AS builder
+FROM golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1 AS builder
 
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
@@ -29,7 +29,7 @@ RUN make build-tharsis && \
     make build-job-executor && \
     make build-runner
 
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:e8a4044e0b4ae4257efa45fc026c0bc30ad320d43bd4c1a7d5271bd241e386d0 AS distroless-base
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:a9329520abc449e3b14d5bc3a6ffae065bdde0f02667fa10880c49b35c109fd1 AS distroless-base
 WORKDIR /app/
 
 FROM distroless-base AS tharsis
@@ -38,7 +38,7 @@ USER 65532:65532
 EXPOSE 8000
 CMD ["./apiserver"]
 
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS runner
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS runner
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
     git \
@@ -63,7 +63,7 @@ USER tharsis
 HEALTHCHECK NONE
 CMD ["./runner"]
 
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS job-executor
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS job-executor
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
     git \
