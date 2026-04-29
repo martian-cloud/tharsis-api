@@ -80,6 +80,8 @@ type JobDispatcher struct {
 	discoveryProtocolHosts []string
 	memoryRequest          resource.Quantity
 	memoryLimit            resource.Quantity
+	cpuRequest             resource.Quantity
+	cpuLimit               resource.Quantity
 	securityContext        *corev1.SecurityContext
 	nodeSelector           map[string]string
 	hostAliases            []corev1.HostAlias
@@ -191,6 +193,22 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		return nil, fmt.Errorf("failed to parse memory limit for runner jobs: %v", err)
 	}
 
+	var cpuRequest resource.Quantity
+	if cpuRequestStr, ok := pluginData["cpu_request"]; ok {
+		cpuRequest, err = resource.ParseQuantity(cpuRequestStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse cpu request for runner jobs: %v", err)
+		}
+	}
+
+	var cpuLimit resource.Quantity
+	if cpuLimitStr, ok := pluginData["cpu_limit"]; ok {
+		cpuLimit, err = resource.ParseQuantity(cpuLimitStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse cpu limit for runner jobs: %v", err)
+		}
+	}
+
 	discoveryProtocolHosts := []string{}
 
 	if discoveryProtocolHost != "" {
@@ -256,6 +274,8 @@ func New(ctx context.Context, pluginData map[string]string, discoveryProtocolHos
 		discoveryProtocolHosts: discoveryProtocolHosts,
 		memoryRequest:          memoryRequest,
 		memoryLimit:            memoryLimit,
+		cpuRequest:             cpuRequest,
+		cpuLimit:               cpuLimit,
 		nodeSelector:           nodeSelector,
 		extraAnnotations:       extraAnnotations,
 		labels:                 labels,
@@ -341,9 +361,11 @@ func (j *JobDispatcher) DispatchJob(ctx context.Context, jobID string, token str
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceMemory: j.memoryRequest,
+									corev1.ResourceCPU:    j.cpuRequest,
 								},
 								Limits: corev1.ResourceList{
 									corev1.ResourceMemory: j.memoryLimit,
+									corev1.ResourceCPU:    j.cpuLimit,
 								},
 							},
 						},
