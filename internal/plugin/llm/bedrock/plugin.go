@@ -63,6 +63,14 @@ func newPlugin(ctx context.Context, pluginData map[string]string, loader awsConf
 		opts = append(opts, WithMaxTokens(int32(i)))
 	}
 
+	if v, ok := pluginData["top_k"]; ok {
+		i, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid top_k value: %v", err)
+		}
+		opts = append(opts, WithTopK(int32(i)))
+	}
+
 	return New(cfg, opts...)
 }
 

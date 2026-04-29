@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
@@ -18,7 +19,7 @@ import (
 
 const (
 	defaultTemperature = 0
-	defaultMaxTokens   = 2048
+	defaultMaxTokens   = 4096
 )
 
 // structuredOutputModels lists Bedrock model ID prefixes that support
@@ -36,6 +37,7 @@ type Client struct {
 	systemPrompt string
 	temperature  *float32
 	maxTokens    *int32
+	topK         *int32
 }
 
 // Option is a functional option for configuring the Client.
@@ -59,6 +61,13 @@ func WithTemperature(temp float32) Option {
 func WithMaxTokens(maxTokens int32) Option {
 	return func(c *Client) {
 		c.maxTokens = &maxTokens
+	}
+}
+
+// WithTopK sets the top-K sampling parameter.
+func WithTopK(topK int32) Option {
+	return func(c *Client) {
+		c.topK = &topK
 	}
 }
 
@@ -91,6 +100,7 @@ type Session struct {
 	cfg             gollem.SessionConfig
 	temperature     float32
 	maxTokens       int32
+	topK            *int32
 }
 
 // NewSession creates a new Bedrock session.
@@ -131,6 +141,7 @@ func (c *Client) NewSession(_ context.Context, options ...gollem.SessionOption) 
 		tools:           bedrockTools,
 		temperature:     temperature,
 		maxTokens:       maxTokens,
+		topK:            c.topK,
 		historyMessages: historyMessages,
 		cfg:             cfg,
 	}
@@ -223,9 +234,19 @@ func (s *Session) Generate(ctx context.Context, input []gollem.Input, _ ...golle
 		inferenceConfig := &types.InferenceConfiguration{
 			Temperature: &s.temperature,
 			MaxTokens:   &s.maxTokens,
+			TopP:        ptr.Float32(1.0),
 		}
 
 		request.InferenceConfig = inferenceConfig
+
+		// Add top-K via additional model request fields (not in base InferenceConfiguration)
+		if s.topK != nil {
+			request.AdditionalModelRequestFields = document.NewLazyDocument(map[string]interface{}{
+				"inferenceConfig": map[string]interface{}{
+					"topK": *s.topK,
+				},
+			})
+		}
 
 		// Attach session ID to request metadata if available in context
 		if sessionID, ok := llm.SessionIDFromContext(ctx); ok {
@@ -257,8 +278,9 @@ func (s *Session) Generate(ctx context.Context, input []gollem.Input, _ ...golle
 		// Set trace data for defer
 		traceData = buildBedrockTraceData(newMessages, resp, s.model, s.cfg.SystemPrompt())
 
-		// Add assistant's response to history
-		if resp.Output != nil {
+		// Only add response to history if this is not an end turn since the gollem harness will automatically add
+		// the final response to the history
+		if resp.Output != nil && resp.StopReason != types.StopReasonEndTurn {
 			if msg, ok := resp.Output.(*types.ConverseOutputMemberMessage); ok {
 				s.historyMessages = append(s.historyMessages, types.Message{
 					Role:    types.ConversationRoleAssistant,
